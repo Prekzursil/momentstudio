@@ -38,10 +38,10 @@ Below is a structured checklist you can turn into issues.
 - [x] ANPC content: add bilingual ANPC/ADR info page including required links and consumer guidance.
 - [x] Consent tracking (DB): store acceptance records with doc key + version + timestamp + (user_id or order_id) + context (register/checkout).
 - [x] Registration gating: require legal consent checkbox(es) before allowing registration (UI + backend enforcement).
-- [ ] Checkout gating: require legal consent checkbox(es) before placing an order (guest + logged-in; UI + backend enforcement).
-- [ ] Consent UX: checkbox click opens a “read before accept” modal; require scrolling to bottom before enabling Accept.
-- [ ] Re-consent policy: force re-acceptance when legal docs change (by version) for both registration and checkout.
-- [ ] Tests: unit tests for publish enforcement + API validation; Playwright tests for modal gating and register/checkout blocking.
+- [x] Checkout gating: require legal consent checkbox(es) before placing an order (guest + logged-in; UI + backend enforcement).
+- [x] Consent UX: checkbox click opens a “read before accept” modal; require scrolling to bottom before enabling Accept.
+- [x] Re-consent policy: force re-acceptance when legal docs change (by version) for both registration and checkout.
+- [x] Tests: unit tests for publish enforcement + API validation; Playwright tests for modal gating and register/checkout blocking.
 
 ## Backend - Core & Auth
 - [x] Scaffold FastAPI app with versioned `/api/v1` router.

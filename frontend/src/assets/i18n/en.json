@@ -78,6 +78,21 @@
       "copy": "This page is available to signed-in customers only."
     }
   },
+  "legal": {
+    "consent": {
+      "loading": "Loading consent requirements…",
+      "required": "Please read and accept the Terms & Conditions and Privacy Policy."
+    },
+    "modal": {
+      "title": "Legal document",
+      "close": "Close",
+      "accept": "Accept",
+      "loading": "Loading…",
+      "scrollToAccept": "Scroll to the bottom to enable Accept.",
+      "missingDoc": "Missing document.",
+      "loadError": "Could not load the document. Please try again."
+    }
+  },
   "contact": {
     "title": "Contact",
     "metaTitle": "Contact | momentstudio",

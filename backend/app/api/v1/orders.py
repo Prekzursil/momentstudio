@@ -89,6 +89,8 @@ from app.services import notifications as notification_service
 from app.services import promo_usage
 from app.services import pricing
 from app.services import pii as pii_service
+from app.services import legal_consents as legal_consents_service
+from app.models.legal import LegalConsentContext
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -349,6 +351,12 @@ async def checkout(
     current_user=Depends(require_verified_email),
     session_id: str | None = Depends(cart_api.session_header),
 ) -> GuestCheckoutResponse:
+    required_versions = await legal_consents_service.required_doc_versions(session)
+    accepted_versions = await legal_consents_service.latest_accepted_versions(session, user_id=current_user.id)
+    needs_consent = not legal_consents_service.is_satisfied(required_versions, accepted_versions)
+    if needs_consent and (not payload.accept_terms or not payload.accept_privacy):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Legal consents required")
+
     user_cart = await cart_service.get_cart(session, current_user.id, session_id)
     if not user_cart.items:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty")
@@ -545,6 +553,16 @@ async def checkout(
         shipping_amount=totals.shipping,
         total_amount=totals.total,
     )
+    if needs_consent:
+        legal_consents_service.add_consent_records(
+            session,
+            context=LegalConsentContext.checkout,
+            required_versions=required_versions,
+            accepted_at=datetime.now(timezone.utc),
+            user_id=current_user.id,
+            order_id=order.id,
+        )
+        await session.commit()
     if applied_coupon:
         await coupons_service.reserve_coupon_for_order(
             session,
@@ -1212,6 +1230,10 @@ async def guest_checkout(
     if not cart.guest_email_verified_at or _normalize_email(cart.guest_email or "") != email:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email verification required")
 
+    required_versions = await legal_consents_service.required_doc_versions(session)
+    if not payload.accept_terms or not payload.accept_privacy:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Legal consents required")
+
     user_id = None
     customer_name = (payload.name or "").strip()
     if not customer_name:
@@ -1414,6 +1436,15 @@ async def guest_checkout(
         shipping_amount=totals.shipping,
         total_amount=totals.total,
     )
+    legal_consents_service.add_consent_records(
+        session,
+        context=LegalConsentContext.checkout,
+        required_versions=required_versions,
+        accepted_at=datetime.now(timezone.utc),
+        user_id=user_id,
+        order_id=order.id,
+    )
+    await session.commit()
 
     if (payment_method or "").strip().lower() == "cod":
         background_tasks.add_task(

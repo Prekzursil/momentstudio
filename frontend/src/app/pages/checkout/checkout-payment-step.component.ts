@@ -123,6 +123,53 @@ import { ButtonComponent } from '../../shared/button.component';
           />
         </div>
       </div>
+
+      <div class="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-200">
+        <div *ngIf="vm.legalConsentsLoading" class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+          <span class="inline-block h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-indigo-600 dark:border-slate-700 dark:border-t-indigo-300"></span>
+          <span>{{ 'legal.consent.loading' | translate }}</span>
+        </div>
+
+        <label class="flex items-start gap-2">
+          <input
+            type="checkbox"
+            [checked]="vm.acceptTerms"
+            [disabled]="vm.consentLocked || vm.legalConsentsLoading"
+            (click)="vm.onCheckoutConsentAttempt($event, 'terms')"
+            (keydown.space)="vm.onCheckoutConsentAttempt($event, 'terms')"
+          />
+          <span>
+            {{ 'auth.acceptTermsPrefix' | translate }}
+            <a
+              routerLink="/pages/terms-and-conditions"
+              class="text-indigo-600 dark:text-indigo-300 font-medium hover:underline"
+            >
+              {{ 'auth.acceptTermsLink' | translate }}
+            </a>
+          </span>
+        </label>
+
+        <label class="flex items-start gap-2">
+          <input
+            type="checkbox"
+            [checked]="vm.acceptPrivacy"
+            [disabled]="vm.consentLocked || vm.legalConsentsLoading"
+            (click)="vm.onCheckoutConsentAttempt($event, 'privacy')"
+            (keydown.space)="vm.onCheckoutConsentAttempt($event, 'privacy')"
+          />
+          <span>
+            {{ 'auth.acceptPrivacyPrefix' | translate }}
+            <a
+              routerLink="/pages/privacy-policy"
+              class="text-indigo-600 dark:text-indigo-300 font-medium hover:underline"
+            >
+              {{ 'auth.acceptPrivacyLink' | translate }}
+            </a>
+          </span>
+        </label>
+
+        <p *ngIf="vm.consentError" class="text-xs text-rose-700 dark:text-rose-300">{{ vm.consentError }}</p>
+      </div>
       <div *ngIf="vm.paymentNotReady" class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
         <span class="inline-block h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-indigo-600 dark:border-slate-700 dark:border-t-indigo-300"></span>
         <span>{{ 'checkout.paymentNotReady' | translate }}</span>
@@ -133,7 +180,7 @@ import { ButtonComponent } from '../../shared/button.component';
       <app-button
         [label]="vm.placing ? ('checkout.placingOrder' | translate) : ('checkout.placeOrder' | translate)"
         type="submit"
-        [disabled]="vm.placing || vm.cartSyncPending()"
+        [disabled]="vm.placing || vm.cartSyncPending() || vm.consentBlocking()"
       >
         <span
           *ngIf="vm.placing"

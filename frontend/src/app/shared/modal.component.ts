@@ -13,6 +13,13 @@ import {
 import { NgIf } from '@angular/common';
 import { ButtonComponent } from './button.component';
 
+export type ModalBodyScrollEvent = {
+  scrollTop: number;
+  scrollHeight: number;
+  clientHeight: number;
+  atBottom: boolean;
+};
+
 @Component({
   selector: 'app-modal',
   standalone: true,
@@ -29,20 +36,24 @@ import { ButtonComponent } from './button.component';
       >
         <div class="flex items-start justify-between gap-4 p-4 sm:p-6 pb-3 sm:pb-4 shrink-0">
           <div class="grid gap-1 min-w-0">
-            <div class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ title }}</div>
-            <div class="text-slate-600 text-sm dark:text-slate-300" *ngIf="subtitle">{{ subtitle }}</div>
-          </div>
-          <app-button variant="ghost" size="sm" [label]="closeLabel" (action)="close()"></app-button>
+          <div class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ title }}</div>
+          <div class="text-slate-600 text-sm dark:text-slate-300" *ngIf="subtitle">{{ subtitle }}</div>
         </div>
-        <div class="min-h-0 overflow-y-auto overflow-x-hidden px-4 sm:px-6 pb-4 sm:pb-6 text-sm text-slate-700 dark:text-slate-200">
-          <ng-content></ng-content>
-        </div>
-        <div class="flex justify-end gap-3 px-4 sm:px-6 py-3 sm:py-4 border-t border-slate-200 dark:border-slate-800 shrink-0" *ngIf="showActions">
-          <app-button variant="ghost" [label]="cancelLabel" (action)="close()"></app-button>
-          <app-button [label]="confirmLabel" (action)="confirm.emit()"></app-button>
-        </div>
+        <app-button variant="ghost" size="sm" [label]="closeLabel" (action)="close()"></app-button>
+      </div>
+      <div
+        #bodyRef
+        class="min-h-0 overflow-y-auto overflow-x-hidden px-4 sm:px-6 pb-4 sm:pb-6 text-sm text-slate-700 dark:text-slate-200"
+        (scroll)="emitBodyScroll()"
+      >
+        <ng-content></ng-content>
+      </div>
+      <div class="flex justify-end gap-3 px-4 sm:px-6 py-3 sm:py-4 border-t border-slate-200 dark:border-slate-800 shrink-0" *ngIf="showActions">
+        <app-button variant="ghost" [label]="cancelLabel" (action)="close()"></app-button>
+        <app-button [label]="confirmLabel" [disabled]="confirmDisabled" (action)="confirm.emit()"></app-button>
       </div>
     </div>
+  </div>
   `
 })
 export class ModalComponent implements AfterViewInit, OnChanges {
@@ -53,9 +64,12 @@ export class ModalComponent implements AfterViewInit, OnChanges {
   @Input() closeLabel = 'Close';
   @Input() cancelLabel = 'Cancel';
   @Input() confirmLabel = 'Confirm';
+  @Input() confirmDisabled = false;
   @Output() confirm = new EventEmitter<void>();
   @Output() closed = new EventEmitter<void>();
+  @Output() bodyScroll = new EventEmitter<ModalBodyScrollEvent>();
   @ViewChild('dialogRef') dialogRef?: ElementRef<HTMLDivElement>;
+  @ViewChild('bodyRef') bodyRef?: ElementRef<HTMLDivElement>;
   private previouslyFocused: HTMLElement | null = null;
 
   @HostListener('document:keydown.escape')
@@ -72,6 +86,7 @@ export class ModalComponent implements AfterViewInit, OnChanges {
 
   ngAfterViewInit(): void {
     this.focusDialog();
+    this.emitBodyScroll();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -81,6 +96,7 @@ export class ModalComponent implements AfterViewInit, OnChanges {
     if (next) {
       this.capturePreviousFocus();
       this.focusDialog();
+      setTimeout(() => this.emitBodyScroll());
       return;
     }
     if (prev) this.restorePreviousFocus();
@@ -90,6 +106,16 @@ export class ModalComponent implements AfterViewInit, OnChanges {
     this.open = false;
     this.closed.emit();
     this.restorePreviousFocus();
+  }
+
+  emitBodyScroll(): void {
+    const el = this.bodyRef?.nativeElement;
+    if (!el) return;
+    const scrollTop = el.scrollTop;
+    const clientHeight = el.clientHeight;
+    const scrollHeight = el.scrollHeight;
+    const atBottom = scrollTop + clientHeight >= scrollHeight - 8;
+    this.bodyScroll.emit({ scrollTop, clientHeight, scrollHeight, atBottom });
   }
 
   private focusDialog(): void {

@@ -78,6 +78,21 @@
       "copy": "Această pagină este disponibilă doar pentru utilizatorii autentificați."
     }
   },
+  "legal": {
+    "consent": {
+      "loading": "Se încarcă cerințele de consimțământ…",
+      "required": "Te rugăm să citești și să accepți Termenii și condițiile și Politica de confidențialitate."
+    },
+    "modal": {
+      "title": "Document legal",
+      "close": "Închide",
+      "accept": "Accept",
+      "loading": "Se încarcă…",
+      "scrollToAccept": "Derulează până jos pentru a activa Accept.",
+      "missingDoc": "Lipsește documentul.",
+      "loadError": "Nu am putut încărca documentul. Te rugăm să încerci din nou."
+    }
+  },
   "contact": {
     "title": "Contact",
     "metaTitle": "Contact | momentstudio",

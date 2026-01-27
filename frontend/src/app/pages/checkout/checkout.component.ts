@@ -23,6 +23,7 @@ import { ModalComponent } from '../../shared/modal.component';
 import { parseMoney } from '../../shared/money';
 import { CheckoutPrefsService } from '../../core/checkout-prefs.service';
 import { ImgFallbackDirective } from '../../shared/img-fallback.directive';
+import { LegalConsentModalComponent } from '../../shared/legal-consent-modal.component';
 import { CheckoutPaymentStepComponent } from './checkout-payment-step.component';
 import { CheckoutPromoStepComponent } from './checkout-promo-step.component';
 import { CheckoutShippingStepComponent } from './checkout-shipping-step.component';
@@ -93,6 +94,19 @@ type CheckoutSuccessSummary = {
   created_at: string;
 };
 
+type LegalConsentDocStatus = {
+  doc_key: string;
+  slug: string;
+  required_version: number;
+  accepted_version: number;
+  accepted: boolean;
+};
+
+type LegalConsentStatusResponse = {
+  docs: LegalConsentDocStatus[];
+  satisfied: boolean;
+};
+
 const CHECKOUT_SUCCESS_KEY = 'checkout_last_order';
 const CHECKOUT_PAYPAL_PENDING_KEY = 'checkout_paypal_pending';
 const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
@@ -122,6 +136,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
 		    LocalizedCurrencyPipe,
 		    TranslateModule,
 		    ModalComponent,
+        LegalConsentModalComponent,
 		    AddressFormComponent,
         CheckoutShippingStepComponent,
         CheckoutPromoStepComponent,
@@ -236,6 +251,13 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
           </div>
           </aside>
         </div>
+
+        <app-legal-consent-modal
+          [open]="consentModalOpen"
+          [slug]="consentModalSlug"
+          (accepted)="confirmConsentModal()"
+          (closed)="closeConsentModal()"
+        ></app-legal-consent-modal>
 
         <app-modal
           [open]="editSavedAddressOpen"
@@ -359,13 +381,21 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     postal: '',
     country: ''
   };
-  invoiceEnabled = false;
-  invoiceCompany = '';
-  invoiceVatId = '';
+	  invoiceEnabled = false;
+	  invoiceCompany = '';
+	  invoiceVatId = '';
+    acceptTerms = false;
+    acceptPrivacy = false;
+    consentLocked = false;
+    consentError = '';
+    legalConsentsLoading = false;
+    consentModalOpen = false;
+    consentModalSlug = '';
+    private consentModalTarget: 'terms' | 'privacy' | null = null;
 
-	  syncing = false;
-	  placing = false;
-	  paymentNotReady = false;
+		  syncing = false;
+		  placing = false;
+		  paymentNotReady = false;
 	  private paymentNotReadyTimer: ReturnType<typeof setTimeout> | null = null;
 	  paymentMethod: CheckoutPaymentMethod = 'cod';
 	  paypalEnabled = Boolean(appConfig.paypalEnabled);
@@ -1464,30 +1494,48 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
 	    }
     this.errorMessage = '';
     this.syncNotice = '';
-    if (!this.isPaymentMethodAvailable(this.paymentMethod)) {
-      this.showPaymentNotReady();
-      this.scrollToStep('checkout-step-4');
-      return;
-    }
-    this.checkoutPrefs.savePaymentMethod(this.paymentMethod);
-    this.placing = true;
-    if (this.auth.isAuthenticated()) {
-      this.submitCheckout();
-    } else {
+	    if (!this.isPaymentMethodAvailable(this.paymentMethod)) {
+	      this.showPaymentNotReady();
+	      this.scrollToStep('checkout-step-4');
+	      return;
+	    }
+      if (!this.validateLegalConsents()) {
+        this.scrollToStep('checkout-step-4');
+        this.announceAssertive(this.consentError);
+        return;
+      }
+	    this.checkoutPrefs.savePaymentMethod(this.paymentMethod);
+	    this.placing = true;
+	    if (this.auth.isAuthenticated()) {
+	      this.submitCheckout();
+	    } else {
       this.submitGuestCheckout();
     }
   }
 
-  retryValidation(): void {
-    this.errorMessage = '';
-    this.queueCartSync(this.items(), { immediate: true });
-  }
+	  retryValidation(): void {
+	    this.errorMessage = '';
+	    this.queueCartSync(this.items(), { immediate: true });
+	  }
 
-  private validateCart(forceRefresh = false): string | null {
-    const items = this.items();
-    const stockIssue = items.find((i) => i.quantity > i.stock);
-    if (stockIssue) {
-      return this.translate.instant('checkout.stockOnlyLeft', { count: stockIssue.stock, name: stockIssue.name });
+    private validateLegalConsents(): boolean {
+      this.consentError = '';
+      if (this.auth.isAuthenticated() && this.legalConsentsLoading) {
+        this.consentError = this.translate.instant('legal.consent.loading');
+        return false;
+      }
+      if (!this.acceptTerms || !this.acceptPrivacy) {
+        this.consentError = this.translate.instant('legal.consent.required');
+        return false;
+      }
+      return true;
+    }
+
+	  private validateCart(forceRefresh = false): string | null {
+	    const items = this.items();
+	    const stockIssue = items.find((i) => i.quantity > i.stock);
+	    if (stockIssue) {
+	      return this.translate.instant('checkout.stockOnlyLeft', { count: stockIssue.stock, name: stockIssue.name });
     }
     if (!items.length) return null;
     if (!this.pricesRefreshed || forceRefresh) {
@@ -1709,11 +1757,12 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       this.queueCartSync(items, { immediate: true });
     } else if (!this.auth.isAuthenticated()) {
       this.redirectToCartIfEmpty();
-    } else {
-      this.loadCartFromServer();
-    }
-    this.loadGuestEmailVerificationStatus();
-  }
+	    } else {
+	      this.loadCartFromServer();
+	    }
+	    this.loadGuestEmailVerificationStatus();
+      this.loadLegalConsentStatus();
+	  }
 
 	  ngOnDestroy(): void {
 	    if (this.syncDebounceHandle) {
@@ -1958,12 +2007,14 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       body['billing_region'] = this.billing.region || null;
       body['billing_postal_code'] = this.billing.postal;
       body['billing_country'] = this.billing.country || this.address.country || 'RO';
-    }
-    body['payment_method'] = this.paymentMethod;
-    this.api
-      .post<{
-        order_id: string;
-        reference_code?: string;
+	    }
+	    body['payment_method'] = this.paymentMethod;
+      body['accept_terms'] = this.acceptTerms;
+      body['accept_privacy'] = this.acceptPrivacy;
+	    this.api
+	      .post<{
+	        order_id: string;
+	        reference_code?: string;
         paypal_order_id?: string | null;
         paypal_approval_url?: string | null;
         stripe_session_id?: string | null;
@@ -2169,6 +2220,70 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       });
   }
 
+  private loadLegalConsentStatus(): void {
+    this.consentError = '';
+    if (!this.auth.isAuthenticated()) {
+      this.acceptTerms = false;
+      this.acceptPrivacy = false;
+      this.consentLocked = false;
+      this.legalConsentsLoading = false;
+      return;
+    }
+
+    this.legalConsentsLoading = true;
+    this.api
+      .get<LegalConsentStatusResponse>('/legal/consents/status', undefined, this.cartApi.headers())
+      .subscribe({
+        next: (res) => {
+          const docs = Array.isArray(res?.docs) ? res.docs : [];
+          const terms = docs.find((d) => d?.doc_key === 'page.terms-and-conditions');
+          const privacy = docs.find((d) => d?.doc_key === 'page.privacy-policy');
+          this.acceptTerms = Boolean(terms?.accepted);
+          this.acceptPrivacy = Boolean(privacy?.accepted);
+          this.consentLocked = Boolean(res?.satisfied);
+          this.legalConsentsLoading = false;
+        },
+        error: () => {
+          this.legalConsentsLoading = false;
+          // Best-effort. If this fails we still enforce on submit + backend.
+          this.acceptTerms = false;
+          this.acceptPrivacy = false;
+          this.consentLocked = false;
+        }
+      });
+  }
+
+  consentBlocking(): boolean {
+    if (this.auth.isAuthenticated() && this.legalConsentsLoading) return true;
+    return !this.acceptTerms || !this.acceptPrivacy;
+  }
+
+  onCheckoutConsentAttempt(event: Event, target: 'terms' | 'privacy'): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.consentError = '';
+    if (this.consentLocked) return;
+    if (this.legalConsentsLoading) return;
+    if (target === 'terms' && this.acceptTerms) return;
+    if (target === 'privacy' && this.acceptPrivacy) return;
+    this.consentModalTarget = target;
+    this.consentModalSlug = target === 'terms' ? 'terms-and-conditions' : 'privacy-policy';
+    this.consentModalOpen = true;
+  }
+
+  confirmConsentModal(): void {
+    if (this.consentModalTarget === 'terms') this.acceptTerms = true;
+    if (this.consentModalTarget === 'privacy') this.acceptPrivacy = true;
+    this.consentError = '';
+    this.closeConsentModal();
+  }
+
+  closeConsentModal(): void {
+    this.consentModalOpen = false;
+    this.consentModalSlug = '';
+    this.consentModalTarget = null;
+  }
+
   private submitGuestCheckout(): void {
     const preferredLanguage = (this.translate.currentLang || 'en') === 'ro' ? 'ro' : 'en';
     const payload: Record<string, unknown> = {
@@ -2192,6 +2307,8 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       shipping_method_id: null,
       save_address: this.saveAddress,
       payment_method: this.paymentMethod,
+      accept_terms: this.acceptTerms,
+      accept_privacy: this.acceptPrivacy,
       create_account: this.guestCreateAccount,
       courier: this.courier,
       delivery_type: this.deliveryType,

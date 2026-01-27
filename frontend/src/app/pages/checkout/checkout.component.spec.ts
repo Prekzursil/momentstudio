@@ -41,7 +41,24 @@ describe('CheckoutComponent', () => {
 
     apiService = jasmine.createSpyObj('ApiService', ['post', 'get']);
     apiService.post.and.returnValue(of({ order_id: 'order1', reference_code: 'REF', client_secret: 'pi_secret' }));
-    apiService.get.and.returnValue(of({ eligible: [], ineligible: [] }));
+    apiService.get.and.callFake((path: string) => {
+      if (path === '/legal/consents/status') {
+        return of({
+          docs: [
+            {
+              doc_key: 'page.terms-and-conditions',
+              slug: 'terms-and-conditions',
+              required_version: 1,
+              accepted_version: 1,
+              accepted: true
+            },
+            { doc_key: 'page.privacy-policy', slug: 'privacy-policy', required_version: 1, accepted_version: 1, accepted: true }
+          ],
+          satisfied: true
+        });
+      }
+      return of({ eligible: [], ineligible: [] });
+    });
 
     accountService = jasmine.createSpyObj('AccountService', ['getAddresses']);
     accountService.getAddresses.and.returnValue(of([]));
@@ -98,6 +115,8 @@ describe('CheckoutComponent', () => {
     expect(payload.promo_code).toBe('SAVE');
     expect(payload.save_address).toBeFalse();
     expect(payload.payment_method).toBe('cod');
+    expect(payload.accept_terms).toBeTrue();
+    expect(payload.accept_privacy).toBeTrue();
     expect(payload.billing_line1).toBeUndefined();
     expect(router.navigate).toHaveBeenCalledWith(['/checkout/success']);
   }));

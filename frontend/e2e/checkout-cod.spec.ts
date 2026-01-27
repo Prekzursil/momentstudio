@@ -3,6 +3,36 @@ import { test, expect, type APIRequestContext, type Page } from '@playwright/tes
 const OWNER_IDENTIFIER = process.env.E2E_OWNER_IDENTIFIER || 'owner';
 const OWNER_PASSWORD = process.env.E2E_OWNER_PASSWORD || 'Password123';
 
+async function acceptConsentIfNeeded(page: Page, checkboxIndex: number): Promise<void> {
+  const checkbox = page.locator('#checkout-step-4 input[type="checkbox"]').nth(checkboxIndex);
+  if (await checkbox.isChecked()) return;
+  if (!(await checkbox.isEnabled())) {
+    throw new Error(`Consent checkbox ${checkboxIndex} is disabled but not checked.`);
+  }
+
+  await checkbox.click();
+
+  const dialog = page.locator('div[role="dialog"][aria-modal="true"]').last();
+  const acceptButton = dialog.getByRole('button', { name: 'Accept' });
+  await expect(acceptButton).toBeDisabled();
+
+  const body = dialog.locator('div.overflow-y-auto').first();
+  await body.evaluate((el) => {
+    el.scrollTop = el.scrollHeight;
+    el.dispatchEvent(new Event('scroll'));
+  });
+
+  await expect(acceptButton).toBeEnabled();
+  await acceptButton.click();
+  await expect(dialog).toBeHidden();
+  await expect(checkbox).toBeChecked();
+}
+
+async function acceptCheckoutConsents(page: Page): Promise<void> {
+  await acceptConsentIfNeeded(page, 0);
+  await acceptConsentIfNeeded(page, 1);
+}
+
 async function loginUi(page: Page): Promise<void> {
   await page.goto('/login');
   await page.getByLabel('Email or username').fill(OWNER_IDENTIFIER);
@@ -109,6 +139,8 @@ test('cart → checkout → COD success', async ({ page, request }) => {
     await codOption.click();
   }
 
+  await expect(page.getByRole('button', { name: 'Place order' })).toBeDisabled();
+  await acceptCheckoutConsents(page);
   await expect(page.getByRole('button', { name: 'Place order' })).toBeEnabled();
   await page.getByRole('button', { name: 'Place order' }).click();
 

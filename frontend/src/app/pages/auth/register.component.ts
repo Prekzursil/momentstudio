@@ -15,6 +15,7 @@ import { type CountryCode } from 'libphonenumber-js';
 import { buildE164, listPhoneCountries, splitE164, type PhoneCountryOption } from '../../shared/phone';
 import { missingRequiredProfileFields } from '../../shared/profile-requirements';
 import { appConfig } from '../../core/app-config';
+import { LegalConsentModalComponent } from '../../shared/legal-consent-modal.component';
 
 @Component({
   selector: 'app-register',
@@ -28,7 +29,8 @@ import { appConfig } from '../../core/app-config';
     BreadcrumbComponent,
     CaptchaTurnstileComponent,
     PasswordStrengthComponent,
-    TranslateModule
+    TranslateModule,
+    LegalConsentModalComponent
   ],
   template: `
     <app-container classes="py-10 grid gap-6 max-w-xl">
@@ -268,28 +270,44 @@ import { appConfig } from '../../core/app-config';
           </div>
 
           <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
-            <div class="grid gap-1">
-              <label class="flex items-start gap-2">
-                <input #acceptTermsCtrl="ngModel" type="checkbox" name="acceptTerms" required [(ngModel)]="acceptTerms" />
-                <span>
-                  {{ 'auth.acceptTermsPrefix' | translate }}
-                  <a routerLink="/pages/terms-and-conditions" class="text-indigo-600 dark:text-indigo-300 font-medium">{{
-                    'auth.acceptTermsLink' | translate
+	            <div class="grid gap-1">
+	              <label class="flex items-start gap-2">
+	                <input
+	                  #acceptTermsCtrl="ngModel"
+	                  type="checkbox"
+	                  name="acceptTerms"
+	                  required
+	                  [(ngModel)]="acceptTerms"
+	                  (click)="onConsentAttempt($event, 'terms')"
+	                  (keydown.space)="onConsentAttempt($event, 'terms')"
+	                />
+	                <span>
+	                  {{ 'auth.acceptTermsPrefix' | translate }}
+	                  <a routerLink="/pages/terms-and-conditions" class="text-indigo-600 dark:text-indigo-300 font-medium">{{
+	                    'auth.acceptTermsLink' | translate
                   }}</a>
                 </span>
               </label>
               <span *ngIf="acceptTermsCtrl.touched && acceptTermsCtrl.invalid" class="text-xs font-normal text-rose-700 dark:text-rose-300">
                 {{ 'validation.required' | translate }}
               </span>
-            </div>
-
-            <div class="grid gap-1">
-              <label class="flex items-start gap-2">
-                <input #acceptPrivacyCtrl="ngModel" type="checkbox" name="acceptPrivacy" required [(ngModel)]="acceptPrivacy" />
-                <span>
-                  {{ 'auth.acceptPrivacyPrefix' | translate }}
-                  <a routerLink="/pages/privacy-policy" class="text-indigo-600 dark:text-indigo-300 font-medium">{{
-                    'auth.acceptPrivacyLink' | translate
+	            </div>
+	
+	            <div class="grid gap-1">
+	              <label class="flex items-start gap-2">
+	                <input
+	                  #acceptPrivacyCtrl="ngModel"
+	                  type="checkbox"
+	                  name="acceptPrivacy"
+	                  required
+	                  [(ngModel)]="acceptPrivacy"
+	                  (click)="onConsentAttempt($event, 'privacy')"
+	                  (keydown.space)="onConsentAttempt($event, 'privacy')"
+	                />
+	                <span>
+	                  {{ 'auth.acceptPrivacyPrefix' | translate }}
+	                  <a routerLink="/pages/privacy-policy" class="text-indigo-600 dark:text-indigo-300 font-medium">{{
+	                    'auth.acceptPrivacyLink' | translate
                   }}</a>
                 </span>
               </label>
@@ -315,10 +333,17 @@ import { appConfig } from '../../core/app-config';
               [disabled]="loading"
             ></app-button>
           </div>
-        </ng-container>
-      </form>
-    </app-container>
-  `
+	        </ng-container>
+	      </form>
+
+      <app-legal-consent-modal
+        [open]="consentModalOpen"
+        [slug]="consentModalSlug"
+        (accepted)="confirmConsentModal()"
+        (closed)="closeConsentModal()"
+      ></app-legal-consent-modal>
+	    </app-container>
+	  `
 })
 export class RegisterComponent implements OnInit, OnDestroy {
   crumbs = [
@@ -346,6 +371,9 @@ export class RegisterComponent implements OnInit, OnDestroy {
   countries: PhoneCountryOption[] = [];
   acceptTerms = false;
   acceptPrivacy = false;
+  consentModalOpen = false;
+  consentModalSlug = '';
+  private consentModalTarget: 'terms' | 'privacy' | null = null;
   error = '';
   loading = false;
   private googleCompletionToken: string | null = null;
@@ -402,6 +430,29 @@ export class RegisterComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.langSub?.unsubscribe();
+  }
+
+  onConsentAttempt(event: Event, target: 'terms' | 'privacy'): void {
+    event.preventDefault();
+    event.stopPropagation();
+    if (this.loading) return;
+    if (target === 'terms' && this.acceptTerms) return;
+    if (target === 'privacy' && this.acceptPrivacy) return;
+    this.consentModalTarget = target;
+    this.consentModalSlug = target === 'terms' ? 'terms-and-conditions' : 'privacy-policy';
+    this.consentModalOpen = true;
+  }
+
+  confirmConsentModal(): void {
+    if (this.consentModalTarget === 'terms') this.acceptTerms = true;
+    if (this.consentModalTarget === 'privacy') this.acceptPrivacy = true;
+    this.closeConsentModal();
+  }
+
+  closeConsentModal(): void {
+    this.consentModalOpen = false;
+    this.consentModalSlug = '';
+    this.consentModalTarget = null;
   }
 
   displayNamePreview(): string {
