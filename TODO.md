@@ -436,8 +436,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Blog list: reading meta – Show author, publish date, and reading time more prominently on cards.
 - [x] Blog list: RSS/Atom feed – Provide `/blog/rss.xml` (and/or Atom) with latest posts and translations.
 - [x] Blog list: JSON feed – Provide `/blog/feed.json` for integrations and modern feed readers.
-- [ ] Blog post: typography refresh – Better line length, font sizes, headings, and spacing for a more premium look.
-- [ ] Blog post: reading progress – Add a top progress bar and “Back to top” affordance.
+- [x] Blog post: typography refresh – Better line length, font sizes, headings, and spacing for a more premium look.
+- [x] Blog post: reading progress – Add a top progress bar and “Back to top” affordance.
 - [ ] Blog post: table of contents – Auto-generate TOC from headings with scroll-spy and anchor links.
 - [ ] Blog post: heading permalinks – Add link icons on headings for easy sharing of sections.
 - [ ] Blog post: next/previous nav – Add “Next post / Previous post” navigation at the bottom.

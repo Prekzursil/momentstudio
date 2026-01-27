@@ -90,6 +90,38 @@
   .markdown blockquote {
     @apply my-4 border-l-4 border-slate-200 pl-4 italic text-slate-700 dark:border-slate-700 dark:text-slate-200;
   }
+
+  .blog-markdown {
+    @apply text-[1.05rem] leading-8 tracking-[-0.01em];
+  }
+
+  .blog-markdown p {
+    @apply my-4;
+  }
+
+  .blog-markdown h1 {
+    @apply mt-10 mb-4 text-3xl font-semibold text-slate-900 dark:text-slate-50;
+  }
+
+  .blog-markdown h2 {
+    @apply mt-9 mb-3 text-2xl font-semibold text-slate-900 dark:text-slate-50;
+  }
+
+  .blog-markdown h3 {
+    @apply mt-7 mb-2 text-xl font-semibold text-slate-900 dark:text-slate-50;
+  }
+
+  .blog-markdown hr {
+    @apply my-8 border-slate-200 dark:border-slate-800;
+  }
+
+  .blog-markdown img {
+    @apply my-6 rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900;
+  }
+
+  .blog-markdown blockquote {
+    @apply my-6 border-l-4 border-slate-200 pl-5 text-slate-700 dark:border-slate-700 dark:text-slate-200;
+  }
 }
 
 @layer utilities {

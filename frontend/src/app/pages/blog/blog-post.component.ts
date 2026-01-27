@@ -1,5 +1,5 @@
 import { CommonModule, DOCUMENT } from '@angular/common';
-import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Meta, Title } from '@angular/platform-browser';
@@ -33,6 +33,21 @@ import { formatIdentity } from '../../shared/user-identity';
     SkeletonComponent
   ],
   template: `
+    <div
+      *ngIf="post()"
+      class="fixed left-0 right-0 top-0 z-[110] h-1 bg-transparent"
+      role="progressbar"
+      [attr.aria-label]="'blog.post.progressLabel' | translate"
+      [attr.aria-valuemin]="0"
+      [attr.aria-valuemax]="100"
+      [attr.aria-valuenow]="progressPercent()"
+    >
+      <div
+        class="h-full bg-indigo-600 dark:bg-indigo-300 transition-[width] duration-100"
+        [style.width.%]="progressPercent()"
+      ></div>
+    </div>
+
     <app-container classes="py-10 grid gap-6 max-w-4xl">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
 
@@ -90,18 +105,25 @@ import { formatIdentity } from '../../shared/user-identity';
 
       <div *ngIf="!loadingPost() && !hasPostError() && post()">
         <app-card>
-          <div class="grid gap-6">
+          <div #articleContent class="grid gap-6">
             <img
               *ngIf="post()!.cover_image_url"
               [src]="post()!.cover_image_url"
               [alt]="post()!.title"
-              class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
+              class="w-full aspect-[16/9] rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
               loading="lazy"
             />
-            <div class="markdown text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="bodyHtml()"></div>
-            <a routerLink="/blog" class="text-sm font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200">
-              ← {{ 'blog.post.backToBlog' | translate }}
-            </a>
+            <div class="mx-auto w-full max-w-[72ch]">
+              <div class="markdown blog-markdown text-slate-700 dark:text-slate-200" [innerHTML]="bodyHtml()"></div>
+            </div>
+            <div class="mx-auto w-full max-w-[72ch]">
+              <a
+                routerLink="/blog"
+                class="text-sm font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200"
+              >
+                ← {{ 'blog.post.backToBlog' | translate }}
+              </a>
+            </div>
           </div>
         </app-card>
       </div>
@@ -283,6 +305,16 @@ import { formatIdentity } from '../../shared/user-identity';
         </app-card>
       </section>
     </app-container>
+
+    <button
+      *ngIf="showBackToTop()"
+      type="button"
+      class="fixed bottom-6 right-6 z-50 h-11 w-11 rounded-full bg-slate-900 text-white shadow-soft hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+      (click)="scrollToTop()"
+      [attr.aria-label]="'blog.post.backToTop' | translate"
+    >
+      ↑
+    </button>
   `
 })
 export class BlogPostComponent implements OnInit, OnDestroy {
@@ -306,6 +338,11 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   submitting = signal<boolean>(false);
   replyTo = signal<BlogComment | null>(null);
   isPreview = signal<boolean>(false);
+  readingProgress = signal<number>(0);
+  showBackToTop = signal<boolean>(false);
+  progressPercent = computed(() => Math.round(this.readingProgress() * 100));
+
+  @ViewChild('articleContent') articleContent?: ElementRef<HTMLElement>;
 
   private slug = '';
   private previewToken = '';
@@ -313,6 +350,10 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   private routeSub?: Subscription;
   private canonicalEl?: HTMLLinkElement;
   private document: Document = inject(DOCUMENT);
+  private scrollStartY = 0;
+  private scrollEndY = 1;
+  private scrollListener = () => this.updateReadingProgress();
+  private resizeListener = () => this.measureReadingProgressSoon();
 
   constructor(
     private blog: BlogService,
@@ -333,11 +374,22 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       this.load();
     });
     this.langSub = this.translate.onLangChange.subscribe(() => this.load());
+
+    const w = this.document?.defaultView;
+    if (w) {
+      w.addEventListener('scroll', this.scrollListener, { passive: true });
+      w.addEventListener('resize', this.resizeListener);
+    }
   }
 
   ngOnDestroy(): void {
     this.langSub?.unsubscribe();
     this.routeSub?.unsubscribe();
+    const w = this.document?.defaultView;
+    if (w) {
+      w.removeEventListener('scroll', this.scrollListener);
+      w.removeEventListener('resize', this.resizeListener);
+    }
   }
 
   load(): void {
@@ -345,6 +397,10 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     this.loadingPost.set(true);
     this.hasPostError.set(false);
     this.post.set(null);
+    this.readingProgress.set(0);
+    this.showBackToTop.set(false);
+    this.scrollStartY = 0;
+    this.scrollEndY = 1;
     this.setCanonical();
 
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
@@ -363,6 +419,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
           { label: post.title }
         ];
         this.setMetaTags(post);
+        this.measureReadingProgressSoon();
         this.loadComments();
       },
       error: () => {
@@ -371,9 +428,17 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         this.loadingPost.set(false);
         this.hasPostError.set(true);
         this.setErrorMetaTags();
+        this.readingProgress.set(0);
+        this.showBackToTop.set(false);
         this.comments.set([]);
       }
     });
+  }
+
+  scrollToTop(): void {
+    const w = this.document?.defaultView;
+    if (!w) return;
+    w.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   loadComments(): void {
@@ -535,5 +600,44 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     link.setAttribute('href', href);
     this.canonicalEl = link;
     this.meta.updateTag({ property: 'og:url', content: href });
+  }
+
+  private measureReadingProgressSoon(): void {
+    const w = this.document?.defaultView;
+    if (!w) return;
+    w.requestAnimationFrame(() => {
+      this.measureReadingProgress();
+      this.updateReadingProgress();
+    });
+  }
+
+  private measureReadingProgress(): void {
+    const w = this.document?.defaultView;
+    const el = this.articleContent?.nativeElement;
+    if (!w || !el) return;
+    const rect = el.getBoundingClientRect();
+    const scrollTop = w.scrollY || this.document.documentElement.scrollTop || 0;
+    const start = rect.top + scrollTop;
+    const end = rect.bottom + scrollTop - w.innerHeight;
+    this.scrollStartY = start;
+    this.scrollEndY = Math.max(start + 1, end);
+  }
+
+  private updateReadingProgress(): void {
+    const w = this.document?.defaultView;
+    if (!w) return;
+    if (!this.articleContent?.nativeElement) {
+      this.readingProgress.set(0);
+      this.showBackToTop.set(false);
+      return;
+    }
+    if (!this.scrollEndY || this.scrollEndY <= this.scrollStartY + 1) {
+      this.measureReadingProgress();
+    }
+    const scrollTop = w.scrollY || 0;
+    const raw = (scrollTop - this.scrollStartY) / (this.scrollEndY - this.scrollStartY);
+    const progress = Math.min(1, Math.max(0, raw));
+    this.readingProgress.set(progress);
+    this.showBackToTop.set(scrollTop > this.scrollStartY + 600);
   }
 }

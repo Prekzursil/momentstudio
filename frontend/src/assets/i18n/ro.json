@@ -833,6 +833,8 @@
     "post": {
       "breadcrumb": "Articol",
       "backToBlog": "Înapoi la blog",
+      "backToTop": "Înapoi sus",
+      "progressLabel": "Progres de citire",
       "loadingTitle": "Se încarcă…",
       "errorTitle": "Nu am putut încărca acest articol.",
       "errorCopy": "Încearcă din nou în câteva momente.",

@@ -833,6 +833,8 @@
     "post": {
       "breadcrumb": "Post",
       "backToBlog": "Back to blog",
+      "backToTop": "Back to top",
+      "progressLabel": "Reading progress",
       "loadingTitle": "Loading…",
       "errorTitle": "Could not load this post.",
       "errorCopy": "Please try again in a moment.",
