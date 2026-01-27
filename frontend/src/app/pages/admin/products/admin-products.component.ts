@@ -35,6 +35,7 @@ import { AdminRecentService } from '../../../core/admin-recent.service';
 import { ToastService } from '../../../core/toast.service';
 import { AuthService } from '../../../core/auth.service';
 import { AdminFavoriteItem, AdminFavoritesService } from '../../../core/admin-favorites.service';
+import { AdminUiPrefsService } from '../../../core/admin-ui-prefs.service';
 import {
   AdminTableLayoutV1,
   adminTableCellPaddingClass,
@@ -1057,240 +1058,254 @@ type PriceHistoryChart = {
 	            </div>
 	          </div>
           <app-input [label]="'adminUi.products.table.stock' | translate" type="number" [(value)]="form.stock_quantity"></app-input>
-          <app-input
-            [label]="'adminUi.lowStock.thresholdLabel' | translate"
-            [hint]="'adminUi.lowStock.thresholdHint' | translate"
-            type="number"
-            [(value)]="form.low_stock_threshold"
-          ></app-input>
+          <details
+            class="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+            [open]="uiPrefs.mode() === 'advanced'"
+          >
+            <summary class="cursor-pointer select-none text-sm font-semibold text-slate-900 dark:text-slate-50">
+              {{ 'adminUi.products.form.advancedSettings' | translate }}
+            </summary>
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              {{ 'adminUi.products.form.advancedHint' | translate }}
+            </p>
 
-          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-            {{ 'adminUi.products.table.status' | translate }}
-            <select
-              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-              [(ngModel)]="form.status"
-            >
-              <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
-              <option value="published">{{ 'adminUi.status.published' | translate }}</option>
-              <option value="archived">{{ 'adminUi.status.archived' | translate }}</option>
-            </select>
-          </label>
-
-          <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
-            <input type="checkbox" [(ngModel)]="form.is_active" />
-            {{ 'adminUi.products.form.active' | translate }}
-          </label>
-
-          <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
-            <input type="checkbox" [(ngModel)]="form.is_featured" />
-            {{ 'adminUi.products.form.featured' | translate }}
-          </label>
-
-	          <app-input
-              [label]="'adminUi.products.form.sku' | translate"
-              [value]="form.sku"
-              (valueChange)="onSkuChange($event)"
-            ></app-input>
-
-	          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	            {{ 'adminUi.products.form.publishAt' | translate }}
-	            <input
-              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-              type="datetime-local"
-              [(ngModel)]="form.publish_at"
-            />
-          </label>
-
-          <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-            <input type="checkbox" [(ngModel)]="form.is_bestseller" />
-            {{ 'adminUi.products.form.bestseller' | translate }}
-          </label>
-
-          <div class="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                {{ 'adminUi.products.badges.title' | translate }}
-              </p>
-              <span class="text-xs text-slate-500 dark:text-slate-400">
-                {{ 'adminUi.products.badges.hint' | translate }}
-              </span>
-            </div>
-
-            <div class="mt-3 grid gap-4">
-              <div class="grid gap-3 md:grid-cols-3 items-end">
-                <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
-                  <input type="checkbox" [(ngModel)]="form.badges.new.enabled" />
-                  {{ 'adminUi.products.badges.new' | translate }}
-                </label>
-
-                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  {{ 'adminUi.products.badges.startAt' | translate }}
-                  <input
-                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    type="datetime-local"
-                    [(ngModel)]="form.badges.new.start_at"
-                    [disabled]="!form.badges.new.enabled"
-                  />
-                </label>
-
-                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  {{ 'adminUi.products.badges.endAt' | translate }}
-                  <input
-                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    type="datetime-local"
-                    [(ngModel)]="form.badges.new.end_at"
-                    [disabled]="!form.badges.new.enabled"
-                  />
-                </label>
-              </div>
-
-              <div class="grid gap-3 md:grid-cols-3 items-end">
-                <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
-                  <input type="checkbox" [(ngModel)]="form.badges.limited.enabled" />
-                  {{ 'adminUi.products.badges.limited' | translate }}
-                </label>
-
-                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  {{ 'adminUi.products.badges.startAt' | translate }}
-                  <input
-                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    type="datetime-local"
-                    [(ngModel)]="form.badges.limited.start_at"
-                    [disabled]="!form.badges.limited.enabled"
-                  />
-                </label>
-
-                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  {{ 'adminUi.products.badges.endAt' | translate }}
-                  <input
-                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    type="datetime-local"
-                    [(ngModel)]="form.badges.limited.end_at"
-                    [disabled]="!form.badges.limited.enabled"
-                  />
-                </label>
-              </div>
-
-              <div class="grid gap-3 md:grid-cols-3 items-end">
-                <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
-                  <input type="checkbox" [(ngModel)]="form.badges.handmade.enabled" />
-                  {{ 'adminUi.products.badges.handmade' | translate }}
-                </label>
-
-                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  {{ 'adminUi.products.badges.startAt' | translate }}
-                  <input
-                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    type="datetime-local"
-                    [(ngModel)]="form.badges.handmade.start_at"
-                    [disabled]="!form.badges.handmade.enabled"
-                  />
-                </label>
-
-                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  {{ 'adminUi.products.badges.endAt' | translate }}
-                  <input
-                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    type="datetime-local"
-                    [(ngModel)]="form.badges.handmade.end_at"
-                    [disabled]="!form.badges.handmade.enabled"
-                  />
-                </label>
-              </div>
-            </div>
-          </div>
-
-          <div class="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                {{ 'adminUi.products.shipping.title' | translate }}
-              </p>
-              <span class="text-xs text-slate-500 dark:text-slate-400">
-                {{ 'adminUi.products.shipping.hint' | translate }}
-              </span>
-            </div>
-
-            <div class="mt-3 grid gap-3 md:grid-cols-4 items-end">
+            <div class="mt-3 grid gap-3 md:grid-cols-2">
               <app-input
-                [label]="'adminUi.products.shipping.weight' | translate"
+                [label]="'adminUi.lowStock.thresholdLabel' | translate"
+                [hint]="'adminUi.lowStock.thresholdHint' | translate"
                 type="number"
-                inputMode="numeric"
-                [value]="form.weight_grams"
-                (valueChange)="form.weight_grams = String($event ?? '')"
-                [min]="0"
-                [hint]="'adminUi.products.shipping.weightUnit' | translate"
+                [(value)]="form.low_stock_threshold"
               ></app-input>
 
-              <app-input
-                [label]="'adminUi.products.shipping.width' | translate"
-                type="number"
-                inputMode="decimal"
-                [value]="form.width_cm"
-                (valueChange)="form.width_cm = String($event ?? '')"
-                [min]="0"
-                [step]="0.01"
-                [hint]="'adminUi.products.shipping.cm' | translate"
-              ></app-input>
-
-              <app-input
-                [label]="'adminUi.products.shipping.height' | translate"
-                type="number"
-                inputMode="decimal"
-                [value]="form.height_cm"
-                (valueChange)="form.height_cm = String($event ?? '')"
-                [min]="0"
-                [step]="0.01"
-                [hint]="'adminUi.products.shipping.cm' | translate"
-              ></app-input>
-
-              <app-input
-                [label]="'adminUi.products.shipping.depth' | translate"
-                type="number"
-                inputMode="decimal"
-                [value]="form.depth_cm"
-                (valueChange)="form.depth_cm = String($event ?? '')"
-                [min]="0"
-                [step]="0.01"
-                [hint]="'adminUi.products.shipping.cm' | translate"
-              ></app-input>
-            </div>
-
-            <div class="mt-3 grid gap-3 md:grid-cols-3 items-end">
               <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.products.shipping.classLabel' | translate }}
+                {{ 'adminUi.products.table.status' | translate }}
                 <select
                   class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="form.shipping_class"
+                  [(ngModel)]="form.status"
                 >
-                  <option value="standard">{{ 'adminUi.products.shipping.class.standard' | translate }}</option>
-                  <option value="bulky">{{ 'adminUi.products.shipping.class.bulky' | translate }}</option>
-                  <option value="oversize">{{ 'adminUi.products.shipping.class.oversize' | translate }}</option>
+                  <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
+                  <option value="published">{{ 'adminUi.status.published' | translate }}</option>
+                  <option value="archived">{{ 'adminUi.status.archived' | translate }}</option>
                 </select>
               </label>
 
               <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
-                <input type="checkbox" [(ngModel)]="form.shipping_allow_locker" />
-                {{ 'adminUi.products.shipping.allowLocker' | translate }}
+                <input type="checkbox" [(ngModel)]="form.is_active" />
+                {{ 'adminUi.products.form.active' | translate }}
               </label>
 
-              <div class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                <span>{{ 'adminUi.products.shipping.disallowedCouriers' | translate }}</span>
-                <div class="flex flex-wrap items-center gap-4 text-sm font-normal text-slate-700 dark:text-slate-200">
-                  <label class="inline-flex items-center gap-2">
-                    <input type="checkbox" [(ngModel)]="form.shipping_disallowed_couriers.sameday" />
-                    {{ 'adminUi.products.shipping.courier.sameday' | translate }}
-                  </label>
-                  <label class="inline-flex items-center gap-2">
-                    <input type="checkbox" [(ngModel)]="form.shipping_disallowed_couriers.fan_courier" />
-                    {{ 'adminUi.products.shipping.courier.fan_courier' | translate }}
-                  </label>
-                </div>
-                <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
-                  {{ 'adminUi.products.shipping.disallowedHint' | translate }}
+              <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
+                <input type="checkbox" [(ngModel)]="form.is_featured" />
+                {{ 'adminUi.products.form.featured' | translate }}
+              </label>
+
+              <app-input
+                [label]="'adminUi.products.form.sku' | translate"
+                [value]="form.sku"
+                (valueChange)="onSkuChange($event)"
+              ></app-input>
+
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.products.form.publishAt' | translate }}
+                <input
+                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  type="datetime-local"
+                  [(ngModel)]="form.publish_at"
+                />
+              </label>
+
+              <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                <input type="checkbox" [(ngModel)]="form.is_bestseller" />
+                {{ 'adminUi.products.form.bestseller' | translate }}
+              </label>
+            </div>
+
+            <div class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.products.badges.title' | translate }}
+                </p>
+                <span class="text-xs text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.products.badges.hint' | translate }}
                 </span>
               </div>
+
+              <div class="mt-3 grid gap-4">
+                <div class="grid gap-3 md:grid-cols-3 items-end">
+                  <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
+                    <input type="checkbox" [(ngModel)]="form.badges.new.enabled" />
+                    {{ 'adminUi.products.badges.new' | translate }}
+                  </label>
+
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'adminUi.products.badges.startAt' | translate }}
+                    <input
+                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      type="datetime-local"
+                      [(ngModel)]="form.badges.new.start_at"
+                      [disabled]="!form.badges.new.enabled"
+                    />
+                  </label>
+
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'adminUi.products.badges.endAt' | translate }}
+                    <input
+                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      type="datetime-local"
+                      [(ngModel)]="form.badges.new.end_at"
+                      [disabled]="!form.badges.new.enabled"
+                    />
+                  </label>
+                </div>
+
+                <div class="grid gap-3 md:grid-cols-3 items-end">
+                  <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
+                    <input type="checkbox" [(ngModel)]="form.badges.limited.enabled" />
+                    {{ 'adminUi.products.badges.limited' | translate }}
+                  </label>
+
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'adminUi.products.badges.startAt' | translate }}
+                    <input
+                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      type="datetime-local"
+                      [(ngModel)]="form.badges.limited.start_at"
+                      [disabled]="!form.badges.limited.enabled"
+                    />
+                  </label>
+
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'adminUi.products.badges.endAt' | translate }}
+                    <input
+                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      type="datetime-local"
+                      [(ngModel)]="form.badges.limited.end_at"
+                      [disabled]="!form.badges.limited.enabled"
+                    />
+                  </label>
+                </div>
+
+                <div class="grid gap-3 md:grid-cols-3 items-end">
+                  <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
+                    <input type="checkbox" [(ngModel)]="form.badges.handmade.enabled" />
+                    {{ 'adminUi.products.badges.handmade' | translate }}
+                  </label>
+
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'adminUi.products.badges.startAt' | translate }}
+                    <input
+                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      type="datetime-local"
+                      [(ngModel)]="form.badges.handmade.start_at"
+                      [disabled]="!form.badges.handmade.enabled"
+                    />
+                  </label>
+
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'adminUi.products.badges.endAt' | translate }}
+                    <input
+                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      type="datetime-local"
+                      [(ngModel)]="form.badges.handmade.end_at"
+                      [disabled]="!form.badges.handmade.enabled"
+                    />
+                  </label>
+                </div>
+              </div>
             </div>
-          </div>
+
+            <div class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.products.shipping.title' | translate }}
+                </p>
+                <span class="text-xs text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.products.shipping.hint' | translate }}
+                </span>
+              </div>
+
+              <div class="mt-3 grid gap-3 md:grid-cols-4 items-end">
+                <app-input
+                  [label]="'adminUi.products.shipping.weight' | translate"
+                  type="number"
+                  inputMode="numeric"
+                  [value]="form.weight_grams"
+                  (valueChange)="form.weight_grams = String($event ?? '')"
+                  [min]="0"
+                  [hint]="'adminUi.products.shipping.weightUnit' | translate"
+                ></app-input>
+
+                <app-input
+                  [label]="'adminUi.products.shipping.width' | translate"
+                  type="number"
+                  inputMode="decimal"
+                  [value]="form.width_cm"
+                  (valueChange)="form.width_cm = String($event ?? '')"
+                  [min]="0"
+                  [step]="0.01"
+                  [hint]="'adminUi.products.shipping.cm' | translate"
+                ></app-input>
+
+                <app-input
+                  [label]="'adminUi.products.shipping.height' | translate"
+                  type="number"
+                  inputMode="decimal"
+                  [value]="form.height_cm"
+                  (valueChange)="form.height_cm = String($event ?? '')"
+                  [min]="0"
+                  [step]="0.01"
+                  [hint]="'adminUi.products.shipping.cm' | translate"
+                ></app-input>
+
+                <app-input
+                  [label]="'adminUi.products.shipping.depth' | translate"
+                  type="number"
+                  inputMode="decimal"
+                  [value]="form.depth_cm"
+                  (valueChange)="form.depth_cm = String($event ?? '')"
+                  [min]="0"
+                  [step]="0.01"
+                  [hint]="'adminUi.products.shipping.cm' | translate"
+                ></app-input>
+              </div>
+
+              <div class="mt-3 grid gap-3 md:grid-cols-3 items-end">
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.products.shipping.classLabel' | translate }}
+                  <select
+                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="form.shipping_class"
+                  >
+                    <option value="standard">{{ 'adminUi.products.shipping.class.standard' | translate }}</option>
+                    <option value="bulky">{{ 'adminUi.products.shipping.class.bulky' | translate }}</option>
+                    <option value="oversize">{{ 'adminUi.products.shipping.class.oversize' | translate }}</option>
+                  </select>
+                </label>
+
+                <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
+                  <input type="checkbox" [(ngModel)]="form.shipping_allow_locker" />
+                  {{ 'adminUi.products.shipping.allowLocker' | translate }}
+                </label>
+
+                <div class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  <span>{{ 'adminUi.products.shipping.disallowedCouriers' | translate }}</span>
+                  <div class="flex flex-wrap items-center gap-4 text-sm font-normal text-slate-700 dark:text-slate-200">
+                    <label class="inline-flex items-center gap-2">
+                      <input type="checkbox" [(ngModel)]="form.shipping_disallowed_couriers.sameday" />
+                      {{ 'adminUi.products.shipping.courier.sameday' | translate }}
+                    </label>
+                    <label class="inline-flex items-center gap-2">
+                      <input type="checkbox" [(ngModel)]="form.shipping_disallowed_couriers.fan_courier" />
+                      {{ 'adminUi.products.shipping.courier.fan_courier' | translate }}
+                    </label>
+                  </div>
+                  <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
+                    {{ 'adminUi.products.shipping.disallowedHint' | translate }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </details>
 	        </div>
 
 	        <div class="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
@@ -2491,6 +2506,7 @@ export class AdminProductsComponent implements OnInit {
     private admin: AdminService,
     private auth: AuthService,
     private recent: AdminRecentService,
+    public uiPrefs: AdminUiPrefsService,
     private markdown: MarkdownService,
     private toast: ToastService,
     private translate: TranslateService,

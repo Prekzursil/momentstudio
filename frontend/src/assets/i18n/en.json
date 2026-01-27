@@ -1550,6 +1550,13 @@
       "ops": "Ops",
       "content": "Content"
     },
+    "uiMode": {
+      "title": "Admin mode",
+      "simple": "Simple",
+      "advanced": "Advanced",
+      "simpleHint": "Hide advanced tools and settings.",
+      "advancedHint": "Show all tools and settings."
+    },
     "security": {
       "mfaRequired": "Two-factor authentication or a passkey is required for admin access."
     },
@@ -3026,6 +3033,8 @@
         "bestseller": "Bestseller",
         "highlight": "Highlight",
         "publishAt": "Publish at",
+        "advancedSettings": "Advanced settings",
+        "advancedHint": "Shipping, scheduling, badges, and other optional settings.",
         "noImages": "No images yet.",
         "imageMeta": "Image SEO",
         "imageAltText": "Alt text",

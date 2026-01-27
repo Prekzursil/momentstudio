@@ -1550,6 +1550,13 @@
       "ops": "Operațiuni",
       "content": "Conținut"
     },
+    "uiMode": {
+      "title": "Mod administrare",
+      "simple": "Simplu",
+      "advanced": "Avansat",
+      "simpleHint": "Ascunde uneltele și setările avansate.",
+      "advancedHint": "Arată toate uneltele și setările."
+    },
     "security": {
       "mfaRequired": "Autentificarea cu doi factori sau o passkey este necesară pentru accesul de administrare."
     },
@@ -3026,6 +3033,8 @@
         "bestseller": "Cel mai vândut",
         "highlight": "Evidențiat",
         "publishAt": "Publică la",
+        "advancedSettings": "Setări avansate",
+        "advancedHint": "Livrare, programare, insigne și alte setări opționale.",
         "noImages": "Nu există imagini.",
         "imageMeta": "SEO imagine",
         "imageAltText": "Text alternativ",

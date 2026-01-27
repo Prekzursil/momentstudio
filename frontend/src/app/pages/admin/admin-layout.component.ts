@@ -9,6 +9,7 @@ import { AuthService } from '../../core/auth.service';
 import { AdminFavoritesService } from '../../core/admin-favorites.service';
 import { AdminRecentService } from '../../core/admin-recent.service';
 import { AdminService } from '../../core/admin.service';
+import { AdminUiPrefsService } from '../../core/admin-ui-prefs.service';
 import { OpsService } from '../../core/ops.service';
 import { ContainerComponent } from '../../layout/container.component';
 
@@ -57,6 +58,41 @@ type AdminNavItem = {
 
           <div *ngIf="navQuery.trim() && filteredNavItems().length === 0" class="px-3 pb-2 text-xs text-slate-500 dark:text-slate-400">
             {{ 'adminUi.nav.searchEmpty' | translate }}
+          </div>
+
+          <div class="px-3 pb-2">
+            <div class="flex items-center justify-between gap-3 text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+              <span>{{ 'adminUi.uiMode.title' | translate }}</span>
+            </div>
+            <div class="mt-1 flex items-center justify-between gap-3">
+              <div class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <button
+                  type="button"
+                  class="px-3 py-1.5 text-xs font-semibold"
+                  [class.bg-slate-900]="uiPrefs.mode() === 'simple'"
+                  [class.text-white]="uiPrefs.mode() === 'simple'"
+                  [class.text-slate-700]="uiPrefs.mode() !== 'simple'"
+                  [class.dark:text-slate-200]="uiPrefs.mode() !== 'simple'"
+                  (click)="uiPrefs.setMode('simple')"
+                >
+                  {{ 'adminUi.uiMode.simple' | translate }}
+                </button>
+                <button
+                  type="button"
+                  class="px-3 py-1.5 text-xs font-semibold"
+                  [class.bg-slate-900]="uiPrefs.mode() === 'advanced'"
+                  [class.text-white]="uiPrefs.mode() === 'advanced'"
+                  [class.text-slate-700]="uiPrefs.mode() !== 'advanced'"
+                  [class.dark:text-slate-200]="uiPrefs.mode() !== 'advanced'"
+                  (click)="uiPrefs.setMode('advanced')"
+                >
+                  {{ 'adminUi.uiMode.advanced' | translate }}
+                </button>
+              </div>
+            </div>
+            <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              {{ (uiPrefs.mode() === 'simple' ? 'adminUi.uiMode.simpleHint' : 'adminUi.uiMode.advancedHint') | translate }}
+            </div>
           </div>
 
           <div class="px-3 pb-2">
@@ -203,6 +239,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
     private router: Router,
     private translate: TranslateService,
     public favorites: AdminFavoritesService,
+    public uiPrefs: AdminUiPrefsService,
     private recent: AdminRecentService,
     private admin: AdminService,
     private ops: OpsService
@@ -259,7 +296,11 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
   filteredNavItems(): AdminNavItem[] {
     const items = this.navItems;
     const query = this.navQuery.trim().toLowerCase();
-    if (!query) return items;
+    if (!query) {
+      if (this.uiPrefs.mode() === 'advanced') return items;
+      const coreSections = new Set(['dashboard', 'content', 'products', 'orders', 'returns', 'support']);
+      return items.filter((item) => coreSections.has(item.section));
+    }
     return items.filter((item) => {
       const label = this.navLabel(item).toLowerCase();
       return label.includes(query) || item.section.includes(query);
