@@ -22,6 +22,30 @@ export class ToastService {
     this.push({ title, description, tone: 'error' });
   }
 
+  action(
+    title: string,
+    actionLabel: string,
+    onAction: () => void,
+    options?: {
+      description?: string;
+      tone?: 'info' | 'success' | 'error';
+      durationMs?: number;
+      actionAriaLabel?: string;
+    }
+  ): void {
+    this.push(
+      {
+        title,
+        description: options?.description,
+        tone: options?.tone ?? 'info',
+        actionLabel,
+        actionAriaLabel: options?.actionAriaLabel,
+        onAction
+      },
+      options?.durationMs ?? 6000
+    );
+  }
+
   clear(id: string): void {
     this.messagesSignal.update((msgs) => msgs.filter((m) => m.id !== id));
   }
@@ -30,14 +54,18 @@ export class ToastService {
     this.messagesSignal.set([]);
   }
 
-  private push(message: Omit<ToastMessage, 'id'>): void {
-    const hasDuplicate = this.messagesSignal().some(
-      (existing) =>
-        existing.title === message.title && existing.description === message.description && existing.tone === message.tone
-    );
+  private push(message: Omit<ToastMessage, 'id'>, durationMs = 4000): void {
+    const hasDuplicate =
+      !message.onAction &&
+      this.messagesSignal().some(
+        (existing) =>
+          existing.title === message.title && existing.description === message.description && existing.tone === message.tone
+      );
     if (hasDuplicate) return;
     const id = uuidv4();
     this.messagesSignal.update((msgs) => [...msgs, { id, ...message }]);
-    setTimeout(() => this.clear(id), 4000);
+    if (durationMs > 0) {
+      setTimeout(() => this.clear(id), durationMs);
+    }
   }
 }

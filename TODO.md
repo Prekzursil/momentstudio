@@ -393,9 +393,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Catalog: respect hidden categories in listings – Do not allow browsing hidden category products via `/shop/:slug` unless storefront edit mode is enabled.
 - [x] Storefront Products: pin/feature – Pin products to top of a category (per-category featured list) from storefront.
 - [x] Storefront Products: quick duplicate – Duplicate a product from product detail in edit mode (clone images, mark draft).
-- [ ] Storefront Products: image manager – Reorder images and edit alt text/captions from product detail in edit mode.
-- [ ] Storefront Admin Mode: undo window – After edits (reorder/publish/price), offer a short “Undo” toast.
-- [ ] Storefront Admin Mode: audit trail – Record all storefront edits in the admin audit log with “source=storefront”.
+- [x] Storefront Products: image manager – Reorder images and edit alt text/captions from product detail in edit mode.
+- [x] Storefront Admin Mode: undo window – After edits (reorder/publish/price), offer a short “Undo” toast.
+- [x] Storefront Admin Mode: audit trail – Record all storefront edits in the admin audit log with “source=storefront”.
 
 ## Blog & Community
 - [x] Nav: add “Blog” link between Home and Shop (header + drawer).

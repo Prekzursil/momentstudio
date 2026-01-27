@@ -290,6 +290,8 @@ async def upsert_product_image_translation(
     image: ProductImage,
     lang: str,
     payload: ProductImageTranslationUpsert,
+    user_id: uuid.UUID | None = None,
+    source: str | None = None,
 ) -> ProductImageTranslation:
     existing = await session.scalar(
         select(ProductImageTranslation).where(ProductImageTranslation.image_id == image.id, ProductImageTranslation.lang == lang)
@@ -304,16 +306,39 @@ async def upsert_product_image_translation(
         session.add(existing)
         await session.commit()
         await session.refresh(existing)
+        await _log_product_action(
+            session,
+            image.product_id,
+            "image_translation_upsert",
+            user_id,
+            {"source": source, "image_id": str(image.id), "lang": lang}
+            if source
+            else {"image_id": str(image.id), "lang": lang},
+        )
         return existing
 
     created = ProductImageTranslation(image_id=image.id, lang=lang, alt_text=alt_text, caption=caption)
     session.add(created)
     await session.commit()
     await session.refresh(created)
+    await _log_product_action(
+        session,
+        image.product_id,
+        "image_translation_upsert",
+        user_id,
+        {"source": source, "image_id": str(image.id), "lang": lang} if source else {"image_id": str(image.id), "lang": lang},
+    )
     return created
 
 
-async def delete_product_image_translation(session: AsyncSession, *, image: ProductImage, lang: str) -> None:
+async def delete_product_image_translation(
+    session: AsyncSession,
+    *,
+    image: ProductImage,
+    lang: str,
+    user_id: uuid.UUID | None = None,
+    source: str | None = None,
+) -> None:
     existing = await session.scalar(
         select(ProductImageTranslation).where(ProductImageTranslation.image_id == image.id, ProductImageTranslation.lang == lang)
     )
@@ -321,6 +346,13 @@ async def delete_product_image_translation(session: AsyncSession, *, image: Prod
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product image translation not found")
     await session.delete(existing)
     await session.commit()
+    await _log_product_action(
+        session,
+        image.product_id,
+        "image_translation_delete",
+        user_id,
+        {"source": source, "image_id": str(image.id), "lang": lang} if source else {"image_id": str(image.id), "lang": lang},
+    )
 
 
 def get_product_image_optimization_stats(image: ProductImage) -> dict[str, int | None]:
@@ -777,7 +809,12 @@ async def create_product(
 
 
 async def update_product(
-    session: AsyncSession, product: Product, payload: ProductUpdate, commit: bool = True, user_id: uuid.UUID | None = None
+    session: AsyncSession,
+    product: Product,
+    payload: ProductUpdate,
+    commit: bool = True,
+    user_id: uuid.UUID | None = None,
+    source: str | None = None,
 ) -> Product:
     was_out_of_stock = is_out_of_stock(product)
     before_stock_quantity = int(getattr(product, "stock_quantity", 0) or 0)
@@ -932,7 +969,10 @@ async def update_product(
         if was_out_of_stock and not is_now_out_of_stock:
             await fulfill_back_in_stock_requests(session, product=product)
         if changes:
-            await _log_product_action(session, product.id, "update", user_id, {"changes": changes, "patch": patch_snapshot})
+            payload = {"changes": changes, "patch": patch_snapshot}
+            if source:
+                payload["source"] = source
+            await _log_product_action(session, product.id, "update", user_id, payload)
         await _maybe_alert_low_stock(session, product)
     else:
         await session.flush()
@@ -1142,7 +1182,14 @@ async def restore_product_image(session: AsyncSession, product: Product, image_i
     await _log_product_action(session, product.id, "image_restored", user_id, {"image_id": image_id, "url": image.url})
 
 
-async def update_product_image_sort(session: AsyncSession, product: Product, image_id: str, sort_order: int) -> Product:
+async def update_product_image_sort(
+    session: AsyncSession,
+    product: Product,
+    image_id: str,
+    sort_order: int,
+    user_id: uuid.UUID | None = None,
+    source: str | None = None,
+) -> Product:
     image = next((img for img in product.images if str(img.id) == str(image_id)), None)
     if not image:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
@@ -1150,6 +1197,15 @@ async def update_product_image_sort(session: AsyncSession, product: Product, ima
     session.add(image)
     await session.commit()
     await session.refresh(product, attribute_names=["images"])
+    await _log_product_action(
+        session,
+        product.id,
+        "image_sort",
+        user_id,
+        {"source": source, "image_id": image_id, "sort_order": sort_order}
+        if source
+        else {"image_id": image_id, "sort_order": sort_order},
+    )
     return product
 
 
@@ -1201,7 +1257,10 @@ async def restore_soft_deleted_product(
 
 
 async def bulk_update_products(
-    session: AsyncSession, updates: list[BulkProductUpdateItem], user_id: uuid.UUID | None = None
+    session: AsyncSession,
+    updates: list[BulkProductUpdateItem],
+    user_id: uuid.UUID | None = None,
+    source: str | None = None,
 ) -> list[Product]:
     product_ids = [item.product_id for item in updates]
     category_ids = {
@@ -1341,25 +1400,22 @@ async def bulk_update_products(
         await session.refresh(product)
         if product.id in restocked:
             await fulfill_back_in_stock_requests(session, product=product)
-        await _log_product_action(
-            session,
-            product.id,
-            "bulk_update",
-            user_id,
-            {
-                "base_price": product.base_price,
-                "sale_type": product.sale_type,
-                "sale_value": product.sale_value,
-                "sale_price": product.sale_price,
-                "stock_quantity": product.stock_quantity,
-                "is_featured": product.is_featured,
-                "sort_order": getattr(product, "sort_order", 0),
-                "category_id": str(product.category_id) if product.category_id else None,
-                "publish_scheduled_for": getattr(product, "publish_scheduled_for", None),
-                "unpublish_scheduled_for": getattr(product, "unpublish_scheduled_for", None),
-                "status": str(product.status),
-            },
-        )
+        payload = {
+            "base_price": product.base_price,
+            "sale_type": product.sale_type,
+            "sale_value": product.sale_value,
+            "sale_price": product.sale_price,
+            "stock_quantity": product.stock_quantity,
+            "is_featured": product.is_featured,
+            "sort_order": getattr(product, "sort_order", 0),
+            "category_id": str(product.category_id) if product.category_id else None,
+            "publish_scheduled_for": getattr(product, "publish_scheduled_for", None),
+            "unpublish_scheduled_for": getattr(product, "unpublish_scheduled_for", None),
+            "status": str(product.status),
+        }
+        if source:
+            payload["source"] = source
+        await _log_product_action(session, product.id, "bulk_update", user_id, payload)
     return updated
 
 
@@ -1745,7 +1801,12 @@ async def _get_or_create_tags(session: AsyncSession, names: list[str]) -> list[T
     return tags
 
 
-async def duplicate_product(session: AsyncSession, product: Product) -> Product:
+async def duplicate_product(
+    session: AsyncSession,
+    product: Product,
+    user_id: uuid.UUID | None = None,
+    source: str | None = None,
+) -> Product:
     base_slug = f"{product.slug}-copy"
     new_slug = base_slug
     counter = 1
@@ -1822,6 +1883,10 @@ async def duplicate_product(session: AsyncSession, product: Product) -> Product:
     session.add(clone)
     await session.commit()
     await session.refresh(clone)
+    payload = {"from_product_id": str(product.id), "from_slug": product.slug}
+    if source:
+        payload["source"] = source
+    await _log_product_action(session, clone.id, "duplicate", user_id, payload)
     return clone
 
 

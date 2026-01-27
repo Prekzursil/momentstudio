@@ -21,6 +21,7 @@ import { Router } from '@angular/router';
 import { MarkdownService } from '../../core/markdown.service';
 import { StorefrontAdminModeService } from '../../core/storefront-admin-mode.service';
 import { AdminService } from '../../core/admin.service';
+import { ProductImageManagerModalComponent } from '../../shared/product-image-manager-modal.component';
 
 @Component({
   selector: 'app-product-detail',
@@ -36,7 +37,8 @@ import { AdminService } from '../../core/admin.service';
     LocalizedCurrencyPipe,
     BreadcrumbComponent,
     TranslateModule,
-    ImgFallbackDirective
+    ImgFallbackDirective,
+    ProductImageManagerModalComponent
   ],
   template: `
     <app-container classes="py-10">
@@ -101,6 +103,14 @@ import { AdminService } from '../../core/admin.service';
                     [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
                   />
                 </button>
+              </div>
+              <div *ngIf="showStorefrontEdit()" class="flex justify-end">
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.storefront.products.images.manageCta' | translate"
+                  (action)="openImageManager()"
+                ></app-button>
               </div>
             </div>
 
@@ -364,6 +374,16 @@ import { AdminService } from '../../core/admin.service';
 	        </div>
 	      </div>
 
+        <app-product-image-manager-modal
+          [open]="imageManagerOpen"
+          [slug]="product.slug"
+          [productNameFallback]="product.name"
+          [currentLang]="uiLang"
+          [images]="product.images ?? []"
+          (closed)="imageManagerOpen = false"
+          (imagesChange)="onImagesChange($event)"
+        ></app-product-image-manager-modal>
+
 	      </ng-container>
 	
 	      <ng-template #missing>
@@ -392,6 +412,7 @@ export class ProductComponent implements OnInit, OnDestroy {
   quantity = 1;
   activeImageIndex = 0;
   previewOpen = false;
+  imageManagerOpen = false;
   backInStockLoading = false;
   duplicateSaving = false;
   backInStockRequest: BackInStockRequest | null = null;
@@ -456,6 +477,7 @@ export class ProductComponent implements OnInit, OnDestroy {
       this.slug = slug;
       this.activeImageIndex = 0;
       this.previewOpen = false;
+      this.imageManagerOpen = false;
       this.load();
     });
     this.langSub = this.translate.onLangChange.subscribe(() => {
@@ -498,13 +520,28 @@ export class ProductComponent implements OnInit, OnDestroy {
     return Boolean(this.product?.slug);
   }
 
+  get uiLang(): 'en' | 'ro' {
+    return this.translate.currentLang === 'ro' ? 'ro' : 'en';
+  }
+
+  openImageManager(): void {
+    if (!this.showStorefrontEdit()) return;
+    this.imageManagerOpen = true;
+  }
+
+  onImagesChange(images: any[]): void {
+    if (!this.product) return;
+    this.product.images = Array.isArray(images) ? images : this.product.images;
+    this.activeImageIndex = 0;
+  }
+
   duplicateFromStorefront(): void {
     if (!this.showStorefrontEdit()) return;
     if (this.duplicateSaving) return;
     const slug = (this.product?.slug || '').trim();
     if (!slug) return;
     this.duplicateSaving = true;
-    this.admin.duplicateProduct(slug).subscribe({
+    this.admin.duplicateProduct(slug, { source: 'storefront' }).subscribe({
       next: (created) => {
         this.duplicateSaving = false;
         const newSlug = String((created as any)?.slug || '').trim();
@@ -541,6 +578,11 @@ export class ProductComponent implements OnInit, OnDestroy {
     this.productLoadSub = this.catalog.getProduct(slug).subscribe({
       next: (product) => {
         if (this.slug !== slug) return;
+        if (Array.isArray(product.images)) {
+          product.images = [...product.images].sort(
+            (a: any, b: any) => Number(a?.sort_order ?? 0) - Number(b?.sort_order ?? 0)
+          );
+        }
         this.product = product;
         this.descriptionHtml = product.long_description ? this.markdown.render(product.long_description) : '';
         this.selectedVariantId = product.variants?.[0]?.id ?? null;

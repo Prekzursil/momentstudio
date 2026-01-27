@@ -150,7 +150,11 @@ class Product(Base):
 
     category: Mapped[Category] = relationship("Category", back_populates="products", lazy="joined")
     images: Mapped[list["ProductImage"]] = relationship(
-        "ProductImage", back_populates="product", cascade="all, delete-orphan", lazy="selectin"
+        "ProductImage",
+        back_populates="product",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="ProductImage.sort_order",
     )
     variants: Mapped[list["ProductVariant"]] = relationship(
         "ProductVariant", back_populates="product", cascade="all, delete-orphan", lazy="selectin"

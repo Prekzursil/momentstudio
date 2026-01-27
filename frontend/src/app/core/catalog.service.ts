@@ -18,8 +18,11 @@ export interface Category {
 }
 
 export interface ProductImage {
+  id?: string;
   url: string;
   alt_text?: string | null;
+  caption?: string | null;
+  sort_order?: number | null;
 }
 
 export interface ProductVariant {

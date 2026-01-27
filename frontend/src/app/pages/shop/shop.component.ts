@@ -1111,12 +1111,18 @@ export class ShopComponent implements OnInit, OnDestroy {
     if (!updates.length) return;
 
     this.productReorderSaving.set(true);
-    this.admin.bulkUpdateProducts(updates).subscribe({
+    this.admin.bulkUpdateProducts(updates, { source: 'storefront' }).subscribe({
       next: () => {
         this.productReorderSaving.set(false);
         this.draggingProductId = null;
         this.dragOverProductId = null;
-        this.toast.success(this.translate.instant('adminUi.storefront.products.reorderSuccess'));
+        const current = this.products.map((p) => p.id);
+        this.toast.action(
+          this.translate.instant('adminUi.storefront.products.reorderSuccess'),
+          this.translate.instant('adminUi.common.undo'),
+          () => this.undoProductOrder(previous, current),
+          { tone: 'success' }
+        );
       },
       error: () => {
         this.productReorderSaving.set(false);
@@ -1145,10 +1151,16 @@ export class ShopComponent implements OnInit, OnDestroy {
     if (!updates.length) return;
 
     this.productReorderSaving.set(true);
-    this.admin.bulkUpdateProducts(updates).subscribe({
+    this.admin.bulkUpdateProducts(updates, { source: 'storefront' }).subscribe({
       next: () => {
         this.productReorderSaving.set(false);
-        this.toast.success(this.translate.instant('adminUi.storefront.products.reorderSuccess'));
+        const current = this.products.map((p) => p.id);
+        this.toast.action(
+          this.translate.instant('adminUi.storefront.products.reorderSuccess'),
+          this.translate.instant('adminUi.common.undo'),
+          () => this.undoProductOrder(previous, current),
+          { tone: 'success' }
+        );
       },
       error: () => {
         this.productReorderSaving.set(false);
@@ -1270,7 +1282,7 @@ export class ShopComponent implements OnInit, OnDestroy {
     }));
 
     this.bulkSaving.set(true);
-    this.admin.bulkUpdateProducts(updates).subscribe({
+    this.admin.bulkUpdateProducts(updates, { source: 'storefront' }).subscribe({
       next: () => {
         this.bulkSaving.set(false);
         for (const product of this.products) {
@@ -1393,7 +1405,7 @@ export class ShopComponent implements OnInit, OnDestroy {
     if (!slug) return;
     const currentlyVisible = category.is_visible !== false;
     this.visibilitySavingSlug = slug;
-    this.admin.updateCategory(slug, { is_visible: !currentlyVisible }).subscribe({
+    this.admin.updateCategory(slug, { is_visible: !currentlyVisible }, { source: 'storefront' }).subscribe({
       next: () => {
         this.visibilitySavingSlug = null;
         this.toast.success(this.translate.instant('adminUi.storefront.categories.visibilitySuccess'));
@@ -1505,12 +1517,12 @@ export class ShopComponent implements OnInit, OnDestroy {
     this.renameError = '';
 
     this.admin
-      .updateCategory(slug, { name: nameRo })
+      .updateCategory(slug, { name: nameRo }, { source: 'storefront' })
       .pipe(
         switchMap(() =>
           forkJoin([
-            this.admin.upsertCategoryTranslation(slug, 'ro', { name: nameRo }),
-            this.admin.upsertCategoryTranslation(slug, 'en', { name: nameEn })
+            this.admin.upsertCategoryTranslation(slug, 'ro', { name: nameRo }, { source: 'storefront' }),
+            this.admin.upsertCategoryTranslation(slug, 'en', { name: nameEn }, { source: 'storefront' })
           ])
         )
       )
@@ -1544,7 +1556,7 @@ export class ShopComponent implements OnInit, OnDestroy {
 
     this.categoryImageSavingSlug = desired;
     this.categoryImageError = '';
-    this.admin.uploadCategoryImage(desired, kind, file).subscribe({
+    this.admin.uploadCategoryImage(desired, kind, file, { source: 'storefront' }).subscribe({
       next: () => {
         this.categoryImageSavingSlug = null;
         this.toast.success(this.translate.instant('adminUi.storefront.categories.imageUploadSuccess'));
@@ -1616,7 +1628,7 @@ export class ShopComponent implements OnInit, OnDestroy {
 
     this.mergeSaving = true;
     this.mergeError = '';
-    this.admin.mergeCategory(sourceSlug, targetSlug).subscribe({
+    this.admin.mergeCategory(sourceSlug, targetSlug, { source: 'storefront' }).subscribe({
       next: () => {
         this.mergeSaving = false;
         this.toast.success(this.translate.instant('adminUi.storefront.categories.mergeSuccess'));
@@ -1675,7 +1687,7 @@ export class ShopComponent implements OnInit, OnDestroy {
 
     this.deleteSaving = true;
     this.deleteError = '';
-    this.admin.deleteCategory(slug).subscribe({
+    this.admin.deleteCategory(slug, { source: 'storefront' }).subscribe({
       next: () => {
         this.deleteSaving = false;
         this.toast.success(this.translate.instant('adminUi.storefront.categories.deleteSuccess'));
@@ -1854,12 +1866,12 @@ export class ShopComponent implements OnInit, OnDestroy {
 	    this.createSaving = true;
 	    this.createError = '';
 	    this.admin
-	      .createCategory({ name: nameRo, sort_order: sortOrder, parent_id: parentId })
+	      .createCategory({ name: nameRo, sort_order: sortOrder, parent_id: parentId }, { source: 'storefront' })
 	      .pipe(
 	        switchMap((created) =>
 	          forkJoin([
-	            this.admin.upsertCategoryTranslation(created.slug, 'ro', { name: nameRo }),
-	            this.admin.upsertCategoryTranslation(created.slug, 'en', { name: nameEn })
+	            this.admin.upsertCategoryTranslation(created.slug, 'ro', { name: nameRo }, { source: 'storefront' }),
+	            this.admin.upsertCategoryTranslation(created.slug, 'en', { name: nameEn }, { source: 'storefront' })
 	          ]).pipe(map(() => created))
 	        )
 	      )
@@ -1915,7 +1927,7 @@ export class ShopComponent implements OnInit, OnDestroy {
     const payload = this.rootCategories.map((c, idx) => ({ slug: c.slug, sort_order: idx }));
     if (!payload.length) return;
     this.reorderSaving.set(true);
-    this.admin.reorderCategories(payload).subscribe({
+    this.admin.reorderCategories(payload, { source: 'storefront' }).subscribe({
       next: (updated) => {
         const bySlug = new Map<string, number>();
         (updated || []).forEach((c) => {
@@ -1928,12 +1940,70 @@ export class ShopComponent implements OnInit, OnDestroy {
         }
         this.rebuildCategoryTree();
         this.reorderSaving.set(false);
-        this.toast.success(this.translate.instant('adminUi.storefront.categories.reorderSuccess'));
+        const current = this.rootCategories.map((c) => c.slug);
+        this.toast.action(
+          this.translate.instant('adminUi.storefront.categories.reorderSuccess'),
+          this.translate.instant('adminUi.common.undo'),
+          () => this.undoRootCategoryOrder(previousSlugs, current),
+          { tone: 'success' }
+        );
       },
       error: () => {
         this.reorderSaving.set(false);
         this.restoreRootCategoryOrder(previousSlugs);
         this.toast.error(this.translate.instant('adminUi.storefront.categories.reorderError'));
+      }
+    });
+  }
+
+  private undoProductOrder(previousIds: string[], currentIds: string[]): void {
+    if (this.productReorderSaving()) return;
+    const updates = previousIds
+      .map((id, idx) => ({ product_id: id, sort_order: idx }))
+      .filter((row) => Boolean(row.product_id));
+    if (!updates.length) return;
+
+    this.restoreProductOrder(previousIds);
+    this.productReorderSaving.set(true);
+    this.admin.bulkUpdateProducts(updates, { source: 'storefront' }).subscribe({
+      next: () => {
+        this.productReorderSaving.set(false);
+        this.toast.success(this.translate.instant('adminUi.storefront.undoApplied'));
+      },
+      error: () => {
+        this.productReorderSaving.set(false);
+        this.restoreProductOrder(currentIds);
+        this.toast.error(this.translate.instant('adminUi.storefront.undoFailed'));
+      }
+    });
+  }
+
+  private undoRootCategoryOrder(previousSlugs: string[], currentSlugs: string[]): void {
+    if (this.reorderSaving()) return;
+    const payload = previousSlugs.map((slug, idx) => ({ slug, sort_order: idx })).filter((row) => Boolean(row.slug));
+    if (!payload.length) return;
+
+    this.restoreRootCategoryOrder(previousSlugs);
+    this.reorderSaving.set(true);
+    this.admin.reorderCategories(payload, { source: 'storefront' }).subscribe({
+      next: (updated) => {
+        const bySlug = new Map<string, number>();
+        (updated || []).forEach((c) => {
+          if (c?.slug && typeof c.sort_order === 'number') bySlug.set(c.slug, c.sort_order);
+        });
+        for (const cat of this.categories) {
+          const next = bySlug.get(cat.slug);
+          if (next == null) continue;
+          cat.sort_order = next;
+        }
+        this.rebuildCategoryTree();
+        this.reorderSaving.set(false);
+        this.toast.success(this.translate.instant('adminUi.storefront.undoApplied'));
+      },
+      error: () => {
+        this.reorderSaving.set(false);
+        this.restoreRootCategoryOrder(currentSlugs);
+        this.toast.error(this.translate.instant('adminUi.storefront.undoFailed'));
       }
     });
   }

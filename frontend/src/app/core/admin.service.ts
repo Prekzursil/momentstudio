@@ -2,6 +2,12 @@ import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from './api.service';
 
+export type AdminRequestSource = 'storefront';
+
+export type AdminRequestOptions = {
+  source?: AdminRequestSource;
+};
+
 export interface AdminSummary {
   products: number;
   orders: number;
@@ -807,26 +813,26 @@ export class AdminService {
     publish_scheduled_for?: string | null;
     unpublish_scheduled_for?: string | null;
     status?: string | null;
-  }[]): Observable<any[]> {
-    return this.api.post<any[]>('/catalog/products/bulk-update', payload);
+  }[], opts?: AdminRequestOptions): Observable<any[]> {
+    return this.api.post<any[]>('/catalog/products/bulk-update', payload, undefined, opts?.source ? { source: opts.source } : undefined);
   }
 
   getCategories(): Observable<AdminCategory[]> {
     return this.api.get<AdminCategory[]>('/catalog/categories');
   }
 
-  createCategory(payload: Partial<AdminCategory>): Observable<AdminCategory> {
-    return this.api.post<AdminCategory>('/catalog/categories', payload);
+  createCategory(payload: Partial<AdminCategory>, opts?: AdminRequestOptions): Observable<AdminCategory> {
+    return this.api.post<AdminCategory>('/catalog/categories', payload, undefined, opts?.source ? { source: opts.source } : undefined);
   }
 
-  updateCategory(slug: string, payload: Partial<AdminCategory>): Observable<AdminCategory> {
-    return this.api.patch<AdminCategory>(`/catalog/categories/${slug}`, payload);
+  updateCategory(slug: string, payload: Partial<AdminCategory>, opts?: AdminRequestOptions): Observable<AdminCategory> {
+    return this.api.patch<AdminCategory>(`/catalog/categories/${slug}`, payload, undefined, opts?.source ? { source: opts.source } : undefined);
   }
 
-  uploadCategoryImage(slug: string, kind: 'thumbnail' | 'banner', file: File): Observable<AdminCategory> {
+  uploadCategoryImage(slug: string, kind: 'thumbnail' | 'banner', file: File, opts?: AdminRequestOptions): Observable<AdminCategory> {
     const form = new FormData();
     form.append('file', file);
-    return this.api.post<AdminCategory>(`/catalog/categories/${slug}/images/${kind}`, form);
+    return this.api.post<AdminCategory>(`/catalog/categories/${slug}/images/${kind}`, form, undefined, opts?.source ? { source: opts.source } : undefined);
   }
 
   previewDeleteCategory(slug: string): Observable<AdminCategoryDeletePreview> {
@@ -837,28 +843,28 @@ export class AdminService {
     return this.api.get<AdminCategoryMergePreview>(`/catalog/categories/${sourceSlug}/merge/preview`, { target_slug: targetSlug });
   }
 
-  mergeCategory(sourceSlug: string, targetSlug: string): Observable<AdminCategoryMergeResult> {
-    return this.api.post<AdminCategoryMergeResult>(`/catalog/categories/${sourceSlug}/merge`, { target_slug: targetSlug });
+  mergeCategory(sourceSlug: string, targetSlug: string, opts?: AdminRequestOptions): Observable<AdminCategoryMergeResult> {
+    return this.api.post<AdminCategoryMergeResult>(`/catalog/categories/${sourceSlug}/merge`, { target_slug: targetSlug }, undefined, opts?.source ? { source: opts.source } : undefined);
   }
 
   getCategoryTranslations(slug: string): Observable<AdminCategoryTranslation[]> {
     return this.api.get<AdminCategoryTranslation[]>(`/catalog/categories/${slug}/translations`);
   }
 
-  upsertCategoryTranslation(slug: string, lang: 'en' | 'ro', payload: { name: string; description?: string | null }): Observable<AdminCategoryTranslation> {
-    return this.api.put<AdminCategoryTranslation>(`/catalog/categories/${slug}/translations/${lang}`, payload);
+  upsertCategoryTranslation(slug: string, lang: 'en' | 'ro', payload: { name: string; description?: string | null }, opts?: AdminRequestOptions): Observable<AdminCategoryTranslation> {
+    return this.api.put<AdminCategoryTranslation>(`/catalog/categories/${slug}/translations/${lang}`, payload, undefined, opts?.source ? { source: opts.source } : undefined);
   }
 
-  deleteCategoryTranslation(slug: string, lang: 'en' | 'ro'): Observable<void> {
-    return this.api.delete<void>(`/catalog/categories/${slug}/translations/${lang}`);
+  deleteCategoryTranslation(slug: string, lang: 'en' | 'ro', opts?: AdminRequestOptions): Observable<void> {
+    return this.api.delete<void>(`/catalog/categories/${slug}/translations/${lang}`, undefined, opts?.source ? { source: opts.source } : undefined);
   }
 
-  deleteCategory(slug: string): Observable<AdminCategory> {
-    return this.api.delete<AdminCategory>(`/catalog/categories/${slug}`);
+  deleteCategory(slug: string, opts?: AdminRequestOptions): Observable<AdminCategory> {
+    return this.api.delete<AdminCategory>(`/catalog/categories/${slug}`, undefined, opts?.source ? { source: opts.source } : undefined);
   }
 
-  reorderCategories(items: { slug: string; sort_order: number }[]): Observable<AdminCategory[]> {
-    return this.api.post<AdminCategory[]>('/catalog/categories/reorder', items);
+  reorderCategories(items: { slug: string; sort_order: number }[], opts?: AdminRequestOptions): Observable<AdminCategory[]> {
+    return this.api.post<AdminCategory[]>('/catalog/categories/reorder', items, undefined, opts?.source ? { source: opts.source } : undefined);
   }
 
   getProduct(slug: string): Observable<AdminProductDetail> {
@@ -913,12 +919,12 @@ export class AdminService {
     return this.api.post<AdminProductDetail>('/catalog/products', payload);
   }
 
-  updateProduct(slug: string, payload: Partial<AdminProductDetail>): Observable<AdminProductDetail> {
-    return this.api.patch<AdminProductDetail>(`/catalog/products/${slug}`, payload);
+  updateProduct(slug: string, payload: Partial<AdminProductDetail>, opts?: AdminRequestOptions): Observable<AdminProductDetail> {
+    return this.api.patch<AdminProductDetail>(`/catalog/products/${slug}`, payload, undefined, opts?.source ? { source: opts.source } : undefined);
   }
 
-  duplicateProduct(slug: string): Observable<AdminProductDetail> {
-    return this.api.post<AdminProductDetail>(`/catalog/products/${slug}/duplicate`, {});
+  duplicateProduct(slug: string, opts?: AdminRequestOptions): Observable<AdminProductDetail> {
+    return this.api.post<AdminProductDetail>(`/catalog/products/${slug}/duplicate`, {}, undefined, opts?.source ? { source: opts.source } : undefined);
   }
 
   deleteProduct(slug: string): Observable<void> {
@@ -955,11 +961,10 @@ export class AdminService {
     return this.api.post<AdminProductDetail>(`/catalog/products/${slug}/images/${imageId}/restore`, {});
   }
 
-  reorderProductImage(slug: string, imageId: string, sortOrder: number): Observable<AdminProductDetail> {
-    return this.api.patch<AdminProductDetail>(
-      `/catalog/products/${slug}/images/${imageId}/sort?sort_order=${sortOrder}`,
-      {}
-    );
+  reorderProductImage(slug: string, imageId: string, sortOrder: number, opts?: AdminRequestOptions): Observable<AdminProductDetail> {
+    const params: Record<string, string | number> = { sort_order: sortOrder };
+    if (opts?.source) params['source'] = opts.source;
+    return this.api.patch<AdminProductDetail>(`/catalog/products/${slug}/images/${imageId}/sort`, {}, undefined, params);
   }
 
   updateProductVariants(
@@ -980,16 +985,19 @@ export class AdminService {
     slug: string,
     imageId: string,
     lang: 'en' | 'ro',
-    payload: { alt_text?: string | null; caption?: string | null }
+    payload: { alt_text?: string | null; caption?: string | null },
+    opts?: AdminRequestOptions
   ): Observable<AdminProductImageTranslation> {
     return this.api.put<AdminProductImageTranslation>(
       `/catalog/products/${slug}/images/${imageId}/translations/${lang}`,
-      payload
+      payload,
+      undefined,
+      opts?.source ? { source: opts.source } : undefined
     );
   }
 
-  deleteProductImageTranslation(slug: string, imageId: string, lang: 'en' | 'ro'): Observable<void> {
-    return this.api.delete<void>(`/catalog/products/${slug}/images/${imageId}/translations/${lang}`);
+  deleteProductImageTranslation(slug: string, imageId: string, lang: 'en' | 'ro', opts?: AdminRequestOptions): Observable<void> {
+    return this.api.delete<void>(`/catalog/products/${slug}/images/${imageId}/translations/${lang}`, undefined, opts?.source ? { source: opts.source } : undefined);
   }
 
   getProductImageStats(slug: string, imageId: string): Observable<AdminProductImageOptimizationStats> {

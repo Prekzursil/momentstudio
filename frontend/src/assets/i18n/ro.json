@@ -1330,7 +1330,9 @@
       "loading": "Se încarcă…",
       "save": "Salvează",
       "cancel": "Anulează",
-      "saving": "Se salvează…"
+      "saving": "Se salvează…",
+      "undo": "Anulează",
+      "close": "Închide"
     },
     "storefront": {
       "categories": {
@@ -1404,8 +1406,21 @@
         "bulkNoChanges": "Alege cel puțin o acțiune (stare/categorie/recomandat).",
         "reorderHint": "Trage cardurile produselor pentru a reordona categoria.",
         "reorderSuccess": "Ordinea produselor a fost actualizată.",
-        "reorderError": "Nu s-au putut reordona produsele."
-      }
+        "reorderError": "Nu s-au putut reordona produsele.",
+        "images": {
+          "manageTitle": "Gestionează imagini",
+          "manageCta": "Gestionează imagini",
+          "reorderHint": "Trage imaginile pentru a le reordona.",
+          "reorderSuccess": "Ordinea imaginilor a fost actualizată.",
+          "reorderError": "Nu s-au putut reordona imaginile.",
+          "empty": "Nu există imagini încă.",
+          "imageLabel": "Imaginea {{index}}",
+          "metaHint": "Textul alternativ și descrierile sunt bilingve (RO/EN).",
+        "metaLoadError": "Nu s-a putut încărca textul imaginii."
+        }
+      },
+      "undoApplied": "Modificările au fost anulate.",
+      "undoFailed": "Nu s-au putut anula modificările."
     },
     "errors": {
       "title": "A apărut o problemă",

@@ -1330,7 +1330,9 @@
       "loading": "Loading…",
       "save": "Save",
       "cancel": "Cancel",
-      "saving": "Saving…"
+      "saving": "Saving…",
+      "undo": "Undo",
+      "close": "Close"
     },
     "storefront": {
       "categories": {
@@ -1404,8 +1406,21 @@
         "bulkNoChanges": "Choose at least one action (status/category/featured).",
         "reorderHint": "Drag product cards to reorder this category.",
         "reorderSuccess": "Product order updated.",
-        "reorderError": "Could not reorder products."
-      }
+        "reorderError": "Could not reorder products.",
+        "images": {
+          "manageTitle": "Manage images",
+          "manageCta": "Manage images",
+          "reorderHint": "Drag images to reorder.",
+          "reorderSuccess": "Image order updated.",
+          "reorderError": "Could not reorder images.",
+          "empty": "No images yet.",
+          "imageLabel": "Image {{index}}",
+          "metaHint": "Alt text and captions are bilingual (RO/EN).",
+        "metaLoadError": "Could not load image text."
+        }
+      },
+      "undoApplied": "Undone.",
+      "undoFailed": "Could not undo changes."
     },
     "errors": {
       "title": "Something went wrong",

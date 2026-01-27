@@ -61,6 +61,7 @@ from app.schemas.catalog import (
     ProductRelationshipsUpdate,
 )
 from app.schemas.catalog_admin import AdminDeletedProductImage, AdminProductAuditEntry
+from app.services import audit_chain as audit_chain_service
 from app.services import catalog as catalog_service
 from app.services import storage
 
@@ -210,9 +211,20 @@ async def product_feed_csv(
 async def create_category(
     payload: CategoryCreate,
     session: AsyncSession = Depends(get_session),
-    _: object = Depends(require_admin_section("products")),
+    current_user=Depends(require_admin_section("products")),
+    source: str | None = Query(default=None, pattern="^(storefront)$"),
 ) -> Category:
-    return await catalog_service.create_category(session, payload)
+    created = await catalog_service.create_category(session, payload)
+    if source:
+        await audit_chain_service.add_admin_audit_log(
+            session,
+            action="catalog.category.create",
+            actor_user_id=current_user.id,
+            subject_user_id=None,
+            data={"source": source, "slug": created.slug, "category_id": str(created.id)},
+        )
+        await session.commit()
+    return created
 
 
 @router.patch("/categories/{slug}", response_model=CategoryRead)
@@ -220,12 +232,23 @@ async def update_category(
     slug: str,
     payload: CategoryUpdate,
     session: AsyncSession = Depends(get_session),
-    _: object = Depends(require_admin_section("products")),
+    current_user=Depends(require_admin_section("products")),
+    source: str | None = Query(default=None, pattern="^(storefront)$"),
 ) -> Category:
     category = await catalog_service.get_category_by_slug(session, slug)
     if not category:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
-    return await catalog_service.update_category(session, category, payload)
+    updated = await catalog_service.update_category(session, category, payload)
+    if source:
+        await audit_chain_service.add_admin_audit_log(
+            session,
+            action="catalog.category.update",
+            actor_user_id=current_user.id,
+            subject_user_id=None,
+            data={"source": source, "slug": slug, "patch": payload.model_dump(exclude_unset=True)},
+        )
+        await session.commit()
+    return updated
 
 
 @router.get("/categories/{slug}/translations", response_model=list[CategoryTranslationRead])
@@ -247,12 +270,22 @@ async def upsert_category_translation(
     lang: str = Path(..., pattern="^(en|ro)$"),
     payload: CategoryTranslationUpsert = ...,
     session: AsyncSession = Depends(get_session),
-    _: object = Depends(require_admin_section("products")),
+    current_user=Depends(require_admin_section("products")),
+    source: str | None = Query(default=None, pattern="^(storefront)$"),
 ) -> CategoryTranslationRead:
     category = await catalog_service.get_category_by_slug(session, slug)
     if not category:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
     updated = await catalog_service.upsert_category_translation(session, category=category, lang=lang, payload=payload)
+    if source:
+        await audit_chain_service.add_admin_audit_log(
+            session,
+            action="catalog.category.translation_upsert",
+            actor_user_id=current_user.id,
+            subject_user_id=None,
+            data={"source": source, "slug": slug, "lang": lang},
+        )
+        await session.commit()
     return CategoryTranslationRead.model_validate(updated)
 
 
@@ -261,12 +294,22 @@ async def delete_category_translation(
     slug: str,
     lang: str = Path(..., pattern="^(en|ro)$"),
     session: AsyncSession = Depends(get_session),
-    _: object = Depends(require_admin_section("products")),
+    current_user=Depends(require_admin_section("products")),
+    source: str | None = Query(default=None, pattern="^(storefront)$"),
 ) -> None:
     category = await catalog_service.get_category_by_slug(session, slug)
     if not category:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
     await catalog_service.delete_category_translation(session, category=category, lang=lang)
+    if source:
+        await audit_chain_service.add_admin_audit_log(
+            session,
+            action="catalog.category.translation_delete",
+            actor_user_id=current_user.id,
+            subject_user_id=None,
+            data={"source": source, "slug": slug, "lang": lang},
+        )
+        await session.commit()
     return None
 
 
@@ -274,13 +317,23 @@ async def delete_category_translation(
 async def delete_category(
     slug: str,
     session: AsyncSession = Depends(get_session),
-    _: object = Depends(require_admin_section("products")),
+    current_user=Depends(require_admin_section("products")),
+    source: str | None = Query(default=None, pattern="^(storefront)$"),
 ) -> Category:
     category = await catalog_service.get_category_by_slug(session, slug)
     if not category:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
     await session.delete(category)
     await session.commit()
+    if source:
+        await audit_chain_service.add_admin_audit_log(
+            session,
+            action="catalog.category.delete",
+            actor_user_id=current_user.id,
+            subject_user_id=None,
+            data={"source": source, "slug": slug, "category_id": str(category.id)},
+        )
+        await session.commit()
     return category
 
 
@@ -288,9 +341,19 @@ async def delete_category(
 async def reorder_categories(
     payload: list[CategoryReorderItem],
     session: AsyncSession = Depends(get_session),
-    _: object = Depends(require_admin_section("products")),
+    current_user=Depends(require_admin_section("products")),
+    source: str | None = Query(default=None, pattern="^(storefront)$"),
 ) -> list[CategoryRead]:
     updated = await catalog_service.reorder_categories(session, payload)
+    if source:
+        await audit_chain_service.add_admin_audit_log(
+            session,
+            action="catalog.category.reorder",
+            actor_user_id=current_user.id,
+            subject_user_id=None,
+            data={"source": source, "count": len(payload)},
+        )
+        await session.commit()
     return updated
 
 
@@ -300,7 +363,8 @@ async def upload_category_image(
     kind: str = Path(pattern="^(thumbnail|banner)$"),
     file: UploadFile = File(...),
     session: AsyncSession = Depends(get_session),
-    _: object = Depends(require_admin_section("products")),
+    current_user=Depends(require_admin_section("products")),
+    source: str | None = Query(default=None, pattern="^(storefront)$"),
 ) -> Category:
     category = await catalog_service.get_category_by_slug(session, slug)
     if not category:
@@ -325,6 +389,15 @@ async def upload_category_image(
     session.add(category)
     await session.commit()
     await session.refresh(category)
+    if source:
+        await audit_chain_service.add_admin_audit_log(
+            session,
+            action="catalog.category.image_upload",
+            actor_user_id=current_user.id,
+            subject_user_id=None,
+            data={"source": source, "slug": slug, "kind": kind, "field": field},
+        )
+        await session.commit()
     return category
 
 
@@ -404,7 +477,8 @@ async def merge_category(
     slug: str,
     payload: CategoryMergeRequest,
     session: AsyncSession = Depends(get_session),
-    _: object = Depends(require_admin_section("products")),
+    current_user=Depends(require_admin_section("products")),
+    audit_source: str | None = Query(default=None, alias="source", pattern="^(storefront)$"),
 ) -> CategoryMergeResult:
     source = await catalog_service.get_category_by_slug(session, slug)
     if not source:
@@ -432,7 +506,22 @@ async def merge_category(
 
     await session.delete(source)
     await session.commit()
-    return CategoryMergeResult(source_slug=source.slug, target_slug=target.slug, moved_products=moved_products)
+    result_model = CategoryMergeResult(source_slug=source.slug, target_slug=target.slug, moved_products=moved_products)
+    if audit_source:
+        await audit_chain_service.add_admin_audit_log(
+            session,
+            action="catalog.category.merge",
+            actor_user_id=current_user.id,
+            subject_user_id=None,
+            data={
+                "source": audit_source,
+                "source_slug": result_model.source_slug,
+                "target_slug": result_model.target_slug,
+                "moved_products": result_model.moved_products,
+            },
+        )
+        await session.commit()
+    return result_model
 
 
 @router.post("/products", response_model=ProductRead, status_code=status.HTTP_201_CREATED)
@@ -450,11 +539,12 @@ async def update_product(
     payload: ProductUpdate,
     session: AsyncSession = Depends(get_session),
     current_user=Depends(require_admin_section("products")),
+    source: str | None = Query(default=None, pattern="^(storefront)$"),
 ) -> Product:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    return await catalog_service.update_product(session, product, payload, user_id=current_user.id)
+    return await catalog_service.update_product(session, product, payload, user_id=current_user.id, source=source)
 
 
 @router.get("/products/{slug}/translations", response_model=list[ProductTranslationRead])
@@ -612,8 +702,9 @@ async def bulk_update_products(
     payload: list[BulkProductUpdateItem],
     session: AsyncSession = Depends(get_session),
     current_user=Depends(require_admin_section("products")),
+    source: str | None = Query(default=None, pattern="^(storefront)$"),
 ) -> list[Product]:
-    updated = await catalog_service.bulk_update_products(session, payload, user_id=current_user.id)
+    updated = await catalog_service.bulk_update_products(session, payload, user_id=current_user.id, source=source)
     return updated
 
 
@@ -684,14 +775,15 @@ async def update_featured_collection(
 async def duplicate_product(
     slug: str,
     session: AsyncSession = Depends(get_session),
-    _: object = Depends(require_admin_section("products")),
+    current_user=Depends(require_admin_section("products")),
+    source: str | None = Query(default=None, pattern="^(storefront)$"),
 ) -> Product:
     product = await catalog_service.get_product_by_slug(
         session, slug, options=[selectinload(Product.images), selectinload(Product.category), selectinload(Product.options)]
     )
     if not product or product.is_deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    clone = await catalog_service.duplicate_product(session, product)
+    clone = await catalog_service.duplicate_product(session, product, user_id=current_user.id, source=source)
     return clone
 
 
@@ -864,14 +956,15 @@ async def reorder_product_image(
     image_id: UUID,
     sort_order: int = Query(..., ge=0),
     session: AsyncSession = Depends(get_session),
-    _: object = Depends(require_admin_section("products")),
+    current_user=Depends(require_admin_section("products")),
+    source: str | None = Query(default=None, pattern="^(storefront)$"),
 ) -> Product:
     product = await catalog_service.get_product_by_slug(
         session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
     )
     if not product or product.is_deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    await catalog_service.update_product_image_sort(session, product, str(image_id), sort_order)
+    await catalog_service.update_product_image_sort(session, product, str(image_id), sort_order, user_id=current_user.id, source=source)
     refreshed = await catalog_service.get_product_by_slug(
         session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
     )
@@ -944,7 +1037,8 @@ async def upsert_product_image_translation(
     payload: ProductImageTranslationUpsert,
     lang: str = Path(..., pattern="^(en|ro)$"),
     session: AsyncSession = Depends(get_session),
-    _: object = Depends(require_admin_section("products")),
+    current_user=Depends(require_admin_section("products")),
+    source: str | None = Query(default=None, pattern="^(storefront)$"),
 ) -> ProductImageTranslationRead:
     product = await catalog_service.get_product_by_slug(session, slug, options=[selectinload(Product.images)])
     if not product or product.is_deleted:
@@ -952,7 +1046,9 @@ async def upsert_product_image_translation(
     image = next((img for img in product.images if str(img.id) == str(image_id)), None)
     if not image:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
-    return await catalog_service.upsert_product_image_translation(session, image=image, lang=lang, payload=payload)
+    return await catalog_service.upsert_product_image_translation(
+        session, image=image, lang=lang, payload=payload, user_id=current_user.id, source=source
+    )
 
 
 @router.delete("/products/{slug}/images/{image_id}/translations/{lang}", status_code=status.HTTP_204_NO_CONTENT)
@@ -961,7 +1057,8 @@ async def delete_product_image_translation(
     image_id: UUID,
     lang: str = Path(..., pattern="^(en|ro)$"),
     session: AsyncSession = Depends(get_session),
-    _: object = Depends(require_admin_section("products")),
+    current_user=Depends(require_admin_section("products")),
+    source: str | None = Query(default=None, pattern="^(storefront)$"),
 ) -> None:
     product = await catalog_service.get_product_by_slug(session, slug, options=[selectinload(Product.images)])
     if not product or product.is_deleted:
@@ -969,7 +1066,7 @@ async def delete_product_image_translation(
     image = next((img for img in product.images if str(img.id) == str(image_id)), None)
     if not image:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
-    await catalog_service.delete_product_image_translation(session, image=image, lang=lang)
+    await catalog_service.delete_product_image_translation(session, image=image, lang=lang, user_id=current_user.id, source=source)
     return None
 
 

@@ -336,7 +336,7 @@ export class ProductCardComponent implements OnChanges {
     if (!slug) return;
 
     this.statusSaving = true;
-    this.admin.updateProduct(slug, { status: desired }).subscribe({
+    this.admin.updateProduct(slug, { status: desired }, { source: 'storefront' }).subscribe({
       next: (updated) => {
         this.statusSaving = false;
         if (updated?.status) {
@@ -345,7 +345,13 @@ export class ProductCardComponent implements OnChanges {
         } else {
           this.product.status = desired;
         }
-        this.toast.success(this.translate.instant('adminUi.products.inline.success'));
+        const nextStatus = String(updated?.status || desired).trim() || desired;
+        this.toast.action(
+          this.translate.instant('adminUi.products.inline.success'),
+          this.translate.instant('adminUi.common.undo'),
+          () => this.undoStatusChange(slug, current, nextStatus, select),
+          { tone: 'success' }
+        );
       },
       error: () => {
         this.statusSaving = false;
@@ -393,16 +399,88 @@ export class ProductCardComponent implements OnChanges {
     if (stockChanged) update.stock_quantity = stock;
 
     this.inlineSaving = true;
-    this.admin.bulkUpdateProducts([update]).subscribe({
+    this.admin.bulkUpdateProducts([update], { source: 'storefront' }).subscribe({
       next: () => {
         this.inlineSaving = false;
-        if (priceChanged) this.product.base_price = Number(price.toFixed(2));
-        if (stockChanged) this.product.stock_quantity = stock;
-        this.toast.success(this.translate.instant('adminUi.products.inline.success'));
+        const nextPrice = priceChanged ? Number(price.toFixed(2)) : currentPrice;
+        const nextStock = stockChanged ? stock : currentStock;
+        if (priceChanged) this.product.base_price = nextPrice;
+        if (stockChanged) this.product.stock_quantity = nextStock;
+        this.toast.action(
+          this.translate.instant('adminUi.products.inline.success'),
+          this.translate.instant('adminUi.common.undo'),
+          () => this.undoInlineUpdate(currentPrice, currentStock, nextPrice, nextStock),
+          { tone: 'success' }
+        );
       },
       error: () => {
         this.inlineSaving = false;
         this.toast.error(this.translate.instant('adminUi.products.inline.errors.save'));
+      }
+    });
+  }
+
+  private undoStatusChange(
+    slug: string,
+    previousStatus: string,
+    currentStatus: string,
+    select?: HTMLSelectElement | null
+  ): void {
+    if (!this.showStorefrontEdit()) return;
+    if (this.statusSaving) return;
+    const desired = (previousStatus || '').trim();
+    if (!desired) return;
+
+    this.statusSaving = true;
+    this.product.status = desired;
+    if (select) select.value = desired;
+    this.admin.updateProduct(slug, { status: desired }, { source: 'storefront' }).subscribe({
+      next: (updated) => {
+        this.statusSaving = false;
+        const next = String(updated?.status || desired).trim() || desired;
+        this.product.status = next;
+        if (select) select.value = next;
+        this.toast.success(this.translate.instant('adminUi.storefront.undoApplied'));
+      },
+      error: () => {
+        this.statusSaving = false;
+        this.product.status = currentStatus;
+        if (select) select.value = currentStatus;
+        this.toast.error(this.translate.instant('adminUi.storefront.undoFailed'));
+      }
+    });
+  }
+
+  private undoInlineUpdate(previousPrice: number, previousStock: number, currentPrice: number, currentStock: number): void {
+    if (!this.showStorefrontEdit()) return;
+    if (this.inlineSaving) return;
+    if (!this.product?.id) return;
+
+    const update: { product_id: string; base_price: number; stock_quantity: number } = {
+      product_id: this.product.id,
+      base_price: Number(previousPrice.toFixed(2)),
+      stock_quantity: previousStock
+    };
+
+    this.inlineSaving = true;
+    this.inlineError = '';
+    this.product.base_price = Number(previousPrice.toFixed(2));
+    this.product.stock_quantity = previousStock;
+    this.inlinePrice = Number(previousPrice.toFixed(2)).toFixed(2);
+    this.inlineStock = String(previousStock);
+
+    this.admin.bulkUpdateProducts([update], { source: 'storefront' }).subscribe({
+      next: () => {
+        this.inlineSaving = false;
+        this.toast.success(this.translate.instant('adminUi.storefront.undoApplied'));
+      },
+      error: () => {
+        this.inlineSaving = false;
+        this.product.base_price = Number(currentPrice.toFixed(2));
+        this.product.stock_quantity = currentStock;
+        this.inlinePrice = Number(currentPrice.toFixed(2)).toFixed(2);
+        this.inlineStock = String(currentStock);
+        this.toast.error(this.translate.instant('adminUi.storefront.undoFailed'));
       }
     });
   }
