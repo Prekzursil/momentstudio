@@ -43,6 +43,14 @@ class BlogPostImage(BaseModel):
     sort_order: int
 
 
+class BlogPostAuthor(BaseModel):
+    id: UUID
+    name: str | None = None
+    name_tag: int | None = None
+    username: str | None = None
+    avatar_url: str | None = None
+
+
 class BlogPostRead(BaseModel):
     slug: str
     title: str
@@ -57,6 +65,7 @@ class BlogPostRead(BaseModel):
     tags: list[str] = Field(default_factory=list)
     series: str | None = None
     author_name: str | None = None
+    author: BlogPostAuthor | None = None
     reading_time_minutes: int | None = None
 
 

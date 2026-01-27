@@ -73,6 +73,18 @@ def _author_public_name(author: User | None) -> str | None:
     return name or username or None
 
 
+def _author_payload(author: User | None) -> dict | None:
+    if not author:
+        return None
+    return {
+        "id": author.id,
+        "name": author.name,
+        "name_tag": getattr(author, "name_tag", None),
+        "username": getattr(author, "username", None),
+        "avatar_url": author.avatar_url or author.google_picture_url,
+    }
+
+
 def _excerpt(body: str, max_len: int = 180) -> str:
     cleaned = " ".join((body or "").split())
     if len(cleaned) <= max_len:
@@ -176,6 +188,7 @@ async def list_published_posts(
     tag: str | None = None,
     series: str | None = None,
     sort: str | None = None,
+    author_id: UUID | None = None,
 ) -> tuple[list[ContentBlock], int]:
     now = datetime.now(timezone.utc)
     page = max(1, page)
@@ -187,6 +200,8 @@ async def list_published_posts(
         or_(ContentBlock.published_at.is_(None), ContentBlock.published_at <= now),
         or_(ContentBlock.published_until.is_(None), ContentBlock.published_until > now),
     )
+    if author_id:
+        filters = (*filters, ContentBlock.author_id == author_id)
     pinned_flag = ContentBlock.meta["pinned"].as_boolean().is_(True)
     pin_order = ContentBlock.meta["pin_order"].as_integer()
     pinned_rank = case((pinned_flag, 0), else_=1)
@@ -413,7 +428,8 @@ def to_read(block: ContentBlock, *, lang: str | None = None) -> dict:
     reading_time_minutes = override_minutes or _compute_reading_time_minutes(block.body_markdown)
     summary = _meta_summary(meta, lang=lang, base_lang=getattr(block, "lang", None))
     series = meta.get("series")
-    author_name = _author_public_name(getattr(block, "author", None))
+    author = getattr(block, "author", None)
+    author_name = _author_public_name(author)
     return {
         "slug": _extract_slug(block.key),
         "title": block.title,
@@ -428,6 +444,7 @@ def to_read(block: ContentBlock, *, lang: str | None = None) -> dict:
         "tags": _normalize_tags(meta.get("tags")),
         "series": series.strip() if isinstance(series, str) and series.strip() else None,
         "author_name": author_name,
+        "author": _author_payload(author),
         "reading_time_minutes": reading_time_minutes,
     }
 
