@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.attributes import set_committed_value
 
+from app.core.config import settings
 from app.models.blog import BlogComment, BlogCommentFlag
 from app.models.content import ContentBlock, ContentStatus
 from app.models.user import User, UserRole
@@ -24,6 +25,7 @@ _MD_IMAGE_RE = re.compile(r"!\[([^\]]*)\]\([^)]+\)")
 _MD_LINK_RE = re.compile(r"\[([^\]]+)\]\([^)]+\)")
 _MD_STRIP_PREFIX_RE = re.compile(r"(^|\n)(#{1,6}\s*|>\\s*|[-*]\\s+)")
 _MD_MULTI_SPACE_RE = re.compile(r"\s+")
+_COMMENT_LINK_RE = re.compile(r"(https?://\S+|www\.\S+)", flags=re.IGNORECASE)
 
 _BLOG_SORT_VALUES = {"newest", "oldest", "most_viewed", "most_commented"}
 
@@ -475,6 +477,85 @@ async def list_comments(
     return items, int(total or 0)
 
 
+async def list_comment_threads(
+    session: AsyncSession,
+    *,
+    content_block_id: UUID,
+    page: int,
+    limit: int,
+    sort: str = "newest",
+) -> tuple[list[tuple[BlogComment, list[BlogComment]]], int, int]:
+    page = max(1, page)
+    limit = max(1, min(limit, 50))
+    offset = (page - 1) * limit
+
+    total_threads = await session.scalar(
+        select(func.count())
+        .select_from(BlogComment)
+        .where(BlogComment.content_block_id == content_block_id, BlogComment.parent_id.is_(None))
+    )
+    total_comments = await session.scalar(
+        select(func.count()).select_from(BlogComment).where(BlogComment.content_block_id == content_block_id)
+    )
+
+    roots = (
+        select(BlogComment)
+        .options(selectinload(BlogComment.author))
+        .where(BlogComment.content_block_id == content_block_id, BlogComment.parent_id.is_(None))
+    )
+
+    cleaned_sort = (sort or "").strip().lower()
+    if cleaned_sort == "oldest":
+        roots = roots.order_by(BlogComment.created_at.asc(), BlogComment.id.asc())
+    elif cleaned_sort == "top":
+        reply_counts = (
+            select(BlogComment.parent_id.label("parent_id"), func.count().label("reply_count"))
+            .where(
+                BlogComment.content_block_id == content_block_id,
+                BlogComment.parent_id.isnot(None),
+                BlogComment.is_deleted.is_(False),
+                BlogComment.is_hidden.is_(False),
+            )
+            .group_by(BlogComment.parent_id)
+            .subquery()
+        )
+        roots = (
+            roots.outerjoin(reply_counts, BlogComment.id == reply_counts.c.parent_id)
+            .order_by(
+                func.coalesce(reply_counts.c.reply_count, 0).desc(),
+                BlogComment.created_at.desc(),
+                BlogComment.id.desc(),
+            )
+        )
+    else:
+        roots = roots.order_by(BlogComment.created_at.desc(), BlogComment.id.desc())
+
+    roots_result = await session.execute(roots.limit(limit).offset(offset))
+    root_comments = list(roots_result.scalars().unique())
+    root_ids = [c.id for c in root_comments]
+
+    replies_by_parent: dict[UUID, list[BlogComment]] = {cid: [] for cid in root_ids}
+    if root_ids:
+        replies_result = await session.execute(
+            select(BlogComment)
+            .options(selectinload(BlogComment.author))
+            .where(
+                BlogComment.content_block_id == content_block_id,
+                BlogComment.parent_id.in_(root_ids),
+            )
+            .order_by(BlogComment.created_at.asc(), BlogComment.id.asc())
+        )
+        for reply in replies_result.scalars().unique():
+            if reply.parent_id:
+                replies_by_parent.setdefault(reply.parent_id, []).append(reply)
+
+    threads: list[tuple[BlogComment, list[BlogComment]]] = []
+    for root in root_comments:
+        threads.append((root, replies_by_parent.get(root.id, [])))
+
+    return threads, int(total_threads or 0), int(total_comments or 0)
+
+
 async def list_user_comments(
     session: AsyncSession,
     *,
@@ -610,6 +691,29 @@ async def create_comment(
         parent = await session.get(BlogComment, parent_id)
         if not parent or parent.content_block_id != content_block_id:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid parent comment")
+
+    max_links = int(settings.blog_comments_max_links or 0)
+    if max_links >= 0 and len(_COMMENT_LINK_RE.findall(body)) > max_links:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Too many links in comment")
+
+    if getattr(user, "role", None) not in (UserRole.admin, UserRole.owner):
+        limit_count = int(settings.blog_comments_rate_limit_count or 0)
+        window_seconds = int(settings.blog_comments_rate_limit_window_seconds or 0)
+        if limit_count > 0 and window_seconds > 0:
+            cutoff = datetime.now(timezone.utc) - timedelta(seconds=window_seconds)
+            recent = await session.scalar(
+                select(func.count())
+                .select_from(BlogComment)
+                .where(
+                    BlogComment.user_id == user.id,
+                    BlogComment.created_at >= cutoff,
+                )
+            )
+            if int(recent or 0) >= limit_count:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="Too many comments. Please wait a moment and try again.",
+                )
 
     comment = BlogComment(
         content_block_id=content_block_id,

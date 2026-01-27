@@ -19,10 +19,11 @@ import { AuthService } from '../../core/auth.service';
 import { CatalogService, Category, FeaturedCollection, Product } from '../../core/catalog.service';
 import { MarkdownService } from '../../core/markdown.service';
 import { ToastService } from '../../core/toast.service';
-import { BlogComment, BlogPost, BlogPostListItem, BlogService } from '../../core/blog.service';
+import { BlogComment, BlogCommentSort, BlogPost, BlogPostListItem, BlogService, PaginationMeta } from '../../core/blog.service';
 import { ContainerComponent } from '../../layout/container.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../shared/button.component';
+import { CaptchaTurnstileComponent } from '../../shared/captcha-turnstile.component';
 import { CardComponent } from '../../shared/card.component';
 import { SkeletonComponent } from '../../shared/skeleton.component';
 import { formatIdentity } from '../../shared/user-identity';
@@ -48,6 +49,7 @@ hljs.registerLanguage('typescript', typescript);
     BreadcrumbComponent,
     CardComponent,
     ButtonComponent,
+    CaptchaTurnstileComponent,
     SkeletonComponent
   ],
   template: `
@@ -321,17 +323,56 @@ hljs.registerLanguage('typescript', typescript);
       </section>
 
       <section class="grid gap-3 no-print">
-        <div class="flex items-center justify-between gap-4">
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">
-            {{ 'blog.comments.title' | translate : { count: comments().length } }}
+            {{ 'blog.comments.title' | translate : { count: commentsTotal() } }}
           </h2>
-          <app-button
-            size="sm"
-            variant="ghost"
-            [label]="'blog.comments.refresh' | translate"
-            [disabled]="loadingComments()"
-            (action)="loadComments()"
-          ></app-button>
+          <div class="flex flex-wrap items-center justify-end gap-2">
+            <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+              <span class="font-medium">{{ 'blog.comments.sortLabel' | translate }}</span>
+              <select
+                class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                [disabled]="loadingComments()"
+                [ngModel]="commentSort()"
+                (ngModelChange)="setCommentSort($event)"
+                name="commentSort"
+              >
+                <option value="newest">{{ 'blog.comments.sortNewest' | translate }}</option>
+                <option value="oldest">{{ 'blog.comments.sortOldest' | translate }}</option>
+                <option value="top">{{ 'blog.comments.sortTop' | translate }}</option>
+              </select>
+            </label>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'blog.comments.refresh' | translate"
+              [disabled]="loadingComments()"
+              (action)="loadComments()"
+            ></app-button>
+          </div>
+        </div>
+
+        <div
+          *ngIf="commentsMeta() as meta"
+          class="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-300 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <span>{{ 'blog.comments.pageMeta' | translate : { page: meta.page, totalPages: meta.total_pages } }}</span>
+          <div class="flex items-center justify-center gap-2">
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'blog.comments.prev' | translate"
+              [disabled]="loadingComments() || meta.page <= 1"
+              (action)="goToCommentsPage(meta.page - 1)"
+            ></app-button>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'blog.comments.next' | translate"
+              [disabled]="loadingComments() || meta.page >= meta.total_pages"
+              (action)="goToCommentsPage(meta.page + 1)"
+            ></app-button>
+          </div>
         </div>
 
         <div *ngIf="loadingComments()" class="grid gap-3">
@@ -347,10 +388,18 @@ hljs.registerLanguage('typescript', typescript);
         </div>
 
         <div
-          *ngIf="!loadingComments() && !hasCommentsError() && comments().length === 0"
+          *ngIf="!loadingComments() && !hasCommentsError() && commentsTotal() === 0"
           class="border border-dashed border-slate-200 rounded-2xl p-6 text-center text-sm text-slate-600 dark:border-slate-800 dark:text-slate-300"
         >
           {{ 'blog.comments.empty' | translate }}
+        </div>
+
+        <div
+          *ngIf="!loadingComments() && !hasCommentsError() && commentsTotal() > 0 && comments().length === 0"
+          class="border border-dashed border-slate-200 rounded-2xl p-6 text-center text-sm text-slate-600 dark:border-slate-800 dark:text-slate-300 grid gap-2"
+        >
+          <p>{{ 'blog.comments.emptyPage' | translate }}</p>
+          <app-button size="sm" variant="ghost" [label]="'blog.comments.goToFirstPage' | translate" (action)="goToCommentsPage(1)"></app-button>
         </div>
 
         <div *ngIf="!loadingComments() && !hasCommentsError() && comments().length" class="grid gap-3">
@@ -488,11 +537,17 @@ hljs.registerLanguage('typescript', typescript);
               <app-button
                 size="sm"
                 [label]="'blog.comments.submit' | translate"
-                [disabled]="submitting() || !commentBody.trim()"
+                [disabled]="submitting() || !commentBody.trim() || (captchaEnabled && !commentCaptchaToken)"
                 (action)="submitComment()"
               ></app-button>
               <span *ngIf="submitting()" class="text-xs text-slate-500 dark:text-slate-400">{{ 'blog.comments.submitting' | translate }}</span>
             </div>
+
+            <app-captcha-turnstile
+              *ngIf="captchaEnabled"
+              [siteKey]="captchaSiteKey"
+              (tokenChange)="commentCaptchaToken = $event"
+            ></app-captcha-turnstile>
           </form>
         </app-card>
       </section>
@@ -591,11 +646,19 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   comments = signal<BlogComment[]>([]);
   loadingComments = signal<boolean>(true);
   hasCommentsError = signal<boolean>(false);
+  commentsMeta = signal<PaginationMeta | null>(null);
+  commentsTotal = signal<number>(0);
+  commentSort = signal<BlogCommentSort>('newest');
+  commentPage = signal<number>(1);
+  private readonly commentThreadsLimit = 10;
   commentSkeletons = Array.from({ length: 3 });
 
   commentBody = '';
   submitting = signal<boolean>(false);
   replyTo = signal<BlogComment | null>(null);
+  captchaSiteKey = appConfig.captchaSiteKey;
+  captchaEnabled = Boolean(this.captchaSiteKey);
+  commentCaptchaToken: string | null = null;
   isPreview = signal<boolean>(false);
   readingProgress = signal<number>(0);
   showBackToTop = signal<boolean>(false);
@@ -637,6 +700,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   });
 
   @ViewChild('articleContent') articleContent?: ElementRef<HTMLElement>;
+  @ViewChild(CaptchaTurnstileComponent) commentCaptcha?: CaptchaTurnstileComponent;
 
   private slug = '';
   private previewToken = '';
@@ -728,6 +792,17 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     this.scrollEndY = 1;
     this.tocHeadingEls = [];
     this.setCanonical();
+    this.comments.set([]);
+    this.commentsMeta.set(null);
+    this.commentsTotal.set(0);
+    this.commentSort.set('newest');
+    this.commentPage.set(1);
+    this.loadingComments.set(true);
+    this.hasCommentsError.set(false);
+    this.replyTo.set(null);
+    this.commentBody = '';
+    this.commentCaptchaToken = null;
+    this.commentCaptcha?.reset();
 
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     const req = this.previewToken
@@ -771,6 +846,10 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         this.readingProgress.set(0);
         this.showBackToTop.set(false);
         this.comments.set([]);
+        this.commentsMeta.set(null);
+        this.commentsTotal.set(0);
+        this.loadingComments.set(false);
+        this.hasCommentsError.set(false);
       }
     });
   }
@@ -1051,22 +1130,56 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     w.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank', 'noopener,noreferrer');
   }
 
-  loadComments(): void {
+  loadComments(opts: { page?: number; sort?: BlogCommentSort } = {}): void {
     if (!this.slug) return;
+
+    const nextSort = opts.sort ?? this.commentSort();
+    const sort = nextSort === 'oldest' || nextSort === 'top' || nextSort === 'newest' ? nextSort : 'newest';
+    const nextPage = opts.page ?? this.commentPage();
+    const page = Math.max(1, Math.floor(nextPage));
+
+    this.commentSort.set(sort);
+    this.commentPage.set(page);
+
     this.loadingComments.set(true);
     this.hasCommentsError.set(false);
-    this.blog.listComments(this.slug, { page: 1, limit: 50 }).subscribe({
+    this.blog.listCommentThreads(this.slug, { page, limit: this.commentThreadsLimit, sort }).subscribe({
       next: (resp) => {
-        this.comments.set(resp.items);
+        const flattened: BlogComment[] = [];
+        for (const thread of resp.items || []) {
+          if (thread?.root) flattened.push(thread.root);
+          if (Array.isArray(thread?.replies)) flattened.push(...thread.replies);
+        }
+        this.comments.set(flattened);
+        this.commentsMeta.set(resp.meta ?? null);
+        this.commentsTotal.set(Number(resp.total_comments ?? 0));
         this.loadingComments.set(false);
         this.hasCommentsError.set(false);
       },
       error: () => {
         this.comments.set([]);
+        this.commentsMeta.set(null);
+        this.commentsTotal.set(0);
         this.loadingComments.set(false);
         this.hasCommentsError.set(true);
       }
     });
+  }
+
+  setCommentSort(sort: BlogCommentSort): void {
+    const next = (sort || '').toLowerCase();
+    if (next !== 'newest' && next !== 'oldest' && next !== 'top') return;
+    if (next === this.commentSort()) return;
+    this.commentPage.set(1);
+    this.loadComments({ page: 1, sort: next as BlogCommentSort });
+  }
+
+  goToCommentsPage(page: number): void {
+    const meta = this.commentsMeta();
+    let nextPage = Math.max(1, Math.floor(page));
+    if (meta) nextPage = Math.min(nextPage, Math.max(1, meta.total_pages));
+    if (nextPage === this.commentPage()) return;
+    this.loadComments({ page: nextPage });
   }
 
   rootComments(): BlogComment[] {
@@ -1108,18 +1221,62 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     if (!this.auth.isAuthenticated()) return;
     const body = this.commentBody.trim();
     if (!body) return;
+    if (this.captchaEnabled && !this.commentCaptchaToken) {
+      this.toast.error(this.translate.instant('blog.comments.createErrorTitle'), this.translate.instant('auth.captchaRequired'));
+      return;
+    }
 
     this.submitting.set(true);
     const parent = this.replyTo();
-    this.blog.createComment(this.slug, { body, parent_id: parent?.id ?? null }).subscribe({
+    this.blog.createComment(this.slug, { body, parent_id: parent?.id ?? null, captcha_token: this.commentCaptchaToken }).subscribe({
       next: () => {
         this.commentBody = '';
         this.replyTo.set(null);
         this.submitting.set(false);
+        if (!parent) {
+          if (this.commentSort() === 'oldest') {
+            const meta = this.commentsMeta();
+            const totalThreads = meta?.total_items ?? 0;
+            const limit = meta?.limit ?? this.commentThreadsLimit;
+            const lastPage = Math.max(1, Math.ceil((totalThreads + 1) / limit));
+            this.commentPage.set(lastPage);
+          } else if (this.commentSort() === 'top') {
+            this.commentSort.set('newest');
+            this.commentPage.set(1);
+          } else {
+            this.commentPage.set(1);
+          }
+        }
+        this.commentCaptchaToken = null;
+        this.commentCaptcha?.reset();
         this.loadComments();
       },
-      error: () => {
+      error: (err) => {
         this.submitting.set(false);
+        this.commentCaptchaToken = null;
+        this.commentCaptcha?.reset();
+        const statusCode = typeof (err as any)?.status === 'number' ? (err as any).status : 0;
+        const detail = (err as any)?.error?.detail;
+        if (statusCode === 429) {
+          this.toast.error(this.translate.instant('blog.comments.rateLimitedTitle'), this.translate.instant('blog.comments.rateLimitedCopy'));
+          return;
+        }
+        if (statusCode === 400 && typeof detail === 'string') {
+          if (detail.toLowerCase().includes('link')) {
+            this.toast.error(this.translate.instant('blog.comments.linkLimitTitle'), this.translate.instant('blog.comments.linkLimitCopy'));
+            return;
+          }
+          if (detail.toLowerCase().includes('captcha')) {
+            const copy =
+              detail.toLowerCase().includes('required')
+                ? this.translate.instant('auth.captchaRequired')
+                : this.translate.instant('auth.captchaFailedTryAgain');
+            this.toast.error(this.translate.instant('blog.comments.createErrorTitle'), copy);
+            return;
+          }
+          this.toast.error(this.translate.instant('blog.comments.createErrorTitle'), detail);
+          return;
+        }
         this.toast.error(this.translate.instant('blog.comments.createErrorTitle'), this.translate.instant('blog.comments.createErrorCopy'));
       }
     });

@@ -451,8 +451,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Blog post: embedded product cards – Allow inserting product/category/collection cards inside posts (shoppable content).
 - [x] Blog post: author card – Author bio + avatar + links, plus “More from this author”.
 - [x] Blog post: print-friendly styles – Clean print stylesheet (no nav, readable typography, proper image sizing).
-- [ ] Blog post: comments UX – Pagination + sorting (newest/oldest/top) and improved empty/loading states.
-- [ ] Blog comments: spam controls – Rate limits + link limits + optional CAPTCHA on comment submit.
+- [x] Blog post: comments UX – Pagination + sorting (newest/oldest/top) and improved empty/loading states.
+- [x] Blog comments: spam controls – Rate limits + link limits + optional CAPTCHA on comment submit.
 - [ ] Blog: newsletter subscribe – Inline subscribe block and optional “subscribe to comments” on a post.
 - [ ] Storefront admin quick edit: edit buttons – Show “Edit” on blog cards/posts for admins (links to admin editor).
 - [ ] Storefront admin quick edit: publish toggle – Allow publish/unpublish/schedule from the blog page in admin mode.

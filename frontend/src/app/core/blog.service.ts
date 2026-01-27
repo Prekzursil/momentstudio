@@ -88,6 +88,19 @@ export interface BlogCommentListResponse {
   meta: PaginationMeta;
 }
 
+export type BlogCommentSort = 'newest' | 'oldest' | 'top';
+
+export interface BlogCommentThread {
+  root: BlogComment;
+  replies: BlogComment[];
+}
+
+export interface BlogCommentThreadListResponse {
+  items: BlogCommentThread[];
+  meta: PaginationMeta;
+  total_comments: number;
+}
+
 export interface BlogCommentFlag {
   id: string;
   user_id: string;
@@ -205,19 +218,30 @@ export class BlogService {
     return this.api.get<BlogCommentListResponse>(`/blog/posts/${slug}/comments`, {
       page: params.page ?? 1,
       limit: params.limit ?? 50
-    });
+    }, { 'X-Silent': '1' });
   }
 
-  createComment(slug: string, payload: { body: string; parent_id?: string | null }): Observable<BlogComment> {
-    return this.api.post<BlogComment>(`/blog/posts/${slug}/comments`, payload);
+  listCommentThreads(
+    slug: string,
+    params: { page?: number; limit?: number; sort?: BlogCommentSort } = {}
+  ): Observable<BlogCommentThreadListResponse> {
+    return this.api.get<BlogCommentThreadListResponse>(`/blog/posts/${slug}/comment-threads`, {
+      sort: params.sort ?? 'newest',
+      page: params.page ?? 1,
+      limit: params.limit ?? 10
+    }, { 'X-Silent': '1' });
+  }
+
+  createComment(slug: string, payload: { body: string; parent_id?: string | null; captcha_token?: string | null }): Observable<BlogComment> {
+    return this.api.post<BlogComment>(`/blog/posts/${slug}/comments`, payload, { 'X-Silent': '1' });
   }
 
   deleteComment(commentId: string): Observable<void> {
-    return this.api.delete<void>(`/blog/comments/${commentId}`);
+    return this.api.delete<void>(`/blog/comments/${commentId}`, { 'X-Silent': '1' });
   }
 
   flagComment(commentId: string, payload: { reason?: string | null }): Observable<BlogCommentFlag> {
-    return this.api.post<BlogCommentFlag>(`/blog/comments/${commentId}/flag`, payload);
+    return this.api.post<BlogCommentFlag>(`/blog/comments/${commentId}/flag`, payload, { 'X-Silent': '1' });
   }
 
   listFlaggedComments(params: { page?: number; limit?: number } = {}): Observable<AdminBlogCommentListResponse> {

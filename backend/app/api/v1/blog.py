@@ -25,6 +25,8 @@ from app.schemas.blog import (
     BlogCommentHideRequest,
     BlogCommentListResponse,
     BlogCommentRead,
+    BlogCommentThreadListResponse,
+    BlogCommentThreadRead,
     BlogMyCommentListResponse,
     BlogMyCommentRead,
     BlogPostNeighbors,
@@ -34,6 +36,7 @@ from app.schemas.blog import (
 )
 from app.schemas.catalog import PaginationMeta
 from app.services import blog as blog_service
+from app.services import captcha as captcha_service
 from app.services import content as content_service
 from app.services import email as email_service
 from app.services import notifications as notification_service
@@ -334,6 +337,35 @@ async def list_blog_comments(
     )
 
 
+@router.get("/posts/{slug}/comment-threads", response_model=BlogCommentThreadListResponse)
+async def list_blog_comment_threads(
+    slug: str,
+    session: AsyncSession = Depends(get_session),
+    sort: str = Query(default="newest", pattern="^(newest|oldest|top)$"),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=10, ge=1, le=50),
+) -> BlogCommentThreadListResponse:
+    post = await blog_service.get_published_post(session, slug=slug, lang=None)
+    if not post:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+
+    threads, total_threads, total_comments = await blog_service.list_comment_threads(
+        session, content_block_id=post.id, page=page, limit=limit, sort=sort
+    )
+    total_pages = (total_threads + limit - 1) // limit if total_threads else 1
+    return BlogCommentThreadListResponse(
+        items=[
+            BlogCommentThreadRead(
+                root=BlogCommentRead.model_validate(blog_service.to_comment_read(root)),
+                replies=[BlogCommentRead.model_validate(blog_service.to_comment_read(r)) for r in replies],
+            )
+            for root, replies in threads
+        ],
+        meta=PaginationMeta(total_items=total_threads, total_pages=total_pages, page=page, limit=limit),
+        total_comments=total_comments,
+    )
+
+
 @router.get("/me/comments", response_model=BlogMyCommentListResponse)
 async def list_my_blog_comments(
     current_user: User = Depends(require_complete_profile),
@@ -356,6 +388,7 @@ async def list_my_blog_comments(
 async def create_blog_comment(
     slug: str,
     payload: BlogCommentCreate,
+    request: Request,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(require_complete_profile),
     session: AsyncSession = Depends(get_session),
@@ -363,6 +396,7 @@ async def create_blog_comment(
     post = await blog_service.get_published_post(session, slug=slug, lang=None)
     if not post:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+    await captcha_service.verify(payload.captcha_token, remote_ip=request.client.host if request.client else None)
     comment = await blog_service.create_comment(
         session,
         content_block_id=post.id,

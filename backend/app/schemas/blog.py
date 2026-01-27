@@ -80,6 +80,7 @@ class BlogCommentAuthor(BaseModel):
 class BlogCommentCreate(BaseModel):
     body: str = Field(min_length=1, max_length=2000)
     parent_id: UUID | None = None
+    captcha_token: str | None = Field(default=None, max_length=5000)
 
 
 class BlogCommentFlagCreate(BaseModel):
@@ -109,6 +110,17 @@ class BlogCommentRead(BaseModel):
 class BlogCommentListResponse(BaseModel):
     items: list[BlogCommentRead]
     meta: PaginationMeta
+
+
+class BlogCommentThreadRead(BaseModel):
+    root: BlogCommentRead
+    replies: list[BlogCommentRead] = Field(default_factory=list)
+
+
+class BlogCommentThreadListResponse(BaseModel):
+    items: list[BlogCommentThreadRead]
+    meta: PaginationMeta
+    total_comments: int = 0
 
 
 class BlogCommentAdminRead(BaseModel):

@@ -130,10 +130,15 @@ class Settings(BaseSettings):
     google_allowed_domains: list[str] = []
     google_completion_token_exp_minutes: int = 30
 
-    # CAPTCHA (login/register only; Google OAuth is exempt)
+    # CAPTCHA (used in auth + optional blog comment protection; Google OAuth is exempt)
     captcha_enabled: bool = False
     captcha_provider: str = "turnstile"
     turnstile_secret_key: str | None = None
+
+    # Blog comments: spam controls
+    blog_comments_rate_limit_count: int = 10
+    blog_comments_rate_limit_window_seconds: int = 60
+    blog_comments_max_links: int = 2
 
     # FX rates (used for display-only approximations; checkout remains in RON)
     fx_rates_url: str = "https://www.bnr.ro/nbrfxrates.xml"

@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from app.core.config import settings
 from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
@@ -373,6 +374,46 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     assert by_id[comment_id]["parent_id"] is None
     assert by_id[reply_id]["parent_id"] == comment_id
 
+    threads = client.get(
+        "/api/v1/blog/posts/first-post/comment-threads",
+        params={"sort": "newest", "page": 1, "limit": 10},
+    )
+    assert threads.status_code == 200, threads.text
+    threads_json = threads.json()
+    assert threads_json["total_comments"] == 2
+    assert threads_json["meta"]["total_items"] == 1
+    assert threads_json["items"][0]["root"]["id"] == comment_id
+    assert {r["id"] for r in threads_json["items"][0]["replies"]} == {reply_id}
+
+    second_root = client.post(
+        "/api/v1/blog/posts/first-post/comments",
+        json={"body": "Second root"},
+        headers=auth_headers(user_token),
+    )
+    assert second_root.status_code == 201, second_root.text
+    second_root_id = second_root.json()["id"]
+    reply2 = client.post(
+        "/api/v1/blog/posts/first-post/comments",
+        json={"body": "Reply A", "parent_id": second_root_id},
+        headers=auth_headers(flagger_token),
+    )
+    assert reply2.status_code == 201, reply2.text
+    reply3 = client.post(
+        "/api/v1/blog/posts/first-post/comments",
+        json={"body": "Reply B", "parent_id": second_root_id},
+        headers=auth_headers(flagger2_token),
+    )
+    assert reply3.status_code == 201, reply3.text
+
+    threads_top = client.get(
+        "/api/v1/blog/posts/first-post/comment-threads",
+        params={"sort": "top", "page": 1, "limit": 10},
+    )
+    assert threads_top.status_code == 200, threads_top.text
+    top_items = threads_top.json()["items"]
+    assert top_items[0]["root"]["id"] == second_root_id
+    assert top_items[1]["root"]["id"] == comment_id
+
     # Moderation: users can flag comments, admins can review/resolve/hide/unhide.
     flagged = client.post(
         f"/api/v1/blog/comments/{comment_id}/flag",
@@ -456,3 +497,62 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     assert "blog/first-post?lang=en" in sitemap_after_unpublish.text
     assert "blog/second-post?lang=en" not in sitemap_after_unpublish.text
     assert "blog/third-post?lang=en" in sitemap_after_unpublish.text
+
+
+def test_blog_comment_spam_controls(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    admin_token = create_user_token(SessionLocal, email="admin@example.com", role=UserRole.admin)
+    user_token = create_user_token(SessionLocal, email="user@example.com", role=UserRole.customer)
+
+    create_post = client.post(
+        "/api/v1/content/admin/blog.first-post",
+        json={
+            "title": "Salut",
+            "body_markdown": "Postare RO",
+            "status": "published",
+            "lang": "ro",
+            "meta": {"summary": {"ro": "Rezumat RO", "en": "Summary EN"}},
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert create_post.status_code == 201, create_post.text
+
+    old_rate_limit = settings.blog_comments_rate_limit_count
+    old_rate_window = settings.blog_comments_rate_limit_window_seconds
+    old_max_links = settings.blog_comments_max_links
+    settings.blog_comments_rate_limit_count = 2
+    settings.blog_comments_rate_limit_window_seconds = 60
+    settings.blog_comments_max_links = 0
+    try:
+        link_blocked = client.post(
+            "/api/v1/blog/posts/first-post/comments",
+            json={"body": "Check https://example.com"},
+            headers=auth_headers(user_token),
+        )
+        assert link_blocked.status_code == 400, link_blocked.text
+        assert "link" in link_blocked.json()["detail"].lower()
+
+        ok1 = client.post(
+            "/api/v1/blog/posts/first-post/comments",
+            json={"body": "One"},
+            headers=auth_headers(user_token),
+        )
+        assert ok1.status_code == 201, ok1.text
+        ok2 = client.post(
+            "/api/v1/blog/posts/first-post/comments",
+            json={"body": "Two"},
+            headers=auth_headers(user_token),
+        )
+        assert ok2.status_code == 201, ok2.text
+        limited = client.post(
+            "/api/v1/blog/posts/first-post/comments",
+            json={"body": "Three"},
+            headers=auth_headers(user_token),
+        )
+        assert limited.status_code == 429, limited.text
+    finally:
+        settings.blog_comments_rate_limit_count = old_rate_limit
+        settings.blog_comments_rate_limit_window_seconds = old_rate_window
+        settings.blog_comments_max_links = old_max_links
