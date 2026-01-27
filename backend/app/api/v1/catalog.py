@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, Path, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -30,6 +30,10 @@ from app.schemas.catalog import (
     CategoryTranslationUpsert,
     CategoryUpdate,
     CategoryReorderItem,
+    CategoryDeletePreview,
+    CategoryMergePreview,
+    CategoryMergeRequest,
+    CategoryMergeResult,
     ProductCreate,
     ProductRead,
     ProductReadBrief,
@@ -309,6 +313,113 @@ async def upload_category_image(
     await session.commit()
     await session.refresh(category)
     return category
+
+
+@router.get("/categories/{slug}/delete/preview", response_model=CategoryDeletePreview)
+async def preview_delete_category(
+    slug: str,
+    session: AsyncSession = Depends(get_session),
+    _: object = Depends(require_admin_section("products")),
+) -> CategoryDeletePreview:
+    category = await catalog_service.get_category_by_slug(session, slug)
+    if not category:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
+
+    product_count = (
+        await session.execute(select(func.count(Product.id)).where(Product.category_id == category.id))
+    ).scalar_one()
+    child_count = (
+        await session.execute(select(func.count(Category.id)).where(Category.parent_id == category.id))
+    ).scalar_one()
+    product_count_int = int(product_count or 0)
+    child_count_int = int(child_count or 0)
+    return CategoryDeletePreview(
+        slug=category.slug,
+        product_count=product_count_int,
+        child_count=child_count_int,
+        can_delete=product_count_int == 0 and child_count_int == 0,
+    )
+
+
+@router.get("/categories/{slug}/merge/preview", response_model=CategoryMergePreview)
+async def preview_merge_category(
+    slug: str,
+    target_slug: str = Query(min_length=1),
+    session: AsyncSession = Depends(get_session),
+    _: object = Depends(require_admin_section("products")),
+) -> CategoryMergePreview:
+    source = await catalog_service.get_category_by_slug(session, slug)
+    if not source:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
+    target = await catalog_service.get_category_by_slug(session, target_slug)
+    if not target:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target category not found")
+
+    product_count = (
+        await session.execute(select(func.count(Product.id)).where(Product.category_id == source.id))
+    ).scalar_one()
+    child_count = (
+        await session.execute(select(func.count(Category.id)).where(Category.parent_id == source.id))
+    ).scalar_one()
+    product_count_int = int(product_count or 0)
+    child_count_int = int(child_count or 0)
+
+    can_merge = True
+    reason: str | None = None
+    if source.slug == target.slug:
+        can_merge = False
+        reason = "same_category"
+    elif source.parent_id != target.parent_id:
+        can_merge = False
+        reason = "different_parent"
+    elif child_count_int > 0:
+        can_merge = False
+        reason = "source_has_children"
+
+    return CategoryMergePreview(
+        source_slug=source.slug,
+        target_slug=target.slug,
+        product_count=product_count_int,
+        child_count=child_count_int,
+        can_merge=can_merge,
+        reason=reason,
+    )
+
+
+@router.post("/categories/{slug}/merge", response_model=CategoryMergeResult)
+async def merge_category(
+    slug: str,
+    payload: CategoryMergeRequest,
+    session: AsyncSession = Depends(get_session),
+    _: object = Depends(require_admin_section("products")),
+) -> CategoryMergeResult:
+    source = await catalog_service.get_category_by_slug(session, slug)
+    if not source:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
+    target = await catalog_service.get_category_by_slug(session, payload.target_slug)
+    if not target:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target category not found")
+    if source.slug == target.slug:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot merge a category into itself")
+    if source.parent_id != target.parent_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Categories must share the same parent")
+
+    child_count = (
+        await session.execute(select(func.count(Category.id)).where(Category.parent_id == source.id))
+    ).scalar_one()
+    if int(child_count or 0) > 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot merge a category with subcategories")
+
+    result = await session.execute(
+        update(Product)
+        .where(Product.category_id == source.id)
+        .values(category_id=target.id, updated_at=func.now())
+    )
+    moved_products = int(result.rowcount or 0)
+
+    await session.delete(source)
+    await session.commit()
+    return CategoryMergeResult(source_slug=source.slug, target_slug=target.slug, moved_products=moved_products)
 
 
 @router.post("/products", response_model=ProductRead, status_code=status.HTTP_201_CREATED)

@@ -256,6 +256,28 @@ export interface AdminCategoryTranslation {
   description?: string | null;
 }
 
+export interface AdminCategoryDeletePreview {
+  slug: string;
+  product_count: number;
+  child_count: number;
+  can_delete: boolean;
+}
+
+export interface AdminCategoryMergePreview {
+  source_slug: string;
+  target_slug: string;
+  product_count: number;
+  child_count: number;
+  can_merge: boolean;
+  reason?: string | null;
+}
+
+export interface AdminCategoryMergeResult {
+  source_slug: string;
+  target_slug: string;
+  moved_products: number;
+}
+
 export interface AdminProductDetail extends AdminProduct {
   short_description?: string | null;
   long_description?: string | null;
@@ -803,6 +825,18 @@ export class AdminService {
     const form = new FormData();
     form.append('file', file);
     return this.api.post<AdminCategory>(`/catalog/categories/${slug}/images/${kind}`, form);
+  }
+
+  previewDeleteCategory(slug: string): Observable<AdminCategoryDeletePreview> {
+    return this.api.get<AdminCategoryDeletePreview>(`/catalog/categories/${slug}/delete/preview`);
+  }
+
+  previewMergeCategory(sourceSlug: string, targetSlug: string): Observable<AdminCategoryMergePreview> {
+    return this.api.get<AdminCategoryMergePreview>(`/catalog/categories/${sourceSlug}/merge/preview`, { target_slug: targetSlug });
+  }
+
+  mergeCategory(sourceSlug: string, targetSlug: string): Observable<AdminCategoryMergeResult> {
+    return this.api.post<AdminCategoryMergeResult>(`/catalog/categories/${sourceSlug}/merge`, { target_slug: targetSlug });
   }
 
   getCategoryTranslations(slug: string): Observable<AdminCategoryTranslation[]> {

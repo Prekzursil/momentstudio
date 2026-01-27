@@ -90,6 +90,32 @@ class CategoryRead(CategoryBase):
     tax_group_id: UUID | None = None
 
 
+class CategoryDeletePreview(BaseModel):
+    slug: str
+    product_count: int
+    child_count: int
+    can_delete: bool
+
+
+class CategoryMergePreview(BaseModel):
+    source_slug: str
+    target_slug: str
+    product_count: int
+    child_count: int
+    can_merge: bool
+    reason: str | None = None
+
+
+class CategoryMergeRequest(BaseModel):
+    target_slug: str = Field(min_length=1, max_length=120)
+
+
+class CategoryMergeResult(BaseModel):
+    source_slug: str
+    target_slug: str
+    moved_products: int
+
+
 class CategoryTranslationUpsert(BaseModel):
     name: str = Field(min_length=1, max_length=160)
     description: str | None = None

@@ -9,7 +9,7 @@ import { InputComponent } from '../../shared/input.component';
 import { ProductCardComponent } from '../../shared/product-card.component';
 import { ProductQuickViewModalComponent } from '../../shared/product-quick-view-modal.component';
 import { SkeletonComponent } from '../../shared/skeleton.component';
-import { AdminService } from '../../core/admin.service';
+import { AdminCategoryDeletePreview, AdminCategoryMergePreview, AdminService } from '../../core/admin.service';
 import { StorefrontAdminModeService } from '../../core/storefront-admin-mode.service';
 import { ToastService } from '../../core/toast.service';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
@@ -268,15 +268,89 @@ interface ShopFilterChip {
 		                        [disabled]="renameSaving"
 		                        (action)="cancelRenameCategory()"
 		                      ></app-button>
-		                      <app-button
-		                        [label]="renameSaving ? ('adminUi.common.saving' | translate) : ('adminUi.common.save' | translate)"
-		                        size="sm"
-		                        [disabled]="renameSaving || !canSaveRename()"
-		                        (action)="saveRenameCategory()"
-		                      ></app-button>
-		                    </div>
-		                  </div>
-		                </div>
+			                      <app-button
+			                        [label]="renameSaving ? ('adminUi.common.saving' | translate) : ('adminUi.common.save' | translate)"
+			                        size="sm"
+			                        [disabled]="renameSaving || !canSaveRename()"
+			                        (action)="saveRenameCategory()"
+			                      ></app-button>
+			                    </div>
+			                    <div class="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+			                      <p class="text-xs font-semibold text-slate-800 dark:text-slate-100">
+			                        {{ 'adminUi.storefront.categories.mergeTitle' | translate }}
+			                      </p>
+			                      <label class="grid gap-1">
+			                        <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">
+			                          {{ 'adminUi.storefront.categories.mergeInto' | translate }}
+			                        </span>
+			                        <select
+			                          class="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                          [(ngModel)]="mergeTargetSlug"
+			                          (ngModelChange)="onMergeTargetChange()"
+			                          [disabled]="mergePreviewLoading || mergeSaving || deletePreviewLoading || deleteSaving"
+			                        >
+			                          <option value="">{{ 'adminUi.storefront.categories.mergeSelectPlaceholder' | translate }}</option>
+			                          <option
+			                            *ngFor="let target of rootCategories"
+			                            [value]="target.slug"
+			                            [disabled]="target.slug === category.slug"
+			                          >
+			                            {{ target.name }}
+			                          </option>
+			                        </select>
+			                      </label>
+			                      <p *ngIf="mergePreview" class="text-xs text-slate-600 dark:text-slate-300">
+			                        {{
+			                          'adminUi.storefront.categories.mergePreviewInfo'
+			                            | translate : { products: mergePreview.product_count, children: mergePreview.child_count }
+			                        }}
+			                      </p>
+			                      <p *ngIf="mergeError" class="text-xs text-rose-700 dark:text-rose-300">{{ mergeError }}</p>
+			                      <div class="flex flex-wrap justify-end gap-2">
+			                        <app-button
+			                          [label]="mergePreviewLoading ? ('adminUi.common.loading' | translate) : ('adminUi.storefront.categories.mergePreview' | translate)"
+			                          size="sm"
+			                          variant="ghost"
+			                          [disabled]="mergePreviewLoading || mergeSaving || !mergeTargetSlug"
+			                          (action)="previewCategoryMerge(category)"
+			                        ></app-button>
+			                        <app-button
+			                          [label]="mergeSaving ? ('adminUi.common.saving' | translate) : ('adminUi.storefront.categories.mergeAction' | translate)"
+			                          size="sm"
+			                          [disabled]="mergeSaving || !mergePreview?.can_merge"
+			                          (action)="mergeCategory(category)"
+			                        ></app-button>
+			                      </div>
+			                    </div>
+			                    <div class="grid gap-3 rounded-xl border border-rose-200 bg-rose-50 p-3 dark:border-rose-900/40 dark:bg-rose-950/30">
+			                      <p class="text-xs font-semibold text-rose-900 dark:text-rose-100">
+			                        {{ 'adminUi.storefront.categories.deleteTitle' | translate }}
+			                      </p>
+			                      <p *ngIf="deletePreview" class="text-xs text-rose-800 dark:text-rose-200">
+			                        {{
+			                          'adminUi.storefront.categories.deletePreviewInfo'
+			                            | translate : { products: deletePreview.product_count, children: deletePreview.child_count }
+			                        }}
+			                      </p>
+			                      <p *ngIf="deleteError" class="text-xs text-rose-800 dark:text-rose-200">{{ deleteError }}</p>
+			                      <div class="flex flex-wrap justify-end gap-2">
+			                        <app-button
+			                          [label]="deletePreviewLoading ? ('adminUi.common.loading' | translate) : ('adminUi.storefront.categories.deletePreview' | translate)"
+			                          size="sm"
+			                          variant="ghost"
+			                          [disabled]="deletePreviewLoading || deleteSaving"
+			                          (action)="previewCategoryDelete(category)"
+			                        ></app-button>
+			                        <app-button
+			                          [label]="deleteSaving ? ('adminUi.common.saving' | translate) : ('adminUi.storefront.categories.deleteAction' | translate)"
+			                          size="sm"
+			                          [disabled]="deleteSaving || !deletePreview?.can_delete"
+			                          (action)="deleteCategorySafe(category)"
+			                        ></app-button>
+			                      </div>
+			                    </div>
+			                  </div>
+			                </div>
 		                <div
 		                  *ngIf="categorySelection === category.slug && (getSubcategories(category).length || canEditCategories())"
 		                  class="ml-6 grid gap-2"
@@ -711,6 +785,17 @@ export class ShopComponent implements OnInit, OnDestroy {
 	  categoryImageSavingSlug: string | null = null;
 	  categoryImageError = '';
 
+	  mergeTargetSlug = '';
+	  mergePreviewLoading = false;
+	  mergePreview: AdminCategoryMergePreview | null = null;
+	  mergeSaving = false;
+	  mergeError = '';
+
+	  deletePreviewLoading = false;
+	  deletePreview: AdminCategoryDeletePreview | null = null;
+	  deleteSaving = false;
+	  deleteError = '';
+
   sortOptions: { label: string; value: SortOption }[] = [
     { label: 'shop.sortNew', value: 'newest' },
     { label: 'shop.sortPriceAsc', value: 'price_asc' },
@@ -895,6 +980,15 @@ export class ShopComponent implements OnInit, OnDestroy {
     this.cancelCreateCategory();
     this.categoryImageSavingSlug = null;
     this.categoryImageError = '';
+    this.mergeTargetSlug = '';
+    this.mergePreviewLoading = false;
+    this.mergePreview = null;
+    this.mergeSaving = false;
+    this.mergeError = '';
+    this.deletePreviewLoading = false;
+    this.deletePreview = null;
+    this.deleteSaving = false;
+    this.deleteError = '';
 
     const slug = (category?.slug || '').trim();
     if (!slug) return;
@@ -942,6 +1036,15 @@ export class ShopComponent implements OnInit, OnDestroy {
     this.renameNameEn = '';
     this.categoryImageSavingSlug = null;
     this.categoryImageError = '';
+    this.mergeTargetSlug = '';
+    this.mergePreviewLoading = false;
+    this.mergePreview = null;
+    this.mergeSaving = false;
+    this.mergeError = '';
+    this.deletePreviewLoading = false;
+    this.deletePreview = null;
+    this.deleteSaving = false;
+    this.deleteError = '';
   }
 
   canSaveRename(): boolean {
@@ -1018,6 +1121,146 @@ export class ShopComponent implements OnInit, OnDestroy {
         this.categoryImageError = this.translate.instant('adminUi.storefront.categories.imageUploadError');
       }
     });
+  }
+
+  onMergeTargetChange(): void {
+    this.mergePreview = null;
+    this.mergeError = '';
+  }
+
+  previewCategoryMerge(category: Category): void {
+    if (!this.canEditCategories()) return;
+    if (this.mergePreviewLoading || this.mergeSaving) return;
+    const sourceSlug = (category?.slug || '').trim();
+    const targetSlug = (this.mergeTargetSlug || '').trim();
+    if (!sourceSlug || !targetSlug) {
+      this.mergeError = this.translate.instant('adminUi.storefront.categories.mergeSelectTarget');
+      return;
+    }
+    this.mergePreviewLoading = true;
+    this.mergePreview = null;
+    this.mergeError = '';
+    this.admin.previewMergeCategory(sourceSlug, targetSlug).subscribe({
+      next: (preview) => {
+        this.mergePreviewLoading = false;
+        this.mergePreview = preview;
+        if (!preview.can_merge) {
+          this.mergeError = this.translate.instant(this.mergeReasonKey(preview.reason));
+        }
+      },
+      error: () => {
+        this.mergePreviewLoading = false;
+        this.mergeError = this.translate.instant('adminUi.storefront.categories.mergePreviewError');
+      }
+    });
+  }
+
+  mergeCategory(category: Category): void {
+    if (!this.canEditCategories()) return;
+    if (this.mergeSaving) return;
+    const sourceSlug = (category?.slug || '').trim();
+    const targetSlug = (this.mergeTargetSlug || '').trim();
+    if (!sourceSlug || !targetSlug) return;
+    if (!this.mergePreview || !this.mergePreview.can_merge) {
+      this.mergeError = this.translate.instant('adminUi.storefront.categories.mergePreviewRequired');
+      return;
+    }
+
+    const targetName = this.rootCategories.find((c) => c.slug === targetSlug)?.name ?? targetSlug;
+    const sourceName = category?.name ?? sourceSlug;
+    const count = Number(this.mergePreview.product_count || 0);
+    if (typeof window !== 'undefined') {
+      const ok = window.confirm(
+        this.translate.instant('adminUi.storefront.categories.confirmMerge', {
+          source: sourceName,
+          target: targetName,
+          count
+        })
+      );
+      if (!ok) return;
+    }
+
+    this.mergeSaving = true;
+    this.mergeError = '';
+    this.admin.mergeCategory(sourceSlug, targetSlug).subscribe({
+      next: () => {
+        this.mergeSaving = false;
+        this.toast.success(this.translate.instant('adminUi.storefront.categories.mergeSuccess'));
+        this.cancelRenameCategory();
+        this.fetchCategories();
+        void this.router.navigate(['/shop', targetSlug]);
+      },
+      error: () => {
+        this.mergeSaving = false;
+        this.mergeError = this.translate.instant('adminUi.storefront.categories.mergeError');
+      }
+    });
+  }
+
+  previewCategoryDelete(category: Category): void {
+    if (!this.canEditCategories()) return;
+    if (this.deletePreviewLoading || this.deleteSaving) return;
+    const slug = (category?.slug || '').trim();
+    if (!slug) return;
+    this.deletePreviewLoading = true;
+    this.deletePreview = null;
+    this.deleteError = '';
+    this.admin.previewDeleteCategory(slug).subscribe({
+      next: (preview) => {
+        this.deletePreviewLoading = false;
+        this.deletePreview = preview;
+        if (!preview.can_delete) {
+          this.deleteError = this.translate.instant('adminUi.storefront.categories.deleteNotAllowed', {
+            products: preview.product_count,
+            children: preview.child_count
+          });
+        }
+      },
+      error: () => {
+        this.deletePreviewLoading = false;
+        this.deleteError = this.translate.instant('adminUi.storefront.categories.deletePreviewError');
+      }
+    });
+  }
+
+  deleteCategorySafe(category: Category): void {
+    if (!this.canEditCategories()) return;
+    if (this.deleteSaving) return;
+    if (!this.deletePreview || !this.deletePreview.can_delete) {
+      this.deleteError = this.translate.instant('adminUi.storefront.categories.deletePreviewRequired');
+      return;
+    }
+    const slug = (category?.slug || '').trim();
+    if (!slug) return;
+
+    const name = category?.name ?? slug;
+    if (typeof window !== 'undefined') {
+      const ok = window.confirm(this.translate.instant('adminUi.storefront.categories.confirmDelete', { name }));
+      if (!ok) return;
+    }
+
+    this.deleteSaving = true;
+    this.deleteError = '';
+    this.admin.deleteCategory(slug).subscribe({
+      next: () => {
+        this.deleteSaving = false;
+        this.toast.success(this.translate.instant('adminUi.storefront.categories.deleteSuccess'));
+        this.cancelRenameCategory();
+        this.fetchCategories();
+        void this.router.navigate(['/shop']);
+      },
+      error: () => {
+        this.deleteSaving = false;
+        this.deleteError = this.translate.instant('adminUi.storefront.categories.deleteError');
+      }
+    });
+  }
+
+  private mergeReasonKey(reason: string | null | undefined): string {
+    if (reason === 'same_category') return 'adminUi.storefront.categories.mergeReasonSame';
+    if (reason === 'different_parent') return 'adminUi.storefront.categories.mergeReasonParent';
+    if (reason === 'source_has_children') return 'adminUi.storefront.categories.mergeReasonChildren';
+    return 'adminUi.storefront.categories.mergeNotAllowed';
   }
 
 	  scrollToFilters(): void {

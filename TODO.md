@@ -381,8 +381,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Storefront Categories: quick subcategory – Create a subcategory under the current category from `/shop/:category`.
 - [x] Storefront Categories: quick image – Upload/change category thumbnail/banner from the category page in edit mode.
 - [x] Storefront Categories: hide/show – Toggle category visibility (hide from storefront) with a clear “hidden” badge.
-- [ ] Storefront Categories: merge shortcut – “Merge into…” action surfaced from the category page (server-side preview/confirm).
-- [ ] Storefront Categories: safe delete – Delete category from storefront only if unused; otherwise prompt reassignment/merge.
+- [x] Storefront Categories: merge shortcut – “Merge into…” action surfaced from the category page (server-side preview/confirm).
+- [x] Storefront Categories: safe delete – Delete category from storefront only if unused; otherwise prompt reassignment/merge.
 - [ ] Storefront Products: inline edit badges – Show small “Edit” chips on product cards for admins (price/stock/status).
 - [ ] Storefront Products: quick publish – One-click publish/unpublish/archive from product card or product detail (admin-only).
 - [ ] Storefront Products: quick stock/price – Inline stock + price editing on the Shop grid for admins (spreadsheet-lite).
