@@ -2717,6 +2717,35 @@
         "outline": "Cuprins",
         "outlineEmpty": "Nu au fost găsite titluri încă."
       },
+      "seo": {
+        "title": "Previzualizare SEO",
+        "hint": "Previzualizează titlul/descrierea pentru rezultate de căutare și social. Numărul de caractere este aproximativ și se poate trunchia diferit în funcție de dispozitiv.",
+        "missingLang": "Nu există conținut pentru această limbă încă.",
+        "searchPreview": "Previzualizare căutare",
+        "socialPreview": "Previzualizare social",
+        "checks": "Verificări",
+        "length": {
+          "title": "Titlu: {{count}} caractere",
+          "description": "Descriere: {{count}} caractere"
+        },
+        "issues": {
+          "missingTitle": "Lipsește titlul.",
+          "missingDescription": "Lipsește descrierea.",
+          "titleTooLong": "Titlul este lung ({{count}} caractere) și se poate trunchia.",
+          "titleTooShort": "Titlul este scurt ({{count}} caractere).",
+          "descriptionTooLong": "Descrierea este lungă ({{count}} caractere) și se poate trunchia.",
+          "descriptionTooShort": "Descrierea este scurtă ({{count}} caractere).",
+          "derivedFromBody": "Nu există rezumat; descrierea este derivată din conținutul articolului.",
+          "previewTokenRecommended": "Generează un token de previzualizare pentru a valida imaginile OG la ciorne."
+        }
+      },
+      "pins": {
+        "badge": "Fixat #{{slot}}",
+        "conflictBadge": "Conflict",
+        "conflictsTitle": "Conflicte de fixare",
+        "conflictLine": "Slot #{{slot}}: {{posts}}",
+        "saveConflict": "Slotul #{{slot}} este deja folosit de „{{title}}”. Debifează-l sau alege alt slot."
+      },
       "preview": {
         "title": "Link previzualizare",
         "expires": "Expiră",

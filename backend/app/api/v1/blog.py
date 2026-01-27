@@ -1,4 +1,6 @@
+import base64
 import json
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from email.utils import format_datetime
@@ -44,6 +46,62 @@ from app.services import notifications as notification_service
 from app.services import og_images
 
 router = APIRouter(prefix="/blog", tags=["blog"])
+
+BLOG_VIEW_COOKIE = "blog_viewed"
+BLOG_VIEW_COOKIE_TTL_SECONDS = 6 * 60 * 60
+BLOG_VIEW_COOKIE_MAX_ITEMS = 30
+
+
+def _is_probable_bot(user_agent: str) -> bool:
+    ua = (user_agent or "").strip().lower()
+    if not ua:
+        return False
+    bot_tokens = (
+        "bot",
+        "spider",
+        "crawl",
+        "slurp",
+        "facebookexternalhit",
+        "twitterbot",
+        "petalbot",
+        "bingpreview",
+        "headless",
+    )
+    return any(token in ua for token in bot_tokens)
+
+
+def _decode_view_cookie(value: str) -> list[tuple[str, int]]:
+    raw = (value or "").strip()
+    if not raw:
+        return []
+    try:
+        decoded = base64.urlsafe_b64decode(raw.encode("utf-8")).decode("utf-8")
+        data = json.loads(decoded)
+    except Exception:
+        return []
+    if not isinstance(data, list):
+        return []
+    out: list[tuple[str, int]] = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        slug = str(item.get("slug") or "").strip()
+        ts = item.get("ts")
+        if not slug:
+            continue
+        if not isinstance(ts, int):
+            try:
+                ts = int(ts)
+            except Exception:
+                continue
+        out.append((slug, ts))
+    return out
+
+
+def _encode_view_cookie(entries: list[tuple[str, int]]) -> str:
+    payload = [{"slug": slug, "ts": ts} for slug, ts in entries if slug and isinstance(ts, int)]
+    raw = json.dumps(payload, separators=(",", ":"))
+    return base64.urlsafe_b64encode(raw.encode("utf-8")).decode("utf-8")
 
 
 class BlogCommentSubscriptionRequest(BaseModel):
@@ -194,6 +252,8 @@ async def blog_json_feed(
 @router.get("/posts/{slug}", response_model=BlogPostRead)
 async def get_blog_post(
     slug: str,
+    request: Request,
+    response: Response,
     session: AsyncSession = Depends(get_session),
     lang: str | None = Query(default=None, pattern="^(en|ro)$"),
 ) -> BlogPostRead:
@@ -201,19 +261,57 @@ async def get_blog_post(
     if not block:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
     payload = blog_service.to_read(block, lang=lang)
-    try:
-        await session.execute(
-            sa.update(ContentBlock)
-            .where(ContentBlock.id == block.id)
-            .values(
-                view_count=ContentBlock.view_count + 1,
-                updated_at=ContentBlock.updated_at,
+    should_count_view = False
+    cookie_needs_update = False
+    ua = request.headers.get("user-agent") or ""
+    if not _is_probable_bot(ua):
+        now = int(time.time())
+        existing = _decode_view_cookie(request.cookies.get(BLOG_VIEW_COOKIE) or "")
+        fresh = [(s, ts) for s, ts in existing if now - ts < BLOG_VIEW_COOKIE_TTL_SECONDS]
+        if len(fresh) != len(existing):
+            cookie_needs_update = True
+        seen = any(s == slug for s, _ in fresh)
+        if not seen:
+            should_count_view = True
+            cookie_needs_update = True
+            fresh = [(s, ts) for s, ts in fresh if s != slug]
+            fresh.insert(0, (slug, now))
+        # De-dupe and cap size
+        deduped: list[tuple[str, int]] = []
+        seen_slugs: set[str] = set()
+        for s, ts in fresh:
+            if s in seen_slugs:
+                cookie_needs_update = True
+                continue
+            seen_slugs.add(s)
+            deduped.append((s, ts))
+            if len(deduped) >= BLOG_VIEW_COOKIE_MAX_ITEMS:
+                break
+        if cookie_needs_update:
+            response.set_cookie(
+                BLOG_VIEW_COOKIE,
+                _encode_view_cookie(deduped),
+                httponly=True,
+                secure=settings.secure_cookies,
+                samesite=settings.cookie_samesite.lower(),
+                path="/",
+                max_age=BLOG_VIEW_COOKIE_TTL_SECONDS,
             )
-            .execution_options(synchronize_session=False)
-        )
-        await session.commit()
-    except Exception:
-        await session.rollback()
+
+    if should_count_view:
+        try:
+            await session.execute(
+                sa.update(ContentBlock)
+                .where(ContentBlock.id == block.id)
+                .values(
+                    view_count=ContentBlock.view_count + 1,
+                    updated_at=ContentBlock.updated_at,
+                )
+                .execution_options(synchronize_session=False)
+            )
+            await session.commit()
+        except Exception:
+            await session.rollback()
     return BlogPostRead.model_validate(payload)
 
 

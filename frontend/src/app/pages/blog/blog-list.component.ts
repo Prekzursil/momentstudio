@@ -177,6 +177,8 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
         *ngIf="!loading() && !hasError() && heroPost"
         class="group relative overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 dark:shadow-none"
         [routerLink]="['/blog', heroPost.slug]"
+        (mouseenter)="prefetchPost(heroPost.slug)"
+        (focusin)="prefetchPost(heroPost.slug)"
       >
         <button
           *ngIf="canEditBlog()"
@@ -246,6 +248,8 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
           *ngFor="let post of gridPosts"
           class="group block"
           [routerLink]="['/blog', post.slug]"
+          (mouseenter)="prefetchPost(post.slug)"
+          (focusin)="prefetchPost(post.slug)"
         >
 	          <div class="h-full transition-transform duration-200 ease-out group-hover:-translate-y-0.5">
 	            <app-card class="h-full">
@@ -581,6 +585,13 @@ export class BlogListComponent implements OnInit, OnDestroy {
     this.seriesQuery = series;
     this.tagQuery = '';
     this.applyFilters();
+  }
+
+  prefetchPost(slug: string): void {
+    const cleaned = (slug || '').trim();
+    if (!cleaned) return;
+    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
+    this.blog.prefetchPost(cleaned, lang);
   }
 
   private setCanonical(page: number): void {

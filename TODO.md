@@ -463,10 +463,10 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin editor: accessibility checks – Warn on missing alt text/captions and offer quick fixes before publish.
 - [x] Admin editor: autosave + recovery – Autosave drafts and offer “restore last autosave” after crashes/refresh.
 - [x] Admin editor: writing aids – Word count, reading-time recalculation, and headings outline sidebar.
-- [ ] Blog SEO: preview panel – Preview meta/OG/twitter cards per language and validate truncation/warnings.
-- [ ] Blog perf: prefetch + caching – Prefetch post data on hover and add caching for list/detail to speed up loads.
-- [ ] Blog list: pinned posts – Prevent conflicting pin slots (1–3) and surface warnings in admin UI.
-- [ ] Blog stats: view counting – De-dupe per session + bot filtering (current counter increments on each page view).
+- [x] Blog SEO: preview panel – Preview meta/OG/twitter cards per language and validate truncation/warnings.
+- [x] Blog perf: prefetch + caching – Prefetch post data on hover and add caching for list/detail to speed up loads.
+- [x] Blog list: pinned posts – Prevent conflicting pin slots (1–3) and surface warnings in admin UI.
+- [x] Blog stats: view counting – De-dupe per session + bot filtering (current counter increments on each page view).
 - [ ] Blog list: image loading polish – Add real LQIP/blurhash placeholders for cover images (optional).
 ## Frontend - Cart & Checkout
 - [x] Cart page/drawer with quantities and totals.

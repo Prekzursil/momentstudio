@@ -2717,6 +2717,35 @@
         "outline": "Outline",
         "outlineEmpty": "No headings found yet."
       },
+      "seo": {
+        "title": "SEO preview",
+        "hint": "Previews the title/description snippets for search and social. Character counts are approximate and may truncate differently per device.",
+        "missingLang": "No content found for this language yet.",
+        "searchPreview": "Search preview",
+        "socialPreview": "Social preview",
+        "checks": "Checks",
+        "length": {
+          "title": "Title: {{count}} chars",
+          "description": "Description: {{count}} chars"
+        },
+        "issues": {
+          "missingTitle": "Missing title.",
+          "missingDescription": "Missing description.",
+          "titleTooLong": "Title is long ({{count}} chars) and may truncate.",
+          "titleTooShort": "Title is short ({{count}} chars).",
+          "descriptionTooLong": "Description is long ({{count}} chars) and may truncate.",
+          "descriptionTooShort": "Description is short ({{count}} chars).",
+          "derivedFromBody": "No summary set; description is derived from body content.",
+          "previewTokenRecommended": "Generate a preview token to validate OG images for drafts."
+        }
+      },
+      "pins": {
+        "badge": "Pinned #{{slot}}",
+        "conflictBadge": "Conflict",
+        "conflictsTitle": "Pinned slot conflicts",
+        "conflictLine": "Slot #{{slot}}: {{posts}}",
+        "saveConflict": "Pinned slot #{{slot}} is already used by \"{{title}}\". Unpin it or choose another slot."
+      },
       "preview": {
         "title": "Preview link",
         "expires": "Expires",

@@ -12,6 +12,7 @@ from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
 from app.models.passkeys import UserPasskey
+from app.models.content import ContentBlock
 from app.models.user import User
 from app.models.user import UserRole
 from app.schemas.user import UserCreate
@@ -613,3 +614,60 @@ def test_blog_comment_subscription_toggle(test_app: Dict[str, object]) -> None:
     )
     assert disabled.status_code == 200, disabled.text
     assert disabled.json()["enabled"] is False
+
+
+def test_blog_view_count_deduped_per_session_and_skips_bots(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    admin_token = create_user_token(SessionLocal, email="admin@example.com", role=UserRole.admin)
+
+    now = datetime.now(timezone.utc)
+    past = (now - timedelta(days=1)).isoformat()
+
+    create = client.post(
+        "/api/v1/content/admin/blog.view-post",
+        json={
+            "title": "View post",
+            "body_markdown": "Content",
+            "status": "published",
+            "lang": "en",
+            "published_at": past,
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert create.status_code == 201, create.text
+
+    def get_view_count() -> int:
+        async def _query() -> int:
+            async with SessionLocal() as session:
+                block = await session.scalar(select(ContentBlock).where(ContentBlock.key == "blog.view-post"))
+                assert block is not None
+                return int(block.view_count or 0)
+
+        return asyncio.run(_query())
+
+    assert get_view_count() == 0
+
+    first = client.get("/api/v1/blog/posts/view-post", params={"lang": "en"})
+    assert first.status_code == 200, first.text
+    assert get_view_count() == 1
+    assert client.cookies.get("blog_viewed"), "Expected de-dupe cookie to be set"
+
+    second = client.get("/api/v1/blog/posts/view-post", params={"lang": "en"})
+    assert second.status_code == 200, second.text
+    assert get_view_count() == 1
+
+    client.cookies.clear()
+    third = client.get("/api/v1/blog/posts/view-post", params={"lang": "en"})
+    assert third.status_code == 200, third.text
+    assert get_view_count() == 2
+
+    client.cookies.clear()
+    bot = client.get(
+        "/api/v1/blog/posts/view-post",
+        params={"lang": "en"},
+        headers={"User-Agent": "Googlebot"},
+    )
+    assert bot.status_code == 200, bot.text
+    assert get_view_count() == 2

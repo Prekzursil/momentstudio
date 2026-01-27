@@ -3507,6 +3507,18 @@ class CmsDraftManager<T> {
               </div>
             </div>
 
+            <div
+              *ngIf="blogPinnedConflicts().length"
+              class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
+            >
+              <p class="font-semibold">{{ 'adminUi.blog.pins.conflictsTitle' | translate }}</p>
+              <div class="mt-1 grid gap-1 text-xs">
+                <div *ngFor="let conflict of blogPinnedConflicts()">
+                  {{ 'adminUi.blog.pins.conflictLine' | translate: { slot: conflict.slot, posts: conflict.posts } }}
+                </div>
+              </div>
+            </div>
+
             <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
               <div *ngIf="blogPosts().length === 0" class="text-sm text-slate-500 dark:text-slate-400">
                 {{ 'adminUi.blog.empty' | translate }}
@@ -3522,6 +3534,18 @@ class CmsDraftManager<T> {
                 <div>
                   <p class="font-semibold text-slate-900 dark:text-slate-50">{{ post.title }}</p>
                   <p class="text-xs text-slate-500 dark:text-slate-400">
+                    <ng-container *ngIf="blogPinnedSlot(post) as slot">
+                      <span class="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 dark:border-indigo-900/50 dark:bg-indigo-950/40 dark:text-indigo-200">
+                        {{ 'adminUi.blog.pins.badge' | translate: { slot } }}
+                      </span>
+                      <span
+                        *ngIf="blogPinnedSlotHasConflict(slot, post.key)"
+                        class="ml-1 inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100"
+                      >
+                        {{ 'adminUi.blog.pins.conflictBadge' | translate }}
+                      </span>
+                      ·
+                    </ng-container>
                     {{ post.key }} · {{ ('adminUi.status.' + (post.status || 'draft')) | translate }} ·
                     {{ post.author ? commentAuthorLabel(post.author) : '—' }} · v{{ post.version }} · {{ post.updated_at | date: 'short' }}
                   </p>
@@ -4253,6 +4277,102 @@ class CmsDraftManager<T> {
 
               <details class="rounded-lg border border-slate-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-900">
                 <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.blog.seo.title' | translate }}
+                </summary>
+                <div class="mt-3 grid gap-3">
+                  <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.blog.seo.hint' | translate }}</p>
+
+                  <div class="grid gap-4 md:grid-cols-2">
+                    <div
+                      *ngFor="let lang of blogSocialLangs"
+                      class="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30"
+                    >
+                      <div class="flex items-center justify-between gap-2">
+                        <p class="text-xs font-semibold tracking-wide uppercase text-slate-600 dark:text-slate-300">{{ lang.toUpperCase() }}</p>
+                        <div class="flex items-center gap-2">
+                          <a
+                            class="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200"
+                            [attr.href]="blogPublicUrl(lang)"
+                            target="_blank"
+                            rel="noopener"
+                          >
+                            {{ 'adminUi.blog.actions.view' | translate }}
+                          </a>
+                          <app-button size="sm" variant="ghost" [label]="'adminUi.blog.actions.copy' | translate" (action)="copyText(blogPublicUrl(lang))"></app-button>
+                        </div>
+                      </div>
+
+                      <div *ngIf="blogSeoHasContent(lang); else seoMissingLang" class="grid gap-3">
+                        <div class="grid gap-1">
+                          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                            {{ 'adminUi.blog.seo.searchPreview' | translate }}
+                          </p>
+                          <div class="rounded-lg border border-slate-200 bg-white p-3 text-xs dark:border-slate-800 dark:bg-slate-900">
+                            <p class="text-emerald-700 dark:text-emerald-300 truncate">{{ blogPublicUrl(lang) }}</p>
+                            <p class="mt-1 text-sm font-semibold text-indigo-700 dark:text-indigo-200 truncate">
+                              {{ blogSeoTitlePreview(lang) }}
+                            </p>
+                            <p class="mt-1 text-xs text-slate-700 dark:text-slate-200">
+                              {{ blogSeoDescriptionPreview(lang) }}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div class="grid gap-1 text-xs">
+                          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                            {{ 'adminUi.blog.seo.checks' | translate }}
+                          </p>
+                          <div class="flex flex-wrap items-center justify-between gap-2 rounded border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
+                            <span class="text-slate-700 dark:text-slate-200">
+                              {{ 'adminUi.blog.seo.length.title' | translate: { count: blogSeoTitleFull(lang).length } }}
+                            </span>
+                            <span class="text-slate-700 dark:text-slate-200">
+                              {{ 'adminUi.blog.seo.length.description' | translate: { count: blogSeoDescriptionFull(lang).length } }}
+                            </span>
+                          </div>
+
+                          <div
+                            *ngFor="let issue of blogSeoIssues(lang)"
+                            class="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100"
+                          >
+                            {{ issue.key | translate: issue.params }}
+                          </div>
+                        </div>
+
+                        <div class="grid gap-1">
+                          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                            {{ 'adminUi.blog.seo.socialPreview' | translate }}
+                          </p>
+                          <div class="rounded-lg border border-slate-200 bg-white p-3 text-xs dark:border-slate-800 dark:bg-slate-900">
+                            <img
+                              *ngIf="blogPreviewToken || blogForm.status === 'published'"
+                              [src]="blogPreviewOgImageUrl(lang) || blogPublishedOgImageUrl(lang)"
+                              [alt]="'adminUi.blog.social.ogAlt' | translate"
+                              class="w-full rounded-lg border border-slate-200 bg-white object-cover dark:border-slate-800 dark:bg-slate-900"
+                              loading="lazy"
+                            />
+                            <p class="mt-2 text-sm font-semibold text-slate-900 dark:text-slate-50 truncate">
+                              {{ blogSeoTitlePreview(lang) }}
+                            </p>
+                            <p class="mt-1 text-xs text-slate-700 dark:text-slate-200">
+                              {{ blogSeoDescriptionPreview(lang) }}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <ng-template #seoMissingLang>
+                        <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+                          {{ 'adminUi.blog.seo.missingLang' | translate }}
+                        </div>
+                      </ng-template>
+                    </div>
+                  </div>
+                </div>
+              </details>
+
+              <details class="rounded-lg border border-slate-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-900">
+                <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
                   {{ 'adminUi.blog.social.title' | translate }}
                 </summary>
                 <div class="mt-3 grid gap-3">
@@ -4937,6 +5057,9 @@ export class AdminComponent implements OnInit, OnDestroy {
   showBlogCoverLibrary = false;
   showBlogPreview = false;
   blogA11yOpen = false;
+  blogSeoSnapshots: Record<UiLang, { title: string; body_markdown: string } | null> = { en: null, ro: null };
+  blogSeoSnapshotsKey: string | null = null;
+  blogSeoSnapshotsLoading = false;
   useRichBlogEditor = true;
   blogImageLayout: 'default' | 'wide' | 'left' | 'right' | 'gallery' = 'default';
   blogSocialLangs: UiLang[] = ['en', 'ro'];
@@ -6563,6 +6686,42 @@ export class AdminComponent implements OnInit, OnDestroy {
     return this.contentBlocks.filter((c) => c.key.startsWith('blog.'));
   }
 
+  private pinnedSlotFromMeta(meta: Record<string, any> | null | undefined): number | null {
+    if (!meta) return null;
+    const pinned = meta['pinned'];
+    let pinnedFlag = false;
+    if (typeof pinned === 'boolean') pinnedFlag = pinned;
+    else if (typeof pinned === 'number') pinnedFlag = pinned === 1;
+    else if (typeof pinned === 'string') pinnedFlag = ['1', 'true', 'yes', 'on'].includes(pinned.trim().toLowerCase());
+    if (!pinnedFlag) return null;
+    const raw = Number(meta['pin_order']);
+    if (!Number.isFinite(raw)) return null;
+    const normalized = Math.min(3, Math.max(1, Math.trunc(raw)));
+    return normalized;
+  }
+
+  blogPinnedSlot(post: AdminContent): number | null {
+    return this.pinnedSlotFromMeta(post.meta || null);
+  }
+
+  blogPinnedSlotHasConflict(slot: number, key: string): boolean {
+    const normalized = Math.min(3, Math.max(1, Math.trunc(Number(slot))));
+    const matches = this.blogPosts().filter((p) => p.key !== key && this.blogPinnedSlot(p) === normalized);
+    return matches.length > 0;
+  }
+
+  blogPinnedConflicts(): Array<{ slot: number; posts: string }> {
+    const out: Array<{ slot: number; posts: string }> = [];
+    for (const slot of [1, 2, 3]) {
+      const posts = this.blogPosts().filter((p) => this.blogPinnedSlot(p) === slot);
+      if (posts.length <= 1) continue;
+      const labels = posts.map((p) => p.title || p.key).slice(0, 4);
+      const more = posts.length > labels.length ? ` (+${posts.length - labels.length})` : '';
+      out.push({ slot, posts: labels.join(', ') + more });
+    }
+    return out;
+  }
+
   isBlogSelected(key: string): boolean {
     return this.blogBulkSelection.has(key);
   }
@@ -6786,9 +6945,14 @@ export class AdminComponent implements OnInit, OnDestroy {
 	      meta['reading_time_minutes'] = Math.trunc(rt);
 	    }
 	    if (this.blogCreate.pinned) {
+        const rawOrder = Number(String(this.blogCreate.pin_order || '').trim());
+        const normalized = Number.isFinite(rawOrder) ? Math.min(3, Math.max(1, Math.trunc(rawOrder))) : 1;
+        const conflict = this.blogPosts().find((post) => this.blogPinnedSlot(post) === normalized);
+        if (conflict) {
+          this.toast.error(this.t('adminUi.blog.pins.saveConflict', { slot: normalized, title: conflict.title || conflict.key }));
+          return;
+        }
 	      meta['pinned'] = true;
-	      const rawOrder = Number(String(this.blogCreate.pin_order || '').trim());
-	      const normalized = Number.isFinite(rawOrder) ? Math.min(3, Math.max(1, Math.trunc(rawOrder))) : 1;
 	      meta['pin_order'] = normalized;
 	    }
 	    const published_at = this.blogCreate.published_at ? new Date(this.blogCreate.published_at).toISOString() : undefined;
@@ -6873,6 +7037,7 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.blogMeta = block.meta || this.blogMeta || {};
         this.syncBlogMetaToForm(lang);
         this.ensureBlogDraft(key, lang).initFromServer(this.currentBlogDraftState());
+        this.setBlogSeoSnapshot(lang, block.title, block.body_markdown);
       },
       error: () => this.toast.error(this.t('adminUi.blog.errors.loadContent'))
     });
@@ -6889,6 +7054,17 @@ export class AdminComponent implements OnInit, OnDestroy {
     const nextMeta = this.buildBlogMeta(this.blogEditLang);
     const metaChanged = JSON.stringify(nextMeta) !== JSON.stringify(this.blogMeta || {});
     const isBase = this.blogEditLang === this.blogBaseLang;
+    if (isBase && nextMeta['pinned']) {
+      const slot = Number(nextMeta['pin_order']);
+      if (Number.isFinite(slot)) {
+        const normalized = Math.min(3, Math.max(1, Math.trunc(slot)));
+        const conflict = this.blogPosts().find((post) => post.key !== key && this.blogPinnedSlot(post) === normalized);
+        if (conflict) {
+          this.toast.error(this.t('adminUi.blog.pins.saveConflict', { slot: normalized, title: conflict.title || conflict.key }));
+          return;
+        }
+      }
+    }
     if (isBase && this.blogForm.status === 'published') {
       const issues = this.blogA11yIssues();
       if (issues.length) {
@@ -6997,6 +7173,113 @@ export class AdminComponent implements OnInit, OnDestroy {
       if (ok) this.toast.info(this.t('adminUi.blog.preview.success.copied'));
       else this.toast.error(this.t('adminUi.blog.preview.errors.copy'));
     });
+  }
+
+  private setBlogSeoSnapshot(lang: UiLang, title: string, body_markdown: string): void {
+    this.blogSeoSnapshots[lang] = { title: title || '', body_markdown: body_markdown || '' };
+  }
+
+  private loadBlogSeoSnapshots(key: string): void {
+    this.blogSeoSnapshotsKey = key;
+    this.blogSeoSnapshotsLoading = true;
+    const langs: UiLang[] = ['en', 'ro'];
+    type BlogSeoRow = { lang: UiLang; title: string; body_markdown: string; missing?: true };
+    const requests = langs.map((lang) =>
+      this.admin.getContent(key, lang).pipe(
+        map((block) => ({ lang, title: block.title || '', body_markdown: block.body_markdown || '' } as BlogSeoRow)),
+        catchError(() => of({ lang, title: '', body_markdown: '', missing: true } as BlogSeoRow))
+      )
+    );
+    forkJoin(requests).subscribe({
+      next: (rows: BlogSeoRow[]) => {
+        if (this.selectedBlogKey !== key || this.blogSeoSnapshotsKey !== key) return;
+        for (const row of rows) {
+          const lang = row.lang;
+          if (row.missing) this.blogSeoSnapshots[lang] = null;
+          else this.setBlogSeoSnapshot(lang, row.title, row.body_markdown);
+        }
+      },
+      complete: () => {
+        if (this.blogSeoSnapshotsKey === key) this.blogSeoSnapshotsLoading = false;
+      }
+    });
+  }
+
+  blogSeoHasContent(lang: UiLang): boolean {
+    if (!this.selectedBlogKey) return false;
+    if (lang === this.blogEditLang) return Boolean((this.blogForm.title || '').trim() || (this.blogForm.body_markdown || '').trim());
+    return Boolean(this.blogSeoSnapshots[lang]?.title || this.blogSeoSnapshots[lang]?.body_markdown);
+  }
+
+  blogSeoTitleFull(lang: UiLang): string {
+    const rawTitle =
+      lang === this.blogEditLang
+        ? (this.blogForm.title || '').trim()
+        : (this.blogSeoSnapshots[lang]?.title || '').trim();
+    if (!rawTitle) return '';
+    return `${rawTitle} | momentstudio`;
+  }
+
+  blogSeoDescriptionFull(lang: UiLang): string {
+    return this.blogSeoDescriptionSource(lang).slice(0, 160).trim();
+  }
+
+  blogSeoTitlePreview(lang: UiLang): string {
+    return this.truncateForPreview(this.blogSeoTitleFull(lang), 62);
+  }
+
+  blogSeoDescriptionPreview(lang: UiLang): string {
+    return this.truncateForPreview(this.blogSeoDescriptionSource(lang), 160);
+  }
+
+  blogSeoIssues(lang: UiLang): Array<{ key: string; params?: Record<string, unknown> }> {
+    const title = this.blogSeoTitleFull(lang);
+    const metaDescription = this.blogSeoDescriptionFull(lang);
+    const sourceDescription = this.blogSeoDescriptionSource(lang);
+    const titleLen = title.length;
+    const descMetaLen = metaDescription.length;
+    const descSourceLen = sourceDescription.length;
+    const issues: Array<{ key: string; params?: Record<string, unknown> }> = [];
+    if (!title.trim()) issues.push({ key: 'adminUi.blog.seo.issues.missingTitle' });
+    if (!metaDescription.trim()) issues.push({ key: 'adminUi.blog.seo.issues.missingDescription' });
+    if (titleLen > 70) issues.push({ key: 'adminUi.blog.seo.issues.titleTooLong', params: { count: titleLen } });
+    if (titleLen > 0 && titleLen < 25) issues.push({ key: 'adminUi.blog.seo.issues.titleTooShort', params: { count: titleLen } });
+    if (descSourceLen > 160) issues.push({ key: 'adminUi.blog.seo.issues.descriptionTooLong', params: { count: descSourceLen } });
+    if (descMetaLen > 0 && descMetaLen < 70) issues.push({ key: 'adminUi.blog.seo.issues.descriptionTooShort', params: { count: descMetaLen } });
+    const summary = this.getBlogSummary(this.blogMeta || {}, lang);
+    if (!summary.trim() && metaDescription.trim()) issues.push({ key: 'adminUi.blog.seo.issues.derivedFromBody' });
+    if (!this.blogPreviewToken && this.blogForm.status !== 'published') issues.push({ key: 'adminUi.blog.seo.issues.previewTokenRecommended' });
+    return issues;
+  }
+
+  private truncateForPreview(value: string, max: number): string {
+    const text = String(value || '').replace(/\s+/g, ' ').trim();
+    if (!text) return '';
+    if (text.length <= max) return text;
+    return text.slice(0, Math.max(0, max - 1)).trimEnd() + '…';
+  }
+
+  private toSeoDescription(markdownOrText: string): string {
+    const cleaned = String(markdownOrText || '')
+      .replace(/```[\s\S]*?```/g, ' ')
+      .replace(/`[^`]*`/g, ' ')
+      .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/[#>*_~]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return cleaned;
+  }
+
+  private blogSeoDescriptionSource(lang: UiLang): string {
+    const summary = this.getBlogSummary(this.blogMeta || {}, lang);
+    const body =
+      lang === this.blogEditLang
+        ? (this.blogForm.body_markdown || '').trim()
+        : (this.blogSeoSnapshots[lang]?.body_markdown || '').trim();
+    const source = (summary || '').trim() || body;
+    return this.toSeoDescription(source);
   }
 
   blogPublicUrl(lang: UiLang): string {
@@ -7623,6 +7906,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 	        };
         this.syncBlogMetaToForm(this.blogEditLang);
         this.ensureBlogDraft(key, this.blogEditLang).initFromServer(this.currentBlogDraftState());
+        this.loadBlogSeoSnapshots(key);
         const images = (block.images || [])
           .map((img) => ({
             id: img.id,
