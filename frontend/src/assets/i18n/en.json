@@ -853,6 +853,16 @@
         "previous": "Previous image",
         "next": "Next image"
       },
+      "code": {
+        "copy": "Copy",
+        "wrap": "Wrap",
+        "unwrap": "Unwrap",
+        "languageFallback": "code",
+        "copiedTitle": "Copied",
+        "copiedCopy": "Code copied to clipboard.",
+        "copyErrorTitle": "Could not copy code",
+        "copyErrorCopy": "Please select and copy manually."
+      },
       "loadingTitle": "Loading…",
       "errorTitle": "Could not load this post.",
       "errorCopy": "Please try again in a moment.",

@@ -188,6 +188,73 @@
       margin: 0.25rem 0 1rem 1.5rem;
     }
   }
+
+  .blog-codeblock {
+    @apply my-6 max-w-prose mx-auto overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800;
+  }
+
+  .blog-codeblock-header {
+    @apply flex items-center justify-between gap-3 px-4 py-2 bg-slate-50 text-slate-600 dark:bg-slate-950/40 dark:text-slate-300;
+  }
+
+  .blog-codeblock-lang {
+    @apply text-[11px] font-semibold tracking-wide uppercase;
+  }
+
+  .blog-codeblock-actions {
+    @apply flex items-center gap-2;
+  }
+
+  .blog-codeblock-btn {
+    @apply text-[11px] font-semibold text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white;
+  }
+
+  .blog-codeblock-pre {
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  .blog-codeblock--wrap pre,
+  .blog-codeblock--wrap code {
+    white-space: pre-wrap !important;
+    word-break: break-word;
+  }
+
+  .hljs-comment,
+  .hljs-quote {
+    color: #94a3b8;
+  }
+
+  .hljs-keyword,
+  .hljs-selector-tag,
+  .hljs-literal {
+    color: #c084fc;
+  }
+
+  .hljs-string,
+  .hljs-template-tag,
+  .hljs-template-variable {
+    color: #86efac;
+  }
+
+  .hljs-number,
+  .hljs-symbol,
+  .hljs-bullet {
+    color: #fbbf24;
+  }
+
+  .hljs-title,
+  .hljs-section,
+  .hljs-name {
+    color: #a5b4fc;
+  }
+
+  .hljs-built_in,
+  .hljs-type,
+  .hljs-attr,
+  .hljs-attribute {
+    color: #7dd3fc;
+  }
 }
 
 @layer utilities {

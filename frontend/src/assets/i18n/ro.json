@@ -853,6 +853,16 @@
         "previous": "Imaginea anterioară",
         "next": "Imaginea următoare"
       },
+      "code": {
+        "copy": "Copiază",
+        "wrap": "Împachetează",
+        "unwrap": "Dezactivează împachetarea",
+        "languageFallback": "cod",
+        "copiedTitle": "Copiat",
+        "copiedCopy": "Cod copiat în clipboard.",
+        "copyErrorTitle": "Nu am putut copia codul",
+        "copyErrorCopy": "Selectează și copiază manual."
+      },
       "loadingTitle": "Se încarcă…",
       "errorTitle": "Nu am putut încărca acest articol.",
       "errorCopy": "Încearcă din nou în câteva momente.",

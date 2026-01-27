@@ -5,6 +5,14 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Meta, Title } from '@angular/platform-browser';
 import { Subscription, combineLatest } from 'rxjs';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import hljs from 'highlight.js/lib/core';
+import bash from 'highlight.js/lib/languages/bash';
+import css from 'highlight.js/lib/languages/css';
+import xml from 'highlight.js/lib/languages/xml';
+import javascript from 'highlight.js/lib/languages/javascript';
+import json from 'highlight.js/lib/languages/json';
+import python from 'highlight.js/lib/languages/python';
+import typescript from 'highlight.js/lib/languages/typescript';
 
 import { appConfig } from '../../core/app-config';
 import { AuthService } from '../../core/auth.service';
@@ -17,6 +25,14 @@ import { ButtonComponent } from '../../shared/button.component';
 import { CardComponent } from '../../shared/card.component';
 import { SkeletonComponent } from '../../shared/skeleton.component';
 import { formatIdentity } from '../../shared/user-identity';
+
+hljs.registerLanguage('bash', bash);
+hljs.registerLanguage('css', css);
+hljs.registerLanguage('html', xml);
+hljs.registerLanguage('javascript', javascript);
+hljs.registerLanguage('json', json);
+hljs.registerLanguage('python', python);
+hljs.registerLanguage('typescript', typescript);
 
 @Component({
   selector: 'app-blog-post',
@@ -710,6 +726,25 @@ export class BlogPostComponent implements OnInit, OnDestroy {
 
   handleArticleClick(event: MouseEvent): void {
     const target = event.target as HTMLElement | null;
+    const codeButton = target?.closest('button[data-code-action]') as HTMLButtonElement | null;
+    if (codeButton) {
+      const action = codeButton.getAttribute('data-code-action');
+      const wrapper = codeButton.closest('.blog-codeblock') as HTMLElement | null;
+      if (!action || !wrapper) return;
+      if (action === 'copy') {
+        const code = wrapper.querySelector('pre code') as HTMLElement | null;
+        const value = (code?.textContent || '').trimEnd();
+        if (value) this.copyCode(value);
+      } else if (action === 'wrap') {
+        const wrap = wrapper.classList.toggle('blog-codeblock--wrap');
+        const wrapLabel = codeButton.getAttribute('data-wrap-label') || this.translate.instant('blog.post.code.wrap');
+        const unwrapLabel = codeButton.getAttribute('data-unwrap-label') || this.translate.instant('blog.post.code.unwrap');
+        codeButton.textContent = wrap ? unwrapLabel : wrapLabel;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     const img = target?.closest('img') as HTMLImageElement | null;
     if (!img) return;
     const images = this.galleryImages();
@@ -721,6 +756,40 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     event.preventDefault();
     event.stopPropagation();
     this.openLightbox(idx);
+  }
+
+  private copyCode(code: string): void {
+    const w = this.document?.defaultView;
+    if (!w) return;
+    const toastTitle = this.translate.instant('blog.post.code.copiedTitle');
+    const toastCopy = this.translate.instant('blog.post.code.copiedCopy');
+    const errorTitle = this.translate.instant('blog.post.code.copyErrorTitle');
+    const errorCopy = this.translate.instant('blog.post.code.copyErrorCopy');
+    if (w.navigator?.clipboard?.writeText) {
+      w.navigator.clipboard
+        .writeText(code)
+        .then(() => this.toast.success(toastTitle, toastCopy))
+        .catch(() => this.toast.error(errorTitle, errorCopy));
+      return;
+    }
+    try {
+      const input = this.document.createElement('textarea');
+      input.value = code;
+      input.setAttribute('readonly', 'true');
+      input.style.position = 'fixed';
+      input.style.left = '-9999px';
+      this.document.body.appendChild(input);
+      input.select();
+      const ok = this.document.execCommand('copy');
+      input.remove();
+      if (ok) {
+        this.toast.success(toastTitle, toastCopy);
+      } else {
+        this.toast.error(errorTitle, errorCopy);
+      }
+    } catch {
+      this.toast.error(errorTitle, errorCopy);
+    }
   }
 
   openLightbox(index: number): void {
@@ -1152,6 +1221,75 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         extra.remove();
       }
       idx += 1;
+    }
+
+    const codeCopyLabel = this.translate.instant('blog.post.code.copy');
+    const codeWrapLabel = this.translate.instant('blog.post.code.wrap');
+    const codeUnwrapLabel = this.translate.instant('blog.post.code.unwrap');
+    const codeFallbackLabel = this.translate.instant('blog.post.code.languageFallback');
+
+    const codeBlocks = Array.from(doc.body.querySelectorAll('pre > code')) as HTMLElement[];
+    for (const codeEl of codeBlocks) {
+      const pre = codeEl.parentElement as HTMLElement | null;
+      if (!pre) continue;
+      const raw = codeEl.textContent || '';
+      const langMatch = codeEl.className.match(/language-([a-z0-9_-]+)/i);
+      const rawLang = (langMatch?.[1] || '').trim().toLowerCase();
+      const lang =
+        rawLang === 'js'
+          ? 'javascript'
+          : rawLang === 'ts'
+            ? 'typescript'
+            : rawLang === 'html'
+              ? 'html'
+              : rawLang === 'xml'
+                ? 'html'
+                : rawLang;
+
+      try {
+        const highlighted = lang && hljs.getLanguage(lang) ? hljs.highlight(raw, { language: lang }).value : hljs.highlightAuto(raw).value;
+        codeEl.innerHTML = highlighted;
+        codeEl.classList.add('hljs');
+      } catch {
+        // leave as-is
+      }
+
+      const wrapper = doc.createElement('div');
+      wrapper.className = 'blog-codeblock';
+
+      const header = doc.createElement('div');
+      header.className = 'blog-codeblock-header';
+
+      const langSpan = doc.createElement('span');
+      langSpan.className = 'blog-codeblock-lang';
+      langSpan.textContent = lang || codeFallbackLabel;
+
+      const actions = doc.createElement('div');
+      actions.className = 'blog-codeblock-actions';
+
+      const copyBtn = doc.createElement('button');
+      copyBtn.type = 'button';
+      copyBtn.className = 'blog-codeblock-btn';
+      copyBtn.setAttribute('data-code-action', 'copy');
+      copyBtn.textContent = codeCopyLabel;
+
+      const wrapBtn = doc.createElement('button');
+      wrapBtn.type = 'button';
+      wrapBtn.className = 'blog-codeblock-btn';
+      wrapBtn.setAttribute('data-code-action', 'wrap');
+      wrapBtn.setAttribute('data-wrap-label', codeWrapLabel);
+      wrapBtn.setAttribute('data-unwrap-label', codeUnwrapLabel);
+      wrapBtn.textContent = codeWrapLabel;
+
+      actions.appendChild(copyBtn);
+      actions.appendChild(wrapBtn);
+      header.appendChild(langSpan);
+      header.appendChild(actions);
+
+      pre.classList.add('blog-codeblock-pre');
+      pre.replaceWith(wrapper);
+      wrapper.appendChild(header);
+      wrapper.appendChild(pre);
     }
 
     return { html: doc.body.innerHTML, toc };
