@@ -3,6 +3,7 @@ import { RouterOutlet } from '@angular/router';
 import { HeaderComponent } from './layout/header.component';
 import { FooterComponent } from './layout/footer.component';
 import { ContainerComponent } from './layout/container.component';
+import { CmsGlobalSectionBlocksComponent } from './shared/cms-global-section-blocks.component';
 import { ToastComponent } from './shared/toast.component';
 import { ToastService } from './core/toast.service';
 import { ThemeService, ThemePreference } from './core/theme.service';
@@ -13,7 +14,7 @@ import { AuthService } from './core/auth.service';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, HeaderComponent, FooterComponent, ContainerComponent, ToastComponent],
+  imports: [RouterOutlet, HeaderComponent, FooterComponent, ContainerComponent, CmsGlobalSectionBlocksComponent, ToastComponent],
   template: `
     <a class="skip-link" href="#main-content">Skip to main content</a>
     <div class="min-h-screen flex flex-col bg-gradient-to-b from-slate-50 to-white text-slate-900 dark:from-slate-950 dark:to-slate-900 dark:text-slate-50 transition-colors">
@@ -23,9 +24,11 @@ import { AuthService } from './core/auth.service';
         (themeChange)="onThemeChange($event)"
         (languageChange)="onLanguageChange($event)"
       ></app-header>
+      <app-cms-global-section-blocks contentKey="site.header-banners" containerClasses="py-6"></app-cms-global-section-blocks>
       <app-container id="main-content" class="flex-1 py-8">
         <router-outlet></router-outlet>
       </app-container>
+      <app-cms-global-section-blocks contentKey="site.footer-promo" containerClasses="py-8"></app-cms-global-section-blocks>
       <app-footer></app-footer>
     </div>
     <app-toast [messages]="toasts()"></app-toast>

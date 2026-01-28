@@ -959,8 +959,9 @@ Below is a structured checklist you can turn into issues.
 - [x] CMS editor: publish checklist – Pre-publish checklist (missing translations, missing alt text, broken links, empty sections).
 - [x] CMS editor: inline style controls – Block inspector for spacing, background, alignment, and max-width (theme-aware).
 - [x] CMS editor: reusable blocks – Save a section as a reusable snippet and insert it on other pages.
-- [ ] CMS editor: global sections – Manage global blocks (announcement bar, footer promo, header banners) used site-wide.
-- [ ] CMS editor: page templates – Create pages from templates (About/FAQ/Shipping/Returns) with prebuilt sections.
+- [x] CMS editor: global sections – Manage global blocks (announcement bar, footer promo, header banners) used site-wide.
+- [x] CMS editor: page templates – Create pages from templates (About/FAQ/Shipping/Returns) with prebuilt sections.
+- [ ] CMS editor: announcement precedence – Allow stacking CMS announcement with Ops banner (currently Ops banner overrides).
 - [ ] CMS editor: inline media drag-drop – Drag images into the editor to auto-upload and insert with caption + alt.
 - [ ] CMS assets: image editor – Crop/rotate/resize tools in the asset library with non-destructive versions.
 - [ ] CMS assets: “where used” – Show usage references for each asset (pages/sections/posts) before deleting.

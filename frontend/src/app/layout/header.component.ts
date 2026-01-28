@@ -12,6 +12,7 @@ import { ThemeSegmentedControlComponent } from '../shared/theme-segmented-contro
 import { NotificationsService, UserNotification } from '../core/notifications.service';
 import { MaintenanceBannerPublic, OpsService } from '../core/ops.service';
 import { ToastService } from '../core/toast.service';
+import { CmsAnnouncementBarComponent } from '../shared/cms-announcement-bar.component';
 
 @Component({
   selector: 'app-header',
@@ -25,28 +26,30 @@ import { ToastService } from '../core/toast.service';
     DatePipe,
     FormsModule,
     TranslateModule,
-    ThemeSegmentedControlComponent
+    ThemeSegmentedControlComponent,
+    CmsAnnouncementBarComponent
   ],
   template: `
     <header class="sticky top-0 z-[100] isolate border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
-      <div
-        *ngIf="bannerText() as bannerMessage"
-        class="border-b border-slate-200 dark:border-slate-800"
-        [ngClass]="bannerClasses()"
-      >
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-3 text-sm">
-          <div class="whitespace-pre-line">{{ bannerMessage }}</div>
-          <a
-            *ngIf="bannerLinkUrl() as href"
-            class="inline-flex items-center gap-1 font-medium underline underline-offset-2 hover:opacity-80"
-            [href]="href"
-            [attr.target]="isExternalLink(href) ? '_blank' : null"
-            [attr.rel]="isExternalLink(href) ? 'noopener noreferrer' : null"
-          >
-            {{ bannerLinkLabel() || ('adminUi.ops.banner.linkDefault' | translate) }}
-          </a>
+      <ng-container *ngIf="bannerText() as bannerMessage; else cmsAnnouncement">
+        <div class="border-b border-slate-200 dark:border-slate-800" [ngClass]="bannerClasses()">
+          <div class="max-w-7xl mx-auto px-4 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-3 text-sm">
+            <div class="whitespace-pre-line">{{ bannerMessage }}</div>
+            <a
+              *ngIf="bannerLinkUrl() as href"
+              class="inline-flex items-center gap-1 font-medium underline underline-offset-2 hover:opacity-80"
+              [href]="href"
+              [attr.target]="isExternalLink(href) ? '_blank' : null"
+              [attr.rel]="isExternalLink(href) ? 'noopener noreferrer' : null"
+            >
+              {{ bannerLinkLabel() || ('adminUi.ops.banner.linkDefault' | translate) }}
+            </a>
+          </div>
         </div>
-      </div>
+      </ng-container>
+      <ng-template #cmsAnnouncement>
+        <app-cms-announcement-bar></app-cms-announcement-bar>
+      </ng-template>
       <div class="max-w-7xl mx-auto px-4 sm:px-6">
         <div class="py-4 grid grid-cols-[auto,1fr,auto] items-center gap-4">
           <a routerLink="/" class="flex items-center gap-3 min-w-0">

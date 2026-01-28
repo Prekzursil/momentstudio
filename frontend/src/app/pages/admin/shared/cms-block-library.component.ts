@@ -57,7 +57,7 @@ type BlockDef = {
 
       <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
         <div
-          *ngFor="let b of blocks"
+          *ngFor="let b of filteredBlocks()"
           class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm cursor-grab active:cursor-grabbing dark:border-slate-800 dark:bg-slate-900"
           draggable="true"
           (dragstart)="onDragStart($event, b.type)"
@@ -76,6 +76,7 @@ type BlockDef = {
 })
 export class CmsBlockLibraryComponent {
   @Input() context: CmsBlockLibraryContext = 'page';
+  @Input() allowedTypes: ReadonlyArray<CmsBlockLibraryBlockType> | null = null;
   @Output() add = new EventEmitter<{ type: CmsBlockLibraryBlockType; template: CmsBlockLibraryTemplate }>();
   @Output() dragActive = new EventEmitter<boolean>();
 
@@ -114,6 +115,13 @@ export class CmsBlockLibraryComponent {
     }
   ];
 
+  filteredBlocks(): BlockDef[] {
+    const allowed = this.allowedTypes;
+    if (!allowed || allowed.length === 0) return this.blocks;
+    const allowedSet = new Set(allowed);
+    return this.blocks.filter((block) => allowedSet.has(block.type));
+  }
+
   addBlock(type: CmsBlockLibraryBlockType): void {
     this.add.emit({ type, template: this.template() });
   }
@@ -133,4 +141,3 @@ export class CmsBlockLibraryComponent {
     this.dragActive.emit(false);
   }
 }
-

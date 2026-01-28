@@ -2446,6 +2446,11 @@
         "success": { "save": "SEO saved." },
         "errors": { "save": "Could not save SEO." }
       },
+      "globalSections": {
+        "announcement": "Announcement bar",
+        "headerBanners": "Header banners",
+        "footerPromo": "Footer promo"
+      },
       "pages": {
         "title": "Static pages",
         "aboutLabel": "Our story (About)",
@@ -2460,9 +2465,19 @@
           "title": "Page builder blocks",
           "hint": "Optional: build richer About/Contact pages with blocks. If blocks are present, the storefront renders them instead of the Markdown body.",
           "newPageTitle": "New page title",
+          "template": "Template",
+          "templates": {
+            "blank": "Blank",
+            "about": "About",
+            "faq": "FAQ",
+            "shipping": "Shipping",
+            "returns": "Returns"
+          },
           "status": "Status",
           "createPage": "Create page",
           "page": "Page",
+          "globalSections": "Global sections",
+          "pagesGroup": "Pages",
           "publishAtOptional": "Publish at (optional)",
           "publishAtHint": "If this is in the future and status is published, the page will go live at that time.",
           "unpublishAtOptional": "Unpublish at (optional)",
@@ -2486,7 +2501,12 @@
             "maxWidth": { "label": "Max width", "full": "Full", "narrow": "Narrow", "prose": "Prose", "wide": "Wide" }
           },
           "success": { "save": "Blocks saved.", "rename": "Page URL updated (redirect created)." },
-          "errors": { "load": "Could not load page blocks.", "save": "Could not save blocks.", "rename": "Could not change page URL." }
+          "errors": {
+            "load": "Could not load page blocks.",
+            "save": "Could not save blocks.",
+            "rename": "Could not change page URL.",
+            "blockTypeNotAllowed": "This block type isn't allowed in this section."
+          }
         },
         "redirects": {
           "title": "Redirects",

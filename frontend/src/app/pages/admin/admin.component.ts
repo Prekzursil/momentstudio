@@ -52,6 +52,13 @@ import { BannerBlockComponent } from '../../shared/banner-block.component';
 import { CarouselBlockComponent } from '../../shared/carousel-block.component';
 import { CmsEditorPrefsService } from './shared/cms-editor-prefs.service';
 import { CmsBlockLibraryBlockType, CmsBlockLibraryComponent, CmsBlockLibraryTemplate } from './shared/cms-block-library.component';
+import {
+  CMS_GLOBAL_SECTIONS,
+  CmsGlobalSectionKey,
+  cmsGlobalSectionAllowedTypes,
+  cmsGlobalSectionDefaultTitle,
+  isCmsGlobalSectionKey
+} from '../../shared/cms-global-sections';
 
 type AdminContentSection = 'home' | 'pages' | 'blog' | 'settings';
 type UiLang = 'en' | 'ro';
@@ -137,7 +144,7 @@ type HomeBlockDraft = {
   layout?: CmsBlockLayout;
 };
 
-type PageBuilderKey = `page.${string}`;
+type PageBuilderKey = `page.${string}` | CmsGlobalSectionKey;
 type PageBlockType = 'text' | 'image' | 'gallery' | 'banner' | 'carousel';
 type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
 
@@ -148,6 +155,8 @@ type PageBlocksDraftState = {
   publishedUntil: string;
   requiresAuth: boolean;
 };
+
+type PageCreationTemplate = 'blank' | 'about' | 'faq' | 'shipping' | 'returns';
 
 type BlogDraftState = {
   title: string;
@@ -1122,12 +1131,25 @@ class CmsDraftManager<T> {
                 <div class="mt-3 grid gap-3">
                   <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.site.pages.builder.hint' | translate }}</p>
 
-                  <div class="grid gap-3 md:grid-cols-[1fr_180px_auto] items-end">
-                    <app-input [label]="'adminUi.site.pages.builder.newPageTitle' | translate" [(value)]="newCustomPageTitle"></app-input>
-                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                      {{ 'adminUi.site.pages.builder.status' | translate }}
-                      <select
-                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                  <div class="grid gap-3 md:grid-cols-[1fr_220px_180px_auto] items-end">
+	                    <app-input [label]="'adminUi.site.pages.builder.newPageTitle' | translate" [(value)]="newCustomPageTitle"></app-input>
+	                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                      {{ 'adminUi.site.pages.builder.template' | translate }}
+	                      <select
+	                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                        [(ngModel)]="newCustomPageTemplate"
+	                      >
+	                        <option [ngValue]="'blank'">{{ 'adminUi.site.pages.builder.templates.blank' | translate }}</option>
+	                        <option [ngValue]="'about'">{{ 'adminUi.site.pages.builder.templates.about' | translate }}</option>
+	                        <option [ngValue]="'faq'">{{ 'adminUi.site.pages.builder.templates.faq' | translate }}</option>
+	                        <option [ngValue]="'shipping'">{{ 'adminUi.site.pages.builder.templates.shipping' | translate }}</option>
+	                        <option [ngValue]="'returns'">{{ 'adminUi.site.pages.builder.templates.returns' | translate }}</option>
+	                      </select>
+	                    </label>
+	                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                      {{ 'adminUi.site.pages.builder.status' | translate }}
+	                      <select
+	                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                         [(ngModel)]="newCustomPageStatus"
                       >
                         <option [ngValue]="'draft'">{{ 'adminUi.status.draft' | translate }}</option>
@@ -1177,28 +1199,35 @@ class CmsDraftManager<T> {
                   <div class="grid gap-3 md:grid-cols-[1fr_auto] items-end">
                     <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                       {{ 'adminUi.site.pages.builder.page' | translate }}
-                      <select
-                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                        [(ngModel)]="pageBlocksKey"
-                        (ngModelChange)="onPageBlocksKeyChange($event)"
-                      >
-                        <ng-container *ngIf="contentPages.length; else defaultPages">
-                          <option *ngFor="let p of contentPages" [ngValue]="p.key">
-                            {{ p.title || p.slug }} · {{ p.slug }}
-                            <ng-container *ngIf="p.needs_translation_en || p.needs_translation_ro">
-                              ·
-                              <ng-container *ngIf="p.needs_translation_en">EN</ng-container>
-                              <ng-container *ngIf="p.needs_translation_en && p.needs_translation_ro">/</ng-container>
-                              <ng-container *ngIf="p.needs_translation_ro">RO</ng-container>
-                            </ng-container>
-                          </option>
-                        </ng-container>
-                        <ng-template #defaultPages>
-                          <option [ngValue]="'page.about'">{{ 'adminUi.site.pages.aboutLabel' | translate }}</option>
-                          <option [ngValue]="'page.contact'">{{ 'adminUi.site.pages.contactLabel' | translate }}</option>
-                        </ng-template>
-                      </select>
-                    </label>
+	                      <select
+	                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                        [(ngModel)]="pageBlocksKey"
+	                        (ngModelChange)="onPageBlocksKeyChange($event)"
+	                      >
+	                        <optgroup [label]="'adminUi.site.pages.builder.globalSections' | translate">
+	                          <option *ngFor="let section of globalSections" [ngValue]="section.key">
+	                            {{ section.labelKey | translate }}
+	                          </option>
+	                        </optgroup>
+	                        <optgroup [label]="'adminUi.site.pages.builder.pagesGroup' | translate">
+	                          <ng-container *ngIf="contentPages.length; else defaultPages">
+	                            <option *ngFor="let p of contentPages" [ngValue]="p.key">
+	                              {{ p.title || p.slug }} · {{ p.slug }}
+	                              <ng-container *ngIf="p.needs_translation_en || p.needs_translation_ro">
+	                                ·
+	                                <ng-container *ngIf="p.needs_translation_en">EN</ng-container>
+	                                <ng-container *ngIf="p.needs_translation_en && p.needs_translation_ro">/</ng-container>
+	                                <ng-container *ngIf="p.needs_translation_ro">RO</ng-container>
+	                              </ng-container>
+	                            </option>
+	                          </ng-container>
+	                          <ng-template #defaultPages>
+	                            <option [ngValue]="'page.about'">{{ 'adminUi.site.pages.aboutLabel' | translate }}</option>
+	                            <option [ngValue]="'page.contact'">{{ 'adminUi.site.pages.contactLabel' | translate }}</option>
+	                          </ng-template>
+	                        </optgroup>
+	                      </select>
+	                    </label>
 
                     <div class="flex flex-wrap items-end gap-2">
                       <app-button
@@ -1209,29 +1238,28 @@ class CmsDraftManager<T> {
                         (action)="renameCustomPageUrl()"
                       ></app-button>
                       <ng-container *ngIf="cmsAdvanced()">
-                        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                          {{ 'adminUi.site.pages.builder.addBlock' | translate }}
-                          <select
-                            class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                            [(ngModel)]="newPageBlockType"
-                          >
-                            <option [ngValue]="'text'">{{ 'adminUi.home.sections.blocks.text' | translate }}</option>
-                            <option [ngValue]="'image'">{{ 'adminUi.home.sections.blocks.image' | translate }}</option>
-                            <option [ngValue]="'gallery'">{{ 'adminUi.home.sections.blocks.gallery' | translate }}</option>
-                            <option [ngValue]="'banner'">{{ 'adminUi.home.sections.blocks.banner' | translate }}</option>
-                            <option [ngValue]="'carousel'">{{ 'adminUi.home.sections.blocks.carousel' | translate }}</option>
-                          </select>
-                        </label>
-                        <app-button size="sm" [label]="'adminUi.actions.add' | translate" (action)="addPageBlock(pageBlocksKey)"></app-button>
-                      </ng-container>
+	                        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                          {{ 'adminUi.site.pages.builder.addBlock' | translate }}
+	                          <select
+	                            class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                            [(ngModel)]="newPageBlockType"
+	                          >
+	                            <option *ngFor="let t of allowedPageBlockTypesForKey(pageBlocksKey)" [ngValue]="t">
+	                              {{ pageBlockTypeLabelKey(t) | translate }}
+	                            </option>
+	                          </select>
+	                        </label>
+	                        <app-button size="sm" [label]="'adminUi.actions.add' | translate" (action)="addPageBlock(pageBlocksKey)"></app-button>
+	                      </ng-container>
                     </div>
                   </div>
 
-                  <app-cms-block-library
-                    context="page"
-                    (add)="addPageBlockFromLibrary(pageBlocksKey, $event.type, $event.template)"
-                    (dragActive)="setPageInsertDragActive($event)"
-                  ></app-cms-block-library>
+	                  <app-cms-block-library
+	                    context="page"
+	                    [allowedTypes]="allowedCmsLibraryTypes(pageBlocksKey)"
+	                    (add)="addPageBlockFromLibrary(pageBlocksKey, $event.type, $event.template)"
+	                    (dragActive)="setPageInsertDragActive($event)"
+	                  ></app-cms-block-library>
 
                   <div class="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
                     <div class="flex flex-wrap items-start justify-between gap-3">
@@ -1939,7 +1967,7 @@ class CmsDraftManager<T> {
                   </label>
                 </div>
 
-	                <div *ngIf="cmsAdvanced()" class="grid gap-1">
+		                <div *ngIf="cmsAdvanced() && pageKeySupportsRequiresAuth(pageBlocksKey)" class="grid gap-1">
 	                  <label class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
 	                    <input type="checkbox" [(ngModel)]="pageBlocksRequiresAuth[pageBlocksKey]" />
 	                    <span>{{ 'adminUi.site.pages.builder.requiresLogin' | translate }}</span>
@@ -5620,10 +5648,13 @@ export class AdminComponent implements OnInit, OnDestroy {
   linkCheckError: string | null = null;
   linkCheckIssues: ContentLinkCheckIssue[] = [];
   newCustomPageTitle = '';
+  newCustomPageTemplate: PageCreationTemplate = 'blank';
   newCustomPageStatus: ContentStatusUi = 'draft';
   newCustomPagePublishedAt = '';
   newCustomPagePublishedUntil = '';
   creatingCustomPage = false;
+  readonly globalSections = CMS_GLOBAL_SECTIONS;
+  readonly allPageBlockTypes: PageBlockType[] = ['text', 'image', 'gallery', 'banner', 'carousel'];
   pageBlocksKey: PageBuilderKey = 'page.about';
   newPageBlockType: PageBlockType = 'text';
   pageBlocks: Record<string, PageBlockDraft[]> = {};
@@ -9487,14 +9518,16 @@ export class AdminComponent implements OnInit, OnDestroy {
           this.pageBlocksNeedsTranslationEn[page.key] = Boolean(page.needs_translation_en);
           this.pageBlocksNeedsTranslationRo[page.key] = Boolean(page.needs_translation_ro);
         }
-        this.contentPagesLoading = false;
-        if (!this.contentPages.length) return;
-        const exists = this.contentPages.some((p) => p.key === this.pageBlocksKey);
-        if (!exists) {
-          const preferred = this.contentPages.find((p) => p.key === 'page.about')?.key || this.contentPages[0].key;
-          this.pageBlocksKey = preferred as PageBuilderKey;
-        }
-      },
+	        this.contentPagesLoading = false;
+	        if (!this.contentPages.length) return;
+	        if (isCmsGlobalSectionKey(this.pageBlocksKey)) return;
+	        const exists = this.contentPages.some((p) => p.key === this.pageBlocksKey);
+	        if (!exists) {
+	          const preferred = this.contentPages.find((p) => p.key === 'page.about')?.key || this.contentPages[0].key;
+	          this.pageBlocksKey = preferred as PageBuilderKey;
+	          this.ensureNewPageBlockTypeForKey(this.pageBlocksKey);
+	        }
+	      },
       error: () => {
         this.contentPagesLoading = false;
         this.contentPages = [];
@@ -9668,6 +9701,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   onPageBlocksKeyChange(next: PageBuilderKey): void {
     if (!next || this.pageBlocksKey === next) return;
     this.pageBlocksKey = next;
+    this.ensureNewPageBlockTypeForKey(next);
     this.loadPageBlocks(next);
   }
 
@@ -9708,10 +9742,10 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
-  createCustomPage(): void {
-    const title = (this.newCustomPageTitle || '').trim();
-    if (!title) return;
-    const baseSlug = this.slugifyPageSlug(title);
+	  createCustomPage(): void {
+	    const title = (this.newCustomPageTitle || '').trim();
+	    if (!title) return;
+	    const baseSlug = this.slugifyPageSlug(title);
     if (this.isReservedPageSlug(baseSlug)) {
       this.toast.error(this.t('adminUi.site.pages.errors.reservedTitle'), this.t('adminUi.site.pages.errors.reservedCopy'));
       return;
@@ -9736,26 +9770,27 @@ export class AdminComponent implements OnInit, OnDestroy {
           ? new Date(this.newCustomPagePublishedUntil).toISOString()
           : null
         : null;
-    const payload = {
-      title,
-      body_markdown: 'Page builder',
-      status: this.newCustomPageStatus,
-      published_at,
-      published_until,
-      meta: { version: 2, blocks: [] }
-    };
+	    const payload = {
+	      title,
+	      body_markdown: 'Page builder',
+	      status: this.newCustomPageStatus,
+	      published_at,
+	      published_until,
+	      meta: { version: 2, blocks: this.pageTemplateBlocks(this.newCustomPageTemplate) }
+	    };
     const done = () => {
       this.creatingCustomPage = false;
     };
     this.admin.createContent(key, payload).subscribe({
-      next: () => {
-        done();
-        this.toast.success(this.t('adminUi.site.pages.success.created'));
-        this.newCustomPageTitle = '';
-        this.newCustomPageStatus = 'draft';
-        this.newCustomPagePublishedAt = '';
-        this.newCustomPagePublishedUntil = '';
-        this.loadContentPages();
+	      next: () => {
+	        done();
+	        this.toast.success(this.t('adminUi.site.pages.success.created'));
+	        this.newCustomPageTitle = '';
+	        this.newCustomPageTemplate = 'blank';
+	        this.newCustomPageStatus = 'draft';
+	        this.newCustomPagePublishedAt = '';
+	        this.newCustomPagePublishedUntil = '';
+	        this.loadContentPages();
         this.pageBlocksKey = key;
         this.loadPageBlocks(key);
       },
@@ -9765,11 +9800,115 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.toast.error(detail || this.t('adminUi.site.pages.errors.create'));
       }
     });
-  }
+	  }
 
-  loadContentRedirects(reset: boolean = false): void {
-    if (reset) {
-      this.redirectsMeta = { ...this.redirectsMeta, page: 1 };
+	  private pageTemplateBlocks(template: PageCreationTemplate): Array<Record<string, unknown>> {
+	    const prose: CmsBlockLayout = { spacing: 'none', background: 'none', align: 'left', max_width: 'prose' };
+	    const textBlock = (
+	      key: string,
+	      titleEn: string,
+	      titleRo: string,
+	      bodyEn: string,
+	      bodyRo: string,
+	      layout: CmsBlockLayout = prose
+	    ): Record<string, unknown> => ({
+	      key,
+	      type: 'text',
+	      enabled: true,
+	      title: { en: titleEn, ro: titleRo },
+	      body_markdown: { en: bodyEn, ro: bodyRo },
+	      layout
+	    });
+
+	    if (template === 'about') {
+	      return [
+	        textBlock(
+	          'about_intro',
+	          'Our story',
+	          'Povestea noastră',
+	          `Write a short introduction about who you are and what you make.\n\n- Where are you based?\n- What inspires your work?\n- What materials do you use?`,
+	          `Scrie o introducere scurtă despre cine ești și ce creezi.\n\n- Unde lucrezi?\n- Ce te inspiră?\n- Ce materiale folosești?`
+	        ),
+	        textBlock(
+	          'about_process',
+	          "How it's made",
+	          'Cum este realizat',
+	          `Describe your process step by step.\n\n1. Idea & sketch\n2. Materials\n3. Crafting\n4. Finishing touches`,
+	          `Descrie procesul pas cu pas.\n\n1. Idee și schiță\n2. Materiale\n3. Realizare\n4. Finisaje`
+	        ),
+	        textBlock(
+	          'about_care',
+	          'Care & longevity',
+	          'Îngrijire și durabilitate',
+	          `Add care instructions and tips to keep items looking great.\n\nTip: link to your Care page if you have one.`,
+	          `Adaugă instrucțiuni de îngrijire și sfaturi pentru păstrarea produselor.\n\nSfat: adaugă un link către pagina de Îngrijire dacă există.`
+	        )
+	      ];
+	    }
+
+	    if (template === 'faq') {
+	      return [
+	        textBlock(
+	          'faq_intro',
+	          'Frequently asked questions',
+	          'Întrebări frecvente',
+	          `Add your FAQs here.\n\n### How long does shipping take?\nAnswer...\n\n### Do you take custom orders?\nAnswer...\n\n### How can I contact you?\nAnswer...`,
+	          `Adaugă aici întrebările frecvente.\n\n### Cât durează livrarea?\nRăspuns...\n\n### Realizezi comenzi personalizate?\nRăspuns...\n\n### Cum te pot contacta?\nRăspuns...`
+	        ),
+	        textBlock(
+	          'faq_policies',
+	          'Policies',
+	          'Politici',
+	          `### Returns & cancellations\nAnswer...\n\n### Payments\nAnswer...`,
+	          `### Returnări și anulări\nRăspuns...\n\n### Plăți\nRăspuns...`
+	        )
+	      ];
+	    }
+
+	    if (template === 'shipping') {
+	      return [
+	        textBlock(
+	          'shipping_rates',
+	          'Shipping',
+	          'Livrare',
+	          `Explain shipping zones, pricing, and estimated delivery times.\n\n- Processing time: ...\n- Delivery time: ...\n- Courier: ...`,
+	          `Explică zonele de livrare, costurile și timpul estimat.\n\n- Timp de procesare: ...\n- Timp de livrare: ...\n- Curier: ...`
+	        ),
+	        textBlock(
+	          'shipping_tracking',
+	          'Tracking & delivery issues',
+	          'Urmărire și probleme la livrare',
+	          `Explain tracking, failed delivery attempts, and how customers can get help.\n\nEmail: ...\nPhone: ...`,
+	          `Explică urmărirea coletului, tentativele eșuate și cum poate clientul primi ajutor.\n\nEmail: ...\nTelefon: ...`
+	        )
+	      ];
+	    }
+
+	    if (template === 'returns') {
+	      return [
+	        textBlock(
+	          'returns_policy',
+	          'Returns & cancellations',
+	          'Returnări și anulări',
+	          `Explain your return window, condition requirements, and cancellation policy.\n\n- Window: ... days\n- Condition: ...\n- How to start a return: ...`,
+	          `Explică perioada de retur, condițiile produsului și politica de anulare.\n\n- Perioadă: ... zile\n- Condiție: ...\n- Cum începi un retur: ...`
+	        ),
+	        textBlock(
+	          'returns_refunds',
+	          'Refunds',
+	          'Rambursări',
+	          `Explain how refunds are issued and typical timelines.\n\n- Payment method: ...\n- Timeline: ...`,
+	          `Explică modul de rambursare și termenele obișnuite.\n\n- Metodă de plată: ...\n- Termen: ...`
+	        )
+	      ];
+	    }
+
+	    return [];
+	  }
+
+	  loadContentRedirects(reset: boolean = false): void {
+	    if (reset) {
+	      this.redirectsMeta = { ...this.redirectsMeta, page: 1 };
     }
     this.redirectsLoading = true;
     this.redirectsError = null;
@@ -9895,6 +10034,38 @@ export class AdminComponent implements OnInit, OnDestroy {
       return `/pages/${slug}`;
     }
     return value;
+  }
+
+  pageKeySupportsRequiresAuth(key: string): boolean {
+    return (key || '').trim().startsWith('page.');
+  }
+
+  pageBlockTypeLabelKey(type: PageBlockType): string {
+    if (type === 'image') return 'adminUi.home.sections.blocks.image';
+    if (type === 'gallery') return 'adminUi.home.sections.blocks.gallery';
+    if (type === 'banner') return 'adminUi.home.sections.blocks.banner';
+    if (type === 'carousel') return 'adminUi.home.sections.blocks.carousel';
+    return 'adminUi.home.sections.blocks.text';
+  }
+
+  allowedPageBlockTypesForKey(pageKey: PageBuilderKey): PageBlockType[] {
+    const allowed = cmsGlobalSectionAllowedTypes(pageKey);
+    if (allowed && allowed.length) return [...allowed] as PageBlockType[];
+    return this.allPageBlockTypes;
+  }
+
+  allowedCmsLibraryTypes(pageKey: PageBuilderKey): ReadonlyArray<CmsBlockLibraryBlockType> | null {
+    const allowed = cmsGlobalSectionAllowedTypes(pageKey);
+    if (!allowed || !allowed.length) return null;
+    return allowed as ReadonlyArray<CmsBlockLibraryBlockType>;
+  }
+
+  private ensureNewPageBlockTypeForKey(pageKey: PageBuilderKey): void {
+    const allowed = this.allowedPageBlockTypesForKey(pageKey);
+    if (!allowed.length) return;
+    if (!allowed.includes(this.newPageBlockType)) {
+      this.newPageBlockType = allowed[0];
+    }
   }
 
   canRenamePageKey(key: string): boolean {
@@ -10077,6 +10248,12 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   private insertPageBlockAt(pageKey: PageBuilderKey, type: CmsBlockLibraryBlockType, index: number, template: CmsBlockLibraryTemplate): void {
+    const allowed = this.allowedPageBlockTypesForKey(pageKey);
+    if (allowed.length && !allowed.includes(type as PageBlockType)) {
+      this.toast.error(this.t('adminUi.site.pages.builder.errors.blockTypeNotAllowed'));
+      return;
+    }
+
     const current = [...(this.pageBlocks[pageKey] || [])];
     const existing = new Set(current.map((b) => b.key));
     const base = `${type}_${Date.now()}`;
@@ -10450,8 +10627,8 @@ export class AdminComponent implements OnInit, OnDestroy {
       return base;
     });
 
-    const meta = { ...(this.pageBlocksMeta[pageKey] || {}), blocks } as Record<string, unknown>;
-    if (this.pageBlocksRequiresAuth[pageKey]) {
+    const meta = { ...(this.pageBlocksMeta[pageKey] || {}), version: 2, blocks } as Record<string, unknown>;
+    if (this.pageKeySupportsRequiresAuth(pageKey) && this.pageBlocksRequiresAuth[pageKey]) {
       meta['requires_auth'] = true;
     } else {
       delete meta['requires_auth'];
@@ -10639,13 +10816,13 @@ export class AdminComponent implements OnInit, OnDestroy {
           this.pageBlocksMessage[pageKey] = null;
           return;
         }
-        if (err?.status === 404) {
-          const createPayload = {
-            title: this.contentPages.find((p) => p.key === pageKey)?.title || pageKey,
-            body_markdown: 'Page builder',
-            status,
-            lang: this.infoLang,
-            published_at,
+	        if (err?.status === 404) {
+	          const createPayload = {
+	            title: this.contentPages.find((p) => p.key === pageKey)?.title || cmsGlobalSectionDefaultTitle(pageKey) || pageKey,
+	            body_markdown: 'Page builder',
+	            status,
+	            lang: this.infoLang,
+	            published_at,
             published_until,
             meta
           };

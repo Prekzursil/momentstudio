@@ -2446,6 +2446,11 @@
         "success": { "save": "SEO salvat." },
         "errors": { "save": "Nu am putut salva SEO." }
       },
+      "globalSections": {
+        "announcement": "Bară de anunț",
+        "headerBanners": "Bannere antet",
+        "footerPromo": "Promo în subsol"
+      },
       "pages": {
         "title": "Pagini statice",
         "aboutLabel": "Povestea noastră",
@@ -2460,9 +2465,19 @@
           "title": "Blocuri tip page builder",
           "hint": "Opțional: construiește pagini mai bogate (Povestea noastră/Contact) din blocuri. Dacă există blocuri, magazinul le afișează în locul conținutului Markdown.",
           "newPageTitle": "Titlu pagină nouă",
+          "template": "Șablon",
+          "templates": {
+            "blank": "Gol",
+            "about": "Despre",
+            "faq": "Întrebări frecvente",
+            "shipping": "Livrare",
+            "returns": "Returnări"
+          },
           "status": "Stare",
           "createPage": "Creează pagină",
           "page": "Pagină",
+          "globalSections": "Secțiuni globale",
+          "pagesGroup": "Pagini",
           "publishAtOptional": "Publică la (opțional)",
           "publishAtHint": "Dacă este în viitor și starea este Publicat, pagina va deveni vizibilă la acel moment.",
           "unpublishAtOptional": "Ascunde la (opțional)",
@@ -2486,7 +2501,12 @@
             "maxWidth": { "label": "Lățime maximă", "full": "Completă", "narrow": "Îngustă", "prose": "Proză", "wide": "Largă" }
           },
           "success": { "save": "Blocurile au fost salvate.", "rename": "URL-ul paginii a fost actualizat (redirecționare creată)." },
-          "errors": { "load": "Nu am putut încărca blocurile.", "save": "Nu am putut salva blocurile.", "rename": "Nu s-a putut schimba URL-ul paginii." }
+          "errors": {
+            "load": "Nu am putut încărca blocurile.",
+            "save": "Nu am putut salva blocurile.",
+            "rename": "Nu s-a putut schimba URL-ul paginii.",
+            "blockTypeNotAllowed": "Acest tip de bloc nu este permis în această secțiune."
+          }
         },
         "redirects": {
           "title": "Redirecționări",
