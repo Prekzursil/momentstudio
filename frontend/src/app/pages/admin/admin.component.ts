@@ -32,13 +32,15 @@ import {
   ContentRedirectRead,
   ContentRedirectImportResult,
   StructuredDataValidationResponse,
-  ContentLinkCheckIssue
+  ContentLinkCheckIssue,
+  ContentPreviewTokenResponse
 } from '../../core/admin.service';
 import { AdminBlogComment, BlogService } from '../../core/blog.service';
 import { FxAdminService, FxAdminStatus, FxOverrideAuditEntry } from '../../core/fx-admin.service';
 import { TaxGroupRead, TaxesAdminService } from '../../core/taxes-admin.service';
 import { ToastService } from '../../core/toast.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { combineLatest, firstValueFrom, forkJoin, of, Subscription } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import { MarkdownService } from '../../core/markdown.service';
@@ -1254,6 +1256,88 @@ class CmsDraftManager<T> {
                     </div>
                   </div>
 
+                  <ng-container *ngIf="pagePreviewSlug(pageBlocksKey) as previewSlug">
+                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
+                      <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="grid gap-0.5 min-w-0">
+                          <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                            {{ 'adminUi.content.previewLinks.title' | translate }}
+                          </p>
+                          <p class="text-xs text-slate-500 dark:text-slate-400">
+                            {{ pagePublicPath(previewSlug) }} · {{ cmsPrefs.previewLang().toUpperCase() }} ·
+                            {{ cmsPrefs.previewTheme().toUpperCase() }} · {{ cmsPreviewViewportWidth() }}px
+                          </p>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-2">
+                          <app-button
+                            size="sm"
+                            variant="ghost"
+                            [label]="'adminUi.content.previewLinks.generate' | translate"
+                            (action)="generatePagePreviewLink(previewSlug)"
+                          ></app-button>
+                          <app-button
+                            size="sm"
+                            variant="ghost"
+                            [label]="'adminUi.actions.refresh' | translate"
+                            [disabled]="!pagePreviewToken || pagePreviewForSlug !== previewSlug"
+                            (action)="refreshPagePreview()"
+                          ></app-button>
+                          <a
+                            *ngIf="pagePreviewShareUrl(previewSlug) as previewUrl"
+                            class="inline-flex items-center justify-center rounded-full font-semibold transition px-3 py-2 text-sm bg-white text-slate-900 border border-slate-200 hover:border-slate-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:bg-slate-800 dark:text-slate-50 dark:border-slate-700 dark:hover:border-slate-600"
+                            [attr.href]="previewUrl"
+                            target="_blank"
+                            rel="noopener"
+                          >
+                            {{ 'adminUi.content.previewLinks.open' | translate }}
+                          </a>
+                        </div>
+                      </div>
+
+                      <div *ngIf="pagePreviewShareUrl(previewSlug) as previewUrl" class="mt-3 grid gap-2">
+                        <div class="flex items-center gap-2">
+                          <input
+                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                            [value]="previewUrl"
+                            readonly
+                          />
+                          <app-button
+                            size="sm"
+                            variant="ghost"
+                            [label]="'adminUi.content.previewLinks.copy' | translate"
+                            (action)="copyPreviewLink(previewUrl)"
+                          ></app-button>
+                        </div>
+                        <p
+                          *ngIf="pagePreviewExpiresAt && pagePreviewForSlug === previewSlug"
+                          class="text-xs text-slate-500 dark:text-slate-400"
+                        >
+                          {{ 'adminUi.content.previewLinks.expires' | translate }} {{ pagePreviewExpiresAt | date: 'short' }}
+                        </p>
+                      </div>
+
+                      <div *ngIf="pagePreviewIframeSrc(previewSlug) as iframeSrc; else pagePreviewHint" class="mt-3 overflow-x-auto">
+                        <div
+                          class="mx-auto rounded-lg border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-900"
+                          [style.width.px]="cmsPreviewViewportWidth()"
+                        >
+                          <iframe
+                            class="h-[720px] w-full rounded-md bg-white dark:bg-slate-950"
+                            [src]="iframeSrc"
+                            [attr.title]="'Preview ' + previewSlug"
+                            loading="lazy"
+                          ></iframe>
+                        </div>
+                      </div>
+                      <ng-template #pagePreviewHint>
+                        <p class="mt-3 text-xs text-slate-500 dark:text-slate-400">
+                          {{ 'adminUi.content.previewLinks.hint' | translate }}
+                        </p>
+                      </ng-template>
+                    </div>
+                  </ng-container>
+
 	                  <app-cms-block-library
 	                    context="page"
 	                    [allowedTypes]="allowedCmsLibraryTypes(pageBlocksKey)"
@@ -2396,6 +2480,77 @@ class CmsDraftManager<T> {
 	                <app-button size="sm" variant="ghost" [label]="'adminUi.actions.dismiss' | translate" (action)="dismissHomeDraftAutosave()"></app-button>
 	              </div>
 	            </div>
+
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="grid gap-0.5 min-w-0">
+                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                    {{ 'adminUi.content.previewLinks.title' | translate }}
+                  </p>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">
+                    / · {{ cmsPrefs.previewLang().toUpperCase() }} · {{ cmsPrefs.previewTheme().toUpperCase() }} · {{ cmsPreviewViewportWidth() }}px
+                  </p>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.content.previewLinks.generate' | translate"
+                    (action)="generateHomePreviewLink()"
+                  ></app-button>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.actions.refresh' | translate"
+                    [disabled]="!homePreviewToken"
+                    (action)="refreshHomePreview()"
+                  ></app-button>
+                  <a
+                    *ngIf="homePreviewShareUrl() as previewUrl"
+                    class="inline-flex items-center justify-center rounded-full font-semibold transition px-3 py-2 text-sm bg-white text-slate-900 border border-slate-200 hover:border-slate-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:bg-slate-800 dark:text-slate-50 dark:border-slate-700 dark:hover:border-slate-600"
+                    [attr.href]="previewUrl"
+                    target="_blank"
+                    rel="noopener"
+                  >
+                    {{ 'adminUi.content.previewLinks.open' | translate }}
+                  </a>
+                </div>
+              </div>
+
+              <div *ngIf="homePreviewShareUrl() as previewUrl" class="mt-3 grid gap-2">
+                <div class="flex items-center gap-2">
+                  <input
+                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [value]="previewUrl"
+                    readonly
+                  />
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.content.previewLinks.copy' | translate"
+                    (action)="copyPreviewLink(previewUrl)"
+                  ></app-button>
+                </div>
+                <p *ngIf="homePreviewExpiresAt" class="text-xs text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.content.previewLinks.expires' | translate }} {{ homePreviewExpiresAt | date: 'short' }}
+                </p>
+              </div>
+
+              <div *ngIf="homePreviewIframeSrc() as iframeSrc; else homePreviewHint" class="mt-3 overflow-x-auto">
+                <div
+                  class="mx-auto rounded-lg border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-900"
+                  [style.width.px]="cmsPreviewViewportWidth()"
+                >
+                  <iframe class="h-[720px] w-full rounded-md bg-white dark:bg-slate-950" [src]="iframeSrc" title="Preview home" loading="lazy"></iframe>
+                </div>
+              </div>
+              <ng-template #homePreviewHint>
+                <p class="mt-3 text-xs text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.content.previewLinks.hint' | translate }}
+                </p>
+              </ng-template>
+            </div>
 
 	            <app-cms-block-library
 	              context="home"
@@ -5668,6 +5823,18 @@ export class AdminComponent implements OnInit, OnDestroy {
   pageBlocksNeedsTranslationEn: Record<string, boolean> = {};
 	  pageBlocksNeedsTranslationRo: Record<string, boolean> = {};
 	  pageBlocksTranslationSaving: Record<string, boolean> = {};
+
+  pagePreviewForSlug: string | null = null;
+  pagePreviewToken: string | null = null;
+  private pagePreviewOrigin: string | null = null;
+  pagePreviewExpiresAt: string | null = null;
+  private pagePreviewNonce = 0;
+
+  homePreviewToken: string | null = null;
+  private homePreviewOrigin: string | null = null;
+  homePreviewExpiresAt: string | null = null;
+  private homePreviewNonce = 0;
+
     pagePublishChecklistOpen = false;
     pagePublishChecklistLoading = false;
     pagePublishChecklistError: string | null = null;
@@ -5716,7 +5883,8 @@ export class AdminComponent implements OnInit, OnDestroy {
     public cmsPrefs: CmsEditorPrefsService,
     private toast: ToastService,
     private translate: TranslateService,
-    private markdown: MarkdownService
+    private markdown: MarkdownService,
+    private sanitizer: DomSanitizer
   ) {}
 
 	  private t(key: string, params?: Record<string, unknown>): string {
@@ -6068,6 +6236,17 @@ export class AdminComponent implements OnInit, OnDestroy {
         return 'max-w-[768px]';
       default:
         return 'max-w-[1024px]';
+    }
+  }
+
+  cmsPreviewViewportWidth(): number {
+    switch (this.cmsPrefs.previewDevice()) {
+      case 'mobile':
+        return 390;
+      case 'tablet':
+        return 768;
+      default:
+        return 1024;
     }
   }
 
@@ -7725,6 +7904,141 @@ export class AdminComponent implements OnInit, OnDestroy {
     void this.copyToClipboard(this.blogPreviewUrl).then((ok) => {
       if (ok) this.toast.info(this.t('adminUi.blog.preview.success.copied'));
       else this.toast.error(this.t('adminUi.blog.preview.errors.copy'));
+    });
+  }
+
+  pagePreviewSlug(pageKey: PageBuilderKey): string | null {
+    const raw = (pageKey || '').trim();
+    if (!raw.startsWith('page.')) return null;
+    const slug = raw.slice('page.'.length).trim();
+    return slug ? slug : null;
+  }
+
+  pagePublicPath(slug: string): string {
+    const value = (slug || '').trim();
+    if (!value) return '/pages';
+    if (value === 'about') return '/about';
+    if (value === 'contact') return '/contact';
+    return `/pages/${value}`;
+  }
+
+  private previewOriginFromResponse(resp: ContentPreviewTokenResponse): string {
+    const raw = (resp?.url || '').trim();
+    if (!raw) return typeof window !== 'undefined' ? window.location.origin : '';
+    try {
+      return new URL(raw).origin;
+    } catch {
+      try {
+        return typeof window !== 'undefined' ? new URL(raw, window.location.origin).origin : '';
+      } catch {
+        return typeof window !== 'undefined' ? window.location.origin : '';
+      }
+    }
+  }
+
+  pagePreviewShareUrl(slug: string): string | null {
+    const value = (slug || '').trim();
+    if (!value) return null;
+    if (!this.pagePreviewToken || this.pagePreviewForSlug !== value) return null;
+
+    const origin = (this.pagePreviewOrigin || '').trim() || (typeof window !== 'undefined' ? window.location.origin : '');
+    if (!origin) return null;
+
+    const url = new URL(this.pagePublicPath(value), origin);
+    url.searchParams.set('preview', this.pagePreviewToken);
+    url.searchParams.set('lang', this.cmsPrefs.previewLang());
+    url.searchParams.set('theme', this.cmsPrefs.previewTheme());
+    return url.toString();
+  }
+
+  pagePreviewIframeSrc(slug: string): SafeResourceUrl | null {
+    const baseUrl = this.pagePreviewShareUrl(slug);
+    if (!baseUrl) return null;
+    const url = new URL(baseUrl);
+    url.searchParams.set('__ts', String(this.pagePreviewNonce || 0));
+    return this.sanitizer.bypassSecurityTrustResourceUrl(url.toString());
+  }
+
+  generatePagePreviewLink(slug: string): void {
+    const value = (slug || '').trim();
+    if (!value) return;
+    this.admin.createPagePreviewToken(value, { lang: this.cmsPrefs.previewLang() }).subscribe({
+      next: (resp) => {
+        this.pagePreviewForSlug = value;
+        this.pagePreviewToken = resp.token;
+        this.pagePreviewExpiresAt = resp.expires_at;
+        this.pagePreviewOrigin = this.previewOriginFromResponse(resp);
+        this.pagePreviewNonce = Date.now();
+        const url = this.pagePreviewShareUrl(value);
+        if (url) {
+          this.toast.success(this.t('adminUi.content.previewLinks.success.ready'));
+          void this.copyToClipboard(url).then((ok) => {
+            if (ok) this.toast.info(this.t('adminUi.content.previewLinks.success.copied'));
+          });
+        } else {
+          this.toast.success(this.t('adminUi.content.previewLinks.success.ready'));
+        }
+      },
+      error: () => this.toast.error(this.t('adminUi.content.previewLinks.errors.generate'))
+    });
+  }
+
+  refreshPagePreview(): void {
+    if (!this.pagePreviewToken) return;
+    this.pagePreviewNonce = Date.now();
+  }
+
+  homePreviewShareUrl(): string | null {
+    if (!this.homePreviewToken) return null;
+    const origin = (this.homePreviewOrigin || '').trim() || (typeof window !== 'undefined' ? window.location.origin : '');
+    if (!origin) return null;
+    const url = new URL('/', origin);
+    url.searchParams.set('preview', this.homePreviewToken);
+    url.searchParams.set('lang', this.cmsPrefs.previewLang());
+    url.searchParams.set('theme', this.cmsPrefs.previewTheme());
+    return url.toString();
+  }
+
+  homePreviewIframeSrc(): SafeResourceUrl | null {
+    const baseUrl = this.homePreviewShareUrl();
+    if (!baseUrl) return null;
+    const url = new URL(baseUrl);
+    url.searchParams.set('__ts', String(this.homePreviewNonce || 0));
+    return this.sanitizer.bypassSecurityTrustResourceUrl(url.toString());
+  }
+
+  generateHomePreviewLink(): void {
+    this.admin.createHomePreviewToken({ lang: this.cmsPrefs.previewLang() }).subscribe({
+      next: (resp) => {
+        this.homePreviewToken = resp.token;
+        this.homePreviewExpiresAt = resp.expires_at;
+        this.homePreviewOrigin = this.previewOriginFromResponse(resp);
+        this.homePreviewNonce = Date.now();
+        const url = this.homePreviewShareUrl();
+        if (url) {
+          this.toast.success(this.t('adminUi.content.previewLinks.success.ready'));
+          void this.copyToClipboard(url).then((ok) => {
+            if (ok) this.toast.info(this.t('adminUi.content.previewLinks.success.copied'));
+          });
+        } else {
+          this.toast.success(this.t('adminUi.content.previewLinks.success.ready'));
+        }
+      },
+      error: () => this.toast.error(this.t('adminUi.content.previewLinks.errors.generate'))
+    });
+  }
+
+  refreshHomePreview(): void {
+    if (!this.homePreviewToken) return;
+    this.homePreviewNonce = Date.now();
+  }
+
+  copyPreviewLink(url: string): void {
+    const value = (url || '').trim();
+    if (!value) return;
+    void this.copyToClipboard(value).then((ok) => {
+      if (ok) this.toast.info(this.t('adminUi.content.previewLinks.success.copied'));
+      else this.toast.error(this.t('adminUi.content.previewLinks.errors.copy'));
     });
   }
 
@@ -9701,6 +10015,11 @@ export class AdminComponent implements OnInit, OnDestroy {
   onPageBlocksKeyChange(next: PageBuilderKey): void {
     if (!next || this.pageBlocksKey === next) return;
     this.pageBlocksKey = next;
+    this.pagePreviewForSlug = null;
+    this.pagePreviewToken = null;
+    this.pagePreviewExpiresAt = null;
+    this.pagePreviewOrigin = null;
+    this.pagePreviewNonce = 0;
     this.ensureNewPageBlockTypeForKey(next);
     this.loadPageBlocks(next);
   }
@@ -11056,6 +11375,8 @@ export class AdminComponent implements OnInit, OnDestroy {
 	        this.pageBlocksMessage[pageKey] = ok;
 	        this.pageBlocksError[pageKey] = null;
 	        this.ensurePageDraft(pageKey).markServerSaved(this.currentPageDraftState(pageKey), true);
+          const slug = this.pagePreviewSlug(pageKey);
+          if (slug && this.pagePreviewForSlug === slug) this.refreshPagePreview();
 	      },
       error: (err) => {
         if (this.handleContentConflict(err, pageKey, reload)) {
@@ -11087,6 +11408,8 @@ export class AdminComponent implements OnInit, OnDestroy {
 	              this.pageBlocksMessage[pageKey] = ok;
 	              this.pageBlocksError[pageKey] = null;
 	              this.ensurePageDraft(pageKey).markServerSaved(this.currentPageDraftState(pageKey), true);
+                const slug = this.pagePreviewSlug(pageKey);
+                if (slug && this.pagePreviewForSlug === slug) this.refreshPagePreview();
 	            },
             error: () => {
               this.pageBlocksError[pageKey] = errMsg;
@@ -11820,6 +12143,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 	        this.rememberContentVersion('home.sections', block);
 	        this.sectionsMessage = ok;
 	        this.cmsHomeDraft.markServerSaved(this.homeBlocks, true);
+        this.refreshHomePreview();
 	      },
 	      error: (err) => {
 	        if (this.handleContentConflict(err, 'home.sections', () => this.loadSections())) {
@@ -11832,6 +12156,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 	              this.rememberContentVersion('home.sections', created);
 	              this.sectionsMessage = ok;
 	              this.cmsHomeDraft.markServerSaved(this.homeBlocks, true);
+                this.refreshHomePreview();
 	            },
 	            error: () => (this.sectionsMessage = errMsg)
 	          });

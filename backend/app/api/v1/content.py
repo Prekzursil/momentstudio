@@ -1,5 +1,6 @@
 import csv
 import httpx
+from datetime import datetime, timedelta, timezone
 from io import StringIO
 from uuid import UUID
 
@@ -9,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.dependencies import get_current_user_optional, get_session, require_admin_section
+from app.core.security import create_content_preview_token, decode_content_preview_token
 from app.models.content import ContentBlock, ContentBlockTranslation, ContentBlockVersion, ContentImage, ContentRedirect, ContentImageTag
 from app.models.user import User
 from app.schemas.content import (
@@ -21,6 +23,7 @@ from app.schemas.content import (
     ContentImageAssetUsageResponse,
     ContentImageEditRequest,
     ContentImageFocalPointUpdate,
+    ContentPreviewTokenResponse,
     ContentPageListItem,
     ContentPageRenameRequest,
     ContentPageRenameResponse,
@@ -34,6 +37,7 @@ from app.schemas.content import (
     ContentLinkCheckResponse,
     ContentLinkCheckPreviewRequest,
     ContentTranslationStatusUpdate,
+    HomePreviewResponse,
     SitemapPreviewResponse,
     StructuredDataValidationResponse,
 )
@@ -126,6 +130,53 @@ async def get_static_page(
     return block
 
 
+@router.get("/pages/{slug}/preview", response_model=ContentBlockRead)
+async def preview_static_page(
+    slug: str,
+    response: Response,
+    token: str = Query(..., min_length=1, description="Preview token"),
+    session: AsyncSession = Depends(get_session),
+    lang: str | None = Query(default=None, pattern="^(en|ro)$"),
+    user: User | None = Depends(get_current_user_optional),
+) -> ContentBlockRead:
+    key = decode_content_preview_token(token)
+    slug_value = content_service.slugify_page_slug(slug)
+    expected_key = f"page.{slug_value}" if slug_value else ""
+    if not key or not expected_key or key != expected_key:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid preview token")
+    response.headers["Cache-Control"] = "private, no-store"
+    block = await content_service.get_block_by_key(session, expected_key, lang=lang)
+    if not block:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+    if _requires_auth(block) and not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    return block
+
+
+@router.post("/pages/{slug}/preview-token", response_model=ContentPreviewTokenResponse)
+async def create_page_preview_token(
+    slug: str,
+    session: AsyncSession = Depends(get_session),
+    lang: str | None = Query(default=None, pattern="^(en|ro)$"),
+    expires_minutes: int = Query(default=60, ge=5, le=7 * 24 * 60),
+    _: User = Depends(require_admin_section("content")),
+) -> ContentPreviewTokenResponse:
+    slug_value = content_service.slugify_page_slug(slug)
+    if not slug_value:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+    key = f"page.{slug_value}"
+    block = await content_service.get_block_by_key(session, key)
+    if not block:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)
+    token = create_content_preview_token(content_key=key, expires_at=expires_at)
+
+    chosen_lang = lang or (block.lang if getattr(block, "lang", None) in ("en", "ro") else "en") or "en"
+    url = f"{settings.frontend_origin.rstrip('/')}/pages/{slug_value}?preview={token}&lang={chosen_lang}"
+    return ContentPreviewTokenResponse(token=token, expires_at=expires_at, url=url)
+
+
 @router.get("/{key}", response_model=ContentBlockRead)
 async def get_content(
     key: str,
@@ -139,6 +190,45 @@ async def get_content(
     if getattr(block, "key", "").startswith("page.") and _requires_auth(block) and not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     return block
+
+
+@router.get("/home/preview", response_model=HomePreviewResponse)
+async def preview_home(
+    response: Response,
+    token: str = Query(..., min_length=1, description="Preview token"),
+    session: AsyncSession = Depends(get_session),
+    lang: str | None = Query(default=None, pattern="^(en|ro)$"),
+) -> HomePreviewResponse:
+    key = decode_content_preview_token(token)
+    if not key or key != "home.sections":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid preview token")
+    response.headers["Cache-Control"] = "private, no-store"
+
+    sections = await content_service.get_block_by_key(session, "home.sections", lang=lang)
+    if not sections:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+
+    story = await content_service.get_block_by_key(session, "home.story", lang=lang)
+    return HomePreviewResponse(sections=sections, story=story)
+
+
+@router.post("/home/preview-token", response_model=ContentPreviewTokenResponse)
+async def create_home_preview_token(
+    session: AsyncSession = Depends(get_session),
+    lang: str | None = Query(default=None, pattern="^(en|ro)$"),
+    expires_minutes: int = Query(default=60, ge=5, le=7 * 24 * 60),
+    _: User = Depends(require_admin_section("content")),
+) -> ContentPreviewTokenResponse:
+    block = await content_service.get_block_by_key(session, "home.sections")
+    if not block:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)
+    token = create_content_preview_token(content_key="home.sections", expires_at=expires_at)
+
+    chosen_lang = lang or (block.lang if getattr(block, "lang", None) in ("en", "ro") else "en") or "en"
+    url = f"{settings.frontend_origin.rstrip('/')}/?preview={token}&lang={chosen_lang}"
+    return ContentPreviewTokenResponse(token=token, expires_at=expires_at, url=url)
 
 
 @router.post("/admin/social/thumbnail", response_model=SocialThumbnailResponse)

@@ -4209,9 +4209,27 @@
         "desktop": "Desktop",
         "tablet": "Tabletă",
         "mobile": "Mobil",
+        "languageLabel": "Limbă previzualizare",
+        "themeLabel": "Temă previzualizare",
         "layoutLabel": "Aspect",
         "stacked": "Vertical",
         "split": "Împărțit"
+      },
+      "previewLinks": {
+        "title": "Previzualizare",
+        "hint": "Generează un link de previzualizare pentru a încărca iframe-ul.",
+        "generate": "Generează link",
+        "open": "Deschide",
+        "copy": "Copiază",
+        "expires": "Expiră",
+        "success": {
+          "ready": "Link de previzualizare gata",
+          "copied": "Copiat în clipboard"
+        },
+        "errors": {
+          "generate": "Nu s-a putut genera linkul de previzualizare",
+          "copy": "Nu s-a putut copia în clipboard"
+        }
       },
       "blockLibrary": {
         "title": "Biblioteca de blocuri",

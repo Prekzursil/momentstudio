@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { Meta, Title } from '@angular/platform-browser';
+import { ActivatedRoute } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { ApiService } from '../../core/api.service';
 import { ContainerComponent } from '../../layout/container.component';
@@ -159,9 +160,12 @@ export class AboutComponent implements OnInit, OnDestroy {
   pageBlockInnerClasses = pageBlockInnerClasses;
 
   private langSub?: Subscription;
+  private querySub?: Subscription;
+  private previewToken = '';
 
   constructor(
     private api: ApiService,
+    private route: ActivatedRoute,
     private translate: TranslateService,
     private title: Title,
     private meta: Meta,
@@ -169,12 +173,16 @@ export class AboutComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    this.load();
+    this.querySub = this.route.queryParams.subscribe((query) => {
+      this.previewToken = typeof query['preview'] === 'string' ? query['preview'] : '';
+      this.load();
+    });
     this.langSub = this.translate.onLangChange.subscribe(() => this.load());
   }
 
   ngOnDestroy(): void {
     this.langSub?.unsubscribe();
+    this.querySub?.unsubscribe();
   }
 
   focalPosition(focalX?: number, focalY?: number): string {
@@ -188,7 +196,10 @@ export class AboutComponent implements OnInit, OnDestroy {
     this.hasError.set(false);
     this.pageBlocks.set([]);
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
-    this.api.get<ContentBlock>('/content/pages/about', { lang }).subscribe({
+    const req = (this.previewToken || '').trim()
+      ? this.api.get<ContentBlock>('/content/pages/about/preview', { token: this.previewToken, lang })
+      : this.api.get<ContentBlock>('/content/pages/about', { lang });
+    req.subscribe({
       next: (block) => {
         this.block.set(block);
         this.bodyHtml.set(this.markdown.render(block.body_markdown));

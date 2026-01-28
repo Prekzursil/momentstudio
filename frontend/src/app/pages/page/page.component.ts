@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Meta, Title } from '@angular/platform-browser';
-import { Subscription } from 'rxjs';
+import { combineLatest, Subscription } from 'rxjs';
 import { ApiService } from '../../core/api.service';
 import { ContainerComponent } from '../../layout/container.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
@@ -186,6 +186,7 @@ export class CmsPageComponent implements OnInit, OnDestroy {
   private langSub?: Subscription;
   private slugSub?: Subscription;
   private slug = '';
+  private previewToken = '';
   private suppressNextLoad = false;
 
   constructor(
@@ -199,8 +200,9 @@ export class CmsPageComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    this.slugSub = this.route.paramMap.subscribe((params) => {
+    this.slugSub = combineLatest([this.route.paramMap, this.route.queryParams]).subscribe(([params, query]) => {
       this.slug = params.get('slug') || '';
+      this.previewToken = typeof query['preview'] === 'string' ? query['preview'] : '';
       if (this.suppressNextLoad) {
         this.suppressNextLoad = false;
         return;
@@ -236,7 +238,10 @@ export class CmsPageComponent implements OnInit, OnDestroy {
     this.requiresLogin.set(false);
     this.pageBlocks.set([]);
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
-    this.api.get<ContentBlock>(`/content/pages/${encodeURIComponent(slug)}`, { lang }).subscribe({
+    const req = this.previewToken
+      ? this.api.get<ContentBlock>(`/content/pages/${encodeURIComponent(slug)}/preview`, { token: this.previewToken, lang })
+      : this.api.get<ContentBlock>(`/content/pages/${encodeURIComponent(slug)}`, { lang });
+    req.subscribe({
       next: (block) => {
         const canonicalSlug = this.slugFromKey(block.key);
         this.block.set(block);

@@ -1,5 +1,5 @@
-import { Component } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { Component, OnDestroy } from '@angular/core';
+import { ActivatedRoute, RouterOutlet } from '@angular/router';
 import { HeaderComponent } from './layout/header.component';
 import { FooterComponent } from './layout/footer.component';
 import { ContainerComponent } from './layout/container.component';
@@ -10,6 +10,7 @@ import { ThemeService, ThemePreference } from './core/theme.service';
 import { TranslateService } from '@ngx-translate/core';
 import { LanguageService } from './core/language.service';
 import { AuthService } from './core/auth.service';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-root',
@@ -34,21 +35,39 @@ import { AuthService } from './core/auth.service';
     <app-toast [messages]="toasts()"></app-toast>
   `
 })
-export class AppComponent {
+export class AppComponent implements OnDestroy {
   toasts = this.toast.messages();
   preference = this.theme.preference();
   language = this.lang.language;
+  private querySub?: Subscription;
 
   constructor(
     private toast: ToastService,
     private theme: ThemeService,
     private translate: TranslateService,
     private lang: LanguageService,
-    private auth: AuthService
+    private auth: AuthService,
+    private route: ActivatedRoute
   ) {
     // Language is handled by LanguageService (localStorage + preferred_language + browser fallback).
     // Revalidate any persisted session on startup to avoid "logged in but unauthorized" UI states.
     this.auth.ensureAuthenticated({ silent: true }).subscribe({ error: () => void 0 });
+
+    this.querySub = this.route.queryParams.subscribe((params) => {
+      const lang = typeof params['lang'] === 'string' ? params['lang'].trim().toLowerCase() : '';
+      if (lang === 'en' || lang === 'ro') {
+        this.lang.setLanguage(lang, { persist: false, syncBackend: false });
+      }
+
+      const theme = typeof params['theme'] === 'string' ? params['theme'].trim().toLowerCase() : '';
+      if (theme === 'light' || theme === 'dark') {
+        this.theme.setPreference(theme, false);
+      }
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.querySub?.unsubscribe();
   }
 
   onThemeChange(pref: ThemePreference): void {

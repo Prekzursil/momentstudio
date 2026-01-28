@@ -4,12 +4,16 @@ import { AuthService } from '../../../core/auth.service';
 export type CmsEditorMode = 'simple' | 'advanced';
 export type CmsPreviewDevice = 'desktop' | 'tablet' | 'mobile';
 export type CmsPreviewLayout = 'stacked' | 'split';
+export type CmsPreviewLang = 'en' | 'ro';
+export type CmsPreviewTheme = 'light' | 'dark';
 
 @Injectable({ providedIn: 'root' })
 export class CmsEditorPrefsService {
   mode = signal<CmsEditorMode>('simple');
   previewDevice = signal<CmsPreviewDevice>('desktop');
   previewLayout = signal<CmsPreviewLayout>('stacked');
+  previewLang = signal<CmsPreviewLang>('en');
+  previewTheme = signal<CmsPreviewTheme>('light');
 
   constructor(private auth: AuthService) {
     this.load();
@@ -27,6 +31,16 @@ export class CmsEditorPrefsService {
 
   setPreviewLayout(layout: CmsPreviewLayout): void {
     this.previewLayout.set(layout);
+    this.persist();
+  }
+
+  setPreviewLang(lang: CmsPreviewLang): void {
+    this.previewLang.set(lang);
+    this.persist();
+  }
+
+  setPreviewTheme(theme: CmsPreviewTheme): void {
+    this.previewTheme.set(theme);
     this.persist();
   }
 
@@ -57,6 +71,14 @@ export class CmsEditorPrefsService {
       if (previewLayout === 'stacked' || previewLayout === 'split') {
         this.previewLayout.set(previewLayout);
       }
+      const previewLang = (parsed as any)?.previewLang;
+      if (previewLang === 'en' || previewLang === 'ro') {
+        this.previewLang.set(previewLang);
+      }
+      const previewTheme = (parsed as any)?.previewTheme;
+      if (previewTheme === 'light' || previewTheme === 'dark') {
+        this.previewTheme.set(previewTheme);
+      }
     } catch {
       // ignore
     }
@@ -70,7 +92,9 @@ export class CmsEditorPrefsService {
         JSON.stringify({
           mode: this.mode(),
           previewDevice: this.previewDevice(),
-          previewLayout: this.previewLayout()
+          previewLayout: this.previewLayout(),
+          previewLang: this.previewLang(),
+          previewTheme: this.previewTheme()
         })
       );
     } catch {

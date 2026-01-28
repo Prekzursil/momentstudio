@@ -4209,9 +4209,27 @@
         "desktop": "Desktop",
         "tablet": "Tablet",
         "mobile": "Mobile",
+        "languageLabel": "Preview language",
+        "themeLabel": "Preview theme",
         "layoutLabel": "Layout",
         "stacked": "Stacked",
         "split": "Split"
+      },
+      "previewLinks": {
+        "title": "Preview",
+        "hint": "Generate a preview link to load the iframe.",
+        "generate": "Generate link",
+        "open": "Open",
+        "copy": "Copy",
+        "expires": "Expires",
+        "success": {
+          "ready": "Preview link ready",
+          "copied": "Copied to clipboard"
+        },
+        "errors": {
+          "generate": "Could not generate preview link",
+          "copy": "Could not copy to clipboard"
+        }
       },
       "blockLibrary": {
         "title": "Block library",

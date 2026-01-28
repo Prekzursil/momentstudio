@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, computed, signal } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { ButtonComponent } from '../../shared/button.component';
 import { CardComponent } from '../../shared/card.component';
@@ -89,6 +90,11 @@ interface ContentBlockRead {
   body_markdown: string;
   meta?: Record<string, unknown> | null;
   images: ContentImage[];
+}
+
+interface HomePreviewResponse {
+  sections: ContentBlockRead;
+  story?: ContentBlockRead | null;
 }
 
 const DEFAULT_BLOCKS: HomeBlock[] = [
@@ -423,6 +429,8 @@ export class HomeComponent implements OnInit, OnDestroy {
   });
 
   private langSub?: Subscription;
+  private routeSub?: Subscription;
+  private previewToken = '';
 
   constructor(
     private catalog: CatalogService,
@@ -431,17 +439,22 @@ export class HomeComponent implements OnInit, OnDestroy {
     private meta: Meta,
     private translate: TranslateService,
     private auth: AuthService,
+    private route: ActivatedRoute,
     private api: ApiService,
     private markdown: MarkdownService
   ) {}
 
   ngOnInit(): void {
-    this.load();
+    this.routeSub = this.route.queryParams.subscribe((query) => {
+      this.previewToken = typeof query['preview'] === 'string' ? query['preview'] : '';
+      this.load();
+    });
     this.langSub = this.translate.onLangChange.subscribe(() => this.load());
   }
 
   ngOnDestroy(): void {
     this.langSub?.unsubscribe();
+    this.routeSub?.unsubscribe();
   }
 
   focalPosition(focalX?: number, focalY?: number): string {
@@ -453,13 +466,37 @@ export class HomeComponent implements OnInit, OnDestroy {
   private load(): void {
     this.setMetaTags();
     this.recentlyViewed = this.recentlyViewedService.list().slice(0, 6);
+    this.storyBlock.set(null);
+    this.storyHtml.set('');
+    this.storyLoading.set(true);
     this.loadLayout();
   }
 
   private loadLayout(): void {
+    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
+    if (this.previewToken) {
+      this.api.get<HomePreviewResponse>('/content/home/preview', { token: this.previewToken, lang }).subscribe({
+        next: (resp) => {
+          this.blocks.set(this.parseBlocks(resp?.sections?.meta, lang));
+          const story = resp?.story ?? null;
+          this.storyBlock.set(story);
+          this.storyHtml.set(story ? this.markdown.render(story.body_markdown || '') : '');
+          this.storyLoading.set(false);
+          this.loadSectionData({ skipStory: true });
+        },
+        error: () => {
+          this.blocks.set(DEFAULT_BLOCKS);
+          this.storyBlock.set(null);
+          this.storyHtml.set('');
+          this.storyLoading.set(false);
+          this.loadSectionData({ skipStory: true });
+        }
+      });
+      return;
+    }
+
     this.api.get<ContentBlockRead>('/content/home.sections').subscribe({
       next: (block) => {
-        const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
         this.blocks.set(this.parseBlocks(block.meta, lang));
         this.loadSectionData();
       },
@@ -738,7 +775,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     return null;
   }
 
-  private loadSectionData(): void {
+  private loadSectionData(opts?: { skipStory?: boolean }): void {
     const ids = new Set(
       this.enabledBlocks()
         .map((b) => (this.isHomeSectionId(b.type) ? (b.type as HomeSectionId) : null))
@@ -748,7 +785,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     if (ids.has('sale_products')) this.loadSaleProducts();
     if (ids.has('new_arrivals')) this.loadNewArrivals();
     if (ids.has('featured_collections')) this.loadCollections();
-    if (ids.has('story')) this.loadStory();
+    if (ids.has('story') && !opts?.skipStory) this.loadStory();
   }
 
   asTextBlock(block: HomeBlock): HomeTextBlock | null {

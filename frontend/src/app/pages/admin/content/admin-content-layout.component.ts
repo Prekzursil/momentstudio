@@ -128,6 +128,62 @@ type ContentNavItem = {
                 </button>
               </div>
             </div>
+
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{ 'adminUi.content.preview.languageLabel' | translate }}</span>
+              <div class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <button
+                  type="button"
+                  class="px-3 py-1.5 text-xs font-semibold"
+                  [class.bg-slate-900]="prefs.previewLang() === 'en'"
+                  [class.text-white]="prefs.previewLang() === 'en'"
+                  [class.text-slate-700]="prefs.previewLang() !== 'en'"
+                  [class.dark:text-slate-200]="prefs.previewLang() !== 'en'"
+                  (click)="prefs.setPreviewLang('en')"
+                >
+                  EN
+                </button>
+                <button
+                  type="button"
+                  class="px-3 py-1.5 text-xs font-semibold"
+                  [class.bg-slate-900]="prefs.previewLang() === 'ro'"
+                  [class.text-white]="prefs.previewLang() === 'ro'"
+                  [class.text-slate-700]="prefs.previewLang() !== 'ro'"
+                  [class.dark:text-slate-200]="prefs.previewLang() !== 'ro'"
+                  (click)="prefs.setPreviewLang('ro')"
+                >
+                  RO
+                </button>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{ 'adminUi.content.preview.themeLabel' | translate }}</span>
+              <div class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <button
+                  type="button"
+                  class="px-3 py-1.5 text-xs font-semibold"
+                  [class.bg-slate-900]="prefs.previewTheme() === 'light'"
+                  [class.text-white]="prefs.previewTheme() === 'light'"
+                  [class.text-slate-700]="prefs.previewTheme() !== 'light'"
+                  [class.dark:text-slate-200]="prefs.previewTheme() !== 'light'"
+                  (click)="prefs.setPreviewTheme('light')"
+                >
+                  {{ 'theme.light' | translate }}
+                </button>
+                <button
+                  type="button"
+                  class="px-3 py-1.5 text-xs font-semibold"
+                  [class.bg-slate-900]="prefs.previewTheme() === 'dark'"
+                  [class.text-white]="prefs.previewTheme() === 'dark'"
+                  [class.text-slate-700]="prefs.previewTheme() !== 'dark'"
+                  [class.dark:text-slate-200]="prefs.previewTheme() !== 'dark'"
+                  (click)="prefs.setPreviewTheme('dark')"
+                >
+                  {{ 'theme.dark' | translate }}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 

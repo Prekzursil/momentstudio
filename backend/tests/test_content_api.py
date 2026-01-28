@@ -217,6 +217,50 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     preview = client.get("/api/v1/content/admin/page.about/preview", params={"token": "preview-token"})
     assert preview.status_code == 200
 
+    # Shareable preview token works for draft page
+    page_token_resp = client.post(
+        "/api/v1/content/pages/about/preview-token",
+        headers=auth_headers(admin_token),
+    )
+    assert page_token_resp.status_code == 200, page_token_resp.text
+    page_token = page_token_resp.json()["token"]
+    page_preview = client.get(
+        "/api/v1/content/pages/about/preview",
+        params={"token": page_token},
+    )
+    assert page_preview.status_code == 200, page_preview.text
+    assert page_preview.headers.get("cache-control") == "private, no-store"
+    assert page_preview.json()["key"] == "page.about"
+
+    # Shareable preview token works for home preview
+    home_sections_create = client.post(
+        "/api/v1/content/admin/home.sections",
+        json={"title": "Home sections", "body_markdown": "Layout", "status": "draft", "meta": {}},
+        headers=auth_headers(admin_token),
+    )
+    assert home_sections_create.status_code in (200, 201), home_sections_create.text
+    home_story_create = client.post(
+        "/api/v1/content/admin/home.story",
+        json={"title": "Story", "body_markdown": "Draft story", "status": "draft"},
+        headers=auth_headers(admin_token),
+    )
+    assert home_story_create.status_code in (200, 201), home_story_create.text
+    home_token_resp = client.post(
+        "/api/v1/content/home/preview-token",
+        headers=auth_headers(admin_token),
+    )
+    assert home_token_resp.status_code == 200, home_token_resp.text
+    home_token = home_token_resp.json()["token"]
+    home_preview = client.get(
+        "/api/v1/content/home/preview",
+        params={"token": home_token},
+    )
+    assert home_preview.status_code == 200, home_preview.text
+    assert home_preview.headers.get("cache-control") == "private, no-store"
+    home_preview_json = home_preview.json()
+    assert home_preview_json["sections"]["key"] == "home.sections"
+    assert home_preview_json["story"]["key"] == "home.story"
+
     # Image upload
     img_resp = client.post(
         "/api/v1/content/admin/home.hero/images",

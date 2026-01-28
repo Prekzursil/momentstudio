@@ -122,6 +122,12 @@ class ContentRedirectImportResult(BaseModel):
     errors: list[ContentRedirectImportError] = Field(default_factory=list)
 
 
+class ContentPreviewTokenResponse(BaseModel):
+    token: str
+    expires_at: datetime
+    url: str
+
+
 class SitemapPreviewResponse(BaseModel):
     by_lang: dict[str, list[str]] = Field(default_factory=dict)
 
@@ -270,6 +276,11 @@ class ContentAuditRead(BaseModel):
     version: int
     user_id: UUID | None = None
     created_at: datetime
+
+
+class HomePreviewResponse(BaseModel):
+    sections: ContentBlockRead
+    story: ContentBlockRead | None = None
 
 
 ContentBlockRead.model_rebuild()

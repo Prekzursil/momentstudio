@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { Meta, Title } from '@angular/platform-browser';
 import { Subscription, finalize } from 'rxjs';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -356,9 +357,12 @@ export class ContactComponent implements OnInit, OnDestroy {
 
   private langSub?: Subscription;
   private socialSub?: Subscription;
+  private querySub?: Subscription;
+  private previewToken = '';
 
   constructor(
     private api: ApiService,
+    private route: ActivatedRoute,
     private translate: TranslateService,
     private title: Title,
     private meta: Meta,
@@ -369,7 +373,10 @@ export class ContactComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    this.load();
+    this.querySub = this.route.queryParams.subscribe((query) => {
+      this.previewToken = typeof query['preview'] === 'string' ? query['preview'] : '';
+      this.load();
+    });
     this.langSub = this.translate.onLangChange.subscribe(() => this.load());
     this.socialSub = this.social.get().subscribe((data) => {
       if (data.contact.phone) this.phone.set(data.contact.phone);
@@ -387,6 +394,7 @@ export class ContactComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.langSub?.unsubscribe();
     this.socialSub?.unsubscribe();
+    this.querySub?.unsubscribe();
   }
 
   private load(): void {
@@ -394,7 +402,10 @@ export class ContactComponent implements OnInit, OnDestroy {
     this.hasError.set(false);
     this.pageBlocks.set([]);
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
-    this.api.get<ContentBlock>('/content/pages/contact', { lang }).subscribe({
+    const req = (this.previewToken || '').trim()
+      ? this.api.get<ContentBlock>('/content/pages/contact/preview', { token: this.previewToken, lang })
+      : this.api.get<ContentBlock>('/content/pages/contact', { lang });
+    req.subscribe({
       next: (block) => {
         this.block.set(block);
         this.bodyHtml.set(this.markdown.render(block.body_markdown));

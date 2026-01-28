@@ -966,10 +966,10 @@ Below is a structured checklist you can turn into issues.
 - [x] CMS assets: image editor – Crop/rotate/resize tools in the asset library with non-destructive versions.
 - [x] CMS assets: “where used” – Show usage references for each asset (pages/sections/posts) before deleting.
 - [x] CMS assets: focal point preview – Preview focal point across common crops (hero/card/mobile) before saving.
-- [ ] CMS preview: shareable draft links – Tokenized preview links for unpublished drafts (pages + home sections).
-- [ ] CMS preview: language toggle – Preview RO/EN (fallbacks visible) without leaving the editor.
-- [ ] CMS preview: theme toggle – Preview light/dark rendering inside the editor.
-- [ ] CMS preview: iframe viewport emulation – Render preview in an iframe at selected device widths so Tailwind breakpoints match.
+- [x] CMS preview: shareable draft links – Tokenized preview links for unpublished drafts (pages + home sections).
+- [x] CMS preview: language toggle – Preview RO/EN (fallbacks visible) without leaving the editor.
+- [x] CMS preview: theme toggle – Preview light/dark rendering inside the editor.
+- [x] CMS preview: iframe viewport emulation – Render preview in an iframe at selected device widths so Tailwind breakpoints match.
 - [ ] CMS scheduling: calendar view – Visual calendar for scheduled publish/unpublish across pages/blog/home banners.
 - [ ] CMS redirects: inline creation – When changing a page URL, offer creating a redirect in the same flow.
 - [ ] CMS navigation: menu builder – Visual editor for header/footer links with drag-drop ordering and per-language labels.

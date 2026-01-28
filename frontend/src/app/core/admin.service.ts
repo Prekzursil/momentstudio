@@ -540,6 +540,12 @@ export interface ContentBlock {
   images?: { id: string; url: string; alt_text?: string | null; sort_order?: number; focal_x?: number; focal_y?: number }[];
 }
 
+export interface ContentPreviewTokenResponse {
+  token: string;
+  expires_at: string;
+  url: string;
+}
+
 export interface ContentBlockVersionListItem {
   id: string;
   version: number;
@@ -1183,5 +1189,24 @@ export class AdminService {
 
   validateStructuredData(): Observable<StructuredDataValidationResponse> {
     return this.api.get<StructuredDataValidationResponse>('/content/admin/seo/structured-data/validate');
+  }
+
+  createPagePreviewToken(
+    slug: string,
+    params: { lang?: string; expires_minutes?: number } = {}
+  ): Observable<ContentPreviewTokenResponse> {
+    const qs = new URLSearchParams();
+    if (params.lang) qs.set('lang', params.lang);
+    if (params.expires_minutes) qs.set('expires_minutes', String(params.expires_minutes));
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return this.api.post<ContentPreviewTokenResponse>(`/content/pages/${encodeURIComponent(slug)}/preview-token${suffix}`, {});
+  }
+
+  createHomePreviewToken(params: { lang?: string; expires_minutes?: number } = {}): Observable<ContentPreviewTokenResponse> {
+    const qs = new URLSearchParams();
+    if (params.lang) qs.set('lang', params.lang);
+    if (params.expires_minutes) qs.set('expires_minutes', String(params.expires_minutes));
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return this.api.post<ContentPreviewTokenResponse>(`/content/home/preview-token${suffix}`, {});
   }
 }
