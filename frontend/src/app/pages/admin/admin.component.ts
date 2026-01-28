@@ -112,6 +112,12 @@ type CmsBlockLayout = {
   max_width: CmsBlockLayoutMaxWidth;
 };
 
+type CmsReusableBlock = {
+  id: string;
+  title: string;
+  block: Omit<PageBlockDraft, 'key'>;
+};
+
 type HomeBlockDraft = {
   key: string;
   type: HomeBlockType;
@@ -1227,6 +1233,75 @@ class CmsDraftManager<T> {
                     (dragActive)="setPageInsertDragActive($event)"
                   ></app-cms-block-library>
 
+                  <div class="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                      <div class="grid gap-0.5 min-w-0">
+                        <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                          {{ 'adminUi.content.reusableBlocks.title' | translate }}
+                        </p>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">
+                          {{ 'adminUi.content.reusableBlocks.hint' | translate }}
+                        </p>
+                      </div>
+
+                      <div class="flex flex-wrap items-end gap-2">
+                        <app-input [label]="'adminUi.content.reusableBlocks.search' | translate" [(value)]="reusableBlocksQuery"></app-input>
+                        <app-button
+                          size="sm"
+                          variant="ghost"
+                          [label]="'adminUi.actions.refresh' | translate"
+                          [disabled]="reusableBlocksLoading"
+                          (action)="loadReusableBlocks()"
+                        ></app-button>
+                      </div>
+                    </div>
+
+                    <div
+                      *ngIf="reusableBlocksError"
+                      class="rounded-lg border border-rose-200 bg-rose-50 p-2 text-sm text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+                    >
+                      {{ reusableBlocksError }}
+                    </div>
+
+                    <div *ngIf="reusableBlocksLoading" class="text-sm text-slate-600 dark:text-slate-300">
+                      {{ 'adminUi.content.reusableBlocks.loading' | translate }}
+                    </div>
+
+                    <div *ngIf="!reusableBlocksLoading && filteredReusableBlocks().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                      {{ 'adminUi.content.reusableBlocks.empty' | translate }}
+                    </div>
+
+                    <div *ngIf="!reusableBlocksLoading && filteredReusableBlocks().length" class="grid gap-2">
+                      <div
+                        *ngFor="let snippet of filteredReusableBlocks()"
+                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 flex items-start justify-between gap-3 dark:border-slate-800 dark:bg-slate-900"
+                      >
+                        <div class="grid gap-0.5 min-w-0">
+                          <p class="text-sm font-semibold text-slate-900 dark:text-slate-50 truncate">
+                            {{ snippet.title }}
+                          </p>
+                          <p class="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                            {{ ('adminUi.home.sections.blocks.' + snippet.block.type) | translate }} · {{ snippet.id }}
+                          </p>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                          <app-button
+                            size="sm"
+                            variant="ghost"
+                            [label]="'adminUi.content.reusableBlocks.actions.insert' | translate"
+                            (action)="insertReusableBlockIntoPage(pageBlocksKey, snippet.id)"
+                          ></app-button>
+                          <app-button
+                            size="sm"
+                            variant="ghost"
+                            [label]="'adminUi.actions.delete' | translate"
+                            (action)="deleteReusableBlock(snippet.id)"
+                          ></app-button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   <div
                     *ngIf="contentPages.length"
                     class="flex flex-wrap items-center gap-4 rounded-xl border border-slate-200 bg-white/60 px-3 py-2 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-200"
@@ -1359,23 +1434,33 @@ class CmsDraftManager<T> {
                               </select>
                             </label>
 
-                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                              {{ 'adminUi.site.pages.builder.styles.maxWidth.label' | translate }}
-                              <select
-                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                [(ngModel)]="block.layout.max_width"
-                              >
-                                <option [ngValue]="'full'">{{ 'adminUi.site.pages.builder.styles.maxWidth.full' | translate }}</option>
-                                <option [ngValue]="'narrow'">{{ 'adminUi.site.pages.builder.styles.maxWidth.narrow' | translate }}</option>
-                                <option [ngValue]="'prose'">{{ 'adminUi.site.pages.builder.styles.maxWidth.prose' | translate }}</option>
-                                <option [ngValue]="'wide'">{{ 'adminUi.site.pages.builder.styles.maxWidth.wide' | translate }}</option>
-                              </select>
-                            </label>
-                          </div>
-
-	                        <ng-container [ngSwitch]="block.type">
-	                          <ng-container *ngSwitchCase="'text'">
 	                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                              {{ 'adminUi.site.pages.builder.styles.maxWidth.label' | translate }}
+	                              <select
+	                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                                [(ngModel)]="block.layout.max_width"
+	                              >
+	                                <option [ngValue]="'full'">{{ 'adminUi.site.pages.builder.styles.maxWidth.full' | translate }}</option>
+	                                <option [ngValue]="'narrow'">{{ 'adminUi.site.pages.builder.styles.maxWidth.narrow' | translate }}</option>
+	                                <option [ngValue]="'prose'">{{ 'adminUi.site.pages.builder.styles.maxWidth.prose' | translate }}</option>
+	                                <option [ngValue]="'wide'">{{ 'adminUi.site.pages.builder.styles.maxWidth.wide' | translate }}</option>
+	                              </select>
+	                            </label>
+	                          </div>
+
+                            <div class="flex flex-wrap items-center justify-end gap-2">
+                              <app-button
+                                size="sm"
+                                variant="ghost"
+                                [disabled]="reusableBlocksLoading"
+                                [label]="'adminUi.content.reusableBlocks.actions.save' | translate"
+                                (action)="savePageBlockAsReusable(pageBlocksKey, block.key)"
+                              ></app-button>
+                            </div>
+
+		                        <ng-container [ngSwitch]="block.type">
+		                          <ng-container *ngSwitchCase="'text'">
+		                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
 	                              {{ 'adminUi.home.sections.fields.body' | translate }}
                               <textarea
                                 class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
@@ -5515,6 +5600,13 @@ export class AdminComponent implements OnInit, OnDestroy {
   contentPages: ContentPageListItem[] = [];
   contentPagesLoading = false;
   contentPagesError: string | null = null;
+  reusableBlocks: CmsReusableBlock[] = [];
+  reusableBlocksLoading = false;
+  reusableBlocksError: string | null = null;
+  reusableBlocksQuery = '';
+  private reusableBlocksMeta: Record<string, unknown> = {};
+  private readonly reusableBlocksKey = 'cms.snippets';
+  private reusableBlocksExists = false;
   redirects: ContentRedirectRead[] = [];
   redirectsMeta = { total_items: 0, total_pages: 1, page: 1, limit: 25 };
   redirectsLoading = false;
@@ -5646,8 +5738,12 @@ export class AdminComponent implements OnInit, OnDestroy {
 	    };
 	  }
 
+    private normalizePageBlockDraft(block: PageBlockDraft): PageBlockDraft {
+      return { ...block, layout: this.toCmsBlockLayout(block.layout) };
+    }
+
 	  private applyPageDraftState(pageKey: PageBuilderKey, draft: PageBlocksDraftState): void {
-	    this.pageBlocks[pageKey] = Array.isArray(draft?.blocks) ? draft.blocks : [];
+	    this.pageBlocks[pageKey] = Array.isArray(draft?.blocks) ? draft.blocks.map((b) => this.normalizePageBlockDraft(b)) : [];
 	    this.pageBlocksStatus[pageKey] = draft?.status === 'published' ? 'published' : draft?.status === 'review' ? 'review' : 'draft';
 	    this.pageBlocksPublishedAt[pageKey] = draft?.publishedAt || '';
 	    this.pageBlocksPublishedUntil[pageKey] = draft?.publishedUntil || '';
@@ -6053,6 +6149,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     if (section === 'pages') {
       this.loadInfo();
       this.loadContentPages();
+      this.loadReusableBlocks();
       this.loadPageBlocks(this.pageBlocksKey);
       this.loadContentRedirects(true);
       this.loading.set(false);
@@ -9404,6 +9501,168 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.contentPagesError = this.t('adminUi.site.pages.errors.load');
       }
     });
+  }
+
+  loadReusableBlocks(): void {
+    this.reusableBlocksLoading = true;
+    this.reusableBlocksError = null;
+    this.admin.getContent(this.reusableBlocksKey).subscribe({
+      next: (block) => {
+        this.rememberContentVersion(this.reusableBlocksKey, block);
+        this.reusableBlocksMeta = ((block as { meta?: Record<string, unknown> | null }).meta || {}) as Record<string, unknown>;
+        this.reusableBlocks = this.parseReusableBlocks(this.reusableBlocksMeta);
+        this.reusableBlocksExists = true;
+        this.reusableBlocksLoading = false;
+      },
+      error: (err) => {
+        this.reusableBlocksLoading = false;
+        if (err?.status === 404) {
+          delete this.contentVersions[this.reusableBlocksKey];
+          this.reusableBlocksMeta = {};
+          this.reusableBlocks = [];
+          this.reusableBlocksExists = false;
+          return;
+        }
+        this.reusableBlocksMeta = {};
+        this.reusableBlocks = [];
+        this.reusableBlocksExists = false;
+        this.reusableBlocksError = this.t('adminUi.content.reusableBlocks.errors.load');
+      }
+    });
+  }
+
+  filteredReusableBlocks(): CmsReusableBlock[] {
+    const query = (this.reusableBlocksQuery || '').trim().toLowerCase();
+    const base = [...(this.reusableBlocks || [])];
+    base.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+    if (!query) return base;
+    return base.filter((b) => (b.title || '').toLowerCase().includes(query) || (b.id || '').toLowerCase().includes(query));
+  }
+
+  savePageBlockAsReusable(pageKey: PageBuilderKey, blockKey: string): void {
+    const blocks = this.pageBlocks[pageKey] || [];
+    const target = blocks.find((b) => b.key === blockKey);
+    if (!target) return;
+
+    const defaultTitle = (target.title?.[this.infoLang] || target.title?.en || target.title?.ro || '').trim() || this.pageBlockLabel(target);
+    const title = (window.prompt(this.t('adminUi.content.reusableBlocks.prompts.name'), defaultTitle) || '').trim();
+    if (!title) return;
+
+    const idBase = this.slugifyReusableBlockId(title);
+    if (!idBase) return;
+    const existing = this.reusableBlocks.find((b) => b.id === idBase);
+    if (existing) {
+      const ok = window.confirm(this.t('adminUi.content.reusableBlocks.prompts.overwriteConfirm', { title: existing.title }));
+      if (!ok) return;
+    }
+
+    const { key: blockDraftKey, ...rest } = target;
+    void blockDraftKey;
+    const snapshot = this.deepCloneJson(rest) as Omit<PageBlockDraft, 'key'>;
+    snapshot.enabled = true;
+    snapshot.layout = this.toCmsBlockLayout(snapshot.layout);
+
+    const next: CmsReusableBlock = { id: idBase, title, block: snapshot };
+    const updated = existing ? this.reusableBlocks.map((b) => (b.id === idBase ? next : b)) : [...this.reusableBlocks, next];
+    this.persistReusableBlocks(updated, { successKey: 'adminUi.content.reusableBlocks.success.saved' });
+  }
+
+  insertReusableBlockIntoPage(pageKey: PageBuilderKey, id: string): void {
+    const found = this.reusableBlocks.find((b) => b.id === id);
+    if (!found) return;
+    const current = [...(this.pageBlocks[pageKey] || [])];
+    const existingKeys = new Set(current.map((b) => b.key));
+    const type = found.block.type;
+    const base = `${type}_${id}_${Date.now()}`;
+    let nextKey = base;
+    let suffix = 1;
+    while (existingKeys.has(nextKey)) {
+      nextKey = `${base}_${suffix++}`;
+    }
+
+    const snapshot = this.deepCloneJson(found.block) as Omit<PageBlockDraft, 'key'>;
+    const draft = { ...snapshot, key: nextKey, enabled: true, layout: this.toCmsBlockLayout(snapshot.layout) } satisfies PageBlockDraft;
+    current.push(draft);
+    this.pageBlocks[pageKey] = current;
+  }
+
+  deleteReusableBlock(id: string): void {
+    const found = this.reusableBlocks.find((b) => b.id === id);
+    if (!found) return;
+    const ok = window.confirm(this.t('adminUi.content.reusableBlocks.prompts.deleteConfirm', { title: found.title }));
+    if (!ok) return;
+    const updated = this.reusableBlocks.filter((b) => b.id !== id);
+    this.persistReusableBlocks(updated, { successKey: 'adminUi.content.reusableBlocks.success.deleted' });
+  }
+
+  private persistReusableBlocks(next: CmsReusableBlock[], opts?: { successKey?: string }): void {
+    const meta = { ...(this.reusableBlocksMeta || {}), snippets: next } as Record<string, unknown>;
+    const payload = this.withExpectedVersion(this.reusableBlocksKey, { meta });
+
+    const onSaved = (block: { version?: number; meta?: Record<string, unknown> | null } | null | undefined) => {
+      this.rememberContentVersion(this.reusableBlocksKey, block);
+      this.reusableBlocksMeta = ((block as { meta?: Record<string, unknown> | null }).meta || {}) as Record<string, unknown>;
+      this.reusableBlocks = this.parseReusableBlocks(this.reusableBlocksMeta);
+      this.reusableBlocksExists = true;
+      if (opts?.successKey) this.toast.success(this.t(opts.successKey));
+    };
+
+    const onError = (err: any) => {
+      if (this.handleContentConflict(err, this.reusableBlocksKey, () => this.loadReusableBlocks())) return;
+      this.toast.error(this.t('adminUi.content.reusableBlocks.errors.save'));
+    };
+
+    if (this.reusableBlocksExists) {
+      this.admin.updateContentBlock(this.reusableBlocksKey, payload).subscribe({ next: onSaved, error: onError });
+      return;
+    }
+
+    const createPayload = {
+      title: 'Reusable blocks',
+      body_markdown: 'Internal CMS reusable blocks storage.',
+      status: 'draft',
+      meta
+    };
+    this.admin.createContent(this.reusableBlocksKey, createPayload).subscribe({ next: onSaved, error: onError });
+  }
+
+  private parseReusableBlocks(meta: Record<string, unknown> | null | undefined): CmsReusableBlock[] {
+    const raw = meta?.['snippets'];
+    if (!Array.isArray(raw)) return [];
+    const parsed: CmsReusableBlock[] = [];
+    const seen = new Set<string>();
+    for (const item of raw) {
+      if (!item || typeof item !== 'object') continue;
+      const rec = item as Record<string, unknown>;
+      const id = typeof rec['id'] === 'string' ? rec['id'].trim() : '';
+      const title = typeof rec['title'] === 'string' ? rec['title'].trim() : '';
+      const block = rec['block'];
+      if (!id || !title || !block || typeof block !== 'object') continue;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      parsed.push({ id, title, block: block as Omit<PageBlockDraft, 'key'> });
+    }
+    return parsed;
+  }
+
+  private deepCloneJson<T>(value: T): T {
+    try {
+      return JSON.parse(JSON.stringify(value)) as T;
+    } catch {
+      return value;
+    }
+  }
+
+  private slugifyReusableBlockId(value: string): string {
+    const raw = (value || '').trim().toLowerCase();
+    if (!raw) return '';
+    const cleaned = raw
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .replace(/-+/g, '-');
+    return cleaned || '';
   }
 
   onPageBlocksKeyChange(next: PageBuilderKey): void {

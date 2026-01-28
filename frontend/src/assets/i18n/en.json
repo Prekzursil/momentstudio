@@ -4180,6 +4180,30 @@
           "carousel": "Slider with multiple slides and autoplay settings."
         }
       },
+      "reusableBlocks": {
+        "title": "Reusable blocks",
+        "hint": "Save a section and reuse it on other pages.",
+        "search": "Search",
+        "loading": "Loading reusable blocks...",
+        "empty": "No reusable blocks yet.",
+        "actions": {
+          "save": "Save as reusable",
+          "insert": "Insert"
+        },
+        "prompts": {
+          "name": "Reusable block name",
+          "overwriteConfirm": "Overwrite reusable block “{{title}}”?",
+          "deleteConfirm": "Delete reusable block “{{title}}”?"
+        },
+        "success": {
+          "saved": "Reusable block saved.",
+          "deleted": "Reusable block deleted."
+        },
+        "errors": {
+          "load": "Could not load reusable blocks.",
+          "save": "Could not save reusable block."
+        }
+      },
       "reorder": {
         "moveUp": "Move up",
         "moveDown": "Move down",

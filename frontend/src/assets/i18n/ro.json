@@ -4180,6 +4180,30 @@
           "carousel": "Carusel cu mai multe slide-uri și setări de autoplay."
         }
       },
+      "reusableBlocks": {
+        "title": "Blocuri reutilizabile",
+        "hint": "Salvează o secțiune și reutilizeaz-o pe alte pagini.",
+        "search": "Caută",
+        "loading": "Se încarcă blocurile reutilizabile...",
+        "empty": "Nu există încă blocuri reutilizabile.",
+        "actions": {
+          "save": "Salvează ca reutilizabil",
+          "insert": "Inserează"
+        },
+        "prompts": {
+          "name": "Nume bloc reutilizabil",
+          "overwriteConfirm": "Suprascrii blocul reutilizabil „{{title}}”?",
+          "deleteConfirm": "Ștergi blocul reutilizabil „{{title}}”?"
+        },
+        "success": {
+          "saved": "Bloc reutilizabil salvat.",
+          "deleted": "Bloc reutilizabil șters."
+        },
+        "errors": {
+          "load": "Nu am putut încărca blocurile reutilizabile.",
+          "save": "Nu am putut salva blocul reutilizabil."
+        }
+      },
       "reorder": {
         "moveUp": "Mută în sus",
         "moveDown": "Mută în jos",

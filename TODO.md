@@ -958,7 +958,7 @@ Below is a structured checklist you can turn into issues.
 - [x] CMS editor: autosave drafts – Autosave with “restore autosave” after refresh/crash and a visible save state.
 - [x] CMS editor: publish checklist – Pre-publish checklist (missing translations, missing alt text, broken links, empty sections).
 - [x] CMS editor: inline style controls – Block inspector for spacing, background, alignment, and max-width (theme-aware).
-- [ ] CMS editor: reusable blocks – Save a section as a reusable snippet and insert it on other pages.
+- [x] CMS editor: reusable blocks – Save a section as a reusable snippet and insert it on other pages.
 - [ ] CMS editor: global sections – Manage global blocks (announcement bar, footer promo, header banners) used site-wide.
 - [ ] CMS editor: page templates – Create pages from templates (About/FAQ/Shipping/Returns) with prebuilt sections.
 - [ ] CMS editor: inline media drag-drop – Drag images into the editor to auto-upload and insert with caption + alt.
