@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.content import ContentStatus
 from app.schemas.catalog import PaginationMeta
@@ -176,6 +176,40 @@ class ContentImageTagsUpdate(BaseModel):
 class ContentImageFocalPointUpdate(BaseModel):
     focal_x: int = Field(default=50, ge=0, le=100)
     focal_y: int = Field(default=50, ge=0, le=100)
+
+
+class ContentImageEditRequest(BaseModel):
+    rotate_cw: int = 0
+    crop_aspect_w: int | None = Field(default=None, ge=1, le=1000)
+    crop_aspect_h: int | None = Field(default=None, ge=1, le=1000)
+    resize_max_width: int | None = Field(default=None, ge=1, le=12000)
+    resize_max_height: int | None = Field(default=None, ge=1, le=12000)
+
+    @field_validator("rotate_cw")
+    @classmethod
+    def _validate_rotate_cw(cls, value: int) -> int:
+        if value not in {0, 90, 180, 270}:
+            raise ValueError("rotate_cw must be one of 0, 90, 180, 270")
+        return value
+
+    @model_validator(mode="after")
+    def _validate_crop_aspect(self) -> "ContentImageEditRequest":
+        if (self.crop_aspect_w is None) ^ (self.crop_aspect_h is None):
+            raise ValueError("crop_aspect_w and crop_aspect_h must be provided together")
+        if (
+            self.rotate_cw == 0
+            and self.crop_aspect_w is None
+            and self.resize_max_width is None
+            and self.resize_max_height is None
+        ):
+            raise ValueError("No edits requested")
+        return self
+
+
+class ContentImageAssetUsageResponse(BaseModel):
+    image_id: UUID
+    url: str
+    keys: list[str] = Field(default_factory=list)
 
 
 class ContentTranslationStatusUpdate(BaseModel):

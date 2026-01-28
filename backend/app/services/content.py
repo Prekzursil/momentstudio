@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import uuid
 from uuid import UUID
 import re
 import unicodedata
@@ -6,7 +7,8 @@ from urllib.parse import parse_qs, urlsplit
 from pathlib import Path
 
 from fastapi import HTTPException, status
-from sqlalchemy import or_, update, select
+from PIL import Image, ImageOps
+from sqlalchemy import func, or_, update, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -16,11 +18,12 @@ from app.models.content import (
     ContentBlockVersion,
     ContentBlockTranslation,
     ContentImage,
+    ContentImageTag,
     ContentRedirect,
     ContentStatus,
 )
 from app.models.catalog import Category, Product, ProductStatus
-from app.schemas.content import ContentLinkCheckIssue, ContentTranslationStatusUpdate
+from app.schemas.content import ContentImageEditRequest, ContentLinkCheckIssue, ContentTranslationStatusUpdate
 from app.schemas.content import ContentBlockCreate, ContentBlockUpdate
 from app.services import audit_chain as audit_chain_service
 from app.services import storage
@@ -523,6 +526,162 @@ async def add_image(session: AsyncSession, block: ContentBlock, file, actor_id: 
     await session.commit()
     await session.refresh(block, attribute_names=["images", "audits"])
     return block
+
+
+async def edit_image_asset(
+    session: AsyncSession,
+    *,
+    image: ContentImage,
+    payload: ContentImageEditRequest,
+    actor_id: UUID | None = None,
+) -> ContentImage:
+    source_url = (getattr(image, "url", None) or "").strip()
+    if not source_url:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid image URL")
+
+    try:
+        source_path = storage.media_url_to_path(source_url)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    if not source_path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image file not found")
+
+    suffix = source_path.suffix.lower()
+    format_map = {".jpg": "JPEG", ".jpeg": "JPEG", ".png": "PNG", ".webp": "WEBP", ".gif": "GIF"}
+    out_format = format_map.get(suffix)
+    if not out_format:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported image type")
+    if out_format == "GIF":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="GIF editing is not supported")
+
+    with Image.open(source_path) as opened:
+        img = ImageOps.exif_transpose(opened)
+        base_w, base_h = img.size
+
+        focal_x = int(getattr(image, "focal_x", 50) or 50)
+        focal_y = int(getattr(image, "focal_y", 50) or 50)
+        fx = base_w * (focal_x / 100.0)
+        fy = base_h * (focal_y / 100.0)
+
+        rotate_cw = int(getattr(payload, "rotate_cw", 0) or 0)
+        if rotate_cw == 90:
+            img = img.transpose(Image.Transpose.ROTATE_270)
+            fx, fy = base_h - fy, fx
+        elif rotate_cw == 180:
+            img = img.transpose(Image.Transpose.ROTATE_180)
+            fx, fy = base_w - fx, base_h - fy
+        elif rotate_cw == 270:
+            img = img.transpose(Image.Transpose.ROTATE_90)
+            fx, fy = fy, base_w - fx
+
+        width, height = img.size
+
+        if payload.crop_aspect_w is not None and payload.crop_aspect_h is not None:
+            target_ratio = float(payload.crop_aspect_w) / float(payload.crop_aspect_h)
+            current_ratio = float(width) / float(height) if height else 0.0
+            if current_ratio > target_ratio:
+                crop_h = float(height)
+                crop_w = crop_h * target_ratio
+            else:
+                crop_w = float(width)
+                crop_h = crop_w / target_ratio if target_ratio else float(height)
+
+            left = fx - crop_w / 2
+            top = fy - crop_h / 2
+            left = max(0.0, min(left, float(width) - crop_w))
+            top = max(0.0, min(top, float(height) - crop_h))
+            right = left + crop_w
+            bottom = top + crop_h
+
+            crop_box = (int(round(left)), int(round(top)), int(round(right)), int(round(bottom)))
+            crop_box = (
+                max(0, min(crop_box[0], width - 1)),
+                max(0, min(crop_box[1], height - 1)),
+                max(1, min(crop_box[2], width)),
+                max(1, min(crop_box[3], height)),
+            )
+            if crop_box[2] <= crop_box[0] or crop_box[3] <= crop_box[1]:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid crop")
+
+            img = img.crop(crop_box)
+            fx -= crop_box[0]
+            fy -= crop_box[1]
+            width, height = img.size
+
+        if payload.resize_max_width or payload.resize_max_height:
+            scale = 1.0
+            if payload.resize_max_width:
+                scale = min(scale, float(payload.resize_max_width) / float(width))
+            if payload.resize_max_height:
+                scale = min(scale, float(payload.resize_max_height) / float(height))
+            scale = min(scale, 1.0)
+            if scale < 1.0:
+                new_w = max(1, int(round(float(width) * scale)))
+                new_h = max(1, int(round(float(height) * scale)))
+                img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+                fx *= scale
+                fy *= scale
+                width, height = img.size
+
+        new_focal_x = int(round((fx / float(width)) * 100)) if width else 50
+        new_focal_y = int(round((fy / float(height)) * 100)) if height else 50
+        new_focal_x = max(0, min(100, new_focal_x))
+        new_focal_y = max(0, min(100, new_focal_y))
+
+        base_root = storage.ensure_media_root()
+        edited_root = base_root / "edited"
+        edited_root.mkdir(parents=True, exist_ok=True)
+        new_filename = f"{uuid.uuid4().hex}{suffix or '.png'}"
+        destination = edited_root / new_filename
+
+        save_kwargs: dict[str, object] = {"optimize": True}
+        image_to_save = img
+        if out_format == "JPEG":
+            if image_to_save.mode not in ("RGB", "L"):
+                image_to_save = image_to_save.convert("RGB")
+            save_kwargs.update({"quality": 90, "progressive": True})
+        elif out_format == "WEBP":
+            save_kwargs.update({"quality": 85})
+
+        image_to_save.save(destination, format=out_format, **save_kwargs)
+        storage.generate_thumbnails(destination)
+
+        rel_path = destination.relative_to(base_root).as_posix()
+        new_url = f"/media/{rel_path}"
+
+    block = await session.scalar(select(ContentBlock).where(ContentBlock.id == image.content_block_id))
+    if not block:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+
+    next_sort = (
+        await session.scalar(select(func.max(ContentImage.sort_order)).where(ContentImage.content_block_id == block.id))
+    ) or 0
+    new_image = ContentImage(
+        content_block_id=block.id,
+        url=new_url,
+        alt_text=image.alt_text,
+        sort_order=int(next_sort) + 1,
+        focal_x=new_focal_x,
+        focal_y=new_focal_y,
+    )
+    session.add(new_image)
+    await session.flush()
+
+    tag_rows = await session.execute(select(ContentImageTag.tag).where(ContentImageTag.content_image_id == image.id))
+    tags = sorted(set(tag_rows.scalars().all()))
+    for tag in tags:
+        session.add(ContentImageTag(content_image_id=new_image.id, tag=tag))
+
+    await audit_chain_service.add_content_audit_log(
+        session,
+        content_block_id=block.id,
+        action="image_edit",
+        version=block.version,
+        user_id=actor_id,
+    )
+    await session.commit()
+    return new_image
 
 
 async def set_translation_status(

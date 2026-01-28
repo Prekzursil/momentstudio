@@ -110,6 +110,14 @@ def regenerate_media_thumbnails(url: str) -> dict[str, int | None]:
     return get_media_image_stats(url)
 
 
+def media_url_to_path(url: str) -> Path:
+    return _media_url_to_path(url)
+
+
+def generate_thumbnails(path: str | Path) -> None:
+    _generate_thumbnails(Path(path))
+
+
 def _media_url_to_path(url: str) -> Path:
     if not url.startswith("/media/"):
         raise ValueError("Invalid media URL")

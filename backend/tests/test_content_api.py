@@ -253,6 +253,33 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     assert focal_set.json()["focal_x"] == 25
     assert focal_set.json()["focal_y"] == 80
 
+    edited = client.post(
+        f"/api/v1/content/admin/assets/images/{first_img['id']}/edit",
+        json={"rotate_cw": 90},
+        headers=auth_headers(admin_token),
+    )
+    assert edited.status_code == 201, edited.text
+    edited_json = edited.json()
+    assert edited_json["id"] != first_img["id"]
+    assert edited_json["content_key"] == "home.hero"
+    assert set(edited_json["tags"]) == {"hero", "homepage"}
+    assert edited_json["focal_x"] == 20
+    assert edited_json["focal_y"] == 25
+
+    client.patch(
+        "/api/v1/content/admin/page.about",
+        json={"title": "About", "body_markdown": f"Uses {first_img['url']}", "status": "draft"},
+        headers=auth_headers(admin_token),
+    )
+    usage = client.get(
+        f"/api/v1/content/admin/assets/images/{first_img['id']}/usage",
+        headers=auth_headers(admin_token),
+    )
+    assert usage.status_code == 200, usage.text
+    usage_keys = usage.json()["keys"]
+    assert "home.hero" in usage_keys
+    assert "page.about" in usage_keys
+
     tagged = client.get(
         "/api/v1/content/admin/assets/images",
         params={"tag": "hero"},

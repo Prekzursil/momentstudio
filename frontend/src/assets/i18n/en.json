@@ -2326,6 +2326,33 @@
           "focalSaved": "Focal point updated.",
           "focalErrorsSave": "Could not update focal point.",
           "focalErrorsFormat": "Enter focal point as \"x, y\" with values between 0 and 100.",
+          "focalTitle": "Focal point",
+          "focalPreviewHint": "Click on the image to preview and set the focal point before saving.",
+          "imageEdit": "Edit",
+          "whereUsed": "Used",
+          "usageTitle": "Where used",
+          "usageHint": "Click a key to filter the library to that scope.",
+          "usageLoading": "Loading usage…",
+          "usageEmpty": "No usage found.",
+          "editorTitle": "Edit image",
+          "editorHint": "Creates an edited copy. The original asset stays unchanged.",
+          "editorCreate": "Create edited copy",
+          "editorPreview": "Preview",
+          "editorRotationNote": "Rotation is applied when creating the copy.",
+          "rotateLabel": "Rotate",
+          "rotateNone": "No rotation",
+          "rotate90": "90° clockwise",
+          "rotate180": "180°",
+          "rotate270": "270° clockwise",
+          "cropLabel": "Crop",
+          "cropNone": "No crop",
+          "cropSquare": "Square (1:1)",
+          "cropHero": "Hero (16:7)",
+          "cropCard": "Card (4:3)",
+          "cropMobile": "Mobile (9:16)",
+          "resizeMaxWidth": "Max width (px)",
+          "resizeMaxHeight": "Max height (px)",
+          "editorErrorsNoop": "Choose at least one edit (rotate, crop, or resize).",
           "upload": "Upload image",
           "uploadHint": "Uploads are attached to {{key}} for easy organization.",
           "loading": "Loading assets…",
@@ -2334,12 +2361,15 @@
           "success": {
             "uploaded": "Uploaded.",
             "copied": "Copied to clipboard.",
-            "selected": "Selected."
+            "selected": "Selected.",
+            "edited": "Edited copy created."
           },
           "errors": {
             "load": "Could not load assets.",
             "upload": "Could not upload image.",
-            "copy": "Could not copy to clipboard."
+            "copy": "Could not copy to clipboard.",
+            "usage": "Could not load usage references.",
+            "edit": "Could not create edited copy."
           }
         }
       },

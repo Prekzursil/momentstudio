@@ -2326,6 +2326,33 @@
           "focalSaved": "Punctul focal a fost actualizat.",
           "focalErrorsSave": "Nu am putut actualiza punctul focal.",
           "focalErrorsFormat": "Introdu punctul focal ca \"x, y\" cu valori între 0 și 100.",
+          "focalTitle": "Punct focal",
+          "focalPreviewHint": "Dă click pe imagine pentru a previzualiza și seta punctul focal înainte de salvare.",
+          "imageEdit": "Editează",
+          "whereUsed": "Utilizată",
+          "usageTitle": "Unde este utilizată",
+          "usageHint": "Apasă pe o cheie pentru a filtra biblioteca la acel scope.",
+          "usageLoading": "Se încarcă utilizările…",
+          "usageEmpty": "Nu s-au găsit utilizări.",
+          "editorTitle": "Editează imaginea",
+          "editorHint": "Creează o copie editată. Imaginea originală rămâne neschimbată.",
+          "editorCreate": "Creează copie editată",
+          "editorPreview": "Previzualizare",
+          "editorRotationNote": "Rotirea se aplică la crearea copiei.",
+          "rotateLabel": "Rotire",
+          "rotateNone": "Fără rotire",
+          "rotate90": "90° în sensul acelor de ceasornic",
+          "rotate180": "180°",
+          "rotate270": "270° în sensul acelor de ceasornic",
+          "cropLabel": "Decupare",
+          "cropNone": "Fără decupare",
+          "cropSquare": "Pătrat (1:1)",
+          "cropHero": "Hero (16:7)",
+          "cropCard": "Card (4:3)",
+          "cropMobile": "Mobil (9:16)",
+          "resizeMaxWidth": "Lățime maximă (px)",
+          "resizeMaxHeight": "Înălțime maximă (px)",
+          "editorErrorsNoop": "Alege cel puțin o editare (rotire, decupare sau redimensionare).",
           "upload": "Încarcă imagine",
           "uploadHint": "Încărcările sunt atașate la {{key}} pentru organizare.",
           "loading": "Se încarcă imaginile…",
@@ -2334,12 +2361,15 @@
           "success": {
             "uploaded": "Încărcată.",
             "copied": "Copiat în clipboard.",
-            "selected": "Selectată."
+            "selected": "Selectată.",
+            "edited": "Copia editată a fost creată."
           },
           "errors": {
             "load": "Nu am putut încărca imaginile.",
             "upload": "Nu am putut încărca imaginea.",
-            "copy": "Nu am putut copia în clipboard."
+            "copy": "Nu am putut copia în clipboard.",
+            "usage": "Nu am putut încărca referințele de utilizare.",
+            "edit": "Nu am putut crea copia editată."
           }
         }
       },

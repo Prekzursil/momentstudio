@@ -963,9 +963,9 @@ Below is a structured checklist you can turn into issues.
 - [x] CMS editor: page templates – Create pages from templates (About/FAQ/Shipping/Returns) with prebuilt sections.
 - [x] CMS editor: announcement precedence – Allow stacking CMS announcement with Ops banner (currently Ops banner overrides).
 - [x] CMS editor: inline media drag-drop – Drag images into the editor to auto-upload and insert with caption + alt.
-- [ ] CMS assets: image editor – Crop/rotate/resize tools in the asset library with non-destructive versions.
-- [ ] CMS assets: “where used” – Show usage references for each asset (pages/sections/posts) before deleting.
-- [ ] CMS assets: focal point preview – Preview focal point across common crops (hero/card/mobile) before saving.
+- [x] CMS assets: image editor – Crop/rotate/resize tools in the asset library with non-destructive versions.
+- [x] CMS assets: “where used” – Show usage references for each asset (pages/sections/posts) before deleting.
+- [x] CMS assets: focal point preview – Preview focal point across common crops (hero/card/mobile) before saving.
 - [ ] CMS preview: shareable draft links – Tokenized preview links for unpublished drafts (pages + home sections).
 - [ ] CMS preview: language toggle – Preview RO/EN (fallbacks visible) without leaving the editor.
 - [ ] CMS preview: theme toggle – Preview light/dark rendering inside the editor.
@@ -980,6 +980,8 @@ Below is a structured checklist you can turn into issues.
 - [ ] CMS blocks: product grids – Insert product/category/collection grids into pages (shoppable sections).
 - [ ] CMS blocks: form builder – Basic contact/newsletter form blocks with validation and success messaging.
 - [ ] Storefront admin mode: “Edit this page” – Admin-only button on storefront pages linking to the correct CMS editor/section.
+- [ ] CMS assets: delete asset – Add a delete action gated by “where used” + safe file cleanup (original + thumbnails).
+- [ ] CMS assets: edited versions – Group edited copies under the original asset (lineage + quick revert).
 
 ## Data Portability & Backups (Extended)
 - [x] CLI command `python -m app.cli export-data` exporting users (no passwords), products, categories, orders, addresses to JSON.

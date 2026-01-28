@@ -4,12 +4,12 @@ from io import StringIO
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Query, Response
-from sqlalchemy import select, func, or_
+from sqlalchemy import String, cast, select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.dependencies import get_current_user_optional, get_session, require_admin_section
-from app.models.content import ContentBlock, ContentBlockVersion, ContentImage, ContentRedirect, ContentImageTag
+from app.models.content import ContentBlock, ContentBlockTranslation, ContentBlockVersion, ContentImage, ContentRedirect, ContentImageTag
 from app.models.user import User
 from app.schemas.content import (
     ContentAuditRead,
@@ -18,6 +18,8 @@ from app.schemas.content import (
     ContentBlockUpdate,
     ContentImageAssetListResponse,
     ContentImageAssetRead,
+    ContentImageAssetUsageResponse,
+    ContentImageEditRequest,
     ContentImageFocalPointUpdate,
     ContentPageListItem,
     ContentPageRenameRequest,
@@ -607,6 +609,80 @@ async def admin_update_content_image_focal_point(
         content_key=content_key,
         tags=tags_sorted,
     )
+
+
+@router.post("/admin/assets/images/{image_id}/edit", response_model=ContentImageAssetRead, status_code=status.HTTP_201_CREATED)
+async def admin_edit_content_image(
+    image_id: UUID,
+    payload: ContentImageEditRequest,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> ContentImageAssetRead:
+    image = await session.scalar(select(ContentImage).where(ContentImage.id == image_id))
+    if not image:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+
+    edited = await content_service.edit_image_asset(session, image=image, payload=payload, actor_id=admin.id)
+
+    tags = (
+        await session.execute(select(ContentImageTag.tag).where(ContentImageTag.content_image_id == edited.id))
+    ).scalars().all()
+    tags_sorted = sorted(set(tags))
+
+    content_key = ""
+    if getattr(edited, "content_block_id", None):
+        content_key = (await session.scalar(select(ContentBlock.key).where(ContentBlock.id == edited.content_block_id))) or ""
+
+    return ContentImageAssetRead(
+        id=edited.id,
+        url=edited.url,
+        alt_text=edited.alt_text,
+        sort_order=edited.sort_order,
+        focal_x=getattr(edited, "focal_x", 50),
+        focal_y=getattr(edited, "focal_y", 50),
+        created_at=edited.created_at,
+        content_key=content_key,
+        tags=tags_sorted,
+    )
+
+
+@router.get("/admin/assets/images/{image_id}/usage", response_model=ContentImageAssetUsageResponse)
+async def admin_get_content_image_usage(
+    image_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> ContentImageAssetUsageResponse:
+    image = await session.scalar(select(ContentImage).where(ContentImage.id == image_id))
+    if not image:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+
+    content_key = ""
+    if getattr(image, "content_block_id", None):
+        content_key = (await session.scalar(select(ContentBlock.key).where(ContentBlock.id == image.content_block_id))) or ""
+
+    url = (getattr(image, "url", None) or "").strip()
+    needle = f"%{url}%"
+    keys: set[str] = set()
+    if content_key:
+        keys.add(content_key)
+
+    if url:
+        rows = await session.execute(
+            select(ContentBlock.key)
+            .distinct()
+            .select_from(ContentBlock)
+            .outerjoin(ContentBlockTranslation, ContentBlockTranslation.content_block_id == ContentBlock.id)
+            .where(
+                or_(
+                    ContentBlock.body_markdown.ilike(needle),
+                    cast(ContentBlock.meta, String).ilike(needle),
+                    ContentBlockTranslation.body_markdown.ilike(needle),
+                )
+            )
+        )
+        keys.update([row[0] for row in rows.all() if row and row[0]])
+
+    return ContentImageAssetUsageResponse(image_id=image.id, url=url, keys=sorted(keys))
 
 
 @router.get("/admin/tools/link-check", response_model=ContentLinkCheckResponse)

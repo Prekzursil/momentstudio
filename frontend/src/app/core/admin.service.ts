@@ -647,6 +647,20 @@ export interface ContentImageAssetListResponse {
   meta: { total_items: number; total_pages: number; page: number; limit: number };
 }
 
+export interface ContentImageEditRequest {
+  rotate_cw?: 0 | 90 | 180 | 270;
+  crop_aspect_w?: number;
+  crop_aspect_h?: number;
+  resize_max_width?: number;
+  resize_max_height?: number;
+}
+
+export interface ContentImageAssetUsageResponse {
+  image_id: string;
+  url: string;
+  keys: string[];
+}
+
 export interface ContentLinkCheckIssue {
   key: string;
   kind: 'link' | 'image';
@@ -1115,6 +1129,14 @@ export class AdminService {
 
   updateContentImageFocalPoint(imageId: string, focal_x: number, focal_y: number): Observable<ContentImageAssetRead> {
     return this.api.patch<ContentImageAssetRead>(`/content/admin/assets/images/${encodeURIComponent(imageId)}/focal`, { focal_x, focal_y });
+  }
+
+  editContentImage(imageId: string, payload: ContentImageEditRequest): Observable<ContentImageAssetRead> {
+    return this.api.post<ContentImageAssetRead>(`/content/admin/assets/images/${encodeURIComponent(imageId)}/edit`, payload);
+  }
+
+  getContentImageUsage(imageId: string): Observable<ContentImageAssetUsageResponse> {
+    return this.api.get<ContentImageAssetUsageResponse>(`/content/admin/assets/images/${encodeURIComponent(imageId)}/usage`);
   }
 
   linkCheckContent(key: string): Observable<ContentLinkCheckResponse> {
