@@ -590,6 +590,23 @@ type PriceHistoryChart = {
               <p class="text-xs text-slate-600 dark:text-slate-300">{{ 'adminUi.categories.csv.hint' | translate }}</p>
               <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.categories.csv.formatHint' | translate }}</p>
 
+              <div class="flex flex-wrap justify-end gap-2">
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.categories.csv.downloadTemplate' | translate"
+                  (action)="downloadCategoriesCsv(true)"
+                  [disabled]="categoryImportBusy()"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.categories.csv.export' | translate"
+                  (action)="downloadCategoriesCsv(false)"
+                  [disabled]="categoryImportBusy()"
+                ></app-button>
+              </div>
+
               <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                 {{ 'adminUi.categories.csv.file' | translate }}
                 <input
@@ -4508,6 +4525,13 @@ export class AdminProductsComponent implements OnInit {
     this.admin.exportProductsCsv().subscribe({
       next: (blob) => this.downloadBlob(blob, 'products.csv'),
       error: () => this.toast.error(this.t('adminUi.products.csv.errors.export'))
+    });
+  }
+
+  downloadCategoriesCsv(template: boolean): void {
+    this.admin.exportCategoriesCsv(template).subscribe({
+      next: (blob) => this.downloadBlob(blob, template ? 'categories-template.csv' : 'categories.csv'),
+      error: () => this.toast.error(this.t('adminUi.categories.csv.exportError'))
     });
   }
 

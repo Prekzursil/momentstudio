@@ -2205,6 +2205,54 @@ async def export_products_csv(session: AsyncSession) -> str:
     return buf.getvalue()
 
 
+async def export_categories_csv(session: AsyncSession, template: bool = False) -> str:
+    buf = io.StringIO()
+    fieldnames = [
+        "slug",
+        "name",
+        "parent_slug",
+        "sort_order",
+        "is_visible",
+        "description",
+        "name_ro",
+        "description_ro",
+        "name_en",
+        "description_en",
+    ]
+    writer = csv.DictWriter(buf, fieldnames=fieldnames)
+    writer.writeheader()
+    if template:
+        return buf.getvalue()
+
+    result = await session.execute(
+        select(Category)
+        .options(selectinload(Category.translations))
+        .order_by(Category.sort_order.asc(), Category.slug.asc())
+    )
+    categories = result.scalars().unique().all()
+    id_to_slug = {c.id: c.slug for c in categories}
+
+    for c in categories:
+        translations = {t.lang: t for t in (c.translations or [])}
+        ro = translations.get("ro")
+        en = translations.get("en")
+        writer.writerow(
+            {
+                "slug": c.slug,
+                "name": c.name,
+                "parent_slug": id_to_slug.get(c.parent_id, "") if c.parent_id else "",
+                "sort_order": c.sort_order,
+                "is_visible": "true" if c.is_visible else "false",
+                "description": c.description or "",
+                "name_ro": ro.name if ro else "",
+                "description_ro": ro.description or "" if ro and ro.description else "",
+                "name_en": en.name if en else "",
+                "description_en": en.description or "" if en and en.description else "",
+            }
+        )
+    return buf.getvalue()
+
+
 async def import_products_csv(session: AsyncSession, content: str, dry_run: bool = True):
     reader = csv.DictReader(io.StringIO(content))
     created = 0

@@ -1,4 +1,5 @@
 import asyncio
+import csv
 import io
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -1120,6 +1121,24 @@ def test_category_csv_import_dry_run_and_apply(test_app: Dict[str, object]) -> N
     assert ro_child.description == "Descr RO"
     assert en_child.name == "Child"
     assert en_child.description == "Desc EN"
+
+    export_res = client.get("/api/v1/catalog/categories/export", headers=auth_headers(admin_token))
+    assert export_res.status_code == 200, export_res.text
+    reader = csv.DictReader(io.StringIO(export_res.text))
+    exported = {row.get("slug"): row for row in reader if row.get("slug")}
+    assert "parent-cat" in exported
+    assert exported["child-cat"]["parent_slug"] == "parent-cat"
+    assert exported["existing-cat"]["is_visible"] in {"false", "False", "0"}
+
+    template_res = client.get(
+        "/api/v1/catalog/categories/export",
+        params={"template": True},
+        headers=auth_headers(admin_token),
+    )
+    assert template_res.status_code == 200, template_res.text
+    assert template_res.text.splitlines() == [
+        "slug,name,parent_slug,sort_order,is_visible,description,name_ro,description_ro,name_en,description_en"
+    ]
 
 
 def test_preorder_shipping_meta_and_sort(test_app: Dict[str, object]) -> None:

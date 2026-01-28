@@ -887,6 +887,10 @@ export class AdminService {
     return this.api.getBlob('/catalog/products/export');
   }
 
+  exportCategoriesCsv(template = false): Observable<Blob> {
+    return this.api.getBlob('/catalog/categories/export', { template });
+  }
+
   importProductsCsv(file: File, dryRun = true): Observable<AdminProductsImportResult> {
     const form = new FormData();
     form.append('file', file);

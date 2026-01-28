@@ -3462,6 +3462,8 @@
         "title": "Bulk import (CSV)",
         "hint": "Upload a CSV to create/update categories. Use Dry run first to validate.",
         "formatHint": "Columns: slug, name, parent_slug, sort_order, is_visible, description, name_ro, description_ro, name_en, description_en.",
+        "downloadTemplate": "Download template",
+        "export": "Export categories CSV",
         "file": "CSV file",
         "dryRun": "Dry run (no changes)",
         "run": "Run import",
@@ -3471,6 +3473,7 @@
         "errorsTitle": "Errors",
         "noErrors": "No errors.",
         "success": "Category import complete.",
+        "exportError": "Could not export categories CSV.",
         "error": "Category import failed."
       },
       "confirmDelete": {

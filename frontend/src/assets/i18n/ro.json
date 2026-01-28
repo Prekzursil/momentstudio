@@ -3462,6 +3462,8 @@
         "title": "Import în masă (CSV)",
         "hint": "Încarcă un CSV pentru a crea/actualiza categorii. Folosește Previzualizare mai întâi pentru validare.",
         "formatHint": "Coloane: slug, name, parent_slug, sort_order, is_visible, description, name_ro, description_ro, name_en, description_en.",
+        "downloadTemplate": "Descarcă șablon",
+        "export": "Exportă categorii CSV",
         "file": "Fișier CSV",
         "dryRun": "Previzualizare (fără schimbări)",
         "run": "Rulează importul",
@@ -3471,6 +3473,7 @@
         "errorsTitle": "Erori",
         "noErrors": "Fără erori.",
         "success": "Importul categoriilor a fost finalizat.",
+        "exportError": "Nu am putut exporta CSV-ul cu categorii.",
         "error": "Importul categoriilor a eșuat."
       },
       "confirmDelete": {

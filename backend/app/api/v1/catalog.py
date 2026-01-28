@@ -357,6 +357,18 @@ async def reorder_categories(
     return updated
 
 
+@router.get("/categories/export", response_class=StreamingResponse)
+async def export_categories_csv(
+    template: bool = Query(default=False),
+    session: AsyncSession = Depends(get_session),
+    _: object = Depends(require_admin_section("products")),
+):
+    content = await catalog_service.export_categories_csv(session, template=template)
+    filename = "categories_template.csv" if template else "categories.csv"
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    return StreamingResponse(iter([content]), media_type="text/csv", headers=headers)
+
+
 @router.post("/categories/import", response_model=ImportResult)
 async def import_categories_csv(
     file: UploadFile = File(...),
