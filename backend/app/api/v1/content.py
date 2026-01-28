@@ -30,6 +30,7 @@ from app.schemas.content import (
     ContentBlockVersionRead,
     ContentImageTagsUpdate,
     ContentLinkCheckResponse,
+    ContentLinkCheckPreviewRequest,
     ContentTranslationStatusUpdate,
     SitemapPreviewResponse,
     StructuredDataValidationResponse,
@@ -615,6 +616,22 @@ async def admin_link_check(
     _: User = Depends(require_admin_section("content")),
 ) -> ContentLinkCheckResponse:
     issues = await content_service.check_content_links(session, key=key)
+    return ContentLinkCheckResponse(issues=issues)
+
+
+@router.post("/admin/tools/link-check/preview", response_model=ContentLinkCheckResponse)
+async def admin_link_check_preview(
+    payload: ContentLinkCheckPreviewRequest,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> ContentLinkCheckResponse:
+    issues = await content_service.check_content_links_preview(
+        session,
+        key=payload.key,
+        body_markdown=payload.body_markdown,
+        meta=payload.meta,
+        images=payload.images,
+    )
     return ContentLinkCheckResponse(issues=issues)
 
 

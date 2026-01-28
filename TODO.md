@@ -956,7 +956,7 @@ Below is a structured checklist you can turn into issues.
 - [x] CMS editor: accessible reordering – Keyboard-friendly reorder controls and screen-reader announcements for block moves.
 - [x] CMS editor: undo/redo – Full undo/redo stack for content edits, including reorder and block adds/removes.
 - [x] CMS editor: autosave drafts – Autosave with “restore autosave” after refresh/crash and a visible save state.
-- [ ] CMS editor: publish checklist – Pre-publish checklist (missing translations, missing alt text, broken links, empty sections).
+- [x] CMS editor: publish checklist – Pre-publish checklist (missing translations, missing alt text, broken links, empty sections).
 - [ ] CMS editor: inline style controls – Block inspector for spacing, background, alignment, and max-width (theme-aware).
 - [ ] CMS editor: reusable blocks – Save a section as a reusable snippet and insert it on other pages.
 - [ ] CMS editor: global sections – Manage global blocks (announcement bar, footer promo, header banners) used site-wide.

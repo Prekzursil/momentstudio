@@ -4232,6 +4232,30 @@
           "load": "Could not run link checker."
         }
       },
+      "publishChecklist": {
+        "title": "Publish checklist",
+        "hint": "Review these items before publishing.",
+        "loading": "Running checks…",
+        "publish": "Publish",
+        "publishAnyway": "Publish anyway",
+        "ok": "OK",
+        "translationsMissing": "Missing translations: {{langs}}.",
+        "altMissing": "{{count}} image(s) are missing alt text.",
+        "emptyFound": "{{count}} section(s) look empty.",
+        "linksFound": "{{count}} broken link(s) found.",
+        "emptyAllDisabled": "No sections are enabled.",
+        "imageLabel": "Image {{index}}",
+        "slideLabel": "Slide {{index}}",
+        "sections": {
+          "translations": "Translations",
+          "altText": "Image alt text",
+          "empty": "Empty sections",
+          "links": "Broken links"
+        },
+        "errors": {
+          "linkCheck": "Could not run link checks."
+        }
+      },
       "errors": {
         "conflictTitle": "Edit conflict",
         "conflictCopy": "This content changed elsewhere. Reload and try again.",

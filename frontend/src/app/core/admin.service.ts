@@ -660,6 +660,13 @@ export interface ContentLinkCheckResponse {
   issues: ContentLinkCheckIssue[];
 }
 
+export interface ContentLinkCheckPreviewRequest {
+  key: string;
+  body_markdown?: string;
+  meta?: Record<string, any> | null;
+  images?: string[];
+}
+
 export interface ContentSavePayload {
   title?: string;
   body_markdown?: string;
@@ -1112,6 +1119,10 @@ export class AdminService {
 
   linkCheckContent(key: string): Observable<ContentLinkCheckResponse> {
     return this.api.get<ContentLinkCheckResponse>('/content/admin/tools/link-check', { key });
+  }
+
+  linkCheckContentPreview(payload: ContentLinkCheckPreviewRequest): Observable<ContentLinkCheckResponse> {
+    return this.api.post<ContentLinkCheckResponse>('/content/admin/tools/link-check/preview', payload);
   }
 
   fetchSocialThumbnail(url: string): Observable<SocialThumbnailResponse> {

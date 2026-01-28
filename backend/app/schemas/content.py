@@ -192,6 +192,13 @@ class ContentLinkCheckIssue(BaseModel):
     reason: str
 
 
+class ContentLinkCheckPreviewRequest(BaseModel):
+    key: str
+    body_markdown: str = ""
+    meta: dict[str, Any] | None = None
+    images: list[str] = Field(default_factory=list)
+
+
 class ContentLinkCheckResponse(BaseModel):
     issues: list[ContentLinkCheckIssue]
 

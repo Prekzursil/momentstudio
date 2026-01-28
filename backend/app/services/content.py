@@ -796,7 +796,6 @@ async def check_content_links(session: AsyncSession, *, key: str) -> list[Conten
     category_slugs: set[str] = set()
     page_keys: set[str] = set()
     blog_keys: set[str] = set()
-    media_urls: set[str] = set()
 
     def register(kind: str, url: str) -> None:
         split = urlsplit(url)
@@ -806,7 +805,6 @@ async def check_content_links(session: AsyncSession, *, key: str) -> list[Conten
         if url.startswith("media/") and not path.startswith("/"):
             path = "/" + path
         if path.startswith("/media/"):
-            media_urls.add("/" + path.lstrip("/"))
             return
         if path.startswith("/products/"):
             parts = [p for p in path.split("/") if p]
@@ -1011,6 +1009,255 @@ async def check_content_links(session: AsyncSession, *, key: str) -> list[Conten
                 issues.append(
                     ContentLinkCheckIssue(
                         key=block.key,
+                        kind=kind,
+                        source=source,
+                        field=field,
+                        url=url,
+                        reason="Content is not publicly visible",
+                    )
+                )
+            continue
+
+    return issues
+
+
+async def check_content_links_preview(
+    session: AsyncSession,
+    *,
+    key: str,
+    body_markdown: str = "",
+    meta: dict | None = None,
+    images: list[str] | None = None,
+) -> list[ContentLinkCheckIssue]:
+    content_key = (key or "").strip() or "preview"
+
+    refs: list[tuple[str, str, str, str]] = []
+    refs.extend([(k, s, f, u) for k, s, f, u in _extract_markdown_refs(body_markdown)])
+    refs.extend([(k, s, f, u) for k, s, f, u in _extract_block_refs(meta)])
+    for raw in images or []:
+        url = _normalize_md_url(str(raw or ""))
+        if url:
+            refs.append(("image", "block", "images", url))
+
+    product_slugs: set[str] = set()
+    category_slugs: set[str] = set()
+    page_keys: set[str] = set()
+    blog_keys: set[str] = set()
+    media_urls: set[str] = set()
+
+    def register(kind: str, url: str) -> None:
+        split = urlsplit(url)
+        if split.scheme in ("http", "https"):
+            return
+        path = split.path or ""
+        if url.startswith("media/") and not path.startswith("/"):
+            path = "/" + path
+        if path.startswith("/media/"):
+            media_urls.add("/" + path.lstrip("/"))
+            return
+        if path.startswith("/products/"):
+            parts = [p for p in path.split("/") if p]
+            if len(parts) >= 2:
+                product_slugs.add(parts[1])
+            return
+        if path.startswith("/pages/"):
+            parts = [p for p in path.split("/") if p]
+            if len(parts) >= 2:
+                page_keys.add(f"page.{slugify_page_slug(parts[1])}")
+            return
+        if path.startswith("/blog/"):
+            parts = [p for p in path.split("/") if p]
+            if len(parts) >= 2:
+                blog_keys.add(f"blog.{slugify_page_slug(parts[1])}")
+            return
+        if path.startswith("/shop"):
+            parts = [p for p in path.split("/") if p]
+            if len(parts) >= 2 and parts[0] == "shop":
+                category_slugs.add(slugify_page_slug(parts[1]))
+            query = parse_qs(split.query or "")
+            if "category" in query and query["category"]:
+                category_slugs.add(slugify_page_slug(str(query["category"][0])))
+            if "sub" in query and query["sub"]:
+                category_slugs.add(slugify_page_slug(str(query["sub"][0])))
+            return
+
+    for kind, _source, _field, url in refs:
+        register(kind, url)
+
+    now = datetime.now(timezone.utc)
+
+    products_by_slug: dict[str, tuple[ProductStatus, bool]] = {}
+    if product_slugs:
+        product_rows = (
+            await session.execute(
+                select(Product.slug, Product.status, Product.is_deleted).where(Product.slug.in_(product_slugs))
+            )
+        ).all()
+        products_by_slug = {slug: (status, bool(is_deleted)) for slug, status, is_deleted in product_rows}
+
+    existing_categories: set[str] = set()
+    if category_slugs:
+        existing_categories = set(
+            (await session.execute(select(Category.slug).where(Category.slug.in_(category_slugs)))).scalars().all()
+        )
+
+    redirects_rows = (await session.execute(select(ContentRedirect.from_key, ContentRedirect.to_key))).all()
+    redirects = {from_key: to_key for from_key, to_key in redirects_rows if from_key and to_key}
+
+    content_keys = page_keys | blog_keys
+    resolved_keys: dict[str, tuple[str, str | None]] = {}
+    resolved_targets: set[str] = set()
+    for k in content_keys:
+        resolved, err = _resolve_redirect_chain(k, redirects)
+        resolved_keys[k] = (resolved, err)
+        resolved_targets.add(resolved)
+
+    blocks_by_key: dict[str, tuple[ContentStatus, datetime | None, datetime | None]] = {}
+    if resolved_targets:
+        block_rows = (
+            await session.execute(
+                select(ContentBlock.key, ContentBlock.status, ContentBlock.published_at, ContentBlock.published_until).where(
+                    ContentBlock.key.in_(resolved_targets)
+                )
+            )
+        ).all()
+        blocks_by_key = {
+            key: (status, published_at, published_until) for key, status, published_at, published_until in block_rows
+        }
+
+    def is_public(status: ContentStatus, published_at: datetime | None, published_until: datetime | None) -> bool:
+        if status != ContentStatus.published:
+            return False
+        if published_at and now < published_at:
+            return False
+        if published_until and now > published_until:
+            return False
+        return True
+
+    issues: list[ContentLinkCheckIssue] = []
+
+    for kind, source, field, url in refs:
+        split = urlsplit(url)
+        if split.scheme in ("http", "https"):
+            continue
+        path = split.path or ""
+        if url.startswith("media/") and not path.startswith("/"):
+            path = "/" + path
+
+        if path.startswith("/media/"):
+            if not _media_url_exists(path):
+                issues.append(
+                    ContentLinkCheckIssue(
+                        key=content_key,
+                        kind=kind,
+                        source=source,
+                        field=field,
+                        url=url,
+                        reason="Media file not found",
+                    )
+                )
+            continue
+
+        if path.startswith("/products/"):
+            slug = slugify_page_slug(path.split("/", 3)[2] if len(path.split("/")) >= 3 else "")
+            if not slug:
+                continue
+            row = products_by_slug.get(slug)
+            if not row:
+                issues.append(
+                    ContentLinkCheckIssue(
+                        key=content_key,
+                        kind=kind,
+                        source=source,
+                        field=field,
+                        url=url,
+                        reason="Product not found",
+                    )
+                )
+                continue
+            product_status, is_deleted = row
+            if is_deleted or product_status != ProductStatus.published:
+                issues.append(
+                    ContentLinkCheckIssue(
+                        key=content_key,
+                        kind=kind,
+                        source=source,
+                        field=field,
+                        url=url,
+                        reason="Product is not publicly visible",
+                    )
+                )
+            continue
+
+        if path.startswith("/shop"):
+            parts = [p for p in path.split("/") if p]
+            if len(parts) >= 2 and parts[0] == "shop":
+                slug = slugify_page_slug(parts[1])
+                if slug and slug not in existing_categories:
+                    issues.append(
+                        ContentLinkCheckIssue(
+                            key=content_key,
+                            kind=kind,
+                            source=source,
+                            field=field,
+                            url=url,
+                            reason="Category not found",
+                        )
+                    )
+            query = parse_qs(split.query or "")
+            for param in ("category", "sub"):
+                if param in query and query[param]:
+                    slug = slugify_page_slug(str(query[param][0]))
+                    if slug and slug not in existing_categories:
+                        issues.append(
+                            ContentLinkCheckIssue(
+                                key=content_key,
+                                kind=kind,
+                                source=source,
+                                field=field,
+                                url=url,
+                                reason="Category not found",
+                            )
+                        )
+            continue
+
+        if path.startswith("/pages/") or path.startswith("/blog/"):
+            base = "page." if path.startswith("/pages/") else "blog."
+            slug = slugify_page_slug(path.split("/", 3)[2] if len(path.split("/")) >= 3 else "")
+            if not slug:
+                continue
+            original_key = f"{base}{slug}"
+            resolved, err = resolved_keys.get(original_key, (original_key, None))
+            if err:
+                issues.append(
+                    ContentLinkCheckIssue(
+                        key=content_key,
+                        kind=kind,
+                        source=source,
+                        field=field,
+                        url=url,
+                        reason=err,
+                    )
+                )
+                continue
+            target = blocks_by_key.get(resolved)
+            if not target:
+                issues.append(
+                    ContentLinkCheckIssue(
+                        key=content_key,
+                        kind=kind,
+                        source=source,
+                        field=field,
+                        url=url,
+                        reason="Content not found",
+                    )
+                )
+                continue
+            content_status, published_at, published_until = target
+            if not is_public(content_status, published_at, published_until):
+                issues.append(
+                    ContentLinkCheckIssue(
+                        key=content_key,
                         kind=kind,
                         source=source,
                         field=field,

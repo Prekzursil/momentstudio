@@ -4232,6 +4232,30 @@
           "load": "Nu am putut rula verificarea."
         }
       },
+      "publishChecklist": {
+        "title": "Listă de verificare pentru publicare",
+        "hint": "Verifică aceste elemente înainte de publicare.",
+        "loading": "Se verifică…",
+        "publish": "Publică",
+        "publishAnyway": "Publică oricum",
+        "ok": "OK",
+        "translationsMissing": "Lipsesc traduceri: {{langs}}.",
+        "altMissing": "{{count}} imagine(i) nu au text alternativ.",
+        "emptyFound": "{{count}} secțiune(i) par goale.",
+        "linksFound": "{{count}} link(uri) nefuncționale găsite.",
+        "emptyAllDisabled": "Nicio secțiune nu este activă.",
+        "imageLabel": "Imaginea {{index}}",
+        "slideLabel": "Slide-ul {{index}}",
+        "sections": {
+          "translations": "Traduceri",
+          "altText": "Text alternativ imagini",
+          "empty": "Secțiuni goale",
+          "links": "Linkuri nefuncționale"
+        },
+        "errors": {
+          "linkCheck": "Nu am putut verifica linkurile."
+        }
+      },
       "errors": {
         "conflictTitle": "Conflict de editare",
         "conflictCopy": "Conținutul s-a schimbat în altă parte. Reîncarcă și încearcă din nou.",

@@ -397,6 +397,22 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     assert any(i["reason"] == "Product not found" for i in issues)
     assert any(i["reason"] == "Content not found" for i in issues)
 
+    preview = client.post(
+        "/api/v1/content/admin/tools/link-check/preview",
+        json={
+            "key": "site.preview",
+            "body_markdown": "![missing](/media/does-not-exist.png) [product](/products/missing) [page](/pages/missing-page)",
+            "meta": None,
+            "images": [],
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert preview.status_code == 200, preview.text
+    preview_issues = preview.json()["issues"]
+    assert any(i["reason"] == "Media file not found" for i in preview_issues)
+    assert any(i["reason"] == "Product not found" for i in preview_issues)
+    assert any(i["reason"] == "Content not found" for i in preview_issues)
+
 
 def test_admin_fetch_social_thumbnail(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]

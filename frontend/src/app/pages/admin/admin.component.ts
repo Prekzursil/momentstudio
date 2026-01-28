@@ -145,6 +145,13 @@ type BlogDraftState = {
   pin_order: string;
 };
 
+type CmsPublishChecklistResult = {
+  missingTranslations: UiLang[];
+  missingAlt: string[];
+  emptySections: string[];
+  linkIssues: ContentLinkCheckIssue[];
+};
+
 type CmsAutosaveEnvelope = {
   v: 1;
   ts: string;
@@ -1869,6 +1876,110 @@ class CmsDraftManager<T> {
 	                </div>
 	                </div>
 	              </details>
+
+                <app-modal
+                  [open]="pagePublishChecklistOpen"
+                  [title]="'adminUi.content.publishChecklist.title' | translate"
+                  [subtitle]="'adminUi.content.publishChecklist.hint' | translate"
+                  [closeLabel]="'adminUi.actions.cancel' | translate"
+                  [cancelLabel]="'adminUi.actions.cancel' | translate"
+                  [confirmLabel]="
+                    pagePublishChecklistLoading
+                      ? ('adminUi.actions.loading' | translate)
+                      : (pagePublishChecklistHasIssues()
+                          ? ('adminUi.content.publishChecklist.publishAnyway' | translate)
+                          : ('adminUi.content.publishChecklist.publish' | translate))
+                  "
+                  [confirmDisabled]="pagePublishChecklistLoading || !pagePublishChecklistKey"
+                  (closed)="closePagePublishChecklist()"
+                  (confirm)="confirmPagePublishChecklist()"
+                >
+                  <div class="grid gap-3">
+                    <p *ngIf="pagePublishChecklistLoading" class="text-sm text-slate-600 dark:text-slate-300">
+                      {{ 'adminUi.content.publishChecklist.loading' | translate }}
+                    </p>
+
+                    <p *ngIf="pagePublishChecklistError" class="text-sm text-rose-700 dark:text-rose-300">
+                      {{ pagePublishChecklistError }}
+                    </p>
+
+                    <div
+                      *ngIf="pagePublishChecklistResult as checklist"
+                      class="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30"
+                    >
+                      <div class="grid gap-1">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                          {{ 'adminUi.content.publishChecklist.sections.translations' | translate }}
+                        </p>
+                        <p *ngIf="checklist.missingTranslations.length === 0" class="text-sm text-emerald-700 dark:text-emerald-300">
+                          {{ 'adminUi.content.publishChecklist.ok' | translate }}
+                        </p>
+                        <p *ngIf="checklist.missingTranslations.length > 0" class="text-sm text-amber-800 dark:text-amber-200">
+                          {{ 'adminUi.content.publishChecklist.translationsMissing' | translate: { langs: checklist.missingTranslations.join(', ').toUpperCase() } }}
+                        </p>
+                      </div>
+
+                      <div class="h-px bg-slate-200 dark:bg-slate-800/70"></div>
+
+                      <div class="grid gap-1">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                          {{ 'adminUi.content.publishChecklist.sections.altText' | translate }}
+                        </p>
+                        <p *ngIf="checklist.missingAlt.length === 0" class="text-sm text-emerald-700 dark:text-emerald-300">
+                          {{ 'adminUi.content.publishChecklist.ok' | translate }}
+                        </p>
+                        <div *ngIf="checklist.missingAlt.length > 0" class="grid gap-1">
+                          <p class="text-sm text-amber-800 dark:text-amber-200">
+                            {{ 'adminUi.content.publishChecklist.altMissing' | translate: { count: checklist.missingAlt.length } }}
+                          </p>
+                          <ul class="list-disc pl-5 text-xs text-slate-600 dark:text-slate-300">
+                            <li *ngFor="let item of checklist.missingAlt | slice:0:6">{{ item }}</li>
+                          </ul>
+                        </div>
+                      </div>
+
+                      <div class="h-px bg-slate-200 dark:bg-slate-800/70"></div>
+
+                      <div class="grid gap-1">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                          {{ 'adminUi.content.publishChecklist.sections.empty' | translate }}
+                        </p>
+                        <p *ngIf="checklist.emptySections.length === 0" class="text-sm text-emerald-700 dark:text-emerald-300">
+                          {{ 'adminUi.content.publishChecklist.ok' | translate }}
+                        </p>
+                        <div *ngIf="checklist.emptySections.length > 0" class="grid gap-1">
+                          <p class="text-sm text-amber-800 dark:text-amber-200">
+                            {{ 'adminUi.content.publishChecklist.emptyFound' | translate: { count: checklist.emptySections.length } }}
+                          </p>
+                          <ul class="list-disc pl-5 text-xs text-slate-600 dark:text-slate-300">
+                            <li *ngFor="let item of checklist.emptySections | slice:0:6">{{ item }}</li>
+                          </ul>
+                        </div>
+                      </div>
+
+                      <div class="h-px bg-slate-200 dark:bg-slate-800/70"></div>
+
+                      <div class="grid gap-1">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                          {{ 'adminUi.content.publishChecklist.sections.links' | translate }}
+                        </p>
+                        <p *ngIf="checklist.linkIssues.length === 0 && !pagePublishChecklistLoading" class="text-sm text-emerald-700 dark:text-emerald-300">
+                          {{ 'adminUi.content.publishChecklist.ok' | translate }}
+                        </p>
+                        <div *ngIf="checklist.linkIssues.length > 0" class="grid gap-1">
+                          <p class="text-sm text-rose-700 dark:text-rose-300">
+                            {{ 'adminUi.content.publishChecklist.linksFound' | translate: { count: checklist.linkIssues.length } }}
+                          </p>
+                          <ul class="list-disc pl-5 text-xs text-slate-600 dark:text-slate-300">
+                            <li *ngFor="let issue of checklist.linkIssues | slice:0:6">
+                              {{ issue.reason }}: {{ issue.url }}
+                            </li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </app-modal>
 
               <details *ngIf="cmsAdvanced()" class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
                 <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
@@ -5370,6 +5481,11 @@ export class AdminComponent implements OnInit, OnDestroy {
   pageBlocksNeedsTranslationEn: Record<string, boolean> = {};
 	  pageBlocksNeedsTranslationRo: Record<string, boolean> = {};
 	  pageBlocksTranslationSaving: Record<string, boolean> = {};
+    pagePublishChecklistOpen = false;
+    pagePublishChecklistLoading = false;
+    pagePublishChecklistError: string | null = null;
+    pagePublishChecklistKey: PageBuilderKey | null = null;
+    pagePublishChecklistResult: CmsPublishChecklistResult | null = null;
 	  draggingPageBlockKey: string | null = null;
 	  draggingPageBlocksKey: string | null = null;
 	  pageInsertDragActive = false;
@@ -9978,9 +10094,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
-  savePageBlocks(pageKey: PageBuilderKey): void {
-    this.pageBlocksMessage[pageKey] = null;
-    this.pageBlocksError[pageKey] = null;
+  private buildPageBlocksMeta(pageKey: PageBuilderKey): Record<string, unknown> {
     const blocks = (this.pageBlocks[pageKey] || []).map((b) => {
       const base: Record<string, unknown> = { key: b.key, type: b.type, enabled: b.enabled };
       base['title'] = b.title;
@@ -10016,7 +10130,149 @@ export class AdminComponent implements OnInit, OnDestroy {
     } else {
       delete meta['requires_auth'];
     }
+    return meta;
+  }
+
+  private pagePublishChecklistBlockLabel(block: PageBlockDraft, idx: number): string {
+    const title = (block.title?.[this.infoLang] || block.title?.en || block.title?.ro || '').trim();
+    const base = title ? title : this.pageBlockLabel(block);
+    return `${idx + 1}. ${base}`;
+  }
+
+  private computePagePublishChecklistLocal(pageKey: PageBuilderKey): Pick<CmsPublishChecklistResult, 'missingTranslations' | 'missingAlt' | 'emptySections'> {
+    const missingTranslations: UiLang[] = [];
+    if (this.pageBlocksNeedsTranslationEn[pageKey]) missingTranslations.push('en');
+    if (this.pageBlocksNeedsTranslationRo[pageKey]) missingTranslations.push('ro');
+
+    const missingAlt: string[] = [];
+    const emptySections: string[] = [];
+    const blocks = this.pageBlocks[pageKey] || [];
+    const enabledBlocks = blocks.filter((b) => Boolean(b?.enabled));
+
+    if (!enabledBlocks.length) {
+      emptySections.push(this.t('adminUi.content.publishChecklist.emptyAllDisabled'));
+    }
+
+    enabledBlocks.forEach((block, idx) => {
+      const label = this.pagePublishChecklistBlockLabel(block, idx);
+      if (block.type === 'text') {
+        const en = (block.body_markdown?.en || '').trim();
+        const ro = (block.body_markdown?.ro || '').trim();
+        if (!en && !ro) emptySections.push(label);
+        return;
+      }
+      if (block.type === 'image') {
+        const url = (block.url || '').trim();
+        if (!url) {
+          emptySections.push(label);
+          return;
+        }
+        if (!(block.alt?.en || '').trim()) missingAlt.push(`${label} (EN)`);
+        if (!(block.alt?.ro || '').trim()) missingAlt.push(`${label} (RO)`);
+        return;
+      }
+      if (block.type === 'gallery') {
+        const images = block.images || [];
+        const withUrls = images.filter((img) => Boolean((img?.url || '').trim()));
+        if (!withUrls.length) {
+          emptySections.push(label);
+          return;
+        }
+        withUrls.forEach((img, imgIdx) => {
+          const imgLabel = `${label} · ${this.t('adminUi.content.publishChecklist.imageLabel', { index: imgIdx + 1 })}`;
+          if (!(img.alt?.en || '').trim()) missingAlt.push(`${imgLabel} (EN)`);
+          if (!(img.alt?.ro || '').trim()) missingAlt.push(`${imgLabel} (RO)`);
+        });
+        return;
+      }
+      if (block.type === 'banner') {
+        const url = (block.slide?.image_url || '').trim();
+        if (!url) {
+          emptySections.push(label);
+          return;
+        }
+        if (!(block.slide?.alt?.en || '').trim()) missingAlt.push(`${label} (EN)`);
+        if (!(block.slide?.alt?.ro || '').trim()) missingAlt.push(`${label} (RO)`);
+        return;
+      }
+      if (block.type === 'carousel') {
+        const slides = block.slides || [];
+        const withUrls = slides.filter((s) => Boolean((s?.image_url || '').trim()));
+        if (!withUrls.length) {
+          emptySections.push(label);
+          return;
+        }
+        withUrls.forEach((slide, slideIdx) => {
+          const slideLabel = `${label} · ${this.t('adminUi.content.publishChecklist.slideLabel', { index: slideIdx + 1 })}`;
+          if (!(slide.alt?.en || '').trim()) missingAlt.push(`${slideLabel} (EN)`);
+          if (!(slide.alt?.ro || '').trim()) missingAlt.push(`${slideLabel} (RO)`);
+        });
+      }
+    });
+
+    return { missingTranslations, missingAlt, emptySections };
+  }
+
+  openPagePublishChecklist(pageKey: PageBuilderKey): void {
+    this.pagePublishChecklistOpen = true;
+    this.pagePublishChecklistKey = pageKey;
+    this.pagePublishChecklistLoading = true;
+    this.pagePublishChecklistError = null;
+    const local = this.computePagePublishChecklistLocal(pageKey);
+    this.pagePublishChecklistResult = { ...local, linkIssues: [] };
+
+    const meta = this.buildPageBlocksMeta(pageKey);
+    this.admin.linkCheckContentPreview({ key: pageKey, meta, body_markdown: '', images: [] }).subscribe({
+      next: (resp) => {
+        this.pagePublishChecklistLoading = false;
+        const current = this.pagePublishChecklistResult;
+        if (!current) return;
+        this.pagePublishChecklistResult = { ...current, linkIssues: resp?.issues || [] };
+      },
+      error: (err) => {
+        this.pagePublishChecklistLoading = false;
+        this.pagePublishChecklistError = err?.error?.detail || this.t('adminUi.content.publishChecklist.errors.linkCheck');
+      }
+    });
+  }
+
+  closePagePublishChecklist(): void {
+    this.pagePublishChecklistOpen = false;
+    this.pagePublishChecklistLoading = false;
+    this.pagePublishChecklistError = null;
+    this.pagePublishChecklistKey = null;
+    this.pagePublishChecklistResult = null;
+  }
+
+  pagePublishChecklistHasIssues(): boolean {
+    const checklist = this.pagePublishChecklistResult;
+    if (!checklist) return false;
+    return Boolean(
+      checklist.missingTranslations.length ||
+        checklist.missingAlt.length ||
+        checklist.emptySections.length ||
+        checklist.linkIssues.length
+    );
+  }
+
+  confirmPagePublishChecklist(): void {
+    const key = this.pagePublishChecklistKey;
+    if (!key) return;
+    this.closePagePublishChecklist();
+    this.savePageBlocks(key, { bypassChecklist: true });
+  }
+
+  savePageBlocks(pageKey: PageBuilderKey, opts?: { bypassChecklist?: boolean }): void {
+    this.pageBlocksMessage[pageKey] = null;
+    this.pageBlocksError[pageKey] = null;
+
     const status: ContentStatusUi = this.pageBlocksStatus[pageKey] || 'draft';
+    if (!opts?.bypassChecklist && status === 'published') {
+      this.openPagePublishChecklist(pageKey);
+      return;
+    }
+
+    const meta = this.buildPageBlocksMeta(pageKey);
     const published_at =
       status === 'published'
         ? this.pageBlocksPublishedAt[pageKey]
