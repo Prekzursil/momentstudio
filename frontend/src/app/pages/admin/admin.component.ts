@@ -1358,12 +1358,12 @@ class CmsDraftManager<T> {
                     </span>
                   </div>
 
-                  <div class="grid gap-2">
-                    <div
-                      *ngIf="pageInsertDragActive"
-                      class="rounded-xl border border-dashed border-slate-300 bg-white/60 px-3 py-2 text-xs font-semibold text-slate-600 flex items-center justify-center dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-300"
-                      (dragover)="onPageBlockDragOver($event)"
-                      (drop)="onPageBlockDropZone($event, pageBlocksKey, 0)"
+	            <div class="grid gap-2" (dragover)="onCmsMediaDragOver($event)" (drop)="onPageMediaDropOnContainer($event, pageBlocksKey)">
+	                    <div
+	                      *ngIf="pageInsertDragActive"
+	                      class="rounded-xl border border-dashed border-slate-300 bg-white/60 px-3 py-2 text-xs font-semibold text-slate-600 flex items-center justify-center dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-300"
+	                      (dragover)="onPageBlockDragOver($event)"
+	                      (drop)="onPageBlockDropZone($event, pageBlocksKey, 0)"
                     >
                       {{ 'adminUi.content.blockLibrary.dropHere' | translate }}
                     </div>
@@ -2420,11 +2420,11 @@ class CmsDraftManager<T> {
               <app-button size="sm" [label]="'adminUi.actions.add' | translate" (action)="addHomeBlock()"></app-button>
             </div>
 
-            <div class="grid gap-2">
-              <div
-                *ngIf="homeInsertDragActive"
-                class="rounded-xl border border-dashed border-slate-300 bg-white/60 px-3 py-2 text-xs font-semibold text-slate-600 flex items-center justify-center dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-300"
-                (dragover)="onHomeBlockDragOver($event)"
+	            <div class="grid gap-2" (dragover)="onCmsMediaDragOver($event)" (drop)="onHomeMediaDropOnContainer($event)">
+	              <div
+	                *ngIf="homeInsertDragActive"
+	                class="rounded-xl border border-dashed border-slate-300 bg-white/60 px-3 py-2 text-xs font-semibold text-slate-600 flex items-center justify-center dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-300"
+	                (dragover)="onHomeBlockDragOver($event)"
                 (drop)="onHomeBlockDropZone($event, 0)"
               >
                 {{ 'adminUi.content.blockLibrary.dropHere' | translate }}
@@ -10247,16 +10247,16 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.insertPageBlockAt(pageKey, type, current.length, template);
   }
 
-  private insertPageBlockAt(pageKey: PageBuilderKey, type: CmsBlockLibraryBlockType, index: number, template: CmsBlockLibraryTemplate): void {
-    const allowed = this.allowedPageBlockTypesForKey(pageKey);
-    if (allowed.length && !allowed.includes(type as PageBlockType)) {
-      this.toast.error(this.t('adminUi.site.pages.builder.errors.blockTypeNotAllowed'));
-      return;
-    }
+	  private insertPageBlockAt(pageKey: PageBuilderKey, type: CmsBlockLibraryBlockType, index: number, template: CmsBlockLibraryTemplate): string | null {
+	    const allowed = this.allowedPageBlockTypesForKey(pageKey);
+	    if (allowed.length && !allowed.includes(type as PageBlockType)) {
+	      this.toast.error(this.t('adminUi.site.pages.builder.errors.blockTypeNotAllowed'));
+	      return null;
+	    }
 
-    const current = [...(this.pageBlocks[pageKey] || [])];
-    const existing = new Set(current.map((b) => b.key));
-    const base = `${type}_${Date.now()}`;
+	    const current = [...(this.pageBlocks[pageKey] || [])];
+	    const existing = new Set(current.map((b) => b.key));
+	    const base = `${type}_${Date.now()}`;
     let key = base;
     let suffix = 1;
     while (existing.has(key)) {
@@ -10285,10 +10285,11 @@ export class AdminComponent implements OnInit, OnDestroy {
       this.applyStarterTemplateToCustomBlock(type, draft);
     }
 
-    const safeIndex = Math.max(0, Math.min(index, current.length));
-    current.splice(safeIndex, 0, draft);
-    this.pageBlocks[pageKey] = current;
-  }
+	    const safeIndex = Math.max(0, Math.min(index, current.length));
+	    current.splice(safeIndex, 0, draft);
+	    this.pageBlocks[pageKey] = current;
+	    return key;
+	  }
 
   private applyStarterTemplateToCustomBlock(type: CmsBlockLibraryBlockType, block: PageBlockDraft | HomeBlockDraft): void {
     if (type === 'text') {
@@ -10412,13 +10413,38 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.pageInsertDragActive = false;
   }
 
-  onPageBlockDragOver(event: DragEvent): void {
-    event.preventDefault();
-  }
+	  onPageBlockDragOver(event: DragEvent): void {
+	    event.preventDefault();
+	  }
 
-  onPageBlockDropZone(event: DragEvent, pageKey: PageBuilderKey, index: number): void {
-    event.preventDefault();
-    const current = [...(this.pageBlocks[pageKey] || [])];
+	  onCmsMediaDragOver(event: DragEvent): void {
+	    if (!this.dragEventHasFiles(event)) return;
+	    event.preventDefault();
+	    if (event.dataTransfer) {
+	      event.dataTransfer.dropEffect = 'copy';
+	    }
+	  }
+
+	  onPageMediaDropOnContainer(event: DragEvent, pageKey: PageBuilderKey): void {
+	    if (event.target !== event.currentTarget) return;
+	    const files = this.extractCmsImageFiles(event);
+	    if (!files.length) return;
+	    event.preventDefault();
+	    const index = (this.pageBlocks[pageKey] || []).length;
+	    void this.insertPageMediaFiles(pageKey, index, files);
+	  }
+
+	  onHomeMediaDropOnContainer(event: DragEvent): void {
+	    if (event.target !== event.currentTarget) return;
+	    const files = this.extractCmsImageFiles(event);
+	    if (!files.length) return;
+	    event.preventDefault();
+	    void this.insertHomeMediaFiles(this.homeBlocks.length, files);
+	  }
+
+	  onPageBlockDropZone(event: DragEvent, pageKey: PageBuilderKey, index: number): void {
+	    event.preventDefault();
+	    const current = [...(this.pageBlocks[pageKey] || [])];
 
     if (this.draggingPageBlocksKey === pageKey && this.draggingPageBlockKey) {
       const from = current.findIndex((b) => b.key === this.draggingPageBlockKey);
@@ -10441,18 +10467,28 @@ export class AdminComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.insertPageBlockAt(pageKey, payload.type, index, payload.template);
-    this.pageInsertDragActive = false;
-  }
+	    this.insertPageBlockAt(pageKey, payload.type, index, payload.template);
+	    this.pageInsertDragActive = false;
+	  }
 
-  onPageBlockDrop(event: DragEvent, pageKey: PageBuilderKey, targetKey: string): void {
-    event.preventDefault();
+	  onPageBlockDrop(event: DragEvent, pageKey: PageBuilderKey, targetKey: string): void {
+	    event.preventDefault();
 
-    const payload = this.readCmsBlockPayload(event);
-    if (payload && payload.scope === 'page') {
-      const current = [...(this.pageBlocks[pageKey] || [])];
-      const to = current.findIndex((b) => b.key === targetKey);
-      if (to !== -1) {
+	    const mediaFiles = this.extractCmsImageFiles(event);
+	    if (mediaFiles.length) {
+	      const current = [...(this.pageBlocks[pageKey] || [])];
+	      const to = current.findIndex((b) => b.key === targetKey);
+	      const safeIndex = to !== -1 ? to : current.length;
+	      void this.insertPageMediaFiles(pageKey, safeIndex, mediaFiles);
+	      this.pageInsertDragActive = false;
+	      return;
+	    }
+
+	    const payload = this.readCmsBlockPayload(event);
+	    if (payload && payload.scope === 'page') {
+	      const current = [...(this.pageBlocks[pageKey] || [])];
+	      const to = current.findIndex((b) => b.key === targetKey);
+	      if (to !== -1) {
         this.insertPageBlockAt(pageKey, payload.type, to, payload.template);
       }
       this.pageInsertDragActive = false;
@@ -10473,11 +10509,222 @@ export class AdminComponent implements OnInit, OnDestroy {
     current.splice(nextIndex, 0, moved);
     this.pageBlocks[pageKey] = current;
     this.onPageBlockDragEnd();
-  }
+	  }
 
-  setPageImageBlockUrl(pageKey: PageBuilderKey, blockKey: string, asset: ContentImageAssetRead): void {
-    const value = (asset?.url || '').trim();
-    if (!value) return;
+	  private dragEventHasFiles(event: DragEvent): boolean {
+	    const dt = event.dataTransfer;
+	    if (!dt) return false;
+	    if (dt.files && dt.files.length > 0) return true;
+	    try {
+	      return Array.from(dt.types || []).includes('Files');
+	    } catch {
+	      return false;
+	    }
+	  }
+
+	  private extractCmsImageFiles(event: DragEvent): File[] {
+	    const dt = event.dataTransfer;
+	    if (!dt) return [];
+	    const files = Array.from(dt.files || []);
+	    return files.filter((f) => Boolean(f));
+	  }
+
+	  private normalizeCmsImageFiles(files: File[]): File[] {
+	    const allowed = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+	    const maxBytes = 5 * 1024 * 1024;
+	    const cleaned = (files || []).filter((f) => f && allowed.has(f.type) && f.size <= maxBytes);
+	    if (!cleaned.length) {
+	      this.toast.error(this.t('adminUi.content.mediaDrop.errors.noImages'));
+	      return [];
+	    }
+	    return cleaned.slice(0, 12);
+	  }
+
+	  private filenameToAltText(filename: string): string {
+	    const base = (filename || '').trim().replace(/\.[^/.]+$/, '');
+	    const normalized = base
+	      .replace(/[_-]+/g, ' ')
+	      .replace(/\s+/g, ' ')
+	      .trim();
+	    if (!normalized) return 'Image';
+	    return normalized.length > 80 ? normalized.slice(0, 80).trim() : normalized;
+	  }
+
+	  private lastUploadedContentImage(block: any): { url: string; focal_x: number; focal_y: number } | null {
+	    const images = Array.isArray(block?.images) ? block.images : [];
+	    if (!images.length) return null;
+	    const last = images[images.length - 1] as any;
+	    const url = typeof last?.url === 'string' ? String(last.url).trim() : '';
+	    if (!url) return null;
+	    return {
+	      url,
+	      focal_x: this.toFocalValue(last?.focal_x),
+	      focal_y: this.toFocalValue(last?.focal_y)
+	    };
+	  }
+
+	  private contentTitleForKey(key: string): string {
+	    const value = (key || '').trim();
+	    return this.contentPages.find((p) => p.key === value)?.title || cmsGlobalSectionDefaultTitle(value) || value || 'Content';
+	  }
+
+	  private async uploadCmsImageToKey(contentKey: string, file: File): Promise<{ url: string; focal_x: number; focal_y: number } | null> {
+	    try {
+	      const block = await firstValueFrom(this.admin.uploadContentImage(contentKey, file));
+	      this.rememberContentVersion(contentKey, block);
+	      return this.lastUploadedContentImage(block);
+	    } catch (err: any) {
+	      if (err?.status !== 404) throw err;
+	      const createPayload = {
+	        title: this.contentTitleForKey(contentKey),
+	        body_markdown: 'CMS assets',
+	        status: 'draft',
+	        meta: { version: 2, blocks: [] }
+	      };
+	      try {
+	        const created = await firstValueFrom(this.admin.createContent(contentKey, createPayload));
+	        this.rememberContentVersion(contentKey, created);
+	      } catch (createErr: any) {
+	        if (createErr?.status !== 409) throw createErr;
+	      }
+	      const block = await firstValueFrom(this.admin.uploadContentImage(contentKey, file));
+	      this.rememberContentVersion(contentKey, block);
+	      return this.lastUploadedContentImage(block);
+	    }
+	  }
+
+	  private async insertPageMediaFiles(pageKey: PageBuilderKey, index: number, files: File[]): Promise<void> {
+	    const normalized = this.normalizeCmsImageFiles(files);
+	    if (!normalized.length) return;
+	    const allowed = this.allowedPageBlockTypesForKey(pageKey);
+	    const canImage = allowed.includes('image');
+	    const canGallery = allowed.includes('gallery');
+
+	    const mode: 'image' | 'gallery' | 'multiImage' =
+	      normalized.length > 1 ? (canGallery ? 'gallery' : canImage ? 'multiImage' : 'image') : canImage ? 'image' : 'gallery';
+	    if (mode === 'image' && !canImage && !canGallery) {
+	      this.toast.error(this.t('adminUi.site.pages.builder.errors.blockTypeNotAllowed'));
+	      return;
+	    }
+	    if (mode === 'gallery' && !canGallery && !canImage) {
+	      this.toast.error(this.t('adminUi.site.pages.builder.errors.blockTypeNotAllowed'));
+	      return;
+	    }
+	    if (mode === 'multiImage' && !canImage) {
+	      this.toast.error(this.t('adminUi.site.pages.builder.errors.blockTypeNotAllowed'));
+	      return;
+	    }
+
+	    const uploads: Array<{ url: string; focal_x: number; focal_y: number; alt: string }> = [];
+	    for (const file of normalized) {
+	      const uploaded = await this.uploadCmsImageToKey(String(pageKey), file);
+	      if (!uploaded) continue;
+	      uploads.push({ ...uploaded, alt: this.filenameToAltText(file.name) });
+	    }
+	    if (!uploads.length) return;
+
+	    const safeIndex = Math.max(0, Math.min(index, (this.pageBlocks[pageKey] || []).length));
+	    if (mode === 'image') {
+	      const createdKey = this.insertPageBlockAt(pageKey, 'image', safeIndex, 'blank');
+	      if (!createdKey) return;
+	      const u = uploads[0];
+	      this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) =>
+	        b.key === createdKey
+	          ? {
+	              ...b,
+	              url: u.url,
+	              focal_x: u.focal_x,
+	              focal_y: u.focal_y,
+	              alt: { ...b.alt, en: u.alt, ro: u.alt }
+	            }
+	          : b
+	      );
+	    } else if (mode === 'gallery') {
+	      const createdKey = this.insertPageBlockAt(pageKey, 'gallery', safeIndex, 'blank');
+	      if (!createdKey) return;
+	      this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+	        if (b.key !== createdKey || b.type !== 'gallery') return b;
+	        return {
+	          ...b,
+	          images: uploads.map((u) => ({
+	            url: u.url,
+	            alt: { en: u.alt, ro: u.alt },
+	            caption: this.emptyLocalizedText(),
+	            focal_x: u.focal_x,
+	            focal_y: u.focal_y
+	          }))
+	        };
+	      });
+	    } else {
+	      let cursor = safeIndex;
+	      for (const u of uploads) {
+	        const createdKey = this.insertPageBlockAt(pageKey, 'image', cursor, 'blank');
+	        if (!createdKey) break;
+	        this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) =>
+	          b.key === createdKey
+	            ? {
+	                ...b,
+	                url: u.url,
+	                focal_x: u.focal_x,
+	                focal_y: u.focal_y,
+	                alt: { ...b.alt, en: u.alt, ro: u.alt }
+	              }
+	            : b
+	        );
+	        cursor += 1;
+	      }
+	    }
+	    this.toast.success(this.t('adminUi.content.mediaDrop.inserted', { count: uploads.length }));
+	  }
+
+	  private async insertHomeMediaFiles(index: number, files: File[]): Promise<void> {
+	    const normalized = this.normalizeCmsImageFiles(files);
+	    if (!normalized.length) return;
+	    const uploads: Array<{ url: string; focal_x: number; focal_y: number; alt: string }> = [];
+	    for (const file of normalized) {
+	      const uploaded = await this.uploadCmsImageToKey('site.assets', file);
+	      if (!uploaded) continue;
+	      uploads.push({ ...uploaded, alt: this.filenameToAltText(file.name) });
+	    }
+	    if (!uploads.length) return;
+
+	    const safeIndex = Math.max(0, Math.min(index, this.homeBlocks.length));
+	    if (uploads.length === 1) {
+	      const createdKey = this.insertHomeBlockAt('image', safeIndex, 'blank');
+	      const u = uploads[0];
+	      this.homeBlocks = this.homeBlocks.map((b) =>
+	        b.key === createdKey
+	          ? {
+	              ...b,
+	              url: u.url,
+	              focal_x: u.focal_x,
+	              focal_y: u.focal_y,
+	              alt: { ...b.alt, en: u.alt, ro: u.alt }
+	            }
+	          : b
+	      );
+	    } else {
+	      const createdKey = this.insertHomeBlockAt('gallery', safeIndex, 'blank');
+	      this.homeBlocks = this.homeBlocks.map((b) => {
+	        if (b.key !== createdKey || b.type !== 'gallery') return b;
+	        return {
+	          ...b,
+	          images: uploads.map((u) => ({
+	            url: u.url,
+	            alt: { en: u.alt, ro: u.alt },
+	            caption: this.emptyLocalizedText(),
+	            focal_x: u.focal_x,
+	            focal_y: u.focal_y
+	          }))
+	        };
+	      });
+	    }
+	    this.toast.success(this.t('adminUi.content.mediaDrop.inserted', { count: uploads.length }));
+	  }
+
+	  setPageImageBlockUrl(pageKey: PageBuilderKey, blockKey: string, asset: ContentImageAssetRead): void {
+	    const value = (asset?.url || '').trim();
+	    if (!value) return;
     const focalX = this.toFocalValue(asset.focal_x);
     const focalY = this.toFocalValue(asset.focal_y);
     this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) =>
@@ -11139,17 +11386,18 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.insertHomeBlockAt(type, this.homeBlocks.length, template);
   }
 
-  private insertHomeBlockAt(type: CmsBlockLibraryBlockType, index: number, template: CmsBlockLibraryTemplate): void {
-    const key = this.nextCustomBlockKey(type);
-    const draft = this.makeHomeBlockDraft(key, type, true);
-    if (template === 'starter') {
-      this.applyStarterTemplateToCustomBlock(type, draft);
-    }
-    const current = [...this.homeBlocks];
-    const safeIndex = Math.max(0, Math.min(index, current.length));
-    current.splice(safeIndex, 0, draft);
-    this.homeBlocks = current;
-  }
+	  private insertHomeBlockAt(type: CmsBlockLibraryBlockType, index: number, template: CmsBlockLibraryTemplate): string {
+	    const key = this.nextCustomBlockKey(type);
+	    const draft = this.makeHomeBlockDraft(key, type, true);
+	    if (template === 'starter') {
+	      this.applyStarterTemplateToCustomBlock(type, draft);
+	    }
+	    const current = [...this.homeBlocks];
+	    const safeIndex = Math.max(0, Math.min(index, current.length));
+	    current.splice(safeIndex, 0, draft);
+	    this.homeBlocks = current;
+	    return key;
+	  }
 
   onHomeBlockDragStart(key: string): void {
     this.homeInsertDragActive = true;
@@ -11194,14 +11442,23 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.homeInsertDragActive = false;
   }
 
-  onHomeBlockDrop(event: DragEvent, targetKey: string): void {
-    event.preventDefault();
+	  onHomeBlockDrop(event: DragEvent, targetKey: string): void {
+	    event.preventDefault();
 
-    const payload = this.readCmsBlockPayload(event);
-    if (payload && payload.scope === 'home') {
-      const to = this.homeBlocks.findIndex((b) => b.key === targetKey);
-      if (to !== -1) {
-        this.insertHomeBlockAt(payload.type, to, payload.template);
+	    const mediaFiles = this.extractCmsImageFiles(event);
+	    if (mediaFiles.length) {
+	      const to = this.homeBlocks.findIndex((b) => b.key === targetKey);
+	      const safeIndex = to !== -1 ? to : this.homeBlocks.length;
+	      void this.insertHomeMediaFiles(safeIndex, mediaFiles);
+	      this.homeInsertDragActive = false;
+	      return;
+	    }
+
+	    const payload = this.readCmsBlockPayload(event);
+	    if (payload && payload.scope === 'home') {
+	      const to = this.homeBlocks.findIndex((b) => b.key === targetKey);
+	      if (to !== -1) {
+	          this.insertHomeBlockAt(payload.type, to, payload.template);
       }
       this.homeInsertDragActive = false;
       return;

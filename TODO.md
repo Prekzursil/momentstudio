@@ -961,8 +961,8 @@ Below is a structured checklist you can turn into issues.
 - [x] CMS editor: reusable blocks – Save a section as a reusable snippet and insert it on other pages.
 - [x] CMS editor: global sections – Manage global blocks (announcement bar, footer promo, header banners) used site-wide.
 - [x] CMS editor: page templates – Create pages from templates (About/FAQ/Shipping/Returns) with prebuilt sections.
-- [ ] CMS editor: announcement precedence – Allow stacking CMS announcement with Ops banner (currently Ops banner overrides).
-- [ ] CMS editor: inline media drag-drop – Drag images into the editor to auto-upload and insert with caption + alt.
+- [x] CMS editor: announcement precedence – Allow stacking CMS announcement with Ops banner (currently Ops banner overrides).
+- [x] CMS editor: inline media drag-drop – Drag images into the editor to auto-upload and insert with caption + alt.
 - [ ] CMS assets: image editor – Crop/rotate/resize tools in the asset library with non-destructive versions.
 - [ ] CMS assets: “where used” – Show usage references for each asset (pages/sections/posts) before deleting.
 - [ ] CMS assets: focal point preview – Preview focal point across common crops (hero/card/mobile) before saving.

@@ -4200,6 +4200,10 @@
           "carousel": "Slider with multiple slides and autoplay settings."
         }
       },
+      "mediaDrop": {
+        "inserted": "Inserted {{count}} image(s).",
+        "errors": { "noImages": "Drop one or more PNG/JPEG/WEBP/GIF images (max 5MB)." }
+      },
       "reusableBlocks": {
         "title": "Reusable blocks",
         "hint": "Save a section and reuse it on other pages.",

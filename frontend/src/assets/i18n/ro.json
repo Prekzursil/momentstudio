@@ -4200,6 +4200,10 @@
           "carousel": "Carusel cu mai multe slide-uri și setări de autoplay."
         }
       },
+      "mediaDrop": {
+        "inserted": "Au fost inserate {{count}} imagine(i).",
+        "errors": { "noImages": "Trage una sau mai multe imagini PNG/JPEG/WEBP/GIF (max 5MB)." }
+      },
       "reusableBlocks": {
         "title": "Blocuri reutilizabile",
         "hint": "Salvează o secțiune și reutilizeaz-o pe alte pagini.",
