@@ -5,7 +5,7 @@ import { Subscription } from 'rxjs';
 import { ApiService } from '../core/api.service';
 import { MarkdownService } from '../core/markdown.service';
 import { ModalBodyScrollEvent, ModalComponent } from './modal.component';
-import { PageBlock, parsePageBlocks, type UiLang } from './page-blocks';
+import { PageBlock, pageBlockInnerClasses, pageBlockOuterClasses, parsePageBlocks, type UiLang } from './page-blocks';
 
 interface ContentImage {
   url: string;
@@ -50,51 +50,55 @@ interface ContentBlock {
       <div *ngIf="!loading && !error" class="grid gap-6">
         <ng-container *ngIf="pageBlocks.length; else markdownTpl">
           <ng-container *ngFor="let b of pageBlocks">
-            <ng-container [ngSwitch]="b.type">
-              <div *ngSwitchCase="'text'" class="grid gap-2">
-                <h2 *ngIf="b.title" class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ b.title }}</h2>
-                <div class="markdown text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="b.body_html"></div>
-              </div>
-
-              <div *ngSwitchCase="'image'" class="grid gap-2">
-                <h2 *ngIf="b.title" class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ b.title }}</h2>
-                <a *ngIf="b.link_url; else plainImage" class="block" [href]="b.link_url" target="_blank" rel="noopener noreferrer">
-                  <img
-                    [src]="b.url"
-                    [alt]="b.alt || b.title || ''"
-                    class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
-                    [style.object-position]="focalPosition(b.focal_x, b.focal_y)"
-                    loading="lazy"
-                  />
-                </a>
-                <ng-template #plainImage>
-                  <img
-                    [src]="b.url"
-                    [alt]="b.alt || b.title || ''"
-                    class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
-                    [style.object-position]="focalPosition(b.focal_x, b.focal_y)"
-                    loading="lazy"
-                  />
-                </ng-template>
-                <p *ngIf="b.caption" class="text-sm text-slate-600 dark:text-slate-300">{{ b.caption }}</p>
-              </div>
-
-              <div *ngSwitchCase="'gallery'" class="grid gap-2">
-                <h2 *ngIf="b.title" class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ b.title }}</h2>
-                <div class="grid gap-3 sm:grid-cols-2">
-                  <div *ngFor="let img of b.images" class="grid gap-1">
-                    <img
-                      [src]="img.url"
-                      [alt]="img.alt || b.title || ''"
-                      class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
-                      [style.object-position]="focalPosition(img.focal_x, img.focal_y)"
-                      loading="lazy"
-                    />
-                    <p *ngIf="img.caption" class="text-sm text-slate-600 dark:text-slate-300">{{ img.caption }}</p>
+            <div class="w-full" [ngClass]="pageBlockOuterClasses(b.layout)">
+              <div [ngClass]="pageBlockInnerClasses(b.layout)">
+                <ng-container [ngSwitch]="b.type">
+                  <div *ngSwitchCase="'text'" class="grid gap-2">
+                    <h2 *ngIf="b.title" class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ b.title }}</h2>
+                    <div class="markdown text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="b.body_html"></div>
                   </div>
-                </div>
+
+                  <div *ngSwitchCase="'image'" class="grid gap-2">
+                    <h2 *ngIf="b.title" class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ b.title }}</h2>
+                    <a *ngIf="b.link_url; else plainImage" class="block" [href]="b.link_url" target="_blank" rel="noopener noreferrer">
+                      <img
+                        [src]="b.url"
+                        [alt]="b.alt || b.title || ''"
+                        class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
+                        [style.object-position]="focalPosition(b.focal_x, b.focal_y)"
+                        loading="lazy"
+                      />
+                    </a>
+                    <ng-template #plainImage>
+                      <img
+                        [src]="b.url"
+                        [alt]="b.alt || b.title || ''"
+                        class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
+                        [style.object-position]="focalPosition(b.focal_x, b.focal_y)"
+                        loading="lazy"
+                      />
+                    </ng-template>
+                    <p *ngIf="b.caption" class="text-sm text-slate-600 dark:text-slate-300">{{ b.caption }}</p>
+                  </div>
+
+                  <div *ngSwitchCase="'gallery'" class="grid gap-2">
+                    <h2 *ngIf="b.title" class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ b.title }}</h2>
+                    <div class="grid gap-3 sm:grid-cols-2">
+                      <div *ngFor="let img of b.images" class="grid gap-1">
+                        <img
+                          [src]="img.url"
+                          [alt]="img.alt || b.title || ''"
+                          class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
+                          [style.object-position]="focalPosition(img.focal_x, img.focal_y)"
+                          loading="lazy"
+                        />
+                        <p *ngIf="img.caption" class="text-sm text-slate-600 dark:text-slate-300">{{ img.caption }}</p>
+                      </div>
+                    </div>
+                  </div>
+                </ng-container>
               </div>
-            </ng-container>
+            </div>
           </ng-container>
         </ng-container>
 
@@ -118,6 +122,8 @@ export class LegalConsentModalComponent implements OnChanges, OnDestroy {
   @Input() slug = '';
   @Output() accepted = new EventEmitter<void>();
   @Output() closed = new EventEmitter<void>();
+  pageBlockOuterClasses = pageBlockOuterClasses;
+  pageBlockInnerClasses = pageBlockInnerClasses;
   @ViewChild(ModalComponent) modal?: ModalComponent;
 
   loading = false;
@@ -249,4 +255,3 @@ export class LegalConsentModalComponent implements OnChanges, OnDestroy {
     });
   }
 }
-

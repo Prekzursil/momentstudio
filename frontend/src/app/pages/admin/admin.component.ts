@@ -100,6 +100,18 @@ type CarouselSettingsDraft = {
   pause_on_hover: boolean;
 };
 
+type CmsBlockLayoutSpacing = 'none' | 'sm' | 'md' | 'lg';
+type CmsBlockLayoutBackground = 'none' | 'muted' | 'accent';
+type CmsBlockLayoutAlign = 'left' | 'center';
+type CmsBlockLayoutMaxWidth = 'full' | 'narrow' | 'prose' | 'wide';
+
+type CmsBlockLayout = {
+  spacing: CmsBlockLayoutSpacing;
+  background: CmsBlockLayoutBackground;
+  align: CmsBlockLayoutAlign;
+  max_width: CmsBlockLayoutMaxWidth;
+};
+
 type HomeBlockDraft = {
   key: string;
   type: HomeBlockType;
@@ -116,6 +128,7 @@ type HomeBlockDraft = {
   slide: SlideDraft;
   slides: SlideDraft[];
   settings: CarouselSettingsDraft;
+  layout?: CmsBlockLayout;
 };
 
 type PageBuilderKey = `page.${string}`;
@@ -1301,18 +1314,69 @@ class CmsDraftManager<T> {
 	                        </div>
 
                       <div class="mt-3 grid gap-3" *ngIf="block.enabled">
-                        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                          {{ 'adminUi.home.sections.fields.title' | translate }}
-                          <input
-                            class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                            [(ngModel)]="block.title[infoLang]"
-                          />
-                        </label>
+	                        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                          {{ 'adminUi.home.sections.fields.title' | translate }}
+	                          <input
+	                            class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                            [(ngModel)]="block.title[infoLang]"
+	                          />
+	                        </label>
 
-                        <ng-container [ngSwitch]="block.type">
-                          <ng-container *ngSwitchCase="'text'">
+                          <div class="grid gap-3 sm:grid-cols-2">
                             <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                              {{ 'adminUi.home.sections.fields.body' | translate }}
+                              {{ 'adminUi.site.pages.builder.styles.spacing.label' | translate }}
+                              <select
+                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                [(ngModel)]="block.layout.spacing"
+                              >
+                                <option [ngValue]="'none'">{{ 'adminUi.site.pages.builder.styles.spacing.none' | translate }}</option>
+                                <option [ngValue]="'sm'">{{ 'adminUi.site.pages.builder.styles.spacing.sm' | translate }}</option>
+                                <option [ngValue]="'md'">{{ 'adminUi.site.pages.builder.styles.spacing.md' | translate }}</option>
+                                <option [ngValue]="'lg'">{{ 'adminUi.site.pages.builder.styles.spacing.lg' | translate }}</option>
+                              </select>
+                            </label>
+
+                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                              {{ 'adminUi.site.pages.builder.styles.background.label' | translate }}
+                              <select
+                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                [(ngModel)]="block.layout.background"
+                              >
+                                <option [ngValue]="'none'">{{ 'adminUi.site.pages.builder.styles.background.none' | translate }}</option>
+                                <option [ngValue]="'muted'">{{ 'adminUi.site.pages.builder.styles.background.muted' | translate }}</option>
+                                <option [ngValue]="'accent'">{{ 'adminUi.site.pages.builder.styles.background.accent' | translate }}</option>
+                              </select>
+                            </label>
+
+                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                              {{ 'adminUi.site.pages.builder.styles.align.label' | translate }}
+                              <select
+                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                [(ngModel)]="block.layout.align"
+                              >
+                                <option [ngValue]="'left'">{{ 'adminUi.site.pages.builder.styles.align.left' | translate }}</option>
+                                <option [ngValue]="'center'">{{ 'adminUi.site.pages.builder.styles.align.center' | translate }}</option>
+                              </select>
+                            </label>
+
+                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                              {{ 'adminUi.site.pages.builder.styles.maxWidth.label' | translate }}
+                              <select
+                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                [(ngModel)]="block.layout.max_width"
+                              >
+                                <option [ngValue]="'full'">{{ 'adminUi.site.pages.builder.styles.maxWidth.full' | translate }}</option>
+                                <option [ngValue]="'narrow'">{{ 'adminUi.site.pages.builder.styles.maxWidth.narrow' | translate }}</option>
+                                <option [ngValue]="'prose'">{{ 'adminUi.site.pages.builder.styles.maxWidth.prose' | translate }}</option>
+                                <option [ngValue]="'wide'">{{ 'adminUi.site.pages.builder.styles.maxWidth.wide' | translate }}</option>
+                              </select>
+                            </label>
+                          </div>
+
+	                        <ng-container [ngSwitch]="block.type">
+	                          <ng-container *ngSwitchCase="'text'">
+	                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                              {{ 'adminUi.home.sections.fields.body' | translate }}
                               <textarea
                                 class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                                 rows="4"
@@ -9696,7 +9760,8 @@ export class AdminComponent implements OnInit, OnDestroy {
         images: [],
         slide: this.emptySlideDraft(),
         slides: [this.emptySlideDraft()],
-        settings: this.defaultCarouselSettings()
+        settings: this.defaultCarouselSettings(),
+        layout: this.toCmsBlockLayout(rec['layout'])
       };
 
       if (typeRaw === 'text') {
@@ -9776,7 +9841,8 @@ export class AdminComponent implements OnInit, OnDestroy {
       images: [],
       slide: this.emptySlideDraft(),
       slides: [this.emptySlideDraft()],
-      settings: this.defaultCarouselSettings()
+      settings: this.defaultCarouselSettings(),
+      layout: this.defaultCmsBlockLayout()
     };
 
     if (template === 'starter') {
@@ -10098,6 +10164,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     const blocks = (this.pageBlocks[pageKey] || []).map((b) => {
       const base: Record<string, unknown> = { key: b.key, type: b.type, enabled: b.enabled };
       base['title'] = b.title;
+      base['layout'] = b.layout || this.defaultCmsBlockLayout();
       if (b.type === 'text') {
         base['body_markdown'] = b.body_markdown;
       } else if (b.type === 'image') {
@@ -10379,6 +10446,35 @@ export class AdminComponent implements OnInit, OnDestroy {
     const raw = typeof value === 'number' ? value : Number(value);
     if (!Number.isFinite(raw)) return fallback;
     return Math.max(0, Math.min(100, Math.round(raw)));
+  }
+
+  private defaultCmsBlockLayout(): CmsBlockLayout {
+    return { spacing: 'none', background: 'none', align: 'left', max_width: 'full' };
+  }
+
+  private toCmsBlockLayout(value: unknown): CmsBlockLayout {
+    const rec = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+    const spacingRaw = typeof rec['spacing'] === 'string' ? String(rec['spacing']).trim() : '';
+    const backgroundRaw = typeof rec['background'] === 'string' ? String(rec['background']).trim() : '';
+    const alignRaw = typeof rec['align'] === 'string' ? String(rec['align']).trim() : '';
+    const maxWidthValue = rec['max_width'] ?? rec['maxWidth'];
+    const maxWidthRaw = typeof maxWidthValue === 'string' ? String(maxWidthValue).trim() : '';
+
+    const spacing: CmsBlockLayoutSpacing =
+      spacingRaw === 'sm' || spacingRaw === 'md' || spacingRaw === 'lg' || spacingRaw === 'none'
+        ? (spacingRaw as CmsBlockLayoutSpacing)
+        : 'none';
+    const background: CmsBlockLayoutBackground =
+      backgroundRaw === 'muted' || backgroundRaw === 'accent' || backgroundRaw === 'none'
+        ? (backgroundRaw as CmsBlockLayoutBackground)
+        : 'none';
+    const align: CmsBlockLayoutAlign = alignRaw === 'center' ? 'center' : 'left';
+    const max_width: CmsBlockLayoutMaxWidth =
+      maxWidthRaw === 'narrow' || maxWidthRaw === 'prose' || maxWidthRaw === 'wide' || maxWidthRaw === 'full'
+        ? (maxWidthRaw as CmsBlockLayoutMaxWidth)
+        : 'full';
+
+    return { spacing, background, align, max_width };
   }
 
   focalPosition(focalX: unknown, focalY: unknown): string {

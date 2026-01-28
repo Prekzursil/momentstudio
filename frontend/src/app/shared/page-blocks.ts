@@ -2,6 +2,18 @@ export type UiLang = 'en' | 'ro';
 
 export type PageBlockType = 'text' | 'image' | 'gallery' | 'banner' | 'carousel';
 
+export type PageBlockLayoutSpacing = 'none' | 'sm' | 'md' | 'lg';
+export type PageBlockLayoutBackground = 'none' | 'muted' | 'accent';
+export type PageBlockLayoutAlign = 'left' | 'center';
+export type PageBlockLayoutMaxWidth = 'full' | 'narrow' | 'prose' | 'wide';
+
+export interface PageBlockLayout {
+  spacing: PageBlockLayoutSpacing;
+  background: PageBlockLayoutBackground;
+  align: PageBlockLayoutAlign;
+  max_width: PageBlockLayoutMaxWidth;
+}
+
 export type SlideVariant = 'full' | 'split';
 export type SlideSize = 'S' | 'M' | 'L';
 export type SlideTextStyle = 'light' | 'dark';
@@ -25,6 +37,7 @@ export interface PageBlockBase {
   type: PageBlockType;
   enabled: boolean;
   title?: string | null;
+  layout?: PageBlockLayout;
 }
 
 export interface PageTextBlock extends PageBlockBase {
@@ -121,6 +134,71 @@ function readNumber(value: unknown, fallback: number): number {
   return fallback;
 }
 
+function normalizeLayoutSpacing(value: unknown): PageBlockLayoutSpacing {
+  const raw = readString(value);
+  if (raw === 'sm' || raw === 'md' || raw === 'lg' || raw === 'none') return raw;
+  return 'none';
+}
+
+function normalizeLayoutBackground(value: unknown): PageBlockLayoutBackground {
+  const raw = readString(value);
+  if (raw === 'muted' || raw === 'accent' || raw === 'none') return raw;
+  return 'none';
+}
+
+function normalizeLayoutAlign(value: unknown): PageBlockLayoutAlign {
+  const raw = readString(value);
+  if (raw === 'center' || raw === 'left') return raw;
+  return 'left';
+}
+
+function normalizeLayoutMaxWidth(value: unknown): PageBlockLayoutMaxWidth {
+  const raw = readString(value);
+  if (raw === 'narrow' || raw === 'prose' || raw === 'wide' || raw === 'full') return raw;
+  return 'full';
+}
+
+function parseLayout(value: unknown): PageBlockLayout {
+  const rec = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+  return {
+    spacing: normalizeLayoutSpacing(rec['spacing']),
+    background: normalizeLayoutBackground(rec['background']),
+    align: normalizeLayoutAlign(rec['align']),
+    max_width: normalizeLayoutMaxWidth(rec['max_width'] ?? rec['maxWidth'])
+  };
+}
+
+export function pageBlockOuterClasses(layout: PageBlockLayout | null | undefined): string {
+  const effective = layout || { spacing: 'none', background: 'none', align: 'left', max_width: 'full' };
+  const backgroundClasses: Record<PageBlockLayoutBackground, string> = {
+    none: '',
+    muted: 'rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/30',
+    accent: 'rounded-2xl border border-indigo-200 bg-indigo-50 dark:border-indigo-900/40 dark:bg-indigo-950/20'
+  };
+  const spacingClasses: Record<PageBlockLayoutSpacing, string> = {
+    none: '',
+    sm: 'p-3 md:p-4',
+    md: 'p-5 md:p-6',
+    lg: 'p-8 md:p-10'
+  };
+  return [backgroundClasses[effective.background], spacingClasses[effective.spacing]].filter(Boolean).join(' ');
+}
+
+export function pageBlockInnerClasses(layout: PageBlockLayout | null | undefined): string {
+  const effective = layout || { spacing: 'none', background: 'none', align: 'left', max_width: 'full' };
+  const maxWidthClasses: Record<PageBlockLayoutMaxWidth, string> = {
+    full: '',
+    narrow: 'max-w-2xl',
+    prose: 'max-w-prose',
+    wide: 'max-w-4xl'
+  };
+  const alignClasses: Record<PageBlockLayoutAlign, string> = {
+    left: '',
+    center: 'mx-auto text-center'
+  };
+  return ['w-full', maxWidthClasses[effective.max_width], alignClasses[effective.align]].filter(Boolean).join(' ');
+}
+
 function normalizeVariant(value: unknown): SlideVariant {
   const raw = readString(value);
   return raw === 'full' ? 'full' : 'split';
@@ -212,6 +290,7 @@ export function parsePageBlocks(
     if (!key) continue;
 
     const title = readLocalized(rec['title'], lang);
+    const layout = parseLayout(rec['layout']);
 
     if (typeRaw === 'text') {
       const bodyMarkdown = readLocalized(rec['body_markdown'], lang) || '';
@@ -220,6 +299,7 @@ export function parsePageBlocks(
         type: 'text',
         enabled: true,
         title,
+        layout,
         body_html: renderMarkdown(bodyMarkdown)
       } satisfies PageTextBlock);
       continue;
@@ -236,6 +316,7 @@ export function parsePageBlocks(
         type: 'image',
         enabled: true,
         title,
+        layout,
         url,
         alt: readLocalized(rec['alt'], lang),
         caption: readLocalized(rec['caption'], lang),
@@ -254,6 +335,7 @@ export function parsePageBlocks(
         type: 'banner',
         enabled: true,
         title,
+        layout,
         slide
       } satisfies PageBannerBlock);
       continue;
@@ -274,6 +356,7 @@ export function parsePageBlocks(
         type: 'carousel',
         enabled: true,
         title,
+        layout,
         slides,
         settings: parseCarouselSettings(rec['settings'])
       } satisfies PageCarouselBlock);
@@ -304,6 +387,7 @@ export function parsePageBlocks(
       type: 'gallery',
       enabled: true,
       title,
+      layout,
       images
     } satisfies PageGalleryBlock);
   }

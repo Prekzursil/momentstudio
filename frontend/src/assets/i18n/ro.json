@@ -2479,6 +2479,12 @@
             "success": "Starea traducerii a fost actualizată.",
             "errors": { "save": "Nu am putut actualiza starea traducerii." }
           },
+          "styles": {
+            "spacing": { "label": "Spațiere", "none": "Niciuna", "sm": "Mică", "md": "Medie", "lg": "Mare" },
+            "background": { "label": "Fundal", "none": "Niciunul", "muted": "Neutru", "accent": "Accent" },
+            "align": { "label": "Aliniere", "left": "Stânga", "center": "Centru" },
+            "maxWidth": { "label": "Lățime maximă", "full": "Completă", "narrow": "Îngustă", "prose": "Proză", "wide": "Largă" }
+          },
           "success": { "save": "Blocurile au fost salvate.", "rename": "URL-ul paginii a fost actualizat (redirecționare creată)." },
           "errors": { "load": "Nu am putut încărca blocurile.", "save": "Nu am putut salva blocurile.", "rename": "Nu s-a putut schimba URL-ul paginii." }
         },

@@ -2479,6 +2479,12 @@
             "success": "Translation status updated.",
             "errors": { "save": "Could not update translation status." }
           },
+          "styles": {
+            "spacing": { "label": "Spacing", "none": "None", "sm": "Small", "md": "Medium", "lg": "Large" },
+            "background": { "label": "Background", "none": "None", "muted": "Muted", "accent": "Accent" },
+            "align": { "label": "Alignment", "left": "Left", "center": "Center" },
+            "maxWidth": { "label": "Max width", "full": "Full", "narrow": "Narrow", "prose": "Prose", "wide": "Wide" }
+          },
           "success": { "save": "Blocks saved.", "rename": "Page URL updated (redirect created)." },
           "errors": { "load": "Could not load page blocks.", "save": "Could not save blocks.", "rename": "Could not change page URL." }
         },
