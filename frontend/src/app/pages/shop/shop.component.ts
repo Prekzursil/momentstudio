@@ -949,7 +949,26 @@ export class ShopComponent implements OnInit, OnDestroy {
     private translate: TranslateService,
     private title: Title,
     private metaService: Meta
-  ) {}
+  ) {
+    this.storefrontEditModeEffect = effect(() => {
+      const enabled = this.storefrontAdminMode.enabled();
+      if (this.lastStorefrontEditMode === null) {
+        this.lastStorefrontEditMode = enabled;
+        return;
+      }
+      if (this.lastStorefrontEditMode === enabled) return;
+      this.lastStorefrontEditMode = enabled;
+      if (!enabled) {
+        this.bulkSelectMode.set(false);
+        this.resetBulkEdits();
+        this.clearBulkSelection();
+        this.bulkEditError = '';
+      }
+      this.cancelCreateCategory();
+      this.cancelRenameCategory();
+      this.fetchCategories();
+    });
+  }
 
 	  ngOnInit(): void {
 	    this.setMetaTags();
@@ -959,24 +978,6 @@ export class ShopComponent implements OnInit, OnDestroy {
 		      this.cancelRenameCategory();
 		      this.fetchCategories();
 		    });
-	    this.storefrontEditModeEffect = effect(() => {
-	      const enabled = this.storefrontAdminMode.enabled();
-	      if (this.lastStorefrontEditMode === null) {
-	        this.lastStorefrontEditMode = enabled;
-	        return;
-	      }
-	      if (this.lastStorefrontEditMode === enabled) return;
-	      this.lastStorefrontEditMode = enabled;
-	      if (!enabled) {
-	        this.bulkSelectMode.set(false);
-	        this.resetBulkEdits();
-	        this.clearBulkSelection();
-	        this.bulkEditError = '';
-	      }
-	      this.cancelCreateCategory();
-	      this.cancelRenameCategory();
-	      this.fetchCategories();
-	    });
 	    this.initScrollRestoreFromSession();
 	    const dataCategories = (this.route.snapshot.data['categories'] as Category[]) ?? [];
     if (dataCategories.length) {

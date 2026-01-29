@@ -196,14 +196,14 @@ async def list_published_posts(
     page = max(1, page)
     limit = max(1, min(limit, 50))
 
-    filters = (
+    filters = [
         ContentBlock.key.like(f"{BLOG_KEY_PREFIX}%"),
         ContentBlock.status == ContentStatus.published,
         or_(ContentBlock.published_at.is_(None), ContentBlock.published_at <= now),
         or_(ContentBlock.published_until.is_(None), ContentBlock.published_until > now),
-    )
+    ]
     if author_id:
-        filters = (*filters, ContentBlock.author_id == author_id)
+        filters.append(ContentBlock.author_id == author_id)
     pinned_flag = ContentBlock.meta["pinned"].as_boolean().is_(True)
     pin_order = ContentBlock.meta["pin_order"].as_integer()
     pinned_rank = case((pinned_flag, 0), else_=1)
@@ -211,20 +211,20 @@ async def list_published_posts(
     sort_key = _normalize_blog_sort(sort)
     comment_counts = None
     if sort_key == "oldest":
-        ordering = (
+        ordering = [
             pinned_rank.asc(),
             pin_order_rank.asc(),
             ContentBlock.published_at.asc().nullslast(),
             ContentBlock.updated_at.asc(),
-        )
+        ]
     elif sort_key == "most_viewed":
-        ordering = (
+        ordering = [
             pinned_rank.asc(),
             pin_order_rank.asc(),
             ContentBlock.view_count.desc(),
             ContentBlock.published_at.desc().nullslast(),
             ContentBlock.updated_at.desc(),
-        )
+        ]
     elif sort_key == "most_commented":
         comment_counts = (
             select(
@@ -238,20 +238,20 @@ async def list_published_posts(
             .group_by(BlogComment.content_block_id)
             .subquery()
         )
-        ordering = (
+        ordering = [
             pinned_rank.asc(),
             pin_order_rank.asc(),
             func.coalesce(comment_counts.c.comment_count, 0).desc(),
             ContentBlock.published_at.desc().nullslast(),
             ContentBlock.updated_at.desc(),
-        )
+        ]
     else:
-        ordering = (
+        ordering = [
             pinned_rank.asc(),
             pin_order_rank.asc(),
             ContentBlock.published_at.desc().nullslast(),
             ContentBlock.updated_at.desc(),
-        )
+        ]
     query_text = (q or "").strip().lower()
     tag_text = (tag or "").strip().lower()
     series_text = (series or "").strip().lower()

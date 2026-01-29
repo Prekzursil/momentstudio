@@ -5,13 +5,13 @@ from io import StringIO
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Query, Response
-from sqlalchemy import String, cast, select, func, or_
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.dependencies import get_current_user_optional, get_session, require_admin_section
 from app.core.security import create_content_preview_token, decode_content_preview_token
-from app.models.content import ContentBlock, ContentBlockTranslation, ContentBlockVersion, ContentImage, ContentRedirect, ContentImageTag
+from app.models.content import ContentBlock, ContentBlockVersion, ContentImage, ContentRedirect, ContentImageTag
 from app.models.user import User
 from app.schemas.content import (
     ContentAuditRead,

@@ -1,10 +1,22 @@
-import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
+import { test, expect, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 
 const OWNER_IDENTIFIER = process.env.E2E_OWNER_IDENTIFIER || 'owner';
 const OWNER_PASSWORD = process.env.E2E_OWNER_PASSWORD || 'Password123';
 
+async function waitForConsentCheckboxReady(page: Page, checkbox: Locator, checkboxIndex: number): Promise<void> {
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    if (await checkbox.isChecked()) return;
+    if (await checkbox.isEnabled()) return;
+    await page.waitForTimeout(250);
+  }
+
+  throw new Error(`Consent checkbox ${checkboxIndex} stayed disabled for too long.`);
+}
+
 async function acceptConsentIfNeeded(page: Page, checkboxIndex: number): Promise<void> {
   const checkbox = page.locator('#checkout-step-4 input[type="checkbox"]').nth(checkboxIndex);
+  await waitForConsentCheckboxReady(page, checkbox, checkboxIndex);
   if (await checkbox.isChecked()) return;
   await expect(checkbox).toBeEnabled();
 

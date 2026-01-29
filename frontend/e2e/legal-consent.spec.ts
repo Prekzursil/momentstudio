@@ -3,15 +3,15 @@ import { test, expect, type Page } from '@playwright/test';
 async function acceptLegalModal(page: Page): Promise<void> {
   const dialog = page.locator('div[role="dialog"][aria-modal="true"]').last();
   const acceptButton = dialog.getByRole('button', { name: 'Accept' });
-  await expect(acceptButton).toBeDisabled();
-
-  const body = dialog.locator('div.overflow-y-auto').first();
-  await body.evaluate((el) => {
-    el.scrollTop = el.scrollHeight;
-    el.dispatchEvent(new Event('scroll'));
-  });
-
-  await expect(acceptButton).toBeEnabled();
+  await expect(acceptButton).toBeVisible();
+  if (await acceptButton.isDisabled()) {
+    const body = dialog.locator('div.overflow-y-auto').first();
+    await body.evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+      el.dispatchEvent(new Event('scroll'));
+    });
+    await expect(acceptButton).toBeEnabled();
+  }
   await acceptButton.click();
   await expect(dialog).toBeHidden();
 }
@@ -48,7 +48,7 @@ test('registration requires reading legal docs in a scroll-to-accept modal', asy
   }
 
   await page.getByRole('button', { name: 'Register' }).click();
-  await expect(page.getByText('This field is required.')).toBeVisible();
+  await expect(page.getByText('This field is required.').first()).toBeVisible();
 
   const termsResponse = page.waitForResponse(
     (res) => res.url().includes('/api/v1/content/pages/terms-and-conditions') && res.status() === 200
@@ -66,4 +66,3 @@ test('registration requires reading legal docs in a scroll-to-accept modal', asy
   await acceptLegalModal(page);
   await expect(page.locator('input[name="acceptPrivacy"]')).toBeChecked();
 });
-

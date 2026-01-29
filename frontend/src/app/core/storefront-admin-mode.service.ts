@@ -7,7 +7,7 @@ const STORAGE_KEY = 'storefront_admin_edit_mode';
 export class StorefrontAdminModeService {
   private readonly enabledSignal = signal(false);
   readonly enabled = this.enabledSignal.asReadonly();
-  readonly available = computed(() => this.auth.isAdmin() && !this.auth.isImpersonating());
+  readonly available = computed(() => this.isAdmin() && !this.isImpersonating());
 
   constructor(private auth: AuthService) {
     const saved = this.loadSaved();
@@ -51,5 +51,18 @@ export class StorefrontAdminModeService {
       // ignore
     }
   }
-}
 
+  private isAdmin(): boolean {
+    const auth: any = this.auth as any;
+    const value = auth?.isAdmin;
+    if (typeof value === 'function') return Boolean(value.call(auth));
+    return Boolean(value);
+  }
+
+  private isImpersonating(): boolean {
+    const auth: any = this.auth as any;
+    const value = auth?.isImpersonating;
+    if (typeof value === 'function') return Boolean(value.call(auth));
+    return Boolean(value);
+  }
+}

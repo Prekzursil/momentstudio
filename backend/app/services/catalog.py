@@ -969,10 +969,10 @@ async def update_product(
         if was_out_of_stock and not is_now_out_of_stock:
             await fulfill_back_in_stock_requests(session, product=product)
         if changes:
-            payload = {"changes": changes, "patch": patch_snapshot}
+            audit_payload: dict[str, object] = {"changes": changes, "patch": patch_snapshot}
             if source:
-                payload["source"] = source
-            await _log_product_action(session, product.id, "update", user_id, payload)
+                audit_payload["source"] = source
+            await _log_product_action(session, product.id, "update", user_id, audit_payload)
         await _maybe_alert_low_stock(session, product)
     else:
         await session.flush()
@@ -2415,8 +2415,8 @@ async def import_categories_csv(session: AsyncSession, content: str, dry_run: bo
 
     file_slugs = {r["slug"] for r in rows}
     if file_slugs:
-        result = await session.execute(select(Category.slug).where(Category.slug.in_(file_slugs)))
-        existing_slugs = set(result.scalars().all())
+        existing_slug_result = await session.execute(select(Category.slug).where(Category.slug.in_(file_slugs)))
+        existing_slugs = set(existing_slug_result.scalars().all())
         created = len(file_slugs - existing_slugs)
         updated = len(file_slugs & existing_slugs)
     else:
@@ -2425,8 +2425,8 @@ async def import_categories_csv(session: AsyncSession, content: str, dry_run: bo
     if rows:
         parent_candidates = {r["parent_slug"] for r in rows if r["parent_slug"] and r["parent_slug"] not in file_slugs}
         if parent_candidates:
-            result = await session.execute(select(Category.slug).where(Category.slug.in_(parent_candidates)))
-            found = set(result.scalars().all())
+            parent_slug_result = await session.execute(select(Category.slug).where(Category.slug.in_(parent_candidates)))
+            found = set(parent_slug_result.scalars().all())
             missing = parent_candidates - found
             if missing:
                 missing_set = set(missing)
@@ -2436,8 +2436,8 @@ async def import_categories_csv(session: AsyncSession, content: str, dry_run: bo
                         errors.append(f"Row {row['idx']}: parent category {parent_slug} not found")
 
     if dry_run and rows:
-        result = await session.execute(select(Category.id, Category.slug, Category.parent_id))
-        category_rows = result.all()
+        hierarchy_result = await session.execute(select(Category.id, Category.slug, Category.parent_id))
+        category_rows = hierarchy_result.all()
         id_to_slug = {cat_id: slug for cat_id, slug, _parent_id in category_rows}
         parent_slug_by_slug = {slug: id_to_slug.get(parent_id) if parent_id else None for _id, slug, parent_id in category_rows}
         proposed_parent_by_slug = {r["slug"]: r["parent_slug"] for r in rows}
@@ -2468,8 +2468,8 @@ async def import_categories_csv(session: AsyncSession, content: str, dry_run: bo
 
     all_slugs = set(file_slugs)
     all_slugs.update(r["parent_slug"] for r in rows if r["parent_slug"])
-    result = await session.execute(select(Category).where(Category.slug.in_(all_slugs)))
-    by_slug = {c.slug: c for c in result.scalars().all()}
+    category_result = await session.execute(select(Category).where(Category.slug.in_(all_slugs)))
+    by_slug: dict[str, Category] = {c.slug: c for c in category_result.scalars().all()}
 
     for row in rows:
         slug = row["slug"]

@@ -557,7 +557,7 @@ async def edit_image_asset(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="GIF editing is not supported")
 
     with Image.open(source_path) as opened:
-        img = ImageOps.exif_transpose(opened)
+        img = ImageOps.exif_transpose(opened) or opened
         base_w, base_h = img.size
 
         focal_x = int(getattr(image, "focal_x", 50) or 50)
@@ -907,20 +907,20 @@ def _find_replace_in_json(value: Any, find: str, replace: str, *, case_sensitive
         return _find_replace_subn(value, find, replace, case_sensitive=case_sensitive)
     if isinstance(value, list):
         total = 0
-        out: list[Any] = []
+        out_list: list[Any] = []
         for item in value:
             nxt, changed = _find_replace_in_json(item, find, replace, case_sensitive=case_sensitive)
             total += changed
-            out.append(nxt)
-        return out, total
+            out_list.append(nxt)
+        return out_list, total
     if isinstance(value, dict):
         total = 0
-        out: dict[Any, Any] = {}
+        out_dict: dict[Any, Any] = {}
         for k, v in value.items():
             nxt, changed = _find_replace_in_json(v, find, replace, case_sensitive=case_sensitive)
             total += changed
-            out[k] = nxt
-        return out, total
+            out_dict[k] = nxt
+        return out_dict, total
     return value, 0
 
 
