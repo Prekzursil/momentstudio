@@ -1035,4 +1035,4 @@ Below is a structured checklist you can turn into issues.
 - [x] Catalog: investigate product detail page sometimes failing to load from listings (route/slug/API error).
 - [x] Admin Dashboard analytics: exclude cancelled/refunded/pending orders from sales totals and “sold” KPIs.
 - [x] Data hygiene: replace any “oz” units in seeded/sample products with metric variants (e.g., ml) and avoid reintroducing.
-- [ ] i18n: move category name required message from `adminUi.products.errors.required` to `adminUi.categories.errors.required` and update call sites.
+- [x] i18n: move category name required message from `adminUi.products.errors.required` to `adminUi.categories.errors.required` and update call sites.

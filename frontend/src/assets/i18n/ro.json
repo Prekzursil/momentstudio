@@ -3409,7 +3409,6 @@
         "load": "Nu am putut încărca produsul",
         "save": "Nu am putut salva produsul",
         "delete": "Nu am putut șterge produsul",
-        "required": "Numele categoriei este obligatoriu",
         "image": "Încărcarea imaginii a eșuat",
         "deleteImage": "Nu am putut șterge imaginea",
         "loadDeletedImages": "Nu am putut încărca imaginile șterse.",
@@ -3659,6 +3658,7 @@
         "updateLowStockThreshold": "Pragul de stoc redus a fost actualizat"
       },
       "errors": {
+        "required": "Numele categoriei este obligatoriu",
         "add": "Nu am putut adăuga categoria",
         "delete": "Nu am putut șterge categoria",
         "reorder": "Nu am putut reordona categoriile",

@@ -8220,7 +8220,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   addCategory(): void {
     if (!this.categoryName) {
-      this.toast.error(this.t('adminUi.products.errors.required'));
+      this.toast.error(this.t('adminUi.categories.errors.required'));
       return;
     }
     const parent_id = (this.categoryParentId || '').trim() || null;

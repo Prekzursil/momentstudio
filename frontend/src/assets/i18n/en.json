@@ -3409,7 +3409,6 @@
         "load": "Unable to load product",
         "save": "Failed to save product",
         "delete": "Failed to delete product",
-        "required": "Category name is required",
         "image": "Image upload failed",
         "deleteImage": "Failed to delete image",
         "loadDeletedImages": "Could not load deleted images.",
@@ -3659,6 +3658,7 @@
         "updateLowStockThreshold": "Low-stock threshold updated"
       },
       "errors": {
+        "required": "Category name is required",
         "add": "Failed to add category",
         "delete": "Failed to delete category",
         "reorder": "Failed to reorder categories",
