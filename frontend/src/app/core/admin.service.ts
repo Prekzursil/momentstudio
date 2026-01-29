@@ -687,6 +687,53 @@ export interface ContentLinkCheckPreviewRequest {
   images?: string[];
 }
 
+export interface ContentFindReplacePreviewRequest {
+  find: string;
+  replace?: string;
+  key_prefix?: string | null;
+  case_sensitive?: boolean;
+  limit?: number;
+}
+
+export interface ContentFindReplaceApplyRequest {
+  find: string;
+  replace?: string;
+  key_prefix?: string | null;
+  case_sensitive?: boolean;
+}
+
+export interface ContentFindReplacePreviewTranslationCount {
+  lang: string;
+  matches: number;
+}
+
+export interface ContentFindReplacePreviewItem {
+  key: string;
+  title: string;
+  matches: number;
+  base_matches: number;
+  translations: ContentFindReplacePreviewTranslationCount[];
+}
+
+export interface ContentFindReplacePreviewResponse {
+  items: ContentFindReplacePreviewItem[];
+  total_items: number;
+  total_matches: number;
+  truncated: boolean;
+}
+
+export interface ContentFindReplaceApplyError {
+  key: string;
+  error: string;
+}
+
+export interface ContentFindReplaceApplyResponse {
+  updated_blocks: number;
+  updated_translations: number;
+  total_replacements: number;
+  errors: ContentFindReplaceApplyError[];
+}
+
 export interface ContentSavePayload {
   title?: string;
   body_markdown?: string;
@@ -1151,6 +1198,14 @@ export class AdminService {
 
   linkCheckContentPreview(payload: ContentLinkCheckPreviewRequest): Observable<ContentLinkCheckResponse> {
     return this.api.post<ContentLinkCheckResponse>('/content/admin/tools/link-check/preview', payload);
+  }
+
+  previewFindReplaceContent(payload: ContentFindReplacePreviewRequest): Observable<ContentFindReplacePreviewResponse> {
+    return this.api.post<ContentFindReplacePreviewResponse>('/content/admin/tools/find-replace/preview', payload);
+  }
+
+  applyFindReplaceContent(payload: ContentFindReplaceApplyRequest): Observable<ContentFindReplaceApplyResponse> {
+    return this.api.post<ContentFindReplaceApplyResponse>('/content/admin/tools/find-replace/apply', payload);
   }
 
   fetchSocialThumbnail(url: string): Observable<SocialThumbnailResponse> {

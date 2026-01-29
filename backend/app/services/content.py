@@ -5,10 +5,11 @@ import re
 import unicodedata
 from urllib.parse import parse_qs, urlsplit
 from pathlib import Path
+from typing import Any
 
 from fastapi import HTTPException, status
 from PIL import Image, ImageOps
-from sqlalchemy import func, or_, update, select
+from sqlalchemy import String, cast, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -817,6 +818,273 @@ def _sanitize_markdown(body: str) -> None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Disallowed markup")
     if re.search(r"on\w+=", lower):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Disallowed event handlers")
+
+
+def _find_replace_subn(text: str, find: str, replace: str, *, case_sensitive: bool) -> tuple[str, int]:
+    if not find:
+        return text, 0
+    if case_sensitive:
+        return text.replace(find, replace), text.count(find)
+    pattern = re.compile(re.escape(find), flags=re.IGNORECASE)
+    return pattern.subn(replace, text)
+
+
+def _find_replace_in_json(value: Any, find: str, replace: str, *, case_sensitive: bool) -> tuple[Any, int]:
+    if isinstance(value, str):
+        return _find_replace_subn(value, find, replace, case_sensitive=case_sensitive)
+    if isinstance(value, list):
+        total = 0
+        out: list[Any] = []
+        for item in value:
+            nxt, changed = _find_replace_in_json(item, find, replace, case_sensitive=case_sensitive)
+            total += changed
+            out.append(nxt)
+        return out, total
+    if isinstance(value, dict):
+        total = 0
+        out: dict[Any, Any] = {}
+        for k, v in value.items():
+            nxt, changed = _find_replace_in_json(v, find, replace, case_sensitive=case_sensitive)
+            total += changed
+            out[k] = nxt
+        return out, total
+    return value, 0
+
+
+async def preview_find_replace(
+    session: AsyncSession,
+    *,
+    find: str,
+    replace: str,
+    key_prefix: str | None = None,
+    case_sensitive: bool = True,
+    limit: int = 200,
+) -> tuple[list[dict[str, object]], int, int, bool]:
+    needle = f"%{find}%"
+    like = (lambda col: col.like(needle)) if case_sensitive else (lambda col: col.ilike(needle))
+
+    query = (
+        select(ContentBlock)
+        .distinct()
+        .select_from(ContentBlock)
+        .outerjoin(ContentBlockTranslation, ContentBlockTranslation.content_block_id == ContentBlock.id)
+        .options(selectinload(ContentBlock.translations))
+        .where(
+            or_(
+                like(ContentBlock.title),
+                like(ContentBlock.body_markdown),
+                like(cast(ContentBlock.meta, String)),
+                like(ContentBlockTranslation.title),
+                like(ContentBlockTranslation.body_markdown),
+            )
+        )
+        .order_by(ContentBlock.key)
+        .limit(limit + 1)
+    )
+    if key_prefix:
+        query = query.where(ContentBlock.key.like(f"{key_prefix}%"))
+
+    rows = (await session.execute(query)).scalars().all()
+    truncated = len(rows) > limit
+    blocks = rows[:limit]
+
+    items: list[dict[str, object]] = []
+    total_items = 0
+    total_matches = 0
+
+    for block in blocks:
+        base_matches = 0
+        _, n = _find_replace_subn(block.title or "", find, replace, case_sensitive=case_sensitive)
+        base_matches += n
+        _, n = _find_replace_subn(block.body_markdown or "", find, replace, case_sensitive=case_sensitive)
+        base_matches += n
+
+        meta = getattr(block, "meta", None)
+        if meta is not None:
+            _, n = _find_replace_in_json(meta, find, replace, case_sensitive=case_sensitive)
+            base_matches += n
+
+        translations_out: list[dict[str, object]] = []
+        tr_total = 0
+        for tr in getattr(block, "translations", None) or []:
+            tr_matches = 0
+            _, n = _find_replace_subn(tr.title or "", find, replace, case_sensitive=case_sensitive)
+            tr_matches += n
+            _, n = _find_replace_subn(tr.body_markdown or "", find, replace, case_sensitive=case_sensitive)
+            tr_matches += n
+            if tr_matches:
+                translations_out.append({"lang": tr.lang, "matches": tr_matches})
+                tr_total += tr_matches
+
+        matches = base_matches + tr_total
+        if matches <= 0:
+            continue
+
+        total_items += 1
+        total_matches += matches
+        items.append(
+            {
+                "key": block.key,
+                "title": block.title,
+                "matches": matches,
+                "base_matches": base_matches,
+                "translations": sorted(translations_out, key=lambda it: str(it.get("lang") or "")),
+            }
+        )
+
+    return items, total_items, total_matches, truncated
+
+
+async def apply_find_replace(
+    session: AsyncSession,
+    *,
+    find: str,
+    replace: str,
+    key_prefix: str | None = None,
+    case_sensitive: bool = True,
+    actor_id: UUID | None = None,
+) -> tuple[int, int, int, list[dict[str, str]]]:
+    needle = f"%{find}%"
+    like = (lambda col: col.like(needle)) if case_sensitive else (lambda col: col.ilike(needle))
+
+    query = (
+        select(ContentBlock)
+        .distinct()
+        .select_from(ContentBlock)
+        .outerjoin(ContentBlockTranslation, ContentBlockTranslation.content_block_id == ContentBlock.id)
+        .options(selectinload(ContentBlock.translations))
+        .where(
+            or_(
+                like(ContentBlock.title),
+                like(ContentBlock.body_markdown),
+                like(cast(ContentBlock.meta, String)),
+                like(ContentBlockTranslation.title),
+                like(ContentBlockTranslation.body_markdown),
+            )
+        )
+        .order_by(ContentBlock.key)
+    )
+    if key_prefix:
+        query = query.where(ContentBlock.key.like(f"{key_prefix}%"))
+
+    blocks = (await session.execute(query)).scalars().all()
+
+    updated_blocks = 0
+    updated_translations = 0
+    total_replacements = 0
+    errors: list[dict[str, str]] = []
+
+    for block in blocks:
+        base_changed = False
+        base_matches = 0
+
+        next_title, n = _find_replace_subn(block.title or "", find, replace, case_sensitive=case_sensitive)
+        if n:
+            base_matches += n
+            base_changed = True
+
+        next_body, n = _find_replace_subn(block.body_markdown or "", find, replace, case_sensitive=case_sensitive)
+        if n:
+            base_matches += n
+            base_changed = True
+
+        next_meta = getattr(block, "meta", None)
+        if next_meta is not None:
+            replaced_meta, n = _find_replace_in_json(next_meta, find, replace, case_sensitive=case_sensitive)
+            if n:
+                next_meta = replaced_meta
+                base_matches += n
+                base_changed = True
+
+        translations_changed_langs: set[str] = set()
+        translation_rows_changed = 0
+        translation_matches_total = 0
+        translation_updates: list[tuple[ContentBlockTranslation, str, str]] = []
+
+        for tr in getattr(block, "translations", None) or []:
+            tr_changed = False
+            tr_matches = 0
+
+            next_tr_title, n = _find_replace_subn(tr.title or "", find, replace, case_sensitive=case_sensitive)
+            if n:
+                tr_matches += n
+                tr_changed = True
+
+            next_tr_body, n = _find_replace_subn(tr.body_markdown or "", find, replace, case_sensitive=case_sensitive)
+            if n:
+                tr_matches += n
+                tr_changed = True
+
+            if not tr_changed:
+                continue
+
+            translations_changed_langs.add(tr.lang)
+            translation_rows_changed += 1
+            translation_matches_total += tr_matches
+            translation_updates.append((tr, next_tr_title, next_tr_body))
+
+        matches = base_matches + translation_matches_total
+        if matches <= 0:
+            continue
+
+        try:
+            async with session.begin_nested():
+                for tr, next_tr_title, next_tr_body in translation_updates:
+                    if next_tr_body != tr.body_markdown:
+                        _sanitize_markdown(next_tr_body)
+                    tr.title = next_tr_title
+                    tr.body_markdown = next_tr_body
+
+                if base_changed:
+                    if next_body != block.body_markdown:
+                        _sanitize_markdown(next_body)
+                    block.title = next_title
+                    block.body_markdown = next_body
+                    block.meta = next_meta
+
+                base_lang = (block.lang or "").strip().lower()
+                if base_changed and base_lang in _SUPPORTED_LANGS:
+                    _mark_other_needs_translation(block, base_lang)
+                for lang in translations_changed_langs:
+                    lang_norm = (lang or "").strip().lower()
+                    if lang_norm in _SUPPORTED_LANGS:
+                        _clear_needs_translation(block, lang_norm)
+
+                _enforce_legal_pages_bilingual(block.key, block)
+
+                block.version += 1
+                session.add(block)
+                translations_snapshot = _snapshot_translations(block)
+                version_row = ContentBlockVersion(
+                    content_block_id=block.id,
+                    version=block.version,
+                    title=block.title,
+                    body_markdown=block.body_markdown,
+                    status=block.status,
+                    meta=block.meta,
+                    lang=block.lang,
+                    published_at=block.published_at,
+                    published_until=block.published_until,
+                    translations=translations_snapshot,
+                )
+                session.add(version_row)
+                await audit_chain_service.add_content_audit_log(
+                    session,
+                    content_block_id=block.id,
+                    action="find_replace",
+                    version=block.version,
+                    user_id=actor_id,
+                )
+
+            updated_blocks += 1
+            updated_translations += translation_rows_changed
+            total_replacements += matches
+        except HTTPException as exc:
+            errors.append({"key": block.key, "error": str(getattr(exc, "detail", None) or "Update failed")})
+            await session.refresh(block, attribute_names=["translations"])
+
+    await session.commit()
+    return updated_blocks, updated_translations, total_replacements, errors
 
 
 _MD_LINK_RE = re.compile(r"(?<!!)\[[^\]]+\]\(([^)]+)\)")

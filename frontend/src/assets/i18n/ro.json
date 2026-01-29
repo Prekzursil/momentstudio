@@ -4344,6 +4344,42 @@
           "rollback": "Nu am putut reveni"
         }
       },
+      "findReplace": {
+        "title": "Căutare & înlocuire",
+        "hint": "Caută și înlocuiește text în conținutul CMS (inclusiv blocurile din page builder). Previzualizează înainte de aplicare.",
+        "find": "Caută",
+        "replace": "Înlocuiește cu",
+        "caseSensitive": "Sensibil la majuscule",
+        "preview": "Previzualizează",
+        "apply": "Aplică",
+        "loading": "Caut…",
+        "applying": "Aplic…",
+        "empty": "Nu s-au găsit potriviri.",
+        "summary": "{{items}} element(e), {{matches}} înlocuire(i).",
+        "truncated": "Se afișează primele {{limit}} elemente.",
+        "result": "Actualizat {{blocks}} bloc(uri), {{translations}} traducere(i) ({{replacements}} înlocuire(i)).",
+        "applyErrors": "Unele elemente nu au putut fi actualizate:",
+        "scope": {
+          "label": "Domeniu",
+          "all": "Tot conținutul",
+          "pages": "Pagini",
+          "blog": "Articole blog",
+          "home": "Acasă",
+          "site": "Secțiuni globale"
+        },
+        "confirms": {
+          "apply": "Aplici {{matches}} înlocuiri pentru {{items}} elemente? Se vor crea revizii noi pentru fiecare element."
+        },
+        "success": {
+          "apply": "Aplicate {{replacements}} înlocuiri ({{blocks}} blocuri)."
+        },
+        "errors": {
+          "findRequired": "Introdu un termen de căutare.",
+          "previewFirst": "Rulează mai întâi previzualizarea.",
+          "preview": "Nu s-a putut rula previzualizarea.",
+          "apply": "Nu s-a putut aplica înlocuirea."
+        }
+      },
       "linkCheck": {
         "title": "Verificare linkuri",
         "hint": "Verifică linkurile interne și referințele media pentru cheia de conținut selectată.",

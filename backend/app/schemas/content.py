@@ -248,6 +248,53 @@ class ContentLinkCheckResponse(BaseModel):
     issues: list[ContentLinkCheckIssue]
 
 
+class ContentFindReplacePreviewRequest(BaseModel):
+    find: str = Field(min_length=1, max_length=500)
+    replace: str = Field(default="", max_length=2000)
+    key_prefix: str | None = Field(default=None, max_length=120)
+    case_sensitive: bool = True
+    limit: int = Field(default=200, ge=1, le=1000)
+
+
+class ContentFindReplaceApplyRequest(BaseModel):
+    find: str = Field(min_length=1, max_length=500)
+    replace: str = Field(default="", max_length=2000)
+    key_prefix: str | None = Field(default=None, max_length=120)
+    case_sensitive: bool = True
+
+
+class ContentFindReplacePreviewTranslationCount(BaseModel):
+    lang: str
+    matches: int
+
+
+class ContentFindReplacePreviewItem(BaseModel):
+    key: str
+    title: str
+    matches: int
+    base_matches: int
+    translations: list[ContentFindReplacePreviewTranslationCount] = Field(default_factory=list)
+
+
+class ContentFindReplacePreviewResponse(BaseModel):
+    items: list[ContentFindReplacePreviewItem]
+    total_items: int
+    total_matches: int
+    truncated: bool = False
+
+
+class ContentFindReplaceApplyError(BaseModel):
+    key: str
+    error: str
+
+
+class ContentFindReplaceApplyResponse(BaseModel):
+    updated_blocks: int
+    updated_translations: int
+    total_replacements: int
+    errors: list[ContentFindReplaceApplyError] = Field(default_factory=list)
+
+
 class ContentBlockVersionListItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

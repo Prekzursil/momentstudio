@@ -4344,6 +4344,42 @@
           "rollback": "Could not rollback"
         }
       },
+      "findReplace": {
+        "title": "Find & replace",
+        "hint": "Search and replace text across CMS content (including page builder blocks). Preview before applying.",
+        "find": "Find",
+        "replace": "Replace with",
+        "caseSensitive": "Case sensitive",
+        "preview": "Preview",
+        "apply": "Apply",
+        "loading": "Searching…",
+        "applying": "Applying…",
+        "empty": "No matches found.",
+        "summary": "{{items}} item(s), {{matches}} replacement(s).",
+        "truncated": "Showing first {{limit}} items.",
+        "result": "Updated {{blocks}} block(s), {{translations}} translation(s) ({{replacements}} replacements).",
+        "applyErrors": "Some items could not be updated:",
+        "scope": {
+          "label": "Scope",
+          "all": "All content",
+          "pages": "Pages",
+          "blog": "Blog posts",
+          "home": "Home",
+          "site": "Site globals"
+        },
+        "confirms": {
+          "apply": "Apply {{matches}} replacements across {{items}} content items? This will create new revisions for each item."
+        },
+        "success": {
+          "apply": "Applied {{replacements}} replacements ({{blocks}} blocks)."
+        },
+        "errors": {
+          "findRequired": "Enter a search term.",
+          "previewFirst": "Run a preview before applying.",
+          "preview": "Could not run find & replace preview.",
+          "apply": "Could not apply find & replace."
+        }
+      },
       "linkCheck": {
         "title": "Link checker",
         "hint": "Checks internal links and media references for the selected content key.",

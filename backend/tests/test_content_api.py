@@ -500,6 +500,67 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     assert any(i["reason"] == "Product not found" for i in preview_issues)
     assert any(i["reason"] == "Content not found" for i in preview_issues)
 
+    # Find & replace (preview + apply) across body/meta/translations.
+    seed_fr = client.post(
+        "/api/v1/content/admin/page.findreplace",
+        json={
+            "title": "Findreplace",
+            "body_markdown": "hello old",
+            "status": "draft",
+            "lang": "en",
+            "meta": {"blocks": [{"type": "text", "body_markdown": {"en": "old in meta", "ro": "old in meta ro"}}]},
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert seed_fr.status_code == 201, seed_fr.text
+
+    tr_fr = client.patch(
+        "/api/v1/content/admin/page.findreplace",
+        json={"title": "Găsește", "body_markdown": "salut old", "lang": "ro"},
+        headers=auth_headers(admin_token),
+    )
+    assert tr_fr.status_code == 200, tr_fr.text
+
+    fr_preview = client.post(
+        "/api/v1/content/admin/tools/find-replace/preview",
+        json={"find": "old", "replace": "new", "key_prefix": "page.", "case_sensitive": True, "limit": 50},
+        headers=auth_headers(admin_token),
+    )
+    assert fr_preview.status_code == 200, fr_preview.text
+    preview_payload = fr_preview.json()
+    assert any(item["key"] == "page.findreplace" for item in preview_payload["items"])
+    assert preview_payload["total_items"] >= 1
+    assert preview_payload["total_matches"] >= 3
+
+    fr_apply = client.post(
+        "/api/v1/content/admin/tools/find-replace/apply",
+        json={"find": "old", "replace": "new", "key_prefix": "page.", "case_sensitive": True},
+        headers=auth_headers(admin_token),
+    )
+    assert fr_apply.status_code == 200, fr_apply.text
+    apply_payload = fr_apply.json()
+    assert apply_payload["updated_blocks"] >= 1
+    assert apply_payload["total_replacements"] >= 3
+    assert apply_payload["errors"] == []
+
+    base_after = client.get(
+        "/api/v1/content/admin/page.findreplace",
+        headers=auth_headers(admin_token),
+    )
+    assert base_after.status_code == 200, base_after.text
+    assert "old" not in base_after.json()["body_markdown"]
+    assert "new" in base_after.json()["body_markdown"]
+    assert "new in meta" in str(base_after.json().get("meta") or {})
+
+    ro_after = client.get(
+        "/api/v1/content/admin/page.findreplace",
+        params={"lang": "ro"},
+        headers=auth_headers(admin_token),
+    )
+    assert ro_after.status_code == 200, ro_after.text
+    assert "old" not in ro_after.json()["body_markdown"]
+    assert "new" in ro_after.json()["body_markdown"]
+
 
 def test_admin_fetch_social_thumbnail(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]

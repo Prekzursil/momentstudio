@@ -33,6 +33,8 @@ import {
   ContentRedirectImportResult,
   StructuredDataValidationResponse,
   ContentLinkCheckIssue,
+  ContentFindReplacePreviewResponse,
+  ContentFindReplaceApplyResponse,
   ContentPreviewTokenResponse
 } from '../../core/admin.service';
 import { AdminBlogComment, BlogService } from '../../core/blog.service';
@@ -2358,6 +2360,115 @@ class CmsDraftManager<T> {
                     </select>
                   </label>
                   <app-content-revisions [contentKey]="pagesRevisionKey" [titleKey]="pagesRevisionTitleKey()"></app-content-revisions>
+                </div>
+              </details>
+
+              <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
+                <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.content.findReplace.title' | translate }}
+                </summary>
+                <div class="mt-3 grid gap-3">
+                  <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.content.findReplace.hint' | translate }}</p>
+
+                  <div class="grid gap-2 md:grid-cols-2">
+                    <app-input [label]="'adminUi.content.findReplace.find' | translate" [(value)]="findReplaceFind"></app-input>
+                    <app-input [label]="'adminUi.content.findReplace.replace' | translate" [(value)]="findReplaceReplace"></app-input>
+                  </div>
+
+                  <div class="flex flex-wrap gap-3 items-end">
+                    <label class="grid gap-1 text-xs font-medium text-slate-700 dark:text-slate-200">
+                      {{ 'adminUi.content.findReplace.scope.label' | translate }}
+                      <select
+                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        [(ngModel)]="findReplaceScope"
+                      >
+                        <option value="all">{{ 'adminUi.content.findReplace.scope.all' | translate }}</option>
+                        <option value="pages">{{ 'adminUi.content.findReplace.scope.pages' | translate }}</option>
+                        <option value="blog">{{ 'adminUi.content.findReplace.scope.blog' | translate }}</option>
+                        <option value="home">{{ 'adminUi.content.findReplace.scope.home' | translate }}</option>
+                        <option value="site">{{ 'adminUi.content.findReplace.scope.site' | translate }}</option>
+                      </select>
+                    </label>
+
+                    <label class="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-200">
+                      <input type="checkbox" [(ngModel)]="findReplaceCaseSensitive" />
+                      <span>{{ 'adminUi.content.findReplace.caseSensitive' | translate }}</span>
+                    </label>
+
+                    <div class="flex flex-wrap gap-2">
+                      <app-button
+                        size="sm"
+                        [disabled]="findReplaceLoading || findReplaceApplying"
+                        [label]="'adminUi.content.findReplace.preview' | translate"
+                        (action)="previewFindReplace()"
+                      ></app-button>
+                      <app-button
+                        size="sm"
+                        variant="ghost"
+                        [disabled]="findReplaceLoading || findReplaceApplying || !findReplacePreview || findReplacePreview.total_items === 0"
+                        [label]="'adminUi.content.findReplace.apply' | translate"
+                        (action)="applyFindReplace()"
+                      ></app-button>
+                    </div>
+                  </div>
+
+                  <div *ngIf="findReplaceError" class="rounded-lg border border-rose-200 bg-rose-50 p-2 text-sm text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
+                    {{ findReplaceError }}
+                  </div>
+
+                  <div *ngIf="findReplaceLoading" class="text-sm text-slate-600 dark:text-slate-300">
+                    {{ 'adminUi.content.findReplace.loading' | translate }}
+                  </div>
+
+                  <div *ngIf="findReplaceApplying" class="text-sm text-slate-600 dark:text-slate-300">
+                    {{ 'adminUi.content.findReplace.applying' | translate }}
+                  </div>
+
+                  <div *ngIf="findReplacePreview && !findReplaceLoading && !findReplaceError" class="grid gap-2">
+                    <div class="text-xs text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.content.findReplace.summary' | translate:{ items: findReplacePreview.total_items, matches: findReplacePreview.total_matches } }}
+                    </div>
+
+                    <div *ngIf="findReplacePreview.total_items === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                      {{ 'adminUi.content.findReplace.empty' | translate }}
+                    </div>
+
+                    <div *ngIf="findReplacePreview.total_items > 0" class="grid gap-2">
+                      <div
+                        *ngFor="let item of findReplacePreview.items"
+                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900"
+                      >
+                        <div class="flex items-start justify-between gap-2">
+                          <div class="min-w-0">
+                            <p class="text-sm font-semibold text-slate-900 dark:text-slate-50 truncate">{{ item.key }}</p>
+                            <p class="text-xs text-slate-600 dark:text-slate-300 truncate">{{ item.title }}</p>
+                            <p *ngIf="item.translations?.length" class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                              <span *ngFor="let tr of item.translations; let last = last">
+                                {{ tr.lang }}: {{ tr.matches }}<span *ngIf="!last"> · </span>
+                              </span>
+                            </p>
+                          </div>
+                          <div class="text-xs font-semibold text-slate-700 dark:text-slate-200">{{ item.matches }}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div *ngIf="findReplacePreview.truncated" class="text-xs text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.content.findReplace.truncated' | translate:{ limit: 200 } }}
+                    </div>
+                  </div>
+
+                  <div *ngIf="findReplaceApplyResult" class="rounded-lg border border-slate-200 bg-white p-2 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
+                    <p class="font-semibold">
+                      {{ 'adminUi.content.findReplace.result' | translate:{ blocks: findReplaceApplyResult.updated_blocks, translations: findReplaceApplyResult.updated_translations, replacements: findReplaceApplyResult.total_replacements } }}
+                    </p>
+                    <div *ngIf="findReplaceApplyResult.errors?.length" class="mt-1 grid gap-1">
+                      <p class="text-rose-700 dark:text-rose-300">{{ 'adminUi.content.findReplace.applyErrors' | translate }}</p>
+                      <p *ngFor="let e of findReplaceApplyResult.errors" class="text-[11px] text-rose-700 dark:text-rose-300">
+                        {{ e.key }}: {{ e.error }}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </details>
 
@@ -5798,6 +5909,16 @@ export class AdminComponent implements OnInit, OnDestroy {
   redirectsExporting = false;
   redirectsImporting = false;
   redirectsImportResult: ContentRedirectImportResult | null = null;
+  findReplaceFind = '';
+  findReplaceReplace = '';
+  findReplaceScope: 'all' | 'pages' | 'blog' | 'home' | 'site' = 'pages';
+  findReplaceCaseSensitive = true;
+  findReplaceLoading = false;
+  findReplaceApplying = false;
+  findReplaceError: string | null = null;
+  findReplacePreview: ContentFindReplacePreviewResponse | null = null;
+  findReplaceApplyResult: ContentFindReplaceApplyResponse | null = null;
+  private findReplacePreviewKey: string | null = null;
   linkCheckKey = 'page.about';
   linkCheckLoading = false;
   linkCheckError: string | null = null;
@@ -10333,6 +10454,110 @@ export class AdminComponent implements OnInit, OnDestroy {
         const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
         this.redirectsImporting = false;
         this.toast.error(detail || this.t('adminUi.site.pages.redirects.errors.import'));
+      }
+    });
+  }
+
+  private findReplaceKeyPrefix(): string | undefined {
+    if (this.findReplaceScope === 'blog') return 'blog.';
+    if (this.findReplaceScope === 'home') return 'home.';
+    if (this.findReplaceScope === 'site') return 'site.';
+    if (this.findReplaceScope === 'pages') return 'page.';
+    return undefined;
+  }
+
+  private findReplacePayloadKey(payload: { find: string; replace: string; key_prefix?: string | null; case_sensitive: boolean }): string {
+    return JSON.stringify({
+      find: payload.find,
+      replace: payload.replace,
+      key_prefix: payload.key_prefix ?? null,
+      case_sensitive: payload.case_sensitive
+    });
+  }
+
+  previewFindReplace(): void {
+    if (this.findReplaceLoading || this.findReplaceApplying) return;
+    const find = (this.findReplaceFind || '').trim();
+    if (!find) {
+      this.toast.error(this.t('adminUi.content.findReplace.errors.findRequired'));
+      return;
+    }
+    const payload = {
+      find,
+      replace: this.findReplaceReplace || '',
+      key_prefix: this.findReplaceKeyPrefix() ?? undefined,
+      case_sensitive: this.findReplaceCaseSensitive,
+      limit: 200
+    };
+
+    this.findReplaceLoading = true;
+    this.findReplaceError = null;
+    this.findReplacePreview = null;
+    this.findReplaceApplyResult = null;
+    this.findReplacePreviewKey = null;
+
+    this.admin.previewFindReplaceContent(payload).subscribe({
+      next: (res) => {
+        this.findReplacePreview = res || null;
+        this.findReplaceLoading = false;
+        this.findReplacePreviewKey = this.findReplacePayloadKey({
+          find: payload.find,
+          replace: payload.replace,
+          key_prefix: payload.key_prefix ?? null,
+          case_sensitive: payload.case_sensitive
+        });
+      },
+      error: (err) => {
+        const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
+        this.findReplaceError = detail || this.t('adminUi.content.findReplace.errors.preview');
+        this.findReplacePreview = null;
+        this.findReplaceLoading = false;
+      }
+    });
+  }
+
+  applyFindReplace(): void {
+    if (this.findReplaceLoading || this.findReplaceApplying) return;
+    const find = (this.findReplaceFind || '').trim();
+    if (!find) {
+      this.toast.error(this.t('adminUi.content.findReplace.errors.findRequired'));
+      return;
+    }
+    const payload = {
+      find,
+      replace: this.findReplaceReplace || '',
+      key_prefix: this.findReplaceKeyPrefix() ?? undefined,
+      case_sensitive: this.findReplaceCaseSensitive
+    };
+    const key = this.findReplacePayloadKey(payload);
+
+    if (!this.findReplacePreview || this.findReplacePreviewKey !== key) {
+      this.toast.error(this.t('adminUi.content.findReplace.errors.previewFirst'));
+      return;
+    }
+
+    const items = this.findReplacePreview.total_items || 0;
+    const matches = this.findReplacePreview.total_matches || 0;
+    if (!window.confirm(this.t('adminUi.content.findReplace.confirms.apply', { items, matches }))) return;
+
+    this.findReplaceApplying = true;
+    this.findReplaceError = null;
+
+    this.admin.applyFindReplaceContent(payload).subscribe({
+      next: (res) => {
+        this.findReplaceApplyResult = res || null;
+        this.findReplaceApplying = false;
+        this.toast.success(
+          this.t('adminUi.content.findReplace.success.apply', {
+            blocks: res?.updated_blocks ?? 0,
+            replacements: res?.total_replacements ?? 0
+          })
+        );
+      },
+      error: (err) => {
+        const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
+        this.findReplaceApplying = false;
+        this.toast.error(detail || this.t('adminUi.content.findReplace.errors.apply'));
       }
     });
   }
