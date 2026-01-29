@@ -77,6 +77,16 @@
     "restricted": {
       "title": "Sign in required",
       "copy": "This page is available to signed-in customers only."
+    },
+    "admin": {
+      "edit": "Edit this page"
+    },
+    "blocks": {
+      "productGrid": {
+        "errorTitle": "Could not load products.",
+        "errorCopy": "Please try again.",
+        "empty": "No products to show right now."
+      }
     }
   },
   "legal": {
@@ -2631,6 +2641,8 @@
 	          "cta": "Call to action",
 	          "faq": "FAQ",
 	          "testimonials": "Testimonials",
+            "product_grid": "Product grid",
+            "form": "Form",
 	          "image": "Image",
 	          "gallery": "Gallery",
 	          "banner": "Banner",
@@ -2671,7 +2683,15 @@
           "interval": "Interval (ms)",
           "arrows": "Arrows",
           "dots": "Dots",
-          "pauseOnHover": "Pause on hover"
+          "pauseOnHover": "Pause on hover",
+          "productGridSource": "Source",
+          "productGridCategorySlug": "Category slug",
+          "productGridCollectionSlug": "Collection slug",
+          "productGridProductSlugs": "Product slugs",
+          "productGridProductSlugsHint": "One slug per line (or comma-separated).",
+          "productGridLimit": "Limit",
+          "formType": "Form type",
+          "formTopic": "Contact topic"
         },
         "variants": {
           "split": "Split",
@@ -2685,6 +2705,15 @@
         "textStyle": {
           "dark": "Dark text",
           "light": "Light text"
+        },
+        "productGridSources": {
+          "category": "Category",
+          "collection": "Collection",
+          "products": "Manual products"
+        },
+        "formTypes": {
+          "contact": "Contact",
+          "newsletter": "Newsletter"
         },
         "success": {
           "save": "Sections order saved."
@@ -4297,6 +4326,8 @@
 	          "cta": "Call-to-action block with button.",
 	          "faq": "FAQ accordion with questions and answers.",
 	          "testimonials": "Testimonials grid with quotes and authors.",
+            "product_grid": "Shoppable product grid sourced by category, collection, or manual selection.",
+            "form": "Contact or newsletter form with validation and success messaging.",
 	          "image": "Single image with optional link and caption.",
 	          "gallery": "Multi-image gallery with captions and focal points.",
 	          "banner": "Hero banner with headline, CTA, and background image.",

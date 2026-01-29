@@ -77,6 +77,16 @@
     "restricted": {
       "title": "Este necesară autentificarea",
       "copy": "Această pagină este disponibilă doar pentru utilizatorii autentificați."
+    },
+    "admin": {
+      "edit": "Editează această pagină"
+    },
+    "blocks": {
+      "productGrid": {
+        "errorTitle": "Nu am putut încărca produsele.",
+        "errorCopy": "Te rugăm să încerci din nou.",
+        "empty": "Nu sunt produse de afișat momentan."
+      }
     }
   },
   "legal": {
@@ -2631,6 +2641,8 @@
 	          "cta": "Apel la acțiune",
 	          "faq": "Întrebări frecvente",
 	          "testimonials": "Testimoniale",
+            "product_grid": "Grilă de produse",
+            "form": "Formular",
 	          "image": "Imagine",
 	          "gallery": "Galerie",
 	          "banner": "Banner",
@@ -2671,7 +2683,15 @@
           "interval": "Interval (ms)",
           "arrows": "Săgeți",
           "dots": "Puncte",
-          "pauseOnHover": "Pauză la hover"
+          "pauseOnHover": "Pauză la hover",
+          "productGridSource": "Sursă",
+          "productGridCategorySlug": "Slug categorie",
+          "productGridCollectionSlug": "Slug colecție",
+          "productGridProductSlugs": "Slug-uri produse",
+          "productGridProductSlugsHint": "Un slug pe linie (sau separat prin virgulă).",
+          "productGridLimit": "Limită",
+          "formType": "Tip formular",
+          "formTopic": "Subiect contact"
         },
         "variants": {
           "split": "Împărțit",
@@ -2685,6 +2705,15 @@
         "textStyle": {
           "dark": "Text închis",
           "light": "Text deschis"
+        },
+        "productGridSources": {
+          "category": "Categorie",
+          "collection": "Colecție",
+          "products": "Produse manuale"
+        },
+        "formTypes": {
+          "contact": "Contact",
+          "newsletter": "Newsletter"
         },
         "success": {
           "save": "Ordinea secțiunilor a fost salvată."
@@ -4297,6 +4326,8 @@
 	          "cta": "Bloc CTA cu buton.",
 	          "faq": "Accordion FAQ cu întrebări și răspunsuri.",
 	          "testimonials": "Grilă de testimoniale cu citate și autori.",
+            "product_grid": "Grilă de produse din categorie, colecție sau selecție manuală.",
+            "form": "Formular de contact sau newsletter cu validare și mesaj de succes.",
 	          "image": "O singură imagine cu link și legendă opționale.",
 	          "gallery": "Galerie cu mai multe imagini, legende și puncte focale.",
 	          "banner": "Banner tip hero cu titlu, CTA și imagine de fundal.",

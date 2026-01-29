@@ -977,14 +977,16 @@ Below is a structured checklist you can turn into issues.
 - [x] CMS content: find & replace – Search/replace across CMS content blocks (with preview of affected pages).
 - [x] CMS blocks: columns/layout – Add layout blocks (2–3 columns, split hero) with responsive controls.
 - [x] CMS blocks: testimonials/FAQ – Add visual blocks for testimonials, FAQ accordions, and CTAs.
-- [ ] CMS blocks: product grids – Insert product/category/collection grids into pages (shoppable sections).
-- [ ] CMS blocks: form builder – Basic contact/newsletter form blocks with validation and success messaging.
-- [ ] Storefront admin mode: “Edit this page” – Admin-only button on storefront pages linking to the correct CMS editor/section.
+- [x] CMS blocks: product grids – Insert product/category/collection grids into pages (shoppable sections).
+- [x] CMS blocks: form builder – Basic contact/newsletter form blocks with validation and success messaging.
+- [x] Storefront admin mode: “Edit this page” – Admin-only button on storefront pages linking to the correct CMS editor/section.
 - [ ] CMS assets: delete asset – Add a delete action gated by “where used” + safe file cleanup (original + thumbnails).
 - [ ] CMS assets: edited versions – Group edited copies under the original asset (lineage + quick revert).
 - [ ] CMS scheduling: dedicated API – Add `/content/admin/scheduling` (window + pagination) so the scheduling view isn’t limited to the admin dashboard’s latest-content cap.
 - [ ] CMS redirects: quick create UI – Add a small “Create redirect” inline form in the redirects manager (no CSV needed).
 - [ ] CMS blocks: CTA external URLs – Support external `http(s)` links (and optional new-tab) for CTA buttons instead of routerLink-only.
+- [ ] CMS blocks: product grids picker – Add admin select/autocomplete for categories, collections, and product slugs (avoid manual typing).
+- [ ] CMS blocks: forms captcha – Optional Turnstile captcha for newsletter/contact blocks to reduce spam.
 
 ## Data Portability & Backups (Extended)
 - [x] CLI command `python -m app.cli export-data` exporting users (no passwords), products, categories, orders, addresses to JSON.

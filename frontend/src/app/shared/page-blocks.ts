@@ -1,6 +1,17 @@
 export type UiLang = 'en' | 'ro';
 
-export type PageBlockType = 'text' | 'image' | 'gallery' | 'banner' | 'carousel' | 'columns' | 'cta' | 'faq' | 'testimonials';
+export type PageBlockType =
+  | 'text'
+  | 'image'
+  | 'gallery'
+  | 'banner'
+  | 'carousel'
+  | 'columns'
+  | 'cta'
+  | 'faq'
+  | 'testimonials'
+  | 'product_grid'
+  | 'form';
 
 export type ColumnsCount = 2 | 3;
 export type ColumnsBreakpoint = 'sm' | 'md' | 'lg';
@@ -118,6 +129,26 @@ export interface PageTestimonialsBlock extends PageBlockBase {
   items: PageTestimonialItem[];
 }
 
+export type ProductGridSource = 'category' | 'collection' | 'products';
+
+export interface PageProductGridBlock extends PageBlockBase {
+  type: 'product_grid';
+  source: ProductGridSource;
+  limit: number;
+  category_slug?: string | null;
+  collection_slug?: string | null;
+  product_slugs?: string[];
+}
+
+export type CmsFormType = 'contact' | 'newsletter';
+export type ContactSubmissionTopic = 'contact' | 'support' | 'refund' | 'dispute';
+
+export interface PageFormBlock extends PageBlockBase {
+  type: 'form';
+  form_type: CmsFormType;
+  topic?: ContactSubmissionTopic | null;
+}
+
 export interface PageColumnsColumn {
   title?: string | null;
   body_html: string;
@@ -139,7 +170,9 @@ export type PageBlock =
   | PageColumnsBlock
   | PageCtaBlock
   | PageFaqBlock
-  | PageTestimonialsBlock;
+  | PageTestimonialsBlock
+  | PageProductGridBlock
+  | PageFormBlock;
 
 function readLocalized(value: unknown, lang: UiLang): string | null {
   if (typeof value === 'string') return value.trim() || null;
@@ -323,6 +356,59 @@ function normalizeColumnsBreakpoint(value: unknown): ColumnsBreakpoint {
   return 'md';
 }
 
+function normalizeProductGridSource(value: unknown): ProductGridSource {
+  const raw = readString(value);
+  if (!raw) return 'products';
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === 'category' || normalized === 'categories') return 'category';
+  if (normalized === 'collection' || normalized === 'collections') return 'collection';
+  if (normalized === 'products' || normalized === 'product' || normalized === 'manual') return 'products';
+  return 'products';
+}
+
+function parseStringList(value: unknown, limit: number): string[] {
+  const out: string[] = [];
+  const push = (raw: string) => {
+    const cleaned = raw.trim();
+    if (!cleaned) return;
+    if (out.includes(cleaned)) return;
+    out.push(cleaned);
+  };
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      if (typeof item !== 'string') continue;
+      push(item);
+      if (out.length >= limit) break;
+    }
+    return out;
+  }
+
+  if (typeof value === 'string') {
+    for (const part of value.split(/[,\n]/g)) {
+      push(part);
+      if (out.length >= limit) break;
+    }
+    return out;
+  }
+
+  return out;
+}
+
+function normalizeFormType(value: unknown): CmsFormType {
+  const raw = readString(value);
+  if (!raw) return 'contact';
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === 'newsletter') return 'newsletter';
+  return 'contact';
+}
+
+function normalizeContactTopic(value: unknown): ContactSubmissionTopic {
+  const raw = readString(value);
+  if (raw === 'support' || raw === 'refund' || raw === 'dispute') return raw;
+  return 'contact';
+}
+
 export function parsePageBlocks(
   meta: Record<string, unknown> | null | undefined,
   lang: UiLang,
@@ -348,7 +434,9 @@ export function parsePageBlocks(
       typeRaw !== 'columns' &&
       typeRaw !== 'cta' &&
       typeRaw !== 'faq' &&
-      typeRaw !== 'testimonials'
+      typeRaw !== 'testimonials' &&
+      typeRaw !== 'product_grid' &&
+      typeRaw !== 'form'
     ) {
       continue;
     }
@@ -389,6 +477,44 @@ export function parsePageBlocks(
         cta_label: ctaLabel,
         cta_url: ctaUrl
       } satisfies PageCtaBlock);
+      continue;
+    }
+
+    if (typeRaw === 'product_grid') {
+      const source = normalizeProductGridSource(rec['source'] ?? rec['mode']);
+      const limit = Math.max(1, Math.min(24, Math.round(readNumber(rec['limit'], 6))));
+      const categorySlug = readString(rec['category_slug'] ?? rec['category']);
+      const collectionSlug = readString(rec['collection_slug'] ?? rec['collection']);
+      const productSlugs = parseStringList(rec['product_slugs'] ?? rec['products'], 50);
+      const hasAny = Boolean(title || categorySlug || collectionSlug || productSlugs.length);
+      if (!hasAny) continue;
+      blocks.push({
+        key,
+        type: 'product_grid',
+        enabled: true,
+        title,
+        layout,
+        source,
+        limit,
+        category_slug: categorySlug,
+        collection_slug: collectionSlug,
+        product_slugs: productSlugs.length ? productSlugs : undefined
+      } satisfies PageProductGridBlock);
+      continue;
+    }
+
+    if (typeRaw === 'form') {
+      const formType = normalizeFormType(rec['form_type'] ?? rec['variant']);
+      const topic = formType === 'contact' ? normalizeContactTopic(rec['topic']) : null;
+      blocks.push({
+        key,
+        type: 'form',
+        enabled: true,
+        title,
+        layout,
+        form_type: formType,
+        topic
+      } satisfies PageFormBlock);
       continue;
     }
 

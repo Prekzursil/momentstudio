@@ -79,6 +79,9 @@ type HomeSectionId =
   | 'why';
 
 type CmsColumnsBreakpoint = 'sm' | 'md' | 'lg';
+type CmsProductGridSource = 'category' | 'collection' | 'products';
+type CmsFormType = 'contact' | 'newsletter';
+type CmsContactTopic = 'contact' | 'support' | 'refund' | 'dispute';
 
 type CmsColumnsColumnDraft = {
   title: LocalizedText;
@@ -96,7 +99,19 @@ type CmsFaqItemDraft = {
   answer_markdown: LocalizedText;
 };
 
-type HomeBlockType = HomeSectionId | 'text' | 'columns' | 'cta' | 'faq' | 'testimonials' | 'image' | 'gallery' | 'banner' | 'carousel';
+type HomeBlockType =
+  | HomeSectionId
+  | 'text'
+  | 'columns'
+  | 'cta'
+  | 'faq'
+  | 'testimonials'
+  | 'product_grid'
+  | 'form'
+  | 'image'
+  | 'gallery'
+  | 'banner'
+  | 'carousel';
 
 type LocalizedText = { en: string; ro: string };
 
@@ -160,6 +175,13 @@ type HomeBlockDraft = {
   cta_url: string;
   faq_items: CmsFaqItemDraft[];
   testimonials: CmsTestimonialDraft[];
+  product_grid_source: CmsProductGridSource;
+  product_grid_category_slug: string;
+  product_grid_collection_slug: string;
+  product_grid_product_slugs: string;
+  product_grid_limit: number;
+  form_type: CmsFormType;
+  form_topic: CmsContactTopic;
   url: string;
   link_url: string;
   focal_x: number;
@@ -174,7 +196,18 @@ type HomeBlockDraft = {
 };
 
 type PageBuilderKey = `page.${string}` | CmsGlobalSectionKey;
-type PageBlockType = 'text' | 'columns' | 'cta' | 'faq' | 'testimonials' | 'image' | 'gallery' | 'banner' | 'carousel';
+type PageBlockType =
+  | 'text'
+  | 'columns'
+  | 'cta'
+  | 'faq'
+  | 'testimonials'
+  | 'product_grid'
+  | 'form'
+  | 'image'
+  | 'gallery'
+  | 'banner'
+  | 'carousel';
 type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
 
 type PageBlocksDraftState = {
@@ -2020,6 +2053,109 @@ class CmsDraftManager<T> {
 			                            </div>
 			                          </ng-container>
 
+			                          <ng-container *ngSwitchCase="'product_grid'">
+			                            <div class="grid gap-3">
+			                              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                                {{ 'adminUi.home.sections.fields.productGridSource' | translate }}
+			                                <select
+			                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                  [(ngModel)]="block.product_grid_source"
+			                                >
+			                                  <option [ngValue]="'category'">{{ 'adminUi.home.sections.productGridSources.category' | translate }}</option>
+			                                  <option [ngValue]="'collection'">{{ 'adminUi.home.sections.productGridSources.collection' | translate }}</option>
+			                                  <option [ngValue]="'products'">{{ 'adminUi.home.sections.productGridSources.products' | translate }}</option>
+			                                </select>
+			                              </label>
+
+			                              <label
+			                                *ngIf="block.product_grid_source === 'category'"
+			                                class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200"
+			                              >
+			                                {{ 'adminUi.home.sections.fields.productGridCategorySlug' | translate }}
+			                                <input
+			                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                  [(ngModel)]="block.product_grid_category_slug"
+			                                />
+			                              </label>
+
+			                              <label
+			                                *ngIf="block.product_grid_source === 'collection'"
+			                                class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200"
+			                              >
+			                                {{ 'adminUi.home.sections.fields.productGridCollectionSlug' | translate }}
+			                                <input
+			                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                  [(ngModel)]="block.product_grid_collection_slug"
+			                                />
+			                              </label>
+
+			                              <label
+			                                *ngIf="block.product_grid_source === 'products'"
+			                                class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200"
+			                              >
+			                                {{ 'adminUi.home.sections.fields.productGridProductSlugs' | translate }}
+			                                <textarea
+			                                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                  rows="4"
+			                                  [(ngModel)]="block.product_grid_product_slugs"
+			                                ></textarea>
+			                                <span class="text-xs text-slate-500 dark:text-slate-400">
+			                                  {{ 'adminUi.home.sections.fields.productGridProductSlugsHint' | translate }}
+			                                </span>
+			                              </label>
+
+			                              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                                {{ 'adminUi.home.sections.fields.productGridLimit' | translate }}
+			                                <input
+			                                  type="number"
+			                                  min="1"
+			                                  max="24"
+			                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                  [(ngModel)]="block.product_grid_limit"
+			                                />
+			                              </label>
+			                            </div>
+			                          </ng-container>
+
+			                          <ng-container *ngSwitchCase="'form'">
+			                            <div class="grid gap-3">
+			                              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                                {{ 'adminUi.home.sections.fields.formType' | translate }}
+			                                <select
+			                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                  [(ngModel)]="block.form_type"
+			                                >
+			                                  <option [ngValue]="'contact'">{{ 'adminUi.home.sections.formTypes.contact' | translate }}</option>
+			                                  <option [ngValue]="'newsletter'">{{ 'adminUi.home.sections.formTypes.newsletter' | translate }}</option>
+			                                </select>
+			                              </label>
+
+			                              <label
+			                                *ngIf="block.form_type === 'contact'"
+			                                class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200"
+			                              >
+			                                {{ 'adminUi.home.sections.fields.formTopic' | translate }}
+			                                <select
+			                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
+			                                  [(ngModel)]="block.form_topic"
+			                                >
+			                                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="contact">
+			                                    {{ 'contact.form.topicContact' | translate }}
+			                                  </option>
+			                                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="support">
+			                                    {{ 'contact.form.topicSupport' | translate }}
+			                                  </option>
+			                                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="refund">
+			                                    {{ 'contact.form.topicRefund' | translate }}
+			                                  </option>
+			                                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="dispute">
+			                                    {{ 'contact.form.topicDispute' | translate }}
+			                                  </option>
+			                                </select>
+			                              </label>
+			                            </div>
+			                          </ng-container>
+
 			                          <ng-container *ngSwitchCase="'faq'">
 			                            <div class="grid gap-3">
 			                              <div class="flex items-center justify-between gap-3">
@@ -3347,6 +3483,7 @@ class CmsDraftManager<T> {
 
 	            <app-cms-block-library
 	              context="home"
+                [allowedTypes]="homeCmsLibraryTypes"
 	              (add)="addHomeBlockFromLibrary($event.type, $event.template)"
 	              (dragActive)="setHomeInsertDragActive($event)"
             ></app-cms-block-library>
@@ -7009,7 +7146,30 @@ export class AdminComponent implements OnInit, OnDestroy {
   newCustomPagePublishedUntil = '';
   creatingCustomPage = false;
   readonly globalSections = CMS_GLOBAL_SECTIONS;
-  readonly allPageBlockTypes: PageBlockType[] = ['text', 'columns', 'cta', 'faq', 'testimonials', 'image', 'gallery', 'banner', 'carousel'];
+  readonly allPageBlockTypes: PageBlockType[] = [
+    'text',
+    'columns',
+    'cta',
+    'faq',
+    'testimonials',
+    'product_grid',
+    'form',
+    'image',
+    'gallery',
+    'banner',
+    'carousel'
+  ];
+  readonly homeCmsLibraryTypes: ReadonlyArray<CmsBlockLibraryBlockType> = [
+    'text',
+    'columns',
+    'cta',
+    'faq',
+    'testimonials',
+    'image',
+    'gallery',
+    'banner',
+    'carousel'
+  ];
   pageBlocksKey: PageBuilderKey = 'page.about';
   newPageBlockType: PageBlockType = 'text';
   pageBlocks: Record<string, PageBlockDraft[]> = {};
@@ -11987,6 +12147,8 @@ export class AdminComponent implements OnInit, OnDestroy {
     if (type === 'cta') return 'adminUi.home.sections.blocks.cta';
     if (type === 'faq') return 'adminUi.home.sections.blocks.faq';
     if (type === 'testimonials') return 'adminUi.home.sections.blocks.testimonials';
+    if (type === 'product_grid') return 'adminUi.home.sections.blocks.product_grid';
+    if (type === 'form') return 'adminUi.home.sections.blocks.form';
     if (type === 'gallery') return 'adminUi.home.sections.blocks.gallery';
     if (type === 'banner') return 'adminUi.home.sections.blocks.banner';
     if (type === 'carousel') return 'adminUi.home.sections.blocks.carousel';
@@ -12125,6 +12287,8 @@ export class AdminComponent implements OnInit, OnDestroy {
         typeRaw !== 'cta' &&
         typeRaw !== 'faq' &&
         typeRaw !== 'testimonials' &&
+        typeRaw !== 'product_grid' &&
+        typeRaw !== 'form' &&
         typeRaw !== 'image' &&
         typeRaw !== 'gallery' &&
         typeRaw !== 'banner' &&
@@ -12153,6 +12317,13 @@ export class AdminComponent implements OnInit, OnDestroy {
         cta_url: '',
         faq_items: [{ question: this.emptyLocalizedText(), answer_markdown: this.emptyLocalizedText() }],
         testimonials: [{ quote_markdown: this.emptyLocalizedText(), author: this.emptyLocalizedText(), role: this.emptyLocalizedText() }],
+        product_grid_source: 'category',
+        product_grid_category_slug: '',
+        product_grid_collection_slug: '',
+        product_grid_product_slugs: '',
+        product_grid_limit: 6,
+        form_type: 'contact',
+        form_topic: 'contact',
         url: '',
         link_url: '',
         focal_x: 50,
@@ -12221,6 +12392,39 @@ export class AdminComponent implements OnInit, OnDestroy {
           }
         }
         if (items.length) draft.testimonials = items;
+      } else if (typeRaw === 'product_grid') {
+        const sourceRaw = typeof rec['source'] === 'string' ? String(rec['source']).trim().toLowerCase() : '';
+        draft.product_grid_source = sourceRaw === 'collection' ? 'collection' : sourceRaw === 'products' ? 'products' : 'category';
+        draft.product_grid_category_slug = typeof rec['category_slug'] === 'string' ? String(rec['category_slug']).trim() : '';
+        draft.product_grid_collection_slug = typeof rec['collection_slug'] === 'string' ? String(rec['collection_slug']).trim() : '';
+        const slugsRaw = rec['product_slugs'];
+        const slugs: string[] = [];
+        const pushSlug = (value: string) => {
+          const cleaned = value.trim();
+          if (!cleaned) return;
+          if (slugs.includes(cleaned)) return;
+          slugs.push(cleaned);
+        };
+        if (Array.isArray(slugsRaw)) {
+          for (const item of slugsRaw) {
+            if (typeof item !== 'string') continue;
+            pushSlug(item);
+            if (slugs.length >= 50) break;
+          }
+        } else if (typeof slugsRaw === 'string') {
+          for (const part of slugsRaw.split(/[,\n]/g)) {
+            pushSlug(part);
+            if (slugs.length >= 50) break;
+          }
+        }
+        draft.product_grid_product_slugs = slugs.join('\n');
+        const desired = Number(rec['limit']);
+        draft.product_grid_limit = Number.isFinite(desired) ? Math.max(1, Math.min(24, Math.trunc(desired))) : 6;
+      } else if (typeRaw === 'form') {
+        const formTypeRaw = typeof rec['form_type'] === 'string' ? String(rec['form_type']).trim().toLowerCase() : '';
+        draft.form_type = formTypeRaw === 'newsletter' ? 'newsletter' : 'contact';
+        const topicRaw = typeof rec['topic'] === 'string' ? String(rec['topic']).trim().toLowerCase() : '';
+        draft.form_topic = topicRaw === 'support' || topicRaw === 'refund' || topicRaw === 'dispute' ? (topicRaw as CmsContactTopic) : 'contact';
       } else if (typeRaw === 'image') {
         draft.url = typeof rec['url'] === 'string' ? String(rec['url']).trim() : '';
         draft.link_url = typeof rec['link_url'] === 'string' ? String(rec['link_url']).trim() : '';
@@ -12302,6 +12506,13 @@ export class AdminComponent implements OnInit, OnDestroy {
       cta_url: '',
       faq_items: [{ question: this.emptyLocalizedText(), answer_markdown: this.emptyLocalizedText() }],
       testimonials: [{ quote_markdown: this.emptyLocalizedText(), author: this.emptyLocalizedText(), role: this.emptyLocalizedText() }],
+      product_grid_source: 'category',
+      product_grid_category_slug: '',
+      product_grid_collection_slug: '',
+      product_grid_product_slugs: '',
+      product_grid_limit: 6,
+      form_type: 'contact',
+      form_topic: 'contact',
       url: '',
       link_url: '',
       focal_x: 50,
@@ -12388,6 +12599,20 @@ export class AdminComponent implements OnInit, OnDestroy {
       return;
     }
 
+    if (type === 'product_grid') {
+      block.title = { en: 'Shoppable grid', ro: 'Grilă de produse' };
+      block.product_grid_source = 'category';
+      block.product_grid_limit = 6;
+      return;
+    }
+
+    if (type === 'form') {
+      block.title = { en: 'Contact form', ro: 'Formular de contact' };
+      block.form_type = 'contact';
+      block.form_topic = 'contact';
+      return;
+    }
+
     if (type === 'image') {
       block.title = { en: 'Image section', ro: 'Secțiune imagine' };
       block.alt = { en: 'Image description', ro: 'Descriere imagine' };
@@ -12448,17 +12673,19 @@ export class AdminComponent implements OnInit, OnDestroy {
       const scope = parsed.scope;
       if (scope !== 'home' && scope !== 'page') return null;
       const type = parsed.type;
-      if (
-        type !== 'text' &&
-        type !== 'columns' &&
-        type !== 'cta' &&
-        type !== 'faq' &&
-        type !== 'testimonials' &&
-        type !== 'image' &&
-        type !== 'gallery' &&
-        type !== 'banner' &&
-        type !== 'carousel'
-      ) {
+       if (
+         type !== 'text' &&
+         type !== 'columns' &&
+         type !== 'cta' &&
+         type !== 'faq' &&
+         type !== 'testimonials' &&
+         type !== 'product_grid' &&
+         type !== 'form' &&
+         type !== 'image' &&
+         type !== 'gallery' &&
+         type !== 'banner' &&
+         type !== 'carousel'
+       ) {
         return null;
       }
       const template = parsed.template === 'starter' ? 'starter' : 'blank';
@@ -13030,6 +13257,32 @@ export class AdminComponent implements OnInit, OnDestroy {
           author: item.author,
           role: item.role
         }));
+      } else if (b.type === 'product_grid') {
+        base['source'] = b.product_grid_source;
+        const desiredLimit = Number(b.product_grid_limit || 6);
+        const limit = Math.max(1, Math.min(24, Number.isFinite(desiredLimit) ? Math.trunc(desiredLimit) : 6));
+        base['limit'] = limit;
+
+        if (b.product_grid_source === 'category') {
+          const categorySlug = (b.product_grid_category_slug || '').trim();
+          if (categorySlug) base['category_slug'] = categorySlug;
+        } else if (b.product_grid_source === 'collection') {
+          const collectionSlug = (b.product_grid_collection_slug || '').trim();
+          if (collectionSlug) base['collection_slug'] = collectionSlug;
+        } else if (b.product_grid_source === 'products') {
+          const unique: string[] = [];
+          for (const raw of (b.product_grid_product_slugs || '').split(/[,\n]/g)) {
+            const slug = raw.trim();
+            if (!slug) continue;
+            if (unique.includes(slug)) continue;
+            unique.push(slug);
+            if (unique.length >= 50) break;
+          }
+          if (unique.length) base['product_slugs'] = unique;
+        }
+      } else if (b.type === 'form') {
+        base['form_type'] = b.form_type;
+        if (b.form_type === 'contact') base['topic'] = b.form_topic;
       } else if (b.type === 'image') {
         base['url'] = b.url;
         base['link_url'] = b.link_url;
@@ -13138,6 +13391,23 @@ export class AdminComponent implements OnInit, OnDestroy {
           return Boolean(qEn || qRo || aEn || aRo || rEn || rRo);
         });
         if (!hasAny) emptySections.push(label);
+        return;
+      }
+      if (block.type === 'product_grid') {
+        const source = block.product_grid_source;
+        if (source === 'category') {
+          if (!(block.product_grid_category_slug || '').trim()) emptySections.push(label);
+          return;
+        }
+        if (source === 'collection') {
+          if (!(block.product_grid_collection_slug || '').trim()) emptySections.push(label);
+          return;
+        }
+        const hasAny = (block.product_grid_product_slugs || '').split(/[,\n]/g).some((raw) => Boolean(raw.trim()));
+        if (!hasAny) emptySections.push(label);
+        return;
+      }
+      if (block.type === 'form') {
         return;
       }
       if (block.type === 'image') {
@@ -13561,6 +13831,13 @@ export class AdminComponent implements OnInit, OnDestroy {
       cta_url: '',
       faq_items: [{ question: this.emptyLocalizedText(), answer_markdown: this.emptyLocalizedText() }],
       testimonials: [{ quote_markdown: this.emptyLocalizedText(), author: this.emptyLocalizedText(), role: this.emptyLocalizedText() }],
+      product_grid_source: 'category',
+      product_grid_category_slug: '',
+      product_grid_collection_slug: '',
+      product_grid_product_slugs: '',
+      product_grid_limit: 6,
+      form_type: 'contact',
+      form_topic: 'contact',
       url: '',
       link_url: '',
       focal_x: 50,
@@ -13591,6 +13868,8 @@ export class AdminComponent implements OnInit, OnDestroy {
       block.type === 'cta' ||
       block.type === 'faq' ||
       block.type === 'testimonials' ||
+      block.type === 'product_grid' ||
+      block.type === 'form' ||
       block.type === 'image' ||
       block.type === 'gallery' ||
       block.type === 'banner' ||

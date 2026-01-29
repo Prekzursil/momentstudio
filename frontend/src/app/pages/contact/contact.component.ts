@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { Meta, Title } from '@angular/platform-browser';
 import { Subscription, finalize } from 'rxjs';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -10,14 +10,15 @@ import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { MarkdownService } from '../../core/markdown.service';
 import { SiteSocialLink, SiteSocialService } from '../../core/site-social.service';
+import { StorefrontAdminModeService } from '../../core/storefront-admin-mode.service';
 import { ContactSubmissionTopic, SupportService } from '../../core/support.service';
 import { ContainerComponent } from '../../layout/container.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
+import { ButtonComponent } from '../../shared/button.component';
 import { CardComponent } from '../../shared/card.component';
+import { CmsPageBlocksComponent } from '../../shared/cms-page-blocks.component';
 import { ImgFallbackDirective } from '../../shared/img-fallback.directive';
-import { PageBlock, pageBlockInnerClasses, pageBlockOuterClasses, pageBlocksToPlainText, parsePageBlocks } from '../../shared/page-blocks';
-import { BannerBlockComponent } from '../../shared/banner-block.component';
-import { CarouselBlockComponent } from '../../shared/carousel-block.component';
+import { PageBlock, pageBlocksToPlainText, parsePageBlocks } from '../../shared/page-blocks';
 
 interface ContentBlock {
   title: string;
@@ -36,13 +37,26 @@ interface ContentBlock {
     CardComponent,
     TranslateModule,
     ImgFallbackDirective,
-    BannerBlockComponent,
-    CarouselBlockComponent
+    CmsPageBlocksComponent,
+    ButtonComponent
   ],
   template: `
     <app-container classes="py-10 grid gap-6 max-w-3xl">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
-      <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ block()?.title || ('contact.title' | translate) }}</h1>
+
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">
+          {{ block()?.title || ('contact.title' | translate) }}
+        </h1>
+        <app-button
+          *ngIf="canEditPage()"
+          class="no-print"
+          size="sm"
+          variant="ghost"
+          [label]="'page.admin.edit' | translate"
+          (action)="editPage()"
+        ></app-button>
+      </div>
 
       <app-card>
         <div class="grid gap-5 text-slate-700 dark:text-slate-200">
@@ -57,85 +71,7 @@ interface ContentBlock {
 
           <ng-container *ngIf="!loading()">
             <ng-container *ngIf="pageBlocks().length; else markdownIntro">
-	              <div class="grid gap-6">
-	                <ng-container *ngFor="let b of pageBlocks()">
-	                  <div class="w-full" [ngClass]="pageBlockOuterClasses(b.layout)">
-	                    <div [ngClass]="pageBlockInnerClasses(b.layout)">
-	                      <ng-container [ngSwitch]="b.type">
-	                        <div *ngSwitchCase="'text'" class="grid gap-2">
-	                          <h2 *ngIf="b.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">
-	                            {{ b.title }}
-	                          </h2>
-	                          <div class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="b.body_html"></div>
-	                        </div>
-
-	                        <div *ngSwitchCase="'image'" class="grid gap-2">
-	                          <h2 *ngIf="b.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">
-	                            {{ b.title }}
-	                          </h2>
-	                          <a
-	                            *ngIf="b.link_url; else plainImage"
-	                            class="block"
-	                            [href]="b.link_url"
-	                            target="_blank"
-	                            rel="noopener noreferrer"
-	                          >
-	                            <img
-	                              [src]="b.url"
-	                              [alt]="b.alt || b.title || ''"
-	                              class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
-	                              [style.object-position]="focalPosition(b.focal_x, b.focal_y)"
-	                              loading="lazy"
-	                            />
-	                          </a>
-	                          <ng-template #plainImage>
-	                            <img
-	                              [src]="b.url"
-	                              [alt]="b.alt || b.title || ''"
-	                              class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
-	                              [style.object-position]="focalPosition(b.focal_x, b.focal_y)"
-	                              loading="lazy"
-	                            />
-	                          </ng-template>
-	                          <p *ngIf="b.caption" class="text-sm text-slate-600 dark:text-slate-300">{{ b.caption }}</p>
-	                        </div>
-
-	                        <div *ngSwitchCase="'gallery'" class="grid gap-2">
-	                          <h2 *ngIf="b.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">
-	                            {{ b.title }}
-	                          </h2>
-	                          <div class="grid gap-3 sm:grid-cols-2">
-	                            <div *ngFor="let img of b.images" class="grid gap-2">
-	                              <img
-	                                [src]="img.url"
-	                                [alt]="img.alt || b.title || ''"
-	                                class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
-	                                [style.object-position]="focalPosition(img.focal_x, img.focal_y)"
-	                                loading="lazy"
-	                              />
-	                              <p *ngIf="img.caption" class="text-sm text-slate-600 dark:text-slate-300">{{ img.caption }}</p>
-	                            </div>
-	                          </div>
-	                        </div>
-
-	                        <div *ngSwitchCase="'banner'" class="grid gap-2">
-	                          <h2 *ngIf="b.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">
-	                            {{ b.title }}
-	                          </h2>
-	                          <app-banner-block [slide]="b.slide"></app-banner-block>
-	                        </div>
-
-	                        <div *ngSwitchCase="'carousel'" class="grid gap-2">
-	                          <h2 *ngIf="b.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">
-	                            {{ b.title }}
-	                          </h2>
-	                          <app-carousel-block [slides]="b.slides" [settings]="b.settings"></app-carousel-block>
-	                        </div>
-	                      </ng-container>
-	                    </div>
-	                  </div>
-	                </ng-container>
-	              </div>
+              <app-cms-page-blocks [blocks]="pageBlocks()"></app-cms-page-blocks>
             </ng-container>
             <ng-template #markdownIntro>
               <div class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="bodyHtml()"></div>
@@ -234,8 +170,12 @@ interface ContentBlock {
           <div class="border-t border-slate-200 pt-6 grid gap-4 dark:border-slate-800">
             <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'contact.form.title' | translate }}</h2>
 
-            <div *ngIf="submitSuccess()" class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-100">
-              {{ 'contact.form.success' | translate }}
+            <div
+              *ngIf="submitSuccess()"
+              class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-100"
+            >
+              <p class="font-semibold">{{ 'contact.form.successTitle' | translate }}</p>
+              <p class="text-sm">{{ 'contact.form.successCopy' | translate }}</p>
             </div>
 
             <div *ngIf="submitError()" class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
@@ -337,8 +277,6 @@ export class ContactComponent implements OnInit, OnDestroy {
   hasError = signal<boolean>(false);
   bodyHtml = signal<string>('');
   pageBlocks = signal<PageBlock[]>([]);
-  pageBlockOuterClasses = pageBlockOuterClasses;
-  pageBlockInnerClasses = pageBlockInnerClasses;
 
   phone = signal<string>('+40723204204');
   email = signal<string>('momentstudio.ro@gmail.com');
@@ -363,6 +301,8 @@ export class ContactComponent implements OnInit, OnDestroy {
   constructor(
     private api: ApiService,
     private route: ActivatedRoute,
+    private router: Router,
+    private storefrontAdminMode: StorefrontAdminModeService,
     private translate: TranslateService,
     private title: Title,
     private meta: Meta,
@@ -452,6 +392,14 @@ export class ContactComponent implements OnInit, OnDestroy {
     const x = Math.max(0, Math.min(100, Math.round(Number(focalX ?? 50))));
     const y = Math.max(0, Math.min(100, Math.round(Number(focalY ?? 50))));
     return `${x}% ${y}%`;
+  }
+
+  canEditPage(): boolean {
+    return this.storefrontAdminMode.enabled();
+  }
+
+  editPage(): void {
+    void this.router.navigate(['/admin/content/pages'], { queryParams: { edit: 'contact' } });
   }
 
   submit(): void {

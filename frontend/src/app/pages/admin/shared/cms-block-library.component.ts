@@ -10,6 +10,8 @@ export type CmsBlockLibraryBlockType =
   | 'cta'
   | 'faq'
   | 'testimonials'
+  | 'product_grid'
+  | 'form'
   | 'image'
   | 'gallery'
   | 'banner'
@@ -121,6 +123,18 @@ export class CmsBlockLibraryComponent {
       titleKey: 'adminUi.home.sections.blocks.testimonials',
       descKey: 'adminUi.content.blockLibrary.items.testimonials',
       gradient: 'from-pink-500/50 to-rose-500/50'
+    },
+    {
+      type: 'product_grid',
+      titleKey: 'adminUi.home.sections.blocks.product_grid',
+      descKey: 'adminUi.content.blockLibrary.items.product_grid',
+      gradient: 'from-emerald-500/50 to-teal-500/50'
+    },
+    {
+      type: 'form',
+      titleKey: 'adminUi.home.sections.blocks.form',
+      descKey: 'adminUi.content.blockLibrary.items.form',
+      gradient: 'from-amber-500/50 to-orange-500/50'
     },
     {
       type: 'image',
