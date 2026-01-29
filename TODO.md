@@ -975,8 +975,8 @@ Below is a structured checklist you can turn into issues.
 - [x] CMS navigation: menu builder – Visual editor for header/footer links with drag-drop ordering and per-language labels.
 - [x] CMS content: side-by-side translation – RO/EN side-by-side editing with “copy from” shortcuts.
 - [x] CMS content: find & replace – Search/replace across CMS content blocks (with preview of affected pages).
-- [ ] CMS blocks: columns/layout – Add layout blocks (2–3 columns, split hero) with responsive controls.
-- [ ] CMS blocks: testimonials/FAQ – Add visual blocks for testimonials, FAQ accordions, and CTAs.
+- [x] CMS blocks: columns/layout – Add layout blocks (2–3 columns, split hero) with responsive controls.
+- [x] CMS blocks: testimonials/FAQ – Add visual blocks for testimonials, FAQ accordions, and CTAs.
 - [ ] CMS blocks: product grids – Insert product/category/collection grids into pages (shoppable sections).
 - [ ] CMS blocks: form builder – Basic contact/newsletter form blocks with validation and success messaging.
 - [ ] Storefront admin mode: “Edit this page” – Admin-only button on storefront pages linking to the correct CMS editor/section.
@@ -984,6 +984,7 @@ Below is a structured checklist you can turn into issues.
 - [ ] CMS assets: edited versions – Group edited copies under the original asset (lineage + quick revert).
 - [ ] CMS scheduling: dedicated API – Add `/content/admin/scheduling` (window + pagination) so the scheduling view isn’t limited to the admin dashboard’s latest-content cap.
 - [ ] CMS redirects: quick create UI – Add a small “Create redirect” inline form in the redirects manager (no CSV needed).
+- [ ] CMS blocks: CTA external URLs – Support external `http(s)` links (and optional new-tab) for CTA buttons instead of routerLink-only.
 
 ## Data Portability & Backups (Extended)
 - [x] CLI command `python -m app.cli export-data` exporting users (no passwords), products, categories, orders, addresses to JSON.

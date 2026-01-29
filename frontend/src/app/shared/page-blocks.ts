@@ -1,6 +1,9 @@
 export type UiLang = 'en' | 'ro';
 
-export type PageBlockType = 'text' | 'image' | 'gallery' | 'banner' | 'carousel';
+export type PageBlockType = 'text' | 'image' | 'gallery' | 'banner' | 'carousel' | 'columns' | 'cta' | 'faq' | 'testimonials';
+
+export type ColumnsCount = 2 | 3;
+export type ColumnsBreakpoint = 'sm' | 'md' | 'lg';
 
 export type PageBlockLayoutSpacing = 'none' | 'sm' | 'md' | 'lg';
 export type PageBlockLayoutBackground = 'none' | 'muted' | 'accent';
@@ -87,7 +90,56 @@ export interface PageCarouselBlock extends PageBlockBase {
   settings: CarouselSettings;
 }
 
-export type PageBlock = PageTextBlock | PageImageBlock | PageGalleryBlock | PageBannerBlock | PageCarouselBlock;
+export interface PageCtaBlock extends PageBlockBase {
+  type: 'cta';
+  body_html: string;
+  cta_label?: string | null;
+  cta_url?: string | null;
+}
+
+export interface PageFaqItem {
+  question: string;
+  answer_html: string;
+}
+
+export interface PageFaqBlock extends PageBlockBase {
+  type: 'faq';
+  items: PageFaqItem[];
+}
+
+export interface PageTestimonialItem {
+  quote_html: string;
+  author?: string | null;
+  role?: string | null;
+}
+
+export interface PageTestimonialsBlock extends PageBlockBase {
+  type: 'testimonials';
+  items: PageTestimonialItem[];
+}
+
+export interface PageColumnsColumn {
+  title?: string | null;
+  body_html: string;
+}
+
+export interface PageColumnsBlock extends PageBlockBase {
+  type: 'columns';
+  columns: PageColumnsColumn[];
+  columns_count: ColumnsCount;
+  breakpoint: ColumnsBreakpoint;
+}
+
+export type PageBlock =
+  | PageTextBlock
+  | PageImageBlock
+  | PageGalleryBlock
+  | PageBannerBlock
+  | PageCarouselBlock
+  | PageColumnsBlock
+  | PageCtaBlock
+  | PageFaqBlock
+  | PageTestimonialsBlock;
 
 function readLocalized(value: unknown, lang: UiLang): string | null {
   if (typeof value === 'string') return value.trim() || null;
@@ -265,6 +317,12 @@ function parseCarouselSettings(raw: unknown): CarouselSettings {
   return { autoplay, interval_ms: intervalMs, show_dots: showDots, show_arrows: showArrows, pause_on_hover: pauseOnHover };
 }
 
+function normalizeColumnsBreakpoint(value: unknown): ColumnsBreakpoint {
+  const raw = readString(value);
+  if (raw === 'sm' || raw === 'md' || raw === 'lg') return raw;
+  return 'md';
+}
+
 export function parsePageBlocks(
   meta: Record<string, unknown> | null | undefined,
   lang: UiLang,
@@ -281,7 +339,17 @@ export function parsePageBlocks(
     const rec = raw as Record<string, unknown>;
     const typeRaw = typeof rec['type'] === 'string' ? String(rec['type']).trim() : '';
     const enabled = rec['enabled'] === false ? false : true;
-    if (typeRaw !== 'text' && typeRaw !== 'image' && typeRaw !== 'gallery' && typeRaw !== 'banner' && typeRaw !== 'carousel') {
+    if (
+      typeRaw !== 'text' &&
+      typeRaw !== 'image' &&
+      typeRaw !== 'gallery' &&
+      typeRaw !== 'banner' &&
+      typeRaw !== 'carousel' &&
+      typeRaw !== 'columns' &&
+      typeRaw !== 'cta' &&
+      typeRaw !== 'faq' &&
+      typeRaw !== 'testimonials'
+    ) {
       continue;
     }
     if (!enabled) continue;
@@ -302,6 +370,62 @@ export function parsePageBlocks(
         layout,
         body_html: renderMarkdown(bodyMarkdown)
       } satisfies PageTextBlock);
+      continue;
+    }
+
+    if (typeRaw === 'cta') {
+      const bodyMarkdown = readLocalized(rec['body_markdown'], lang) || '';
+      const ctaLabel = readLocalized(rec['cta_label'], lang);
+      const ctaUrl = readString(rec['cta_url']);
+      const hasAny = Boolean(title || bodyMarkdown.trim() || ctaLabel || ctaUrl);
+      if (!hasAny) continue;
+      blocks.push({
+        key,
+        type: 'cta',
+        enabled: true,
+        title,
+        layout,
+        body_html: renderMarkdown(bodyMarkdown),
+        cta_label: ctaLabel,
+        cta_url: ctaUrl
+      } satisfies PageCtaBlock);
+      continue;
+    }
+
+    if (typeRaw === 'faq') {
+      const itemsRaw = rec['items'];
+      if (!Array.isArray(itemsRaw)) continue;
+      const items: PageFaqItem[] = [];
+      for (const itemRaw of itemsRaw) {
+        if (!itemRaw || typeof itemRaw !== 'object') continue;
+        const itemRec = itemRaw as Record<string, unknown>;
+        const question = readLocalized(itemRec['question'], lang);
+        if (!question) continue;
+        const answerMarkdown = readLocalized(itemRec['answer_markdown'], lang) || '';
+        items.push({ question, answer_html: renderMarkdown(answerMarkdown) });
+        if (items.length >= 20) break;
+      }
+      if (!items.length) continue;
+      blocks.push({ key, type: 'faq', enabled: true, title, layout, items } satisfies PageFaqBlock);
+      continue;
+    }
+
+    if (typeRaw === 'testimonials') {
+      const itemsRaw = rec['items'];
+      if (!Array.isArray(itemsRaw)) continue;
+      const items: PageTestimonialItem[] = [];
+      for (const itemRaw of itemsRaw) {
+        if (!itemRaw || typeof itemRaw !== 'object') continue;
+        const itemRec = itemRaw as Record<string, unknown>;
+        const quoteMarkdown = readLocalized(itemRec['quote_markdown'], lang) || '';
+        if (!quoteMarkdown.trim()) continue;
+        const author = readLocalized(itemRec['author'], lang);
+        const role = readLocalized(itemRec['role'], lang);
+        items.push({ quote_html: renderMarkdown(quoteMarkdown), author, role });
+        if (items.length >= 12) break;
+      }
+      if (!items.length) continue;
+      blocks.push({ key, type: 'testimonials', enabled: true, title, layout, items } satisfies PageTestimonialsBlock);
       continue;
     }
 
@@ -363,6 +487,38 @@ export function parsePageBlocks(
       continue;
     }
 
+    if (typeRaw === 'columns') {
+      const columnsRaw = rec['columns'];
+      if (!Array.isArray(columnsRaw)) continue;
+      const columns: PageColumnsColumn[] = [];
+      let hasAny = false;
+
+      for (const colRaw of columnsRaw) {
+        if (!colRaw || typeof colRaw !== 'object') continue;
+        const colRec = colRaw as Record<string, unknown>;
+        const colTitle = readLocalized(colRec['title'], lang);
+        const bodyMarkdown = readLocalized(colRec['body_markdown'], lang) || '';
+        if (colTitle || bodyMarkdown.trim()) hasAny = true;
+        columns.push({ title: colTitle, body_html: renderMarkdown(bodyMarkdown) });
+        if (columns.length >= 3) break;
+      }
+
+      if (columns.length < 2) continue;
+      if (!hasAny) continue;
+
+      blocks.push({
+        key,
+        type: 'columns',
+        enabled: true,
+        title,
+        layout,
+        columns,
+        columns_count: columns.length === 3 ? 3 : 2,
+        breakpoint: normalizeColumnsBreakpoint(rec['columns_breakpoint'] ?? rec['breakpoint'] ?? rec['stack_at'])
+      } satisfies PageColumnsBlock);
+      continue;
+    }
+
     const imagesRaw = rec['images'];
     if (!Array.isArray(imagesRaw)) continue;
     const images: PageGalleryImage[] = [];
@@ -397,16 +553,37 @@ export function parsePageBlocks(
 
 export function pageBlocksToPlainText(blocks: PageBlock[]): string {
   const parts: string[] = [];
+  const htmlToText = (html: string): string =>
+    (html || '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
   for (const block of blocks) {
     if (!block.enabled) continue;
     if (block.title) parts.push(block.title);
     if (block.type === 'text') {
-      const html = block.body_html || '';
-      const text = html
-        .replace(/<[^>]+>/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
+      const text = htmlToText(block.body_html || '');
       if (text) parts.push(text);
+    }
+    if (block.type === 'cta') {
+      const text = htmlToText(block.body_html || '');
+      if (text) parts.push(text);
+      if (block.cta_label) parts.push(block.cta_label);
+    }
+    if (block.type === 'faq') {
+      for (const item of block.items) {
+        parts.push(item.question);
+        const answer = htmlToText(item.answer_html || '');
+        if (answer) parts.push(answer);
+      }
+    }
+    if (block.type === 'testimonials') {
+      for (const item of block.items) {
+        const quote = htmlToText(item.quote_html || '');
+        if (quote) parts.push(quote);
+        if (item.author) parts.push(item.author);
+        if (item.role) parts.push(item.role);
+      }
     }
     if (block.type === 'image' && block.caption) parts.push(block.caption);
     if (block.type === 'gallery') {
@@ -425,6 +602,13 @@ export function pageBlocksToPlainText(blocks: PageBlock[]): string {
         if (slide.headline) parts.push(slide.headline);
         if (slide.subheadline) parts.push(slide.subheadline);
         if (slide.cta_label) parts.push(slide.cta_label);
+      }
+    }
+    if (block.type === 'columns') {
+      for (const col of block.columns) {
+        if (col.title) parts.push(col.title);
+        const text = htmlToText(col.body_html || '');
+        if (text) parts.push(text);
       }
     }
   }

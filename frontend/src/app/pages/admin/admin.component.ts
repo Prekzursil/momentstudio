@@ -78,7 +78,25 @@ type HomeSectionId =
   | 'recently_viewed'
   | 'why';
 
-type HomeBlockType = HomeSectionId | 'text' | 'image' | 'gallery' | 'banner' | 'carousel';
+type CmsColumnsBreakpoint = 'sm' | 'md' | 'lg';
+
+type CmsColumnsColumnDraft = {
+  title: LocalizedText;
+  body_markdown: LocalizedText;
+};
+
+type CmsTestimonialDraft = {
+  quote_markdown: LocalizedText;
+  author: LocalizedText;
+  role: LocalizedText;
+};
+
+type CmsFaqItemDraft = {
+  question: LocalizedText;
+  answer_markdown: LocalizedText;
+};
+
+type HomeBlockType = HomeSectionId | 'text' | 'columns' | 'cta' | 'faq' | 'testimonials' | 'image' | 'gallery' | 'banner' | 'carousel';
 
 type LocalizedText = { en: string; ro: string };
 
@@ -136,6 +154,12 @@ type HomeBlockDraft = {
   enabled: boolean;
   title: LocalizedText;
   body_markdown: LocalizedText;
+  columns: CmsColumnsColumnDraft[];
+  columns_breakpoint: CmsColumnsBreakpoint;
+  cta_label: LocalizedText;
+  cta_url: string;
+  faq_items: CmsFaqItemDraft[];
+  testimonials: CmsTestimonialDraft[];
   url: string;
   link_url: string;
   focal_x: number;
@@ -150,7 +174,7 @@ type HomeBlockDraft = {
 };
 
 type PageBuilderKey = `page.${string}` | CmsGlobalSectionKey;
-type PageBlockType = 'text' | 'image' | 'gallery' | 'banner' | 'carousel';
+type PageBlockType = 'text' | 'columns' | 'cta' | 'faq' | 'testimonials' | 'image' | 'gallery' | 'banner' | 'carousel';
 type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
 
 type PageBlocksDraftState = {
@@ -1873,14 +1897,276 @@ class CmsDraftManager<T> {
                                   class="markdown rounded-2xl border border-slate-200 bg-white p-3 text-slate-700 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
                                   [innerHTML]="renderMarkdown(block.body_markdown[infoLang] || '')"
                                 ></div>
-                              </div>
-                            </details>
-                          </ng-container>
+			                              </div>
+			                            </details>
+			                          </ng-container>
 
-                          <ng-container *ngSwitchCase="'image'">
-                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                              {{ 'adminUi.home.sections.fields.imageUrl' | translate }}
-                              <input
+			                          <ng-container *ngSwitchCase="'columns'">
+			                            <div class="grid gap-3">
+			                              <div class="grid gap-3 sm:grid-cols-[1fr_auto] items-end">
+			                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                                  {{ 'adminUi.home.sections.fields.columnsBreakpoint' | translate }}
+			                                  <select
+			                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                    [(ngModel)]="block.columns_breakpoint"
+			                                  >
+			                                    <option [ngValue]="'sm'">SM</option>
+			                                    <option [ngValue]="'md'">MD</option>
+			                                    <option [ngValue]="'lg'">LG</option>
+			                                  </select>
+			                                </label>
+
+			                                <app-button
+			                                  size="sm"
+			                                  variant="ghost"
+			                                  [disabled]="block.columns.length >= 3"
+			                                  [label]="'adminUi.home.sections.fields.addColumn' | translate"
+			                                  (action)="addPageColumnsColumn(pageBlocksKey, block.key)"
+			                                ></app-button>
+			                              </div>
+
+			                              <div class="grid gap-2">
+			                                <div
+			                                  *ngFor="let col of block.columns; let colIdx = index"
+			                                  class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+			                                >
+			                                  <div class="flex items-center justify-between gap-3">
+			                                    <span class="text-xs font-semibold text-slate-700 dark:text-slate-200">
+			                                      {{ 'adminUi.home.sections.fields.column' | translate }} {{ colIdx + 1 }}
+			                                    </span>
+			                                    <app-button
+			                                      size="sm"
+			                                      variant="ghost"
+			                                      [disabled]="block.columns.length <= 2"
+			                                      [label]="'adminUi.actions.delete' | translate"
+			                                      (action)="removePageColumnsColumn(pageBlocksKey, block.key, colIdx)"
+			                                    ></app-button>
+			                                  </div>
+
+			                                  <div class="mt-3 grid gap-3">
+			                                    <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pageBlockColumnsTextSingle">
+			                                      <app-localized-text-editor
+			                                        [label]="'adminUi.home.sections.fields.columnTitle' | translate"
+			                                        [value]="col.title"
+			                                      ></app-localized-text-editor>
+			                                      <app-localized-text-editor
+			                                        [label]="'adminUi.home.sections.fields.columnBody' | translate"
+			                                        [multiline]="true"
+			                                        [rows]="5"
+			                                        [value]="col.body_markdown"
+			                                      ></app-localized-text-editor>
+			                                    </ng-container>
+			                                    <ng-template #pageBlockColumnsTextSingle>
+			                                      <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                                        {{ 'adminUi.home.sections.fields.columnTitle' | translate }}
+			                                        <input
+			                                          class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                          [(ngModel)]="col.title[infoLang]"
+			                                        />
+			                                      </label>
+			                                      <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                                        {{ 'adminUi.home.sections.fields.columnBody' | translate }}
+			                                        <textarea
+			                                          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                          rows="4"
+			                                          [(ngModel)]="col.body_markdown[infoLang]"
+			                                        ></textarea>
+			                                      </label>
+			                                    </ng-template>
+			                                  </div>
+			                                </div>
+			                              </div>
+			                            </div>
+			                          </ng-container>
+
+			                          <ng-container *ngSwitchCase="'cta'">
+			                            <div class="grid gap-3">
+			                              <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pageBlockCtaTextSingle">
+			                                <app-localized-text-editor
+			                                  [label]="'adminUi.home.sections.fields.body' | translate"
+			                                  [multiline]="true"
+			                                  [rows]="5"
+			                                  [value]="block.body_markdown"
+			                                ></app-localized-text-editor>
+			                                <app-localized-text-editor
+			                                  [label]="'adminUi.home.hero.ctaLabel' | translate"
+			                                  [value]="block.cta_label"
+			                                ></app-localized-text-editor>
+			                              </ng-container>
+			                              <ng-template #pageBlockCtaTextSingle>
+			                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                                  {{ 'adminUi.home.sections.fields.body' | translate }}
+			                                  <textarea
+			                                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                    rows="4"
+			                                    [(ngModel)]="block.body_markdown[infoLang]"
+			                                  ></textarea>
+			                                </label>
+			                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                                  {{ 'adminUi.home.hero.ctaLabel' | translate }}
+			                                  <input
+			                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                    [(ngModel)]="block.cta_label[infoLang]"
+			                                  />
+			                                </label>
+			                              </ng-template>
+			                              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                                {{ 'adminUi.home.hero.ctaUrl' | translate }}
+			                                <input
+			                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                  [(ngModel)]="block.cta_url"
+			                                />
+			                              </label>
+			                            </div>
+			                          </ng-container>
+
+			                          <ng-container *ngSwitchCase="'faq'">
+			                            <div class="grid gap-3">
+			                              <div class="flex items-center justify-between gap-3">
+			                                <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+			                                  {{ 'adminUi.home.sections.blocks.faq' | translate }}
+			                                </p>
+			                                <app-button
+			                                  size="sm"
+			                                  variant="ghost"
+			                                  [label]="'adminUi.actions.add' | translate"
+			                                  (action)="addPageFaqItem(pageBlocksKey, block.key)"
+			                                ></app-button>
+			                              </div>
+
+			                              <div class="grid gap-2">
+			                                <div
+			                                  *ngFor="let item of block.faq_items; let idx = index"
+			                                  class="grid gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+			                                >
+			                                  <div class="flex items-center justify-between gap-3">
+			                                    <span class="text-xs font-semibold text-slate-700 dark:text-slate-200">
+			                                      {{ 'adminUi.home.sections.fields.question' | translate }} {{ idx + 1 }}
+			                                    </span>
+			                                    <app-button
+			                                      size="sm"
+			                                      variant="ghost"
+			                                      [disabled]="block.faq_items.length <= 1"
+			                                      [label]="'adminUi.actions.delete' | translate"
+			                                      (action)="removePageFaqItem(pageBlocksKey, block.key, idx)"
+			                                    ></app-button>
+			                                  </div>
+
+			                                  <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pageBlockFaqTextSingle">
+			                                    <app-localized-text-editor
+			                                      [label]="'adminUi.home.sections.fields.question' | translate"
+			                                      [value]="item.question"
+			                                    ></app-localized-text-editor>
+			                                    <app-localized-text-editor
+			                                      [label]="'adminUi.home.sections.fields.answer' | translate"
+			                                      [multiline]="true"
+			                                      [rows]="4"
+			                                      [value]="item.answer_markdown"
+			                                    ></app-localized-text-editor>
+			                                  </ng-container>
+			                                  <ng-template #pageBlockFaqTextSingle>
+			                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                                      {{ 'adminUi.home.sections.fields.question' | translate }}
+			                                      <input
+			                                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                        [(ngModel)]="item.question[infoLang]"
+			                                      />
+			                                    </label>
+			                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                                      {{ 'adminUi.home.sections.fields.answer' | translate }}
+			                                      <textarea
+			                                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                        rows="4"
+			                                        [(ngModel)]="item.answer_markdown[infoLang]"
+			                                      ></textarea>
+			                                    </label>
+			                                  </ng-template>
+			                                </div>
+			                              </div>
+			                            </div>
+			                          </ng-container>
+
+			                          <ng-container *ngSwitchCase="'testimonials'">
+			                            <div class="grid gap-3">
+			                              <div class="flex items-center justify-between gap-3">
+			                                <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+			                                  {{ 'adminUi.home.sections.blocks.testimonials' | translate }}
+			                                </p>
+			                                <app-button
+			                                  size="sm"
+			                                  variant="ghost"
+			                                  [label]="'adminUi.actions.add' | translate"
+			                                  (action)="addPageTestimonial(pageBlocksKey, block.key)"
+			                                ></app-button>
+			                              </div>
+
+			                              <div class="grid gap-2">
+			                                <div
+			                                  *ngFor="let item of block.testimonials; let idx = index"
+			                                  class="grid gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+			                                >
+			                                  <div class="flex items-center justify-between gap-3">
+			                                    <span class="text-xs font-semibold text-slate-700 dark:text-slate-200">
+			                                      {{ 'adminUi.home.sections.fields.testimonial' | translate }} {{ idx + 1 }}
+			                                    </span>
+			                                    <app-button
+			                                      size="sm"
+			                                      variant="ghost"
+			                                      [disabled]="block.testimonials.length <= 1"
+			                                      [label]="'adminUi.actions.delete' | translate"
+			                                      (action)="removePageTestimonial(pageBlocksKey, block.key, idx)"
+			                                    ></app-button>
+			                                  </div>
+
+			                                  <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pageBlockTestimonialsTextSingle">
+			                                    <app-localized-text-editor
+			                                      [label]="'adminUi.home.sections.fields.quote' | translate"
+			                                      [multiline]="true"
+			                                      [rows]="4"
+			                                      [value]="item.quote_markdown"
+			                                    ></app-localized-text-editor>
+			                                    <app-localized-text-editor
+			                                      [label]="'adminUi.home.sections.fields.author' | translate"
+			                                      [value]="item.author"
+			                                    ></app-localized-text-editor>
+			                                    <app-localized-text-editor
+			                                      [label]="'adminUi.home.sections.fields.role' | translate"
+			                                      [value]="item.role"
+			                                    ></app-localized-text-editor>
+			                                  </ng-container>
+			                                  <ng-template #pageBlockTestimonialsTextSingle>
+			                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                                      {{ 'adminUi.home.sections.fields.quote' | translate }}
+			                                      <textarea
+			                                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                        rows="4"
+			                                        [(ngModel)]="item.quote_markdown[infoLang]"
+			                                      ></textarea>
+			                                    </label>
+			                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                                      {{ 'adminUi.home.sections.fields.author' | translate }}
+			                                      <input
+			                                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                        [(ngModel)]="item.author[infoLang]"
+			                                      />
+			                                    </label>
+			                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                                      {{ 'adminUi.home.sections.fields.role' | translate }}
+			                                      <input
+			                                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                        [(ngModel)]="item.role[infoLang]"
+			                                      />
+			                                    </label>
+			                                  </ng-template>
+			                                </div>
+			                              </div>
+			                            </div>
+			                          </ng-container>
+
+			                          <ng-container *ngSwitchCase="'image'">
+			                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                              {{ 'adminUi.home.sections.fields.imageUrl' | translate }}
+			                              <input
                                 class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                                 [(ngModel)]="block.url"
                               />
@@ -3071,14 +3357,18 @@ class CmsDraftManager<T> {
                 <select
                   class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                   [(ngModel)]="newHomeBlockType"
-                >
-                  <option [ngValue]="'text'">{{ 'adminUi.home.sections.blocks.text' | translate }}</option>
-                  <option [ngValue]="'image'">{{ 'adminUi.home.sections.blocks.image' | translate }}</option>
-                  <option [ngValue]="'gallery'">{{ 'adminUi.home.sections.blocks.gallery' | translate }}</option>
-                  <option [ngValue]="'banner'">{{ 'adminUi.home.sections.blocks.banner' | translate }}</option>
-                  <option [ngValue]="'carousel'">{{ 'adminUi.home.sections.blocks.carousel' | translate }}</option>
-                </select>
-              </label>
+	                >
+	                  <option [ngValue]="'text'">{{ 'adminUi.home.sections.blocks.text' | translate }}</option>
+	                  <option [ngValue]="'columns'">{{ 'adminUi.home.sections.blocks.columns' | translate }}</option>
+	                  <option [ngValue]="'cta'">{{ 'adminUi.home.sections.blocks.cta' | translate }}</option>
+	                  <option [ngValue]="'faq'">{{ 'adminUi.home.sections.blocks.faq' | translate }}</option>
+	                  <option [ngValue]="'testimonials'">{{ 'adminUi.home.sections.blocks.testimonials' | translate }}</option>
+	                  <option [ngValue]="'image'">{{ 'adminUi.home.sections.blocks.image' | translate }}</option>
+	                  <option [ngValue]="'gallery'">{{ 'adminUi.home.sections.blocks.gallery' | translate }}</option>
+	                  <option [ngValue]="'banner'">{{ 'adminUi.home.sections.blocks.banner' | translate }}</option>
+	                  <option [ngValue]="'carousel'">{{ 'adminUi.home.sections.blocks.carousel' | translate }}</option>
+	                </select>
+	              </label>
               <app-button size="sm" [label]="'adminUi.actions.add' | translate" (action)="addHomeBlock()"></app-button>
             </div>
 
@@ -3160,11 +3450,11 @@ class CmsDraftManager<T> {
                     </ng-template>
 
                     <ng-container [ngSwitch]="block.type">
-                      <ng-container *ngSwitchCase="'text'">
-                        <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockTextBodySingle">
-                          <app-localized-text-editor
-                            [label]="'adminUi.home.sections.fields.body' | translate"
-                            [multiline]="true"
+	                      <ng-container *ngSwitchCase="'text'">
+	                        <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockTextBodySingle">
+	                          <app-localized-text-editor
+	                            [label]="'adminUi.home.sections.fields.body' | translate"
+	                            [multiline]="true"
                             [rows]="6"
                             [value]="block.body_markdown"
                           ></app-localized-text-editor>
@@ -3186,14 +3476,276 @@ class CmsDraftManager<T> {
                               class="markdown rounded-2xl border border-slate-200 bg-white p-3 text-slate-700 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
                               [innerHTML]="renderMarkdown(block.body_markdown[homeBlocksLang])"
                             ></div>
-                          </div>
-                        </div>
-                      </ng-container>
+	                          </div>
+	                        </div>
+	                      </ng-container>
 
-                      <ng-container *ngSwitchCase="'image'">
-                        <div class="grid gap-3 md:grid-cols-2">
-                          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
-                            {{ 'adminUi.home.sections.fields.imageUrl' | translate }}
+	                      <ng-container *ngSwitchCase="'columns'">
+	                        <div class="grid gap-3">
+	                          <div class="grid gap-3 sm:grid-cols-[1fr_auto] items-end">
+	                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                              {{ 'adminUi.home.sections.fields.columnsBreakpoint' | translate }}
+	                              <select
+	                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                                [(ngModel)]="block.columns_breakpoint"
+	                              >
+	                                <option [ngValue]="'sm'">SM</option>
+	                                <option [ngValue]="'md'">MD</option>
+	                                <option [ngValue]="'lg'">LG</option>
+	                              </select>
+	                            </label>
+
+	                            <app-button
+	                              size="sm"
+	                              variant="ghost"
+	                              [disabled]="block.columns.length >= 3"
+	                              [label]="'adminUi.home.sections.fields.addColumn' | translate"
+	                              (action)="addHomeColumnsColumn(block.key)"
+	                            ></app-button>
+	                          </div>
+
+	                          <div class="grid gap-2">
+	                            <div
+	                              *ngFor="let col of block.columns; let colIdx = index"
+	                              class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+	                            >
+	                              <div class="flex items-center justify-between gap-3">
+	                                <span class="text-xs font-semibold text-slate-700 dark:text-slate-200">
+	                                  {{ 'adminUi.home.sections.fields.column' | translate }} {{ colIdx + 1 }}
+	                                </span>
+	                                <app-button
+	                                  size="sm"
+	                                  variant="ghost"
+	                                  [disabled]="block.columns.length <= 2"
+	                                  [label]="'adminUi.actions.delete' | translate"
+	                                  (action)="removeHomeColumnsColumn(block.key, colIdx)"
+	                                ></app-button>
+	                              </div>
+
+	                              <div class="mt-3 grid gap-3">
+	                                <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockColumnsTextSingle">
+	                                  <app-localized-text-editor
+	                                    [label]="'adminUi.home.sections.fields.columnTitle' | translate"
+	                                    [value]="col.title"
+	                                  ></app-localized-text-editor>
+	                                  <app-localized-text-editor
+	                                    [label]="'adminUi.home.sections.fields.columnBody' | translate"
+	                                    [multiline]="true"
+	                                    [rows]="5"
+	                                    [value]="col.body_markdown"
+	                                  ></app-localized-text-editor>
+	                                </ng-container>
+	                                <ng-template #homeBlockColumnsTextSingle>
+	                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                                    {{ 'adminUi.home.sections.fields.columnTitle' | translate }}
+	                                    <input
+	                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                                      [(ngModel)]="col.title[homeBlocksLang]"
+	                                    />
+	                                  </label>
+	                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                                    {{ 'adminUi.home.sections.fields.columnBody' | translate }}
+	                                    <textarea
+	                                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                                      rows="4"
+	                                      [(ngModel)]="col.body_markdown[homeBlocksLang]"
+	                                    ></textarea>
+	                                  </label>
+	                                </ng-template>
+	                              </div>
+	                            </div>
+	                          </div>
+	                        </div>
+	                      </ng-container>
+
+	                      <ng-container *ngSwitchCase="'cta'">
+	                        <div class="grid gap-3">
+	                          <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockCtaTextSingle">
+	                            <app-localized-text-editor
+	                              [label]="'adminUi.home.sections.fields.body' | translate"
+	                              [multiline]="true"
+	                              [rows]="5"
+	                              [value]="block.body_markdown"
+	                            ></app-localized-text-editor>
+	                            <app-localized-text-editor
+	                              [label]="'adminUi.home.hero.ctaLabel' | translate"
+	                              [value]="block.cta_label"
+	                            ></app-localized-text-editor>
+	                          </ng-container>
+	                          <ng-template #homeBlockCtaTextSingle>
+	                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                              {{ 'adminUi.home.sections.fields.body' | translate }}
+	                              <textarea
+	                                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                                rows="4"
+	                                [(ngModel)]="block.body_markdown[homeBlocksLang]"
+	                              ></textarea>
+	                            </label>
+	                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                              {{ 'adminUi.home.hero.ctaLabel' | translate }}
+	                              <input
+	                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                                [(ngModel)]="block.cta_label[homeBlocksLang]"
+	                              />
+	                            </label>
+	                          </ng-template>
+	                          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                            {{ 'adminUi.home.hero.ctaUrl' | translate }}
+	                            <input
+	                              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                              [(ngModel)]="block.cta_url"
+	                            />
+	                          </label>
+	                        </div>
+	                      </ng-container>
+
+	                      <ng-container *ngSwitchCase="'faq'">
+	                        <div class="grid gap-3">
+	                          <div class="flex items-center justify-between gap-3">
+	                            <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+	                              {{ 'adminUi.home.sections.blocks.faq' | translate }}
+	                            </p>
+	                            <app-button
+	                              size="sm"
+	                              variant="ghost"
+	                              [label]="'adminUi.actions.add' | translate"
+	                              (action)="addHomeFaqItem(block.key)"
+	                            ></app-button>
+	                          </div>
+
+	                          <div class="grid gap-2">
+	                            <div
+	                              *ngFor="let item of block.faq_items; let idx = index"
+	                              class="grid gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+	                            >
+	                              <div class="flex items-center justify-between gap-3">
+	                                <span class="text-xs font-semibold text-slate-700 dark:text-slate-200">
+	                                  {{ 'adminUi.home.sections.fields.question' | translate }} {{ idx + 1 }}
+	                                </span>
+	                                <app-button
+	                                  size="sm"
+	                                  variant="ghost"
+	                                  [disabled]="block.faq_items.length <= 1"
+	                                  [label]="'adminUi.actions.delete' | translate"
+	                                  (action)="removeHomeFaqItem(block.key, idx)"
+	                                ></app-button>
+	                              </div>
+
+	                              <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockFaqTextSingle">
+	                                <app-localized-text-editor
+	                                  [label]="'adminUi.home.sections.fields.question' | translate"
+	                                  [value]="item.question"
+	                                ></app-localized-text-editor>
+	                                <app-localized-text-editor
+	                                  [label]="'adminUi.home.sections.fields.answer' | translate"
+	                                  [multiline]="true"
+	                                  [rows]="4"
+	                                  [value]="item.answer_markdown"
+	                                ></app-localized-text-editor>
+	                              </ng-container>
+	                              <ng-template #homeBlockFaqTextSingle>
+	                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                                  {{ 'adminUi.home.sections.fields.question' | translate }}
+	                                  <input
+	                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                                    [(ngModel)]="item.question[homeBlocksLang]"
+	                                  />
+	                                </label>
+	                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                                  {{ 'adminUi.home.sections.fields.answer' | translate }}
+	                                  <textarea
+	                                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                                    rows="4"
+	                                    [(ngModel)]="item.answer_markdown[homeBlocksLang]"
+	                                  ></textarea>
+	                                </label>
+	                              </ng-template>
+	                            </div>
+	                          </div>
+	                        </div>
+	                      </ng-container>
+
+	                      <ng-container *ngSwitchCase="'testimonials'">
+	                        <div class="grid gap-3">
+	                          <div class="flex items-center justify-between gap-3">
+	                            <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+	                              {{ 'adminUi.home.sections.blocks.testimonials' | translate }}
+	                            </p>
+	                            <app-button
+	                              size="sm"
+	                              variant="ghost"
+	                              [label]="'adminUi.actions.add' | translate"
+	                              (action)="addHomeTestimonial(block.key)"
+	                            ></app-button>
+	                          </div>
+
+	                          <div class="grid gap-2">
+	                            <div
+	                              *ngFor="let item of block.testimonials; let idx = index"
+	                              class="grid gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+	                            >
+	                              <div class="flex items-center justify-between gap-3">
+	                                <span class="text-xs font-semibold text-slate-700 dark:text-slate-200">
+	                                  {{ 'adminUi.home.sections.fields.testimonial' | translate }} {{ idx + 1 }}
+	                                </span>
+	                                <app-button
+	                                  size="sm"
+	                                  variant="ghost"
+	                                  [disabled]="block.testimonials.length <= 1"
+	                                  [label]="'adminUi.actions.delete' | translate"
+	                                  (action)="removeHomeTestimonial(block.key, idx)"
+	                                ></app-button>
+	                              </div>
+
+	                              <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockTestimonialsTextSingle">
+	                                <app-localized-text-editor
+	                                  [label]="'adminUi.home.sections.fields.quote' | translate"
+	                                  [multiline]="true"
+	                                  [rows]="4"
+	                                  [value]="item.quote_markdown"
+	                                ></app-localized-text-editor>
+	                                <app-localized-text-editor
+	                                  [label]="'adminUi.home.sections.fields.author' | translate"
+	                                  [value]="item.author"
+	                                ></app-localized-text-editor>
+	                                <app-localized-text-editor
+	                                  [label]="'adminUi.home.sections.fields.role' | translate"
+	                                  [value]="item.role"
+	                                ></app-localized-text-editor>
+	                              </ng-container>
+	                              <ng-template #homeBlockTestimonialsTextSingle>
+	                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                                  {{ 'adminUi.home.sections.fields.quote' | translate }}
+	                                  <textarea
+	                                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                                    rows="4"
+	                                    [(ngModel)]="item.quote_markdown[homeBlocksLang]"
+	                                  ></textarea>
+	                                </label>
+	                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                                  {{ 'adminUi.home.sections.fields.author' | translate }}
+	                                  <input
+	                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                                    [(ngModel)]="item.author[homeBlocksLang]"
+	                                  />
+	                                </label>
+	                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                                  {{ 'adminUi.home.sections.fields.role' | translate }}
+	                                  <input
+	                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                                    [(ngModel)]="item.role[homeBlocksLang]"
+	                                  />
+	                                </label>
+	                              </ng-template>
+	                            </div>
+	                          </div>
+	                        </div>
+	                      </ng-container>
+
+	                      <ng-container *ngSwitchCase="'image'">
+	                        <div class="grid gap-3 md:grid-cols-2">
+	                          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
+	                            {{ 'adminUi.home.sections.fields.imageUrl' | translate }}
                             <input
                               class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                               [(ngModel)]="block.url"
@@ -6148,7 +6700,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   selectedIds = new Set<string>();
   allSelected = false;
   homeBlocksLang: UiLang = 'en';
-  newHomeBlockType: 'text' | 'image' | 'gallery' | 'banner' | 'carousel' = 'text';
+  newHomeBlockType: 'text' | 'columns' | 'cta' | 'faq' | 'testimonials' | 'image' | 'gallery' | 'banner' | 'carousel' = 'text';
   homeBlocks: HomeBlockDraft[] = [];
   draggingHomeBlockKey: string | null = null;
   homeInsertDragActive = false;
@@ -6457,7 +7009,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   newCustomPagePublishedUntil = '';
   creatingCustomPage = false;
   readonly globalSections = CMS_GLOBAL_SECTIONS;
-  readonly allPageBlockTypes: PageBlockType[] = ['text', 'image', 'gallery', 'banner', 'carousel'];
+  readonly allPageBlockTypes: PageBlockType[] = ['text', 'columns', 'cta', 'faq', 'testimonials', 'image', 'gallery', 'banner', 'carousel'];
   pageBlocksKey: PageBuilderKey = 'page.about';
   newPageBlockType: PageBlockType = 'text';
   pageBlocks: Record<string, PageBlockDraft[]> = {};
@@ -11431,6 +11983,10 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   pageBlockTypeLabelKey(type: PageBlockType): string {
     if (type === 'image') return 'adminUi.home.sections.blocks.image';
+    if (type === 'columns') return 'adminUi.home.sections.blocks.columns';
+    if (type === 'cta') return 'adminUi.home.sections.blocks.cta';
+    if (type === 'faq') return 'adminUi.home.sections.blocks.faq';
+    if (type === 'testimonials') return 'adminUi.home.sections.blocks.testimonials';
     if (type === 'gallery') return 'adminUi.home.sections.blocks.gallery';
     if (type === 'banner') return 'adminUi.home.sections.blocks.banner';
     if (type === 'carousel') return 'adminUi.home.sections.blocks.carousel';
@@ -11565,6 +12121,10 @@ export class AdminComponent implements OnInit, OnDestroy {
       const typeRaw = typeof rec['type'] === 'string' ? String(rec['type']).trim() : '';
       if (
         typeRaw !== 'text' &&
+        typeRaw !== 'columns' &&
+        typeRaw !== 'cta' &&
+        typeRaw !== 'faq' &&
+        typeRaw !== 'testimonials' &&
         typeRaw !== 'image' &&
         typeRaw !== 'gallery' &&
         typeRaw !== 'banner' &&
@@ -11584,6 +12144,15 @@ export class AdminComponent implements OnInit, OnDestroy {
         enabled,
         title: this.toLocalizedText(rec['title']),
         body_markdown: this.emptyLocalizedText(),
+        columns: [
+          { title: this.emptyLocalizedText(), body_markdown: this.emptyLocalizedText() },
+          { title: this.emptyLocalizedText(), body_markdown: this.emptyLocalizedText() }
+        ],
+        columns_breakpoint: 'md',
+        cta_label: this.emptyLocalizedText(),
+        cta_url: '',
+        faq_items: [{ question: this.emptyLocalizedText(), answer_markdown: this.emptyLocalizedText() }],
+        testimonials: [{ quote_markdown: this.emptyLocalizedText(), author: this.emptyLocalizedText(), role: this.emptyLocalizedText() }],
         url: '',
         link_url: '',
         focal_x: 50,
@@ -11599,6 +12168,59 @@ export class AdminComponent implements OnInit, OnDestroy {
 
       if (typeRaw === 'text') {
         draft.body_markdown = this.toLocalizedText(rec['body_markdown']);
+      } else if (typeRaw === 'columns') {
+        const columnsRaw = rec['columns'];
+        const cols: CmsColumnsColumnDraft[] = [];
+        if (Array.isArray(columnsRaw)) {
+          for (const colRaw of columnsRaw) {
+            if (!colRaw || typeof colRaw !== 'object') continue;
+            const colRec = colRaw as Record<string, unknown>;
+            cols.push({
+              title: this.toLocalizedText(colRec['title']),
+              body_markdown: this.toLocalizedText(colRec['body_markdown'])
+            });
+            if (cols.length >= 3) break;
+          }
+        }
+        if (cols.length >= 2) draft.columns = cols;
+        const bpRaw = rec['columns_breakpoint'] ?? rec['breakpoint'] ?? rec['stack_at'];
+        const bp = typeof bpRaw === 'string' ? String(bpRaw).trim() : '';
+        draft.columns_breakpoint = bp === 'sm' || bp === 'md' || bp === 'lg' ? bp : 'md';
+      } else if (typeRaw === 'cta') {
+        draft.body_markdown = this.toLocalizedText(rec['body_markdown']);
+        draft.cta_label = this.toLocalizedText(rec['cta_label']);
+        draft.cta_url = typeof rec['cta_url'] === 'string' ? String(rec['cta_url']).trim() : '';
+      } else if (typeRaw === 'faq') {
+        const itemsRaw = rec['items'];
+        const items: CmsFaqItemDraft[] = [];
+        if (Array.isArray(itemsRaw)) {
+          for (const itemRaw of itemsRaw) {
+            if (!itemRaw || typeof itemRaw !== 'object') continue;
+            const itemRec = itemRaw as Record<string, unknown>;
+            items.push({
+              question: this.toLocalizedText(itemRec['question']),
+              answer_markdown: this.toLocalizedText(itemRec['answer_markdown'])
+            });
+            if (items.length >= 20) break;
+          }
+        }
+        if (items.length) draft.faq_items = items;
+      } else if (typeRaw === 'testimonials') {
+        const itemsRaw = rec['items'];
+        const items: CmsTestimonialDraft[] = [];
+        if (Array.isArray(itemsRaw)) {
+          for (const itemRaw of itemsRaw) {
+            if (!itemRaw || typeof itemRaw !== 'object') continue;
+            const itemRec = itemRaw as Record<string, unknown>;
+            items.push({
+              quote_markdown: this.toLocalizedText(itemRec['quote_markdown']),
+              author: this.toLocalizedText(itemRec['author']),
+              role: this.toLocalizedText(itemRec['role'])
+            });
+            if (items.length >= 12) break;
+          }
+        }
+        if (items.length) draft.testimonials = items;
       } else if (typeRaw === 'image') {
         draft.url = typeof rec['url'] === 'string' ? String(rec['url']).trim() : '';
         draft.link_url = typeof rec['link_url'] === 'string' ? String(rec['link_url']).trim() : '';
@@ -11671,6 +12293,15 @@ export class AdminComponent implements OnInit, OnDestroy {
       enabled: true,
       title: this.emptyLocalizedText(),
       body_markdown: this.emptyLocalizedText(),
+      columns: [
+        { title: this.emptyLocalizedText(), body_markdown: this.emptyLocalizedText() },
+        { title: this.emptyLocalizedText(), body_markdown: this.emptyLocalizedText() }
+      ],
+      columns_breakpoint: 'md',
+      cta_label: this.emptyLocalizedText(),
+      cta_url: '',
+      faq_items: [{ question: this.emptyLocalizedText(), answer_markdown: this.emptyLocalizedText() }],
+      testimonials: [{ quote_markdown: this.emptyLocalizedText(), author: this.emptyLocalizedText(), role: this.emptyLocalizedText() }],
       url: '',
       link_url: '',
       focal_x: 50,
@@ -11698,6 +12329,62 @@ export class AdminComponent implements OnInit, OnDestroy {
     if (type === 'text') {
       block.title = { en: 'Section title', ro: 'Titlu secțiune' };
       block.body_markdown = { en: 'Write your content here...', ro: 'Scrie conținutul aici...' };
+      return;
+    }
+
+    if (type === 'columns') {
+      block.title = { en: 'Columns', ro: 'Coloane' };
+      block.columns_breakpoint = 'md';
+      block.columns = [
+        {
+          title: { en: 'Column 1', ro: 'Coloana 1' },
+          body_markdown: { en: 'Add text here…', ro: 'Adaugă text aici…' }
+        },
+        {
+          title: { en: 'Column 2', ro: 'Coloana 2' },
+          body_markdown: { en: 'Add text here…', ro: 'Adaugă text aici…' }
+        }
+      ];
+      return;
+    }
+
+    if (type === 'cta') {
+      block.title = { en: 'Call to action', ro: 'Apel la acțiune' };
+      block.body_markdown = { en: 'Add a short message and a button.', ro: 'Adaugă un mesaj scurt și un buton.' };
+      block.cta_label = { en: 'Shop now', ro: 'Cumpără acum' };
+      block.cta_url = '/shop';
+      return;
+    }
+
+    if (type === 'faq') {
+      block.title = { en: 'FAQ', ro: 'Întrebări frecvente' };
+      block.faq_items = [
+        {
+          question: { en: 'How long does shipping take?', ro: 'Cât durează livrarea?' },
+          answer_markdown: { en: 'Usually 1–3 business days.', ro: 'De obicei 1–3 zile lucrătoare.' }
+        },
+        {
+          question: { en: 'Can I return an item?', ro: 'Pot returna un produs?' },
+          answer_markdown: { en: 'Yes. Please contact us for details.', ro: 'Da. Te rugăm să ne contactezi pentru detalii.' }
+        }
+      ];
+      return;
+    }
+
+    if (type === 'testimonials') {
+      block.title = { en: 'Testimonials', ro: 'Testimoniale' };
+      block.testimonials = [
+        {
+          quote_markdown: { en: '“Amazing quality and fast delivery.”', ro: '„Calitate excelentă și livrare rapidă.”' },
+          author: { en: 'Customer name', ro: 'Nume client' },
+          role: { en: 'Verified buyer', ro: 'Client verificat' }
+        },
+        {
+          quote_markdown: { en: '“Beautiful craftsmanship.”', ro: '„Măiestrie deosebită.”' },
+          author: { en: 'Customer name', ro: 'Nume client' },
+          role: { en: 'Verified buyer', ro: 'Client verificat' }
+        }
+      ];
       return;
     }
 
@@ -11761,7 +12448,19 @@ export class AdminComponent implements OnInit, OnDestroy {
       const scope = parsed.scope;
       if (scope !== 'home' && scope !== 'page') return null;
       const type = parsed.type;
-      if (type !== 'text' && type !== 'image' && type !== 'gallery' && type !== 'banner' && type !== 'carousel') return null;
+      if (
+        type !== 'text' &&
+        type !== 'columns' &&
+        type !== 'cta' &&
+        type !== 'faq' &&
+        type !== 'testimonials' &&
+        type !== 'image' &&
+        type !== 'gallery' &&
+        type !== 'banner' &&
+        type !== 'carousel'
+      ) {
+        return null;
+      }
       const template = parsed.template === 'starter' ? 'starter' : 'blank';
       return { scope, type, template };
     } catch {
@@ -12246,6 +12945,69 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
+  addPageColumnsColumn(pageKey: PageBuilderKey, blockKey: string): void {
+    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+      if (b.key !== blockKey || b.type !== 'columns') return b;
+      const cols = [...(b.columns || [])];
+      if (cols.length >= 3) return b;
+      cols.push({ title: this.emptyLocalizedText(), body_markdown: this.emptyLocalizedText() });
+      return { ...b, columns: cols };
+    });
+  }
+
+  removePageColumnsColumn(pageKey: PageBuilderKey, blockKey: string, idx: number): void {
+    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+      if (b.key !== blockKey || b.type !== 'columns') return b;
+      const cols = [...(b.columns || [])];
+      if (cols.length <= 2) return b;
+      if (idx < 0 || idx >= cols.length) return b;
+      cols.splice(idx, 1);
+      return { ...b, columns: cols };
+    });
+  }
+
+  addPageFaqItem(pageKey: PageBuilderKey, blockKey: string): void {
+    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+      if (b.key !== blockKey || b.type !== 'faq') return b;
+      const items = [...(b.faq_items || [])];
+      if (items.length >= 20) return b;
+      items.push({ question: this.emptyLocalizedText(), answer_markdown: this.emptyLocalizedText() });
+      return { ...b, faq_items: items };
+    });
+  }
+
+  removePageFaqItem(pageKey: PageBuilderKey, blockKey: string, idx: number): void {
+    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+      if (b.key !== blockKey || b.type !== 'faq') return b;
+      const items = [...(b.faq_items || [])];
+      if (items.length <= 1) return b;
+      if (idx < 0 || idx >= items.length) return b;
+      items.splice(idx, 1);
+      return { ...b, faq_items: items };
+    });
+  }
+
+  addPageTestimonial(pageKey: PageBuilderKey, blockKey: string): void {
+    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+      if (b.key !== blockKey || b.type !== 'testimonials') return b;
+      const items = [...(b.testimonials || [])];
+      if (items.length >= 12) return b;
+      items.push({ quote_markdown: this.emptyLocalizedText(), author: this.emptyLocalizedText(), role: this.emptyLocalizedText() });
+      return { ...b, testimonials: items };
+    });
+  }
+
+  removePageTestimonial(pageKey: PageBuilderKey, blockKey: string, idx: number): void {
+    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+      if (b.key !== blockKey || b.type !== 'testimonials') return b;
+      const items = [...(b.testimonials || [])];
+      if (items.length <= 1) return b;
+      if (idx < 0 || idx >= items.length) return b;
+      items.splice(idx, 1);
+      return { ...b, testimonials: items };
+    });
+  }
+
   private buildPageBlocksMeta(pageKey: PageBuilderKey): Record<string, unknown> {
     const blocks = (this.pageBlocks[pageKey] || []).map((b) => {
       const base: Record<string, unknown> = { key: b.key, type: b.type, enabled: b.enabled };
@@ -12253,6 +13015,21 @@ export class AdminComponent implements OnInit, OnDestroy {
       base['layout'] = b.layout || this.defaultCmsBlockLayout();
       if (b.type === 'text') {
         base['body_markdown'] = b.body_markdown;
+      } else if (b.type === 'columns') {
+        base['columns'] = (b.columns || []).slice(0, 3).map((col) => ({ title: col.title, body_markdown: col.body_markdown }));
+        base['columns_breakpoint'] = b.columns_breakpoint;
+      } else if (b.type === 'cta') {
+        base['body_markdown'] = b.body_markdown;
+        base['cta_label'] = b.cta_label;
+        base['cta_url'] = b.cta_url;
+      } else if (b.type === 'faq') {
+        base['items'] = (b.faq_items || []).slice(0, 20).map((item) => ({ question: item.question, answer_markdown: item.answer_markdown }));
+      } else if (b.type === 'testimonials') {
+        base['items'] = (b.testimonials || []).slice(0, 12).map((item) => ({
+          quote_markdown: item.quote_markdown,
+          author: item.author,
+          role: item.role
+        }));
       } else if (b.type === 'image') {
         base['url'] = b.url;
         base['link_url'] = b.link_url;
@@ -12312,6 +13089,55 @@ export class AdminComponent implements OnInit, OnDestroy {
         const en = (block.body_markdown?.en || '').trim();
         const ro = (block.body_markdown?.ro || '').trim();
         if (!en && !ro) emptySections.push(label);
+        return;
+      }
+      if (block.type === 'columns') {
+        const cols = block.columns || [];
+        const hasAny = cols.some((col) => {
+          const titleEn = (col?.title?.en || '').trim();
+          const titleRo = (col?.title?.ro || '').trim();
+          const bodyEn = (col?.body_markdown?.en || '').trim();
+          const bodyRo = (col?.body_markdown?.ro || '').trim();
+          return Boolean(titleEn || titleRo || bodyEn || bodyRo);
+        });
+        if (!hasAny) emptySections.push(label);
+        return;
+      }
+      if (block.type === 'cta') {
+        const titleEn = (block.title?.en || '').trim();
+        const titleRo = (block.title?.ro || '').trim();
+        const bodyEn = (block.body_markdown?.en || '').trim();
+        const bodyRo = (block.body_markdown?.ro || '').trim();
+        const ctaEn = (block.cta_label?.en || '').trim();
+        const ctaRo = (block.cta_label?.ro || '').trim();
+        const url = (block.cta_url || '').trim();
+        if (!(titleEn || titleRo || bodyEn || bodyRo || ctaEn || ctaRo || url)) emptySections.push(label);
+        return;
+      }
+      if (block.type === 'faq') {
+        const items = block.faq_items || [];
+        const hasAny = items.some((item) => {
+          const qEn = (item?.question?.en || '').trim();
+          const qRo = (item?.question?.ro || '').trim();
+          const aEn = (item?.answer_markdown?.en || '').trim();
+          const aRo = (item?.answer_markdown?.ro || '').trim();
+          return Boolean(qEn || qRo || aEn || aRo);
+        });
+        if (!hasAny) emptySections.push(label);
+        return;
+      }
+      if (block.type === 'testimonials') {
+        const items = block.testimonials || [];
+        const hasAny = items.some((item) => {
+          const qEn = (item?.quote_markdown?.en || '').trim();
+          const qRo = (item?.quote_markdown?.ro || '').trim();
+          const aEn = (item?.author?.en || '').trim();
+          const aRo = (item?.author?.ro || '').trim();
+          const rEn = (item?.role?.en || '').trim();
+          const rRo = (item?.role?.ro || '').trim();
+          return Boolean(qEn || qRo || aEn || aRo || rEn || rRo);
+        });
+        if (!hasAny) emptySections.push(label);
         return;
       }
       if (block.type === 'image') {
@@ -12726,6 +13552,15 @@ export class AdminComponent implements OnInit, OnDestroy {
       enabled,
       title: this.emptyLocalizedText(),
       body_markdown: this.emptyLocalizedText(),
+      columns: [
+        { title: this.emptyLocalizedText(), body_markdown: this.emptyLocalizedText() },
+        { title: this.emptyLocalizedText(), body_markdown: this.emptyLocalizedText() }
+      ],
+      columns_breakpoint: 'md',
+      cta_label: this.emptyLocalizedText(),
+      cta_url: '',
+      faq_items: [{ question: this.emptyLocalizedText(), answer_markdown: this.emptyLocalizedText() }],
+      testimonials: [{ quote_markdown: this.emptyLocalizedText(), author: this.emptyLocalizedText(), role: this.emptyLocalizedText() }],
       url: '',
       link_url: '',
       focal_x: 50,
@@ -12752,6 +13587,10 @@ export class AdminComponent implements OnInit, OnDestroy {
   isCustomHomeBlock(block: HomeBlockDraft): boolean {
     return (
       block.type === 'text' ||
+      block.type === 'columns' ||
+      block.type === 'cta' ||
+      block.type === 'faq' ||
+      block.type === 'testimonials' ||
       block.type === 'image' ||
       block.type === 'gallery' ||
       block.type === 'banner' ||
@@ -12968,6 +13807,69 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
+  addHomeColumnsColumn(blockKey: string): void {
+    this.homeBlocks = this.homeBlocks.map((b) => {
+      if (b.key !== blockKey || b.type !== 'columns') return b;
+      const cols = [...(b.columns || [])];
+      if (cols.length >= 3) return b;
+      cols.push({ title: this.emptyLocalizedText(), body_markdown: this.emptyLocalizedText() });
+      return { ...b, columns: cols };
+    });
+  }
+
+  removeHomeColumnsColumn(blockKey: string, idx: number): void {
+    this.homeBlocks = this.homeBlocks.map((b) => {
+      if (b.key !== blockKey || b.type !== 'columns') return b;
+      const cols = [...(b.columns || [])];
+      if (cols.length <= 2) return b;
+      if (idx < 0 || idx >= cols.length) return b;
+      cols.splice(idx, 1);
+      return { ...b, columns: cols };
+    });
+  }
+
+  addHomeFaqItem(blockKey: string): void {
+    this.homeBlocks = this.homeBlocks.map((b) => {
+      if (b.key !== blockKey || b.type !== 'faq') return b;
+      const items = [...(b.faq_items || [])];
+      if (items.length >= 20) return b;
+      items.push({ question: this.emptyLocalizedText(), answer_markdown: this.emptyLocalizedText() });
+      return { ...b, faq_items: items };
+    });
+  }
+
+  removeHomeFaqItem(blockKey: string, idx: number): void {
+    this.homeBlocks = this.homeBlocks.map((b) => {
+      if (b.key !== blockKey || b.type !== 'faq') return b;
+      const items = [...(b.faq_items || [])];
+      if (items.length <= 1) return b;
+      if (idx < 0 || idx >= items.length) return b;
+      items.splice(idx, 1);
+      return { ...b, faq_items: items };
+    });
+  }
+
+  addHomeTestimonial(blockKey: string): void {
+    this.homeBlocks = this.homeBlocks.map((b) => {
+      if (b.key !== blockKey || b.type !== 'testimonials') return b;
+      const items = [...(b.testimonials || [])];
+      if (items.length >= 12) return b;
+      items.push({ quote_markdown: this.emptyLocalizedText(), author: this.emptyLocalizedText(), role: this.emptyLocalizedText() });
+      return { ...b, testimonials: items };
+    });
+  }
+
+  removeHomeTestimonial(blockKey: string, idx: number): void {
+    this.homeBlocks = this.homeBlocks.map((b) => {
+      if (b.key !== blockKey || b.type !== 'testimonials') return b;
+      const items = [...(b.testimonials || [])];
+      if (items.length <= 1) return b;
+      if (idx < 0 || idx >= items.length) return b;
+      items.splice(idx, 1);
+      return { ...b, testimonials: items };
+    });
+  }
+
   setBannerSlideImage(blockKey: string, asset: ContentImageAssetRead): void {
     const value = (asset?.url || '').trim();
     if (!value) return;
@@ -13056,14 +13958,18 @@ export class AdminComponent implements OnInit, OnDestroy {
             const enabledRaw = rec['enabled'];
             const enabled = enabledRaw === false ? false : true;
             const builtIn = this.normalizeHomeSectionId(typeRaw);
-            const type: HomeBlockType | null =
-              builtIn ||
-              (typeRaw === 'text' ||
-              typeRaw === 'image' ||
-              typeRaw === 'gallery' ||
-              typeRaw === 'banner' ||
-              typeRaw === 'carousel'
-                ? (typeRaw as HomeBlockType)
+              const type: HomeBlockType | null =
+                builtIn ||
+                (typeRaw === 'text' ||
+                typeRaw === 'columns' ||
+                typeRaw === 'cta' ||
+                typeRaw === 'faq' ||
+                typeRaw === 'testimonials' ||
+                typeRaw === 'image' ||
+                typeRaw === 'gallery' ||
+                typeRaw === 'banner' ||
+                typeRaw === 'carousel'
+                  ? (typeRaw as HomeBlockType)
                 : null);
             if (!type) continue;
 
@@ -13080,6 +13986,56 @@ export class AdminComponent implements OnInit, OnDestroy {
             draft.title = this.toLocalizedText(rec['title']);
             if (type === 'text') {
               draft.body_markdown = this.toLocalizedText(rec['body_markdown']);
+            } else if (type === 'columns') {
+              const columnsRaw = rec['columns'];
+              const cols: CmsColumnsColumnDraft[] = [];
+              if (Array.isArray(columnsRaw)) {
+                for (const colRaw of columnsRaw) {
+                  if (!colRaw || typeof colRaw !== 'object') continue;
+                  const colRec = colRaw as Record<string, unknown>;
+                  cols.push({ title: this.toLocalizedText(colRec['title']), body_markdown: this.toLocalizedText(colRec['body_markdown']) });
+                  if (cols.length >= 3) break;
+                }
+              }
+              if (cols.length >= 2) draft.columns = cols;
+              const bpRaw = rec['columns_breakpoint'] ?? rec['breakpoint'] ?? rec['stack_at'];
+              const bp = typeof bpRaw === 'string' ? String(bpRaw).trim() : '';
+              draft.columns_breakpoint = bp === 'sm' || bp === 'md' || bp === 'lg' ? bp : 'md';
+            } else if (type === 'cta') {
+              draft.body_markdown = this.toLocalizedText(rec['body_markdown']);
+              draft.cta_label = this.toLocalizedText(rec['cta_label']);
+              draft.cta_url = typeof rec['cta_url'] === 'string' ? String(rec['cta_url']).trim() : '';
+            } else if (type === 'faq') {
+              const itemsRaw = rec['items'];
+              const items: CmsFaqItemDraft[] = [];
+              if (Array.isArray(itemsRaw)) {
+                for (const itemRaw of itemsRaw) {
+                  if (!itemRaw || typeof itemRaw !== 'object') continue;
+                  const itemRec = itemRaw as Record<string, unknown>;
+                  items.push({
+                    question: this.toLocalizedText(itemRec['question']),
+                    answer_markdown: this.toLocalizedText(itemRec['answer_markdown'])
+                  });
+                  if (items.length >= 20) break;
+                }
+              }
+              if (items.length) draft.faq_items = items;
+            } else if (type === 'testimonials') {
+              const itemsRaw = rec['items'];
+              const items: CmsTestimonialDraft[] = [];
+              if (Array.isArray(itemsRaw)) {
+                for (const itemRaw of itemsRaw) {
+                  if (!itemRaw || typeof itemRaw !== 'object') continue;
+                  const itemRec = itemRaw as Record<string, unknown>;
+                  items.push({
+                    quote_markdown: this.toLocalizedText(itemRec['quote_markdown']),
+                    author: this.toLocalizedText(itemRec['author']),
+                    role: this.toLocalizedText(itemRec['role'])
+                  });
+                  if (items.length >= 12) break;
+                }
+              }
+              if (items.length) draft.testimonials = items;
             } else if (type === 'image') {
               draft.url = typeof rec['url'] === 'string' ? String(rec['url']).trim() : '';
               draft.link_url = typeof rec['link_url'] === 'string' ? String(rec['link_url']).trim() : '';
@@ -13176,6 +14132,25 @@ export class AdminComponent implements OnInit, OnDestroy {
       if (b.type === 'text') {
         base['title'] = b.title;
         base['body_markdown'] = b.body_markdown;
+      } else if (b.type === 'columns') {
+        base['title'] = b.title;
+        base['columns'] = (b.columns || []).slice(0, 3).map((col) => ({ title: col.title, body_markdown: col.body_markdown }));
+        base['columns_breakpoint'] = b.columns_breakpoint;
+      } else if (b.type === 'cta') {
+        base['title'] = b.title;
+        base['body_markdown'] = b.body_markdown;
+        base['cta_label'] = b.cta_label;
+        base['cta_url'] = b.cta_url;
+      } else if (b.type === 'faq') {
+        base['title'] = b.title;
+        base['items'] = (b.faq_items || []).slice(0, 20).map((item) => ({ question: item.question, answer_markdown: item.answer_markdown }));
+      } else if (b.type === 'testimonials') {
+        base['title'] = b.title;
+        base['items'] = (b.testimonials || []).slice(0, 12).map((item) => ({
+          quote_markdown: item.quote_markdown,
+          author: item.author,
+          role: item.role
+        }));
       } else if (b.type === 'image') {
         base['title'] = b.title;
         base['url'] = b.url;

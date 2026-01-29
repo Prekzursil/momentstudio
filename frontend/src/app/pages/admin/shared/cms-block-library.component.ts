@@ -4,7 +4,16 @@ import { TranslateModule } from '@ngx-translate/core';
 import { ButtonComponent } from '../../../shared/button.component';
 
 export type CmsBlockLibraryContext = 'home' | 'page';
-export type CmsBlockLibraryBlockType = 'text' | 'image' | 'gallery' | 'banner' | 'carousel';
+export type CmsBlockLibraryBlockType =
+  | 'text'
+  | 'columns'
+  | 'cta'
+  | 'faq'
+  | 'testimonials'
+  | 'image'
+  | 'gallery'
+  | 'banner'
+  | 'carousel';
 export type CmsBlockLibraryTemplate = 'blank' | 'starter';
 
 type BlockDef = {
@@ -88,6 +97,30 @@ export class CmsBlockLibraryComponent {
       titleKey: 'adminUi.home.sections.blocks.text',
       descKey: 'adminUi.content.blockLibrary.items.text',
       gradient: 'from-indigo-500/50 to-fuchsia-500/50'
+    },
+    {
+      type: 'columns',
+      titleKey: 'adminUi.home.sections.blocks.columns',
+      descKey: 'adminUi.content.blockLibrary.items.columns',
+      gradient: 'from-slate-500/50 to-slate-700/50'
+    },
+    {
+      type: 'cta',
+      titleKey: 'adminUi.home.sections.blocks.cta',
+      descKey: 'adminUi.content.blockLibrary.items.cta',
+      gradient: 'from-emerald-500/50 to-lime-500/50'
+    },
+    {
+      type: 'faq',
+      titleKey: 'adminUi.home.sections.blocks.faq',
+      descKey: 'adminUi.content.blockLibrary.items.faq',
+      gradient: 'from-sky-500/50 to-cyan-500/50'
+    },
+    {
+      type: 'testimonials',
+      titleKey: 'adminUi.home.sections.blocks.testimonials',
+      descKey: 'adminUi.content.blockLibrary.items.testimonials',
+      gradient: 'from-pink-500/50 to-rose-500/50'
     },
     {
       type: 'image',
