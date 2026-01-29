@@ -1,10 +1,11 @@
 import { NgClass, NgForOf, NgIf } from '@angular/common';
 import { Component, ElementRef, HostListener, OnDestroy, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Subscription } from 'rxjs';
 
 import { SiteCompanyInfo, SiteCompanyService } from '../core/site-company.service';
+import { SiteNavigationLink, SiteNavigationService } from '../core/site-navigation.service';
 import { SiteSocialService, SiteSocialLink } from '../core/site-social.service';
 import { ImgFallbackDirective } from '../shared/img-fallback.directive';
 
@@ -116,17 +117,61 @@ import { ImgFallbackDirective } from '../shared/img-fallback.directive';
 
         <div class="grid gap-2 content-start">
           <p class="font-semibold text-slate-900 dark:text-slate-100">{{ 'footer.handcraftedArt' | translate }}</p>
-          <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/shop">{{ 'nav.shop' | translate }}</a>
-          <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/about">{{ 'nav.about' | translate }}</a>
-          <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/contact">{{ 'nav.contact' | translate }}</a>
-          <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/pages/terms">{{ 'nav.terms' | translate }}</a>
+          <ng-container *ngIf="footerHandcraftedLinks?.length; else defaultHandcraftedLinks">
+            <ng-container *ngFor="let link of footerHandcraftedLinks; trackBy: trackSiteNavLink">
+              <a
+                *ngIf="!isExternalLink(link.url)"
+                class="hover:text-slate-900 dark:hover:text-white"
+                [routerLink]="link.url"
+              >
+                {{ navLabel(link) }}
+              </a>
+              <a
+                *ngIf="isExternalLink(link.url)"
+                class="hover:text-slate-900 dark:hover:text-white"
+                [href]="link.url"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {{ navLabel(link) }}
+              </a>
+            </ng-container>
+          </ng-container>
+          <ng-template #defaultHandcraftedLinks>
+            <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/shop">{{ 'nav.shop' | translate }}</a>
+            <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/about">{{ 'nav.about' | translate }}</a>
+            <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/contact">{{ 'nav.contact' | translate }}</a>
+            <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/pages/terms">{{ 'nav.terms' | translate }}</a>
+          </ng-template>
         </div>
 
         <div class="grid gap-2 content-start">
           <p class="font-semibold text-slate-900 dark:text-slate-100">{{ 'footer.legal' | translate }}</p>
-          <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/pages/terms">{{ 'nav.terms' | translate }}</a>
-          <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/pages/privacy-policy">{{ 'footer.privacyPolicy' | translate }}</a>
-          <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/pages/anpc">{{ 'footer.anpc' | translate }}</a>
+          <ng-container *ngIf="footerLegalLinks?.length; else defaultLegalLinks">
+            <ng-container *ngFor="let link of footerLegalLinks; trackBy: trackSiteNavLink">
+              <a
+                *ngIf="!isExternalLink(link.url)"
+                class="hover:text-slate-900 dark:hover:text-white"
+                [routerLink]="link.url"
+              >
+                {{ navLabel(link) }}
+              </a>
+              <a
+                *ngIf="isExternalLink(link.url)"
+                class="hover:text-slate-900 dark:hover:text-white"
+                [href]="link.url"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {{ navLabel(link) }}
+              </a>
+            </ng-container>
+          </ng-container>
+          <ng-template #defaultLegalLinks>
+            <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/pages/terms">{{ 'nav.terms' | translate }}</a>
+            <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/pages/privacy-policy">{{ 'footer.privacyPolicy' | translate }}</a>
+            <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/pages/anpc">{{ 'footer.anpc' | translate }}</a>
+          </ng-template>
         </div>
 
         <div class="grid gap-2 content-start">
@@ -159,6 +204,8 @@ export class FooterComponent implements OnInit, OnDestroy {
 
   instagramPages: Array<{ label: string; url: string; thumbnailUrl?: string | null; initials: string; avatarClass: string }> = [];
   facebookPages: Array<{ label: string; url: string; thumbnailUrl?: string | null; initials: string; avatarClass: string }> = [];
+  footerHandcraftedLinks: SiteNavigationLink[] | null = null;
+  footerLegalLinks: SiteNavigationLink[] | null = null;
   companyInfo: SiteCompanyInfo = {
     name: null,
     registrationNumber: null,
@@ -170,11 +217,14 @@ export class FooterComponent implements OnInit, OnDestroy {
 
   private socialSub?: Subscription;
   private companySub?: Subscription;
+  private navSub?: Subscription;
 
   constructor(
     private elementRef: ElementRef<HTMLElement>,
     private social: SiteSocialService,
-    private company: SiteCompanyService
+    private company: SiteCompanyService,
+    private navigation: SiteNavigationService,
+    private translate: TranslateService
   ) {}
 
   ngOnInit(): void {
@@ -185,11 +235,31 @@ export class FooterComponent implements OnInit, OnDestroy {
     this.companySub = this.company.get().subscribe((info) => {
       this.companyInfo = info;
     });
+    this.navSub = this.navigation.get().subscribe((data) => {
+      this.footerHandcraftedLinks = data?.footerHandcraftedLinks?.length ? data.footerHandcraftedLinks : null;
+      this.footerLegalLinks = data?.footerLegalLinks?.length ? data.footerLegalLinks : null;
+    });
   }
 
   ngOnDestroy(): void {
     this.socialSub?.unsubscribe();
     this.companySub?.unsubscribe();
+    this.navSub?.unsubscribe();
+  }
+
+  navLabel(link: SiteNavigationLink): string {
+    const lang = (this.translate.currentLang || 'en').toLowerCase();
+    if (lang === 'ro') return (link?.label?.ro || '').trim();
+    return (link?.label?.en || '').trim();
+  }
+
+  isExternalLink(url: string): boolean {
+    const value = (url || '').trim();
+    return value.startsWith('http://') || value.startsWith('https://');
+  }
+
+  trackSiteNavLink(_: number, link: SiteNavigationLink): string {
+    return (link?.id || '').trim() || (link?.url || '').trim();
   }
 
   private toFooterPages(

@@ -972,7 +972,7 @@ Below is a structured checklist you can turn into issues.
 - [x] CMS preview: iframe viewport emulation – Render preview in an iframe at selected device widths so Tailwind breakpoints match.
 - [x] CMS scheduling: calendar view – Visual calendar for scheduled publish/unpublish across pages/blog/home banners.
 - [x] CMS redirects: inline creation – When changing a page URL, offer creating a redirect in the same flow.
-- [ ] CMS navigation: menu builder – Visual editor for header/footer links with drag-drop ordering and per-language labels.
+- [x] CMS navigation: menu builder – Visual editor for header/footer links with drag-drop ordering and per-language labels.
 - [ ] CMS content: side-by-side translation – RO/EN side-by-side editing with “copy from” shortcuts.
 - [x] CMS content: find & replace – Search/replace across CMS content blocks (with preview of affected pages).
 - [ ] CMS blocks: columns/layout – Add layout blocks (2–3 columns, split hero) with responsive controls.

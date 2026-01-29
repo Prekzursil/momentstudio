@@ -10,6 +10,8 @@ import { ThemeSegmentedControlComponent } from './theme-segmented-control.compon
 export interface NavLink {
   label: string;
   path: string;
+  translate?: boolean;
+  external?: boolean;
 }
 
 export interface NavDrawerUser {
@@ -69,14 +71,27 @@ export interface NavDrawerUser {
         </div>
       </div>
       <nav class="p-4 grid gap-3">
-        <a
-          *ngFor="let link of links"
-          [routerLink]="link.path"
-          (click)="onClose()"
-          class="text-slate-800 hover:text-slate-900 font-medium dark:text-slate-200 dark:hover:text-white"
-        >
-          {{ link.label | translate }}
-        </a>
+        <ng-container *ngFor="let link of links">
+          <a
+            *ngIf="!link.external; else externalNavLink"
+            [routerLink]="link.path"
+            (click)="onClose()"
+            class="text-slate-800 hover:text-slate-900 font-medium dark:text-slate-200 dark:hover:text-white"
+          >
+            {{ link.translate === false ? link.label : (link.label | translate) }}
+          </a>
+          <ng-template #externalNavLink>
+            <a
+              [href]="link.path"
+              target="_blank"
+              rel="noopener noreferrer"
+              (click)="onClose()"
+              class="text-slate-800 hover:text-slate-900 font-medium dark:text-slate-200 dark:hover:text-white"
+            >
+              {{ link.translate === false ? link.label : (link.label | translate) }}
+            </a>
+          </ng-template>
+        </ng-container>
       </nav>
       <div class="p-4 border-t border-slate-200 dark:border-slate-700">
         <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">

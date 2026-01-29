@@ -2373,6 +2373,31 @@
           }
         }
       },
+      "navigation": {
+        "title": "Site navigation",
+        "hint": "Manage storefront header/footer links. Each link needs a URL plus labels in both EN and RO.",
+        "headerLinks": "Header links",
+        "footerHandcraftedLinks": "Footer — Handcrafted Art",
+        "footerLegalLinks": "Footer — Legal",
+        "dragHint": "Drag to reorder links. Use ↑/↓ for precise moves.",
+        "empty": "No links.",
+        "fields": {
+          "labelEn": "Label (EN)",
+          "labelRo": "Label (RO)",
+          "url": "URL"
+        },
+        "resetDefaults": "Reset to defaults",
+        "confirms": {
+          "resetDefaults": "Reset navigation to defaults? This will overwrite your current edits."
+        },
+        "success": {
+          "save": "Navigation saved."
+        },
+        "errors": {
+          "save": "Could not save navigation.",
+          "invalid": "Each link must have URL + Label (EN) + Label (RO), or be left completely blank."
+        }
+      },
       "social": {
         "title": "Social & contact",
         "phone": "Phone",

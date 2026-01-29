@@ -2373,6 +2373,31 @@
           }
         }
       },
+      "navigation": {
+        "title": "Navigație site",
+        "hint": "Gestionează linkurile din header/footer. Fiecare link are nevoie de un URL și etichete în EN și RO.",
+        "headerLinks": "Linkuri header",
+        "footerHandcraftedLinks": "Footer — Artă handmade",
+        "footerLegalLinks": "Footer — Legal",
+        "dragHint": "Trage pentru a reordona linkurile. Folosește ↑/↓ pentru mutări precise.",
+        "empty": "Nu există linkuri.",
+        "fields": {
+          "labelEn": "Etichetă (EN)",
+          "labelRo": "Etichetă (RO)",
+          "url": "URL"
+        },
+        "resetDefaults": "Resetează la valorile implicite",
+        "confirms": {
+          "resetDefaults": "Resetezi navigația la valorile implicite? Acest lucru va suprascrie modificările curente."
+        },
+        "success": {
+          "save": "Navigația a fost salvată."
+        },
+        "errors": {
+          "save": "Nu am putut salva navigația.",
+          "invalid": "Fiecare link trebuie să aibă URL + Etichetă (EN) + Etichetă (RO), sau să fie lăsat complet gol."
+        }
+      },
       "social": {
         "title": "Rețele sociale și contact",
         "phone": "Telefon",

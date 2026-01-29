@@ -13,6 +13,8 @@ import { NotificationsService, UserNotification } from '../core/notifications.se
 import { MaintenanceBannerPublic, OpsService } from '../core/ops.service';
 import { ToastService } from '../core/toast.service';
 import { CmsAnnouncementBarComponent } from '../shared/cms-announcement-bar.component';
+import { SiteNavigationService, SiteNavigationData } from '../core/site-navigation.service';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-header',
@@ -306,12 +308,21 @@ import { CmsAnnouncementBarComponent } from '../shared/cms-announcement-bar.comp
           </div>
         </div>
 	        <nav class="hidden lg:flex items-center gap-6 border-t border-slate-200/60 py-2 text-sm font-medium text-slate-700 dark:border-slate-800/60 dark:text-slate-200 overflow-x-auto whitespace-nowrap">
-	          <a routerLink="/" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.home' | translate }}</a>
-	          <a routerLink="/blog" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.blog' | translate }}</a>
-	          <a routerLink="/shop" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.shop' | translate }}</a>
-	          <a routerLink="/about" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.about' | translate }}</a>
-	          <a routerLink="/contact" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.contact' | translate }}</a>
-	          <a routerLink="/pages/terms" class="hover:text-slate-900 dark:hover:text-white">{{ 'nav.terms' | translate }}</a>
+            <ng-container *ngFor="let link of storefrontLinks(); trackBy: trackNavLink">
+              <a *ngIf="!link.external; else externalStorefrontLink" [routerLink]="link.path" class="hover:text-slate-900 dark:hover:text-white">
+                {{ link.translate === false ? link.label : (link.label | translate) }}
+              </a>
+              <ng-template #externalStorefrontLink>
+                <a
+                  [href]="link.path"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="hover:text-slate-900 dark:hover:text-white"
+                >
+                  {{ link.translate === false ? link.label : (link.label | translate) }}
+                </a>
+              </ng-template>
+            </ng-container>
 	          <button
 	            *ngIf="isAdmin() && !isImpersonating()"
 	            type="button"
@@ -331,7 +342,7 @@ import { CmsAnnouncementBarComponent } from '../shared/cms-announcement-bar.comp
           </a>
         </nav>
       </div>
-    </header>
+	    </header>
     <div *ngIf="userMenuOpen || notificationsOpen" class="fixed inset-0 z-40" (click)="closeOverlays()"></div>
     <div *ngIf="searchOpen" class="fixed inset-0 z-50" (click)="closeSearch()">
       <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm dark:bg-black/60"></div>
@@ -376,7 +387,13 @@ import { CmsAnnouncementBarComponent } from '../shared/cms-announcement-bar.comp
 export class HeaderComponent implements OnDestroy {
   @Input() themePreference: ThemePreference = 'system';
   @Output() themeChange = new EventEmitter<ThemePreference>();
-  @Input() language = 'en';
+  private readonly languageSig = signal<'en' | 'ro'>('en');
+  @Input() set language(value: string) {
+    this.languageSig.set(value === 'ro' ? 'ro' : 'en');
+  }
+  get language(): string {
+    return this.languageSig();
+  }
   @Output() languageChange = new EventEmitter<string>();
   drawerOpen = false;
   searchOpen = false;
@@ -386,8 +403,10 @@ export class HeaderComponent implements OnDestroy {
   private unreadPoll?: number;
   private bannerPoll?: number;
   private authEffect?: EffectRef;
+  private navSub?: Subscription;
 
   banner = signal<MaintenanceBannerPublic | null>(null);
+  private cmsNavigation = signal<SiteNavigationData | null>(null);
 
 	  readonly isAuthenticated = computed(() => this.auth.isAuthenticated());
 	  readonly currentUser = computed(() => this.auth.user());
@@ -399,23 +418,41 @@ export class HeaderComponent implements OnDestroy {
 	  readonly notificationsLoading = computed(() => this.notificationsService.loading());
 	  readonly unreadCount = computed(() => this.notificationsService.unreadCount());
 
+  private readonly fallbackStorefrontLinks: NavLink[] = [
+    { label: 'nav.home', path: '/' },
+    { label: 'nav.blog', path: '/blog' },
+    { label: 'nav.shop', path: '/shop' },
+    { label: 'nav.about', path: '/about' },
+    { label: 'nav.contact', path: '/contact' },
+    { label: 'nav.terms', path: '/pages/terms' }
+  ];
+
+  readonly storefrontLinks = computed<NavLink[]>(() => {
+    const nav = this.cmsNavigation();
+    const lang = this.languageSig();
+    const items = nav?.headerLinks || [];
+    if (!nav || !items.length) return this.fallbackStorefrontLinks;
+
+    const out: NavLink[] = [];
+    for (const item of items) {
+      const url = (item.url || '').trim();
+      const label = (lang === 'ro' ? item.label.ro : item.label.en).trim();
+      if (!url || !label) continue;
+      out.push({ label, path: url, translate: false, external: this.isExternalLink(url) });
+    }
+    return out.length ? out : this.fallbackStorefrontLinks;
+  });
+
   readonly navLinks = computed<NavLink[]>(() => {
     const authenticated = this.isAuthenticated();
-    const links: NavLink[] = [
-      { label: 'nav.home', path: '/' },
-      { label: 'nav.blog', path: '/blog' },
-      { label: 'nav.shop', path: '/shop' },
-      { label: 'nav.about', path: '/about' },
-      { label: 'nav.contact', path: '/contact' },
-      { label: 'nav.terms', path: '/pages/terms' }
-    ];
+    const links: NavLink[] = [...this.storefrontLinks()];
     if (authenticated) {
       links.push({ label: 'nav.account', path: '/account' });
     } else {
       links.push({ label: 'nav.signIn', path: '/login' });
       links.push({ label: 'nav.register', path: '/register' });
     }
-    if (authenticated && this.auth.isStaff()) {
+    if (authenticated && this.isStaff()) {
       links.push({ label: 'nav.admin', path: '/admin' });
     }
     return links;
@@ -425,6 +462,7 @@ export class HeaderComponent implements OnDestroy {
 	    private cart: CartStore,
 	    private router: Router,
 	    private auth: AuthService,
+      private navigation: SiteNavigationService,
 	    private storefrontAdminMode: StorefrontAdminModeService,
 	    private notificationsService: NotificationsService,
 	    private ops: OpsService,
@@ -445,6 +483,8 @@ export class HeaderComponent implements OnDestroy {
 
     this.refreshBanner();
     this.bannerPoll = window.setInterval(() => this.refreshBanner(), 60_000);
+
+    this.navSub = this.navigation.get().subscribe((nav) => this.cmsNavigation.set(nav));
   }
 
   cartCount = this.cart.count;
@@ -570,6 +610,12 @@ export class HeaderComponent implements OnDestroy {
     return 'bg-indigo-50 text-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-100';
   }
 
+  trackNavLink(_: number, link: NavLink): string {
+    const label = (link?.label || '').trim();
+    const path = (link?.path || '').trim();
+    return `${path}|${label}`;
+  }
+
   isExternalLink(url: string): boolean {
     const value = (url || '').trim();
     return value.startsWith('http://') || value.startsWith('https://');
@@ -625,6 +671,7 @@ export class HeaderComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     this.stopUnreadPolling();
+    this.navSub?.unsubscribe();
     this.authEffect?.destroy();
     if (this.bannerPoll) window.clearInterval(this.bannerPoll);
   }

@@ -581,6 +581,199 @@ class CmsDraftManager<T> {
 
           <section *ngIf="section() === 'settings'" class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between gap-3">
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.navigation.title' | translate }}</h2>
+              <div class="flex items-center gap-2">
+                <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadNavigation()"></app-button>
+                <app-button size="sm" [label]="'adminUi.actions.save' | translate" (action)="saveNavigation()"></app-button>
+              </div>
+            </div>
+            <p class="text-xs text-slate-600 dark:text-slate-300">
+              {{ 'adminUi.site.navigation.hint' | translate }}
+            </p>
+
+            <div class="grid gap-4">
+              <div class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30">
+                <div class="flex items-center justify-between gap-3">
+                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.navigation.headerLinks' | translate }}</p>
+                  <button
+                    type="button"
+                    class="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-300"
+                    (click)="addNavigationLink('header')"
+                  >
+                    {{ 'adminUi.actions.add' | translate }}
+                  </button>
+                </div>
+                <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.site.navigation.dragHint' | translate }}</p>
+
+                <div *ngIf="navigationForm.header_links.length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.site.navigation.empty' | translate }}
+                </div>
+
+                <div
+                  *ngFor="let link of navigationForm.header_links; let i = index"
+                  class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+                  (dragover)="onNavigationDragOver($event)"
+                  (drop)="onNavigationDrop('header', link.id)"
+                >
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <span
+                        class="cursor-move select-none text-slate-400 dark:text-slate-500"
+                        draggable="true"
+                        (dragstart)="onNavigationDragStart('header', link.id)"
+                        aria-label="Drag"
+                        >⠿</span
+                      >
+                      <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">#{{ i + 1 }}</span>
+                      <span class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ link.url }}</span>
+                    </div>
+                    <div class="flex flex-wrap justify-end gap-2">
+                      <app-button size="sm" variant="ghost" label="↑" (action)="moveNavigationLink('header', link.id, -1)"></app-button>
+                      <app-button size="sm" variant="ghost" label="↓" (action)="moveNavigationLink('header', link.id, 1)"></app-button>
+                      <app-button
+                        size="sm"
+                        variant="ghost"
+                        [label]="'adminUi.actions.remove' | translate"
+                        (action)="removeNavigationLink('header', link.id)"
+                      ></app-button>
+                    </div>
+                  </div>
+                  <div class="mt-3 grid gap-3 md:grid-cols-3 text-sm">
+                    <app-input [label]="'adminUi.site.navigation.fields.labelEn' | translate" [(value)]="link.label.en"></app-input>
+                    <app-input [label]="'adminUi.site.navigation.fields.labelRo' | translate" [(value)]="link.label.ro"></app-input>
+                    <app-input [label]="'adminUi.site.navigation.fields.url' | translate" [(value)]="link.url"></app-input>
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30">
+                <div class="flex items-center justify-between gap-3">
+                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.navigation.footerHandcraftedLinks' | translate }}</p>
+                  <button
+                    type="button"
+                    class="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-300"
+                    (click)="addNavigationLink('footer_handcrafted')"
+                  >
+                    {{ 'adminUi.actions.add' | translate }}
+                  </button>
+                </div>
+                <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.site.navigation.dragHint' | translate }}</p>
+
+                <div *ngIf="navigationForm.footer_handcrafted_links.length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.site.navigation.empty' | translate }}
+                </div>
+
+                <div
+                  *ngFor="let link of navigationForm.footer_handcrafted_links; let i = index"
+                  class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+                  (dragover)="onNavigationDragOver($event)"
+                  (drop)="onNavigationDrop('footer_handcrafted', link.id)"
+                >
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <span
+                        class="cursor-move select-none text-slate-400 dark:text-slate-500"
+                        draggable="true"
+                        (dragstart)="onNavigationDragStart('footer_handcrafted', link.id)"
+                        aria-label="Drag"
+                        >⠿</span
+                      >
+                      <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">#{{ i + 1 }}</span>
+                      <span class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ link.url }}</span>
+                    </div>
+                    <div class="flex flex-wrap justify-end gap-2">
+                      <app-button
+                        size="sm"
+                        variant="ghost"
+                        label="↑"
+                        (action)="moveNavigationLink('footer_handcrafted', link.id, -1)"
+                      ></app-button>
+                      <app-button size="sm" variant="ghost" label="↓" (action)="moveNavigationLink('footer_handcrafted', link.id, 1)"></app-button>
+                      <app-button
+                        size="sm"
+                        variant="ghost"
+                        [label]="'adminUi.actions.remove' | translate"
+                        (action)="removeNavigationLink('footer_handcrafted', link.id)"
+                      ></app-button>
+                    </div>
+                  </div>
+                  <div class="mt-3 grid gap-3 md:grid-cols-3 text-sm">
+                    <app-input [label]="'adminUi.site.navigation.fields.labelEn' | translate" [(value)]="link.label.en"></app-input>
+                    <app-input [label]="'adminUi.site.navigation.fields.labelRo' | translate" [(value)]="link.label.ro"></app-input>
+                    <app-input [label]="'adminUi.site.navigation.fields.url' | translate" [(value)]="link.url"></app-input>
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30">
+                <div class="flex items-center justify-between gap-3">
+                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.navigation.footerLegalLinks' | translate }}</p>
+                  <button
+                    type="button"
+                    class="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-300"
+                    (click)="addNavigationLink('footer_legal')"
+                  >
+                    {{ 'adminUi.actions.add' | translate }}
+                  </button>
+                </div>
+                <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.site.navigation.dragHint' | translate }}</p>
+
+                <div *ngIf="navigationForm.footer_legal_links.length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.site.navigation.empty' | translate }}
+                </div>
+
+                <div
+                  *ngFor="let link of navigationForm.footer_legal_links; let i = index"
+                  class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+                  (dragover)="onNavigationDragOver($event)"
+                  (drop)="onNavigationDrop('footer_legal', link.id)"
+                >
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <span
+                        class="cursor-move select-none text-slate-400 dark:text-slate-500"
+                        draggable="true"
+                        (dragstart)="onNavigationDragStart('footer_legal', link.id)"
+                        aria-label="Drag"
+                        >⠿</span
+                      >
+                      <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">#{{ i + 1 }}</span>
+                      <span class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ link.url }}</span>
+                    </div>
+                    <div class="flex flex-wrap justify-end gap-2">
+                      <app-button size="sm" variant="ghost" label="↑" (action)="moveNavigationLink('footer_legal', link.id, -1)"></app-button>
+                      <app-button size="sm" variant="ghost" label="↓" (action)="moveNavigationLink('footer_legal', link.id, 1)"></app-button>
+                      <app-button
+                        size="sm"
+                        variant="ghost"
+                        [label]="'adminUi.actions.remove' | translate"
+                        (action)="removeNavigationLink('footer_legal', link.id)"
+                      ></app-button>
+                    </div>
+                  </div>
+                  <div class="mt-3 grid gap-3 md:grid-cols-3 text-sm">
+                    <app-input [label]="'adminUi.site.navigation.fields.labelEn' | translate" [(value)]="link.label.en"></app-input>
+                    <app-input [label]="'adminUi.site.navigation.fields.labelRo' | translate" [(value)]="link.label.ro"></app-input>
+                    <app-input [label]="'adminUi.site.navigation.fields.url' | translate" [(value)]="link.url"></app-input>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2 text-sm">
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.site.navigation.resetDefaults' | translate"
+                (action)="resetNavigationDefaults()"
+              ></app-button>
+              <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="navigationMessage">{{ navigationMessage }}</span>
+              <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="navigationError">{{ navigationError }}</span>
+            </div>
+          </section>
+
+          <section *ngIf="section() === 'settings'" class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+            <div class="flex items-center justify-between gap-3">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.company.title' | translate }}</h2>
               <div class="flex items-center gap-2">
                 <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadCompany()"></app-button>
@@ -5551,6 +5744,7 @@ class CmsDraftManager<T> {
 	                    <option [ngValue]="'site.assets'">{{ 'adminUi.site.assets.title' | translate }}</option>
 	                    <option [ngValue]="'site.social'">{{ 'adminUi.site.social.title' | translate }}</option>
 	                    <option [ngValue]="'site.company'">{{ 'adminUi.site.company.title' | translate }}</option>
+                      <option [ngValue]="'site.navigation'">{{ 'adminUi.site.navigation.title' | translate }}</option>
 	                    <option [ngValue]="'site.checkout'">{{ 'adminUi.site.checkout.title' | translate }}</option>
 	                    <option [ngValue]="'site.reports'">{{ 'adminUi.reports.title' | translate }}</option>
 	                    <option [ngValue]="'seo.' + seoPage">{{ ('adminUi.site.seo.title' | translate) + ' · ' + seoPage.toUpperCase() }}</option>
@@ -5788,6 +5982,15 @@ export class AdminComponent implements OnInit, OnDestroy {
   socialError: string | null = null;
   socialThumbLoading: Record<string, boolean> = {};
   socialThumbErrors: Record<string, string> = {};
+  navigationForm: {
+    header_links: Array<{ id: string; url: string; label: LocalizedText }>;
+    footer_handcrafted_links: Array<{ id: string; url: string; label: LocalizedText }>;
+    footer_legal_links: Array<{ id: string; url: string; label: LocalizedText }>;
+  } = this.defaultNavigationForm();
+  navigationMessage: string | null = null;
+  navigationError: string | null = null;
+  private draggingNavList: 'header' | 'footer_handcrafted' | 'footer_legal' | null = null;
+  private draggingNavId: string | null = null;
   companyForm: {
     name: string;
     registration_number: string;
@@ -6332,6 +6535,8 @@ export class AdminComponent implements OnInit, OnDestroy {
         return 'adminUi.site.social.title';
       case 'site.company':
         return 'adminUi.site.company.title';
+      case 'site.navigation':
+        return 'adminUi.site.navigation.title';
       case 'site.checkout':
         return 'adminUi.site.checkout.title';
       case 'site.reports':
@@ -6530,6 +6735,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.loadAssets();
     this.loadSocial();
     this.loadCompany();
+    this.loadNavigation();
     this.loadCheckoutSettings();
     this.loadReportsSettings();
     this.loadSeo();
@@ -9709,6 +9915,253 @@ export class AdminComponent implements OnInit, OnDestroy {
         }
 	    });
 	  }
+
+  private newNavigationId(prefix: string): string {
+    const rand = Math.random().toString(36).slice(2, 8);
+    return `${prefix}_${Date.now().toString(36)}_${rand}`;
+  }
+
+  private defaultNavigationForm(): {
+    header_links: Array<{ id: string; url: string; label: LocalizedText }>;
+    footer_handcrafted_links: Array<{ id: string; url: string; label: LocalizedText }>;
+    footer_legal_links: Array<{ id: string; url: string; label: LocalizedText }>;
+  } {
+    return {
+      header_links: [
+        { id: this.newNavigationId('nav'), url: '/', label: { en: 'Home', ro: 'Acasă' } },
+        { id: this.newNavigationId('nav'), url: '/blog', label: { en: 'Blog', ro: 'Blog' } },
+        { id: this.newNavigationId('nav'), url: '/shop', label: { en: 'Shop', ro: 'Magazin' } },
+        { id: this.newNavigationId('nav'), url: '/about', label: { en: 'Our story', ro: 'Povestea noastră' } },
+        { id: this.newNavigationId('nav'), url: '/contact', label: { en: 'Contact', ro: 'Contact' } },
+        { id: this.newNavigationId('nav'), url: '/pages/terms', label: { en: 'Terms & Conditions', ro: 'Termeni și condiții' } }
+      ],
+      footer_handcrafted_links: [
+        { id: this.newNavigationId('nav'), url: '/shop', label: { en: 'Shop', ro: 'Magazin' } },
+        { id: this.newNavigationId('nav'), url: '/about', label: { en: 'Our story', ro: 'Povestea noastră' } },
+        { id: this.newNavigationId('nav'), url: '/contact', label: { en: 'Contact', ro: 'Contact' } },
+        { id: this.newNavigationId('nav'), url: '/pages/terms', label: { en: 'Terms & Conditions', ro: 'Termeni și condiții' } }
+      ],
+      footer_legal_links: [
+        { id: this.newNavigationId('nav'), url: '/pages/terms', label: { en: 'Terms & Conditions', ro: 'Termeni și condiții' } },
+        { id: this.newNavigationId('nav'), url: '/pages/privacy-policy', label: { en: 'Privacy Policy', ro: 'Politica de confidențialitate' } },
+        { id: this.newNavigationId('nav'), url: '/pages/anpc', label: { en: 'ANPC', ro: 'ANPC' } }
+      ]
+    };
+  }
+
+  private parseNavigationLinks(value: unknown): Array<{ id: string; url: string; label: LocalizedText }> {
+    if (!Array.isArray(value)) return [];
+    const out: Array<{ id: string; url: string; label: LocalizedText }> = [];
+    const seen = new Set<string>();
+    for (const [idx, raw] of value.entries()) {
+      if (!raw || typeof raw !== 'object') continue;
+      const rec = raw as Record<string, unknown>;
+      const idRaw = typeof rec['id'] === 'string' ? rec['id'].trim() : '';
+      const url = typeof rec['url'] === 'string' ? rec['url'].trim() : '';
+      const labelRaw = rec['label'];
+      const labelRec = labelRaw && typeof labelRaw === 'object' ? (labelRaw as Record<string, unknown>) : {};
+      const en = typeof labelRec['en'] === 'string' ? labelRec['en'].trim() : '';
+      const ro = typeof labelRec['ro'] === 'string' ? labelRec['ro'].trim() : '';
+      if (!url || !en || !ro) continue;
+      const id = idRaw || `nav_${idx + 1}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      out.push({ id, url, label: { en, ro } });
+    }
+    return out;
+  }
+
+  loadNavigation(): void {
+    this.navigationError = null;
+    this.navigationMessage = null;
+    this.admin.getContent('site.navigation').subscribe({
+      next: (block) => {
+        this.rememberContentVersion('site.navigation', block);
+        const meta = (block.meta || {}) as Record<string, any>;
+        const header_links = this.parseNavigationLinks(meta['header_links']);
+        const footer_handcrafted_links = this.parseNavigationLinks(meta['footer_handcrafted_links']);
+        const footer_legal_links = this.parseNavigationLinks(meta['footer_legal_links']);
+        this.navigationForm = {
+          header_links,
+          footer_handcrafted_links,
+          footer_legal_links
+        };
+      },
+      error: () => {
+        delete this.contentVersions['site.navigation'];
+        this.navigationForm = this.defaultNavigationForm();
+      }
+    });
+  }
+
+  addNavigationLink(list: 'header' | 'footer_handcrafted' | 'footer_legal'): void {
+    const item = { id: this.newNavigationId('nav'), url: '', label: this.emptyLocalizedText() };
+    if (list === 'header') {
+      this.navigationForm.header_links = [...this.navigationForm.header_links, item];
+      return;
+    }
+    if (list === 'footer_handcrafted') {
+      this.navigationForm.footer_handcrafted_links = [...this.navigationForm.footer_handcrafted_links, item];
+      return;
+    }
+    this.navigationForm.footer_legal_links = [...this.navigationForm.footer_legal_links, item];
+  }
+
+  removeNavigationLink(list: 'header' | 'footer_handcrafted' | 'footer_legal', id: string): void {
+    const key = (id || '').trim();
+    if (!key) return;
+    if (list === 'header') {
+      this.navigationForm.header_links = this.navigationForm.header_links.filter((l) => l.id !== key);
+      return;
+    }
+    if (list === 'footer_handcrafted') {
+      this.navigationForm.footer_handcrafted_links = this.navigationForm.footer_handcrafted_links.filter((l) => l.id !== key);
+      return;
+    }
+    this.navigationForm.footer_legal_links = this.navigationForm.footer_legal_links.filter((l) => l.id !== key);
+  }
+
+  moveNavigationLink(list: 'header' | 'footer_handcrafted' | 'footer_legal', id: string, delta: number): void {
+    const key = (id || '').trim();
+    if (!key) return;
+    const items =
+      list === 'header'
+        ? [...this.navigationForm.header_links]
+        : list === 'footer_handcrafted'
+          ? [...this.navigationForm.footer_handcrafted_links]
+          : [...this.navigationForm.footer_legal_links];
+
+    const fromIdx = items.findIndex((l) => l.id === key);
+    const toIdx = fromIdx + delta;
+    if (fromIdx < 0 || toIdx < 0 || toIdx >= items.length) return;
+    const [moved] = items.splice(fromIdx, 1);
+    items.splice(toIdx, 0, moved);
+
+    if (list === 'header') this.navigationForm.header_links = items;
+    else if (list === 'footer_handcrafted') this.navigationForm.footer_handcrafted_links = items;
+    else this.navigationForm.footer_legal_links = items;
+  }
+
+  resetNavigationDefaults(): void {
+    if (!window.confirm(this.t('adminUi.site.navigation.confirms.resetDefaults'))) return;
+    this.navigationForm = this.defaultNavigationForm();
+    this.navigationError = null;
+    this.navigationMessage = null;
+  }
+
+  onNavigationDragStart(list: 'header' | 'footer_handcrafted' | 'footer_legal', id: string): void {
+    this.draggingNavList = list;
+    this.draggingNavId = (id || '').trim();
+  }
+
+  onNavigationDragOver(event: DragEvent): void {
+    event.preventDefault();
+  }
+
+  onNavigationDrop(list: 'header' | 'footer_handcrafted' | 'footer_legal', targetId: string): void {
+    const draggingList = this.draggingNavList;
+    const draggingId = (this.draggingNavId || '').trim();
+    const target = (targetId || '').trim();
+    if (!draggingList || !draggingId || draggingList !== list || draggingId === target) {
+      this.draggingNavList = null;
+      this.draggingNavId = null;
+      return;
+    }
+    const items =
+      list === 'header'
+        ? [...this.navigationForm.header_links]
+        : list === 'footer_handcrafted'
+          ? [...this.navigationForm.footer_handcrafted_links]
+          : [...this.navigationForm.footer_legal_links];
+    const fromIdx = items.findIndex((l) => l.id === draggingId);
+    const toIdx = items.findIndex((l) => l.id === target);
+    if (fromIdx < 0 || toIdx < 0) {
+      this.draggingNavList = null;
+      this.draggingNavId = null;
+      return;
+    }
+    const [moved] = items.splice(fromIdx, 1);
+    items.splice(toIdx, 0, moved);
+
+    if (list === 'header') this.navigationForm.header_links = items;
+    else if (list === 'footer_handcrafted') this.navigationForm.footer_handcrafted_links = items;
+    else this.navigationForm.footer_legal_links = items;
+
+    this.draggingNavList = null;
+    this.draggingNavId = null;
+  }
+
+  saveNavigation(): void {
+    this.navigationMessage = null;
+    this.navigationError = null;
+
+    const cleanList = (items: Array<{ id: string; url: string; label: LocalizedText }>) => {
+      const out: Array<{ id: string; url: string; label: LocalizedText }> = [];
+      let invalid = false;
+      const seen = new Set<string>();
+      for (const item of items) {
+        const id = (item?.id || '').trim() || this.newNavigationId('nav');
+        const url = (item?.url || '').trim();
+        const en = (item?.label?.en || '').trim();
+        const ro = (item?.label?.ro || '').trim();
+        const isBlank = !url && !en && !ro;
+        if (isBlank) continue;
+        if (!url || !en || !ro) {
+          invalid = true;
+          continue;
+        }
+        if (seen.has(id)) continue;
+        seen.add(id);
+        out.push({ id, url, label: { en, ro } });
+      }
+      return { out, invalid };
+    };
+
+    const header = cleanList(this.navigationForm.header_links);
+    const handcrafted = cleanList(this.navigationForm.footer_handcrafted_links);
+    const legal = cleanList(this.navigationForm.footer_legal_links);
+
+    if (header.invalid || handcrafted.invalid || legal.invalid) {
+      this.navigationError = this.t('adminUi.site.navigation.errors.invalid');
+      return;
+    }
+
+    const payload = {
+      title: 'Site navigation',
+      body_markdown: 'Header and footer navigation menus.',
+      status: 'published',
+      meta: {
+        version: 1,
+        header_links: header.out,
+        footer_handcrafted_links: handcrafted.out,
+        footer_legal_links: legal.out
+      }
+    };
+
+    const onSuccess = (block?: { version?: number } | null) => {
+      this.rememberContentVersion('site.navigation', block);
+      this.navigationMessage = this.t('adminUi.site.navigation.success.save');
+      this.navigationError = null;
+    };
+
+    this.admin.updateContentBlock('site.navigation', this.withExpectedVersion('site.navigation', payload)).subscribe({
+      next: (block) => onSuccess(block),
+      error: (err) => {
+        if (this.handleContentConflict(err, 'site.navigation', () => this.loadNavigation())) {
+          this.navigationError = this.t('adminUi.site.navigation.errors.save');
+          this.navigationMessage = null;
+          return;
+        }
+        this.admin.createContent('site.navigation', payload).subscribe({
+          next: (created) => onSuccess(created),
+          error: () => {
+            this.navigationError = this.t('adminUi.site.navigation.errors.save');
+            this.navigationMessage = null;
+          }
+        });
+      }
+    });
+  }
 
   private parseSocialPages(
     raw: unknown,
