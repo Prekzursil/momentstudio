@@ -3,7 +3,7 @@ import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { AdminContent, AdminService } from '../../../core/admin.service';
+import { AdminService, ContentSchedulingItem, PaginationMeta } from '../../../core/admin.service';
 import { ButtonComponent } from '../../../shared/button.component';
 import { isCmsGlobalSectionKey } from '../../../shared/cms-global-sections';
 
@@ -130,14 +130,41 @@ const DAY_MS = 86_400_000;
           </div>
         </div>
       </div>
+
+      <div
+        *ngIf="!loading() && !error() && meta() && (meta()?.total_pages ?? 1) > 1"
+        class="flex flex-col gap-2 border-t border-slate-200 pt-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div>{{ meta()?.total_items }} · {{ meta()?.page }} / {{ meta()?.total_pages }}</div>
+        <div class="flex gap-2">
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="'adminUi.actions.prev' | translate"
+            [disabled]="page() <= 1"
+            (action)="prevPage()"
+          ></app-button>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="'adminUi.actions.next' | translate"
+            [disabled]="page() >= (meta()?.total_pages ?? 1)"
+            (action)="nextPage()"
+          ></app-button>
+        </div>
+      </div>
     </section>
   `
 })
 export class AdminContentSchedulingComponent implements OnInit {
   loading = signal<boolean>(false);
   error = signal<string | null>(null);
-  blocks = signal<AdminContent[]>([]);
+  items = signal<ContentSchedulingItem[]>([]);
+  meta = signal<PaginationMeta | null>(null);
   windowDays = signal<number>(90);
+  page = signal<number>(1);
+
+  private readonly pageSize = 50;
 
   constructor(
     private admin: AdminService,
@@ -155,19 +182,43 @@ export class AdminContentSchedulingComponent implements OnInit {
   setWindowDays(days: number): void {
     const next = typeof days === 'number' ? days : Number(days);
     this.windowDays.set(next === 30 || next === 90 || next === 180 ? next : 90);
+    this.page.set(1);
+    this.load();
   }
 
   load(): void {
     this.loading.set(true);
     this.error.set(null);
-    this.admin.content().subscribe({
-      next: (blocks) => this.blocks.set(blocks || []),
+    this.admin.contentScheduling({
+      window_days: this.windowDays(),
+      window_start: this.calendarStartDate().toISOString(),
+      page: this.page(),
+      limit: this.pageSize,
+    }).subscribe({
+      next: (resp) => {
+        this.items.set(resp?.items || []);
+        this.meta.set(resp?.meta || null);
+      },
       error: () => {
         this.error.set(this.t('adminUi.content.scheduling.errors.load'));
         this.loading.set(false);
       },
       complete: () => this.loading.set(false),
     });
+  }
+
+  prevPage(): void {
+    if (this.page() <= 1) return;
+    this.page.set(this.page() - 1);
+    this.load();
+  }
+
+  nextPage(): void {
+    const meta = this.meta();
+    const total = meta?.total_pages ?? 1;
+    if (this.page() >= total) return;
+    this.page.set(this.page() + 1);
+    this.load();
   }
 
   calendarStartDate(): Date {
@@ -181,8 +232,8 @@ export class AdminContentSchedulingComponent implements OnInit {
   }
 
   scheduleRows(): ScheduleRow[] {
-    const blocks = this.blocks();
-    if (!blocks.length) return [];
+    const items = this.items();
+    if (!items.length) return [];
 
     const startDate = this.calendarStartDate();
     const windowStart = startDate.getTime();
@@ -219,7 +270,7 @@ export class AdminContentSchedulingComponent implements OnInit {
 
     const out: ScheduleRow[] = [];
 
-    for (const block of blocks) {
+    for (const block of items) {
       const key = (block.key || '').trim();
       if (!isRelevantKey(key)) continue;
       if ((block.status || '').trim() !== 'published') continue;
@@ -254,9 +305,14 @@ export class AdminContentSchedulingComponent implements OnInit {
     }
 
     const sortTs = (row: ScheduleRow): number => {
-      const publishMs = row.publishAt?.getTime() ?? Number.POSITIVE_INFINITY;
-      const unpublishMs = row.unpublishAt?.getTime() ?? Number.POSITIVE_INFINITY;
-      return Math.min(publishMs, unpublishMs);
+      const publishMs = row.publishAt?.getTime() ?? null;
+      const unpublishMs = row.unpublishAt?.getTime() ?? null;
+      const publishUpcoming = publishMs !== null && publishMs >= nowMs;
+      const unpublishUpcoming = unpublishMs !== null && unpublishMs >= nowMs;
+      return Math.min(
+        publishUpcoming && publishMs !== null ? publishMs : Number.POSITIVE_INFINITY,
+        unpublishUpcoming && unpublishMs !== null ? unpublishMs : Number.POSITIVE_INFINITY
+      );
     };
 
     return out.sort((a, b) => sortTs(a) - sortTs(b));

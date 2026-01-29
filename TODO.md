@@ -982,9 +982,10 @@ Below is a structured checklist you can turn into issues.
 - [x] Storefront admin mode: “Edit this page” – Admin-only button on storefront pages linking to the correct CMS editor/section.
 - [x] CMS assets: delete asset – Add a delete action gated by “where used” + safe file cleanup (original + thumbnails).
 - [x] CMS assets: edited versions – Group edited copies under the original asset (lineage + quick revert).
-- [ ] CMS scheduling: dedicated API – Add `/content/admin/scheduling` (window + pagination) so the scheduling view isn’t limited to the admin dashboard’s latest-content cap.
-- [ ] CMS redirects: quick create UI – Add a small “Create redirect” inline form in the redirects manager (no CSV needed).
-- [ ] CMS blocks: CTA external URLs – Support external `http(s)` links (and optional new-tab) for CTA buttons instead of routerLink-only.
+- [x] CMS scheduling: dedicated API – Add `/content/admin/scheduling` (window + pagination) so the scheduling view isn’t limited to the admin dashboard’s latest-content cap.
+- [x] CMS redirects: quick create UI – Add a small “Create redirect” inline form in the redirects manager (no CSV needed).
+- [x] CMS blocks: CTA external URLs – Support external `http(s)` links (and optional new-tab) for CTA buttons instead of routerLink-only.
+- [ ] UI: Button component external links – Support `href` + optional `target`/`rel` in `app-button` to avoid duplicating anchor styles across CMS CTA/banners.
 - [ ] CMS blocks: product grids picker – Add admin select/autocomplete for categories, collections, and product slugs (avoid manual typing).
 - [ ] CMS blocks: forms captcha – Optional Turnstile captcha for newsletter/contact blocks to reduce spam.
 - [ ] CMS assets: delete original w/ versions – Add a “delete all versions” option for original assets (cascade, with usage safety checks).

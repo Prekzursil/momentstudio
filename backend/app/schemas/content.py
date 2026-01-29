@@ -113,6 +113,21 @@ class ContentRedirectListResponse(BaseModel):
     meta: PaginationMeta
 
 
+class ContentSchedulingItem(BaseModel):
+    key: str
+    title: str
+    status: ContentStatus
+    lang: str | None = None
+    published_at: datetime | None = None
+    published_until: datetime | None = None
+    updated_at: datetime
+
+
+class ContentSchedulingListResponse(BaseModel):
+    items: list[ContentSchedulingItem]
+    meta: PaginationMeta
+
+
 class ContentRedirectImportError(BaseModel):
     line: int
     from_value: str | None = None

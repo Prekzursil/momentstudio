@@ -2586,6 +2586,10 @@
         "redirects": {
           "title": "Redirecționări",
           "hint": "Redirecționările păstrează linkurile vechi după schimbarea URL-ului unei pagini. Redirecționările expirate indică către conținut lipsă.",
+          "createTitle": "Creează redirecționare",
+          "createFrom": "De la",
+          "createTo": "Către",
+          "createHint": "Tip: poți lipi URL-uri precum /pages/vechi și /pages/nou.",
           "search": "Caută redirecționări",
           "export": "Export CSV",
           "import": "Import CSV",
@@ -2622,6 +2626,7 @@
         "subtitle": "Subtitlu",
         "ctaLabel": "Etichetă CTA",
         "ctaUrl": "URL CTA",
+        "ctaNewTab": "Deschide într-o filă nouă",
         "imageUrl": "URL imagine erou",
         "success": {
           "saved": "Erou salvat.",

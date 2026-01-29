@@ -173,6 +173,7 @@ type HomeBlockDraft = {
   columns_breakpoint: CmsColumnsBreakpoint;
   cta_label: LocalizedText;
   cta_url: string;
+  cta_new_tab: boolean;
   faq_items: CmsFaqItemDraft[];
   testimonials: CmsTestimonialDraft[];
   product_grid_source: CmsProductGridSource;
@@ -2043,15 +2044,19 @@ class CmsDraftManager<T> {
 			                                  />
 			                                </label>
 			                              </ng-template>
-			                              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-			                                {{ 'adminUi.home.hero.ctaUrl' | translate }}
-			                                <input
-			                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-			                                  [(ngModel)]="block.cta_url"
-			                                />
-			                              </label>
-			                            </div>
-			                          </ng-container>
+				                              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+				                                {{ 'adminUi.home.hero.ctaUrl' | translate }}
+				                                <input
+				                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+				                                  [(ngModel)]="block.cta_url"
+				                                />
+				                              </label>
+				                              <label class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+				                                <input type="checkbox" [(ngModel)]="block.cta_new_tab" />
+				                                {{ 'adminUi.home.hero.ctaNewTab' | translate }}
+				                              </label>
+				                            </div>
+				                          </ng-container>
 
 			                          <ng-container *ngSwitchCase="'product_grid'">
 			                            <div class="grid gap-3">
@@ -3058,12 +3063,32 @@ class CmsDraftManager<T> {
                         [disabled]="redirectsImporting"
                         (change)="importContentRedirects($event)"
                       />
-                    </label>
-                  </div>
-                  <div *ngIf="redirectsImportResult" class="rounded-lg border border-slate-200 bg-white p-2 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
-                    <p class="font-semibold">{{ 'adminUi.site.pages.redirects.importResult' | translate:{ created: redirectsImportResult.created, updated: redirectsImportResult.updated, skipped: redirectsImportResult.skipped } }}</p>
-                    <div *ngIf="redirectsImportResult.errors?.length" class="mt-1 grid gap-1">
-                      <p class="text-rose-700 dark:text-rose-300">{{ 'adminUi.site.pages.redirects.importErrors' | translate }}</p>
+	                    </label>
+	                  </div>
+
+	                  <div class="grid gap-2 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+	                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+	                      {{ 'adminUi.site.pages.redirects.createTitle' | translate }}
+	                    </p>
+	                    <div class="flex flex-wrap items-end gap-2">
+	                      <app-input [label]="'adminUi.site.pages.redirects.createFrom' | translate" [(value)]="redirectCreateFrom"></app-input>
+	                      <app-input [label]="'adminUi.site.pages.redirects.createTo' | translate" [(value)]="redirectCreateTo"></app-input>
+	                      <app-button
+	                        size="sm"
+	                        variant="ghost"
+	                        [label]="'adminUi.actions.create' | translate"
+	                        [disabled]="redirectCreateSaving || !redirectCreateFrom || !redirectCreateTo"
+	                        (action)="createContentRedirect()"
+	                      ></app-button>
+	                    </div>
+	                    <p class="text-xs text-slate-500 dark:text-slate-400">
+	                      {{ 'adminUi.site.pages.redirects.createHint' | translate }}
+	                    </p>
+	                  </div>
+	                  <div *ngIf="redirectsImportResult" class="rounded-lg border border-slate-200 bg-white p-2 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
+	                    <p class="font-semibold">{{ 'adminUi.site.pages.redirects.importResult' | translate:{ created: redirectsImportResult.created, updated: redirectsImportResult.updated, skipped: redirectsImportResult.skipped } }}</p>
+	                    <div *ngIf="redirectsImportResult.errors?.length" class="mt-1 grid gap-1">
+	                      <p class="text-rose-700 dark:text-rose-300">{{ 'adminUi.site.pages.redirects.importErrors' | translate }}</p>
                       <p *ngFor="let e of redirectsImportResult.errors" class="text-[11px] text-rose-700 dark:text-rose-300">
                         #{{ e.line }}: {{ e.error }}
                       </p>
@@ -3726,15 +3751,19 @@ class CmsDraftManager<T> {
 	                              />
 	                            </label>
 	                          </ng-template>
-	                          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	                            {{ 'adminUi.home.hero.ctaUrl' | translate }}
-	                            <input
-	                              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-	                              [(ngModel)]="block.cta_url"
-	                            />
-	                          </label>
-	                        </div>
-	                      </ng-container>
+		                          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+		                            {{ 'adminUi.home.hero.ctaUrl' | translate }}
+		                            <input
+		                              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+		                              [(ngModel)]="block.cta_url"
+		                            />
+		                          </label>
+		                          <label class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+		                            <input type="checkbox" [(ngModel)]="block.cta_new_tab" />
+		                            {{ 'adminUi.home.hero.ctaNewTab' | translate }}
+		                          </label>
+		                        </div>
+		                      </ng-container>
 
 	                      <ng-container *ngSwitchCase="'faq'">
 	                        <div class="grid gap-3">
@@ -7125,6 +7154,9 @@ export class AdminComponent implements OnInit, OnDestroy {
   redirectsExporting = false;
   redirectsImporting = false;
   redirectsImportResult: ContentRedirectImportResult | null = null;
+  redirectCreateFrom = '';
+  redirectCreateTo = '';
+  redirectCreateSaving = false;
   findReplaceFind = '';
   findReplaceReplace = '';
   findReplaceScope: 'all' | 'pages' | 'blog' | 'home' | 'site' = 'pages';
@@ -12003,6 +12035,29 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
+  createContentRedirect(): void {
+    if (this.redirectCreateSaving) return;
+    const from = (this.redirectCreateFrom || '').trim();
+    const to = (this.redirectCreateTo || '').trim();
+    if (!from || !to) return;
+
+    this.redirectCreateSaving = true;
+    this.admin.upsertContentRedirect({ from_key: from, to_key: to }).subscribe({
+      next: () => {
+        this.redirectCreateSaving = false;
+        this.redirectCreateFrom = '';
+        this.redirectCreateTo = '';
+        this.toast.success(this.t('adminUi.site.pages.redirects.success.created'));
+        this.loadContentRedirects(true);
+      },
+      error: (err) => {
+        const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
+        this.redirectCreateSaving = false;
+        this.toast.error(detail || this.t('adminUi.site.pages.redirects.errors.create'));
+      }
+    });
+  }
+
   private findReplaceKeyPrefix(): string | undefined {
     if (this.findReplaceScope === 'blog') return 'blog.';
     if (this.findReplaceScope === 'home') return 'home.';
@@ -12315,6 +12370,7 @@ export class AdminComponent implements OnInit, OnDestroy {
         columns_breakpoint: 'md',
         cta_label: this.emptyLocalizedText(),
         cta_url: '',
+        cta_new_tab: false,
         faq_items: [{ question: this.emptyLocalizedText(), answer_markdown: this.emptyLocalizedText() }],
         testimonials: [{ quote_markdown: this.emptyLocalizedText(), author: this.emptyLocalizedText(), role: this.emptyLocalizedText() }],
         product_grid_source: 'category',
@@ -12361,6 +12417,7 @@ export class AdminComponent implements OnInit, OnDestroy {
         draft.body_markdown = this.toLocalizedText(rec['body_markdown']);
         draft.cta_label = this.toLocalizedText(rec['cta_label']);
         draft.cta_url = typeof rec['cta_url'] === 'string' ? String(rec['cta_url']).trim() : '';
+        draft.cta_new_tab = this.toBooleanValue(rec['cta_new_tab'], false);
       } else if (typeRaw === 'faq') {
         const itemsRaw = rec['items'];
         const items: CmsFaqItemDraft[] = [];
@@ -12504,6 +12561,7 @@ export class AdminComponent implements OnInit, OnDestroy {
       columns_breakpoint: 'md',
       cta_label: this.emptyLocalizedText(),
       cta_url: '',
+      cta_new_tab: false,
       faq_items: [{ question: this.emptyLocalizedText(), answer_markdown: this.emptyLocalizedText() }],
       testimonials: [{ quote_markdown: this.emptyLocalizedText(), author: this.emptyLocalizedText(), role: this.emptyLocalizedText() }],
       product_grid_source: 'category',
@@ -13249,6 +13307,7 @@ export class AdminComponent implements OnInit, OnDestroy {
         base['body_markdown'] = b.body_markdown;
         base['cta_label'] = b.cta_label;
         base['cta_url'] = b.cta_url;
+        base['cta_new_tab'] = Boolean(b.cta_new_tab);
       } else if (b.type === 'faq') {
         base['items'] = (b.faq_items || []).slice(0, 20).map((item) => ({ question: item.question, answer_markdown: item.answer_markdown }));
       } else if (b.type === 'testimonials') {
@@ -13634,6 +13693,17 @@ export class AdminComponent implements OnInit, OnDestroy {
     return Math.max(0, Math.min(100, Math.round(raw)));
   }
 
+  private toBooleanValue(value: unknown, fallback = false): boolean {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value === 1;
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on') return true;
+      if (normalized === '0' || normalized === 'false' || normalized === 'no' || normalized === 'off') return false;
+    }
+    return fallback;
+  }
+
   private defaultCmsBlockLayout(): CmsBlockLayout {
     return { spacing: 'none', background: 'none', align: 'left', max_width: 'full' };
   }
@@ -13829,6 +13899,7 @@ export class AdminComponent implements OnInit, OnDestroy {
       columns_breakpoint: 'md',
       cta_label: this.emptyLocalizedText(),
       cta_url: '',
+      cta_new_tab: false,
       faq_items: [{ question: this.emptyLocalizedText(), answer_markdown: this.emptyLocalizedText() }],
       testimonials: [{ quote_markdown: this.emptyLocalizedText(), author: this.emptyLocalizedText(), role: this.emptyLocalizedText() }],
       product_grid_source: 'category',
@@ -14284,6 +14355,7 @@ export class AdminComponent implements OnInit, OnDestroy {
               draft.body_markdown = this.toLocalizedText(rec['body_markdown']);
               draft.cta_label = this.toLocalizedText(rec['cta_label']);
               draft.cta_url = typeof rec['cta_url'] === 'string' ? String(rec['cta_url']).trim() : '';
+              draft.cta_new_tab = this.toBooleanValue(rec['cta_new_tab'], false);
             } else if (type === 'faq') {
               const itemsRaw = rec['items'];
               const items: CmsFaqItemDraft[] = [];
@@ -14420,6 +14492,7 @@ export class AdminComponent implements OnInit, OnDestroy {
         base['body_markdown'] = b.body_markdown;
         base['cta_label'] = b.cta_label;
         base['cta_url'] = b.cta_url;
+        base['cta_new_tab'] = Boolean(b.cta_new_tab);
       } else if (b.type === 'faq') {
         base['title'] = b.title;
         base['items'] = (b.faq_items || []).slice(0, 20).map((item) => ({ question: item.question, answer_markdown: item.answer_markdown }));

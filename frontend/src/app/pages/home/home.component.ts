@@ -84,6 +84,7 @@ interface HomeCtaBlock extends HomeBlockBase {
   body_html: string;
   cta_label?: string | null;
   cta_url?: string | null;
+  cta_new_tab?: boolean;
 }
 
 interface HomeFaqItem {
@@ -436,7 +437,19 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
                 <app-card>
                   <div class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="cta.body_html"></div>
                   <div class="mt-4 flex" *ngIf="cta.cta_label && cta.cta_url">
-                    <app-button [label]="cta.cta_label" [routerLink]="cta.cta_url"></app-button>
+                    <ng-container *ngIf="isExternalHttpUrl(cta.cta_url); else internalCta">
+                      <a
+                        class="inline-flex items-center justify-center rounded-full font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 bg-slate-900 text-white hover:bg-slate-800 focus-visible:outline-slate-900 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white px-4 py-2.5 text-sm"
+                        [href]="cta.cta_url"
+                        [attr.target]="cta.cta_new_tab ? '_blank' : null"
+                        [attr.rel]="cta.cta_new_tab ? 'noopener noreferrer' : null"
+                      >
+                        {{ cta.cta_label }}
+                      </a>
+                    </ng-container>
+                    <ng-template #internalCta>
+                      <app-button [label]="cta.cta_label" [routerLink]="cta.cta_url"></app-button>
+                    </ng-template>
                   </div>
                 </app-card>
               </div>
@@ -856,9 +869,19 @@ export class HomeComponent implements OnInit, OnDestroy {
           const body = readLocalized(rec['body_markdown']) || '';
           const ctaLabel = readLocalized(rec['cta_label']);
           const ctaUrl = readString(rec['cta_url']);
+          const ctaNewTab = readBoolean(rec['cta_new_tab'], false);
           const hasAny = Boolean(title || body.trim() || ctaLabel || ctaUrl);
           if (!hasAny) continue;
-          configured.push({ key, type, enabled, title, body_html: this.markdown.render(body), cta_label: ctaLabel, cta_url: ctaUrl });
+          configured.push({
+            key,
+            type,
+            enabled,
+            title,
+            body_html: this.markdown.render(body),
+            cta_label: ctaLabel,
+            cta_url: ctaUrl,
+            cta_new_tab: ctaNewTab
+          });
           continue;
         }
 
@@ -1022,6 +1045,11 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   asCtaBlock(block: HomeBlock): HomeCtaBlock | null {
     return block.type === 'cta' ? (block as HomeCtaBlock) : null;
+  }
+
+  isExternalHttpUrl(url: string | null | undefined): boolean {
+    const trimmed = (url || '').trim().toLowerCase();
+    return trimmed.startsWith('http://') || trimmed.startsWith('https://');
   }
 
   asFaqBlock(block: HomeBlock): HomeFaqBlock | null {

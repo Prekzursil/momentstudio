@@ -37,7 +37,19 @@ import {
                 </h2>
                 <div class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="b.body_html"></div>
                 <div class="flex" *ngIf="b.cta_label && b.cta_url">
-                  <app-button [label]="b.cta_label" [routerLink]="b.cta_url"></app-button>
+                  <ng-container *ngIf="isExternalHttpUrl(b.cta_url); else internalCta">
+                    <a
+                      class="inline-flex items-center justify-center rounded-full font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 bg-slate-900 text-white hover:bg-slate-800 focus-visible:outline-slate-900 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white px-4 py-2.5 text-sm"
+                      [href]="b.cta_url"
+                      [attr.target]="b.cta_new_tab ? '_blank' : null"
+                      [attr.rel]="b.cta_new_tab ? 'noopener noreferrer' : null"
+                    >
+                      {{ b.cta_label }}
+                    </a>
+                  </ng-container>
+                  <ng-template #internalCta>
+                    <app-button [label]="b.cta_label" [routerLink]="b.cta_url"></app-button>
+                  </ng-template>
                 </div>
               </div>
 
@@ -166,6 +178,11 @@ export class CmsPageBlocksComponent {
   pageBlockOuterClasses = pageBlockOuterClasses;
   pageBlockInnerClasses = pageBlockInnerClasses;
 
+  isExternalHttpUrl(url: string | null | undefined): boolean {
+    const trimmed = (url || '').trim().toLowerCase();
+    return trimmed.startsWith('http://') || trimmed.startsWith('https://');
+  }
+
   focalPosition(focalX?: number, focalY?: number): string {
     const x = Math.max(0, Math.min(100, Math.round(Number(focalX ?? 50))));
     const y = Math.max(0, Math.min(100, Math.round(Number(focalY ?? 50))));
@@ -183,4 +200,3 @@ export class CmsPageBlocksComponent {
     return ['grid', 'gap-6', 'grid-cols-1', matrix[count][breakpoint]].join(' ');
   }
 }
-

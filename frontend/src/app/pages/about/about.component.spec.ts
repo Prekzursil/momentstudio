@@ -6,6 +6,7 @@ import { of } from 'rxjs';
 
 import { ApiService } from '../../core/api.service';
 import { MarkdownService } from '../../core/markdown.service';
+import { StorefrontAdminModeService } from '../../core/storefront-admin-mode.service';
 import { AboutComponent } from './about.component';
 
 describe('AboutComponent', () => {
@@ -33,6 +34,7 @@ describe('AboutComponent', () => {
         { provide: Title, useValue: title },
         { provide: Meta, useValue: meta },
         { provide: ApiService, useValue: api },
+        { provide: StorefrontAdminModeService, useValue: { enabled: () => false } },
         { provide: MarkdownService, useValue: markdown }
       ]
     });
@@ -124,4 +126,3 @@ describe('AboutComponent', () => {
     expect(meta.updateTag).not.toHaveBeenCalled();
   });
 });
-

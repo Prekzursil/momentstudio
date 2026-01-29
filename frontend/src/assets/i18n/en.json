@@ -2586,6 +2586,10 @@
         "redirects": {
           "title": "Redirects",
           "hint": "Redirects preserve old links after changing a page URL. Stale redirects point to missing content.",
+          "createTitle": "Create redirect",
+          "createFrom": "From",
+          "createTo": "To",
+          "createHint": "Tip: You can paste URLs like /pages/old and /pages/new.",
           "search": "Search redirects",
           "export": "Export CSV",
           "import": "Import CSV",
@@ -2622,6 +2626,7 @@
         "subtitle": "Subtitle",
         "ctaLabel": "CTA label",
         "ctaUrl": "CTA URL",
+        "ctaNewTab": "Open in new tab",
         "imageUrl": "Hero image URL",
         "success": {
           "saved": "Hero saved.",

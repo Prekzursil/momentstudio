@@ -5,13 +5,13 @@ from io import StringIO
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Query, Response
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, and_, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.dependencies import get_current_user_optional, get_session, require_admin_section
 from app.core.security import create_content_preview_token, decode_content_preview_token
-from app.models.content import ContentBlock, ContentBlockVersion, ContentImage, ContentRedirect, ContentImageTag
+from app.models.content import ContentBlock, ContentBlockVersion, ContentImage, ContentRedirect, ContentImageTag, ContentStatus
 from app.models.user import User
 from app.schemas.content import (
     ContentAuditRead,
@@ -34,6 +34,8 @@ from app.schemas.content import (
     ContentRedirectUpsertRequest,
     ContentBlockVersionListItem,
     ContentBlockVersionRead,
+    ContentSchedulingItem,
+    ContentSchedulingListResponse,
     ContentImageTagsUpdate,
     ContentLinkCheckResponse,
     ContentLinkCheckPreviewRequest,
@@ -250,6 +252,89 @@ async def admin_fetch_social_thumbnail(
     return SocialThumbnailResponse(thumbnail_url=thumbnail_url)
 
 
+@router.get("/admin/scheduling", response_model=ContentSchedulingListResponse)
+async def admin_list_scheduling(
+    session: AsyncSession = Depends(get_session),
+    window_days: int = Query(default=90, ge=1, le=365),
+    window_start: datetime | None = Query(default=None, description="ISO datetime (optional)"),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=200),
+    _: User = Depends(require_admin_section("content")),
+) -> ContentSchedulingListResponse:
+    now = datetime.now(timezone.utc)
+    start = window_start
+    if start is None:
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=timezone.utc)
+    start = start.astimezone(timezone.utc)
+    window_end = start + timedelta(days=window_days)
+
+    key_filter = or_(
+        ContentBlock.key.like("page.%"),
+        ContentBlock.key.like("blog.%"),
+        ContentBlock.key.like("site.%"),
+    )
+
+    publish_filter = and_(
+        ContentBlock.published_at.is_not(None),
+        ContentBlock.published_at >= now,
+        ContentBlock.published_at < window_end,
+    )
+    unpublish_filter = and_(
+        ContentBlock.published_until.is_not(None),
+        ContentBlock.published_until >= now,
+        ContentBlock.published_until < window_end,
+    )
+
+    filters = [
+        key_filter,
+        ContentBlock.status == ContentStatus.published,
+        or_(publish_filter, unpublish_filter),
+    ]
+
+    publish_event = case((publish_filter, ContentBlock.published_at), else_=None)
+    unpublish_event = case((unpublish_filter, ContentBlock.published_until), else_=None)
+    next_event = case(
+        (publish_event.is_(None), unpublish_event),
+        (unpublish_event.is_(None), publish_event),
+        (publish_event <= unpublish_event, publish_event),
+        else_=unpublish_event,
+    )
+
+    total = await session.scalar(select(func.count()).select_from(ContentBlock).where(*filters))
+    total_items = int(total or 0)
+    total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
+    offset = (page - 1) * limit
+
+    result = await session.execute(
+        select(ContentBlock)
+        .where(*filters)
+        .order_by(next_event.asc(), ContentBlock.key.asc())
+        .offset(offset)
+        .limit(limit)
+    )
+    blocks = list(result.scalars().all())
+
+    items = [
+        ContentSchedulingItem(
+            key=b.key,
+            title=b.title,
+            status=b.status,
+            lang=b.lang,
+            published_at=b.published_at,
+            published_until=b.published_until,
+            updated_at=b.updated_at,
+        )
+        for b in blocks
+    ]
+
+    return ContentSchedulingListResponse(
+        items=items,
+        meta={"total_items": total_items, "total_pages": total_pages, "page": page, "limit": limit},
+    )
+
+
 @router.get("/admin/redirects", response_model=ContentRedirectListResponse)
 async def admin_list_redirects(
     session: AsyncSession = Depends(get_session),
@@ -314,8 +399,10 @@ async def admin_upsert_redirect(
     session: AsyncSession = Depends(get_session),
     _: User = Depends(require_admin_section("content")),
 ) -> ContentRedirectRead:
-    from_key = (payload.from_key or "").strip()
-    to_key = (payload.to_key or "").strip()
+    from_key_raw = (payload.from_key or "").strip()
+    to_key_raw = (payload.to_key or "").strip()
+    from_key = _redirect_display_value_to_key(from_key_raw)
+    to_key = _redirect_display_value_to_key(to_key_raw)
     if not from_key or not to_key or from_key == to_key:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid redirect")
 

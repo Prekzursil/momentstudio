@@ -106,6 +106,7 @@ export interface PageCtaBlock extends PageBlockBase {
   body_html: string;
   cta_label?: string | null;
   cta_url?: string | null;
+  cta_new_tab?: boolean;
 }
 
 export interface PageFaqItem {
@@ -465,6 +466,7 @@ export function parsePageBlocks(
       const bodyMarkdown = readLocalized(rec['body_markdown'], lang) || '';
       const ctaLabel = readLocalized(rec['cta_label'], lang);
       const ctaUrl = readString(rec['cta_url']);
+      const ctaNewTab = readBoolean(rec['cta_new_tab'], false);
       const hasAny = Boolean(title || bodyMarkdown.trim() || ctaLabel || ctaUrl);
       if (!hasAny) continue;
       blocks.push({
@@ -475,7 +477,8 @@ export function parsePageBlocks(
         layout,
         body_html: renderMarkdown(bodyMarkdown),
         cta_label: ctaLabel,
-        cta_url: ctaUrl
+        cta_url: ctaUrl,
+        cta_new_tab: ctaNewTab
       } satisfies PageCtaBlock);
       continue;
     }

@@ -241,3 +241,38 @@ def test_admin_can_list_and_delete_redirects(test_app: Dict[str, object]) -> Non
     assert listed2.status_code == 200, listed2.text
     keys = {item["from_key"] for item in listed2.json()["items"]}
     assert "page.stale" not in keys
+
+
+def test_admin_upsert_redirect_accepts_display_values(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    session_factory = test_app["session_factory"]  # type: ignore[assignment]
+
+    async def seed_target() -> None:
+        async with session_factory() as session:
+            await session.execute(delete(ContentRedirect))
+            await session.execute(delete(ContentBlock).where(ContentBlock.key.like("page.%")))
+            session.add(
+                ContentBlock(
+                    key="page.target",
+                    title="Target",
+                    body_markdown="Hello",
+                    status=ContentStatus.published,
+                    version=1,
+                    published_at=datetime.now(timezone.utc),
+                    meta={"version": 2, "blocks": []},
+                )
+            )
+            await session.commit()
+
+    asyncio.run(seed_target())
+    headers = admin_headers(client, session_factory)
+
+    created = client.post(
+        "/api/v1/content/admin/redirects",
+        json={"from_key": "/pages/old-slug", "to_key": "/pages/target"},
+        headers=headers,
+    )
+    assert created.status_code == 200, created.text
+    payload = created.json()
+    assert payload["from_key"] == "page.old-slug"
+    assert payload["to_key"] == "page.target"

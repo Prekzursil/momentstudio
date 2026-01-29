@@ -226,6 +226,28 @@ export interface AdminContent {
   author?: { id: string; username: string; name?: string | null; name_tag?: number | null } | null;
 }
 
+export interface PaginationMeta {
+  total_items: number;
+  total_pages: number;
+  page: number;
+  limit: number;
+}
+
+export interface ContentSchedulingItem {
+  key: string;
+  title: string;
+  status: string;
+  lang?: string | null;
+  published_at?: string | null;
+  published_until?: string | null;
+  updated_at: string;
+}
+
+export interface ContentSchedulingListResponse {
+  items: ContentSchedulingItem[];
+  meta: PaginationMeta;
+}
+
 export interface AdminCoupon {
   id: string;
   code: string;
@@ -807,6 +829,10 @@ export class AdminService {
 
   content(): Observable<AdminContent[]> {
     return this.api.get<AdminContent[]>('/admin/dashboard/content');
+  }
+
+  contentScheduling(params?: { window_days?: number; window_start?: string; page?: number; limit?: number }): Observable<ContentSchedulingListResponse> {
+    return this.api.get<ContentSchedulingListResponse>('/content/admin/scheduling', params as any);
   }
 
   updateContentBlock(key: string, payload: ContentSavePayload): Observable<ContentBlock> {
