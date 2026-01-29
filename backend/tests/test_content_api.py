@@ -76,6 +76,50 @@ def _jpeg_bytes() -> bytes:
     return buf.getvalue()
 
 
+def test_content_asset_delete_versions_flag(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_admin_token(SessionLocal)
+
+    img_resp = client.post(
+        "/api/v1/content/admin/home.hero/images",
+        files={"file": ("hero.jpg", _jpeg_bytes(), "image/jpeg")},
+        headers=auth_headers(admin_token),
+    )
+    assert img_resp.status_code == 200
+
+    assets = client.get("/api/v1/content/admin/assets/images", headers=auth_headers(admin_token))
+    assert assets.status_code == 200, assets.text
+    first_img = assets.json()["items"][0]
+
+    edited = client.post(
+        f"/api/v1/content/admin/assets/images/{first_img['id']}/edit",
+        json={"rotate_cw": 90},
+        headers=auth_headers(admin_token),
+    )
+    assert edited.status_code == 201, edited.text
+    edited_json = edited.json()
+
+    blocked = client.delete(
+        f"/api/v1/content/admin/assets/images/{first_img['id']}",
+        headers=auth_headers(admin_token),
+    )
+    assert blocked.status_code == 409, blocked.text
+
+    deleted = client.delete(
+        f"/api/v1/content/admin/assets/images/{first_img['id']}",
+        params={"delete_versions": 1},
+        headers=auth_headers(admin_token),
+    )
+    assert deleted.status_code == 204, deleted.text
+
+    missing_edit = client.delete(
+        f"/api/v1/content/admin/assets/images/{edited_json['id']}",
+        headers=auth_headers(admin_token),
+    )
+    assert missing_edit.status_code == 404, missing_edit.text
+
+
 def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]

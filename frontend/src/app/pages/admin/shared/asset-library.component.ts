@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges, computed, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { firstValueFrom } from 'rxjs';
 import { AdminService, ContentImageAssetRead, ContentImageEditRequest } from '../../../core/admin.service';
 import { ToastService } from '../../../core/toast.service';
 import { ErrorStateComponent } from '../../../shared/error-state.component';
@@ -142,7 +143,7 @@ type AssetGroup = {
               <button
                 type="button"
                 class="text-xs text-rose-700 hover:underline dark:text-rose-300"
-                (click)="deleteAsset(group.primary, !group.primary.root_image_id && group.edits.length > 0)"
+                (click)="deleteAssetGroup(group)"
               >
                 {{ 'adminUi.actions.delete' | translate }}
               </button>
@@ -688,14 +689,52 @@ export class AssetLibraryComponent implements OnInit, OnChanges {
 	    this.loadUsage();
 	  }
 
-	  deleteAsset(img: ContentImageAssetRead, hasEditedVersions: boolean = false): void {
+    async deleteAssetGroup(group: AssetGroup): Promise<void> {
+      const original = group.original;
+      const edited = group.edits || [];
+
+      if (!original || edited.length === 0) {
+        this.deleteAsset(group.primary);
+        return;
+      }
+
+      const imagesToCheck = [original, ...edited];
+      for (const img of imagesToCheck) {
+        const id = (img?.id || '').trim();
+        if (!id) continue;
+        try {
+          const resp = await firstValueFrom(this.admin.getContentImageUsage(id));
+          const keys = (resp?.keys || []).filter(Boolean);
+          if (keys.length) {
+            this.toast.error(this.t('adminUi.site.assets.library.errors.deleteInUse'));
+            this.openUsage(img);
+            return;
+          }
+        } catch {
+          this.toast.error(this.t('adminUi.site.assets.library.errors.usage'));
+          return;
+        }
+      }
+
+      const confirmed = window.confirm(this.t('adminUi.site.assets.library.confirmDeleteWithVersions', { count: edited.length }));
+      if (!confirmed) return;
+
+      const id = (original?.id || '').trim();
+      if (!id) return;
+
+      try {
+        await firstValueFrom(this.admin.deleteContentImage(id, { delete_versions: true }));
+        this.toast.success(this.t('adminUi.site.assets.library.success.deleted'));
+        this.page = 1;
+        this.reload();
+      } catch {
+        this.toast.error(this.t('adminUi.site.assets.library.errors.delete'));
+      }
+    }
+
+	  deleteAsset(img: ContentImageAssetRead): void {
 	    const id = (img?.id || '').trim();
 	    if (!id) return;
-
-	    if (hasEditedVersions) {
-	      this.toast.error(this.t('adminUi.site.assets.library.errors.deleteHasVersions'));
-	      return;
-	    }
 
 	    this.admin.getContentImageUsage(id).subscribe({
 	      next: (resp) => {

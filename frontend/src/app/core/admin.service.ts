@@ -1221,8 +1221,8 @@ export class AdminService {
     return this.api.get<ContentImageAssetUsageResponse>(`/content/admin/assets/images/${encodeURIComponent(imageId)}/usage`);
   }
 
-  deleteContentImage(imageId: string): Observable<void> {
-    return this.api.delete<void>(`/content/admin/assets/images/${encodeURIComponent(imageId)}`);
+  deleteContentImage(imageId: string, params?: { delete_versions?: boolean }): Observable<void> {
+    return this.api.delete<void>(`/content/admin/assets/images/${encodeURIComponent(imageId)}`, undefined, params as any);
   }
 
   linkCheckContent(key: string): Observable<ContentLinkCheckResponse> {

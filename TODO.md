@@ -987,8 +987,8 @@ Below is a structured checklist you can turn into issues.
 - [x] CMS blocks: CTA external URLs – Support external `http(s)` links (and optional new-tab) for CTA buttons instead of routerLink-only.
 - [x] UI: Button component external links – Support `href` + optional `target`/`rel` in `app-button` to avoid duplicating anchor styles across CMS CTA/banners.
 - [x] CMS blocks: product grids picker – Add admin select/autocomplete for categories, collections, and product slugs (avoid manual typing).
-- [ ] CMS blocks: forms captcha – Optional Turnstile captcha for newsletter/contact blocks to reduce spam.
-- [ ] CMS assets: delete original w/ versions – Add a “delete all versions” option for original assets (cascade, with usage safety checks).
+- [x] CMS blocks: forms captcha – Optional Turnstile captcha for newsletter/contact blocks to reduce spam.
+- [x] CMS assets: delete original w/ versions – Add a “delete all versions” option for original assets (cascade, with usage safety checks).
 
 ## Data Portability & Backups (Extended)
 - [x] CLI command `python -m app.cli export-data` exporting users (no passwords), products, categories, orders, addresses to JSON.

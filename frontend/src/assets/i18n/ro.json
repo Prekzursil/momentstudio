@@ -2373,6 +2373,7 @@
           "versionsTitle": "Versiuni editate ({{count}})",
           "revertToOriginal": "Original",
           "confirmDelete": "Ștergi această imagine? Acțiunea nu poate fi anulată.",
+          "confirmDeleteWithVersions": "Ștergi această imagine și cele {{count}} versiuni editate? Acțiunea nu poate fi anulată.",
           "success": {
             "uploaded": "Încărcată.",
             "copied": "Copiat în clipboard.",

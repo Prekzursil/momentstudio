@@ -919,6 +919,7 @@ async def admin_get_content_image_usage(
 @router.delete("/admin/assets/images/{image_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def admin_delete_content_image(
     image_id: UUID,
+    delete_versions: bool = Query(default=False, description="Delete original and edited versions (if any)"),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("content")),
 ) -> Response:
@@ -926,7 +927,7 @@ async def admin_delete_content_image(
     if not image:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
 
-    await content_service.delete_image_asset(session, image=image, actor_id=admin.id)
+    await content_service.delete_image_asset(session, image=image, actor_id=admin.id, delete_versions=delete_versions)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

@@ -715,10 +715,75 @@ async def delete_image_asset(
     *,
     image: ContentImage,
     actor_id: UUID | None = None,
+    delete_versions: bool = False,
 ) -> None:
     image_id = getattr(image, "id", None)
     if not image_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+
+    root_id = getattr(image, "root_image_id", None) or image_id
+    if delete_versions:
+        images = (
+            (
+                await session.execute(
+                    select(ContentImage).where(or_(ContentImage.id == root_id, ContentImage.root_image_id == root_id))
+                )
+            )
+            .scalars()
+            .all()
+        )
+        if not images:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+
+        delete_ids = {img.id for img in images if getattr(img, "id", None)}
+        urls: set[str] = set()
+
+        for img in images:
+            url = (getattr(img, "url", None) or "").strip()
+            if not url:
+                continue
+            urls.add(url)
+            shared = await session.scalar(
+                select(func.count()).select_from(ContentImage).where(ContentImage.url == url, ContentImage.id.notin_(delete_ids))
+            )
+            if int(shared or 0) > 0:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Image file is shared by other assets")
+
+            keys = await get_asset_usage_keys(session, url=url)
+            if keys:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Image is used")
+
+        block = await session.scalar(select(ContentBlock).where(ContentBlock.id == image.content_block_id))
+        if not block:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+
+        remaining: dict[UUID, ContentImage] = {img.id: img for img in images if img.id}
+        while remaining:
+            referenced = {
+                img.source_image_id
+                for img in remaining.values()
+                if getattr(img, "source_image_id", None) and img.source_image_id in remaining
+            }
+            leaves = [img for img in remaining.values() if img.id not in referenced]
+            if not leaves:
+                leaves = list(remaining.values())
+
+            for leaf in leaves:
+                await session.delete(leaf)
+                remaining.pop(leaf.id, None)
+
+        await audit_chain_service.add_content_audit_log(
+            session,
+            content_block_id=block.id,
+            action="image_delete_versions",
+            version=block.version,
+            user_id=actor_id,
+        )
+        await session.commit()
+
+        for url in sorted(urls):
+            storage.delete_file(url)
+        return
 
     child_id = await session.scalar(
         select(ContentImage.id)

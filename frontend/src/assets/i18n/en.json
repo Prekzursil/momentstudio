@@ -2373,6 +2373,7 @@
           "versionsTitle": "Edited versions ({{count}})",
           "revertToOriginal": "Original",
           "confirmDelete": "Delete this asset? This cannot be undone.",
+          "confirmDeleteWithVersions": "Delete this asset and its {{count}} edited versions? This cannot be undone.",
           "success": {
             "uploaded": "Uploaded.",
             "copied": "Copied to clipboard.",
