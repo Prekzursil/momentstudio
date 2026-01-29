@@ -56,6 +56,7 @@ import { BannerBlockComponent } from '../../shared/banner-block.component';
 import { CarouselBlockComponent } from '../../shared/carousel-block.component';
 import { CmsEditorPrefsService } from './shared/cms-editor-prefs.service';
 import { CmsBlockLibraryBlockType, CmsBlockLibraryComponent, CmsBlockLibraryTemplate } from './shared/cms-block-library.component';
+import { LocalizedTextEditorComponent } from './shared/localized-text-editor.component';
 import {
   CMS_GLOBAL_SECTIONS,
   CmsGlobalSectionKey,
@@ -443,6 +444,7 @@ class CmsDraftManager<T> {
     CmsBlockLibraryComponent,
     BannerBlockComponent,
     CarouselBlockComponent,
+    LocalizedTextEditorComponent,
     TranslateModule
   ],
  template: `
@@ -1252,71 +1254,143 @@ class CmsDraftManager<T> {
           <section *ngIf="section() === 'pages'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.pages.title' | translate }}</h2>
-              <div class="flex gap-2 text-sm">
-                <button
-                  type="button"
-                  class="px-3 py-1 rounded border"
-                  [class.bg-slate-900]="infoLang === 'en'"
-                  [class.text-white]="infoLang === 'en'"
-                  (click)="selectInfoLang('en')"
-                >
-                  EN
-                </button>
-                <button
-                  type="button"
-                  class="px-3 py-1 rounded border"
-                  [class.bg-slate-900]="infoLang === 'ro'"
-                  [class.text-white]="infoLang === 'ro'"
-                  (click)="selectInfoLang('ro')"
-                >
-                  RO
-                </button>
+              <div class="flex flex-wrap items-center justify-end gap-3 text-sm">
+                <div class="flex gap-2">
+                  <button
+                    type="button"
+                    class="px-3 py-1 rounded border"
+                    [class.bg-slate-900]="infoLang === 'en'"
+                    [class.text-white]="infoLang === 'en'"
+                    (click)="selectInfoLang('en')"
+                  >
+                    EN
+                  </button>
+                  <button
+                    type="button"
+                    class="px-3 py-1 rounded border"
+                    [class.bg-slate-900]="infoLang === 'ro'"
+                    [class.text-white]="infoLang === 'ro'"
+                    (click)="selectInfoLang('ro')"
+                  >
+                    RO
+                  </button>
+                </div>
+
+                <div class="flex items-center gap-2">
+                  <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                    {{ 'adminUi.content.translation.layoutLabel' | translate }}
+                  </span>
+                  <div class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <button
+                      type="button"
+                      class="px-3 py-1.5 text-xs font-semibold"
+                      [class.bg-slate-900]="cmsPrefs.translationLayout() === 'single'"
+                      [class.text-white]="cmsPrefs.translationLayout() === 'single'"
+                      [class.text-slate-700]="cmsPrefs.translationLayout() !== 'single'"
+                      [class.dark:text-slate-200]="cmsPrefs.translationLayout() !== 'single'"
+                      (click)="cmsPrefs.setTranslationLayout('single')"
+                    >
+                      {{ 'adminUi.content.translation.layouts.single' | translate }}
+                    </button>
+                    <button
+                      type="button"
+                      class="px-3 py-1.5 text-xs font-semibold"
+                      [class.bg-slate-900]="cmsPrefs.translationLayout() === 'sideBySide'"
+                      [class.text-white]="cmsPrefs.translationLayout() === 'sideBySide'"
+                      [class.text-slate-700]="cmsPrefs.translationLayout() !== 'sideBySide'"
+                      [class.dark:text-slate-200]="cmsPrefs.translationLayout() !== 'sideBySide'"
+                      (click)="cmsPrefs.setTranslationLayout('sideBySide')"
+                    >
+                      {{ 'adminUi.content.translation.layouts.sideBySide' | translate }}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
             <div class="grid gap-3 text-sm">
-              <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.site.pages.aboutLabel' | translate }}
-                <textarea
-                  rows="3"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="infoForm.about[infoLang]"
-                ></textarea>
-              </label>
+              <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pagesAboutSingle">
+                <app-localized-text-editor
+                  [label]="'adminUi.site.pages.aboutLabel' | translate"
+                  [multiline]="true"
+                  [rows]="5"
+                  [value]="infoForm.about"
+                ></app-localized-text-editor>
+              </ng-container>
+              <ng-template #pagesAboutSingle>
+                <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.site.pages.aboutLabel' | translate }}
+                  <textarea
+                    rows="3"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="infoForm.about[infoLang]"
+                  ></textarea>
+                </label>
+              </ng-template>
               <div class="flex gap-2">
-                <app-button size="sm" [label]="'adminUi.site.pages.saveAbout' | translate" (action)="saveInfo('page.about', infoForm.about[infoLang])"></app-button>
+                <app-button size="sm" [label]="'adminUi.site.pages.saveAbout' | translate" (action)="saveInfoUi('page.about', infoForm.about)"></app-button>
               </div>
-              <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.site.pages.faqLabel' | translate }}
-                <textarea
-                  rows="3"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="infoForm.faq[infoLang]"
-                ></textarea>
-              </label>
+              <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pagesFaqSingle">
+                <app-localized-text-editor
+                  [label]="'adminUi.site.pages.faqLabel' | translate"
+                  [multiline]="true"
+                  [rows]="5"
+                  [value]="infoForm.faq"
+                ></app-localized-text-editor>
+              </ng-container>
+              <ng-template #pagesFaqSingle>
+                <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.site.pages.faqLabel' | translate }}
+                  <textarea
+                    rows="3"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="infoForm.faq[infoLang]"
+                  ></textarea>
+                </label>
+              </ng-template>
               <div class="flex gap-2">
-                <app-button size="sm" [label]="'adminUi.site.pages.saveFaq' | translate" (action)="saveInfo('page.faq', infoForm.faq[infoLang])"></app-button>
+                <app-button size="sm" [label]="'adminUi.site.pages.saveFaq' | translate" (action)="saveInfoUi('page.faq', infoForm.faq)"></app-button>
               </div>
-              <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.site.pages.shippingLabel' | translate }}
-                <textarea
-                  rows="3"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="infoForm.shipping[infoLang]"
-                ></textarea>
-              </label>
+              <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pagesShippingSingle">
+                <app-localized-text-editor
+                  [label]="'adminUi.site.pages.shippingLabel' | translate"
+                  [multiline]="true"
+                  [rows]="5"
+                  [value]="infoForm.shipping"
+                ></app-localized-text-editor>
+              </ng-container>
+              <ng-template #pagesShippingSingle>
+                <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.site.pages.shippingLabel' | translate }}
+                  <textarea
+                    rows="3"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="infoForm.shipping[infoLang]"
+                  ></textarea>
+                </label>
+              </ng-template>
               <div class="flex gap-2">
-                <app-button size="sm" [label]="'adminUi.site.pages.saveShipping' | translate" (action)="saveInfo('page.shipping', infoForm.shipping[infoLang])"></app-button>
+                <app-button size="sm" [label]="'adminUi.site.pages.saveShipping' | translate" (action)="saveInfoUi('page.shipping', infoForm.shipping)"></app-button>
               </div>
-              <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.site.pages.contactLabel' | translate }}
-                <textarea
-                  rows="3"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="infoForm.contact[infoLang]"
-                ></textarea>
-              </label>
+              <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pagesContactSingle">
+                <app-localized-text-editor
+                  [label]="'adminUi.site.pages.contactLabel' | translate"
+                  [multiline]="true"
+                  [rows]="5"
+                  [value]="infoForm.contact"
+                ></app-localized-text-editor>
+              </ng-container>
+              <ng-template #pagesContactSingle>
+                <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.site.pages.contactLabel' | translate }}
+                  <textarea
+                    rows="3"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="infoForm.contact[infoLang]"
+                  ></textarea>
+                </label>
+              </ng-template>
               <div class="flex gap-2">
-                <app-button size="sm" [label]="'adminUi.site.pages.saveContact' | translate" (action)="saveInfo('page.contact', infoForm.contact[infoLang])"></app-button>
+                <app-button size="sm" [label]="'adminUi.site.pages.saveContact' | translate" (action)="saveInfoUi('page.contact', infoForm.contact)"></app-button>
                 <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="infoMessage">{{ infoMessage }}</span>
                 <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="infoError">{{ infoError }}</span>
               </div>
@@ -1696,13 +1770,18 @@ class CmsDraftManager<T> {
 	                        </div>
 
                       <div class="mt-3 grid gap-3" *ngIf="block.enabled">
-	                        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	                          {{ 'adminUi.home.sections.fields.title' | translate }}
-	                          <input
-	                            class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-	                            [(ngModel)]="block.title[infoLang]"
-	                          />
-	                        </label>
+	                        <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pageBlockTitleSingle">
+	                          <app-localized-text-editor [label]="'adminUi.home.sections.fields.title' | translate" [value]="block.title"></app-localized-text-editor>
+	                        </ng-container>
+	                        <ng-template #pageBlockTitleSingle>
+	                          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                            {{ 'adminUi.home.sections.fields.title' | translate }}
+	                            <input
+	                              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                              [(ngModel)]="block.title[infoLang]"
+	                            />
+	                          </label>
+	                        </ng-template>
 
                           <div class="grid gap-3 sm:grid-cols-2">
                             <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -1767,14 +1846,24 @@ class CmsDraftManager<T> {
 
 		                        <ng-container [ngSwitch]="block.type">
 		                          <ng-container *ngSwitchCase="'text'">
-		                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	                              {{ 'adminUi.home.sections.fields.body' | translate }}
-                              <textarea
-                                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                rows="4"
-                                [(ngModel)]="block.body_markdown[infoLang]"
-                              ></textarea>
-                            </label>
+		                            <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pageBlockTextBodySingle">
+	                              <app-localized-text-editor
+	                                [label]="'adminUi.home.sections.fields.body' | translate"
+	                                [multiline]="true"
+	                                [rows]="6"
+	                                [value]="block.body_markdown"
+	                              ></app-localized-text-editor>
+	                            </ng-container>
+	                            <ng-template #pageBlockTextBodySingle>
+		                              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                                {{ 'adminUi.home.sections.fields.body' | translate }}
+                                <textarea
+                                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                  rows="4"
+                                  [(ngModel)]="block.body_markdown[infoLang]"
+                                ></textarea>
+                              </label>
+	                            </ng-template>
                             <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
                               <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
                                 {{ 'adminUi.home.sections.fields.preview' | translate }}
@@ -1803,22 +1892,30 @@ class CmsDraftManager<T> {
                                 [(ngModel)]="block.link_url"
                               />
                             </label>
-                            <div class="grid gap-3 sm:grid-cols-2">
-                              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                                {{ 'adminUi.home.sections.fields.alt' | translate }}
-                                <input
-                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                  [(ngModel)]="block.alt[infoLang]"
-                                />
-                              </label>
-                              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                                {{ 'adminUi.home.sections.fields.caption' | translate }}
-                                <input
-                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                  [(ngModel)]="block.caption[infoLang]"
-                                />
-                              </label>
-                            </div>
+                            <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pageBlockImageTextSingle">
+                              <div class="grid gap-3">
+                                <app-localized-text-editor [label]="'adminUi.home.sections.fields.alt' | translate" [value]="block.alt"></app-localized-text-editor>
+                                <app-localized-text-editor [label]="'adminUi.home.sections.fields.caption' | translate" [value]="block.caption"></app-localized-text-editor>
+                              </div>
+                            </ng-container>
+                            <ng-template #pageBlockImageTextSingle>
+                              <div class="grid gap-3 sm:grid-cols-2">
+                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                  {{ 'adminUi.home.sections.fields.alt' | translate }}
+                                  <input
+                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    [(ngModel)]="block.alt[infoLang]"
+                                  />
+                                </label>
+                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                  {{ 'adminUi.home.sections.fields.caption' | translate }}
+                                  <input
+                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    [(ngModel)]="block.caption[infoLang]"
+                                  />
+                                </label>
+                              </div>
+                            </ng-template>
                             <div class="grid gap-3 sm:grid-cols-2">
                               <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                                 {{ 'adminUi.home.sections.fields.focalX' | translate }}
@@ -1888,22 +1985,30 @@ class CmsDraftManager<T> {
                                     [(ngModel)]="img.url"
                                   />
                                 </label>
-                                <div class="grid gap-3 sm:grid-cols-2">
-                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                                    {{ 'adminUi.home.sections.fields.alt' | translate }}
-                                    <input
-                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                      [(ngModel)]="img.alt[infoLang]"
-                                    />
-                                  </label>
-                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                                    {{ 'adminUi.home.sections.fields.caption' | translate }}
-                                    <input
-                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                      [(ngModel)]="img.caption[infoLang]"
-                                    />
-                                  </label>
-                                </div>
+                                <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pageBlockGalleryTextSingle">
+                                  <div class="grid gap-3">
+                                    <app-localized-text-editor [label]="'adminUi.home.sections.fields.alt' | translate" [value]="img.alt"></app-localized-text-editor>
+                                    <app-localized-text-editor [label]="'adminUi.home.sections.fields.caption' | translate" [value]="img.caption"></app-localized-text-editor>
+                                  </div>
+                                </ng-container>
+                                <ng-template #pageBlockGalleryTextSingle>
+                                  <div class="grid gap-3 sm:grid-cols-2">
+                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                      {{ 'adminUi.home.sections.fields.alt' | translate }}
+                                      <input
+                                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                        [(ngModel)]="img.alt[infoLang]"
+                                      />
+                                    </label>
+                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                      {{ 'adminUi.home.sections.fields.caption' | translate }}
+                                      <input
+                                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                        [(ngModel)]="img.caption[infoLang]"
+                                      />
+                                    </label>
+                                  </div>
+                                </ng-template>
                                 <div class="grid gap-3 sm:grid-cols-2">
                                   <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                                     {{ 'adminUi.home.sections.fields.focalX' | translate }}
@@ -1965,34 +2070,73 @@ class CmsDraftManager<T> {
                                     [(ngModel)]="block.slide.image_url"
                                   />
                                 </label>
-                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                                  {{ 'adminUi.home.sections.fields.alt' | translate }}
-                                  <input
-                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                    [(ngModel)]="block.slide.alt[infoLang]"
-                                  />
-                                </label>
-                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                                  {{ 'adminUi.home.hero.headline' | translate }}
-                                  <input
-                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                    [(ngModel)]="block.slide.headline[infoLang]"
-                                  />
-                                </label>
-                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
-                                  {{ 'adminUi.home.hero.subtitle' | translate }}
-                                  <input
-                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                    [(ngModel)]="block.slide.subheadline[infoLang]"
-                                  />
-                                </label>
-                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                                  {{ 'adminUi.home.hero.ctaLabel' | translate }}
-                                  <input
-                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                    [(ngModel)]="block.slide.cta_label[infoLang]"
-                                  />
-                                </label>
+                                <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pageBlockBannerAltSingle">
+                                  <app-localized-text-editor
+                                    class="md:col-span-2"
+                                    [label]="'adminUi.home.sections.fields.alt' | translate"
+                                    [value]="block.slide.alt"
+                                  ></app-localized-text-editor>
+                                </ng-container>
+                                <ng-template #pageBlockBannerAltSingle>
+                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    {{ 'adminUi.home.sections.fields.alt' | translate }}
+                                    <input
+                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      [(ngModel)]="block.slide.alt[infoLang]"
+                                    />
+                                  </label>
+                                </ng-template>
+
+                                <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pageBlockBannerHeadlineSingle">
+                                  <app-localized-text-editor
+                                    class="md:col-span-2"
+                                    [label]="'adminUi.home.hero.headline' | translate"
+                                    [value]="block.slide.headline"
+                                  ></app-localized-text-editor>
+                                </ng-container>
+                                <ng-template #pageBlockBannerHeadlineSingle>
+                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    {{ 'adminUi.home.hero.headline' | translate }}
+                                    <input
+                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      [(ngModel)]="block.slide.headline[infoLang]"
+                                    />
+                                  </label>
+                                </ng-template>
+
+                                <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pageBlockBannerSubheadlineSingle">
+                                  <app-localized-text-editor
+                                    class="md:col-span-2"
+                                    [label]="'adminUi.home.hero.subtitle' | translate"
+                                    [value]="block.slide.subheadline"
+                                  ></app-localized-text-editor>
+                                </ng-container>
+                                <ng-template #pageBlockBannerSubheadlineSingle>
+                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
+                                    {{ 'adminUi.home.hero.subtitle' | translate }}
+                                    <input
+                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      [(ngModel)]="block.slide.subheadline[infoLang]"
+                                    />
+                                  </label>
+                                </ng-template>
+
+                                <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pageBlockBannerCtaLabelSingle">
+                                  <app-localized-text-editor
+                                    class="md:col-span-2"
+                                    [label]="'adminUi.home.hero.ctaLabel' | translate"
+                                    [value]="block.slide.cta_label"
+                                  ></app-localized-text-editor>
+                                </ng-container>
+                                <ng-template #pageBlockBannerCtaLabelSingle>
+                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    {{ 'adminUi.home.hero.ctaLabel' | translate }}
+                                    <input
+                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      [(ngModel)]="block.slide.cta_label[infoLang]"
+                                    />
+                                  </label>
+                                </ng-template>
                                 <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                                   {{ 'adminUi.home.hero.ctaUrl' | translate }}
                                   <input
@@ -2106,27 +2250,56 @@ class CmsDraftManager<T> {
                                     />
                                   </label>
                                   <div class="grid gap-3 md:grid-cols-2">
-                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                                      {{ 'adminUi.home.sections.fields.alt' | translate }}
-                                      <input
-                                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                        [(ngModel)]="slide.alt[infoLang]"
-                                      />
-                                    </label>
-                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                                      {{ 'adminUi.home.hero.headline' | translate }}
-                                      <input
-                                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                        [(ngModel)]="slide.headline[infoLang]"
-                                      />
-                                    </label>
-                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
-                                      {{ 'adminUi.home.hero.subtitle' | translate }}
-                                      <input
-                                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                        [(ngModel)]="slide.subheadline[infoLang]"
-                                      />
-                                    </label>
+                                    <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pageBlockCarouselAltSingle">
+                                      <app-localized-text-editor
+                                        class="md:col-span-2"
+                                        [label]="'adminUi.home.sections.fields.alt' | translate"
+                                        [value]="slide.alt"
+                                      ></app-localized-text-editor>
+                                    </ng-container>
+                                    <ng-template #pageBlockCarouselAltSingle>
+                                      <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                        {{ 'adminUi.home.sections.fields.alt' | translate }}
+                                        <input
+                                          class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                          [(ngModel)]="slide.alt[infoLang]"
+                                        />
+                                      </label>
+                                    </ng-template>
+
+                                    <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pageBlockCarouselHeadlineSingle">
+                                      <app-localized-text-editor
+                                        class="md:col-span-2"
+                                        [label]="'adminUi.home.hero.headline' | translate"
+                                        [value]="slide.headline"
+                                      ></app-localized-text-editor>
+                                    </ng-container>
+                                    <ng-template #pageBlockCarouselHeadlineSingle>
+                                      <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                        {{ 'adminUi.home.hero.headline' | translate }}
+                                        <input
+                                          class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                          [(ngModel)]="slide.headline[infoLang]"
+                                        />
+                                      </label>
+                                    </ng-template>
+
+                                    <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pageBlockCarouselSubheadlineSingle">
+                                      <app-localized-text-editor
+                                        class="md:col-span-2"
+                                        [label]="'adminUi.home.hero.subtitle' | translate"
+                                        [value]="slide.subheadline"
+                                      ></app-localized-text-editor>
+                                    </ng-container>
+                                    <ng-template #pageBlockCarouselSubheadlineSingle>
+                                      <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
+                                        {{ 'adminUi.home.hero.subtitle' | translate }}
+                                        <input
+                                          class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                          [(ngModel)]="slide.subheadline[infoLang]"
+                                        />
+                                      </label>
+                                    </ng-template>
                                     <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                                       {{ 'adminUi.home.sections.fields.focalX' | translate }}
                                       <input
@@ -2739,6 +2912,36 @@ class CmsDraftManager<T> {
 	                    RO
 	                  </button>
 	                </div>
+
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                      {{ 'adminUi.content.translation.layoutLabel' | translate }}
+                    </span>
+                    <div class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                      <button
+                        type="button"
+                        class="px-3 py-1.5 text-xs font-semibold"
+                        [class.bg-slate-900]="cmsPrefs.translationLayout() === 'single'"
+                        [class.text-white]="cmsPrefs.translationLayout() === 'single'"
+                        [class.text-slate-700]="cmsPrefs.translationLayout() !== 'single'"
+                        [class.dark:text-slate-200]="cmsPrefs.translationLayout() !== 'single'"
+                        (click)="cmsPrefs.setTranslationLayout('single')"
+                      >
+                        {{ 'adminUi.content.translation.layouts.single' | translate }}
+                      </button>
+                      <button
+                        type="button"
+                        class="px-3 py-1.5 text-xs font-semibold"
+                        [class.bg-slate-900]="cmsPrefs.translationLayout() === 'sideBySide'"
+                        [class.text-white]="cmsPrefs.translationLayout() === 'sideBySide'"
+                        [class.text-slate-700]="cmsPrefs.translationLayout() !== 'sideBySide'"
+                        [class.dark:text-slate-200]="cmsPrefs.translationLayout() !== 'sideBySide'"
+                        (click)="cmsPrefs.setTranslationLayout('sideBySide')"
+                      >
+                        {{ 'adminUi.content.translation.layouts.sideBySide' | translate }}
+                      </button>
+                    </div>
+                  </div>
 	                <app-button
 	                  size="sm"
 	                  variant="ghost"
@@ -2943,24 +3146,39 @@ class CmsDraftManager<T> {
 
                 <ng-container *ngIf="isCustomHomeBlock(block)">
                   <div class="mt-3 grid gap-3">
-                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                      {{ 'adminUi.home.sections.fields.title' | translate }}
-                      <input
-                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                        [(ngModel)]="block.title[homeBlocksLang]"
-                      />
-                    </label>
+                    <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockTitleSingle">
+                      <app-localized-text-editor [label]="'adminUi.home.sections.fields.title' | translate" [value]="block.title"></app-localized-text-editor>
+                    </ng-container>
+                    <ng-template #homeBlockTitleSingle>
+                      <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                        {{ 'adminUi.home.sections.fields.title' | translate }}
+                        <input
+                          class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                          [(ngModel)]="block.title[homeBlocksLang]"
+                        />
+                      </label>
+                    </ng-template>
 
                     <ng-container [ngSwitch]="block.type">
                       <ng-container *ngSwitchCase="'text'">
-                        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                          {{ 'adminUi.home.sections.fields.body' | translate }}
-                          <textarea
-                            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                            rows="5"
-                            [(ngModel)]="block.body_markdown[homeBlocksLang]"
-                          ></textarea>
-                        </label>
+                        <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockTextBodySingle">
+                          <app-localized-text-editor
+                            [label]="'adminUi.home.sections.fields.body' | translate"
+                            [multiline]="true"
+                            [rows]="6"
+                            [value]="block.body_markdown"
+                          ></app-localized-text-editor>
+                        </ng-container>
+                        <ng-template #homeBlockTextBodySingle>
+                          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                            {{ 'adminUi.home.sections.fields.body' | translate }}
+                            <textarea
+                              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                              rows="5"
+                              [(ngModel)]="block.body_markdown[homeBlocksLang]"
+                            ></textarea>
+                          </label>
+                        </ng-template>
                         <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
                           <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.home.sections.fields.preview' | translate }}</p>
                           <div class="mt-2 mx-auto w-full" [ngClass]="cmsPreviewMaxWidthClass()">
@@ -2988,20 +3206,34 @@ class CmsDraftManager<T> {
                               [(ngModel)]="block.link_url"
                             />
                           </label>
-                          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                            {{ 'adminUi.home.sections.fields.alt' | translate }}
-                            <input
-                              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                              [(ngModel)]="block.alt[homeBlocksLang]"
-                            />
-                          </label>
-                          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                            {{ 'adminUi.home.sections.fields.caption' | translate }}
-                            <input
-                              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                              [(ngModel)]="block.caption[homeBlocksLang]"
-                            />
-                          </label>
+                          <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockImageTextSingle">
+                            <app-localized-text-editor
+                              class="md:col-span-2"
+                              [label]="'adminUi.home.sections.fields.alt' | translate"
+                              [value]="block.alt"
+                            ></app-localized-text-editor>
+                            <app-localized-text-editor
+                              class="md:col-span-2"
+                              [label]="'adminUi.home.sections.fields.caption' | translate"
+                              [value]="block.caption"
+                            ></app-localized-text-editor>
+                          </ng-container>
+                          <ng-template #homeBlockImageTextSingle>
+                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                              {{ 'adminUi.home.sections.fields.alt' | translate }}
+                              <input
+                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                [(ngModel)]="block.alt[homeBlocksLang]"
+                              />
+                            </label>
+                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                              {{ 'adminUi.home.sections.fields.caption' | translate }}
+                              <input
+                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                [(ngModel)]="block.caption[homeBlocksLang]"
+                              />
+                            </label>
+                          </ng-template>
                           <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                             {{ 'adminUi.home.sections.fields.focalX' | translate }}
                             <input
@@ -3075,20 +3307,34 @@ class CmsDraftManager<T> {
                                 />
                               </label>
                               <div class="grid gap-3 md:grid-cols-2">
-                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                                  {{ 'adminUi.home.sections.fields.alt' | translate }}
-                                  <input
-                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                    [(ngModel)]="img.alt[homeBlocksLang]"
-                                  />
-                                </label>
-                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                                  {{ 'adminUi.home.sections.fields.caption' | translate }}
-                                  <input
-                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                    [(ngModel)]="img.caption[homeBlocksLang]"
-                                  />
-                                </label>
+                                <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockGalleryTextSingle">
+                                  <app-localized-text-editor
+                                    class="md:col-span-2"
+                                    [label]="'adminUi.home.sections.fields.alt' | translate"
+                                    [value]="img.alt"
+                                  ></app-localized-text-editor>
+                                  <app-localized-text-editor
+                                    class="md:col-span-2"
+                                    [label]="'adminUi.home.sections.fields.caption' | translate"
+                                    [value]="img.caption"
+                                  ></app-localized-text-editor>
+                                </ng-container>
+                                <ng-template #homeBlockGalleryTextSingle>
+                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    {{ 'adminUi.home.sections.fields.alt' | translate }}
+                                    <input
+                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      [(ngModel)]="img.alt[homeBlocksLang]"
+                                    />
+                                  </label>
+                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    {{ 'adminUi.home.sections.fields.caption' | translate }}
+                                    <input
+                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      [(ngModel)]="img.caption[homeBlocksLang]"
+                                    />
+                                  </label>
+                                </ng-template>
                                 <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                                   {{ 'adminUi.home.sections.fields.focalX' | translate }}
                                   <input
@@ -3149,34 +3395,73 @@ class CmsDraftManager<T> {
                                 [(ngModel)]="block.slide.image_url"
                               />
                             </label>
-                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                              {{ 'adminUi.home.sections.fields.alt' | translate }}
-                              <input
-                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                [(ngModel)]="block.slide.alt[homeBlocksLang]"
-                              />
-                            </label>
-                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                              {{ 'adminUi.home.hero.headline' | translate }}
-                              <input
-                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                [(ngModel)]="block.slide.headline[homeBlocksLang]"
-                              />
-                            </label>
-                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
-                              {{ 'adminUi.home.hero.subtitle' | translate }}
-                              <input
-                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                [(ngModel)]="block.slide.subheadline[homeBlocksLang]"
-                              />
-                            </label>
-                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                              {{ 'adminUi.home.hero.ctaLabel' | translate }}
-                              <input
-                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                [(ngModel)]="block.slide.cta_label[homeBlocksLang]"
-                              />
-                            </label>
+                            <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockBannerAltSingle">
+                              <app-localized-text-editor
+                                class="md:col-span-2"
+                                [label]="'adminUi.home.sections.fields.alt' | translate"
+                                [value]="block.slide.alt"
+                              ></app-localized-text-editor>
+                            </ng-container>
+                            <ng-template #homeBlockBannerAltSingle>
+                              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                {{ 'adminUi.home.sections.fields.alt' | translate }}
+                                <input
+                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                  [(ngModel)]="block.slide.alt[homeBlocksLang]"
+                                />
+                              </label>
+                            </ng-template>
+
+                            <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockBannerHeadlineSingle">
+                              <app-localized-text-editor
+                                class="md:col-span-2"
+                                [label]="'adminUi.home.hero.headline' | translate"
+                                [value]="block.slide.headline"
+                              ></app-localized-text-editor>
+                            </ng-container>
+                            <ng-template #homeBlockBannerHeadlineSingle>
+                              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                {{ 'adminUi.home.hero.headline' | translate }}
+                                <input
+                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                  [(ngModel)]="block.slide.headline[homeBlocksLang]"
+                                />
+                              </label>
+                            </ng-template>
+
+                            <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockBannerSubheadlineSingle">
+                              <app-localized-text-editor
+                                class="md:col-span-2"
+                                [label]="'adminUi.home.hero.subtitle' | translate"
+                                [value]="block.slide.subheadline"
+                              ></app-localized-text-editor>
+                            </ng-container>
+                            <ng-template #homeBlockBannerSubheadlineSingle>
+                              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
+                                {{ 'adminUi.home.hero.subtitle' | translate }}
+                                <input
+                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                  [(ngModel)]="block.slide.subheadline[homeBlocksLang]"
+                                />
+                              </label>
+                            </ng-template>
+
+                            <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockBannerCtaLabelSingle">
+                              <app-localized-text-editor
+                                class="md:col-span-2"
+                                [label]="'adminUi.home.hero.ctaLabel' | translate"
+                                [value]="block.slide.cta_label"
+                              ></app-localized-text-editor>
+                            </ng-container>
+                            <ng-template #homeBlockBannerCtaLabelSingle>
+                              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                {{ 'adminUi.home.hero.ctaLabel' | translate }}
+                                <input
+                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                  [(ngModel)]="block.slide.cta_label[homeBlocksLang]"
+                                />
+                              </label>
+                            </ng-template>
                             <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                               {{ 'adminUi.home.hero.ctaUrl' | translate }}
                               <input
@@ -3293,34 +3578,73 @@ class CmsDraftManager<T> {
                                       [(ngModel)]="slide.image_url"
                                     />
                                   </label>
-                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                                    {{ 'adminUi.home.sections.fields.alt' | translate }}
-                                    <input
-                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                      [(ngModel)]="slide.alt[homeBlocksLang]"
-                                    />
-                                  </label>
-                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                                    {{ 'adminUi.home.hero.headline' | translate }}
-                                    <input
-                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                      [(ngModel)]="slide.headline[homeBlocksLang]"
-                                    />
-                                  </label>
-                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
-                                    {{ 'adminUi.home.hero.subtitle' | translate }}
-                                    <input
-                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                      [(ngModel)]="slide.subheadline[homeBlocksLang]"
-                                    />
-                                  </label>
-                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                                    {{ 'adminUi.home.hero.ctaLabel' | translate }}
-                                    <input
-                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                      [(ngModel)]="slide.cta_label[homeBlocksLang]"
-                                    />
-                                  </label>
+                                  <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockCarouselAltSingle">
+                                    <app-localized-text-editor
+                                      class="md:col-span-2"
+                                      [label]="'adminUi.home.sections.fields.alt' | translate"
+                                      [value]="slide.alt"
+                                    ></app-localized-text-editor>
+                                  </ng-container>
+                                  <ng-template #homeBlockCarouselAltSingle>
+                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                      {{ 'adminUi.home.sections.fields.alt' | translate }}
+                                      <input
+                                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                        [(ngModel)]="slide.alt[homeBlocksLang]"
+                                      />
+                                    </label>
+                                  </ng-template>
+
+                                  <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockCarouselHeadlineSingle">
+                                    <app-localized-text-editor
+                                      class="md:col-span-2"
+                                      [label]="'adminUi.home.hero.headline' | translate"
+                                      [value]="slide.headline"
+                                    ></app-localized-text-editor>
+                                  </ng-container>
+                                  <ng-template #homeBlockCarouselHeadlineSingle>
+                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                      {{ 'adminUi.home.hero.headline' | translate }}
+                                      <input
+                                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                        [(ngModel)]="slide.headline[homeBlocksLang]"
+                                      />
+                                    </label>
+                                  </ng-template>
+
+                                  <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockCarouselSubheadlineSingle">
+                                    <app-localized-text-editor
+                                      class="md:col-span-2"
+                                      [label]="'adminUi.home.hero.subtitle' | translate"
+                                      [value]="slide.subheadline"
+                                    ></app-localized-text-editor>
+                                  </ng-container>
+                                  <ng-template #homeBlockCarouselSubheadlineSingle>
+                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
+                                      {{ 'adminUi.home.hero.subtitle' | translate }}
+                                      <input
+                                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                        [(ngModel)]="slide.subheadline[homeBlocksLang]"
+                                      />
+                                    </label>
+                                  </ng-template>
+
+                                  <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockCarouselCtaLabelSingle">
+                                    <app-localized-text-editor
+                                      class="md:col-span-2"
+                                      [label]="'adminUi.home.hero.ctaLabel' | translate"
+                                      [value]="slide.cta_label"
+                                    ></app-localized-text-editor>
+                                  </ng-container>
+                                  <ng-template #homeBlockCarouselCtaLabelSingle>
+                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                      {{ 'adminUi.home.hero.ctaLabel' | translate }}
+                                      <input
+                                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                        [(ngModel)]="slide.cta_label[homeBlocksLang]"
+                                      />
+                                    </label>
+                                  </ng-template>
                                   <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                                     {{ 'adminUi.home.hero.ctaUrl' | translate }}
                                     <input
@@ -10344,44 +10668,100 @@ export class AdminComponent implements OnInit, OnDestroy {
     void loadKey('page.contact', 'contact');
   }
 
-	  saveInfo(key: 'page.about' | 'page.faq' | 'page.shipping' | 'page.contact', body: string): void {
-    this.infoMessage = null;
-    this.infoError = null;
+  saveInfoUi(key: 'page.about' | 'page.faq' | 'page.shipping' | 'page.contact', body: LocalizedText): void {
+    if (this.cmsPrefs.translationLayout() === 'sideBySide') {
+      this.saveInfoBoth(key, body);
+      return;
+    }
+    this.saveInfo(key, body[this.infoLang] || '', this.infoLang);
+  }
+
+  private saveInfoInternal(
+    key: 'page.about' | 'page.faq' | 'page.shipping' | 'page.contact',
+    body: string,
+    lang: UiLang,
+    onSuccess: () => void,
+    onError: () => void
+  ): void {
     const payload = {
       body_markdown: body,
       status: 'published',
-      lang: this.infoLang
-	    };
+      lang
+    };
     const createPayload = {
       title: key,
       ...payload
     };
-	    const onSuccess = (block?: any | null) => {
-        this.rememberContentVersion(key, block);
-        this.pageBlocksNeedsTranslationEn[key] = Boolean(block?.needs_translation_en);
-        this.pageBlocksNeedsTranslationRo[key] = Boolean(block?.needs_translation_ro);
-        this.loadContentPages();
-	      this.infoMessage = this.t('adminUi.site.pages.success.save');
-	      this.infoError = null;
-	    };
-	    this.admin.updateContentBlock(key, this.withExpectedVersion(key, payload)).subscribe({
-	      next: (block) => onSuccess(block),
-	      error: (err) => {
-          if (this.handleContentConflict(err, key, () => this.loadInfo())) {
+
+    const onSuccessWithBlock = (block?: any | null) => {
+      this.rememberContentVersion(key, block);
+      this.pageBlocksNeedsTranslationEn[key] = Boolean(block?.needs_translation_en);
+      this.pageBlocksNeedsTranslationRo[key] = Boolean(block?.needs_translation_ro);
+      this.loadContentPages();
+      onSuccess();
+    };
+
+    this.admin.updateContentBlock(key, this.withExpectedVersion(key, payload)).subscribe({
+      next: (block) => onSuccessWithBlock(block),
+      error: (err) => {
+        if (this.handleContentConflict(err, key, () => this.loadInfo())) {
+          onError();
+          return;
+        }
+        this.admin.createContent(key, createPayload).subscribe({
+          next: (created) => onSuccessWithBlock(created),
+          error: () => onError()
+        });
+      }
+    });
+  }
+
+  saveInfo(key: 'page.about' | 'page.faq' | 'page.shipping' | 'page.contact', body: string, lang: UiLang = this.infoLang): void {
+    this.infoMessage = null;
+    this.infoError = null;
+    this.saveInfoInternal(
+      key,
+      body,
+      lang,
+      () => {
+        this.infoMessage = this.t('adminUi.site.pages.success.save');
+        this.infoError = null;
+      },
+      () => {
+        this.infoError = this.t('adminUi.site.pages.errors.save');
+        this.infoMessage = null;
+      }
+    );
+  }
+
+  saveInfoBoth(key: 'page.about' | 'page.faq' | 'page.shipping' | 'page.contact', body: LocalizedText): void {
+    this.infoMessage = null;
+    this.infoError = null;
+    this.saveInfoInternal(
+      key,
+      body.en || '',
+      'en',
+      () => {
+        this.saveInfoInternal(
+          key,
+          body.ro || '',
+          'ro',
+          () => {
+            this.infoMessage = this.t('adminUi.site.pages.success.save');
+            this.infoError = null;
+          },
+          () => {
             this.infoError = this.t('adminUi.site.pages.errors.save');
             this.infoMessage = null;
-            return;
           }
-	        this.admin.createContent(key, createPayload).subscribe({
-	          next: (created) => onSuccess(created),
-	          error: () => {
-	            this.infoError = this.t('adminUi.site.pages.errors.save');
-	            this.infoMessage = null;
-	          }
-	        })
-        }
-	    });
-	  }
+        );
+      },
+      () => {
+        this.infoError = this.t('adminUi.site.pages.errors.save');
+        this.infoMessage = null;
+      }
+    );
+  }
 
   togglePageNeedsTranslation(pageKey: PageBuilderKey, lang: UiLang, event: Event): void {
     const key = (pageKey || '').trim();

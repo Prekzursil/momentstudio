@@ -973,7 +973,7 @@ Below is a structured checklist you can turn into issues.
 - [x] CMS scheduling: calendar view – Visual calendar for scheduled publish/unpublish across pages/blog/home banners.
 - [x] CMS redirects: inline creation – When changing a page URL, offer creating a redirect in the same flow.
 - [x] CMS navigation: menu builder – Visual editor for header/footer links with drag-drop ordering and per-language labels.
-- [ ] CMS content: side-by-side translation – RO/EN side-by-side editing with “copy from” shortcuts.
+- [x] CMS content: side-by-side translation – RO/EN side-by-side editing with “copy from” shortcuts.
 - [x] CMS content: find & replace – Search/replace across CMS content blocks (with preview of affected pages).
 - [ ] CMS blocks: columns/layout – Add layout blocks (2–3 columns, split hero) with responsive controls.
 - [ ] CMS blocks: testimonials/FAQ – Add visual blocks for testimonials, FAQ accordions, and CTAs.

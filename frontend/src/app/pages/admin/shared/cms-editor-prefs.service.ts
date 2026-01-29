@@ -6,6 +6,7 @@ export type CmsPreviewDevice = 'desktop' | 'tablet' | 'mobile';
 export type CmsPreviewLayout = 'stacked' | 'split';
 export type CmsPreviewLang = 'en' | 'ro';
 export type CmsPreviewTheme = 'light' | 'dark';
+export type CmsTranslationLayout = 'single' | 'sideBySide';
 
 @Injectable({ providedIn: 'root' })
 export class CmsEditorPrefsService {
@@ -14,6 +15,7 @@ export class CmsEditorPrefsService {
   previewLayout = signal<CmsPreviewLayout>('stacked');
   previewLang = signal<CmsPreviewLang>('en');
   previewTheme = signal<CmsPreviewTheme>('light');
+  translationLayout = signal<CmsTranslationLayout>('single');
 
   constructor(private auth: AuthService) {
     this.load();
@@ -41,6 +43,11 @@ export class CmsEditorPrefsService {
 
   setPreviewTheme(theme: CmsPreviewTheme): void {
     this.previewTheme.set(theme);
+    this.persist();
+  }
+
+  setTranslationLayout(layout: CmsTranslationLayout): void {
+    this.translationLayout.set(layout);
     this.persist();
   }
 
@@ -79,6 +86,10 @@ export class CmsEditorPrefsService {
       if (previewTheme === 'light' || previewTheme === 'dark') {
         this.previewTheme.set(previewTheme);
       }
+      const translationLayout = (parsed as any)?.translationLayout;
+      if (translationLayout === 'single' || translationLayout === 'sideBySide') {
+        this.translationLayout.set(translationLayout);
+      }
     } catch {
       // ignore
     }
@@ -94,7 +105,8 @@ export class CmsEditorPrefsService {
           previewDevice: this.previewDevice(),
           previewLayout: this.previewLayout(),
           previewLang: this.previewLang(),
-          previewTheme: this.previewTheme()
+          previewTheme: this.previewTheme(),
+          translationLayout: this.translationLayout()
         })
       );
     } catch {

@@ -4231,6 +4231,15 @@
         "simpleHint": "Simple mode hides SEO and scheduling.",
         "advancedHint": "Advanced mode shows SEO, scheduling, and extra controls."
       },
+      "translation": {
+        "layoutLabel": "Translation layout",
+        "layouts": {
+          "single": "Single",
+          "sideBySide": "Side-by-side"
+        },
+        "copyRoToEn": "Copy RO → EN",
+        "copyEnToRo": "Copy EN → RO"
+      },
       "preview": {
         "deviceLabel": "Preview size",
         "desktop": "Desktop",
