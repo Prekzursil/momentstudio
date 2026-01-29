@@ -2703,6 +2703,9 @@
           "productGridCollectionSlug": "Slug colecție",
           "productGridProductSlugs": "Slug-uri produse",
           "productGridProductSlugsHint": "Un slug pe linie (sau separat prin virgulă).",
+          "productGridProductSearch": "Caută produse",
+          "productGridProductSearchPlaceholder": "Caută după nume, SKU sau slug…",
+          "productGridProductSearchEmpty": "Nu am găsit produse.",
           "productGridLimit": "Limită",
           "formType": "Tip formular",
           "formTopic": "Subiect contact"
@@ -2733,7 +2736,8 @@
           "save": "Ordinea secțiunilor a fost salvată."
         },
         "errors": {
-          "save": "Nu am putut salva ordinea secțiunilor."
+          "save": "Nu am putut salva ordinea secțiunilor.",
+          "searchProducts": "Nu am putut căuta produse."
         }
       },
       "collections": {

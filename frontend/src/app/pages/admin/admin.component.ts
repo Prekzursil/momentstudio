@@ -48,6 +48,7 @@ import { catchError, map } from 'rxjs/operators';
 import { MarkdownService } from '../../core/markdown.service';
 import { AuthService } from '../../core/auth.service';
 import { appConfig } from '../../core/app-config';
+import { AdminProductListItem, AdminProductsService } from '../../core/admin-products.service';
 import { diffLines } from 'diff';
 import { formatIdentity } from '../../shared/user-identity';
 import { ContentRevisionsComponent } from './shared/content-revisions.component';
@@ -2080,7 +2081,11 @@ class CmsDraftManager<T> {
 			                                <input
 			                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
 			                                  [(ngModel)]="block.product_grid_category_slug"
+			                                  [attr.list]="'product-grid-category-slugs-' + block.key"
 			                                />
+			                                <datalist [id]="'product-grid-category-slugs-' + block.key">
+			                                  <option *ngFor="let cat of categories" [value]="cat.slug">{{ cat.name }}</option>
+			                                </datalist>
 			                              </label>
 
 			                              <label
@@ -2091,23 +2096,95 @@ class CmsDraftManager<T> {
 			                                <input
 			                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
 			                                  [(ngModel)]="block.product_grid_collection_slug"
+			                                  [attr.list]="'product-grid-collection-slugs-' + block.key"
 			                                />
+			                                <datalist [id]="'product-grid-collection-slugs-' + block.key">
+			                                  <option *ngFor="let col of featuredCollections" [value]="col.slug">{{ col.name }}</option>
+			                                </datalist>
 			                              </label>
 
-			                              <label
-			                                *ngIf="block.product_grid_source === 'products'"
-			                                class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200"
-			                              >
-			                                {{ 'adminUi.home.sections.fields.productGridProductSlugs' | translate }}
-			                                <textarea
-			                                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-			                                  rows="4"
-			                                  [(ngModel)]="block.product_grid_product_slugs"
-			                                ></textarea>
-			                                <span class="text-xs text-slate-500 dark:text-slate-400">
-			                                  {{ 'adminUi.home.sections.fields.productGridProductSlugsHint' | translate }}
-			                                </span>
-			                              </label>
+			                              <div *ngIf="block.product_grid_source === 'products'" class="grid gap-2">
+			                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                                  {{ 'adminUi.home.sections.fields.productGridProductSlugs' | translate }}
+			                                  <textarea
+			                                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                    rows="4"
+			                                    [(ngModel)]="block.product_grid_product_slugs"
+			                                  ></textarea>
+			                                  <span class="text-xs text-slate-500 dark:text-slate-400">
+			                                    {{ 'adminUi.home.sections.fields.productGridProductSlugsHint' | translate }}
+			                                  </span>
+			                                </label>
+
+			                                <div class="grid gap-2 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+			                                  <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+			                                    {{ 'adminUi.home.sections.fields.productGridProductSearch' | translate }}
+			                                  </p>
+			                                  <div class="flex flex-wrap items-center gap-2">
+			                                    <input
+			                                      class="h-10 flex-1 min-w-[220px] rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                      [(ngModel)]="productGridProductSearchQuery[block.key]"
+			                                      (ngModelChange)="queueProductGridProductSearch(block.key, $event)"
+			                                      [placeholder]="'adminUi.home.sections.fields.productGridProductSearchPlaceholder' | translate"
+			                                    />
+			                                    <app-button
+			                                      size="sm"
+			                                      variant="ghost"
+			                                      [disabled]="productGridProductSearchLoading[block.key]"
+			                                      [label]="'adminUi.actions.search' | translate"
+			                                      (action)="searchProductGridProducts(block.key)"
+			                                    ></app-button>
+			                                  </div>
+			                                  <div *ngIf="productGridProductSearchLoading[block.key]" class="text-xs text-slate-500 dark:text-slate-400">
+			                                    {{ 'adminUi.common.loading' | translate }}
+			                                  </div>
+			                                  <div *ngIf="productGridProductSearchError[block.key]" class="text-xs text-rose-700 dark:text-rose-300">
+			                                    {{ productGridProductSearchError[block.key] }}
+			                                  </div>
+			                                  <div
+			                                    *ngIf="productGridProductSearchResults[block.key]?.length; else productGridSearchEmptyTpl"
+			                                    class="grid gap-2"
+			                                  >
+			                                    <div
+			                                      *ngFor="let item of productGridProductSearchResults[block.key]"
+			                                      class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs dark:border-slate-800 dark:bg-slate-950/30"
+			                                    >
+			                                      <div class="min-w-0">
+			                                        <p class="font-semibold truncate text-slate-900 dark:text-slate-50">{{ item.name }}</p>
+			                                        <p class="truncate text-slate-500 dark:text-slate-400">{{ item.sku }} — {{ item.slug }}</p>
+			                                      </div>
+			                                      <app-button
+			                                        size="sm"
+			                                        variant="ghost"
+			                                        [label]="'adminUi.actions.add' | translate"
+			                                        (action)="addProductGridProductSlug(block, item.slug)"
+			                                      ></app-button>
+			                                    </div>
+			                                  </div>
+			                                  <ng-template #productGridSearchEmptyTpl>
+			                                    <div
+			                                      *ngIf="(productGridProductSearchQuery[block.key] || '').trim()"
+			                                      class="text-xs text-slate-500 dark:text-slate-400"
+			                                    >
+			                                      {{ 'adminUi.home.sections.fields.productGridProductSearchEmpty' | translate }}
+			                                    </div>
+			                                  </ng-template>
+			                                </div>
+
+			                                <ng-container *ngIf="productGridSelectedSlugs(block) as slugs">
+			                                  <div *ngIf="slugs.length" class="flex flex-wrap gap-2">
+			                                    <button
+			                                      type="button"
+			                                      *ngFor="let slug of slugs"
+			                                      class="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+			                                      (click)="removeProductGridProductSlug(block, slug)"
+			                                    >
+			                                      <span class="truncate max-w-[160px]">{{ slug }}</span>
+			                                      <span class="text-slate-400 dark:text-slate-500">×</span>
+			                                    </button>
+			                                  </div>
+			                                </ng-container>
+			                              </div>
 
 			                              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
 			                                {{ 'adminUi.home.sections.fields.productGridLimit' | translate }}
@@ -6872,6 +6949,12 @@ export class AdminComponent implements OnInit, OnDestroy {
   homeInsertDragActive = false;
   sectionsMessage = '';
 
+  productGridProductSearchQuery: Record<string, string> = {};
+  productGridProductSearchResults: Record<string, AdminProductListItem[]> = {};
+  productGridProductSearchLoading: Record<string, boolean> = {};
+  productGridProductSearchError: Record<string, string | null> = {};
+  private productGridProductSearchTimers: Record<string, number> = {};
+
   featuredCollections: FeaturedCollection[] = [];
   collectionForm: { name: string; description?: string | null; product_ids: string[] } = {
     name: '',
@@ -7268,6 +7351,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   constructor(
     private route: ActivatedRoute,
     private admin: AdminService,
+    private adminProducts: AdminProductsService,
     private blog: BlogService,
     private fxAdmin: FxAdminService,
     private taxesAdmin: TaxesAdminService,
@@ -7764,6 +7848,8 @@ export class AdminComponent implements OnInit, OnDestroy {
 
     if (section === 'pages') {
       this.loadInfo();
+      this.loadCategories();
+      this.loadCollections();
       this.loadContentPages();
       this.loadReusableBlocks();
       this.loadPageBlocks(this.pageBlocksKey);
@@ -7791,14 +7877,7 @@ export class AdminComponent implements OnInit, OnDestroy {
       },
       error: () => this.toast.error(this.t('adminUi.audit.errors.loadTitle'), this.t('adminUi.audit.errors.loadCopy'))
     });
-    this.admin.getCategories().subscribe({
-      next: (cats) => {
-        this.categories = cats
-          .map((c) => ({ ...c, sort_order: c.sort_order ?? 0 }))
-          .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-      },
-      error: () => (this.categories = [])
-    });
+    this.loadCategories();
     this.loadTaxGroups();
     this.loadAssets();
     this.loadSocial();
@@ -13251,6 +13330,87 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
+  private parseProductGridSlugs(raw: string): string[] {
+    const unique: string[] = [];
+    for (const part of (raw || '').split(/[,\n]/g)) {
+      const slug = part.trim();
+      if (!slug) continue;
+      if (unique.includes(slug)) continue;
+      unique.push(slug);
+      if (unique.length >= 50) break;
+    }
+    return unique;
+  }
+
+  productGridSelectedSlugs(block: { product_grid_product_slugs: string }): string[] {
+    return this.parseProductGridSlugs(block?.product_grid_product_slugs || '');
+  }
+
+  addProductGridProductSlug(block: { product_grid_product_slugs: string }, slug: string): void {
+    const cleaned = (slug || '').trim();
+    if (!cleaned) return;
+    const slugs = this.parseProductGridSlugs(block?.product_grid_product_slugs || '');
+    if (slugs.includes(cleaned)) return;
+    slugs.push(cleaned);
+    block.product_grid_product_slugs = slugs.join('\n');
+  }
+
+  removeProductGridProductSlug(block: { product_grid_product_slugs: string }, slug: string): void {
+    const cleaned = (slug || '').trim();
+    if (!cleaned) return;
+    const slugs = this.parseProductGridSlugs(block?.product_grid_product_slugs || '');
+    const next = slugs.filter((s) => s !== cleaned);
+    block.product_grid_product_slugs = next.join('\n');
+  }
+
+  queueProductGridProductSearch(blockKey: string, query: string): void {
+    this.productGridProductSearchQuery[blockKey] = query;
+
+    const trimmed = (query || '').trim();
+    if (!trimmed) {
+      this.productGridProductSearchResults[blockKey] = [];
+      this.productGridProductSearchError[blockKey] = null;
+      this.productGridProductSearchLoading[blockKey] = false;
+      const existing = this.productGridProductSearchTimers[blockKey];
+      if (existing && typeof window !== 'undefined') {
+        window.clearTimeout(existing);
+      }
+      delete this.productGridProductSearchTimers[blockKey];
+      return;
+    }
+
+    if (typeof window === 'undefined') return;
+    const existing = this.productGridProductSearchTimers[blockKey];
+    if (existing) window.clearTimeout(existing);
+    this.productGridProductSearchTimers[blockKey] = window.setTimeout(() => {
+      this.searchProductGridProducts(blockKey);
+    }, 250);
+  }
+
+  searchProductGridProducts(blockKey: string): void {
+    const query = (this.productGridProductSearchQuery[blockKey] || '').trim();
+    if (!query) {
+      this.productGridProductSearchResults[blockKey] = [];
+      this.productGridProductSearchError[blockKey] = null;
+      this.productGridProductSearchLoading[blockKey] = false;
+      return;
+    }
+
+    this.productGridProductSearchLoading[blockKey] = true;
+    this.productGridProductSearchError[blockKey] = null;
+    this.adminProducts.search({ q: query, limit: 8, page: 1 }).subscribe({
+      next: (resp) => {
+        this.productGridProductSearchResults[blockKey] = resp?.items || [];
+        this.productGridProductSearchLoading[blockKey] = false;
+      },
+      error: () => {
+        this.productGridProductSearchResults[blockKey] = [];
+        this.productGridProductSearchLoading[blockKey] = false;
+        this.productGridProductSearchError[blockKey] = this.t('adminUi.home.sections.errors.searchProducts');
+      }
+    });
+  }
+
   addPageFaqItem(pageKey: PageBuilderKey, blockKey: string): void {
     this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
       if (b.key !== blockKey || b.type !== 'faq') return b;
@@ -14575,6 +14735,18 @@ export class AdminComponent implements OnInit, OnDestroy {
 	          this.sectionsMessage = errMsg;
         }
       }
+    });
+  }
+
+  // Categories
+  loadCategories(): void {
+    this.admin.getCategories().subscribe({
+      next: (cats) => {
+        this.categories = cats
+          .map((c) => ({ ...c, sort_order: c.sort_order ?? 0 }))
+          .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+      },
+      error: () => (this.categories = [])
     });
   }
 

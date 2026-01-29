@@ -2703,6 +2703,9 @@
           "productGridCollectionSlug": "Collection slug",
           "productGridProductSlugs": "Product slugs",
           "productGridProductSlugsHint": "One slug per line (or comma-separated).",
+          "productGridProductSearch": "Search products",
+          "productGridProductSearchPlaceholder": "Search by name, SKU, or slug…",
+          "productGridProductSearchEmpty": "No products found.",
           "productGridLimit": "Limit",
           "formType": "Form type",
           "formTopic": "Contact topic"
@@ -2733,7 +2736,8 @@
           "save": "Sections order saved."
         },
         "errors": {
-          "save": "Could not save sections order."
+          "save": "Could not save sections order.",
+          "searchProducts": "Could not search products."
         }
       },
       "collections": {
