@@ -165,6 +165,8 @@ class ContentImageRead(BaseModel):
 
 class ContentImageAssetRead(BaseModel):
     id: UUID
+    root_image_id: UUID | None = None
+    source_image_id: UUID | None = None
     url: str
     alt_text: str | None = None
     sort_order: int
@@ -220,6 +222,7 @@ class ContentImageEditRequest(BaseModel):
 class ContentImageAssetUsageResponse(BaseModel):
     image_id: UUID
     url: str
+    stored_in_key: str | None = None
     keys: list[str] = Field(default_factory=list)
 
 

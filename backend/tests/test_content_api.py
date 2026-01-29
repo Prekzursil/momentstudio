@@ -278,6 +278,8 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     first_img = data["items"][0]
     assert "focal_x" in first_img
     assert "focal_y" in first_img
+    assert first_img["root_image_id"] is None
+    assert first_img["source_image_id"] is None
 
     # Asset tags: set tags and filter by tag.
     tag_set = client.patch(
@@ -305,6 +307,8 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     assert edited.status_code == 201, edited.text
     edited_json = edited.json()
     assert edited_json["id"] != first_img["id"]
+    assert edited_json["root_image_id"] == first_img["id"]
+    assert edited_json["source_image_id"] == first_img["id"]
     assert edited_json["content_key"] == "home.hero"
     assert set(edited_json["tags"]) == {"hero", "homepage"}
     assert edited_json["focal_x"] == 20
@@ -320,8 +324,9 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
         headers=auth_headers(admin_token),
     )
     assert usage.status_code == 200, usage.text
-    usage_keys = usage.json()["keys"]
-    assert "home.hero" in usage_keys
+    usage_json = usage.json()
+    assert usage_json["stored_in_key"] == "home.hero"
+    usage_keys = usage_json["keys"]
     assert "page.about" in usage_keys
 
     tagged = client.get(
@@ -339,6 +344,36 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     )
     assert assets_filtered.status_code == 200, assets_filtered.text
     assert all(item["content_key"] == "home.hero" for item in assets_filtered.json()["items"])
+
+    # Delete: blocked while used, then requires deleting edited versions first.
+    delete_used = client.delete(
+        f"/api/v1/content/admin/assets/images/{first_img['id']}",
+        headers=auth_headers(admin_token),
+    )
+    assert delete_used.status_code == 409, delete_used.text
+
+    client.patch(
+        "/api/v1/content/admin/page.about",
+        json={"title": "About", "body_markdown": "No usage", "status": "draft"},
+        headers=auth_headers(admin_token),
+    )
+    delete_with_versions = client.delete(
+        f"/api/v1/content/admin/assets/images/{first_img['id']}",
+        headers=auth_headers(admin_token),
+    )
+    assert delete_with_versions.status_code == 409, delete_with_versions.text
+
+    delete_edited = client.delete(
+        f"/api/v1/content/admin/assets/images/{edited_json['id']}",
+        headers=auth_headers(admin_token),
+    )
+    assert delete_edited.status_code == 204, delete_edited.text
+
+    delete_original = client.delete(
+        f"/api/v1/content/admin/assets/images/{first_img['id']}",
+        headers=auth_headers(admin_token),
+    )
+    assert delete_original.status_code == 204, delete_original.text
 
     # Audit log
     audit = client.get("/api/v1/content/admin/home.hero/audit", headers=auth_headers(admin_token))

@@ -638,6 +638,8 @@ export interface StructuredDataValidationResponse {
 
 export interface ContentImageAssetRead {
   id: string;
+  root_image_id?: string | null;
+  source_image_id?: string | null;
   url: string;
   alt_text?: string | null;
   sort_order: number;
@@ -664,6 +666,7 @@ export interface ContentImageEditRequest {
 export interface ContentImageAssetUsageResponse {
   image_id: string;
   url: string;
+  stored_in_key?: string | null;
   keys: string[];
 }
 
@@ -1190,6 +1193,10 @@ export class AdminService {
 
   getContentImageUsage(imageId: string): Observable<ContentImageAssetUsageResponse> {
     return this.api.get<ContentImageAssetUsageResponse>(`/content/admin/assets/images/${encodeURIComponent(imageId)}/usage`);
+  }
+
+  deleteContentImage(imageId: string): Observable<void> {
+    return this.api.delete<void>(`/content/admin/assets/images/${encodeURIComponent(imageId)}`);
   }
 
   linkCheckContent(key: string): Observable<ContentLinkCheckResponse> {

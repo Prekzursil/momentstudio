@@ -2344,6 +2344,7 @@
           "usageHint": "Click a key to filter the library to that scope.",
           "usageLoading": "Loading usage…",
           "usageEmpty": "No usage found.",
+          "usageStoredIn": "Stored in: {{key}}",
           "editorTitle": "Edit image",
           "editorHint": "Creates an edited copy. The original asset stays unchanged.",
           "editorCreate": "Create edited copy",
@@ -2368,18 +2369,26 @@
           "loading": "Loading assets…",
           "empty": "No images found.",
           "pagination": "Page {{page}} of {{total}}",
+          "editedBadge": "Edited",
+          "versionsTitle": "Edited versions ({{count}})",
+          "revertToOriginal": "Original",
+          "confirmDelete": "Delete this asset? This cannot be undone.",
           "success": {
             "uploaded": "Uploaded.",
             "copied": "Copied to clipboard.",
             "selected": "Selected.",
-            "edited": "Edited copy created."
+            "edited": "Edited copy created.",
+            "deleted": "Deleted."
           },
           "errors": {
             "load": "Could not load assets.",
             "upload": "Could not upload image.",
             "copy": "Could not copy to clipboard.",
             "usage": "Could not load usage references.",
-            "edit": "Could not create edited copy."
+            "edit": "Could not create edited copy.",
+            "delete": "Could not delete asset.",
+            "deleteHasVersions": "Delete edited versions first.",
+            "deleteInUse": "Cannot delete: asset is used."
           }
         }
       },

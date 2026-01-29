@@ -658,8 +658,11 @@ async def edit_image_asset(
     next_sort = (
         await session.scalar(select(func.max(ContentImage.sort_order)).where(ContentImage.content_block_id == block.id))
     ) or 0
+    root_image_id = getattr(image, "root_image_id", None) or image.id
     new_image = ContentImage(
         content_block_id=block.id,
+        root_image_id=root_image_id,
+        source_image_id=image.id,
         url=new_url,
         alt_text=image.alt_text,
         sort_order=int(next_sort) + 1,
@@ -683,6 +686,76 @@ async def edit_image_asset(
     )
     await session.commit()
     return new_image
+
+
+async def get_asset_usage_keys(session: AsyncSession, *, url: str) -> list[str]:
+    needle = (url or "").strip()
+    if not needle:
+        return []
+
+    like = f"%{needle}%"
+    rows = await session.execute(
+        select(ContentBlock.key)
+        .distinct()
+        .select_from(ContentBlock)
+        .outerjoin(ContentBlockTranslation, ContentBlockTranslation.content_block_id == ContentBlock.id)
+        .where(
+            or_(
+                ContentBlock.body_markdown.ilike(like),
+                cast(ContentBlock.meta, String).ilike(like),
+                ContentBlockTranslation.body_markdown.ilike(like),
+            )
+        )
+    )
+    return sorted({row[0] for row in rows.all() if row and row[0]})
+
+
+async def delete_image_asset(
+    session: AsyncSession,
+    *,
+    image: ContentImage,
+    actor_id: UUID | None = None,
+) -> None:
+    image_id = getattr(image, "id", None)
+    if not image_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+
+    child_id = await session.scalar(
+        select(ContentImage.id)
+        .where(or_(ContentImage.root_image_id == image_id, ContentImage.source_image_id == image_id))
+        .limit(1)
+    )
+    if child_id:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Image has edited versions")
+
+    url = (getattr(image, "url", None) or "").strip()
+    if url:
+        shared = await session.scalar(
+            select(func.count()).select_from(ContentImage).where(ContentImage.url == url, ContentImage.id != image_id)
+        )
+        if int(shared or 0) > 0:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Image file is shared by other assets")
+
+        keys = await get_asset_usage_keys(session, url=url)
+        if keys:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Image is used")
+
+    block = await session.scalar(select(ContentBlock).where(ContentBlock.id == image.content_block_id))
+    if not block:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+
+    await session.delete(image)
+    await audit_chain_service.add_content_audit_log(
+        session,
+        content_block_id=block.id,
+        action="image_delete",
+        version=block.version,
+        user_id=actor_id,
+    )
+    await session.commit()
+
+    if url:
+        storage.delete_file(url)
 
 
 async def set_translation_status(

@@ -2344,6 +2344,7 @@
           "usageHint": "Apasă pe o cheie pentru a filtra biblioteca la acel scope.",
           "usageLoading": "Se încarcă utilizările…",
           "usageEmpty": "Nu s-au găsit utilizări.",
+          "usageStoredIn": "Stocată în: {{key}}",
           "editorTitle": "Editează imaginea",
           "editorHint": "Creează o copie editată. Imaginea originală rămâne neschimbată.",
           "editorCreate": "Creează copie editată",
@@ -2368,18 +2369,26 @@
           "loading": "Se încarcă imaginile…",
           "empty": "Nu există imagini.",
           "pagination": "Pagina {{page}} din {{total}}",
+          "editedBadge": "Editată",
+          "versionsTitle": "Versiuni editate ({{count}})",
+          "revertToOriginal": "Original",
+          "confirmDelete": "Ștergi această imagine? Acțiunea nu poate fi anulată.",
           "success": {
             "uploaded": "Încărcată.",
             "copied": "Copiat în clipboard.",
             "selected": "Selectată.",
-            "edited": "Copia editată a fost creată."
+            "edited": "Copia editată a fost creată.",
+            "deleted": "Ștearsă."
           },
           "errors": {
             "load": "Nu am putut încărca imaginile.",
             "upload": "Nu am putut încărca imaginea.",
             "copy": "Nu am putut copia în clipboard.",
             "usage": "Nu am putut încărca referințele de utilizare.",
-            "edit": "Nu am putut crea copia editată."
+            "edit": "Nu am putut crea copia editată.",
+            "delete": "Nu am putut șterge imaginea.",
+            "deleteHasVersions": "Șterge mai întâi versiunile editate.",
+            "deleteInUse": "Nu poate fi ștearsă: imaginea este utilizată."
           }
         }
       },

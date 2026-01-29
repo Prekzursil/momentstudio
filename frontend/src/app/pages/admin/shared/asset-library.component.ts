@@ -1,11 +1,18 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges, signal } from '@angular/core';
+import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges, computed, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AdminService, ContentImageAssetRead, ContentImageEditRequest } from '../../../core/admin.service';
 import { ToastService } from '../../../core/toast.service';
 import { ErrorStateComponent } from '../../../shared/error-state.component';
 import { extractRequestId } from '../../../shared/http-error';
+
+type AssetGroup = {
+  primary: ContentImageAssetRead;
+  original: ContentImageAssetRead | null;
+  edits: ContentImageAssetRead[];
+  latestAt: number;
+};
 
 @Component({
   selector: 'app-asset-library',
@@ -83,61 +90,144 @@ import { extractRequestId } from '../../../shared/http-error';
 
       <div *ngIf="loading()" class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.site.assets.library.loading' | translate }}</div>
 
-      <div *ngIf="!loading() && !error() && images().length === 0" class="text-sm text-slate-500 dark:text-slate-400">
+      <div *ngIf="!loading() && !error() && assetGroups().length === 0" class="text-sm text-slate-500 dark:text-slate-400">
         {{ 'adminUi.site.assets.library.empty' | translate }}
       </div>
 
-      <div *ngIf="!loading() && images().length" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <div *ngFor="let img of images()" class="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-	          <div class="flex items-center justify-between gap-3">
-	            <img
-	              [src]="img.url"
-	              [alt]="img.alt_text || 'asset'"
-	              class="h-16 w-16 rounded-lg border border-slate-200 object-cover dark:border-slate-800"
-	              loading="lazy"
-		            />
-		            <div class="flex items-center gap-2">
-		              <button type="button" class="text-xs text-indigo-600 hover:underline dark:text-indigo-300" (click)="copy(img.url)">
-		                {{ 'adminUi.actions.copy' | translate }}
-		              </button>
-		              <button type="button" class="text-xs text-slate-700 hover:underline dark:text-slate-200" (click)="openImageEditor(img)">
-		                {{ 'adminUi.site.assets.library.imageEdit' | translate }}
-		              </button>
-		              <button type="button" class="text-xs text-slate-700 hover:underline dark:text-slate-200" (click)="openUsage(img)">
-		                {{ 'adminUi.site.assets.library.whereUsed' | translate }}
-		              </button>
-		              <button type="button" class="text-xs text-slate-700 hover:underline dark:text-slate-200" (click)="editTags(img)">
-		                {{ 'adminUi.site.assets.library.tagsEdit' | translate }}
-		              </button>
-		              <button type="button" class="text-xs text-slate-700 hover:underline dark:text-slate-200" (click)="openFocalEditor(img)">
-		                {{ 'adminUi.site.assets.library.focalEdit' | translate }}
-		              </button>
-		              <button
-		                *ngIf="allowSelect"
-	                type="button"
-	                class="text-xs text-emerald-700 hover:underline dark:text-emerald-300"
-	                (click)="useAsset(img)"
-	              >
-	                {{ 'adminUi.actions.use' | translate }}
-	              </button>
-	            </div>
-	          </div>
-          <p class="mt-2 text-xs text-slate-600 dark:text-slate-300 truncate">{{ img.url }}</p>
-	          <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-	            {{ img.content_key }} · {{ img.created_at | date: 'short' }}
-	          </p>
-	          <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-	            {{ 'adminUi.site.assets.library.focalLabel' | translate: { x: img.focal_x, y: img.focal_y } }}
-	          </p>
-	          <div *ngIf="img.tags?.length" class="mt-2 flex flex-wrap gap-1">
+      <div *ngIf="!loading() && assetGroups().length" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div
+          *ngFor="let group of assetGroups()"
+          class="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+        >
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+              <img
+                [src]="group.primary.url"
+                [alt]="group.primary.alt_text || 'asset'"
+                class="h-16 w-16 rounded-lg border border-slate-200 object-cover dark:border-slate-800"
+                loading="lazy"
+              />
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                  <p class="text-xs font-semibold text-slate-900 dark:text-slate-50 truncate">{{ group.primary.content_key }}</p>
+                  <span
+                    *ngIf="group.primary.root_image_id"
+                    class="rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-200"
+                  >
+                    {{ 'adminUi.site.assets.library.editedBadge' | translate }}
+                  </span>
+                </div>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                  {{ group.primary.url }}
+                </p>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-end gap-2">
+              <button type="button" class="text-xs text-indigo-600 hover:underline dark:text-indigo-300" (click)="copy(group.primary.url)">
+                {{ 'adminUi.actions.copy' | translate }}
+              </button>
+              <button type="button" class="text-xs text-slate-700 hover:underline dark:text-slate-200" (click)="openImageEditor(group.primary)">
+                {{ 'adminUi.site.assets.library.imageEdit' | translate }}
+              </button>
+              <button type="button" class="text-xs text-slate-700 hover:underline dark:text-slate-200" (click)="openUsage(group.primary)">
+                {{ 'adminUi.site.assets.library.whereUsed' | translate }}
+              </button>
+              <button type="button" class="text-xs text-slate-700 hover:underline dark:text-slate-200" (click)="editTags(group.primary)">
+                {{ 'adminUi.site.assets.library.tagsEdit' | translate }}
+              </button>
+              <button type="button" class="text-xs text-slate-700 hover:underline dark:text-slate-200" (click)="openFocalEditor(group.primary)">
+                {{ 'adminUi.site.assets.library.focalEdit' | translate }}
+              </button>
+              <button
+                type="button"
+                class="text-xs text-rose-700 hover:underline dark:text-rose-300"
+                (click)="deleteAsset(group.primary, !group.primary.root_image_id && group.edits.length > 0)"
+              >
+                {{ 'adminUi.actions.delete' | translate }}
+              </button>
+              <button
+                *ngIf="allowSelect"
+                type="button"
+                class="text-xs text-emerald-700 hover:underline dark:text-emerald-300"
+                (click)="useAsset(group.primary)"
+              >
+                {{ 'adminUi.actions.use' | translate }}
+              </button>
+            </div>
+          </div>
+
+          <p class="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+            {{ group.primary.created_at | date: 'short' }} · {{ 'adminUi.site.assets.library.focalLabel' | translate: { x: group.primary.focal_x, y: group.primary.focal_y } }}
+          </p>
+
+          <div *ngIf="group.primary.tags?.length" class="mt-2 flex flex-wrap gap-1">
             <button
-              *ngFor="let t of img.tags"
+              *ngFor="let t of group.primary.tags"
               type="button"
               class="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-200 dark:hover:bg-slate-800"
               (click)="applyTagFilter(t)"
             >
               {{ t }}
             </button>
+          </div>
+
+          <div *ngIf="group.edits.length" class="mt-3 border-t border-slate-200 pt-3 dark:border-slate-800">
+            <p class="text-xs font-semibold text-slate-900 dark:text-slate-50">
+              {{ 'adminUi.site.assets.library.versionsTitle' | translate: { count: group.edits.length } }}
+            </p>
+            <div class="mt-2 grid gap-2">
+              <div
+                *ngFor="let edited of group.edits"
+                class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2 dark:border-slate-800 dark:bg-slate-950/30"
+              >
+                <div class="flex items-center gap-2 min-w-0">
+                  <img
+                    [src]="edited.url"
+                    [alt]="edited.alt_text || 'asset'"
+                    class="h-12 w-12 rounded-lg border border-slate-200 object-cover dark:border-slate-800"
+                    loading="lazy"
+                  />
+                  <div class="min-w-0">
+                    <p class="text-[11px] font-semibold text-slate-800 dark:text-slate-100">
+                      {{ edited.created_at | date: 'short' }}
+                    </p>
+                    <p class="text-[11px] text-slate-500 dark:text-slate-400 truncate">{{ edited.url }}</p>
+                  </div>
+                </div>
+
+                <div class="flex flex-wrap items-center justify-end gap-2">
+                  <button type="button" class="text-xs text-indigo-600 hover:underline dark:text-indigo-300" (click)="copy(edited.url)">
+                    {{ 'adminUi.actions.copy' | translate }}
+                  </button>
+                  <button type="button" class="text-xs text-slate-700 hover:underline dark:text-slate-200" (click)="openImageEditor(edited)">
+                    {{ 'adminUi.site.assets.library.imageEdit' | translate }}
+                  </button>
+                  <button type="button" class="text-xs text-slate-700 hover:underline dark:text-slate-200" (click)="openUsage(edited)">
+                    {{ 'adminUi.site.assets.library.whereUsed' | translate }}
+                  </button>
+                  <button
+                    *ngIf="group.original"
+                    type="button"
+                    class="text-xs text-slate-700 hover:underline dark:text-slate-200"
+                    (click)="copy(group.original.url)"
+                  >
+                    {{ 'adminUi.site.assets.library.revertToOriginal' | translate }}
+                  </button>
+                  <button type="button" class="text-xs text-rose-700 hover:underline dark:text-rose-300" (click)="deleteAsset(edited)">
+                    {{ 'adminUi.actions.delete' | translate }}
+                  </button>
+                  <button
+                    *ngIf="allowSelect"
+                    type="button"
+                    class="text-xs text-emerald-700 hover:underline dark:text-emerald-300"
+                    (click)="useAsset(edited)"
+                  >
+                    {{ 'adminUi.actions.use' | translate }}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -164,17 +254,20 @@ import { extractRequestId } from '../../../shared/http-error';
 
 	      <div *ngIf="usageImage" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
 	        <div class="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-950">
-	          <div class="flex items-start justify-between gap-3">
-	            <div class="grid gap-1">
-	              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-	                {{ 'adminUi.site.assets.library.usageTitle' | translate }}
-	              </p>
-	              <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ usageImage?.url }}</p>
-	            </div>
-	            <button type="button" class="text-xs font-semibold text-slate-700 hover:underline dark:text-slate-200" (click)="closeUsage()">
-	              {{ 'adminUi.common.close' | translate }}
-	            </button>
-	          </div>
+		          <div class="flex items-start justify-between gap-3">
+		            <div class="grid gap-1">
+		              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+		                {{ 'adminUi.site.assets.library.usageTitle' | translate }}
+		              </p>
+		              <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ usageImage?.url }}</p>
+                  <p *ngIf="usageStoredInKey()" class="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                    {{ 'adminUi.site.assets.library.usageStoredIn' | translate: { key: usageStoredInKey() } }}
+                  </p>
+		            </div>
+		            <button type="button" class="text-xs font-semibold text-slate-700 hover:underline dark:text-slate-200" (click)="closeUsage()">
+		              {{ 'adminUi.common.close' | translate }}
+		            </button>
+		          </div>
 
 	          <div class="mt-3 grid gap-2">
 	            <app-error-state
@@ -448,16 +541,18 @@ export class AssetLibraryComponent implements OnInit, OnChanges {
   limit = 24;
 
   loading = signal(false);
-  error = signal<string | null>(null);
-  errorRequestId = signal<string | null>(null);
-  images = signal<ContentImageAssetRead[]>([]);
-  private totalPages = signal(1);
+	  error = signal<string | null>(null);
+	  errorRequestId = signal<string | null>(null);
+	  images = signal<ContentImageAssetRead[]>([]);
+	  assetGroups = computed<AssetGroup[]>(() => this.buildAssetGroups(this.images()));
+	  private totalPages = signal(1);
 
-  usageImage: ContentImageAssetRead | null = null;
-  usageLoading = signal(false);
-  usageError = signal<string | null>(null);
-  usageRequestId = signal<string | null>(null);
-  usageKeys = signal<string[]>([]);
+	  usageImage: ContentImageAssetRead | null = null;
+	  usageLoading = signal(false);
+	  usageError = signal<string | null>(null);
+	  usageRequestId = signal<string | null>(null);
+	  usageKeys = signal<string[]>([]);
+	  usageStoredInKey = signal<string | null>(null);
 
   focalImage: ContentImageAssetRead | null = null;
   focalDraftX = 50;
@@ -583,43 +678,81 @@ export class AssetLibraryComponent implements OnInit, OnChanges {
     });
   }
 
-  openUsage(img: ContentImageAssetRead): void {
-    const id = (img?.id || '').trim();
-    if (!id) return;
-    this.usageImage = img;
-    this.focalImage = null;
-    this.editImage = null;
-    this.loadUsage();
-  }
+	  openUsage(img: ContentImageAssetRead): void {
+	    const id = (img?.id || '').trim();
+	    if (!id) return;
+	    this.usageImage = img;
+	    this.focalImage = null;
+	    this.editImage = null;
+	    this.usageStoredInKey.set(null);
+	    this.loadUsage();
+	  }
 
-  loadUsage(): void {
-    const img = this.usageImage;
-    const id = (img?.id || '').trim();
-    if (!id) return;
-    this.usageLoading.set(true);
-    this.usageError.set(null);
-    this.usageRequestId.set(null);
-    this.usageKeys.set([]);
-    this.admin.getContentImageUsage(id).subscribe({
-      next: (resp) => {
-        this.usageKeys.set((resp?.keys || []).filter(Boolean));
-        this.usageLoading.set(false);
-      },
-      error: (err) => {
-        this.usageError.set(this.t('adminUi.site.assets.library.errors.usage'));
-        this.usageRequestId.set(extractRequestId(err));
+	  deleteAsset(img: ContentImageAssetRead, hasEditedVersions: boolean = false): void {
+	    const id = (img?.id || '').trim();
+	    if (!id) return;
+
+	    if (hasEditedVersions) {
+	      this.toast.error(this.t('adminUi.site.assets.library.errors.deleteHasVersions'));
+	      return;
+	    }
+
+	    this.admin.getContentImageUsage(id).subscribe({
+	      next: (resp) => {
+	        const keys = (resp?.keys || []).filter(Boolean);
+	        if (keys.length) {
+	          this.toast.error(this.t('adminUi.site.assets.library.errors.deleteInUse'));
+	          this.openUsage(img);
+	          return;
+	        }
+	        const confirmed = window.confirm(this.t('adminUi.site.assets.library.confirmDelete'));
+	        if (!confirmed) return;
+	        this.admin.deleteContentImage(id).subscribe({
+	          next: () => {
+	            this.toast.success(this.t('adminUi.site.assets.library.success.deleted'));
+	            this.page = 1;
+	            this.reload();
+	          },
+	          error: () => this.toast.error(this.t('adminUi.site.assets.library.errors.delete'))
+	        });
+	      },
+	      error: () => {
+	        this.toast.error(this.t('adminUi.site.assets.library.errors.usage'));
+	      }
+	    });
+	  }
+
+	  loadUsage(): void {
+	    const img = this.usageImage;
+	    const id = (img?.id || '').trim();
+	    if (!id) return;
+	    this.usageLoading.set(true);
+	    this.usageError.set(null);
+	    this.usageRequestId.set(null);
+	    this.usageKeys.set([]);
+	    this.usageStoredInKey.set(null);
+	    this.admin.getContentImageUsage(id).subscribe({
+	      next: (resp) => {
+	        this.usageKeys.set((resp?.keys || []).filter(Boolean));
+	        this.usageStoredInKey.set((resp?.stored_in_key || '').trim() || null);
+	        this.usageLoading.set(false);
+	      },
+	      error: (err) => {
+	        this.usageError.set(this.t('adminUi.site.assets.library.errors.usage'));
+	        this.usageRequestId.set(extractRequestId(err));
         this.usageLoading.set(false);
       }
     });
   }
 
-  closeUsage(): void {
-    this.usageImage = null;
-    this.usageLoading.set(false);
-    this.usageError.set(null);
-    this.usageRequestId.set(null);
-    this.usageKeys.set([]);
-  }
+	  closeUsage(): void {
+	    this.usageImage = null;
+	    this.usageLoading.set(false);
+	    this.usageError.set(null);
+	    this.usageRequestId.set(null);
+	    this.usageKeys.set([]);
+	    this.usageStoredInKey.set(null);
+	  }
 
   jumpToKey(key: string): void {
     const value = (key || '').trim();
@@ -762,6 +895,49 @@ export class AssetLibraryComponent implements OnInit, OnChanges {
         this.editSaving.set(false);
       }
     });
+  }
+
+  private buildAssetGroups(items: ContentImageAssetRead[]): AssetGroup[] {
+    const images = items || [];
+    const grouped = new Map<string, { original: ContentImageAssetRead | null; edits: ContentImageAssetRead[]; latestAt: number }>();
+
+    for (const img of images) {
+      const groupId = (img.root_image_id || img.id || '').trim();
+      if (!groupId) continue;
+
+      const entry = grouped.get(groupId) || { original: null, edits: [], latestAt: 0 };
+      entry.latestAt = Math.max(entry.latestAt, this.createdAtMs(img.created_at));
+
+      if ((img.root_image_id || '').trim()) {
+        entry.edits.push(img);
+      } else {
+        entry.original = img;
+      }
+      grouped.set(groupId, entry);
+    }
+
+    const groups: AssetGroup[] = [];
+    for (const entry of grouped.values()) {
+      const editsSorted = entry.edits
+        .slice()
+        .sort((a, b) => this.createdAtMs(b.created_at) - this.createdAtMs(a.created_at));
+      const primary = entry.original || editsSorted[0];
+      if (!primary) continue;
+      groups.push({
+        primary,
+        original: entry.original,
+        edits: editsSorted.filter((img) => img.id !== primary.id),
+        latestAt: entry.latestAt
+      });
+    }
+
+    groups.sort((a, b) => b.latestAt - a.latestAt);
+    return groups;
+  }
+
+  private createdAtMs(value: string | undefined | null): number {
+    const ts = Date.parse(value || '');
+    return Number.isFinite(ts) ? ts : 0;
   }
 
   useAsset(img: ContentImageAssetRead): void {

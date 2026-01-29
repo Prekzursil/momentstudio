@@ -659,6 +659,8 @@ async def admin_list_content_images(
         items.append(
             ContentImageAssetRead(
                 id=img.id,
+                root_image_id=getattr(img, "root_image_id", None),
+                source_image_id=getattr(img, "source_image_id", None),
                 url=img.url,
                 alt_text=img.alt_text,
                 sort_order=img.sort_order,
@@ -712,6 +714,8 @@ async def admin_update_content_image_tags(
 
     return ContentImageAssetRead(
         id=image.id,
+        root_image_id=getattr(image, "root_image_id", None),
+        source_image_id=getattr(image, "source_image_id", None),
         url=image.url,
         alt_text=image.alt_text,
         sort_order=image.sort_order,
@@ -750,6 +754,8 @@ async def admin_update_content_image_focal_point(
 
     return ContentImageAssetRead(
         id=image.id,
+        root_image_id=getattr(image, "root_image_id", None),
+        source_image_id=getattr(image, "source_image_id", None),
         url=image.url,
         alt_text=image.alt_text,
         sort_order=image.sort_order,
@@ -785,6 +791,8 @@ async def admin_edit_content_image(
 
     return ContentImageAssetRead(
         id=edited.id,
+        root_image_id=getattr(edited, "root_image_id", None),
+        source_image_id=getattr(edited, "source_image_id", None),
         url=edited.url,
         alt_text=edited.alt_text,
         sort_order=edited.sort_order,
@@ -811,28 +819,28 @@ async def admin_get_content_image_usage(
         content_key = (await session.scalar(select(ContentBlock.key).where(ContentBlock.id == image.content_block_id))) or ""
 
     url = (getattr(image, "url", None) or "").strip()
-    needle = f"%{url}%"
-    keys: set[str] = set()
-    if content_key:
-        keys.add(content_key)
+    keys = await content_service.get_asset_usage_keys(session, url=url)
 
-    if url:
-        rows = await session.execute(
-            select(ContentBlock.key)
-            .distinct()
-            .select_from(ContentBlock)
-            .outerjoin(ContentBlockTranslation, ContentBlockTranslation.content_block_id == ContentBlock.id)
-            .where(
-                or_(
-                    ContentBlock.body_markdown.ilike(needle),
-                    cast(ContentBlock.meta, String).ilike(needle),
-                    ContentBlockTranslation.body_markdown.ilike(needle),
-                )
-            )
-        )
-        keys.update([row[0] for row in rows.all() if row and row[0]])
+    return ContentImageAssetUsageResponse(
+        image_id=image.id,
+        url=url,
+        stored_in_key=content_key or None,
+        keys=keys,
+    )
 
-    return ContentImageAssetUsageResponse(image_id=image.id, url=url, keys=sorted(keys))
+
+@router.delete("/admin/assets/images/{image_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def admin_delete_content_image(
+    image_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> Response:
+    image = await session.scalar(select(ContentImage).where(ContentImage.id == image_id))
+    if not image:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+
+    await content_service.delete_image_asset(session, image=image, actor_id=admin.id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/admin/tools/link-check", response_model=ContentLinkCheckResponse)
