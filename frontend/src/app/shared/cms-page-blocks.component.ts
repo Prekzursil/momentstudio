@@ -38,14 +38,12 @@ import {
                 <div class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="b.body_html"></div>
                 <div class="flex" *ngIf="b.cta_label && b.cta_url">
                   <ng-container *ngIf="isExternalHttpUrl(b.cta_url); else internalCta">
-                    <a
-                      class="inline-flex items-center justify-center rounded-full font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 bg-slate-900 text-white hover:bg-slate-800 focus-visible:outline-slate-900 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white px-4 py-2.5 text-sm"
+                    <app-button
+                      [label]="b.cta_label"
                       [href]="b.cta_url"
-                      [attr.target]="b.cta_new_tab ? '_blank' : null"
-                      [attr.rel]="b.cta_new_tab ? 'noopener noreferrer' : null"
-                    >
-                      {{ b.cta_label }}
-                    </a>
+                      [target]="b.cta_new_tab ? '_blank' : null"
+                      [rel]="b.cta_new_tab ? 'noopener noreferrer' : null"
+                    ></app-button>
                   </ng-container>
                   <ng-template #internalCta>
                     <app-button [label]="b.cta_label" [routerLink]="b.cta_url"></app-button>

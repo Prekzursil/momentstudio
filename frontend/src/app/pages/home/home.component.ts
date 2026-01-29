@@ -438,14 +438,12 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
                   <div class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="cta.body_html"></div>
                   <div class="mt-4 flex" *ngIf="cta.cta_label && cta.cta_url">
                     <ng-container *ngIf="isExternalHttpUrl(cta.cta_url); else internalCta">
-                      <a
-                        class="inline-flex items-center justify-center rounded-full font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 bg-slate-900 text-white hover:bg-slate-800 focus-visible:outline-slate-900 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white px-4 py-2.5 text-sm"
+                      <app-button
+                        [label]="cta.cta_label"
                         [href]="cta.cta_url"
-                        [attr.target]="cta.cta_new_tab ? '_blank' : null"
-                        [attr.rel]="cta.cta_new_tab ? 'noopener noreferrer' : null"
-                      >
-                        {{ cta.cta_label }}
-                      </a>
+                        [target]="cta.cta_new_tab ? '_blank' : null"
+                        [rel]="cta.cta_new_tab ? 'noopener noreferrer' : null"
+                      ></app-button>
                     </ng-container>
                     <ng-template #internalCta>
                       <app-button [label]="cta.cta_label" [routerLink]="cta.cta_url"></app-button>
