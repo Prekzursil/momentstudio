@@ -11,6 +11,7 @@ export interface ContactSubmissionCreate {
   email: string;
   message: string;
   order_reference?: string | null;
+  captcha_token?: string | null;
 }
 
 export interface ContactSubmissionRead {
@@ -34,4 +35,3 @@ export class SupportService {
     return this.api.post<ContactSubmissionRead>('/support/contact', payload);
   }
 }
-

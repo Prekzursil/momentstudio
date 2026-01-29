@@ -26,6 +26,7 @@ class ContactSubmissionCreate(BaseModel):
     email: EmailStr
     message: str = Field(min_length=1, max_length=10_000)
     order_reference: str | None = Field(default=None, max_length=50)
+    captcha_token: str | None = Field(default=None, max_length=5000)
 
 
 class ContactSubmissionUpdate(BaseModel):

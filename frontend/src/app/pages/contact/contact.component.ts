@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, ViewChild, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Meta, Title } from '@angular/platform-browser';
@@ -8,6 +8,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
+import { appConfig } from '../../core/app-config';
 import { MarkdownService } from '../../core/markdown.service';
 import { SiteSocialLink, SiteSocialService } from '../../core/site-social.service';
 import { StorefrontAdminModeService } from '../../core/storefront-admin-mode.service';
@@ -15,6 +16,7 @@ import { ContactSubmissionTopic, SupportService } from '../../core/support.servi
 import { ContainerComponent } from '../../layout/container.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../shared/button.component';
+import { CaptchaTurnstileComponent } from '../../shared/captcha-turnstile.component';
 import { CardComponent } from '../../shared/card.component';
 import { CmsPageBlocksComponent } from '../../shared/cms-page-blocks.component';
 import { ImgFallbackDirective } from '../../shared/img-fallback.directive';
@@ -38,7 +40,8 @@ interface ContentBlock {
     TranslateModule,
     ImgFallbackDirective,
     CmsPageBlocksComponent,
-    ButtonComponent
+    ButtonComponent,
+    CaptchaTurnstileComponent
   ],
   template: `
     <app-container classes="py-10 grid gap-6 max-w-3xl">
@@ -250,11 +253,18 @@ interface ContentBlock {
                 ></textarea>
               </label>
 
+              <app-captcha-turnstile
+                #contactCaptcha
+                *ngIf="captchaEnabled"
+                [siteKey]="captchaSiteKey"
+                (tokenChange)="captchaToken = $event"
+              ></app-captcha-turnstile>
+
               <div class="flex items-center justify-end gap-3">
                 <button
                   type="submit"
                   class="h-11 px-5 rounded-xl bg-slate-900 text-white font-semibold shadow-sm hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
-                  [disabled]="submitting() || !contactForm.form.valid"
+                  [disabled]="submitting() || !contactForm.form.valid || (captchaEnabled && !captchaToken)"
                 >
                   {{ submitting() ? ('contact.form.sending' | translate) : ('contact.form.submit' | translate) }}
                 </button>
@@ -292,6 +302,12 @@ export class ContactComponent implements OnInit, OnDestroy {
   formEmail = '';
   formOrderRef = '';
   formMessage = '';
+
+  captchaSiteKey = appConfig.captchaSiteKey || '';
+  captchaEnabled = Boolean(this.captchaSiteKey);
+  captchaToken: string | null = null;
+
+  @ViewChild('contactCaptcha') contactCaptcha?: CaptchaTurnstileComponent;
 
   private langSub?: Subscription;
   private socialSub?: Subscription;
@@ -407,12 +423,18 @@ export class ContactComponent implements OnInit, OnDestroy {
     this.submitError.set('');
     this.submitSuccess.set(false);
 
+    if (this.captchaEnabled && !this.captchaToken) {
+      this.submitError.set(this.translate.instant('auth.captchaRequired'));
+      return;
+    }
+
     const payload = {
       topic: this.formTopic,
       name: this.formName.trim(),
       email: this.formEmail.trim(),
       message: this.formMessage.trim(),
-      order_reference: this.formOrderRef.trim() ? this.formOrderRef.trim() : null
+      order_reference: this.formOrderRef.trim() ? this.formOrderRef.trim() : null,
+      captcha_token: this.captchaToken
     };
     this.submitting.set(true);
     this.support
@@ -427,10 +449,14 @@ export class ContactComponent implements OnInit, OnDestroy {
           this.submitSuccess.set(true);
           this.formMessage = '';
           this.formOrderRef = '';
+          this.captchaToken = null;
+          this.contactCaptcha?.reset();
         },
         error: (err) => {
           const msg = err?.error?.detail || this.translate.instant('contact.form.error');
           this.submitError.set(msg);
+          this.captchaToken = null;
+          this.contactCaptcha?.reset();
         }
       });
   }

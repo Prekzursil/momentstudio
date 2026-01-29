@@ -1,18 +1,20 @@
 import { CommonModule } from '@angular/common';
-import { Component, Input, OnChanges, signal } from '@angular/core';
+import { Component, Input, OnChanges, ViewChild, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { finalize } from 'rxjs/operators';
 
 import { AuthService } from '../core/auth.service';
+import { appConfig } from '../core/app-config';
 import { NewsletterService } from '../core/newsletter.service';
 import { SupportService } from '../core/support.service';
+import { CaptchaTurnstileComponent } from './captcha-turnstile.component';
 import { ContactSubmissionTopic, PageFormBlock } from './page-blocks';
 
 @Component({
   selector: 'app-cms-form-block',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslateModule],
+  imports: [CommonModule, FormsModule, TranslateModule, CaptchaTurnstileComponent],
   template: `
     <div class="grid gap-4">
       <ng-container [ngSwitch]="block.form_type">
@@ -61,11 +63,18 @@ import { ContactSubmissionTopic, PageFormBlock } from './page-blocks';
               />
             </label>
 
+            <app-captcha-turnstile
+              #newsletterCaptcha
+              *ngIf="captchaEnabled"
+              [siteKey]="captchaSiteKey"
+              (tokenChange)="newsletterCaptchaToken = $event"
+            ></app-captcha-turnstile>
+
             <div class="flex items-center justify-end gap-3">
               <button
                 type="submit"
                 class="h-11 px-5 rounded-xl bg-slate-900 text-white font-semibold shadow-sm hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
-                [disabled]="newsletterLoading() || !newsletterForm.form.valid"
+                [disabled]="newsletterLoading() || !newsletterForm.form.valid || (captchaEnabled && !newsletterCaptchaToken)"
               >
                 {{ 'blog.newsletter.subscribe' | translate }}
               </button>
@@ -169,11 +178,18 @@ import { ContactSubmissionTopic, PageFormBlock } from './page-blocks';
               ></textarea>
             </label>
 
+            <app-captcha-turnstile
+              #contactCaptcha
+              *ngIf="captchaEnabled"
+              [siteKey]="captchaSiteKey"
+              (tokenChange)="contactCaptchaToken = $event"
+            ></app-captcha-turnstile>
+
             <div class="flex items-center justify-end gap-3">
               <button
                 type="submit"
                 class="h-11 px-5 rounded-xl bg-slate-900 text-white font-semibold shadow-sm hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
-                [disabled]="contactSubmitting() || !contactForm.form.valid"
+                [disabled]="contactSubmitting() || !contactForm.form.valid || (captchaEnabled && !contactCaptchaToken)"
               >
                 {{ contactSubmitting() ? ('contact.form.sending' | translate) : ('contact.form.submit' | translate) }}
               </button>
@@ -203,6 +219,14 @@ export class CmsFormBlockComponent implements OnChanges {
   formMessage = '';
   newsletterEmail = '';
 
+  captchaSiteKey = appConfig.captchaSiteKey || '';
+  captchaEnabled = Boolean(this.captchaSiteKey);
+  contactCaptchaToken: string | null = null;
+  newsletterCaptchaToken: string | null = null;
+
+  @ViewChild('contactCaptcha') contactCaptcha?: CaptchaTurnstileComponent;
+  @ViewChild('newsletterCaptcha') newsletterCaptcha?: CaptchaTurnstileComponent;
+
   constructor(
     private auth: AuthService,
     private support: SupportService,
@@ -228,12 +252,18 @@ export class CmsFormBlockComponent implements OnChanges {
     this.contactError.set('');
     this.contactSuccess.set(false);
 
+    if (this.captchaEnabled && !this.contactCaptchaToken) {
+      this.contactError.set(this.translate.instant('auth.captchaRequired'));
+      return;
+    }
+
     const payload = {
       topic: this.formTopic,
       name: this.formName.trim(),
       email: this.formEmail.trim(),
       message: this.formMessage.trim(),
-      order_reference: this.formOrderRef.trim() ? this.formOrderRef.trim() : null
+      order_reference: this.formOrderRef.trim() ? this.formOrderRef.trim() : null,
+      captcha_token: this.contactCaptchaToken
     };
 
     this.contactSubmitting.set(true);
@@ -249,10 +279,14 @@ export class CmsFormBlockComponent implements OnChanges {
           this.contactSuccess.set(true);
           this.formMessage = '';
           this.formOrderRef = '';
+          this.contactCaptchaToken = null;
+          this.contactCaptcha?.reset();
         },
         error: (err) => {
           const msg = err?.error?.detail || this.translate.instant('contact.form.error');
           this.contactError.set(msg);
+          this.contactCaptchaToken = null;
+          this.contactCaptcha?.reset();
         }
       });
   }
@@ -265,10 +299,15 @@ export class CmsFormBlockComponent implements OnChanges {
     this.newsletterSuccess.set(false);
     this.newsletterAlreadySubscribed.set(false);
 
+    if (this.captchaEnabled && !this.newsletterCaptchaToken) {
+      this.newsletterError.set(this.translate.instant('auth.captchaRequired'));
+      return;
+    }
+
     const email = (this.newsletterEmail || '').trim();
     this.newsletterLoading.set(true);
     this.newsletter
-      .subscribe(email, { source: 'cms', captcha_token: null })
+      .subscribe(email, { source: 'cms', captcha_token: this.newsletterCaptchaToken })
       .pipe(
         finalize(() => {
           this.newsletterLoading.set(false);
@@ -278,13 +317,19 @@ export class CmsFormBlockComponent implements OnChanges {
         next: (res) => {
           if (res?.already_subscribed) {
             this.newsletterAlreadySubscribed.set(true);
+            this.newsletterCaptchaToken = null;
+            this.newsletterCaptcha?.reset();
             return;
           }
           this.newsletterSuccess.set(true);
+          this.newsletterCaptchaToken = null;
+          this.newsletterCaptcha?.reset();
         },
         error: (err) => {
           const msg = err?.error?.detail || this.translate.instant('blog.newsletter.errorCopy');
           this.newsletterError.set(msg);
+          this.newsletterCaptchaToken = null;
+          this.newsletterCaptcha?.reset();
         }
       });
   }
@@ -295,6 +340,10 @@ export class CmsFormBlockComponent implements OnChanges {
     this.newsletterError.set('');
     this.newsletterSuccess.set(false);
     this.newsletterAlreadySubscribed.set(false);
+    this.contactCaptchaToken = null;
+    this.newsletterCaptchaToken = null;
+    this.contactCaptcha?.reset();
+    this.newsletterCaptcha?.reset();
   }
 
   private prefillFromUser(): void {
@@ -309,4 +358,3 @@ export class CmsFormBlockComponent implements OnChanges {
     if (name) this.formName = name;
   }
 }
-
