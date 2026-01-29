@@ -230,6 +230,12 @@ export const routes: Routes = [
             loadComponent: () => import('./pages/admin/admin.component').then((m) => m.AdminComponent),
             data: { section: 'settings' },
             title: 'Content · Settings | Admin | momentstudio'
+          },
+          {
+            path: 'scheduling',
+            loadComponent: () =>
+              import('./pages/admin/content/admin-content-scheduling.component').then((m) => m.AdminContentSchedulingComponent),
+            title: 'Content · Scheduling | Admin | momentstudio'
           }
         ]
       },

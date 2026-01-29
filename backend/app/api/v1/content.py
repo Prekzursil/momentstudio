@@ -31,6 +31,7 @@ from app.schemas.content import (
     ContentRedirectRead,
     ContentRedirectImportResult,
     ContentRedirectImportError,
+    ContentRedirectUpsertRequest,
     ContentBlockVersionListItem,
     ContentBlockVersionRead,
     ContentImageTagsUpdate,
@@ -300,6 +301,61 @@ async def admin_list_redirects(
     return ContentRedirectListResponse(
         items=items,
         meta={"total_items": total_items, "total_pages": total_pages, "page": page, "limit": limit},
+    )
+
+
+@router.post("/admin/redirects", response_model=ContentRedirectRead)
+async def admin_upsert_redirect(
+    payload: ContentRedirectUpsertRequest,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> ContentRedirectRead:
+    from_key = (payload.from_key or "").strip()
+    to_key = (payload.to_key or "").strip()
+    if not from_key or not to_key or from_key == to_key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid redirect")
+
+    target = await session.scalar(select(ContentBlock.key).where(ContentBlock.key == to_key))
+    if not target:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Redirect target not found")
+
+    redirect_map_rows = (await session.execute(select(ContentRedirect.from_key, ContentRedirect.to_key))).all()
+    redirect_map = {fk: tk for fk, tk in redirect_map_rows if fk and tk}
+    redirect_map[from_key] = to_key
+    chain_error = _redirect_chain_error(from_key, redirect_map)
+    if chain_error == "loop":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Redirect loop detected")
+    if chain_error == "too_deep":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Redirect chain too deep")
+
+    existing = await session.scalar(select(ContentRedirect).where(ContentRedirect.from_key == from_key))
+    if existing:
+        existing.to_key = to_key
+        session.add(existing)
+        await session.commit()
+        await session.refresh(existing)
+        return ContentRedirectRead(
+            id=existing.id,
+            from_key=existing.from_key,
+            to_key=existing.to_key,
+            created_at=existing.created_at,
+            updated_at=existing.updated_at,
+            target_exists=True,
+            chain_error=None,
+        )
+
+    redirect = ContentRedirect(from_key=from_key, to_key=to_key)
+    session.add(redirect)
+    await session.commit()
+    await session.refresh(redirect)
+    return ContentRedirectRead(
+        id=redirect.id,
+        from_key=redirect.from_key,
+        to_key=redirect.to_key,
+        created_at=redirect.created_at,
+        updated_at=redirect.updated_at,
+        target_exists=True,
+        chain_error=None,
     )
 
 

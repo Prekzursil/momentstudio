@@ -970,8 +970,8 @@ Below is a structured checklist you can turn into issues.
 - [x] CMS preview: language toggle – Preview RO/EN (fallbacks visible) without leaving the editor.
 - [x] CMS preview: theme toggle – Preview light/dark rendering inside the editor.
 - [x] CMS preview: iframe viewport emulation – Render preview in an iframe at selected device widths so Tailwind breakpoints match.
-- [ ] CMS scheduling: calendar view – Visual calendar for scheduled publish/unpublish across pages/blog/home banners.
-- [ ] CMS redirects: inline creation – When changing a page URL, offer creating a redirect in the same flow.
+- [x] CMS scheduling: calendar view – Visual calendar for scheduled publish/unpublish across pages/blog/home banners.
+- [x] CMS redirects: inline creation – When changing a page URL, offer creating a redirect in the same flow.
 - [ ] CMS navigation: menu builder – Visual editor for header/footer links with drag-drop ordering and per-language labels.
 - [ ] CMS content: side-by-side translation – RO/EN side-by-side editing with “copy from” shortcuts.
 - [ ] CMS content: find & replace – Search/replace across CMS content blocks (with preview of affected pages).
@@ -982,6 +982,8 @@ Below is a structured checklist you can turn into issues.
 - [ ] Storefront admin mode: “Edit this page” – Admin-only button on storefront pages linking to the correct CMS editor/section.
 - [ ] CMS assets: delete asset – Add a delete action gated by “where used” + safe file cleanup (original + thumbnails).
 - [ ] CMS assets: edited versions – Group edited copies under the original asset (lineage + quick revert).
+- [ ] CMS scheduling: dedicated API – Add `/content/admin/scheduling` (window + pagination) so the scheduling view isn’t limited to the admin dashboard’s latest-content cap.
+- [ ] CMS redirects: quick create UI – Add a small “Create redirect” inline form in the redirects manager (no CSV needed).
 
 ## Data Portability & Backups (Extended)
 - [x] CLI command `python -m app.cli export-data` exporting users (no passwords), products, categories, orders, addresses to JSON.

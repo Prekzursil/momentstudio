@@ -2515,7 +2515,8 @@
           "requiresLogin": "Require login",
           "requiresLoginHint": "When enabled, only signed-in users can view this page (it will not appear in the sitemap).",
           "changeUrlPrompt": "New URL (slug) for this page",
-          "changeUrlConfirm": "Change URL from /pages/{{old}} to /pages/{{next}}? Existing links will redirect.",
+          "changeUrlConfirm": "Change URL from /pages/{{old}} to /pages/{{next}}?",
+          "redirectConfirm": "Create redirect from /pages/{{old}} to /pages/{{next}}? (Recommended)",
           "addBlock": "Add block",
           "translation": {
             "title": "Translation workflow",
@@ -2530,7 +2531,7 @@
             "align": { "label": "Alignment", "left": "Left", "center": "Center" },
             "maxWidth": { "label": "Max width", "full": "Full", "narrow": "Narrow", "prose": "Prose", "wide": "Wide" }
           },
-          "success": { "save": "Blocks saved.", "rename": "Page URL updated (redirect created)." },
+          "success": { "save": "Blocks saved.", "rename": "Page URL updated." },
           "errors": {
             "load": "Could not load page blocks.",
             "save": "Could not save blocks.",
@@ -2540,7 +2541,7 @@
         },
         "redirects": {
           "title": "Redirects",
-          "hint": "Created automatically when changing a page URL. Stale redirects point to missing content.",
+          "hint": "Redirects preserve old links after changing a page URL. Stale redirects point to missing content.",
           "search": "Search redirects",
           "export": "Export CSV",
           "import": "Import CSV",
@@ -2551,9 +2552,10 @@
           "loop": "Redirect loop detected.",
           "tooDeep": "Redirect chain too deep.",
           "deleteConfirm": "Delete this redirect?",
-          "success": { "deleted": "Redirect deleted.", "export": "Redirects exported.", "import": "Redirects imported." },
+          "success": { "created": "Redirect created.", "deleted": "Redirect deleted.", "export": "Redirects exported.", "import": "Redirects imported." },
           "errors": {
             "load": "Could not load redirects.",
+            "create": "Could not create redirect.",
             "delete": "Could not delete redirect.",
             "export": "Could not export redirects.",
             "import": "Could not import redirects."
@@ -4294,7 +4296,27 @@
         "home": "Home",
         "pages": "Pages",
         "blog": "Blog",
+        "scheduling": "Scheduling",
         "settings": "Settings"
+      },
+      "scheduling": {
+        "title": "Scheduling",
+        "hint": "Upcoming publish/unpublish times across pages, blog posts, and global banners.",
+        "window": "Window",
+        "window30": "30 days",
+        "window90": "90 days",
+        "window180": "180 days",
+        "empty": "No scheduled publish/unpublish events in this window.",
+        "publish": "Publish",
+        "unpublish": "Unpublish",
+        "kind": {
+          "page": "Page",
+          "blog": "Blog",
+          "global": "Global"
+        },
+        "errors": {
+          "load": "Could not load scheduling data."
+        }
       },
       "editing": "Editing",
       "titleLabel": "Title",

@@ -6269,37 +6269,49 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
-	  ngOnInit(): void {
-	    this.routeSub = combineLatest([this.route.data, this.route.queryParams]).subscribe(([data, query]) => {
-	      const next = this.normalizeSection(data['section']);
-	      this.applySection(next);
-        if (next !== 'blog') return;
-        const raw = typeof query['edit'] === 'string' ? query['edit'] : '';
-        const cleaned = raw.trim();
-        if (!cleaned) return;
+  ngOnInit(): void {
+    this.routeSub = combineLatest([this.route.data, this.route.queryParams]).subscribe(([data, query]) => {
+      const next = this.normalizeSection(data['section']);
+      this.applySection(next);
+
+      const raw = typeof query['edit'] === 'string' ? query['edit'] : '';
+      const cleaned = raw.trim();
+      if (!cleaned) return;
+
+      if (next === 'blog') {
         const key = cleaned.startsWith('blog.') ? cleaned : `blog.${cleaned}`;
         if (this.selectedBlogKey === key) return;
         this.loadBlogEditor(key);
-	    });
-	    if (typeof window !== 'undefined') {
-	      this.cmsDraftPoller = window.setInterval(() => this.observeCmsDrafts(), 250);
-	    }
-	  }
+        return;
+      }
 
-	  ngOnDestroy(): void {
-	    this.routeSub?.unsubscribe();
-	    this.routeSub = undefined;
-	    if (this.cmsDraftPoller !== null) {
-	      window.clearInterval(this.cmsDraftPoller);
-	      this.cmsDraftPoller = null;
-	    }
-	    this.cmsHomeDraft.dispose();
-	    for (const manager of this.cmsPageDrafts.values()) manager.dispose();
-	    for (const manager of this.cmsBlogDrafts.values()) manager.dispose();
-	    for (const key of Object.keys(this.contentVersions)) {
-	      delete this.contentVersions[key];
-	    }
-	  }
+      if (next === 'pages') {
+        const key = isCmsGlobalSectionKey(cleaned) ? cleaned : cleaned.startsWith('page.') ? cleaned : `page.${cleaned}`;
+        const normalized = key.trim();
+        if (!normalized || normalized === 'page.') return;
+        if (normalized === this.pageBlocksKey) return;
+        this.onPageBlocksKeyChange(normalized as PageBuilderKey);
+      }
+    });
+    if (typeof window !== 'undefined') {
+      this.cmsDraftPoller = window.setInterval(() => this.observeCmsDrafts(), 250);
+    }
+  }
+
+  ngOnDestroy(): void {
+    this.routeSub?.unsubscribe();
+    this.routeSub = undefined;
+    if (this.cmsDraftPoller !== null) {
+      window.clearInterval(this.cmsDraftPoller);
+      this.cmsDraftPoller = null;
+    }
+    this.cmsHomeDraft.dispose();
+    for (const manager of this.cmsPageDrafts.values()) manager.dispose();
+    for (const manager of this.cmsBlogDrafts.values()) manager.dispose();
+    for (const key of Object.keys(this.contentVersions)) {
+      delete this.contentVersions[key];
+    }
+  }
 
   loadAll(): void {
     this.loadForSection(this.section());
@@ -10422,6 +10434,20 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.pageBlocksKey = res.new_key as PageBuilderKey;
         this.loadContentPages();
         this.loadPageBlocks(this.pageBlocksKey);
+        const wantRedirect = window.confirm(
+          this.t('adminUi.site.pages.builder.redirectConfirm', { old: oldSlug, next: nextSlug })
+        );
+        if (!wantRedirect) return;
+        this.admin.upsertContentRedirect({ from_key: res.old_key, to_key: res.new_key }).subscribe({
+          next: () => {
+            this.toast.success(this.t('adminUi.site.pages.redirects.success.created'));
+            this.loadContentRedirects(true);
+          },
+          error: (err) => {
+            const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
+            this.toast.error(detail || this.t('adminUi.site.pages.redirects.errors.create'));
+          }
+        });
       },
       error: (err) => {
         const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';

@@ -1165,6 +1165,10 @@ export class AdminService {
     return this.api.post<ContentPageRenameResponse>(`/content/admin/pages/${encodeURIComponent(slug)}/rename`, { new_slug: newSlug });
   }
 
+  upsertContentRedirect(payload: { from_key: string; to_key: string }): Observable<ContentRedirectRead> {
+    return this.api.post<ContentRedirectRead>('/content/admin/redirects', payload);
+  }
+
   listContentRedirects(params?: { q?: string; page?: number; limit?: number }): Observable<ContentRedirectListResponse> {
     return this.api.get<ContentRedirectListResponse>('/content/admin/redirects', params as any);
   }

@@ -2515,7 +2515,8 @@
           "requiresLogin": "Necesită autentificare",
           "requiresLoginHint": "Când este activat, doar utilizatorii autentificați pot vedea această pagină (nu va apărea în sitemap).",
           "changeUrlPrompt": "Noul URL (slug) pentru această pagină",
-          "changeUrlConfirm": "Schimbi URL-ul din /pages/{{old}} în /pages/{{next}}? Linkurile existente vor redirecționa.",
+          "changeUrlConfirm": "Schimbi URL-ul din /pages/{{old}} în /pages/{{next}}?",
+          "redirectConfirm": "Creezi o redirecționare din /pages/{{old}} în /pages/{{next}}? (Recomandat)",
           "addBlock": "Adaugă bloc",
           "translation": {
             "title": "Workflow traducere",
@@ -2530,7 +2531,7 @@
             "align": { "label": "Aliniere", "left": "Stânga", "center": "Centru" },
             "maxWidth": { "label": "Lățime maximă", "full": "Completă", "narrow": "Îngustă", "prose": "Proză", "wide": "Largă" }
           },
-          "success": { "save": "Blocurile au fost salvate.", "rename": "URL-ul paginii a fost actualizat (redirecționare creată)." },
+          "success": { "save": "Blocurile au fost salvate.", "rename": "URL-ul paginii a fost actualizat." },
           "errors": {
             "load": "Nu am putut încărca blocurile.",
             "save": "Nu am putut salva blocurile.",
@@ -2540,7 +2541,7 @@
         },
         "redirects": {
           "title": "Redirecționări",
-          "hint": "Create automat când schimbi URL-ul unei pagini. Redirecționările expirate indică către conținut lipsă.",
+          "hint": "Redirecționările păstrează linkurile vechi după schimbarea URL-ului unei pagini. Redirecționările expirate indică către conținut lipsă.",
           "search": "Caută redirecționări",
           "export": "Export CSV",
           "import": "Import CSV",
@@ -2551,9 +2552,10 @@
           "loop": "A fost detectată o buclă de redirecționare.",
           "tooDeep": "Lanțul de redirecționare este prea lung.",
           "deleteConfirm": "Ștergi această redirecționare?",
-          "success": { "deleted": "Redirecționare ștearsă.", "export": "Redirecționări exportate.", "import": "Redirecționări importate." },
+          "success": { "created": "Redirecționare creată.", "deleted": "Redirecționare ștearsă.", "export": "Redirecționări exportate.", "import": "Redirecționări importate." },
           "errors": {
             "load": "Nu am putut încărca redirecționările.",
+            "create": "Nu am putut crea redirecționarea.",
             "delete": "Nu am putut șterge redirecționarea.",
             "export": "Nu am putut exporta redirecționările.",
             "import": "Nu am putut importa redirecționările."
@@ -4294,7 +4296,27 @@
         "home": "Acasă",
         "pages": "Pagini",
         "blog": "Blog",
+        "scheduling": "Programare",
         "settings": "Setări"
+      },
+      "scheduling": {
+        "title": "Programare",
+        "hint": "Evenimente viitoare de publicare/anulare a publicării pentru pagini, blog și bannere globale.",
+        "window": "Fereastră",
+        "window30": "30 zile",
+        "window90": "90 zile",
+        "window180": "180 zile",
+        "empty": "Nu există evenimente programate în această fereastră.",
+        "publish": "Publicare",
+        "unpublish": "Anulează publicarea",
+        "kind": {
+          "page": "Pagină",
+          "blog": "Blog",
+          "global": "Global"
+        },
+        "errors": {
+          "load": "Nu am putut încărca datele de programare."
+        }
       },
       "editing": "Se editează",
       "titleLabel": "Titlu",

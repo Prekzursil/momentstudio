@@ -213,6 +213,7 @@ export class AdminContentLayoutComponent {
     { path: '/admin/content/home', labelKey: 'adminUi.content.nav.home' },
     { path: '/admin/content/pages', labelKey: 'adminUi.content.nav.pages' },
     { path: '/admin/content/blog', labelKey: 'adminUi.content.nav.blog' },
+    { path: '/admin/content/scheduling', labelKey: 'adminUi.content.nav.scheduling' },
     { path: '/admin/content/settings', labelKey: 'adminUi.content.nav.settings' }
   ];
 }

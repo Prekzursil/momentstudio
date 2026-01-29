@@ -372,6 +372,22 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
         json={"title": "New", "body_markdown": "New body", "status": "published"},
         headers=auth_headers(admin_token),
     )
+    redirect_upsert = client.post(
+        "/api/v1/content/admin/redirects",
+        json={"from_key": "page.old2", "to_key": "page.new"},
+        headers=auth_headers(admin_token),
+    )
+    assert redirect_upsert.status_code == 200, redirect_upsert.text
+    assert redirect_upsert.json()["from_key"] == "page.old2"
+    assert redirect_upsert.json()["to_key"] == "page.new"
+
+    missing_target = client.post(
+        "/api/v1/content/admin/redirects",
+        json={"from_key": "page.old3", "to_key": "page.does-not-exist"},
+        headers=auth_headers(admin_token),
+    )
+    assert missing_target.status_code == 400
+
     redirect_import = client.post(
         "/api/v1/content/admin/redirects/import",
         files={"file": ("redirects.csv", b"from,to\n/pages/old,/pages/new\n", "text/csv")},

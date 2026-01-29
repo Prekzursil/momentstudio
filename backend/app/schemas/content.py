@@ -103,6 +103,11 @@ class ContentRedirectRead(BaseModel):
     chain_error: str | None = None
 
 
+class ContentRedirectUpsertRequest(BaseModel):
+    from_key: str = Field(min_length=1, max_length=200)
+    to_key: str = Field(min_length=1, max_length=200)
+
+
 class ContentRedirectListResponse(BaseModel):
     items: list[ContentRedirectRead]
     meta: PaginationMeta
