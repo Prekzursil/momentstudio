@@ -182,7 +182,7 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
           <ng-container *ngSwitchCase="'banner'">
             <ng-container *ngIf="asBannerBlock(block) as banner">
               <app-banner-block
-                [slide]="banner.key === firstHeroLikeKey() ? heroSlide(banner.slide) : banner.slide"
+                [slide]="banner.slide"
                 [tagline]="banner.key === firstHeroLikeKey() ? ('app.tagline' | translate) : null"
               ></app-banner-block>
             </ng-container>
@@ -595,10 +595,6 @@ export class HomeComponent implements OnInit, OnDestroy {
     const x = Math.max(0, Math.min(100, Math.round(Number(focalX ?? 50))));
     const y = Math.max(0, Math.min(100, Math.round(Number(focalY ?? 50))));
     return `${x}% ${y}%`;
-  }
-
-  heroSlide(slide: Slide): Slide {
-    return { ...slide, image_url: 'assets/home/banner_image.jpeg' };
   }
 
   private load(): void {

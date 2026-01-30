@@ -415,8 +415,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Storefront: add optional PWA install prompt + offline fallback page.
 - [x] Storefront: remove borders and adjust sizing on the homepage hero banner image.
 - [x] Storefront: move the homepage hero banner image into frontend assets and use it by default.
-- [ ] Storefront: optimize the homepage hero banner image (WebP/AVIF + responsive sizes).
-- [ ] Storefront: allow configuring the homepage hero banner image via CMS without code changes.
+- [x] Storefront: optimize the homepage hero banner image (WebP/AVIF + responsive sizes).
+- [x] Storefront: allow configuring the homepage hero banner image via CMS without code changes.
 
 ## Blog & Community
 - [x] Nav: add “Blog” link between Home and Shop (header + drawer).
