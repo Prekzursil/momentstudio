@@ -1549,8 +1549,10 @@
           "reorderError": "Nu s-au putut reordona imaginile.",
           "empty": "Nu există imagini încă.",
           "imageLabel": "Imaginea {{index}}",
+          "primaryBadge": "Principală",
+          "makePrimary": "Setează ca principală",
           "metaHint": "Textul alternativ și descrierile sunt bilingve (RO/EN).",
-        "metaLoadError": "Nu s-a putut încărca textul imaginii."
+          "metaLoadError": "Nu s-a putut încărca textul imaginii."
         }
       },
       "undoApplied": "Modificările au fost anulate.",

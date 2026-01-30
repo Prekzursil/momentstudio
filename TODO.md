@@ -410,6 +410,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Storefront Products: image manager – Reorder images and edit alt text/captions from product detail in edit mode.
 - [x] Storefront Admin Mode: undo window – After edits (reorder/publish/price), offer a short “Undo” toast.
 - [x] Storefront Admin Mode: audit trail – Record all storefront edits in the admin audit log with “source=storefront”.
+- [x] Storefront Products: set a product’s main image from the image manager (moves it to the first position).
 
 ### Storefront – Homepage & PWA
 - [x] Storefront: add product share controls (copy link / share sheet) on product pages.

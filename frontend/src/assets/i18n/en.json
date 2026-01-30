@@ -1549,8 +1549,10 @@
           "reorderError": "Could not reorder images.",
           "empty": "No images yet.",
           "imageLabel": "Image {{index}}",
+          "primaryBadge": "Main",
+          "makePrimary": "Set as main",
           "metaHint": "Alt text and captions are bilingual (RO/EN).",
-        "metaLoadError": "Could not load image text."
+          "metaLoadError": "Could not load image text."
         }
       },
       "undoApplied": "Undone.",
