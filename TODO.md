@@ -20,6 +20,10 @@
 ### Storefront
 - [x] Storefront: add product share controls (copy link / share sheet) on product pages.
 - [x] Storefront: add optional PWA install prompt + offline fallback page.
+- [x] Storefront: remove borders and adjust sizing on the homepage hero banner image.
+- [x] Storefront: move the homepage hero banner image into frontend assets and use it by default.
+- [ ] Storefront: optimize the homepage hero banner image (WebP/AVIF + responsive sizes).
+- [ ] Storefront: allow configuring the homepage hero banner image via CMS without code changes.
 
 ### Analytics
 - [x] Analytics: add lightweight funnel metrics (sessions → carts → checkouts → orders) with opt-in tracking.
