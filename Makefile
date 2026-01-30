@@ -1,4 +1,4 @@
-.PHONY: dev test lint docker-up docker-down backend-test frontend-test backend-lint frontend-lint
+.PHONY: dev test lint docker-up docker-down backend-test frontend-test backend-lint frontend-lint compose-smoke
 
 dev:
 	./start.sh
@@ -26,3 +26,5 @@ docker-up:
 docker-down:
 	cd infra && docker compose down
 
+compose-smoke:
+	bash scripts/compose-smoke.sh

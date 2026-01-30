@@ -74,6 +74,7 @@ make lint
 make test
 make docker-up
 make docker-down
+make compose-smoke
 ```
 
 Frontend-only:
@@ -108,6 +109,12 @@ cd ../frontend
 E2E_BASE_URL=http://localhost:4201 npm run e2e
 ```
 
+To run the same end-to-end flow as the `compose-smoke` GitHub Actions job (build stack, wait for health, seed + bootstrap owner, run E2E):
+
+```bash
+make compose-smoke
+```
+
 ## Backups & data portability
 
 - Export/import JSON: `python -m app.cli export-data` / `python -m app.cli import-data`
@@ -126,4 +133,5 @@ The `Release` GitHub Actions workflow builds/pushes images when you push a tag l
 
 - `ARCHITECTURE.md` — high-level design notes
 - `CONTRIBUTING.md` — conventions and workflows
+- `docs/PRODUCTION.md` — production deployment guide
 - `backend/README.md`, `frontend/README.md`, `infra/README.md`

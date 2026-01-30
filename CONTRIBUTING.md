@@ -61,8 +61,7 @@ pre-commit run --all-files
 
 It runs Black/Ruff for Python and Prettier/ESLint for the Angular code.
 
-Note: the frontend ESLint hook is in the process of being aligned with the ESLint v9 flat config.
-`npm -C frontend run lint` is the authoritative lint check.
+Note: the frontend hooks run via `npm --prefix frontend ...`, so you need `npm ci` in `frontend/` at least once.
 
 ## Shortcuts
 
