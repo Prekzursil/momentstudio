@@ -2,6 +2,11 @@
 
 FastAPI + PostgreSQL service with versioned API routing under `/api/v1`.
 
+## Requirements
+
+- Python 3.12+
+- Postgres (or use the Docker Compose stack in `infra/`)
+
 ## Quick start
 
 ```bash
@@ -43,6 +48,16 @@ alembic revision --autogenerate -m "describe change"  # after models exist
 
 ```bash
 pytest
+```
+
+## Lint & type-check
+
+CI pins tooling versions via `backend/requirements-ci.txt`. To run locally:
+
+```bash
+pip install -r requirements-ci.txt
+ruff check .
+PYTHONPATH=$(pwd) mypy app
 ```
 
 ## Data portability & backups

@@ -10,9 +10,9 @@ Thanks for helping build the momentstudio storefront and admin suite. This monor
 - Pull requests: keep scope tight; include summary, key changes, tests, and risks. Update `TODO.md` when you finish or add work items.
 - Keep PRs focused on one area (backend vs frontend vs infra) when possible.
 
-## Local setup (placeholder until scaffolding lands)
+## Local setup
 
-Prereqs: Python 3.11+, Node.js 20 LTS, Docker + docker-compose.
+Prereqs: Python 3.12+, Node.js (CI uses Node 24 + npm 11.7), Docker + docker-compose.
 
 ### Backend (FastAPI)
 
@@ -30,7 +30,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ```
 cd frontend
-npm install
+npm ci
 cp .env.example .env  # set API_BASE_URL, STRIPE_ENV/STRIPE_PUBLISHABLE_KEY_SANDBOX, APP_ENV
 npm start
 ```
@@ -44,8 +44,8 @@ docker compose up --build
 
 ## Quality gates
 
-- Backend: `ruff check .`, `black .`, `isort .`, `mypy .`, `pytest`.
-- Frontend: `npm run lint`, `npm test`, `npm run build`.
+- Backend: `ruff check .`, `mypy`, `pytest` (install `backend/requirements-ci.txt` for CI-pinned tool versions).
+- Frontend: `npm run lint`, `npm run i18n:check`, `npm test`, `npm run build`.
 - Infra: `docker compose config` to validate compose file.
 - Run the relevant checks before opening a PR; fix lint/type issues in the same branch.
 
@@ -60,6 +60,8 @@ pre-commit run --all-files
 ```
 
 It runs Black/Ruff for Python and Prettier/ESLint for the Angular code.
+
+Note: the frontend hooks run via `npm --prefix frontend ...`, so you need `npm ci` in `frontend/` at least once.
 
 ## Shortcuts
 
@@ -76,7 +78,7 @@ If you have `make` available, common workflows are:
 - Create branch: `git checkout -b feat/<slug>` from `main`.
 - Update backlog: mark finished items in `TODO.md` and add concise follow-ups when needed.
 - Reset local DB (Docker): `docker compose down -v && docker compose up --build`.
-- Apply migrations: `alembic upgrade head` (once migrations exist).
+- Apply migrations: `cd backend && alembic upgrade head`.
 - Logs: `docker compose logs -f backend` or `docker compose logs -f frontend` for live debugging.
 
 ## Pull request expectations

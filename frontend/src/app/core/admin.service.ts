@@ -78,6 +78,28 @@ export interface AdminChannelBreakdownResponse {
   delivery_types: AdminChannelBreakdownRow[];
 }
 
+export interface AdminFunnelCounts {
+  sessions: number;
+  carts: number;
+  checkouts: number;
+  orders: number;
+}
+
+export interface AdminFunnelConversions {
+  to_cart: number | null;
+  to_checkout: number | null;
+  to_order: number | null;
+}
+
+export interface AdminFunnelMetricsResponse {
+  range_days: number;
+  range_from: string;
+  range_to: string;
+  opt_in_only: boolean;
+  counts: AdminFunnelCounts;
+  conversions: AdminFunnelConversions;
+}
+
 export type AdminScheduledReportKind = 'weekly' | 'monthly';
 
 export interface AdminScheduledReportSendResponse {
@@ -791,6 +813,10 @@ export class AdminService {
 
   summary(params?: { range_days?: number; range_from?: string; range_to?: string }): Observable<AdminSummary> {
     return this.api.get<AdminSummary>('/admin/dashboard/summary', params);
+  }
+
+  funnel(params?: { range_days?: number; range_from?: string; range_to?: string }): Observable<AdminFunnelMetricsResponse> {
+    return this.api.get<AdminFunnelMetricsResponse>('/admin/dashboard/funnel', params);
   }
 
   channelBreakdown(params?: { range_days?: number; range_from?: string; range_to?: string }): Observable<AdminChannelBreakdownResponse> {

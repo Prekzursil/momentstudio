@@ -215,6 +215,15 @@ import { ProductImageManagerModalComponent } from '../../shared/product-image-ma
                     />
                   </svg>
                 </app-button>
+                <app-button [label]="'product.share' | translate" variant="ghost" (action)="shareProduct()">
+                  <svg viewBox="0 0 24 24" class="mr-2 h-4 w-4" fill="none" stroke="currentColor" stroke-width="2">
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M7 12a4 4 0 0 1 4-4h1m5 4a4 4 0 0 0-4-4m0 0V5m0 3l-3-3m3 3l3-3m-4 7h-1a4 4 0 1 0 0 8h1"
+                    />
+                  </svg>
+                </app-button>
               </div>
 
               <div class="flex flex-wrap gap-2" *ngIf="product.tags?.length">
@@ -494,6 +503,58 @@ export class ProductComponent implements OnInit, OnDestroy {
       return;
     }
     void this.router.navigate(['/shop']);
+  }
+
+  async shareProduct(): Promise<void> {
+    const url = (this.document?.location?.href || '').toString();
+    if (!url) return;
+    const title = (this.product?.name || this.translate.instant('app.name') || 'momentstudio').toString();
+    const text = (this.product?.short_description || '').trim();
+
+    const nav: any = typeof navigator !== 'undefined' ? navigator : null;
+    if (nav && typeof nav.share === 'function') {
+      try {
+        await nav.share({ title, text: text || undefined, url });
+        return;
+      } catch (err: any) {
+        if (err?.name === 'AbortError') return;
+      }
+    }
+
+    const ok = await this.copyToClipboard(url);
+    this.toast.success(
+      this.translate.instant(ok ? 'product.shareCopied' : 'product.shareReady')
+    );
+  }
+
+  private async copyToClipboard(text: string): Promise<boolean> {
+    const value = (text || '').trim();
+    if (!value) return false;
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+        return true;
+      }
+    } catch {
+      // Fallback below.
+    }
+    try {
+      const el = this.document.createElement('textarea');
+      el.value = value;
+      el.setAttribute('readonly', 'true');
+      el.style.position = 'fixed';
+      el.style.top = '0';
+      el.style.left = '0';
+      el.style.opacity = '0';
+      this.document.body.appendChild(el);
+      el.focus();
+      el.select();
+      const ok = this.document.execCommand('copy');
+      el.remove();
+      return ok;
+    } catch {
+      return false;
+    }
   }
 
   private readShopReturnUrl(): string | null {

@@ -54,6 +54,8 @@ from app.models.order import (  # noqa: F401
     OrderAdminNote,
     OrderTag,
 )
+from app.models.order_document_export import OrderDocumentExport, OrderDocumentExportKind  # noqa: F401
+from app.models.analytics_event import AnalyticsEvent  # noqa: F401
 from app.models.content import (  # noqa: F401
     ContentBlock,
     ContentBlockVersion,
@@ -127,6 +129,9 @@ __all__ = [
     "OrderRefund",
     "OrderAdminNote",
     "OrderTag",
+    "OrderDocumentExport",
+    "OrderDocumentExportKind",
+    "AnalyticsEvent",
     "ContentBlock",
     "ContentBlockVersion",
     "ContentStatus",

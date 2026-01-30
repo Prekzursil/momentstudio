@@ -1,5 +1,31 @@
 # TODO / Roadmap
 
+## Open backlog
+
+### Docs
+- [x] Docs: add a production deployment guide (reverse proxy, env vars, migrations, backups, first-owner bootstrap).
+
+### DX
+- [x] DX: update `.pre-commit-config.yaml` to match the current toolchain (ESLint v9 flat config, remove deprecated hooks).
+
+### Infra
+- [x] Infra: add a local helper to run the CI Docker smoke flow (same steps as `compose-smoke`).
+
+### Observability
+- [x] Observability: add an ops “health dashboard” view in admin (surface uptime, recent errors, backpressure signals).
+
+### Orders
+- [x] Orders: add an export center/history for generated PDFs/labels (packing slips, invoices, shipping labels) with retention + re-download links.
+
+### Storefront
+- [x] Storefront: add product share controls (copy link / share sheet) on product pages.
+- [x] Storefront: add optional PWA install prompt + offline fallback page.
+
+### Analytics
+- [x] Analytics: add lightweight funnel metrics (sessions → carts → checkouts → orders) with opt-in tracking.
+
+---
+
 Below is a structured checklist you can turn into issues.
 
 ## Project & Infra

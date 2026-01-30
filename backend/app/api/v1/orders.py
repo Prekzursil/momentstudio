@@ -29,6 +29,7 @@ from app.db.session import get_session
 from app.models.address import Address
 from app.models.cart import Cart
 from app.models.order import Order, OrderItem, OrderStatus, OrderEvent
+from app.models.order_document_export import OrderDocumentExportKind
 from app.models.user import User
 from app.schemas.cart import CartRead
 from app.schemas.cart import Totals
@@ -52,6 +53,7 @@ from app.services import auth as auth_service
 from app.services import private_storage
 from app.services import receipts as receipt_service
 from app.services import packing_slips as packing_slips_service
+from app.services import order_document_exports as order_exports_service
 from app.schemas.checkout import (
     CheckoutRequest,
     GuestCheckoutRequest,
@@ -84,6 +86,7 @@ from app.schemas.order_admin_address import AdminOrderAddressesUpdate
 from app.schemas.order_shipment import OrderShipmentCreate, OrderShipmentUpdate, OrderShipmentRead
 from app.schemas.order_tag import OrderTagCreate, OrderTagsResponse
 from app.schemas.order_refund import AdminOrderRefundCreate, AdminOrderRefundRequest
+from app.schemas.order_exports_admin import AdminOrderDocumentExportListResponse, AdminOrderDocumentExportRead
 from app.schemas.receipt import ReceiptRead, ReceiptShareTokenRead
 from app.services import notifications as notification_service
 from app.services import promo_usage
@@ -1059,6 +1062,56 @@ async def admin_export_orders(
     return StreamingResponse(iter([buffer.getvalue()]), media_type="text/csv", headers=headers)
 
 
+@router.get("/admin/exports", response_model=AdminOrderDocumentExportListResponse)
+async def admin_list_document_exports(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=200),
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("orders")),
+) -> AdminOrderDocumentExportListResponse:
+    rows, total_items = await order_exports_service.list_exports(session, page=page, limit=limit)
+    items: list[AdminOrderDocumentExportRead] = []
+    for export, ref in rows:
+        order_count = len(getattr(export, "order_ids", None) or []) or (1 if getattr(export, "order_id", None) else 0)
+        items.append(
+            AdminOrderDocumentExportRead(
+                id=export.id,
+                kind=getattr(getattr(export, "kind", None), "value", None) or str(getattr(export, "kind", "")),
+                filename=export.filename,
+                mime_type=export.mime_type,
+                created_at=export.created_at,
+                expires_at=export.expires_at,
+                order_id=getattr(export, "order_id", None),
+                order_reference=ref,
+                order_count=order_count,
+            )
+        )
+    total_pages = max(1, (int(total_items) + int(limit) - 1) // int(limit))
+    meta = AdminPaginationMeta(total_items=int(total_items), total_pages=total_pages, page=int(page), limit=int(limit))
+    return AdminOrderDocumentExportListResponse(items=items, meta=meta)
+
+
+@router.get("/admin/exports/{export_id}/download")
+async def admin_download_document_export(
+    export_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("orders")),
+) -> FileResponse:
+    export, _ref = await order_exports_service.get_export(session, export_id)
+    if not export:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export not found")
+    expires_at = getattr(export, "expires_at", None)
+    if expires_at and expires_at <= datetime.now(timezone.utc):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export expired")
+    path = private_storage.resolve_private_path(export.file_path)
+    if not path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export not found")
+    filename = Path(export.filename).name or path.name
+    headers = {"Cache-Control": "no-store"}
+    media_type = export.mime_type or mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    return FileResponse(path, media_type=media_type, filename=filename, headers=headers)
+
+
 async def _serialize_admin_order(
     session: AsyncSession,
     order: Order,
@@ -1761,6 +1814,18 @@ async def admin_upload_shipping_label(
     session.add(OrderEvent(order_id=order.id, event="shipping_label_uploaded", note=order.shipping_label_filename))
     await session.commit()
 
+    filename = _sanitize_filename(getattr(order, "shipping_label_filename", None) or original_name or "shipping-label")
+    mime_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    await order_exports_service.create_existing_file_export(
+        session,
+        kind=OrderDocumentExportKind.shipping_label,
+        filename=filename,
+        rel_path=rel_path,
+        mime_type=mime_type,
+        order_id=order.id,
+        created_by_user_id=getattr(admin, "id", None),
+    )
+
     if old_path and old_path != rel_path:
         private_storage.delete_private_file(old_path)
 
@@ -2087,13 +2152,21 @@ async def admin_order_events(
 async def admin_packing_slip(
     order_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: object = Depends(require_admin_section("orders")),
+    admin: User = Depends(require_admin_section("orders")),
 ):
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
     pdf = packing_slips_service.render_packing_slip_pdf(order)
     ref = getattr(order, "reference_code", None) or str(order.id)
+    await order_exports_service.create_pdf_export(
+        session,
+        kind=OrderDocumentExportKind.packing_slip,
+        filename=f"packing-slip-{ref}.pdf",
+        content=pdf,
+        order_id=order.id,
+        created_by_user_id=getattr(admin, "id", None),
+    )
     headers = {"Content-Disposition": f"attachment; filename=packing-slip-{ref}.pdf"}
     return Response(content=pdf, media_type="application/pdf", headers=headers)
 
@@ -2102,7 +2175,7 @@ async def admin_packing_slip(
 async def admin_batch_packing_slips(
     payload: AdminOrderIdsRequest,
     session: AsyncSession = Depends(get_session),
-    _: object = Depends(require_admin_section("orders")),
+    admin: User = Depends(require_admin_section("orders")),
 ):
     ids = list(dict.fromkeys(payload.order_ids))
     if not ids:
@@ -2130,8 +2203,40 @@ async def admin_batch_packing_slips(
     order_by_id = {o.id: o for o in orders}
     ordered = [order_by_id[order_id] for order_id in ids if order_id in order_by_id]
     pdf = packing_slips_service.render_batch_packing_slips_pdf(ordered)
+    await order_exports_service.create_pdf_export(
+        session,
+        kind=OrderDocumentExportKind.packing_slips_batch,
+        filename="packing-slips.pdf",
+        content=pdf,
+        order_ids=ids,
+        created_by_user_id=getattr(admin, "id", None),
+    )
     headers = {"Content-Disposition": "attachment; filename=packing-slips.pdf"}
     return Response(content=pdf, media_type="application/pdf", headers=headers)
+
+
+@router.get("/admin/{order_id}/receipt")
+async def admin_download_receipt_pdf(
+    order_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("orders")),
+):
+    order = await order_service.get_order_by_id(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    ref = getattr(order, "reference_code", None) or str(order.id)
+    filename = f"receipt-{ref}.pdf"
+    pdf = receipt_service.render_order_receipt_pdf(order, order.items)
+    await order_exports_service.create_pdf_export(
+        session,
+        kind=OrderDocumentExportKind.receipt,
+        filename=filename,
+        content=pdf,
+        order_id=order.id,
+        created_by_user_id=getattr(admin, "id", None),
+    )
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    return StreamingResponse(io.BytesIO(pdf), media_type="application/pdf", headers=headers)
 
 
 @router.post("/admin/{order_id}/capture-payment", response_model=OrderRead)

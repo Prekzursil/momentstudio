@@ -9,7 +9,7 @@ repos:
       - id: check-added-large-files
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.6.9
+    rev: v0.14.10
     hooks:
       - id: ruff
         args: [--fix]
@@ -25,15 +25,18 @@ repos:
       - id: prettier
         files: ^frontend/
 
-  - repo: https://github.com/pre-commit/mirrors-eslint
-    rev: v8.57.0
+  - repo: local
     hooks:
-      - id: eslint
-        files: ^frontend/.*\\.ts$
-        args: [--config, frontend/.eslintrc.cjs]
-        additional_dependencies:
-          - "@typescript-eslint/eslint-plugin@7.17.0"
-          - "@typescript-eslint/parser@7.17.0"
-          - "eslint-config-prettier@9.1.0"
-          - "typescript@5.4.5"
+      - id: frontend-eslint
+        name: frontend lint (eslint)
+        entry: npm --prefix frontend run lint
+        language: system
+        pass_filenames: false
+        files: ^frontend/
 
+      - id: frontend-i18n
+        name: frontend i18n key check
+        entry: npm --prefix frontend run i18n:check
+        language: system
+        pass_filenames: false
+        files: ^frontend/

@@ -56,6 +56,33 @@ def save_private_upload(
     return rel_path, original_name
 
 
+def save_private_bytes(
+    content: bytes,
+    *,
+    subdir: str,
+    filename: str,
+    root: str | Path | None = None,
+) -> str:
+    private_root = Path(root or settings.private_media_root).resolve()
+    private_root.mkdir(parents=True, exist_ok=True)
+
+    dest_dir = (private_root / subdir).resolve()
+    try:
+        dest_dir.relative_to(private_root)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload destination")
+    dest_dir.mkdir(parents=True, exist_ok=True)
+
+    safe_name = Path(filename).name
+    destination = (dest_dir / safe_name).resolve()
+    try:
+        destination.relative_to(dest_dir)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload destination")
+    destination.write_bytes(content)
+    return destination.relative_to(private_root).as_posix()
+
+
 def resolve_private_path(rel_path: str, *, root: str | Path | None = None) -> Path:
     private_root = Path(root or settings.private_media_root).resolve()
     private_root.mkdir(parents=True, exist_ok=True)
@@ -115,4 +142,3 @@ def _suffix_for_mime(mime: str, original_name: str) -> str:
     if mime == "image/webp":
         return original_suffix if original_suffix == ".webp" else ".webp"
     return original_suffix or ".bin"
-

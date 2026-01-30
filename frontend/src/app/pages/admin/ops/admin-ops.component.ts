@@ -3,6 +3,7 @@ import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { catchError, forkJoin, of } from 'rxjs';
 import {
   OpsService,
   BannerLevel,
@@ -13,6 +14,7 @@ import {
   WebhookEventRead,
   WebhookEventDetail
 } from '../../../core/ops.service';
+import { HealthService } from '../../../core/health.service';
 import { ToastService } from '../../../core/toast.service';
 import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
@@ -32,6 +34,76 @@ import { SkeletonComponent } from '../../../shared/skeleton.component';
       </div>
 
       <div class="grid gap-6">
+        <div class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.ops.health.title' | translate }}</div>
+              <div class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.ops.health.hint' | translate }}</div>
+            </div>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.actions.refresh' | translate"
+              [disabled]="healthLoading()"
+              (action)="loadHealthDashboard()"
+            ></app-button>
+          </div>
+
+          <div *ngIf="healthLoading()" class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+            <app-skeleton [rows]="2"></app-skeleton>
+          </div>
+
+          <div
+            *ngIf="!healthLoading() && healthError()"
+            class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+          >
+            {{ healthError() }}
+          </div>
+
+          <div *ngIf="!healthLoading()" class="grid gap-3 md:grid-cols-4">
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.ops.health.backend' | translate }}
+              </p>
+              <p class="mt-2 font-semibold text-slate-900 dark:text-slate-50">
+                {{
+                  backendReady()
+                    ? ('adminUi.dashboard.systemHealth.ready' | translate)
+                    : ('adminUi.dashboard.systemHealth.unavailable' | translate)
+                }}
+              </p>
+            </div>
+
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.ops.health.webhooksFailed' | translate }}
+              </p>
+              <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ webhookFailures24h() }}</p>
+              <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">{{ 'adminUi.ops.health.lastHours' | translate: { hours: 24 } }}</p>
+            </div>
+
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.ops.health.webhooksBacklog' | translate }}
+              </p>
+              <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ webhookBacklog24h() }}</p>
+              <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">{{ 'adminUi.ops.health.lastHours' | translate: { hours: 24 } }}</p>
+            </div>
+
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.ops.health.emailFailures' | translate }}
+              </p>
+              <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ emailFailures24h() }}</p>
+              <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">{{ 'adminUi.ops.health.lastHours' | translate: { hours: 24 } }}</p>
+            </div>
+          </div>
+
+          <p *ngIf="healthCheckedAt() as checkedAt" class="text-xs text-slate-500 dark:text-slate-400">
+            {{ 'adminUi.ops.health.lastChecked' | translate }}: {{ checkedAt | date: 'short' }}
+          </p>
+        </div>
+
         <div class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
           <div class="flex items-center justify-between gap-3">
             <div>
@@ -548,6 +620,14 @@ import { SkeletonComponent } from '../../../shared/skeleton.component';
 	  `
 })
 export class AdminOpsComponent implements OnInit {
+  healthLoading = signal(true);
+  healthError = signal<string | null>(null);
+  backendReady = signal(false);
+  webhookFailures24h = signal(0);
+  webhookBacklog24h = signal(0);
+  emailFailures24h = signal(0);
+  healthCheckedAt = signal<Date | null>(null);
+
   bannersLoading = signal(true);
   bannersError = signal<string | null>(null);
   banners = signal<MaintenanceBannerRead[]>([]);
@@ -589,6 +669,7 @@ export class AdminOpsComponent implements OnInit {
   webhookRetrying = signal<string | null>(null);
 
   constructor(
+    private health: HealthService,
     private ops: OpsService,
     private toast: ToastService,
     private translate: TranslateService,
@@ -597,12 +678,61 @@ export class AdminOpsComponent implements OnInit {
 
   ngOnInit(): void {
     this.resetBannerForm();
+    this.loadHealthDashboard();
     this.loadBanners();
     this.loadShippingMethods();
     this.applyEmailFailuresDeepLink();
     this.loadEmailFailures();
     this.loadWebhooks();
     this.maybeFocusSection();
+  }
+
+  loadHealthDashboard(): void {
+    this.healthLoading.set(true);
+    this.healthError.set(null);
+    const sinceHours = 24;
+
+    forkJoin({
+      ready: this.health.ready().pipe(catchError(() => of(null))),
+      webhooksFailed: this.ops.getWebhookFailureStats({ since_hours: sinceHours }).pipe(catchError(() => of(null))),
+      webhooksBacklog: this.ops.getWebhookBacklogStats({ since_hours: sinceHours }).pipe(catchError(() => of(null))),
+      emailsFailed: this.ops.getEmailFailureStats({ since_hours: sinceHours }).pipe(catchError(() => of(null)))
+    }).subscribe({
+      next: (res) => {
+        this.backendReady.set(Boolean(res.ready));
+
+        if (res.webhooksFailed) {
+          const count = Number((res.webhooksFailed as any)?.failed ?? 0);
+          this.webhookFailures24h.set(Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0);
+        }
+        if (res.webhooksBacklog) {
+          const count = Number((res.webhooksBacklog as any)?.pending ?? 0);
+          this.webhookBacklog24h.set(Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0);
+        }
+        if (res.emailsFailed) {
+          const count = Number((res.emailsFailed as any)?.failed ?? 0);
+          this.emailFailures24h.set(Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0);
+        }
+
+        const failedCalls = [
+          res.ready == null,
+          res.webhooksFailed == null,
+          res.webhooksBacklog == null,
+          res.emailsFailed == null
+        ].some(Boolean);
+        if (failedCalls) {
+          this.healthError.set(this.translate.instant('adminUi.ops.health.errors.load'));
+        }
+        this.healthCheckedAt.set(new Date());
+        this.healthLoading.set(false);
+      },
+      error: () => {
+        this.backendReady.set(false);
+        this.healthError.set(this.translate.instant('adminUi.ops.health.errors.load'));
+        this.healthCheckedAt.set(new Date());
+        this.healthLoading.set(false);
+      }
+    });
   }
 
   crumbs(): { label: string; url?: string }[] {

@@ -31,6 +31,16 @@
     "language": "Language",
     "editMode": "Edit mode"
   },
+  "pwa": {
+    "install": "Install app",
+    "installAccepted": "Install started.",
+    "installDismissed": "Install dismissed.",
+    "offlineBadge": "Offline",
+    "offlineTitle": "You're offline",
+    "offlineBody": "Some features require an internet connection.",
+    "retry": "Retry",
+    "goHome": "Go home"
+  },
   "notifications": {
     "title": "Notifications",
     "loading": "Loading…",
@@ -282,6 +292,11 @@
         },
         "downloaded": "Export downloaded",
         "downloadError": "Could not download export."
+      },
+      "analytics": {
+        "title": "Usage analytics",
+        "copy": "Opt in to share anonymous usage statistics (sessions, cart, checkout, orders) to help improve the store.",
+        "toggleLabel": "Share anonymous usage analytics"
       },
       "deletion": {
         "title": "Delete account",
@@ -1087,6 +1102,9 @@
     "quantity": "Quantity",
     "addToCart": "Add to cart",
     "backToShop": "Back to shop",
+    "share": "Share",
+    "shareCopied": "Link copied.",
+    "shareReady": "Share link is ready.",
     "upsells": "Recommended add-ons",
     "relatedProducts": "Related products",
     "recentlyViewed": "Recently viewed",
@@ -1247,6 +1265,8 @@
     "paymentCashHint": "Pay in cash upon delivery (RON).",
     "acceptedCards": "Accepted",
     "acceptedCardsAlt": "Accepted cards: Netopia, Visa, Mastercard",
+    "analyticsOptInLabel": "Share anonymous usage analytics (optional)",
+    "analyticsOptInCopy": "Helps us understand the checkout funnel (sessions → cart → checkout → orders). You can disable anytime in Account → Privacy.",
     "paymentHelpLink": "Contact us",
     "paypalReturnTitle": "PayPal",
     "paypalCapturing": "Confirming your PayPal payment…",
@@ -1715,6 +1735,18 @@
           "sales": "Sales"
         }
       },
+      "funnel": {
+        "title": "Funnel (opt-in)",
+        "note": "Counts are based on users who opted in to anonymous usage analytics.",
+        "sessions": "Sessions",
+        "carts": "Carts",
+        "checkouts": "Checkouts",
+        "orders": "Orders",
+        "toCart": "Session → cart",
+        "toCheckout": "Cart → checkout",
+        "toOrder": "Checkout → order",
+        "error": "Could not load funnel metrics."
+      },
       "widgetsTitle": "Dashboard widgets",
       "widgets": {
         "kpis": "Today KPIs",
@@ -2055,6 +2087,19 @@
     "ops": {
       "title": "Operations",
       "subtitle": "Store operations, banners, shipping simulator, and webhooks.",
+      "health": {
+        "title": "Health dashboard",
+        "hint": "Quick signals for availability and processing backlogs.",
+        "backend": "Backend (DB ready)",
+        "webhooksFailed": "Webhook failures",
+        "webhooksBacklog": "Webhook backlog",
+        "emailFailures": "Email failures",
+        "lastHours": "Last {{hours}}h",
+        "lastChecked": "Last checked",
+        "errors": {
+          "load": "Could not load health signals."
+        }
+      },
       "banner": {
         "title": "Maintenance banners",
         "hint": "Schedule storefront announcement banners for downtime or promotions.",
@@ -3673,6 +3718,34 @@
       "title": "Orders",
       "hint": "Search by reference, id, email, or username.",
       "export": "Export CSV",
+      "exports": {
+        "nav": "Documents",
+        "title": "Order documents",
+        "hint": "Recent packing slips, receipts, and shipping labels created in admin.",
+        "back": "Back to orders",
+        "download": "Download",
+        "empty": "No documents yet.",
+        "ordersCount": "orders",
+        "table": {
+          "kind": "Type",
+          "orders": "Order(s)",
+          "file": "File",
+          "created": "Created",
+          "expires": "Expires",
+          "actions": "Actions"
+        },
+        "kinds": {
+          "packingSlip": "Packing slip",
+          "packingSlipsBatch": "Packing slips (batch)",
+          "shippingLabel": "Shipping label",
+          "receipt": "Receipt (PDF)"
+        },
+        "errors": {
+          "load": "Could not load documents.",
+          "download": "Could not download document.",
+          "expired": "This document has expired."
+        }
+      },
       "help": {
         "subtitle": "Quick guide to managing orders.",
         "mediaAlt": "Example view of the orders list (search, status filters, export).",
@@ -3885,6 +3958,7 @@
         "voidPayment": "Void payment",
         "deliveryEmail": "Send delivery email",
         "packingSlip": "Download packing slip",
+        "receiptPdf": "Download receipt (PDF)",
         "partialRefund": "Partial refund",
         "addNote": "Add note",
         "refund": "Request refund"
@@ -4049,6 +4123,7 @@
         "noteRequired": "Note is required.",
         "deliveryEmail": "Could not send delivery email.",
         "packingSlip": "Could not download packing slip.",
+        "receiptPdf": "Could not download receipt.",
         "shippingLabelUpload": "Could not upload shipping label.",
         "shippingLabelDownload": "Could not download shipping label.",
         "shippingLabelDelete": "Could not delete shipping label.",

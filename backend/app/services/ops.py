@@ -286,6 +286,32 @@ async def count_failed_webhooks(session: AsyncSession, *, since_hours: int = 24)
     return int(stripe_failed or 0) + int(paypal_failed or 0)
 
 
+async def count_webhook_backlog(session: AsyncSession, *, since_hours: int = 24) -> int:
+    now = datetime.now(timezone.utc)
+    hours = max(1, int(since_hours or 0))
+    since = now - timedelta(hours=hours)
+
+    stripe_pending = await session.scalar(
+        select(func.count())
+        .select_from(StripeWebhookEvent)
+        .where(
+            StripeWebhookEvent.processed_at.is_(None),
+            or_(StripeWebhookEvent.last_error.is_(None), StripeWebhookEvent.last_error == ""),
+            StripeWebhookEvent.last_attempt_at >= since,
+        )
+    )
+    paypal_pending = await session.scalar(
+        select(func.count())
+        .select_from(PayPalWebhookEvent)
+        .where(
+            PayPalWebhookEvent.processed_at.is_(None),
+            or_(PayPalWebhookEvent.last_error.is_(None), PayPalWebhookEvent.last_error == ""),
+            PayPalWebhookEvent.last_attempt_at >= since,
+        )
+    )
+    return int(stripe_pending or 0) + int(paypal_pending or 0)
+
+
 async def list_email_failures(
     session: AsyncSession,
     *,

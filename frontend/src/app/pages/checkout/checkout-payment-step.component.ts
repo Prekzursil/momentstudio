@@ -168,6 +168,12 @@ import { ButtonComponent } from '../../shared/button.component';
           </span>
         </label>
 
+        <label class="flex items-start gap-2">
+          <input type="checkbox" [checked]="vm.analyticsOptIn" (change)="vm.setAnalyticsOptIn($any($event.target).checked)" />
+          <span>{{ 'checkout.analyticsOptInLabel' | translate }}</span>
+        </label>
+        <p class="text-xs text-slate-600 dark:text-slate-300">{{ 'checkout.analyticsOptInCopy' | translate }}</p>
+
         <p *ngIf="vm.consentError" class="text-xs text-rose-700 dark:text-rose-300">{{ vm.consentError }}</p>
       </div>
       <div *ngIf="vm.paymentNotReady" class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">

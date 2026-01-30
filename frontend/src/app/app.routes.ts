@@ -246,6 +246,13 @@ export const routes: Routes = [
         title: 'Orders | Admin | momentstudio'
       },
       {
+        path: 'orders/exports',
+        loadComponent: () =>
+          import('./pages/admin/orders/admin-order-exports.component').then((m) => m.AdminOrderExportsComponent),
+        canActivate: [adminSectionGuard('orders')],
+        title: 'Order exports | Admin | momentstudio'
+      },
+      {
         path: 'orders/:orderId',
         loadComponent: () =>
           import('./pages/admin/orders/admin-order-detail.component').then((m) => m.AdminOrderDetailComponent),
@@ -310,6 +317,11 @@ export const routes: Routes = [
         title: 'Ops | Admin | momentstudio'
       }
     ]
+  },
+  {
+    path: 'offline',
+    loadComponent: () => import('./pages/offline/offline.component').then((m) => m.OfflineComponent),
+    title: 'Offline | momentstudio'
   },
   { path: 'error', component: ErrorComponent, title: 'Something went wrong' },
   { path: '**', component: NotFoundComponent, title: 'Not Found' }

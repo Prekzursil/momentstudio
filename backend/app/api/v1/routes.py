@@ -23,6 +23,7 @@ from app.api.v1 import taxes
 from app.api.v1 import ops
 from app.api.v1 import observability
 from app.api.v1 import newsletter
+from app.api.v1 import analytics
 from app.models.catalog import Product
 from fastapi import Response, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -57,6 +58,7 @@ api_router.include_router(taxes.router)
 api_router.include_router(ops.router)
 api_router.include_router(observability.router)
 api_router.include_router(newsletter.router)
+api_router.include_router(analytics.router)
 
 
 @api_router.get("/health", tags=["health"])

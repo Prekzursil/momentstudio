@@ -63,6 +63,7 @@ from app.models.user import AdminAuditLog, EmailVerificationToken, User, Refresh
 from app.models.promo import PromoCode, StripeCouponMapping
 from app.models.coupons_v2 import Promotion
 from app.models.user_export import UserDataExportJob, UserDataExportStatus
+from app.models.analytics_event import AnalyticsEvent
 from app.services import auth as auth_service
 from app.services import audit_chain as audit_chain_service
 from app.services import email as email_service
@@ -90,6 +91,7 @@ from app.schemas.gdpr_admin import (
     AdminGdprUserRef,
 )
 from app.schemas.user_segments_admin import AdminUserSegmentListItem, AdminUserSegmentResponse
+from app.schemas.analytics import AdminFunnelConversions, AdminFunnelCounts, AdminFunnelMetricsResponse
 
 router = APIRouter(prefix="/admin/dashboard", tags=["admin"])
 
@@ -514,6 +516,74 @@ async def admin_send_scheduled_report(
         return await admin_reports_service.send_report_now(session, kind=kind, force=force)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.get("/funnel", response_model=AdminFunnelMetricsResponse)
+async def admin_funnel_metrics(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("dashboard")),
+    range_days: int = Query(default=30, ge=1, le=365),
+    range_from: date | None = Query(default=None),
+    range_to: date | None = Query(default=None),
+) -> AdminFunnelMetricsResponse:
+    now = datetime.now(timezone.utc)
+    if (range_from is None) != (range_to is None):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="range_from and range_to must be provided together",
+        )
+
+    if range_from is not None and range_to is not None:
+        if range_to < range_from:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="range_to must be on/after range_from",
+            )
+        start = datetime.combine(range_from, datetime.min.time(), tzinfo=timezone.utc)
+        end = datetime.combine(range_to + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc)
+        effective_range_days = (range_to - range_from).days + 1
+    else:
+        start = now - timedelta(days=range_days)
+        end = now
+        effective_range_days = range_days
+
+    window_filters = [AnalyticsEvent.created_at >= start, AnalyticsEvent.created_at < end]
+
+    async def _distinct_sessions(event: str) -> int:
+        value = await session.scalar(
+            select(func.count(func.distinct(AnalyticsEvent.session_id))).where(
+                *window_filters,
+                AnalyticsEvent.event == event,
+            )
+        )
+        return int(value or 0)
+
+    sessions_count = await _distinct_sessions("session_start")
+    carts_count = await _distinct_sessions("view_cart")
+    checkouts_count = await _distinct_sessions("checkout_start")
+    orders_count = await _distinct_sessions("checkout_success")
+
+    def _rate(numer: int, denom: int) -> float | None:
+        if denom <= 0:
+            return None
+        return numer / denom
+
+    return AdminFunnelMetricsResponse(
+        range_days=int(effective_range_days),
+        range_from=start.date(),
+        range_to=(end - timedelta(microseconds=1)).date(),
+        counts=AdminFunnelCounts(
+            sessions=sessions_count,
+            carts=carts_count,
+            checkouts=checkouts_count,
+            orders=orders_count,
+        ),
+        conversions=AdminFunnelConversions(
+            to_cart=_rate(carts_count, sessions_count),
+            to_checkout=_rate(checkouts_count, carts_count),
+            to_order=_rate(orders_count, checkouts_count),
+        ),
+    )
 
 
 @router.get("/channel-breakdown")

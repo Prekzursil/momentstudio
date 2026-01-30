@@ -67,6 +67,7 @@ class Settings(BaseSettings):
     account_deletion_cooldown_hours: int = 24
     gdpr_export_sla_days: int = 30
     gdpr_deletion_sla_days: int = 30
+    order_export_retention_days: int = 30
     audit_retention_days_product: int = 0
     audit_retention_days_content: int = 0
     audit_retention_days_security: int = 0

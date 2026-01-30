@@ -20,6 +20,7 @@ from app.schemas.ops import (
     MaintenanceBannerUpdate,
     ShippingSimulationRequest,
     ShippingSimulationResult,
+    WebhookBacklogCount,
     WebhookEventDetail,
     WebhookEventRead,
 )
@@ -127,6 +128,16 @@ async def admin_webhook_failure_stats(
 ) -> FailureCount:
     failed = await ops_service.count_failed_webhooks(session, since_hours=since_hours)
     return FailureCount(failed=failed, since_hours=int(since_hours))
+
+
+@router.get("/admin/webhooks/backlog", response_model=WebhookBacklogCount)
+async def admin_webhook_backlog_stats(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("ops")),
+    since_hours: int = Query(default=24, ge=1, le=168),
+) -> WebhookBacklogCount:
+    pending = await ops_service.count_webhook_backlog(session, since_hours=since_hours)
+    return WebhookBacklogCount(pending=pending, since_hours=int(since_hours))
 
 
 @router.get("/admin/webhooks/{provider}/{event_id}", response_model=WebhookEventDetail)

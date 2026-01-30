@@ -28,6 +28,25 @@ export interface AdminOrderListResponse {
   meta: AdminPaginationMeta;
 }
 
+export type OrderDocumentExportKind = 'packing_slip' | 'packing_slips_batch' | 'shipping_label' | 'receipt';
+
+export interface AdminOrderDocumentExport {
+  id: string;
+  kind: OrderDocumentExportKind;
+  filename: string;
+  mime_type: string;
+  created_at: string;
+  expires_at?: string | null;
+  order_id?: string | null;
+  order_reference?: string | null;
+  order_count?: number;
+}
+
+export interface AdminOrderDocumentExportListResponse {
+  items: AdminOrderDocumentExport[];
+  meta: AdminPaginationMeta;
+}
+
 export interface AdminOrderEvent {
   id: string;
   event: string;
@@ -483,6 +502,18 @@ export class AdminOrdersService {
 
   downloadBatchPackingSlips(orderIds: string[]): Observable<Blob> {
     return this.api.postBlob('/orders/admin/batch/packing-slips', { order_ids: orderIds });
+  }
+
+  downloadReceiptPdf(orderId: string): Observable<Blob> {
+    return this.api.getBlob(`/orders/admin/${orderId}/receipt`);
+  }
+
+  listDocumentExports(params?: { page?: number; limit?: number }): Observable<AdminOrderDocumentExportListResponse> {
+    return this.api.get<AdminOrderDocumentExportListResponse>('/orders/admin/exports', params as any);
+  }
+
+  downloadDocumentExport(exportId: string): Observable<Blob> {
+    return this.api.getBlob(`/orders/admin/exports/${exportId}/download`);
   }
 
   downloadExport(columns?: string[], opts?: { include_pii?: boolean }): Observable<Blob> {
