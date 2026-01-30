@@ -25,6 +25,7 @@ class ContentBlock(Base):
     status: Mapped[ContentStatus] = mapped_column(Enum(ContentStatus), nullable=False, default=ContentStatus.draft)
     version: Mapped[int] = mapped_column(nullable=False, default=1)
     meta: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    view_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     lang: Mapped[str | None] = mapped_column(String(10), nullable=True, index=True)
     needs_translation_en: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -59,7 +60,7 @@ class ContentBlock(Base):
         lazy="selectin",
         order_by="ContentAuditLog.created_at",
     )
-    author = relationship("User", foreign_keys=[author_id])
+    author = relationship("User", foreign_keys=[author_id], lazy="selectin")
     translations: Mapped[list["ContentBlockTranslation"]] = relationship(
         "ContentBlockTranslation", back_populates="block", cascade="all, delete-orphan", lazy="selectin"
     )
@@ -89,6 +90,18 @@ class ContentImage(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     content_block_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("content_blocks.id"), nullable=False)
+    root_image_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("content_images.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    source_image_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("content_images.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     url: Mapped[str] = mapped_column(String(255), nullable=False)
     alt_text: Mapped[str | None] = mapped_column(String(255), nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=1)

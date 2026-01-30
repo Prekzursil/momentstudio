@@ -48,13 +48,18 @@ jobs:
         run: |
           cd frontend
           npm run lint
+      - name: i18n key check
+        if: steps.detect.outputs.missing != 'true'
+        run: |
+          cd frontend
+          npm run i18n:check
 
       - name: Run tests
         if: steps.detect.outputs.missing != 'true'
         run: |
           cd frontend
           export CHROME_BIN="${{ steps.chrome.outputs.chrome-path }}"
-          npm test -- --watch=false --browsers=ChromeHeadless || npm test -- --watch=false
+          npm test -- --watch=false --browsers=ChromeHeadlessNoSandbox || npm test -- --watch=false
 
       - name: Build
         if: steps.detect.outputs.missing != 'true'

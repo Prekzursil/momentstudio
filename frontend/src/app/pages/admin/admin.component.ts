@@ -6,6 +6,8 @@ import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { ErrorStateComponent } from '../../shared/error-state.component';
 import { InputComponent } from '../../shared/input.component';
+import { HelpPanelComponent } from '../../shared/help-panel.component';
+import { ModalComponent } from '../../shared/modal.component';
 import { RichEditorComponent } from '../../shared/rich-editor.component';
 import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
 import { SkeletonComponent } from '../../shared/skeleton.component';
@@ -30,17 +32,23 @@ import {
   ContentRedirectRead,
   ContentRedirectImportResult,
   StructuredDataValidationResponse,
-  ContentLinkCheckIssue
+  ContentLinkCheckIssue,
+  ContentFindReplacePreviewResponse,
+  ContentFindReplaceApplyResponse,
+  ContentPreviewTokenResponse
 } from '../../core/admin.service';
 import { AdminBlogComment, BlogService } from '../../core/blog.service';
 import { FxAdminService, FxAdminStatus, FxOverrideAuditEntry } from '../../core/fx-admin.service';
 import { TaxGroupRead, TaxesAdminService } from '../../core/taxes-admin.service';
 import { ToastService } from '../../core/toast.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { firstValueFrom, Subscription } from 'rxjs';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { combineLatest, firstValueFrom, forkJoin, of, Subscription } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
 import { MarkdownService } from '../../core/markdown.service';
 import { AuthService } from '../../core/auth.service';
 import { appConfig } from '../../core/app-config';
+import { AdminProductListItem, AdminProductsService } from '../../core/admin-products.service';
 import { diffLines } from 'diff';
 import { formatIdentity } from '../../shared/user-identity';
 import { ContentRevisionsComponent } from './shared/content-revisions.component';
@@ -49,6 +57,14 @@ import { BannerBlockComponent } from '../../shared/banner-block.component';
 import { CarouselBlockComponent } from '../../shared/carousel-block.component';
 import { CmsEditorPrefsService } from './shared/cms-editor-prefs.service';
 import { CmsBlockLibraryBlockType, CmsBlockLibraryComponent, CmsBlockLibraryTemplate } from './shared/cms-block-library.component';
+import { LocalizedTextEditorComponent } from './shared/localized-text-editor.component';
+import {
+  CMS_GLOBAL_SECTIONS,
+  CmsGlobalSectionKey,
+  cmsGlobalSectionAllowedTypes,
+  cmsGlobalSectionDefaultTitle,
+  isCmsGlobalSectionKey
+} from '../../shared/cms-global-sections';
 
 type AdminContentSection = 'home' | 'pages' | 'blog' | 'settings';
 type UiLang = 'en' | 'ro';
@@ -63,7 +79,40 @@ type HomeSectionId =
   | 'recently_viewed'
   | 'why';
 
-type HomeBlockType = HomeSectionId | 'text' | 'image' | 'gallery' | 'banner' | 'carousel';
+type CmsColumnsBreakpoint = 'sm' | 'md' | 'lg';
+type CmsProductGridSource = 'category' | 'collection' | 'products';
+type CmsFormType = 'contact' | 'newsletter';
+type CmsContactTopic = 'contact' | 'support' | 'refund' | 'dispute';
+
+type CmsColumnsColumnDraft = {
+  title: LocalizedText;
+  body_markdown: LocalizedText;
+};
+
+type CmsTestimonialDraft = {
+  quote_markdown: LocalizedText;
+  author: LocalizedText;
+  role: LocalizedText;
+};
+
+type CmsFaqItemDraft = {
+  question: LocalizedText;
+  answer_markdown: LocalizedText;
+};
+
+type HomeBlockType =
+  | HomeSectionId
+  | 'text'
+  | 'columns'
+  | 'cta'
+  | 'faq'
+  | 'testimonials'
+  | 'product_grid'
+  | 'form'
+  | 'image'
+  | 'gallery'
+  | 'banner'
+  | 'carousel';
 
 type LocalizedText = { en: string; ro: string };
 
@@ -97,12 +146,44 @@ type CarouselSettingsDraft = {
   pause_on_hover: boolean;
 };
 
+type CmsBlockLayoutSpacing = 'none' | 'sm' | 'md' | 'lg';
+type CmsBlockLayoutBackground = 'none' | 'muted' | 'accent';
+type CmsBlockLayoutAlign = 'left' | 'center';
+type CmsBlockLayoutMaxWidth = 'full' | 'narrow' | 'prose' | 'wide';
+
+type CmsBlockLayout = {
+  spacing: CmsBlockLayoutSpacing;
+  background: CmsBlockLayoutBackground;
+  align: CmsBlockLayoutAlign;
+  max_width: CmsBlockLayoutMaxWidth;
+};
+
+type CmsReusableBlock = {
+  id: string;
+  title: string;
+  block: Omit<PageBlockDraft, 'key'>;
+};
+
 type HomeBlockDraft = {
   key: string;
   type: HomeBlockType;
   enabled: boolean;
   title: LocalizedText;
   body_markdown: LocalizedText;
+  columns: CmsColumnsColumnDraft[];
+  columns_breakpoint: CmsColumnsBreakpoint;
+  cta_label: LocalizedText;
+  cta_url: string;
+  cta_new_tab: boolean;
+  faq_items: CmsFaqItemDraft[];
+  testimonials: CmsTestimonialDraft[];
+  product_grid_source: CmsProductGridSource;
+  product_grid_category_slug: string;
+  product_grid_collection_slug: string;
+  product_grid_product_slugs: string;
+  product_grid_limit: number;
+  form_type: CmsFormType;
+  form_topic: CmsContactTopic;
   url: string;
   link_url: string;
   focal_x: number;
@@ -113,10 +194,22 @@ type HomeBlockDraft = {
   slide: SlideDraft;
   slides: SlideDraft[];
   settings: CarouselSettingsDraft;
+  layout?: CmsBlockLayout;
 };
 
-type PageBuilderKey = `page.${string}`;
-type PageBlockType = 'text' | 'image' | 'gallery' | 'banner' | 'carousel';
+type PageBuilderKey = `page.${string}` | CmsGlobalSectionKey;
+type PageBlockType =
+  | 'text'
+  | 'columns'
+  | 'cta'
+  | 'faq'
+  | 'testimonials'
+  | 'product_grid'
+  | 'form'
+  | 'image'
+  | 'gallery'
+  | 'banner'
+  | 'carousel';
 type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
 
 type PageBlocksDraftState = {
@@ -125,6 +218,30 @@ type PageBlocksDraftState = {
   publishedAt: string;
   publishedUntil: string;
   requiresAuth: boolean;
+};
+
+type PageCreationTemplate = 'blank' | 'about' | 'faq' | 'shipping' | 'returns';
+
+type BlogDraftState = {
+  title: string;
+  body_markdown: string;
+  status: ContentStatusUi;
+  published_at: string;
+  published_until: string;
+  summary: string;
+  tags: string;
+  series: string;
+  cover_image_url: string;
+  reading_time_minutes: string;
+  pinned: boolean;
+  pin_order: string;
+};
+
+type CmsPublishChecklistResult = {
+  missingTranslations: UiLang[];
+  missingAlt: string[];
+  emptySections: string[];
+  linkIssues: ContentLinkCheckIssue[];
 };
 
 type CmsAutosaveEnvelope = {
@@ -376,6 +493,8 @@ class CmsDraftManager<T> {
     ButtonComponent,
     ErrorStateComponent,
     InputComponent,
+    HelpPanelComponent,
+    ModalComponent,
     RichEditorComponent,
     LocalizedCurrencyPipe,
     SkeletonComponent,
@@ -384,6 +503,7 @@ class CmsDraftManager<T> {
     CmsBlockLibraryComponent,
     BannerBlockComponent,
     CarouselBlockComponent,
+    LocalizedTextEditorComponent,
     TranslateModule
   ],
  template: `
@@ -514,16 +634,245 @@ class CmsDraftManager<T> {
                 </div>
               </div>
             </div>
-            <div class="flex items-center gap-2 text-sm">
-              <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="socialMessage">{{ socialMessage }}</span>
-              <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="socialError">{{ socialError }}</span>
+	            <div class="flex items-center gap-2 text-sm">
+	              <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="socialMessage">{{ socialMessage }}</span>
+	              <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="socialError">{{ socialError }}</span>
+	            </div>
+	          </section>
+
+          <section *ngIf="section() === 'settings'" class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+            <div class="flex items-center justify-between gap-3">
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.navigation.title' | translate }}</h2>
+              <div class="flex items-center gap-2">
+                <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadNavigation()"></app-button>
+                <app-button size="sm" [label]="'adminUi.actions.save' | translate" (action)="saveNavigation()"></app-button>
+              </div>
+            </div>
+            <p class="text-xs text-slate-600 dark:text-slate-300">
+              {{ 'adminUi.site.navigation.hint' | translate }}
+            </p>
+
+            <div class="grid gap-4">
+              <div class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30">
+                <div class="flex items-center justify-between gap-3">
+                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.navigation.headerLinks' | translate }}</p>
+                  <button
+                    type="button"
+                    class="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-300"
+                    (click)="addNavigationLink('header')"
+                  >
+                    {{ 'adminUi.actions.add' | translate }}
+                  </button>
+                </div>
+                <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.site.navigation.dragHint' | translate }}</p>
+
+                <div *ngIf="navigationForm.header_links.length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.site.navigation.empty' | translate }}
+                </div>
+
+                <div
+                  *ngFor="let link of navigationForm.header_links; let i = index"
+                  class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+                  (dragover)="onNavigationDragOver($event)"
+                  (drop)="onNavigationDrop('header', link.id)"
+                >
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <span
+                        class="cursor-move select-none text-slate-400 dark:text-slate-500"
+                        draggable="true"
+                        (dragstart)="onNavigationDragStart('header', link.id)"
+                        aria-label="Drag"
+                        >⠿</span
+                      >
+                      <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">#{{ i + 1 }}</span>
+                      <span class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ link.url }}</span>
+                    </div>
+                    <div class="flex flex-wrap justify-end gap-2">
+                      <app-button size="sm" variant="ghost" label="↑" (action)="moveNavigationLink('header', link.id, -1)"></app-button>
+                      <app-button size="sm" variant="ghost" label="↓" (action)="moveNavigationLink('header', link.id, 1)"></app-button>
+                      <app-button
+                        size="sm"
+                        variant="ghost"
+                        [label]="'adminUi.actions.remove' | translate"
+                        (action)="removeNavigationLink('header', link.id)"
+                      ></app-button>
+                    </div>
+                  </div>
+                  <div class="mt-3 grid gap-3 md:grid-cols-3 text-sm">
+                    <app-input [label]="'adminUi.site.navigation.fields.labelEn' | translate" [(value)]="link.label.en"></app-input>
+                    <app-input [label]="'adminUi.site.navigation.fields.labelRo' | translate" [(value)]="link.label.ro"></app-input>
+                    <app-input [label]="'adminUi.site.navigation.fields.url' | translate" [(value)]="link.url"></app-input>
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30">
+                <div class="flex items-center justify-between gap-3">
+                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.navigation.footerHandcraftedLinks' | translate }}</p>
+                  <button
+                    type="button"
+                    class="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-300"
+                    (click)="addNavigationLink('footer_handcrafted')"
+                  >
+                    {{ 'adminUi.actions.add' | translate }}
+                  </button>
+                </div>
+                <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.site.navigation.dragHint' | translate }}</p>
+
+                <div *ngIf="navigationForm.footer_handcrafted_links.length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.site.navigation.empty' | translate }}
+                </div>
+
+                <div
+                  *ngFor="let link of navigationForm.footer_handcrafted_links; let i = index"
+                  class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+                  (dragover)="onNavigationDragOver($event)"
+                  (drop)="onNavigationDrop('footer_handcrafted', link.id)"
+                >
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <span
+                        class="cursor-move select-none text-slate-400 dark:text-slate-500"
+                        draggable="true"
+                        (dragstart)="onNavigationDragStart('footer_handcrafted', link.id)"
+                        aria-label="Drag"
+                        >⠿</span
+                      >
+                      <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">#{{ i + 1 }}</span>
+                      <span class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ link.url }}</span>
+                    </div>
+                    <div class="flex flex-wrap justify-end gap-2">
+                      <app-button
+                        size="sm"
+                        variant="ghost"
+                        label="↑"
+                        (action)="moveNavigationLink('footer_handcrafted', link.id, -1)"
+                      ></app-button>
+                      <app-button size="sm" variant="ghost" label="↓" (action)="moveNavigationLink('footer_handcrafted', link.id, 1)"></app-button>
+                      <app-button
+                        size="sm"
+                        variant="ghost"
+                        [label]="'adminUi.actions.remove' | translate"
+                        (action)="removeNavigationLink('footer_handcrafted', link.id)"
+                      ></app-button>
+                    </div>
+                  </div>
+                  <div class="mt-3 grid gap-3 md:grid-cols-3 text-sm">
+                    <app-input [label]="'adminUi.site.navigation.fields.labelEn' | translate" [(value)]="link.label.en"></app-input>
+                    <app-input [label]="'adminUi.site.navigation.fields.labelRo' | translate" [(value)]="link.label.ro"></app-input>
+                    <app-input [label]="'adminUi.site.navigation.fields.url' | translate" [(value)]="link.url"></app-input>
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30">
+                <div class="flex items-center justify-between gap-3">
+                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.navigation.footerLegalLinks' | translate }}</p>
+                  <button
+                    type="button"
+                    class="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-300"
+                    (click)="addNavigationLink('footer_legal')"
+                  >
+                    {{ 'adminUi.actions.add' | translate }}
+                  </button>
+                </div>
+                <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.site.navigation.dragHint' | translate }}</p>
+
+                <div *ngIf="navigationForm.footer_legal_links.length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.site.navigation.empty' | translate }}
+                </div>
+
+                <div
+                  *ngFor="let link of navigationForm.footer_legal_links; let i = index"
+                  class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+                  (dragover)="onNavigationDragOver($event)"
+                  (drop)="onNavigationDrop('footer_legal', link.id)"
+                >
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <span
+                        class="cursor-move select-none text-slate-400 dark:text-slate-500"
+                        draggable="true"
+                        (dragstart)="onNavigationDragStart('footer_legal', link.id)"
+                        aria-label="Drag"
+                        >⠿</span
+                      >
+                      <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">#{{ i + 1 }}</span>
+                      <span class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ link.url }}</span>
+                    </div>
+                    <div class="flex flex-wrap justify-end gap-2">
+                      <app-button size="sm" variant="ghost" label="↑" (action)="moveNavigationLink('footer_legal', link.id, -1)"></app-button>
+                      <app-button size="sm" variant="ghost" label="↓" (action)="moveNavigationLink('footer_legal', link.id, 1)"></app-button>
+                      <app-button
+                        size="sm"
+                        variant="ghost"
+                        [label]="'adminUi.actions.remove' | translate"
+                        (action)="removeNavigationLink('footer_legal', link.id)"
+                      ></app-button>
+                    </div>
+                  </div>
+                  <div class="mt-3 grid gap-3 md:grid-cols-3 text-sm">
+                    <app-input [label]="'adminUi.site.navigation.fields.labelEn' | translate" [(value)]="link.label.en"></app-input>
+                    <app-input [label]="'adminUi.site.navigation.fields.labelRo' | translate" [(value)]="link.label.ro"></app-input>
+                    <app-input [label]="'adminUi.site.navigation.fields.url' | translate" [(value)]="link.url"></app-input>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2 text-sm">
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.site.navigation.resetDefaults' | translate"
+                (action)="resetNavigationDefaults()"
+              ></app-button>
+              <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="navigationMessage">{{ navigationMessage }}</span>
+              <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="navigationError">{{ navigationError }}</span>
             </div>
           </section>
 
           <section *ngIf="section() === 'settings'" class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between gap-3">
-              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.checkout.title' | translate }}</h2>
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.company.title' | translate }}</h2>
               <div class="flex items-center gap-2">
+                <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadCompany()"></app-button>
+                <app-button size="sm" [label]="'adminUi.actions.save' | translate" (action)="saveCompany()"></app-button>
+              </div>
+            </div>
+            <p class="text-xs text-slate-600 dark:text-slate-300">
+              {{ 'adminUi.site.company.hint' | translate }}
+            </p>
+            <div class="grid md:grid-cols-2 gap-3 text-sm">
+              <app-input [label]="'adminUi.site.company.fields.name' | translate" [(value)]="companyForm.name"></app-input>
+              <app-input [label]="'adminUi.site.company.fields.registrationNumber' | translate" [(value)]="companyForm.registration_number"></app-input>
+              <app-input [label]="'adminUi.site.company.fields.cui' | translate" [(value)]="companyForm.cui"></app-input>
+              <app-input [label]="'adminUi.site.company.fields.phone' | translate" [(value)]="companyForm.phone"></app-input>
+              <app-input [label]="'adminUi.site.company.fields.email' | translate" [(value)]="companyForm.email"></app-input>
+              <app-input [label]="'adminUi.site.company.fields.address' | translate" [(value)]="companyForm.address"></app-input>
+            </div>
+
+            <div
+              *ngIf="companyMissingFields().length"
+              class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
+            >
+              <p class="text-xs font-semibold uppercase tracking-[0.2em]">{{ 'adminUi.site.company.missing.title' | translate }}</p>
+              <ul class="mt-2 list-disc pl-5 text-xs">
+                <li *ngFor="let fieldKey of companyMissingFields()">{{ fieldKey | translate }}</li>
+              </ul>
+            </div>
+
+            <div class="flex items-center gap-2 text-sm">
+              <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="companyMessage">{{ companyMessage }}</span>
+              <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="companyError">{{ companyError }}</span>
+            </div>
+          </section>
+
+	          <section *ngIf="section() === 'settings'" class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+	            <div class="flex items-center justify-between gap-3">
+	              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.checkout.title' | translate }}</h2>
+	              <div class="flex items-center gap-2">
                 <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadCheckoutSettings()"></app-button>
                 <app-button size="sm" [label]="'adminUi.actions.save' | translate" (action)="saveCheckoutSettings()"></app-button>
               </div>
@@ -964,71 +1313,143 @@ class CmsDraftManager<T> {
           <section *ngIf="section() === 'pages'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.pages.title' | translate }}</h2>
-              <div class="flex gap-2 text-sm">
-                <button
-                  type="button"
-                  class="px-3 py-1 rounded border"
-                  [class.bg-slate-900]="infoLang === 'en'"
-                  [class.text-white]="infoLang === 'en'"
-                  (click)="selectInfoLang('en')"
-                >
-                  EN
-                </button>
-                <button
-                  type="button"
-                  class="px-3 py-1 rounded border"
-                  [class.bg-slate-900]="infoLang === 'ro'"
-                  [class.text-white]="infoLang === 'ro'"
-                  (click)="selectInfoLang('ro')"
-                >
-                  RO
-                </button>
+              <div class="flex flex-wrap items-center justify-end gap-3 text-sm">
+                <div class="flex gap-2">
+                  <button
+                    type="button"
+                    class="px-3 py-1 rounded border"
+                    [class.bg-slate-900]="infoLang === 'en'"
+                    [class.text-white]="infoLang === 'en'"
+                    (click)="selectInfoLang('en')"
+                  >
+                    EN
+                  </button>
+                  <button
+                    type="button"
+                    class="px-3 py-1 rounded border"
+                    [class.bg-slate-900]="infoLang === 'ro'"
+                    [class.text-white]="infoLang === 'ro'"
+                    (click)="selectInfoLang('ro')"
+                  >
+                    RO
+                  </button>
+                </div>
+
+                <div class="flex items-center gap-2">
+                  <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                    {{ 'adminUi.content.translation.layoutLabel' | translate }}
+                  </span>
+                  <div class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <button
+                      type="button"
+                      class="px-3 py-1.5 text-xs font-semibold"
+                      [class.bg-slate-900]="cmsPrefs.translationLayout() === 'single'"
+                      [class.text-white]="cmsPrefs.translationLayout() === 'single'"
+                      [class.text-slate-700]="cmsPrefs.translationLayout() !== 'single'"
+                      [class.dark:text-slate-200]="cmsPrefs.translationLayout() !== 'single'"
+                      (click)="cmsPrefs.setTranslationLayout('single')"
+                    >
+                      {{ 'adminUi.content.translation.layouts.single' | translate }}
+                    </button>
+                    <button
+                      type="button"
+                      class="px-3 py-1.5 text-xs font-semibold"
+                      [class.bg-slate-900]="cmsPrefs.translationLayout() === 'sideBySide'"
+                      [class.text-white]="cmsPrefs.translationLayout() === 'sideBySide'"
+                      [class.text-slate-700]="cmsPrefs.translationLayout() !== 'sideBySide'"
+                      [class.dark:text-slate-200]="cmsPrefs.translationLayout() !== 'sideBySide'"
+                      (click)="cmsPrefs.setTranslationLayout('sideBySide')"
+                    >
+                      {{ 'adminUi.content.translation.layouts.sideBySide' | translate }}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
             <div class="grid gap-3 text-sm">
-              <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.site.pages.aboutLabel' | translate }}
-                <textarea
-                  rows="3"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="infoForm.about[infoLang]"
-                ></textarea>
-              </label>
+              <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pagesAboutSingle">
+                <app-localized-text-editor
+                  [label]="'adminUi.site.pages.aboutLabel' | translate"
+                  [multiline]="true"
+                  [rows]="5"
+                  [value]="infoForm.about"
+                ></app-localized-text-editor>
+              </ng-container>
+              <ng-template #pagesAboutSingle>
+                <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.site.pages.aboutLabel' | translate }}
+                  <textarea
+                    rows="3"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="infoForm.about[infoLang]"
+                  ></textarea>
+                </label>
+              </ng-template>
               <div class="flex gap-2">
-                <app-button size="sm" [label]="'adminUi.site.pages.saveAbout' | translate" (action)="saveInfo('page.about', infoForm.about[infoLang])"></app-button>
+                <app-button size="sm" [label]="'adminUi.site.pages.saveAbout' | translate" (action)="saveInfoUi('page.about', infoForm.about)"></app-button>
               </div>
-              <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.site.pages.faqLabel' | translate }}
-                <textarea
-                  rows="3"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="infoForm.faq[infoLang]"
-                ></textarea>
-              </label>
+              <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pagesFaqSingle">
+                <app-localized-text-editor
+                  [label]="'adminUi.site.pages.faqLabel' | translate"
+                  [multiline]="true"
+                  [rows]="5"
+                  [value]="infoForm.faq"
+                ></app-localized-text-editor>
+              </ng-container>
+              <ng-template #pagesFaqSingle>
+                <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.site.pages.faqLabel' | translate }}
+                  <textarea
+                    rows="3"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="infoForm.faq[infoLang]"
+                  ></textarea>
+                </label>
+              </ng-template>
               <div class="flex gap-2">
-                <app-button size="sm" [label]="'adminUi.site.pages.saveFaq' | translate" (action)="saveInfo('page.faq', infoForm.faq[infoLang])"></app-button>
+                <app-button size="sm" [label]="'adminUi.site.pages.saveFaq' | translate" (action)="saveInfoUi('page.faq', infoForm.faq)"></app-button>
               </div>
-              <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.site.pages.shippingLabel' | translate }}
-                <textarea
-                  rows="3"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="infoForm.shipping[infoLang]"
-                ></textarea>
-              </label>
+              <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pagesShippingSingle">
+                <app-localized-text-editor
+                  [label]="'adminUi.site.pages.shippingLabel' | translate"
+                  [multiline]="true"
+                  [rows]="5"
+                  [value]="infoForm.shipping"
+                ></app-localized-text-editor>
+              </ng-container>
+              <ng-template #pagesShippingSingle>
+                <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.site.pages.shippingLabel' | translate }}
+                  <textarea
+                    rows="3"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="infoForm.shipping[infoLang]"
+                  ></textarea>
+                </label>
+              </ng-template>
               <div class="flex gap-2">
-                <app-button size="sm" [label]="'adminUi.site.pages.saveShipping' | translate" (action)="saveInfo('page.shipping', infoForm.shipping[infoLang])"></app-button>
+                <app-button size="sm" [label]="'adminUi.site.pages.saveShipping' | translate" (action)="saveInfoUi('page.shipping', infoForm.shipping)"></app-button>
               </div>
-              <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.site.pages.contactLabel' | translate }}
-                <textarea
-                  rows="3"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="infoForm.contact[infoLang]"
-                ></textarea>
-              </label>
+              <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pagesContactSingle">
+                <app-localized-text-editor
+                  [label]="'adminUi.site.pages.contactLabel' | translate"
+                  [multiline]="true"
+                  [rows]="5"
+                  [value]="infoForm.contact"
+                ></app-localized-text-editor>
+              </ng-container>
+              <ng-template #pagesContactSingle>
+                <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.site.pages.contactLabel' | translate }}
+                  <textarea
+                    rows="3"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="infoForm.contact[infoLang]"
+                  ></textarea>
+                </label>
+              </ng-template>
               <div class="flex gap-2">
-                <app-button size="sm" [label]="'adminUi.site.pages.saveContact' | translate" (action)="saveInfo('page.contact', infoForm.contact[infoLang])"></app-button>
+                <app-button size="sm" [label]="'adminUi.site.pages.saveContact' | translate" (action)="saveInfoUi('page.contact', infoForm.contact)"></app-button>
                 <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="infoMessage">{{ infoMessage }}</span>
                 <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="infoError">{{ infoError }}</span>
               </div>
@@ -1040,12 +1461,25 @@ class CmsDraftManager<T> {
                 <div class="mt-3 grid gap-3">
                   <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.site.pages.builder.hint' | translate }}</p>
 
-                  <div class="grid gap-3 md:grid-cols-[1fr_180px_auto] items-end">
-                    <app-input [label]="'adminUi.site.pages.builder.newPageTitle' | translate" [(value)]="newCustomPageTitle"></app-input>
-                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                      {{ 'adminUi.site.pages.builder.status' | translate }}
-                      <select
-                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                  <div class="grid gap-3 md:grid-cols-[1fr_220px_180px_auto] items-end">
+	                    <app-input [label]="'adminUi.site.pages.builder.newPageTitle' | translate" [(value)]="newCustomPageTitle"></app-input>
+	                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                      {{ 'adminUi.site.pages.builder.template' | translate }}
+	                      <select
+	                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                        [(ngModel)]="newCustomPageTemplate"
+	                      >
+	                        <option [ngValue]="'blank'">{{ 'adminUi.site.pages.builder.templates.blank' | translate }}</option>
+	                        <option [ngValue]="'about'">{{ 'adminUi.site.pages.builder.templates.about' | translate }}</option>
+	                        <option [ngValue]="'faq'">{{ 'adminUi.site.pages.builder.templates.faq' | translate }}</option>
+	                        <option [ngValue]="'shipping'">{{ 'adminUi.site.pages.builder.templates.shipping' | translate }}</option>
+	                        <option [ngValue]="'returns'">{{ 'adminUi.site.pages.builder.templates.returns' | translate }}</option>
+	                      </select>
+	                    </label>
+	                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                      {{ 'adminUi.site.pages.builder.status' | translate }}
+	                      <select
+	                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                         [(ngModel)]="newCustomPageStatus"
                       >
                         <option [ngValue]="'draft'">{{ 'adminUi.status.draft' | translate }}</option>
@@ -1095,28 +1529,35 @@ class CmsDraftManager<T> {
                   <div class="grid gap-3 md:grid-cols-[1fr_auto] items-end">
                     <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                       {{ 'adminUi.site.pages.builder.page' | translate }}
-                      <select
-                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                        [(ngModel)]="pageBlocksKey"
-                        (ngModelChange)="onPageBlocksKeyChange($event)"
-                      >
-                        <ng-container *ngIf="contentPages.length; else defaultPages">
-                          <option *ngFor="let p of contentPages" [ngValue]="p.key">
-                            {{ p.title || p.slug }} · {{ p.slug }}
-                            <ng-container *ngIf="p.needs_translation_en || p.needs_translation_ro">
-                              ·
-                              <ng-container *ngIf="p.needs_translation_en">EN</ng-container>
-                              <ng-container *ngIf="p.needs_translation_en && p.needs_translation_ro">/</ng-container>
-                              <ng-container *ngIf="p.needs_translation_ro">RO</ng-container>
-                            </ng-container>
-                          </option>
-                        </ng-container>
-                        <ng-template #defaultPages>
-                          <option [ngValue]="'page.about'">{{ 'adminUi.site.pages.aboutLabel' | translate }}</option>
-                          <option [ngValue]="'page.contact'">{{ 'adminUi.site.pages.contactLabel' | translate }}</option>
-                        </ng-template>
-                      </select>
-                    </label>
+	                      <select
+	                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                        [(ngModel)]="pageBlocksKey"
+	                        (ngModelChange)="onPageBlocksKeyChange($event)"
+	                      >
+	                        <optgroup [label]="'adminUi.site.pages.builder.globalSections' | translate">
+	                          <option *ngFor="let section of globalSections" [ngValue]="section.key">
+	                            {{ section.labelKey | translate }}
+	                          </option>
+	                        </optgroup>
+	                        <optgroup [label]="'adminUi.site.pages.builder.pagesGroup' | translate">
+	                          <ng-container *ngIf="contentPages.length; else defaultPages">
+	                            <option *ngFor="let p of contentPages" [ngValue]="p.key">
+	                              {{ p.title || p.slug }} · {{ p.slug }}
+	                              <ng-container *ngIf="p.needs_translation_en || p.needs_translation_ro">
+	                                ·
+	                                <ng-container *ngIf="p.needs_translation_en">EN</ng-container>
+	                                <ng-container *ngIf="p.needs_translation_en && p.needs_translation_ro">/</ng-container>
+	                                <ng-container *ngIf="p.needs_translation_ro">RO</ng-container>
+	                              </ng-container>
+	                            </option>
+	                          </ng-container>
+	                          <ng-template #defaultPages>
+	                            <option [ngValue]="'page.about'">{{ 'adminUi.site.pages.aboutLabel' | translate }}</option>
+	                            <option [ngValue]="'page.contact'">{{ 'adminUi.site.pages.contactLabel' | translate }}</option>
+	                          </ng-template>
+	                        </optgroup>
+	                      </select>
+	                    </label>
 
                     <div class="flex flex-wrap items-end gap-2">
                       <app-button
@@ -1127,29 +1568,179 @@ class CmsDraftManager<T> {
                         (action)="renameCustomPageUrl()"
                       ></app-button>
                       <ng-container *ngIf="cmsAdvanced()">
-                        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                          {{ 'adminUi.site.pages.builder.addBlock' | translate }}
-                          <select
-                            class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                            [(ngModel)]="newPageBlockType"
-                          >
-                            <option [ngValue]="'text'">{{ 'adminUi.home.sections.blocks.text' | translate }}</option>
-                            <option [ngValue]="'image'">{{ 'adminUi.home.sections.blocks.image' | translate }}</option>
-                            <option [ngValue]="'gallery'">{{ 'adminUi.home.sections.blocks.gallery' | translate }}</option>
-                            <option [ngValue]="'banner'">{{ 'adminUi.home.sections.blocks.banner' | translate }}</option>
-                            <option [ngValue]="'carousel'">{{ 'adminUi.home.sections.blocks.carousel' | translate }}</option>
-                          </select>
-                        </label>
-                        <app-button size="sm" [label]="'adminUi.actions.add' | translate" (action)="addPageBlock(pageBlocksKey)"></app-button>
-                      </ng-container>
+	                        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                          {{ 'adminUi.site.pages.builder.addBlock' | translate }}
+	                          <select
+	                            class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                            [(ngModel)]="newPageBlockType"
+	                          >
+	                            <option *ngFor="let t of allowedPageBlockTypesForKey(pageBlocksKey)" [ngValue]="t">
+	                              {{ pageBlockTypeLabelKey(t) | translate }}
+	                            </option>
+	                          </select>
+	                        </label>
+	                        <app-button size="sm" [label]="'adminUi.actions.add' | translate" (action)="addPageBlock(pageBlocksKey)"></app-button>
+	                      </ng-container>
                     </div>
                   </div>
 
-                  <app-cms-block-library
-                    context="page"
-                    (add)="addPageBlockFromLibrary(pageBlocksKey, $event.type, $event.template)"
-                    (dragActive)="setPageInsertDragActive($event)"
-                  ></app-cms-block-library>
+                  <ng-container *ngIf="pagePreviewSlug(pageBlocksKey) as previewSlug">
+                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
+                      <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="grid gap-0.5 min-w-0">
+                          <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                            {{ 'adminUi.content.previewLinks.title' | translate }}
+                          </p>
+                          <p class="text-xs text-slate-500 dark:text-slate-400">
+                            {{ pagePublicPath(previewSlug) }} · {{ cmsPrefs.previewLang().toUpperCase() }} ·
+                            {{ cmsPrefs.previewTheme().toUpperCase() }} · {{ cmsPreviewViewportWidth() }}px
+                          </p>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-2">
+                          <app-button
+                            size="sm"
+                            variant="ghost"
+                            [label]="'adminUi.content.previewLinks.generate' | translate"
+                            (action)="generatePagePreviewLink(previewSlug)"
+                          ></app-button>
+                          <app-button
+                            size="sm"
+                            variant="ghost"
+                            [label]="'adminUi.actions.refresh' | translate"
+                            [disabled]="!pagePreviewToken || pagePreviewForSlug !== previewSlug"
+                            (action)="refreshPagePreview()"
+                          ></app-button>
+                          <a
+                            *ngIf="pagePreviewShareUrl(previewSlug) as previewUrl"
+                            class="inline-flex items-center justify-center rounded-full font-semibold transition px-3 py-2 text-sm bg-white text-slate-900 border border-slate-200 hover:border-slate-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:bg-slate-800 dark:text-slate-50 dark:border-slate-700 dark:hover:border-slate-600"
+                            [attr.href]="previewUrl"
+                            target="_blank"
+                            rel="noopener"
+                          >
+                            {{ 'adminUi.content.previewLinks.open' | translate }}
+                          </a>
+                        </div>
+                      </div>
+
+                      <div *ngIf="pagePreviewShareUrl(previewSlug) as previewUrl" class="mt-3 grid gap-2">
+                        <div class="flex items-center gap-2">
+                          <input
+                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                            [value]="previewUrl"
+                            readonly
+                          />
+                          <app-button
+                            size="sm"
+                            variant="ghost"
+                            [label]="'adminUi.content.previewLinks.copy' | translate"
+                            (action)="copyPreviewLink(previewUrl)"
+                          ></app-button>
+                        </div>
+                        <p
+                          *ngIf="pagePreviewExpiresAt && pagePreviewForSlug === previewSlug"
+                          class="text-xs text-slate-500 dark:text-slate-400"
+                        >
+                          {{ 'adminUi.content.previewLinks.expires' | translate }} {{ pagePreviewExpiresAt | date: 'short' }}
+                        </p>
+                      </div>
+
+                      <div *ngIf="pagePreviewIframeSrc(previewSlug) as iframeSrc; else pagePreviewHint" class="mt-3 overflow-x-auto">
+                        <div
+                          class="mx-auto rounded-lg border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-900"
+                          [style.width.px]="cmsPreviewViewportWidth()"
+                        >
+                          <iframe
+                            class="h-[720px] w-full rounded-md bg-white dark:bg-slate-950"
+                            [src]="iframeSrc"
+                            [attr.title]="'Preview ' + previewSlug"
+                            loading="lazy"
+                          ></iframe>
+                        </div>
+                      </div>
+                      <ng-template #pagePreviewHint>
+                        <p class="mt-3 text-xs text-slate-500 dark:text-slate-400">
+                          {{ 'adminUi.content.previewLinks.hint' | translate }}
+                        </p>
+                      </ng-template>
+                    </div>
+                  </ng-container>
+
+	                  <app-cms-block-library
+	                    context="page"
+	                    [allowedTypes]="allowedCmsLibraryTypes(pageBlocksKey)"
+	                    (add)="addPageBlockFromLibrary(pageBlocksKey, $event.type, $event.template)"
+	                    (dragActive)="setPageInsertDragActive($event)"
+	                  ></app-cms-block-library>
+
+                  <div class="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                      <div class="grid gap-0.5 min-w-0">
+                        <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                          {{ 'adminUi.content.reusableBlocks.title' | translate }}
+                        </p>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">
+                          {{ 'adminUi.content.reusableBlocks.hint' | translate }}
+                        </p>
+                      </div>
+
+                      <div class="flex flex-wrap items-end gap-2">
+                        <app-input [label]="'adminUi.content.reusableBlocks.search' | translate" [(value)]="reusableBlocksQuery"></app-input>
+                        <app-button
+                          size="sm"
+                          variant="ghost"
+                          [label]="'adminUi.actions.refresh' | translate"
+                          [disabled]="reusableBlocksLoading"
+                          (action)="loadReusableBlocks()"
+                        ></app-button>
+                      </div>
+                    </div>
+
+                    <div
+                      *ngIf="reusableBlocksError"
+                      class="rounded-lg border border-rose-200 bg-rose-50 p-2 text-sm text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+                    >
+                      {{ reusableBlocksError }}
+                    </div>
+
+                    <div *ngIf="reusableBlocksLoading" class="text-sm text-slate-600 dark:text-slate-300">
+                      {{ 'adminUi.content.reusableBlocks.loading' | translate }}
+                    </div>
+
+                    <div *ngIf="!reusableBlocksLoading && filteredReusableBlocks().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                      {{ 'adminUi.content.reusableBlocks.empty' | translate }}
+                    </div>
+
+                    <div *ngIf="!reusableBlocksLoading && filteredReusableBlocks().length" class="grid gap-2">
+                      <div
+                        *ngFor="let snippet of filteredReusableBlocks()"
+                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 flex items-start justify-between gap-3 dark:border-slate-800 dark:bg-slate-900"
+                      >
+                        <div class="grid gap-0.5 min-w-0">
+                          <p class="text-sm font-semibold text-slate-900 dark:text-slate-50 truncate">
+                            {{ snippet.title }}
+                          </p>
+                          <p class="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                            {{ ('adminUi.home.sections.blocks.' + snippet.block.type) | translate }} · {{ snippet.id }}
+                          </p>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                          <app-button
+                            size="sm"
+                            variant="ghost"
+                            [label]="'adminUi.content.reusableBlocks.actions.insert' | translate"
+                            (action)="insertReusableBlockIntoPage(pageBlocksKey, snippet.id)"
+                          ></app-button>
+                          <app-button
+                            size="sm"
+                            variant="ghost"
+                            [label]="'adminUi.actions.delete' | translate"
+                            (action)="deleteReusableBlock(snippet.id)"
+                          ></app-button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
                   <div
                     *ngIf="contentPages.length"
@@ -1179,12 +1770,12 @@ class CmsDraftManager<T> {
                     </span>
                   </div>
 
-                  <div class="grid gap-2">
-                    <div
-                      *ngIf="pageInsertDragActive"
-                      class="rounded-xl border border-dashed border-slate-300 bg-white/60 px-3 py-2 text-xs font-semibold text-slate-600 flex items-center justify-center dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-300"
-                      (dragover)="onPageBlockDragOver($event)"
-                      (drop)="onPageBlockDropZone($event, pageBlocksKey, 0)"
+	            <div class="grid gap-2" (dragover)="onCmsMediaDragOver($event)" (drop)="onPageMediaDropOnContainer($event, pageBlocksKey)">
+	                    <div
+	                      *ngIf="pageInsertDragActive"
+	                      class="rounded-xl border border-dashed border-slate-300 bg-white/60 px-3 py-2 text-xs font-semibold text-slate-600 flex items-center justify-center dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-300"
+	                      (dragover)="onPageBlockDragOver($event)"
+	                      (drop)="onPageBlockDropZone($event, pageBlocksKey, 0)"
                     >
                       {{ 'adminUi.content.blockLibrary.dropHere' | translate }}
                     </div>
@@ -1238,24 +1829,100 @@ class CmsDraftManager<T> {
 	                        </div>
 
                       <div class="mt-3 grid gap-3" *ngIf="block.enabled">
-                        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                          {{ 'adminUi.home.sections.fields.title' | translate }}
-                          <input
-                            class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                            [(ngModel)]="block.title[infoLang]"
-                          />
-                        </label>
+	                        <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pageBlockTitleSingle">
+	                          <app-localized-text-editor [label]="'adminUi.home.sections.fields.title' | translate" [value]="block.title"></app-localized-text-editor>
+	                        </ng-container>
+	                        <ng-template #pageBlockTitleSingle>
+	                          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                            {{ 'adminUi.home.sections.fields.title' | translate }}
+	                            <input
+	                              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                              [(ngModel)]="block.title[infoLang]"
+	                            />
+	                          </label>
+	                        </ng-template>
 
-                        <ng-container [ngSwitch]="block.type">
-                          <ng-container *ngSwitchCase="'text'">
+                          <div class="grid gap-3 sm:grid-cols-2">
                             <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                              {{ 'adminUi.home.sections.fields.body' | translate }}
-                              <textarea
-                                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                rows="4"
-                                [(ngModel)]="block.body_markdown[infoLang]"
-                              ></textarea>
+                              {{ 'adminUi.site.pages.builder.styles.spacing.label' | translate }}
+                              <select
+                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                [(ngModel)]="block.layout.spacing"
+                              >
+                                <option [ngValue]="'none'">{{ 'adminUi.site.pages.builder.styles.spacing.none' | translate }}</option>
+                                <option [ngValue]="'sm'">{{ 'adminUi.site.pages.builder.styles.spacing.sm' | translate }}</option>
+                                <option [ngValue]="'md'">{{ 'adminUi.site.pages.builder.styles.spacing.md' | translate }}</option>
+                                <option [ngValue]="'lg'">{{ 'adminUi.site.pages.builder.styles.spacing.lg' | translate }}</option>
+                              </select>
                             </label>
+
+                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                              {{ 'adminUi.site.pages.builder.styles.background.label' | translate }}
+                              <select
+                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                [(ngModel)]="block.layout.background"
+                              >
+                                <option [ngValue]="'none'">{{ 'adminUi.site.pages.builder.styles.background.none' | translate }}</option>
+                                <option [ngValue]="'muted'">{{ 'adminUi.site.pages.builder.styles.background.muted' | translate }}</option>
+                                <option [ngValue]="'accent'">{{ 'adminUi.site.pages.builder.styles.background.accent' | translate }}</option>
+                              </select>
+                            </label>
+
+                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                              {{ 'adminUi.site.pages.builder.styles.align.label' | translate }}
+                              <select
+                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                [(ngModel)]="block.layout.align"
+                              >
+                                <option [ngValue]="'left'">{{ 'adminUi.site.pages.builder.styles.align.left' | translate }}</option>
+                                <option [ngValue]="'center'">{{ 'adminUi.site.pages.builder.styles.align.center' | translate }}</option>
+                              </select>
+                            </label>
+
+	                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                              {{ 'adminUi.site.pages.builder.styles.maxWidth.label' | translate }}
+	                              <select
+	                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                                [(ngModel)]="block.layout.max_width"
+	                              >
+	                                <option [ngValue]="'full'">{{ 'adminUi.site.pages.builder.styles.maxWidth.full' | translate }}</option>
+	                                <option [ngValue]="'narrow'">{{ 'adminUi.site.pages.builder.styles.maxWidth.narrow' | translate }}</option>
+	                                <option [ngValue]="'prose'">{{ 'adminUi.site.pages.builder.styles.maxWidth.prose' | translate }}</option>
+	                                <option [ngValue]="'wide'">{{ 'adminUi.site.pages.builder.styles.maxWidth.wide' | translate }}</option>
+	                              </select>
+	                            </label>
+	                          </div>
+
+                            <div class="flex flex-wrap items-center justify-end gap-2">
+                              <app-button
+                                size="sm"
+                                variant="ghost"
+                                [disabled]="reusableBlocksLoading"
+                                [label]="'adminUi.content.reusableBlocks.actions.save' | translate"
+                                (action)="savePageBlockAsReusable(pageBlocksKey, block.key)"
+                              ></app-button>
+                            </div>
+
+		                        <ng-container [ngSwitch]="block.type">
+		                          <ng-container *ngSwitchCase="'text'">
+		                            <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pageBlockTextBodySingle">
+	                              <app-localized-text-editor
+	                                [label]="'adminUi.home.sections.fields.body' | translate"
+	                                [multiline]="true"
+	                                [rows]="6"
+	                                [value]="block.body_markdown"
+	                              ></app-localized-text-editor>
+	                            </ng-container>
+	                            <ng-template #pageBlockTextBodySingle>
+		                              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                                {{ 'adminUi.home.sections.fields.body' | translate }}
+                                <textarea
+                                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                  rows="4"
+                                  [(ngModel)]="block.body_markdown[infoLang]"
+                                ></textarea>
+                              </label>
+	                            </ng-template>
                             <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
                               <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
                                 {{ 'adminUi.home.sections.fields.preview' | translate }}
@@ -1265,14 +1932,459 @@ class CmsDraftManager<T> {
                                   class="markdown rounded-2xl border border-slate-200 bg-white p-3 text-slate-700 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
                                   [innerHTML]="renderMarkdown(block.body_markdown[infoLang] || '')"
                                 ></div>
-                              </div>
-                            </details>
-                          </ng-container>
+			                              </div>
+			                            </details>
+			                          </ng-container>
 
-                          <ng-container *ngSwitchCase="'image'">
-                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                              {{ 'adminUi.home.sections.fields.imageUrl' | translate }}
-                              <input
+			                          <ng-container *ngSwitchCase="'columns'">
+			                            <div class="grid gap-3">
+			                              <div class="grid gap-3 sm:grid-cols-[1fr_auto] items-end">
+			                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                                  {{ 'adminUi.home.sections.fields.columnsBreakpoint' | translate }}
+			                                  <select
+			                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                    [(ngModel)]="block.columns_breakpoint"
+			                                  >
+			                                    <option [ngValue]="'sm'">SM</option>
+			                                    <option [ngValue]="'md'">MD</option>
+			                                    <option [ngValue]="'lg'">LG</option>
+			                                  </select>
+			                                </label>
+
+			                                <app-button
+			                                  size="sm"
+			                                  variant="ghost"
+			                                  [disabled]="block.columns.length >= 3"
+			                                  [label]="'adminUi.home.sections.fields.addColumn' | translate"
+			                                  (action)="addPageColumnsColumn(pageBlocksKey, block.key)"
+			                                ></app-button>
+			                              </div>
+
+			                              <div class="grid gap-2">
+			                                <div
+			                                  *ngFor="let col of block.columns; let colIdx = index"
+			                                  class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+			                                >
+			                                  <div class="flex items-center justify-between gap-3">
+			                                    <span class="text-xs font-semibold text-slate-700 dark:text-slate-200">
+			                                      {{ 'adminUi.home.sections.fields.column' | translate }} {{ colIdx + 1 }}
+			                                    </span>
+			                                    <app-button
+			                                      size="sm"
+			                                      variant="ghost"
+			                                      [disabled]="block.columns.length <= 2"
+			                                      [label]="'adminUi.actions.delete' | translate"
+			                                      (action)="removePageColumnsColumn(pageBlocksKey, block.key, colIdx)"
+			                                    ></app-button>
+			                                  </div>
+
+			                                  <div class="mt-3 grid gap-3">
+			                                    <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pageBlockColumnsTextSingle">
+			                                      <app-localized-text-editor
+			                                        [label]="'adminUi.home.sections.fields.columnTitle' | translate"
+			                                        [value]="col.title"
+			                                      ></app-localized-text-editor>
+			                                      <app-localized-text-editor
+			                                        [label]="'adminUi.home.sections.fields.columnBody' | translate"
+			                                        [multiline]="true"
+			                                        [rows]="5"
+			                                        [value]="col.body_markdown"
+			                                      ></app-localized-text-editor>
+			                                    </ng-container>
+			                                    <ng-template #pageBlockColumnsTextSingle>
+			                                      <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                                        {{ 'adminUi.home.sections.fields.columnTitle' | translate }}
+			                                        <input
+			                                          class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                          [(ngModel)]="col.title[infoLang]"
+			                                        />
+			                                      </label>
+			                                      <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                                        {{ 'adminUi.home.sections.fields.columnBody' | translate }}
+			                                        <textarea
+			                                          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                          rows="4"
+			                                          [(ngModel)]="col.body_markdown[infoLang]"
+			                                        ></textarea>
+			                                      </label>
+			                                    </ng-template>
+			                                  </div>
+			                                </div>
+			                              </div>
+			                            </div>
+			                          </ng-container>
+
+			                          <ng-container *ngSwitchCase="'cta'">
+			                            <div class="grid gap-3">
+			                              <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pageBlockCtaTextSingle">
+			                                <app-localized-text-editor
+			                                  [label]="'adminUi.home.sections.fields.body' | translate"
+			                                  [multiline]="true"
+			                                  [rows]="5"
+			                                  [value]="block.body_markdown"
+			                                ></app-localized-text-editor>
+			                                <app-localized-text-editor
+			                                  [label]="'adminUi.home.hero.ctaLabel' | translate"
+			                                  [value]="block.cta_label"
+			                                ></app-localized-text-editor>
+			                              </ng-container>
+			                              <ng-template #pageBlockCtaTextSingle>
+			                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                                  {{ 'adminUi.home.sections.fields.body' | translate }}
+			                                  <textarea
+			                                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                    rows="4"
+			                                    [(ngModel)]="block.body_markdown[infoLang]"
+			                                  ></textarea>
+			                                </label>
+			                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                                  {{ 'adminUi.home.hero.ctaLabel' | translate }}
+			                                  <input
+			                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                    [(ngModel)]="block.cta_label[infoLang]"
+			                                  />
+			                                </label>
+			                              </ng-template>
+				                              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+				                                {{ 'adminUi.home.hero.ctaUrl' | translate }}
+				                                <input
+				                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+				                                  [(ngModel)]="block.cta_url"
+				                                />
+				                              </label>
+				                              <label class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+				                                <input type="checkbox" [(ngModel)]="block.cta_new_tab" />
+				                                {{ 'adminUi.home.hero.ctaNewTab' | translate }}
+				                              </label>
+				                            </div>
+				                          </ng-container>
+
+			                          <ng-container *ngSwitchCase="'product_grid'">
+			                            <div class="grid gap-3">
+			                              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                                {{ 'adminUi.home.sections.fields.productGridSource' | translate }}
+			                                <select
+			                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                  [(ngModel)]="block.product_grid_source"
+			                                >
+			                                  <option [ngValue]="'category'">{{ 'adminUi.home.sections.productGridSources.category' | translate }}</option>
+			                                  <option [ngValue]="'collection'">{{ 'adminUi.home.sections.productGridSources.collection' | translate }}</option>
+			                                  <option [ngValue]="'products'">{{ 'adminUi.home.sections.productGridSources.products' | translate }}</option>
+			                                </select>
+			                              </label>
+
+			                              <label
+			                                *ngIf="block.product_grid_source === 'category'"
+			                                class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200"
+			                              >
+			                                {{ 'adminUi.home.sections.fields.productGridCategorySlug' | translate }}
+			                                <input
+			                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                  [(ngModel)]="block.product_grid_category_slug"
+			                                  [attr.list]="'product-grid-category-slugs-' + block.key"
+			                                />
+			                                <datalist [id]="'product-grid-category-slugs-' + block.key">
+			                                  <option *ngFor="let cat of categories" [value]="cat.slug">{{ cat.name }}</option>
+			                                </datalist>
+			                              </label>
+
+			                              <label
+			                                *ngIf="block.product_grid_source === 'collection'"
+			                                class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200"
+			                              >
+			                                {{ 'adminUi.home.sections.fields.productGridCollectionSlug' | translate }}
+			                                <input
+			                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                  [(ngModel)]="block.product_grid_collection_slug"
+			                                  [attr.list]="'product-grid-collection-slugs-' + block.key"
+			                                />
+			                                <datalist [id]="'product-grid-collection-slugs-' + block.key">
+			                                  <option *ngFor="let col of featuredCollections" [value]="col.slug">{{ col.name }}</option>
+			                                </datalist>
+			                              </label>
+
+			                              <div *ngIf="block.product_grid_source === 'products'" class="grid gap-2">
+			                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                                  {{ 'adminUi.home.sections.fields.productGridProductSlugs' | translate }}
+			                                  <textarea
+			                                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                    rows="4"
+			                                    [(ngModel)]="block.product_grid_product_slugs"
+			                                  ></textarea>
+			                                  <span class="text-xs text-slate-500 dark:text-slate-400">
+			                                    {{ 'adminUi.home.sections.fields.productGridProductSlugsHint' | translate }}
+			                                  </span>
+			                                </label>
+
+			                                <div class="grid gap-2 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+			                                  <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+			                                    {{ 'adminUi.home.sections.fields.productGridProductSearch' | translate }}
+			                                  </p>
+			                                  <div class="flex flex-wrap items-center gap-2">
+			                                    <input
+			                                      class="h-10 flex-1 min-w-[220px] rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                      [(ngModel)]="productGridProductSearchQuery[block.key]"
+			                                      (ngModelChange)="queueProductGridProductSearch(block.key, $event)"
+			                                      [placeholder]="'adminUi.home.sections.fields.productGridProductSearchPlaceholder' | translate"
+			                                    />
+			                                    <app-button
+			                                      size="sm"
+			                                      variant="ghost"
+			                                      [disabled]="productGridProductSearchLoading[block.key]"
+			                                      [label]="'adminUi.actions.search' | translate"
+			                                      (action)="searchProductGridProducts(block.key)"
+			                                    ></app-button>
+			                                  </div>
+			                                  <div *ngIf="productGridProductSearchLoading[block.key]" class="text-xs text-slate-500 dark:text-slate-400">
+			                                    {{ 'adminUi.common.loading' | translate }}
+			                                  </div>
+			                                  <div *ngIf="productGridProductSearchError[block.key]" class="text-xs text-rose-700 dark:text-rose-300">
+			                                    {{ productGridProductSearchError[block.key] }}
+			                                  </div>
+			                                  <div
+			                                    *ngIf="productGridProductSearchResults[block.key]?.length; else productGridSearchEmptyTpl"
+			                                    class="grid gap-2"
+			                                  >
+			                                    <div
+			                                      *ngFor="let item of productGridProductSearchResults[block.key]"
+			                                      class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs dark:border-slate-800 dark:bg-slate-950/30"
+			                                    >
+			                                      <div class="min-w-0">
+			                                        <p class="font-semibold truncate text-slate-900 dark:text-slate-50">{{ item.name }}</p>
+			                                        <p class="truncate text-slate-500 dark:text-slate-400">{{ item.sku }} — {{ item.slug }}</p>
+			                                      </div>
+			                                      <app-button
+			                                        size="sm"
+			                                        variant="ghost"
+			                                        [label]="'adminUi.actions.add' | translate"
+			                                        (action)="addProductGridProductSlug(block, item.slug)"
+			                                      ></app-button>
+			                                    </div>
+			                                  </div>
+			                                  <ng-template #productGridSearchEmptyTpl>
+			                                    <div
+			                                      *ngIf="(productGridProductSearchQuery[block.key] || '').trim()"
+			                                      class="text-xs text-slate-500 dark:text-slate-400"
+			                                    >
+			                                      {{ 'adminUi.home.sections.fields.productGridProductSearchEmpty' | translate }}
+			                                    </div>
+			                                  </ng-template>
+			                                </div>
+
+			                                <ng-container *ngIf="productGridSelectedSlugs(block) as slugs">
+			                                  <div *ngIf="slugs.length" class="flex flex-wrap gap-2">
+			                                    <button
+			                                      type="button"
+			                                      *ngFor="let slug of slugs"
+			                                      class="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+			                                      (click)="removeProductGridProductSlug(block, slug)"
+			                                    >
+			                                      <span class="truncate max-w-[160px]">{{ slug }}</span>
+			                                      <span class="text-slate-400 dark:text-slate-500">×</span>
+			                                    </button>
+			                                  </div>
+			                                </ng-container>
+			                              </div>
+
+			                              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                                {{ 'adminUi.home.sections.fields.productGridLimit' | translate }}
+			                                <input
+			                                  type="number"
+			                                  min="1"
+			                                  max="24"
+			                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                  [(ngModel)]="block.product_grid_limit"
+			                                />
+			                              </label>
+			                            </div>
+			                          </ng-container>
+
+			                          <ng-container *ngSwitchCase="'form'">
+			                            <div class="grid gap-3">
+			                              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                                {{ 'adminUi.home.sections.fields.formType' | translate }}
+			                                <select
+			                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                  [(ngModel)]="block.form_type"
+			                                >
+			                                  <option [ngValue]="'contact'">{{ 'adminUi.home.sections.formTypes.contact' | translate }}</option>
+			                                  <option [ngValue]="'newsletter'">{{ 'adminUi.home.sections.formTypes.newsletter' | translate }}</option>
+			                                </select>
+			                              </label>
+
+			                              <label
+			                                *ngIf="block.form_type === 'contact'"
+			                                class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200"
+			                              >
+			                                {{ 'adminUi.home.sections.fields.formTopic' | translate }}
+			                                <select
+			                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
+			                                  [(ngModel)]="block.form_topic"
+			                                >
+			                                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="contact">
+			                                    {{ 'contact.form.topicContact' | translate }}
+			                                  </option>
+			                                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="support">
+			                                    {{ 'contact.form.topicSupport' | translate }}
+			                                  </option>
+			                                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="refund">
+			                                    {{ 'contact.form.topicRefund' | translate }}
+			                                  </option>
+			                                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="dispute">
+			                                    {{ 'contact.form.topicDispute' | translate }}
+			                                  </option>
+			                                </select>
+			                              </label>
+			                            </div>
+			                          </ng-container>
+
+			                          <ng-container *ngSwitchCase="'faq'">
+			                            <div class="grid gap-3">
+			                              <div class="flex items-center justify-between gap-3">
+			                                <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+			                                  {{ 'adminUi.home.sections.blocks.faq' | translate }}
+			                                </p>
+			                                <app-button
+			                                  size="sm"
+			                                  variant="ghost"
+			                                  [label]="'adminUi.actions.add' | translate"
+			                                  (action)="addPageFaqItem(pageBlocksKey, block.key)"
+			                                ></app-button>
+			                              </div>
+
+			                              <div class="grid gap-2">
+			                                <div
+			                                  *ngFor="let item of block.faq_items; let idx = index"
+			                                  class="grid gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+			                                >
+			                                  <div class="flex items-center justify-between gap-3">
+			                                    <span class="text-xs font-semibold text-slate-700 dark:text-slate-200">
+			                                      {{ 'adminUi.home.sections.fields.question' | translate }} {{ idx + 1 }}
+			                                    </span>
+			                                    <app-button
+			                                      size="sm"
+			                                      variant="ghost"
+			                                      [disabled]="block.faq_items.length <= 1"
+			                                      [label]="'adminUi.actions.delete' | translate"
+			                                      (action)="removePageFaqItem(pageBlocksKey, block.key, idx)"
+			                                    ></app-button>
+			                                  </div>
+
+			                                  <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pageBlockFaqTextSingle">
+			                                    <app-localized-text-editor
+			                                      [label]="'adminUi.home.sections.fields.question' | translate"
+			                                      [value]="item.question"
+			                                    ></app-localized-text-editor>
+			                                    <app-localized-text-editor
+			                                      [label]="'adminUi.home.sections.fields.answer' | translate"
+			                                      [multiline]="true"
+			                                      [rows]="4"
+			                                      [value]="item.answer_markdown"
+			                                    ></app-localized-text-editor>
+			                                  </ng-container>
+			                                  <ng-template #pageBlockFaqTextSingle>
+			                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                                      {{ 'adminUi.home.sections.fields.question' | translate }}
+			                                      <input
+			                                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                        [(ngModel)]="item.question[infoLang]"
+			                                      />
+			                                    </label>
+			                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                                      {{ 'adminUi.home.sections.fields.answer' | translate }}
+			                                      <textarea
+			                                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                        rows="4"
+			                                        [(ngModel)]="item.answer_markdown[infoLang]"
+			                                      ></textarea>
+			                                    </label>
+			                                  </ng-template>
+			                                </div>
+			                              </div>
+			                            </div>
+			                          </ng-container>
+
+			                          <ng-container *ngSwitchCase="'testimonials'">
+			                            <div class="grid gap-3">
+			                              <div class="flex items-center justify-between gap-3">
+			                                <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+			                                  {{ 'adminUi.home.sections.blocks.testimonials' | translate }}
+			                                </p>
+			                                <app-button
+			                                  size="sm"
+			                                  variant="ghost"
+			                                  [label]="'adminUi.actions.add' | translate"
+			                                  (action)="addPageTestimonial(pageBlocksKey, block.key)"
+			                                ></app-button>
+			                              </div>
+
+			                              <div class="grid gap-2">
+			                                <div
+			                                  *ngFor="let item of block.testimonials; let idx = index"
+			                                  class="grid gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+			                                >
+			                                  <div class="flex items-center justify-between gap-3">
+			                                    <span class="text-xs font-semibold text-slate-700 dark:text-slate-200">
+			                                      {{ 'adminUi.home.sections.fields.testimonial' | translate }} {{ idx + 1 }}
+			                                    </span>
+			                                    <app-button
+			                                      size="sm"
+			                                      variant="ghost"
+			                                      [disabled]="block.testimonials.length <= 1"
+			                                      [label]="'adminUi.actions.delete' | translate"
+			                                      (action)="removePageTestimonial(pageBlocksKey, block.key, idx)"
+			                                    ></app-button>
+			                                  </div>
+
+			                                  <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pageBlockTestimonialsTextSingle">
+			                                    <app-localized-text-editor
+			                                      [label]="'adminUi.home.sections.fields.quote' | translate"
+			                                      [multiline]="true"
+			                                      [rows]="4"
+			                                      [value]="item.quote_markdown"
+			                                    ></app-localized-text-editor>
+			                                    <app-localized-text-editor
+			                                      [label]="'adminUi.home.sections.fields.author' | translate"
+			                                      [value]="item.author"
+			                                    ></app-localized-text-editor>
+			                                    <app-localized-text-editor
+			                                      [label]="'adminUi.home.sections.fields.role' | translate"
+			                                      [value]="item.role"
+			                                    ></app-localized-text-editor>
+			                                  </ng-container>
+			                                  <ng-template #pageBlockTestimonialsTextSingle>
+			                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                                      {{ 'adminUi.home.sections.fields.quote' | translate }}
+			                                      <textarea
+			                                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                        rows="4"
+			                                        [(ngModel)]="item.quote_markdown[infoLang]"
+			                                      ></textarea>
+			                                    </label>
+			                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                                      {{ 'adminUi.home.sections.fields.author' | translate }}
+			                                      <input
+			                                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                        [(ngModel)]="item.author[infoLang]"
+			                                      />
+			                                    </label>
+			                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                                      {{ 'adminUi.home.sections.fields.role' | translate }}
+			                                      <input
+			                                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                                        [(ngModel)]="item.role[infoLang]"
+			                                      />
+			                                    </label>
+			                                  </ng-template>
+			                                </div>
+			                              </div>
+			                            </div>
+			                          </ng-container>
+
+			                          <ng-container *ngSwitchCase="'image'">
+			                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                              {{ 'adminUi.home.sections.fields.imageUrl' | translate }}
+			                              <input
                                 class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                                 [(ngModel)]="block.url"
                               />
@@ -1284,22 +2396,30 @@ class CmsDraftManager<T> {
                                 [(ngModel)]="block.link_url"
                               />
                             </label>
-                            <div class="grid gap-3 sm:grid-cols-2">
-                              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                                {{ 'adminUi.home.sections.fields.alt' | translate }}
-                                <input
-                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                  [(ngModel)]="block.alt[infoLang]"
-                                />
-                              </label>
-                              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                                {{ 'adminUi.home.sections.fields.caption' | translate }}
-                                <input
-                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                  [(ngModel)]="block.caption[infoLang]"
-                                />
-                              </label>
-                            </div>
+                            <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pageBlockImageTextSingle">
+                              <div class="grid gap-3">
+                                <app-localized-text-editor [label]="'adminUi.home.sections.fields.alt' | translate" [value]="block.alt"></app-localized-text-editor>
+                                <app-localized-text-editor [label]="'adminUi.home.sections.fields.caption' | translate" [value]="block.caption"></app-localized-text-editor>
+                              </div>
+                            </ng-container>
+                            <ng-template #pageBlockImageTextSingle>
+                              <div class="grid gap-3 sm:grid-cols-2">
+                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                  {{ 'adminUi.home.sections.fields.alt' | translate }}
+                                  <input
+                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    [(ngModel)]="block.alt[infoLang]"
+                                  />
+                                </label>
+                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                  {{ 'adminUi.home.sections.fields.caption' | translate }}
+                                  <input
+                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    [(ngModel)]="block.caption[infoLang]"
+                                  />
+                                </label>
+                              </div>
+                            </ng-template>
                             <div class="grid gap-3 sm:grid-cols-2">
                               <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                                 {{ 'adminUi.home.sections.fields.focalX' | translate }}
@@ -1369,22 +2489,30 @@ class CmsDraftManager<T> {
                                     [(ngModel)]="img.url"
                                   />
                                 </label>
-                                <div class="grid gap-3 sm:grid-cols-2">
-                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                                    {{ 'adminUi.home.sections.fields.alt' | translate }}
-                                    <input
-                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                      [(ngModel)]="img.alt[infoLang]"
-                                    />
-                                  </label>
-                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                                    {{ 'adminUi.home.sections.fields.caption' | translate }}
-                                    <input
-                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                      [(ngModel)]="img.caption[infoLang]"
-                                    />
-                                  </label>
-                                </div>
+                                <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pageBlockGalleryTextSingle">
+                                  <div class="grid gap-3">
+                                    <app-localized-text-editor [label]="'adminUi.home.sections.fields.alt' | translate" [value]="img.alt"></app-localized-text-editor>
+                                    <app-localized-text-editor [label]="'adminUi.home.sections.fields.caption' | translate" [value]="img.caption"></app-localized-text-editor>
+                                  </div>
+                                </ng-container>
+                                <ng-template #pageBlockGalleryTextSingle>
+                                  <div class="grid gap-3 sm:grid-cols-2">
+                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                      {{ 'adminUi.home.sections.fields.alt' | translate }}
+                                      <input
+                                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                        [(ngModel)]="img.alt[infoLang]"
+                                      />
+                                    </label>
+                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                      {{ 'adminUi.home.sections.fields.caption' | translate }}
+                                      <input
+                                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                        [(ngModel)]="img.caption[infoLang]"
+                                      />
+                                    </label>
+                                  </div>
+                                </ng-template>
                                 <div class="grid gap-3 sm:grid-cols-2">
                                   <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                                     {{ 'adminUi.home.sections.fields.focalX' | translate }}
@@ -1446,34 +2574,73 @@ class CmsDraftManager<T> {
                                     [(ngModel)]="block.slide.image_url"
                                   />
                                 </label>
-                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                                  {{ 'adminUi.home.sections.fields.alt' | translate }}
-                                  <input
-                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                    [(ngModel)]="block.slide.alt[infoLang]"
-                                  />
-                                </label>
-                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                                  {{ 'adminUi.home.hero.headline' | translate }}
-                                  <input
-                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                    [(ngModel)]="block.slide.headline[infoLang]"
-                                  />
-                                </label>
-                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
-                                  {{ 'adminUi.home.hero.subtitle' | translate }}
-                                  <input
-                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                    [(ngModel)]="block.slide.subheadline[infoLang]"
-                                  />
-                                </label>
-                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                                  {{ 'adminUi.home.hero.ctaLabel' | translate }}
-                                  <input
-                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                    [(ngModel)]="block.slide.cta_label[infoLang]"
-                                  />
-                                </label>
+                                <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pageBlockBannerAltSingle">
+                                  <app-localized-text-editor
+                                    class="md:col-span-2"
+                                    [label]="'adminUi.home.sections.fields.alt' | translate"
+                                    [value]="block.slide.alt"
+                                  ></app-localized-text-editor>
+                                </ng-container>
+                                <ng-template #pageBlockBannerAltSingle>
+                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    {{ 'adminUi.home.sections.fields.alt' | translate }}
+                                    <input
+                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      [(ngModel)]="block.slide.alt[infoLang]"
+                                    />
+                                  </label>
+                                </ng-template>
+
+                                <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pageBlockBannerHeadlineSingle">
+                                  <app-localized-text-editor
+                                    class="md:col-span-2"
+                                    [label]="'adminUi.home.hero.headline' | translate"
+                                    [value]="block.slide.headline"
+                                  ></app-localized-text-editor>
+                                </ng-container>
+                                <ng-template #pageBlockBannerHeadlineSingle>
+                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    {{ 'adminUi.home.hero.headline' | translate }}
+                                    <input
+                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      [(ngModel)]="block.slide.headline[infoLang]"
+                                    />
+                                  </label>
+                                </ng-template>
+
+                                <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pageBlockBannerSubheadlineSingle">
+                                  <app-localized-text-editor
+                                    class="md:col-span-2"
+                                    [label]="'adminUi.home.hero.subtitle' | translate"
+                                    [value]="block.slide.subheadline"
+                                  ></app-localized-text-editor>
+                                </ng-container>
+                                <ng-template #pageBlockBannerSubheadlineSingle>
+                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
+                                    {{ 'adminUi.home.hero.subtitle' | translate }}
+                                    <input
+                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      [(ngModel)]="block.slide.subheadline[infoLang]"
+                                    />
+                                  </label>
+                                </ng-template>
+
+                                <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pageBlockBannerCtaLabelSingle">
+                                  <app-localized-text-editor
+                                    class="md:col-span-2"
+                                    [label]="'adminUi.home.hero.ctaLabel' | translate"
+                                    [value]="block.slide.cta_label"
+                                  ></app-localized-text-editor>
+                                </ng-container>
+                                <ng-template #pageBlockBannerCtaLabelSingle>
+                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    {{ 'adminUi.home.hero.ctaLabel' | translate }}
+                                    <input
+                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      [(ngModel)]="block.slide.cta_label[infoLang]"
+                                    />
+                                  </label>
+                                </ng-template>
                                 <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                                   {{ 'adminUi.home.hero.ctaUrl' | translate }}
                                   <input
@@ -1587,27 +2754,56 @@ class CmsDraftManager<T> {
                                     />
                                   </label>
                                   <div class="grid gap-3 md:grid-cols-2">
-                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                                      {{ 'adminUi.home.sections.fields.alt' | translate }}
-                                      <input
-                                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                        [(ngModel)]="slide.alt[infoLang]"
-                                      />
-                                    </label>
-                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                                      {{ 'adminUi.home.hero.headline' | translate }}
-                                      <input
-                                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                        [(ngModel)]="slide.headline[infoLang]"
-                                      />
-                                    </label>
-                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
-                                      {{ 'adminUi.home.hero.subtitle' | translate }}
-                                      <input
-                                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                        [(ngModel)]="slide.subheadline[infoLang]"
-                                      />
-                                    </label>
+                                    <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pageBlockCarouselAltSingle">
+                                      <app-localized-text-editor
+                                        class="md:col-span-2"
+                                        [label]="'adminUi.home.sections.fields.alt' | translate"
+                                        [value]="slide.alt"
+                                      ></app-localized-text-editor>
+                                    </ng-container>
+                                    <ng-template #pageBlockCarouselAltSingle>
+                                      <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                        {{ 'adminUi.home.sections.fields.alt' | translate }}
+                                        <input
+                                          class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                          [(ngModel)]="slide.alt[infoLang]"
+                                        />
+                                      </label>
+                                    </ng-template>
+
+                                    <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pageBlockCarouselHeadlineSingle">
+                                      <app-localized-text-editor
+                                        class="md:col-span-2"
+                                        [label]="'adminUi.home.hero.headline' | translate"
+                                        [value]="slide.headline"
+                                      ></app-localized-text-editor>
+                                    </ng-container>
+                                    <ng-template #pageBlockCarouselHeadlineSingle>
+                                      <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                        {{ 'adminUi.home.hero.headline' | translate }}
+                                        <input
+                                          class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                          [(ngModel)]="slide.headline[infoLang]"
+                                        />
+                                      </label>
+                                    </ng-template>
+
+                                    <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pageBlockCarouselSubheadlineSingle">
+                                      <app-localized-text-editor
+                                        class="md:col-span-2"
+                                        [label]="'adminUi.home.hero.subtitle' | translate"
+                                        [value]="slide.subheadline"
+                                      ></app-localized-text-editor>
+                                    </ng-container>
+                                    <ng-template #pageBlockCarouselSubheadlineSingle>
+                                      <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
+                                        {{ 'adminUi.home.hero.subtitle' | translate }}
+                                        <input
+                                          class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                          [(ngModel)]="slide.subheadline[infoLang]"
+                                        />
+                                      </label>
+                                    </ng-template>
                                     <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                                       {{ 'adminUi.home.sections.fields.focalX' | translate }}
                                       <input
@@ -1727,7 +2923,7 @@ class CmsDraftManager<T> {
                   </label>
                 </div>
 
-	                <div *ngIf="cmsAdvanced()" class="grid gap-1">
+		                <div *ngIf="cmsAdvanced() && pageKeySupportsRequiresAuth(pageBlocksKey)" class="grid gap-1">
 	                  <label class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
 	                    <input type="checkbox" [(ngModel)]="pageBlocksRequiresAuth[pageBlocksKey]" />
 	                    <span>{{ 'adminUi.site.pages.builder.requiresLogin' | translate }}</span>
@@ -1814,6 +3010,110 @@ class CmsDraftManager<T> {
 	                </div>
 	              </details>
 
+                <app-modal
+                  [open]="pagePublishChecklistOpen"
+                  [title]="'adminUi.content.publishChecklist.title' | translate"
+                  [subtitle]="'adminUi.content.publishChecklist.hint' | translate"
+                  [closeLabel]="'adminUi.actions.cancel' | translate"
+                  [cancelLabel]="'adminUi.actions.cancel' | translate"
+                  [confirmLabel]="
+                    pagePublishChecklistLoading
+                      ? ('adminUi.actions.loading' | translate)
+                      : (pagePublishChecklistHasIssues()
+                          ? ('adminUi.content.publishChecklist.publishAnyway' | translate)
+                          : ('adminUi.content.publishChecklist.publish' | translate))
+                  "
+                  [confirmDisabled]="pagePublishChecklistLoading || !pagePublishChecklistKey"
+                  (closed)="closePagePublishChecklist()"
+                  (confirm)="confirmPagePublishChecklist()"
+                >
+                  <div class="grid gap-3">
+                    <p *ngIf="pagePublishChecklistLoading" class="text-sm text-slate-600 dark:text-slate-300">
+                      {{ 'adminUi.content.publishChecklist.loading' | translate }}
+                    </p>
+
+                    <p *ngIf="pagePublishChecklistError" class="text-sm text-rose-700 dark:text-rose-300">
+                      {{ pagePublishChecklistError }}
+                    </p>
+
+                    <div
+                      *ngIf="pagePublishChecklistResult as checklist"
+                      class="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30"
+                    >
+                      <div class="grid gap-1">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                          {{ 'adminUi.content.publishChecklist.sections.translations' | translate }}
+                        </p>
+                        <p *ngIf="checklist.missingTranslations.length === 0" class="text-sm text-emerald-700 dark:text-emerald-300">
+                          {{ 'adminUi.content.publishChecklist.ok' | translate }}
+                        </p>
+                        <p *ngIf="checklist.missingTranslations.length > 0" class="text-sm text-amber-800 dark:text-amber-200">
+                          {{ 'adminUi.content.publishChecklist.translationsMissing' | translate: { langs: checklist.missingTranslations.join(', ').toUpperCase() } }}
+                        </p>
+                      </div>
+
+                      <div class="h-px bg-slate-200 dark:bg-slate-800/70"></div>
+
+                      <div class="grid gap-1">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                          {{ 'adminUi.content.publishChecklist.sections.altText' | translate }}
+                        </p>
+                        <p *ngIf="checklist.missingAlt.length === 0" class="text-sm text-emerald-700 dark:text-emerald-300">
+                          {{ 'adminUi.content.publishChecklist.ok' | translate }}
+                        </p>
+                        <div *ngIf="checklist.missingAlt.length > 0" class="grid gap-1">
+                          <p class="text-sm text-amber-800 dark:text-amber-200">
+                            {{ 'adminUi.content.publishChecklist.altMissing' | translate: { count: checklist.missingAlt.length } }}
+                          </p>
+                          <ul class="list-disc pl-5 text-xs text-slate-600 dark:text-slate-300">
+                            <li *ngFor="let item of checklist.missingAlt | slice:0:6">{{ item }}</li>
+                          </ul>
+                        </div>
+                      </div>
+
+                      <div class="h-px bg-slate-200 dark:bg-slate-800/70"></div>
+
+                      <div class="grid gap-1">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                          {{ 'adminUi.content.publishChecklist.sections.empty' | translate }}
+                        </p>
+                        <p *ngIf="checklist.emptySections.length === 0" class="text-sm text-emerald-700 dark:text-emerald-300">
+                          {{ 'adminUi.content.publishChecklist.ok' | translate }}
+                        </p>
+                        <div *ngIf="checklist.emptySections.length > 0" class="grid gap-1">
+                          <p class="text-sm text-amber-800 dark:text-amber-200">
+                            {{ 'adminUi.content.publishChecklist.emptyFound' | translate: { count: checklist.emptySections.length } }}
+                          </p>
+                          <ul class="list-disc pl-5 text-xs text-slate-600 dark:text-slate-300">
+                            <li *ngFor="let item of checklist.emptySections | slice:0:6">{{ item }}</li>
+                          </ul>
+                        </div>
+                      </div>
+
+                      <div class="h-px bg-slate-200 dark:bg-slate-800/70"></div>
+
+                      <div class="grid gap-1">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                          {{ 'adminUi.content.publishChecklist.sections.links' | translate }}
+                        </p>
+                        <p *ngIf="checklist.linkIssues.length === 0 && !pagePublishChecklistLoading" class="text-sm text-emerald-700 dark:text-emerald-300">
+                          {{ 'adminUi.content.publishChecklist.ok' | translate }}
+                        </p>
+                        <div *ngIf="checklist.linkIssues.length > 0" class="grid gap-1">
+                          <p class="text-sm text-rose-700 dark:text-rose-300">
+                            {{ 'adminUi.content.publishChecklist.linksFound' | translate: { count: checklist.linkIssues.length } }}
+                          </p>
+                          <ul class="list-disc pl-5 text-xs text-slate-600 dark:text-slate-300">
+                            <li *ngFor="let issue of checklist.linkIssues | slice:0:6">
+                              {{ issue.reason }}: {{ issue.url }}
+                            </li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </app-modal>
+
               <details *ngIf="cmsAdvanced()" class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
                 <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
                   {{ 'adminUi.site.pages.redirects.title' | translate }}
@@ -1840,12 +3140,32 @@ class CmsDraftManager<T> {
                         [disabled]="redirectsImporting"
                         (change)="importContentRedirects($event)"
                       />
-                    </label>
-                  </div>
-                  <div *ngIf="redirectsImportResult" class="rounded-lg border border-slate-200 bg-white p-2 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
-                    <p class="font-semibold">{{ 'adminUi.site.pages.redirects.importResult' | translate:{ created: redirectsImportResult.created, updated: redirectsImportResult.updated, skipped: redirectsImportResult.skipped } }}</p>
-                    <div *ngIf="redirectsImportResult.errors?.length" class="mt-1 grid gap-1">
-                      <p class="text-rose-700 dark:text-rose-300">{{ 'adminUi.site.pages.redirects.importErrors' | translate }}</p>
+	                    </label>
+	                  </div>
+
+	                  <div class="grid gap-2 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+	                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+	                      {{ 'adminUi.site.pages.redirects.createTitle' | translate }}
+	                    </p>
+	                    <div class="flex flex-wrap items-end gap-2">
+	                      <app-input [label]="'adminUi.site.pages.redirects.createFrom' | translate" [(value)]="redirectCreateFrom"></app-input>
+	                      <app-input [label]="'adminUi.site.pages.redirects.createTo' | translate" [(value)]="redirectCreateTo"></app-input>
+	                      <app-button
+	                        size="sm"
+	                        variant="ghost"
+	                        [label]="'adminUi.actions.create' | translate"
+	                        [disabled]="redirectCreateSaving || !redirectCreateFrom || !redirectCreateTo"
+	                        (action)="createContentRedirect()"
+	                      ></app-button>
+	                    </div>
+	                    <p class="text-xs text-slate-500 dark:text-slate-400">
+	                      {{ 'adminUi.site.pages.redirects.createHint' | translate }}
+	                    </p>
+	                  </div>
+	                  <div *ngIf="redirectsImportResult" class="rounded-lg border border-slate-200 bg-white p-2 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
+	                    <p class="font-semibold">{{ 'adminUi.site.pages.redirects.importResult' | translate:{ created: redirectsImportResult.created, updated: redirectsImportResult.updated, skipped: redirectsImportResult.skipped } }}</p>
+	                    <div *ngIf="redirectsImportResult.errors?.length" class="mt-1 grid gap-1">
+	                      <p class="text-rose-700 dark:text-rose-300">{{ 'adminUi.site.pages.redirects.importErrors' | translate }}</p>
                       <p *ngFor="let e of redirectsImportResult.errors" class="text-[11px] text-rose-700 dark:text-rose-300">
                         #{{ e.line }}: {{ e.error }}
                       </p>
@@ -1935,6 +3255,115 @@ class CmsDraftManager<T> {
 
               <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
                 <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.content.findReplace.title' | translate }}
+                </summary>
+                <div class="mt-3 grid gap-3">
+                  <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.content.findReplace.hint' | translate }}</p>
+
+                  <div class="grid gap-2 md:grid-cols-2">
+                    <app-input [label]="'adminUi.content.findReplace.find' | translate" [(value)]="findReplaceFind"></app-input>
+                    <app-input [label]="'adminUi.content.findReplace.replace' | translate" [(value)]="findReplaceReplace"></app-input>
+                  </div>
+
+                  <div class="flex flex-wrap gap-3 items-end">
+                    <label class="grid gap-1 text-xs font-medium text-slate-700 dark:text-slate-200">
+                      {{ 'adminUi.content.findReplace.scope.label' | translate }}
+                      <select
+                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        [(ngModel)]="findReplaceScope"
+                      >
+                        <option value="all">{{ 'adminUi.content.findReplace.scope.all' | translate }}</option>
+                        <option value="pages">{{ 'adminUi.content.findReplace.scope.pages' | translate }}</option>
+                        <option value="blog">{{ 'adminUi.content.findReplace.scope.blog' | translate }}</option>
+                        <option value="home">{{ 'adminUi.content.findReplace.scope.home' | translate }}</option>
+                        <option value="site">{{ 'adminUi.content.findReplace.scope.site' | translate }}</option>
+                      </select>
+                    </label>
+
+                    <label class="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-200">
+                      <input type="checkbox" [(ngModel)]="findReplaceCaseSensitive" />
+                      <span>{{ 'adminUi.content.findReplace.caseSensitive' | translate }}</span>
+                    </label>
+
+                    <div class="flex flex-wrap gap-2">
+                      <app-button
+                        size="sm"
+                        [disabled]="findReplaceLoading || findReplaceApplying"
+                        [label]="'adminUi.content.findReplace.preview' | translate"
+                        (action)="previewFindReplace()"
+                      ></app-button>
+                      <app-button
+                        size="sm"
+                        variant="ghost"
+                        [disabled]="findReplaceLoading || findReplaceApplying || !findReplacePreview || findReplacePreview.total_items === 0"
+                        [label]="'adminUi.content.findReplace.apply' | translate"
+                        (action)="applyFindReplace()"
+                      ></app-button>
+                    </div>
+                  </div>
+
+                  <div *ngIf="findReplaceError" class="rounded-lg border border-rose-200 bg-rose-50 p-2 text-sm text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
+                    {{ findReplaceError }}
+                  </div>
+
+                  <div *ngIf="findReplaceLoading" class="text-sm text-slate-600 dark:text-slate-300">
+                    {{ 'adminUi.content.findReplace.loading' | translate }}
+                  </div>
+
+                  <div *ngIf="findReplaceApplying" class="text-sm text-slate-600 dark:text-slate-300">
+                    {{ 'adminUi.content.findReplace.applying' | translate }}
+                  </div>
+
+                  <div *ngIf="findReplacePreview && !findReplaceLoading && !findReplaceError" class="grid gap-2">
+                    <div class="text-xs text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.content.findReplace.summary' | translate:{ items: findReplacePreview.total_items, matches: findReplacePreview.total_matches } }}
+                    </div>
+
+                    <div *ngIf="findReplacePreview.total_items === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                      {{ 'adminUi.content.findReplace.empty' | translate }}
+                    </div>
+
+                    <div *ngIf="findReplacePreview.total_items > 0" class="grid gap-2">
+                      <div
+                        *ngFor="let item of findReplacePreview.items"
+                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900"
+                      >
+                        <div class="flex items-start justify-between gap-2">
+                          <div class="min-w-0">
+                            <p class="text-sm font-semibold text-slate-900 dark:text-slate-50 truncate">{{ item.key }}</p>
+                            <p class="text-xs text-slate-600 dark:text-slate-300 truncate">{{ item.title }}</p>
+                            <p *ngIf="item.translations?.length" class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                              <span *ngFor="let tr of item.translations; let last = last">
+                                {{ tr.lang }}: {{ tr.matches }}<span *ngIf="!last"> · </span>
+                              </span>
+                            </p>
+                          </div>
+                          <div class="text-xs font-semibold text-slate-700 dark:text-slate-200">{{ item.matches }}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div *ngIf="findReplacePreview.truncated" class="text-xs text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.content.findReplace.truncated' | translate:{ limit: 200 } }}
+                    </div>
+                  </div>
+
+                  <div *ngIf="findReplaceApplyResult" class="rounded-lg border border-slate-200 bg-white p-2 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
+                    <p class="font-semibold">
+                      {{ 'adminUi.content.findReplace.result' | translate:{ blocks: findReplaceApplyResult.updated_blocks, translations: findReplaceApplyResult.updated_translations, replacements: findReplaceApplyResult.total_replacements } }}
+                    </p>
+                    <div *ngIf="findReplaceApplyResult.errors?.length" class="mt-1 grid gap-1">
+                      <p class="text-rose-700 dark:text-rose-300">{{ 'adminUi.content.findReplace.applyErrors' | translate }}</p>
+                      <p *ngFor="let e of findReplaceApplyResult.errors" class="text-[11px] text-rose-700 dark:text-rose-300">
+                        {{ e.key }}: {{ e.error }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </details>
+
+              <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
+                <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
                   {{ 'adminUi.content.linkCheck.title' | translate }}
                 </summary>
                 <div class="mt-3 grid gap-3">
@@ -2007,6 +3436,36 @@ class CmsDraftManager<T> {
 	                    RO
 	                  </button>
 	                </div>
+
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                      {{ 'adminUi.content.translation.layoutLabel' | translate }}
+                    </span>
+                    <div class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                      <button
+                        type="button"
+                        class="px-3 py-1.5 text-xs font-semibold"
+                        [class.bg-slate-900]="cmsPrefs.translationLayout() === 'single'"
+                        [class.text-white]="cmsPrefs.translationLayout() === 'single'"
+                        [class.text-slate-700]="cmsPrefs.translationLayout() !== 'single'"
+                        [class.dark:text-slate-200]="cmsPrefs.translationLayout() !== 'single'"
+                        (click)="cmsPrefs.setTranslationLayout('single')"
+                      >
+                        {{ 'adminUi.content.translation.layouts.single' | translate }}
+                      </button>
+                      <button
+                        type="button"
+                        class="px-3 py-1.5 text-xs font-semibold"
+                        [class.bg-slate-900]="cmsPrefs.translationLayout() === 'sideBySide'"
+                        [class.text-white]="cmsPrefs.translationLayout() === 'sideBySide'"
+                        [class.text-slate-700]="cmsPrefs.translationLayout() !== 'sideBySide'"
+                        [class.dark:text-slate-200]="cmsPrefs.translationLayout() !== 'sideBySide'"
+                        (click)="cmsPrefs.setTranslationLayout('sideBySide')"
+                      >
+                        {{ 'adminUi.content.translation.layouts.sideBySide' | translate }}
+                      </button>
+                    </div>
+                  </div>
 	                <app-button
 	                  size="sm"
 	                  variant="ghost"
@@ -2053,8 +3512,80 @@ class CmsDraftManager<T> {
 	              </div>
 	            </div>
 
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="grid gap-0.5 min-w-0">
+                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                    {{ 'adminUi.content.previewLinks.title' | translate }}
+                  </p>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">
+                    / · {{ cmsPrefs.previewLang().toUpperCase() }} · {{ cmsPrefs.previewTheme().toUpperCase() }} · {{ cmsPreviewViewportWidth() }}px
+                  </p>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.content.previewLinks.generate' | translate"
+                    (action)="generateHomePreviewLink()"
+                  ></app-button>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.actions.refresh' | translate"
+                    [disabled]="!homePreviewToken"
+                    (action)="refreshHomePreview()"
+                  ></app-button>
+                  <a
+                    *ngIf="homePreviewShareUrl() as previewUrl"
+                    class="inline-flex items-center justify-center rounded-full font-semibold transition px-3 py-2 text-sm bg-white text-slate-900 border border-slate-200 hover:border-slate-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:bg-slate-800 dark:text-slate-50 dark:border-slate-700 dark:hover:border-slate-600"
+                    [attr.href]="previewUrl"
+                    target="_blank"
+                    rel="noopener"
+                  >
+                    {{ 'adminUi.content.previewLinks.open' | translate }}
+                  </a>
+                </div>
+              </div>
+
+              <div *ngIf="homePreviewShareUrl() as previewUrl" class="mt-3 grid gap-2">
+                <div class="flex items-center gap-2">
+                  <input
+                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [value]="previewUrl"
+                    readonly
+                  />
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.content.previewLinks.copy' | translate"
+                    (action)="copyPreviewLink(previewUrl)"
+                  ></app-button>
+                </div>
+                <p *ngIf="homePreviewExpiresAt" class="text-xs text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.content.previewLinks.expires' | translate }} {{ homePreviewExpiresAt | date: 'short' }}
+                </p>
+              </div>
+
+              <div *ngIf="homePreviewIframeSrc() as iframeSrc; else homePreviewHint" class="mt-3 overflow-x-auto">
+                <div
+                  class="mx-auto rounded-lg border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-900"
+                  [style.width.px]="cmsPreviewViewportWidth()"
+                >
+                  <iframe class="h-[720px] w-full rounded-md bg-white dark:bg-slate-950" [src]="iframeSrc" title="Preview home" loading="lazy"></iframe>
+                </div>
+              </div>
+              <ng-template #homePreviewHint>
+                <p class="mt-3 text-xs text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.content.previewLinks.hint' | translate }}
+                </p>
+              </ng-template>
+            </div>
+
 	            <app-cms-block-library
 	              context="home"
+                [allowedTypes]="homeCmsLibraryTypes"
 	              (add)="addHomeBlockFromLibrary($event.type, $event.template)"
 	              (dragActive)="setHomeInsertDragActive($event)"
             ></app-cms-block-library>
@@ -2065,22 +3596,26 @@ class CmsDraftManager<T> {
                 <select
                   class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                   [(ngModel)]="newHomeBlockType"
-                >
-                  <option [ngValue]="'text'">{{ 'adminUi.home.sections.blocks.text' | translate }}</option>
-                  <option [ngValue]="'image'">{{ 'adminUi.home.sections.blocks.image' | translate }}</option>
-                  <option [ngValue]="'gallery'">{{ 'adminUi.home.sections.blocks.gallery' | translate }}</option>
-                  <option [ngValue]="'banner'">{{ 'adminUi.home.sections.blocks.banner' | translate }}</option>
-                  <option [ngValue]="'carousel'">{{ 'adminUi.home.sections.blocks.carousel' | translate }}</option>
-                </select>
-              </label>
+	                >
+	                  <option [ngValue]="'text'">{{ 'adminUi.home.sections.blocks.text' | translate }}</option>
+	                  <option [ngValue]="'columns'">{{ 'adminUi.home.sections.blocks.columns' | translate }}</option>
+	                  <option [ngValue]="'cta'">{{ 'adminUi.home.sections.blocks.cta' | translate }}</option>
+	                  <option [ngValue]="'faq'">{{ 'adminUi.home.sections.blocks.faq' | translate }}</option>
+	                  <option [ngValue]="'testimonials'">{{ 'adminUi.home.sections.blocks.testimonials' | translate }}</option>
+	                  <option [ngValue]="'image'">{{ 'adminUi.home.sections.blocks.image' | translate }}</option>
+	                  <option [ngValue]="'gallery'">{{ 'adminUi.home.sections.blocks.gallery' | translate }}</option>
+	                  <option [ngValue]="'banner'">{{ 'adminUi.home.sections.blocks.banner' | translate }}</option>
+	                  <option [ngValue]="'carousel'">{{ 'adminUi.home.sections.blocks.carousel' | translate }}</option>
+	                </select>
+	              </label>
               <app-button size="sm" [label]="'adminUi.actions.add' | translate" (action)="addHomeBlock()"></app-button>
             </div>
 
-            <div class="grid gap-2">
-              <div
-                *ngIf="homeInsertDragActive"
-                class="rounded-xl border border-dashed border-slate-300 bg-white/60 px-3 py-2 text-xs font-semibold text-slate-600 flex items-center justify-center dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-300"
-                (dragover)="onHomeBlockDragOver($event)"
+	            <div class="grid gap-2" (dragover)="onCmsMediaDragOver($event)" (drop)="onHomeMediaDropOnContainer($event)">
+	              <div
+	                *ngIf="homeInsertDragActive"
+	                class="rounded-xl border border-dashed border-slate-300 bg-white/60 px-3 py-2 text-xs font-semibold text-slate-600 flex items-center justify-center dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-300"
+	                (dragover)="onHomeBlockDragOver($event)"
                 (drop)="onHomeBlockDropZone($event, 0)"
               >
                 {{ 'adminUi.content.blockLibrary.dropHere' | translate }}
@@ -2140,24 +3675,39 @@ class CmsDraftManager<T> {
 
                 <ng-container *ngIf="isCustomHomeBlock(block)">
                   <div class="mt-3 grid gap-3">
-                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                      {{ 'adminUi.home.sections.fields.title' | translate }}
-                      <input
-                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                        [(ngModel)]="block.title[homeBlocksLang]"
-                      />
-                    </label>
+                    <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockTitleSingle">
+                      <app-localized-text-editor [label]="'adminUi.home.sections.fields.title' | translate" [value]="block.title"></app-localized-text-editor>
+                    </ng-container>
+                    <ng-template #homeBlockTitleSingle>
+                      <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                        {{ 'adminUi.home.sections.fields.title' | translate }}
+                        <input
+                          class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                          [(ngModel)]="block.title[homeBlocksLang]"
+                        />
+                      </label>
+                    </ng-template>
 
                     <ng-container [ngSwitch]="block.type">
-                      <ng-container *ngSwitchCase="'text'">
-                        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                          {{ 'adminUi.home.sections.fields.body' | translate }}
-                          <textarea
-                            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                            rows="5"
-                            [(ngModel)]="block.body_markdown[homeBlocksLang]"
-                          ></textarea>
-                        </label>
+	                      <ng-container *ngSwitchCase="'text'">
+	                        <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockTextBodySingle">
+	                          <app-localized-text-editor
+	                            [label]="'adminUi.home.sections.fields.body' | translate"
+	                            [multiline]="true"
+                            [rows]="6"
+                            [value]="block.body_markdown"
+                          ></app-localized-text-editor>
+                        </ng-container>
+                        <ng-template #homeBlockTextBodySingle>
+                          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                            {{ 'adminUi.home.sections.fields.body' | translate }}
+                            <textarea
+                              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                              rows="5"
+                              [(ngModel)]="block.body_markdown[homeBlocksLang]"
+                            ></textarea>
+                          </label>
+                        </ng-template>
                         <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
                           <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.home.sections.fields.preview' | translate }}</p>
                           <div class="mt-2 mx-auto w-full" [ngClass]="cmsPreviewMaxWidthClass()">
@@ -2165,14 +3715,280 @@ class CmsDraftManager<T> {
                               class="markdown rounded-2xl border border-slate-200 bg-white p-3 text-slate-700 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
                               [innerHTML]="renderMarkdown(block.body_markdown[homeBlocksLang])"
                             ></div>
-                          </div>
-                        </div>
-                      </ng-container>
+	                          </div>
+	                        </div>
+	                      </ng-container>
 
-                      <ng-container *ngSwitchCase="'image'">
-                        <div class="grid gap-3 md:grid-cols-2">
-                          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
-                            {{ 'adminUi.home.sections.fields.imageUrl' | translate }}
+	                      <ng-container *ngSwitchCase="'columns'">
+	                        <div class="grid gap-3">
+	                          <div class="grid gap-3 sm:grid-cols-[1fr_auto] items-end">
+	                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                              {{ 'adminUi.home.sections.fields.columnsBreakpoint' | translate }}
+	                              <select
+	                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                                [(ngModel)]="block.columns_breakpoint"
+	                              >
+	                                <option [ngValue]="'sm'">SM</option>
+	                                <option [ngValue]="'md'">MD</option>
+	                                <option [ngValue]="'lg'">LG</option>
+	                              </select>
+	                            </label>
+
+	                            <app-button
+	                              size="sm"
+	                              variant="ghost"
+	                              [disabled]="block.columns.length >= 3"
+	                              [label]="'adminUi.home.sections.fields.addColumn' | translate"
+	                              (action)="addHomeColumnsColumn(block.key)"
+	                            ></app-button>
+	                          </div>
+
+	                          <div class="grid gap-2">
+	                            <div
+	                              *ngFor="let col of block.columns; let colIdx = index"
+	                              class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+	                            >
+	                              <div class="flex items-center justify-between gap-3">
+	                                <span class="text-xs font-semibold text-slate-700 dark:text-slate-200">
+	                                  {{ 'adminUi.home.sections.fields.column' | translate }} {{ colIdx + 1 }}
+	                                </span>
+	                                <app-button
+	                                  size="sm"
+	                                  variant="ghost"
+	                                  [disabled]="block.columns.length <= 2"
+	                                  [label]="'adminUi.actions.delete' | translate"
+	                                  (action)="removeHomeColumnsColumn(block.key, colIdx)"
+	                                ></app-button>
+	                              </div>
+
+	                              <div class="mt-3 grid gap-3">
+	                                <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockColumnsTextSingle">
+	                                  <app-localized-text-editor
+	                                    [label]="'adminUi.home.sections.fields.columnTitle' | translate"
+	                                    [value]="col.title"
+	                                  ></app-localized-text-editor>
+	                                  <app-localized-text-editor
+	                                    [label]="'adminUi.home.sections.fields.columnBody' | translate"
+	                                    [multiline]="true"
+	                                    [rows]="5"
+	                                    [value]="col.body_markdown"
+	                                  ></app-localized-text-editor>
+	                                </ng-container>
+	                                <ng-template #homeBlockColumnsTextSingle>
+	                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                                    {{ 'adminUi.home.sections.fields.columnTitle' | translate }}
+	                                    <input
+	                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                                      [(ngModel)]="col.title[homeBlocksLang]"
+	                                    />
+	                                  </label>
+	                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                                    {{ 'adminUi.home.sections.fields.columnBody' | translate }}
+	                                    <textarea
+	                                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                                      rows="4"
+	                                      [(ngModel)]="col.body_markdown[homeBlocksLang]"
+	                                    ></textarea>
+	                                  </label>
+	                                </ng-template>
+	                              </div>
+	                            </div>
+	                          </div>
+	                        </div>
+	                      </ng-container>
+
+	                      <ng-container *ngSwitchCase="'cta'">
+	                        <div class="grid gap-3">
+	                          <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockCtaTextSingle">
+	                            <app-localized-text-editor
+	                              [label]="'adminUi.home.sections.fields.body' | translate"
+	                              [multiline]="true"
+	                              [rows]="5"
+	                              [value]="block.body_markdown"
+	                            ></app-localized-text-editor>
+	                            <app-localized-text-editor
+	                              [label]="'adminUi.home.hero.ctaLabel' | translate"
+	                              [value]="block.cta_label"
+	                            ></app-localized-text-editor>
+	                          </ng-container>
+	                          <ng-template #homeBlockCtaTextSingle>
+	                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                              {{ 'adminUi.home.sections.fields.body' | translate }}
+	                              <textarea
+	                                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                                rows="4"
+	                                [(ngModel)]="block.body_markdown[homeBlocksLang]"
+	                              ></textarea>
+	                            </label>
+	                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                              {{ 'adminUi.home.hero.ctaLabel' | translate }}
+	                              <input
+	                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                                [(ngModel)]="block.cta_label[homeBlocksLang]"
+	                              />
+	                            </label>
+	                          </ng-template>
+		                          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+		                            {{ 'adminUi.home.hero.ctaUrl' | translate }}
+		                            <input
+		                              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+		                              [(ngModel)]="block.cta_url"
+		                            />
+		                          </label>
+		                          <label class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+		                            <input type="checkbox" [(ngModel)]="block.cta_new_tab" />
+		                            {{ 'adminUi.home.hero.ctaNewTab' | translate }}
+		                          </label>
+		                        </div>
+		                      </ng-container>
+
+	                      <ng-container *ngSwitchCase="'faq'">
+	                        <div class="grid gap-3">
+	                          <div class="flex items-center justify-between gap-3">
+	                            <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+	                              {{ 'adminUi.home.sections.blocks.faq' | translate }}
+	                            </p>
+	                            <app-button
+	                              size="sm"
+	                              variant="ghost"
+	                              [label]="'adminUi.actions.add' | translate"
+	                              (action)="addHomeFaqItem(block.key)"
+	                            ></app-button>
+	                          </div>
+
+	                          <div class="grid gap-2">
+	                            <div
+	                              *ngFor="let item of block.faq_items; let idx = index"
+	                              class="grid gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+	                            >
+	                              <div class="flex items-center justify-between gap-3">
+	                                <span class="text-xs font-semibold text-slate-700 dark:text-slate-200">
+	                                  {{ 'adminUi.home.sections.fields.question' | translate }} {{ idx + 1 }}
+	                                </span>
+	                                <app-button
+	                                  size="sm"
+	                                  variant="ghost"
+	                                  [disabled]="block.faq_items.length <= 1"
+	                                  [label]="'adminUi.actions.delete' | translate"
+	                                  (action)="removeHomeFaqItem(block.key, idx)"
+	                                ></app-button>
+	                              </div>
+
+	                              <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockFaqTextSingle">
+	                                <app-localized-text-editor
+	                                  [label]="'adminUi.home.sections.fields.question' | translate"
+	                                  [value]="item.question"
+	                                ></app-localized-text-editor>
+	                                <app-localized-text-editor
+	                                  [label]="'adminUi.home.sections.fields.answer' | translate"
+	                                  [multiline]="true"
+	                                  [rows]="4"
+	                                  [value]="item.answer_markdown"
+	                                ></app-localized-text-editor>
+	                              </ng-container>
+	                              <ng-template #homeBlockFaqTextSingle>
+	                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                                  {{ 'adminUi.home.sections.fields.question' | translate }}
+	                                  <input
+	                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                                    [(ngModel)]="item.question[homeBlocksLang]"
+	                                  />
+	                                </label>
+	                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                                  {{ 'adminUi.home.sections.fields.answer' | translate }}
+	                                  <textarea
+	                                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                                    rows="4"
+	                                    [(ngModel)]="item.answer_markdown[homeBlocksLang]"
+	                                  ></textarea>
+	                                </label>
+	                              </ng-template>
+	                            </div>
+	                          </div>
+	                        </div>
+	                      </ng-container>
+
+	                      <ng-container *ngSwitchCase="'testimonials'">
+	                        <div class="grid gap-3">
+	                          <div class="flex items-center justify-between gap-3">
+	                            <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+	                              {{ 'adminUi.home.sections.blocks.testimonials' | translate }}
+	                            </p>
+	                            <app-button
+	                              size="sm"
+	                              variant="ghost"
+	                              [label]="'adminUi.actions.add' | translate"
+	                              (action)="addHomeTestimonial(block.key)"
+	                            ></app-button>
+	                          </div>
+
+	                          <div class="grid gap-2">
+	                            <div
+	                              *ngFor="let item of block.testimonials; let idx = index"
+	                              class="grid gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+	                            >
+	                              <div class="flex items-center justify-between gap-3">
+	                                <span class="text-xs font-semibold text-slate-700 dark:text-slate-200">
+	                                  {{ 'adminUi.home.sections.fields.testimonial' | translate }} {{ idx + 1 }}
+	                                </span>
+	                                <app-button
+	                                  size="sm"
+	                                  variant="ghost"
+	                                  [disabled]="block.testimonials.length <= 1"
+	                                  [label]="'adminUi.actions.delete' | translate"
+	                                  (action)="removeHomeTestimonial(block.key, idx)"
+	                                ></app-button>
+	                              </div>
+
+	                              <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockTestimonialsTextSingle">
+	                                <app-localized-text-editor
+	                                  [label]="'adminUi.home.sections.fields.quote' | translate"
+	                                  [multiline]="true"
+	                                  [rows]="4"
+	                                  [value]="item.quote_markdown"
+	                                ></app-localized-text-editor>
+	                                <app-localized-text-editor
+	                                  [label]="'adminUi.home.sections.fields.author' | translate"
+	                                  [value]="item.author"
+	                                ></app-localized-text-editor>
+	                                <app-localized-text-editor
+	                                  [label]="'adminUi.home.sections.fields.role' | translate"
+	                                  [value]="item.role"
+	                                ></app-localized-text-editor>
+	                              </ng-container>
+	                              <ng-template #homeBlockTestimonialsTextSingle>
+	                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                                  {{ 'adminUi.home.sections.fields.quote' | translate }}
+	                                  <textarea
+	                                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                                    rows="4"
+	                                    [(ngModel)]="item.quote_markdown[homeBlocksLang]"
+	                                  ></textarea>
+	                                </label>
+	                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                                  {{ 'adminUi.home.sections.fields.author' | translate }}
+	                                  <input
+	                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                                    [(ngModel)]="item.author[homeBlocksLang]"
+	                                  />
+	                                </label>
+	                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                                  {{ 'adminUi.home.sections.fields.role' | translate }}
+	                                  <input
+	                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                                    [(ngModel)]="item.role[homeBlocksLang]"
+	                                  />
+	                                </label>
+	                              </ng-template>
+	                            </div>
+	                          </div>
+	                        </div>
+	                      </ng-container>
+
+	                      <ng-container *ngSwitchCase="'image'">
+	                        <div class="grid gap-3 md:grid-cols-2">
+	                          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
+	                            {{ 'adminUi.home.sections.fields.imageUrl' | translate }}
                             <input
                               class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                               [(ngModel)]="block.url"
@@ -2185,20 +4001,34 @@ class CmsDraftManager<T> {
                               [(ngModel)]="block.link_url"
                             />
                           </label>
-                          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                            {{ 'adminUi.home.sections.fields.alt' | translate }}
-                            <input
-                              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                              [(ngModel)]="block.alt[homeBlocksLang]"
-                            />
-                          </label>
-                          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                            {{ 'adminUi.home.sections.fields.caption' | translate }}
-                            <input
-                              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                              [(ngModel)]="block.caption[homeBlocksLang]"
-                            />
-                          </label>
+                          <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockImageTextSingle">
+                            <app-localized-text-editor
+                              class="md:col-span-2"
+                              [label]="'adminUi.home.sections.fields.alt' | translate"
+                              [value]="block.alt"
+                            ></app-localized-text-editor>
+                            <app-localized-text-editor
+                              class="md:col-span-2"
+                              [label]="'adminUi.home.sections.fields.caption' | translate"
+                              [value]="block.caption"
+                            ></app-localized-text-editor>
+                          </ng-container>
+                          <ng-template #homeBlockImageTextSingle>
+                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                              {{ 'adminUi.home.sections.fields.alt' | translate }}
+                              <input
+                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                [(ngModel)]="block.alt[homeBlocksLang]"
+                              />
+                            </label>
+                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                              {{ 'adminUi.home.sections.fields.caption' | translate }}
+                              <input
+                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                [(ngModel)]="block.caption[homeBlocksLang]"
+                              />
+                            </label>
+                          </ng-template>
                           <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                             {{ 'adminUi.home.sections.fields.focalX' | translate }}
                             <input
@@ -2272,20 +4102,34 @@ class CmsDraftManager<T> {
                                 />
                               </label>
                               <div class="grid gap-3 md:grid-cols-2">
-                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                                  {{ 'adminUi.home.sections.fields.alt' | translate }}
-                                  <input
-                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                    [(ngModel)]="img.alt[homeBlocksLang]"
-                                  />
-                                </label>
-                                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                                  {{ 'adminUi.home.sections.fields.caption' | translate }}
-                                  <input
-                                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                    [(ngModel)]="img.caption[homeBlocksLang]"
-                                  />
-                                </label>
+                                <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockGalleryTextSingle">
+                                  <app-localized-text-editor
+                                    class="md:col-span-2"
+                                    [label]="'adminUi.home.sections.fields.alt' | translate"
+                                    [value]="img.alt"
+                                  ></app-localized-text-editor>
+                                  <app-localized-text-editor
+                                    class="md:col-span-2"
+                                    [label]="'adminUi.home.sections.fields.caption' | translate"
+                                    [value]="img.caption"
+                                  ></app-localized-text-editor>
+                                </ng-container>
+                                <ng-template #homeBlockGalleryTextSingle>
+                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    {{ 'adminUi.home.sections.fields.alt' | translate }}
+                                    <input
+                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      [(ngModel)]="img.alt[homeBlocksLang]"
+                                    />
+                                  </label>
+                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                    {{ 'adminUi.home.sections.fields.caption' | translate }}
+                                    <input
+                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                      [(ngModel)]="img.caption[homeBlocksLang]"
+                                    />
+                                  </label>
+                                </ng-template>
                                 <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                                   {{ 'adminUi.home.sections.fields.focalX' | translate }}
                                   <input
@@ -2346,34 +4190,73 @@ class CmsDraftManager<T> {
                                 [(ngModel)]="block.slide.image_url"
                               />
                             </label>
-                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                              {{ 'adminUi.home.sections.fields.alt' | translate }}
-                              <input
-                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                [(ngModel)]="block.slide.alt[homeBlocksLang]"
-                              />
-                            </label>
-                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                              {{ 'adminUi.home.hero.headline' | translate }}
-                              <input
-                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                [(ngModel)]="block.slide.headline[homeBlocksLang]"
-                              />
-                            </label>
-                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
-                              {{ 'adminUi.home.hero.subtitle' | translate }}
-                              <input
-                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                [(ngModel)]="block.slide.subheadline[homeBlocksLang]"
-                              />
-                            </label>
-                            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                              {{ 'adminUi.home.hero.ctaLabel' | translate }}
-                              <input
-                                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                [(ngModel)]="block.slide.cta_label[homeBlocksLang]"
-                              />
-                            </label>
+                            <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockBannerAltSingle">
+                              <app-localized-text-editor
+                                class="md:col-span-2"
+                                [label]="'adminUi.home.sections.fields.alt' | translate"
+                                [value]="block.slide.alt"
+                              ></app-localized-text-editor>
+                            </ng-container>
+                            <ng-template #homeBlockBannerAltSingle>
+                              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                {{ 'adminUi.home.sections.fields.alt' | translate }}
+                                <input
+                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                  [(ngModel)]="block.slide.alt[homeBlocksLang]"
+                                />
+                              </label>
+                            </ng-template>
+
+                            <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockBannerHeadlineSingle">
+                              <app-localized-text-editor
+                                class="md:col-span-2"
+                                [label]="'adminUi.home.hero.headline' | translate"
+                                [value]="block.slide.headline"
+                              ></app-localized-text-editor>
+                            </ng-container>
+                            <ng-template #homeBlockBannerHeadlineSingle>
+                              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                {{ 'adminUi.home.hero.headline' | translate }}
+                                <input
+                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                  [(ngModel)]="block.slide.headline[homeBlocksLang]"
+                                />
+                              </label>
+                            </ng-template>
+
+                            <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockBannerSubheadlineSingle">
+                              <app-localized-text-editor
+                                class="md:col-span-2"
+                                [label]="'adminUi.home.hero.subtitle' | translate"
+                                [value]="block.slide.subheadline"
+                              ></app-localized-text-editor>
+                            </ng-container>
+                            <ng-template #homeBlockBannerSubheadlineSingle>
+                              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
+                                {{ 'adminUi.home.hero.subtitle' | translate }}
+                                <input
+                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                  [(ngModel)]="block.slide.subheadline[homeBlocksLang]"
+                                />
+                              </label>
+                            </ng-template>
+
+                            <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockBannerCtaLabelSingle">
+                              <app-localized-text-editor
+                                class="md:col-span-2"
+                                [label]="'adminUi.home.hero.ctaLabel' | translate"
+                                [value]="block.slide.cta_label"
+                              ></app-localized-text-editor>
+                            </ng-container>
+                            <ng-template #homeBlockBannerCtaLabelSingle>
+                              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                {{ 'adminUi.home.hero.ctaLabel' | translate }}
+                                <input
+                                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                  [(ngModel)]="block.slide.cta_label[homeBlocksLang]"
+                                />
+                              </label>
+                            </ng-template>
                             <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                               {{ 'adminUi.home.hero.ctaUrl' | translate }}
                               <input
@@ -2490,34 +4373,73 @@ class CmsDraftManager<T> {
                                       [(ngModel)]="slide.image_url"
                                     />
                                   </label>
-                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                                    {{ 'adminUi.home.sections.fields.alt' | translate }}
-                                    <input
-                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                      [(ngModel)]="slide.alt[homeBlocksLang]"
-                                    />
-                                  </label>
-                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                                    {{ 'adminUi.home.hero.headline' | translate }}
-                                    <input
-                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                      [(ngModel)]="slide.headline[homeBlocksLang]"
-                                    />
-                                  </label>
-                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
-                                    {{ 'adminUi.home.hero.subtitle' | translate }}
-                                    <input
-                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                      [(ngModel)]="slide.subheadline[homeBlocksLang]"
-                                    />
-                                  </label>
-                                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                                    {{ 'adminUi.home.hero.ctaLabel' | translate }}
-                                    <input
-                                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                      [(ngModel)]="slide.cta_label[homeBlocksLang]"
-                                    />
-                                  </label>
+                                  <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockCarouselAltSingle">
+                                    <app-localized-text-editor
+                                      class="md:col-span-2"
+                                      [label]="'adminUi.home.sections.fields.alt' | translate"
+                                      [value]="slide.alt"
+                                    ></app-localized-text-editor>
+                                  </ng-container>
+                                  <ng-template #homeBlockCarouselAltSingle>
+                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                      {{ 'adminUi.home.sections.fields.alt' | translate }}
+                                      <input
+                                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                        [(ngModel)]="slide.alt[homeBlocksLang]"
+                                      />
+                                    </label>
+                                  </ng-template>
+
+                                  <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockCarouselHeadlineSingle">
+                                    <app-localized-text-editor
+                                      class="md:col-span-2"
+                                      [label]="'adminUi.home.hero.headline' | translate"
+                                      [value]="slide.headline"
+                                    ></app-localized-text-editor>
+                                  </ng-container>
+                                  <ng-template #homeBlockCarouselHeadlineSingle>
+                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                      {{ 'adminUi.home.hero.headline' | translate }}
+                                      <input
+                                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                        [(ngModel)]="slide.headline[homeBlocksLang]"
+                                      />
+                                    </label>
+                                  </ng-template>
+
+                                  <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockCarouselSubheadlineSingle">
+                                    <app-localized-text-editor
+                                      class="md:col-span-2"
+                                      [label]="'adminUi.home.hero.subtitle' | translate"
+                                      [value]="slide.subheadline"
+                                    ></app-localized-text-editor>
+                                  </ng-container>
+                                  <ng-template #homeBlockCarouselSubheadlineSingle>
+                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
+                                      {{ 'adminUi.home.hero.subtitle' | translate }}
+                                      <input
+                                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                        [(ngModel)]="slide.subheadline[homeBlocksLang]"
+                                      />
+                                    </label>
+                                  </ng-template>
+
+                                  <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else homeBlockCarouselCtaLabelSingle">
+                                    <app-localized-text-editor
+                                      class="md:col-span-2"
+                                      [label]="'adminUi.home.hero.ctaLabel' | translate"
+                                      [value]="slide.cta_label"
+                                    ></app-localized-text-editor>
+                                  </ng-container>
+                                  <ng-template #homeBlockCarouselCtaLabelSingle>
+                                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                      {{ 'adminUi.home.hero.ctaLabel' | translate }}
+                                      <input
+                                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                        [(ngModel)]="slide.cta_label[homeBlocksLang]"
+                                      />
+                                    </label>
+                                  </ng-template>
                                   <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                                     {{ 'adminUi.home.hero.ctaUrl' | translate }}
                                     <input
@@ -2871,7 +4793,122 @@ class CmsDraftManager<T> {
           <section *ngIf="section() === 'settings'" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.categories.title' | translate }}</h2>
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.categories.wizard.start' | translate"
+                (action)="startCategoryWizard()"
+              ></app-button>
             </div>
+
+            <app-help-panel
+              [titleKey]="'adminUi.help.title'"
+              [subtitleKey]="'adminUi.categories.help.subtitle'"
+              [mediaSrc]="'assets/help/admin-categories-help.svg'"
+              [mediaAltKey]="'adminUi.categories.help.mediaAlt'"
+            >
+              <ul class="list-disc pl-5 text-xs text-slate-600 dark:text-slate-300">
+                <li>{{ 'adminUi.categories.help.points.slug' | translate }}</li>
+                <li>{{ 'adminUi.categories.help.points.parent' | translate }}</li>
+                <li>{{ 'adminUi.categories.help.points.translations' | translate }}</li>
+              </ul>
+            </app-help-panel>
+
+            <app-modal
+              [open]="categoryDeleteConfirmOpen()"
+              [title]="'adminUi.categories.confirmDelete.title' | translate: { name: categoryDeleteConfirmTarget()?.name || '' }"
+              [subtitle]="'adminUi.categories.confirmDelete.subtitle' | translate"
+              [closeLabel]="'adminUi.actions.cancel' | translate"
+              [cancelLabel]="'adminUi.actions.cancel' | translate"
+              [confirmLabel]="
+                categoryDeleteConfirmBusy()
+                  ? ('adminUi.actions.loading' | translate)
+                  : ('adminUi.actions.delete' | translate)
+              "
+              [confirmDisabled]="categoryDeleteConfirmBusy()"
+              (closed)="closeCategoryDeleteConfirm()"
+              (confirm)="confirmDeleteCategory()"
+            >
+              <div class="grid gap-3">
+                <div
+                  *ngIf="categoryDeleteConfirmTarget() as cat"
+                  class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+                >
+                  <p class="font-semibold text-slate-900 dark:text-slate-50">{{ cat.name }}</p>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">Slug: {{ cat.slug }}</p>
+                </div>
+
+                <ul class="list-disc pl-5 text-sm text-slate-700 dark:text-slate-200">
+                  <li>{{ 'adminUi.categories.confirmDelete.points.permanent' | translate }}</li>
+                  <li>{{ 'adminUi.categories.confirmDelete.points.inUse' | translate }}</li>
+                  <li>{{ 'adminUi.categories.confirmDelete.points.urls' | translate }}</li>
+                </ul>
+              </div>
+            </app-modal>
+
+            <div
+              *ngIf="categoryWizardOpen()"
+              class="rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900 dark:border-indigo-900/40 dark:bg-indigo-950/30 dark:text-indigo-100"
+            >
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="grid gap-1">
+                  <p class="font-semibold">{{ 'adminUi.categories.wizard.title' | translate }}</p>
+                  <p class="text-xs text-indigo-800 dark:text-indigo-200">{{ categoryWizardDescriptionKey() | translate }}</p>
+                </div>
+                <app-button size="sm" variant="ghost" [label]="'adminUi.actions.exit' | translate" (action)="exitCategoryWizard()"></app-button>
+              </div>
+
+              <div class="mt-3 flex flex-wrap items-center gap-2">
+                <button
+                  *ngFor="let step of categoryWizardSteps; let idx = index"
+                  type="button"
+                  class="rounded-full border border-indigo-200 bg-white px-3 py-1 text-xs font-semibold text-indigo-900 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/10 dark:text-indigo-100 dark:hover:bg-indigo-900/30"
+                  [class.bg-indigo-600]="idx === categoryWizardStep()"
+                  [class.text-white]="idx === categoryWizardStep()"
+                  [class.border-indigo-600]="idx === categoryWizardStep()"
+                  [class.hover:bg-indigo-700]="idx === categoryWizardStep()"
+                  [class.dark:bg-indigo-500/30]="idx === categoryWizardStep()"
+                  [class.dark:hover:bg-indigo-500/40]="idx === categoryWizardStep()"
+                  (click)="goToCategoryWizardStep(idx)"
+                >
+                  {{ step.labelKey | translate }}
+                </button>
+              </div>
+
+              <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.actions.back' | translate"
+                  (action)="categoryWizardPrev()"
+                  [disabled]="categoryWizardStep() === 0"
+                ></app-button>
+
+                <div class="flex flex-wrap items-center gap-2">
+                  <app-button
+                    *ngIf="categoryWizardStep() === 0"
+                    size="sm"
+                    [label]="'adminUi.categories.add' | translate"
+                    (action)="addCategory()"
+                    [disabled]="!categoryName.trim()"
+                  ></app-button>
+                  <app-button
+                    *ngIf="categoryWizardStep() === 1 && categoryWizardSlug()"
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.categories.translations.button' | translate"
+                    (action)="openCategoryWizardTranslations()"
+                  ></app-button>
+                  <app-button
+                    size="sm"
+                    [label]="categoryWizardNextLabelKey() | translate"
+                    (action)="categoryWizardNext()"
+                    [disabled]="!categoryWizardCanNext()"
+                  ></app-button>
+                </div>
+              </div>
+            </div>
+
             <div class="grid md:grid-cols-[1fr_260px_auto] gap-2 items-end text-sm">
               <app-input [label]="'adminUi.products.table.name' | translate" [(value)]="categoryName"></app-input>
               <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -2910,14 +4947,14 @@ class CmsDraftManager<T> {
 	                      [label]="'adminUi.categories.translations.button' | translate"
 	                      (action)="toggleCategoryTranslations(cat.slug)"
 	                    ></app-button>
-	                    <app-button
-	                      size="sm"
-	                      variant="ghost"
-	                      [label]="'adminUi.actions.delete' | translate"
-	                      (action)="deleteCategory(cat.slug)"
-	                    ></app-button>
-	                  </div>
-	                </div>
+		                    <app-button
+		                      size="sm"
+		                      variant="ghost"
+		                      [label]="'adminUi.actions.delete' | translate"
+		                      (action)="openCategoryDeleteConfirm(cat)"
+		                    ></app-button>
+		                  </div>
+		                </div>
                   <label class="mt-2 flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
                     <span class="font-semibold">{{ 'adminUi.categories.parent' | translate }}:</span>
                     <select
@@ -3373,17 +5410,127 @@ class CmsDraftManager<T> {
               </div>
             </div>
 
+            <div class="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/40">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="flex flex-wrap items-center gap-3">
+                  <label class="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                    <input
+                      type="checkbox"
+                      [checked]="areAllBlogSelected()"
+                      [disabled]="blogPosts().length === 0"
+                      (change)="toggleSelectAllBlogs($event)"
+                    />
+                    {{ 'adminUi.blog.bulk.selectAll' | translate }}
+                  </label>
+                  <span class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ 'adminUi.blog.bulk.selected' | translate : { count: blogBulkSelection.size } }}
+                  </span>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.blog.bulk.clear' | translate"
+                    (action)="clearBlogBulkSelection()"
+                    [disabled]="blogBulkSelection.size === 0"
+                  ></app-button>
+                </div>
+                <div class="text-xs text-rose-600 dark:text-rose-300" *ngIf="blogBulkError">
+                  {{ blogBulkError }}
+                </div>
+              </div>
+
+              <div class="grid gap-3 md:grid-cols-4">
+                <label class="grid gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.blog.bulk.actionLabel' | translate }}
+                  <select
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="blogBulkAction"
+                  >
+                    <option value="publish">{{ 'adminUi.blog.bulk.actionPublish' | translate }}</option>
+                    <option value="unpublish">{{ 'adminUi.blog.bulk.actionUnpublish' | translate }}</option>
+                    <option value="schedule">{{ 'adminUi.blog.bulk.actionSchedule' | translate }}</option>
+                    <option value="tags_add">{{ 'adminUi.blog.bulk.actionTagsAdd' | translate }}</option>
+                    <option value="tags_remove">{{ 'adminUi.blog.bulk.actionTagsRemove' | translate }}</option>
+                  </select>
+                </label>
+
+                <label *ngIf="blogBulkAction === 'schedule'" class="grid gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.blog.bulk.publishAt' | translate }}
+                  <input
+                    type="datetime-local"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="blogBulkPublishAt"
+                  />
+                </label>
+
+                <label *ngIf="blogBulkAction === 'schedule'" class="grid gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.blog.bulk.unpublishAt' | translate }}
+                  <input
+                    type="datetime-local"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="blogBulkUnpublishAt"
+                  />
+                </label>
+
+                <label *ngIf="blogBulkAction === 'tags_add' || blogBulkAction === 'tags_remove'" class="grid gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300 md:col-span-2">
+                  {{ 'adminUi.blog.bulk.tagsLabel' | translate }}
+                  <input
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [placeholder]="'adminUi.blog.bulk.tagsPlaceholder' | translate"
+                    [(ngModel)]="blogBulkTags"
+                  />
+                </label>
+              </div>
+
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <p class="text-xs text-slate-500 dark:text-slate-400">{{ blogBulkPreview() }}</p>
+                <app-button
+                  size="sm"
+                  [label]="blogBulkSaving ? ('adminUi.common.saving' | translate) : ('adminUi.blog.bulk.apply' | translate)"
+                  (action)="applyBlogBulkAction()"
+                  [disabled]="!canApplyBlogBulk() || blogBulkSaving"
+                ></app-button>
+              </div>
+            </div>
+
+            <div
+              *ngIf="blogPinnedConflicts().length"
+              class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
+            >
+              <p class="font-semibold">{{ 'adminUi.blog.pins.conflictsTitle' | translate }}</p>
+              <div class="mt-1 grid gap-1 text-xs">
+                <div *ngFor="let conflict of blogPinnedConflicts()">
+                  {{ 'adminUi.blog.pins.conflictLine' | translate: { slot: conflict.slot, posts: conflict.posts } }}
+                </div>
+              </div>
+            </div>
+
             <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
               <div *ngIf="blogPosts().length === 0" class="text-sm text-slate-500 dark:text-slate-400">
                 {{ 'adminUi.blog.empty' | translate }}
               </div>
               <div
                 *ngFor="let post of blogPosts()"
-                class="flex items-center justify-between rounded-lg border border-slate-200 p-3 dark:border-slate-700"
+                class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700"
+                [ngClass]="isBlogSelected(post.key) ? 'bg-indigo-50/60 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-900' : ''"
               >
+                <label class="flex items-center gap-2">
+                  <input type="checkbox" [checked]="isBlogSelected(post.key)" (change)="toggleBlogSelection(post.key, $event)" />
+                </label>
                 <div>
                   <p class="font-semibold text-slate-900 dark:text-slate-50">{{ post.title }}</p>
                   <p class="text-xs text-slate-500 dark:text-slate-400">
+                    <ng-container *ngIf="blogPinnedSlot(post) as slot">
+                      <span class="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 dark:border-indigo-900/50 dark:bg-indigo-950/40 dark:text-indigo-200">
+                        {{ 'adminUi.blog.pins.badge' | translate: { slot } }}
+                      </span>
+                      <span
+                        *ngIf="blogPinnedSlotHasConflict(slot, post.key)"
+                        class="ml-1 inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100"
+                      >
+                        {{ 'adminUi.blog.pins.conflictBadge' | translate }}
+                      </span>
+                      ·
+                    </ng-container>
                     {{ post.key }} · {{ ('adminUi.status.' + (post.status || 'draft')) | translate }} ·
                     {{ post.author ? commentAuthorLabel(post.author) : '—' }} · v{{ post.version }} · {{ post.updated_at | date: 'short' }}
                   </p>
@@ -3471,16 +5618,22 @@ class CmsDraftManager<T> {
                     [(ngModel)]="blogCreate.summary"
                   ></textarea>
                 </label>
-                <app-input
-                  [label]="'adminUi.blog.fields.tags' | translate"
-                  [(value)]="blogCreate.tags"
-                  [placeholder]="'adminUi.blog.fields.tagsPlaceholder' | translate"
-                ></app-input>
-                <app-input
-                  [label]="'adminUi.blog.fields.coverImageUrlOptional' | translate"
-                  [(value)]="blogCreate.cover_image_url"
-                  [placeholder]="'adminUi.blog.fields.coverImagePlaceholder' | translate"
-                ></app-input>
+	                <app-input
+	                  [label]="'adminUi.blog.fields.tags' | translate"
+	                  [(value)]="blogCreate.tags"
+	                  [placeholder]="'adminUi.blog.fields.tagsPlaceholder' | translate"
+	                ></app-input>
+	                <app-input
+	                  [label]="'adminUi.blog.fields.seriesOptional' | translate"
+	                  [(value)]="blogCreate.series"
+	                  [placeholder]="'adminUi.blog.fields.seriesPlaceholder' | translate"
+	                  [hint]="'adminUi.blog.fields.seriesHint' | translate"
+	                ></app-input>
+	                <app-input
+	                  [label]="'adminUi.blog.fields.coverImageUrlOptional' | translate"
+	                  [(value)]="blogCreate.cover_image_url"
+	                  [placeholder]="'adminUi.blog.fields.coverImagePlaceholder' | translate"
+	                ></app-input>
                 <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                   {{ 'adminUi.blog.fields.readingTimeOptional' | translate }}
                   <input
@@ -3489,6 +5642,25 @@ class CmsDraftManager<T> {
                     class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     [(ngModel)]="blogCreate.reading_time_minutes"
                   />
+                </label>
+                <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                  <input type="checkbox" [(ngModel)]="blogCreate.pinned" />
+                  {{ 'adminUi.blog.fields.pinned' | translate }}
+                </label>
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.blog.fields.pinOrder' | translate }}
+                  <select
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="blogCreate.pin_order"
+                    [disabled]="!blogCreate.pinned"
+                  >
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                  </select>
+                  <span class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ 'adminUi.blog.fields.pinOrderHint' | translate }}
+                  </span>
                 </label>
                 <div class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
                   {{ 'adminUi.blog.fields.body' | translate }}
@@ -3603,27 +5775,153 @@ class CmsDraftManager<T> {
                     {{ 'adminUi.blog.editing.summaryHint' | translate }}
                   </span>
                 </label>
-                <app-input
-                  [label]="'adminUi.blog.fields.tags' | translate"
-                  [(value)]="blogForm.tags"
-                  [placeholder]="'adminUi.blog.fields.tagsPlaceholder' | translate"
-                ></app-input>
-                <app-input
-                  [label]="'adminUi.blog.fields.coverImageUrlOptional' | translate"
-                  [(value)]="blogForm.cover_image_url"
-                  [placeholder]="'adminUi.blog.fields.coverImagePlaceholder' | translate"
-                ></app-input>
-                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  {{ 'adminUi.blog.fields.readingTimeOptional' | translate }}
-                  <input
-                    type="number"
+	                <app-input
+	                  [label]="'adminUi.blog.fields.tags' | translate"
+	                  [(value)]="blogForm.tags"
+	                  [placeholder]="'adminUi.blog.fields.tagsPlaceholder' | translate"
+	                ></app-input>
+		                <app-input
+		                  [label]="'adminUi.blog.fields.seriesOptional' | translate"
+		                  [(value)]="blogForm.series"
+		                  [placeholder]="'adminUi.blog.fields.seriesPlaceholder' | translate"
+		                  [hint]="'adminUi.blog.fields.seriesHint' | translate"
+		                  [disabled]="blogEditLang !== blogBaseLang"
+		                ></app-input>
+                    <div class="grid gap-2 md:col-span-2">
+                      <div class="flex flex-wrap items-center justify-between gap-2">
+                        <p class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ 'adminUi.blog.cover.title' | translate }}</p>
+                        <div class="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-600"
+                            [disabled]="blogEditLang !== blogBaseLang"
+                            (click)="blogCoverUploadInput.click()"
+                          >
+                            {{ 'adminUi.blog.cover.upload' | translate }}
+                          </button>
+                          <input #blogCoverUploadInput type="file" accept="image/*" class="hidden" (change)="uploadBlogCoverImage($event)" />
+                          <button
+                            type="button"
+                            class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-600"
+                            [disabled]="blogEditLang !== blogBaseLang"
+                            (click)="showBlogCoverLibrary = !showBlogCoverLibrary"
+                          >
+                            {{ showBlogCoverLibrary ? ('adminUi.common.close' | translate) : ('adminUi.blog.cover.choose' | translate) }}
+                          </button>
+                          <button
+                            type="button"
+                            class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:border-slate-300 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-600"
+                            [disabled]="blogEditLang !== blogBaseLang || !blogForm.cover_image_url.trim()"
+                            (click)="clearBlogCoverOverride()"
+                          >
+                            {{ 'adminUi.blog.cover.clear' | translate }}
+                          </button>
+                        </div>
+                      </div>
+
+                      <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                        {{ 'adminUi.blog.fields.coverImageUrlOptional' | translate }}
+                        <input
+                          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                          [(ngModel)]="blogForm.cover_image_url"
+                          [placeholder]="'adminUi.blog.fields.coverImagePlaceholder' | translate"
+                          [disabled]="blogEditLang !== blogBaseLang"
+                        />
+                        <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.blog.cover.hint' | translate }}</span>
+                      </label>
+
+                      <div *ngIf="blogCoverPreviewUrl() as coverUrl" class="grid gap-3 sm:grid-cols-2">
+                        <div class="grid gap-2">
+                          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                            {{ 'adminUi.blog.cover.previewDesktop' | translate }}
+                          </p>
+                          <div class="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-800">
+                            <img
+                              [src]="coverUrl"
+                              [alt]="blogForm.title || 'cover'"
+                              class="w-full aspect-[16/9] object-cover"
+                              [style.object-position]="blogCoverPreviewFocalPosition()"
+                              loading="lazy"
+                              decoding="async"
+                            />
+                          </div>
+                        </div>
+                        <div class="grid gap-2">
+                          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                            {{ 'adminUi.blog.cover.previewMobile' | translate }}
+                          </p>
+                          <div class="max-w-[280px] relative overflow-hidden rounded-xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-800">
+                            <img
+                              [src]="coverUrl"
+                              [alt]="blogForm.title || 'cover'"
+                              class="w-full aspect-[1/1] object-cover"
+                              [style.object-position]="blogCoverPreviewFocalPosition()"
+                              loading="lazy"
+                              decoding="async"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div *ngIf="blogCoverPreviewAsset() as coverAsset" class="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                        <span>{{ 'adminUi.blog.cover.focalLabel' | translate: { x: coverAsset.focal_x, y: coverAsset.focal_y } }}</span>
+                        <button
+                          type="button"
+                          class="text-xs text-slate-700 hover:underline disabled:opacity-60 dark:text-slate-200"
+                          [disabled]="blogEditLang !== blogBaseLang"
+                          (click)="editBlogCoverFocalPoint()"
+                        >
+                          {{ 'adminUi.blog.cover.editFocal' | translate }}
+                        </button>
+                      </div>
+
+                      <div
+                        *ngIf="showBlogCoverLibrary && selectedBlogKey"
+                        class="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900"
+                      >
+                        <app-asset-library
+                          titleKey="adminUi.blog.cover.libraryTitle"
+                          [allowUpload]="false"
+                          [allowSelect]="true"
+                          [scopedKeys]="[selectedBlogKey]"
+                          [initialKey]="selectedBlogKey"
+                          [uploadKey]="selectedBlogKey"
+                          (selectAsset)="selectBlogCoverAsset($event)"
+                        ></app-asset-library>
+                      </div>
+                    </div>
+	                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                  {{ 'adminUi.blog.fields.readingTimeOptional' | translate }}
+	                  <input
+	                    type="number"
                     min="1"
                     class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     [(ngModel)]="blogForm.reading_time_minutes"
                   />
                 </label>
+                <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 md:col-span-2">
+                  <input type="checkbox" [(ngModel)]="blogForm.pinned" [disabled]="blogEditLang !== blogBaseLang" />
+                  {{ 'adminUi.blog.fields.pinned' | translate }}
+                </label>
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.blog.fields.pinOrder' | translate }}
+                  <select
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="blogForm.pin_order"
+                    [disabled]="blogEditLang !== blogBaseLang || !blogForm.pinned"
+                  >
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                  </select>
+                  <span class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ 'adminUi.blog.fields.pinOrderHint' | translate }}
+                  </span>
+                </label>
                 <div class="grid gap-2 md:col-span-2">
-                  <div class="flex flex-wrap items-center justify-between gap-2">
+                  <div class="grid gap-3 lg:grid-cols-[1fr_280px]">
+                    <div class="grid gap-2">
+                      <div class="flex flex-wrap items-center justify-between gap-2">
                     <p class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ 'adminUi.blog.fields.body' | translate }}</p>
                     <div class="flex flex-wrap items-center gap-3">
                       <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
@@ -3639,12 +5937,46 @@ class CmsDraftManager<T> {
 
                   <ng-container *ngIf="useRichBlogEditor; else markdownBlogEditor">
                     <div class="flex flex-wrap items-center gap-2 text-xs">
+                      <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                        {{ 'adminUi.blog.images.layout.label' | translate }}
+                        <select
+                          class="rounded-md border border-slate-200 bg-white px-2 py-1 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                          [(ngModel)]="blogImageLayout"
+                        >
+                          <option value="default">{{ 'adminUi.blog.images.layout.default' | translate }}</option>
+                          <option value="wide">{{ 'adminUi.blog.images.layout.wide' | translate }}</option>
+                          <option value="left">{{ 'adminUi.blog.images.layout.left' | translate }}</option>
+                          <option value="right">{{ 'adminUi.blog.images.layout.right' | translate }}</option>
+                          <option value="gallery">{{ 'adminUi.blog.images.layout.gallery' | translate }}</option>
+                        </select>
+                      </label>
                       <button
                         type="button"
                         class="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
                         (click)="blogImageInputRich.click()"
                       >
                         {{ 'adminUi.blog.actions.image' | translate }}
+                      </button>
+                      <button
+                        type="button"
+                        class="rounded-full border border-slate-200 bg-white px-3 py-1 font-mono text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
+                        (click)="insertBlogEmbed(blogEditor, 'product')"
+                      >
+                        {{ 'adminUi.blog.toolbar.product' | translate }}
+                      </button>
+                      <button
+                        type="button"
+                        class="rounded-full border border-slate-200 bg-white px-3 py-1 font-mono text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
+                        (click)="insertBlogEmbed(blogEditor, 'category')"
+                      >
+                        {{ 'adminUi.blog.toolbar.category' | translate }}
+                      </button>
+                      <button
+                        type="button"
+                        class="rounded-full border border-slate-200 bg-white px-3 py-1 font-mono text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
+                        (click)="insertBlogEmbed(blogEditor, 'collection')"
+                      >
+                        {{ 'adminUi.blog.toolbar.collection' | translate }}
                       </button>
                       <input
                         #blogImageInputRich
@@ -3655,13 +5987,15 @@ class CmsDraftManager<T> {
                       />
                     </div>
 
-                    <app-rich-editor
-                      #blogEditor
-                      [(value)]="blogForm.body_markdown"
-                      [initialEditType]="'wysiwyg'"
-                      [height]="'520px'"
-                    ></app-rich-editor>
-                  </ng-container>
+	                    <div (dragover)="onBlogImageDragOver($event)" (drop)="onBlogImageDrop(blogEditor, $event)">
+	                      <app-rich-editor
+	                        #blogEditor
+	                        [(value)]="blogForm.body_markdown"
+	                        [initialEditType]="'wysiwyg'"
+	                        [height]="'520px'"
+	                      ></app-rich-editor>
+	                    </div>
+	                  </ng-container>
 
                   <ng-template #markdownBlogEditor>
                     <div class="flex flex-wrap items-center gap-2 text-xs">
@@ -3709,11 +6043,45 @@ class CmsDraftManager<T> {
                       </button>
                       <button
                         type="button"
+                        class="rounded-full border border-slate-200 bg-white px-3 py-1 font-mono text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
+                        (click)="insertBlogEmbed(blogBody, 'product')"
+                      >
+                        {{ 'adminUi.blog.toolbar.product' | translate }}
+                      </button>
+                      <button
+                        type="button"
+                        class="rounded-full border border-slate-200 bg-white px-3 py-1 font-mono text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
+                        (click)="insertBlogEmbed(blogBody, 'category')"
+                      >
+                        {{ 'adminUi.blog.toolbar.category' | translate }}
+                      </button>
+                      <button
+                        type="button"
+                        class="rounded-full border border-slate-200 bg-white px-3 py-1 font-mono text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
+                        (click)="insertBlogEmbed(blogBody, 'collection')"
+                      >
+                        {{ 'adminUi.blog.toolbar.collection' | translate }}
+                      </button>
+                      <button
+                        type="button"
                         class="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
                         (click)="applyBlogList(blogBody)"
                       >
                         {{ 'adminUi.blog.toolbar.list' | translate }}
                       </button>
+                      <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                        {{ 'adminUi.blog.images.layout.label' | translate }}
+                        <select
+                          class="rounded-md border border-slate-200 bg-white px-2 py-1 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                          [(ngModel)]="blogImageLayout"
+                        >
+                          <option value="default">{{ 'adminUi.blog.images.layout.default' | translate }}</option>
+                          <option value="wide">{{ 'adminUi.blog.images.layout.wide' | translate }}</option>
+                          <option value="left">{{ 'adminUi.blog.images.layout.left' | translate }}</option>
+                          <option value="right">{{ 'adminUi.blog.images.layout.right' | translate }}</option>
+                          <option value="gallery">{{ 'adminUi.blog.images.layout.gallery' | translate }}</option>
+                        </select>
+                      </label>
                       <button
                         type="button"
                         class="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
@@ -3728,13 +6096,15 @@ class CmsDraftManager<T> {
                       class="grid gap-3"
                       [ngClass]="showBlogPreview && cmsPrefs.previewLayout() === 'split' ? 'lg:grid-cols-2' : ''"
                     >
-                      <textarea
-                        #blogBody
-                        rows="10"
-                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                        [(ngModel)]="blogForm.body_markdown"
-                        (scroll)="syncSplitScroll(blogBody, blogPreview)"
-                      ></textarea>
+	                      <textarea
+	                        #blogBody
+	                        rows="10"
+	                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                        (dragover)="onBlogImageDragOver($event)"
+	                        (drop)="onBlogImageDrop(blogBody, $event)"
+	                        [(ngModel)]="blogForm.body_markdown"
+	                        (scroll)="syncSplitScroll(blogBody, blogPreview)"
+	                      ></textarea>
 
                       <div class="mx-auto w-full" [ngClass]="cmsPreviewMaxWidthClass()" [class.hidden]="!showBlogPreview">
                       <div
@@ -3746,8 +6116,77 @@ class CmsDraftManager<T> {
                     </div>
                     </div>
                   </ng-template>
+                    </div>
+
+                    <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs dark:border-slate-800 dark:bg-slate-950/30">
+                      <ng-container *ngIf="blogWritingAids() as aids">
+                        <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                          {{ 'adminUi.blog.writing.title' | translate }}
+                        </p>
+                        <div class="mt-2 grid gap-3">
+                          <div class="grid gap-1">
+                            <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                              {{ 'adminUi.blog.writing.words' | translate: { count: aids.words } }}
+                            </p>
+                            <p class="text-xs text-slate-600 dark:text-slate-300">
+                              {{ 'adminUi.blog.writing.estimate' | translate: { minutes: aids.minutes || 0 } }}
+                            </p>
+                            <app-button
+                              size="sm"
+                              variant="ghost"
+                              [label]="'adminUi.blog.writing.applyEstimate' | translate"
+                              [disabled]="!aids.minutes"
+                              (action)="applyBlogReadingTimeEstimate()"
+                            ></app-button>
+                          </div>
+
+                          <div class="grid gap-1">
+                            <p class="text-xs font-semibold text-slate-700 dark:text-slate-200">{{ 'adminUi.blog.writing.outline' | translate }}</p>
+                            <p *ngIf="!aids.headings.length" class="text-xs text-slate-500 dark:text-slate-400">
+                              {{ 'adminUi.blog.writing.outlineEmpty' | translate }}
+                            </p>
+                            <div *ngFor="let h of aids.headings" class="truncate text-slate-700 dark:text-slate-200" [style.paddingLeft.px]="(h.level - 1) * 8">
+                              {{ h.text }}
+                            </div>
+                          </div>
+                        </div>
+                      </ng-container>
+                    </div>
+                  </div>
                 </div>
               </div>
+
+              <ng-container *ngIf="blogA11yIssues() as issues">
+                <details
+                  *ngIf="issues.length"
+                  class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-900/50 dark:bg-amber-950/30"
+                  [open]="blogA11yOpen"
+                >
+                  <summary class="cursor-pointer select-none font-semibold text-amber-900 dark:text-amber-100">
+                    {{ 'adminUi.blog.a11y.title' | translate }} ({{ issues.length }})
+                  </summary>
+                  <div class="mt-2 grid gap-2">
+                    <p class="text-xs text-amber-900/80 dark:text-amber-100/80">{{ 'adminUi.blog.a11y.hint' | translate }}</p>
+                    <div
+                      *ngFor="let issue of issues"
+                      class="flex flex-wrap items-center justify-between gap-2 rounded border border-amber-200 bg-white p-2 text-xs dark:border-amber-900/50 dark:bg-slate-900"
+                    >
+                      <a class="text-indigo-600 dark:text-indigo-300 hover:underline truncate" [href]="issue.url" target="_blank" rel="noopener">
+                        {{ issue.url }}
+                      </a>
+                      <div class="flex items-center gap-2">
+                        <span class="text-slate-600 dark:text-slate-300">{{ issue.alt || '—' }}</span>
+                        <app-button
+                          size="sm"
+                          variant="ghost"
+                          [label]="'adminUi.blog.a11y.fixAlt' | translate"
+                          (action)="promptFixBlogImageAlt(issue.index)"
+                        ></app-button>
+                      </div>
+                    </div>
+                  </div>
+                </details>
+              </ng-container>
 
               <div class="grid gap-2">
                 <div *ngIf="blogImages.length" class="grid gap-2">
@@ -3766,6 +6205,20 @@ class CmsDraftManager<T> {
                 </div>
               </div>
 
+              <div
+                *ngIf="blogDraftHasRestore()"
+                class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
+              >
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="font-semibold">{{ 'adminUi.content.autosave.restoreFound' | translate }}</span>
+                  <span *ngIf="blogDraftRestoreAt()" class="text-amber-700 dark:text-amber-200">{{ blogDraftRestoreAt() | date: 'short' }}</span>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <app-button size="sm" variant="ghost" [label]="'adminUi.actions.restore' | translate" (action)="restoreBlogDraftAutosave()"></app-button>
+                  <app-button size="sm" variant="ghost" [label]="'adminUi.actions.dismiss' | translate" (action)="dismissBlogDraftAutosave()"></app-button>
+                </div>
+              </div>
+
               <div class="flex flex-wrap gap-2">
                 <app-button [label]="'adminUi.actions.save' | translate" (action)="saveBlogPost()"></app-button>
                 <app-button size="sm" variant="ghost" [label]="'adminUi.blog.actions.previewLink' | translate" (action)="generateBlogPreviewLink()"></app-button>
@@ -3777,6 +6230,20 @@ class CmsDraftManager<T> {
                 >
                   {{ 'adminUi.blog.actions.view' | translate }}
                 </a>
+                <span *ngIf="blogDraftReady()" class="text-xs text-slate-500 dark:text-slate-400">
+                  <ng-container *ngIf="!blogDraftDirty()">
+                    {{ 'adminUi.content.autosave.state.saved' | translate }}
+                  </ng-container>
+                  <ng-container *ngIf="blogDraftDirty() && blogDraftAutosaving()">
+                    {{ 'adminUi.content.autosave.state.autosaving' | translate }}
+                  </ng-container>
+                  <ng-container *ngIf="blogDraftDirty() && !blogDraftAutosaving() && blogDraftLastAutosavedAt()">
+                    {{ 'adminUi.content.autosave.state.autosaved' | translate }} {{ blogDraftLastAutosavedAt() | date: 'shortTime' }}
+                  </ng-container>
+                  <ng-container *ngIf="blogDraftDirty() && !blogDraftAutosaving() && !blogDraftLastAutosavedAt()">
+                    {{ 'adminUi.content.autosave.state.unsaved' | translate }}
+                  </ng-container>
+                </span>
               </div>
               <div *ngIf="blogPreviewUrl" class="grid gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-950/30">
                 <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{{ 'adminUi.blog.preview.title' | translate }}</p>
@@ -3792,6 +6259,102 @@ class CmsDraftManager<T> {
                   {{ 'adminUi.blog.preview.expires' | translate }} {{ blogPreviewExpiresAt | date: 'short' }}
                 </p>
               </div>
+
+              <details class="rounded-lg border border-slate-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-900">
+                <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.blog.seo.title' | translate }}
+                </summary>
+                <div class="mt-3 grid gap-3">
+                  <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.blog.seo.hint' | translate }}</p>
+
+                  <div class="grid gap-4 md:grid-cols-2">
+                    <div
+                      *ngFor="let lang of blogSocialLangs"
+                      class="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30"
+                    >
+                      <div class="flex items-center justify-between gap-2">
+                        <p class="text-xs font-semibold tracking-wide uppercase text-slate-600 dark:text-slate-300">{{ lang.toUpperCase() }}</p>
+                        <div class="flex items-center gap-2">
+                          <a
+                            class="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200"
+                            [attr.href]="blogPublicUrl(lang)"
+                            target="_blank"
+                            rel="noopener"
+                          >
+                            {{ 'adminUi.blog.actions.view' | translate }}
+                          </a>
+                          <app-button size="sm" variant="ghost" [label]="'adminUi.blog.actions.copy' | translate" (action)="copyText(blogPublicUrl(lang))"></app-button>
+                        </div>
+                      </div>
+
+                      <div *ngIf="blogSeoHasContent(lang); else seoMissingLang" class="grid gap-3">
+                        <div class="grid gap-1">
+                          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                            {{ 'adminUi.blog.seo.searchPreview' | translate }}
+                          </p>
+                          <div class="rounded-lg border border-slate-200 bg-white p-3 text-xs dark:border-slate-800 dark:bg-slate-900">
+                            <p class="text-emerald-700 dark:text-emerald-300 truncate">{{ blogPublicUrl(lang) }}</p>
+                            <p class="mt-1 text-sm font-semibold text-indigo-700 dark:text-indigo-200 truncate">
+                              {{ blogSeoTitlePreview(lang) }}
+                            </p>
+                            <p class="mt-1 text-xs text-slate-700 dark:text-slate-200">
+                              {{ blogSeoDescriptionPreview(lang) }}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div class="grid gap-1 text-xs">
+                          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                            {{ 'adminUi.blog.seo.checks' | translate }}
+                          </p>
+                          <div class="flex flex-wrap items-center justify-between gap-2 rounded border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
+                            <span class="text-slate-700 dark:text-slate-200">
+                              {{ 'adminUi.blog.seo.length.title' | translate: { count: blogSeoTitleFull(lang).length } }}
+                            </span>
+                            <span class="text-slate-700 dark:text-slate-200">
+                              {{ 'adminUi.blog.seo.length.description' | translate: { count: blogSeoDescriptionFull(lang).length } }}
+                            </span>
+                          </div>
+
+                          <div
+                            *ngFor="let issue of blogSeoIssues(lang)"
+                            class="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100"
+                          >
+                            {{ issue.key | translate: issue.params }}
+                          </div>
+                        </div>
+
+                        <div class="grid gap-1">
+                          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                            {{ 'adminUi.blog.seo.socialPreview' | translate }}
+                          </p>
+                          <div class="rounded-lg border border-slate-200 bg-white p-3 text-xs dark:border-slate-800 dark:bg-slate-900">
+                            <img
+                              *ngIf="blogPreviewToken || blogForm.status === 'published'"
+                              [src]="blogPreviewOgImageUrl(lang) || blogPublishedOgImageUrl(lang)"
+                              [alt]="'adminUi.blog.social.ogAlt' | translate"
+                              class="w-full rounded-lg border border-slate-200 bg-white object-cover dark:border-slate-800 dark:bg-slate-900"
+                              loading="lazy"
+                            />
+                            <p class="mt-2 text-sm font-semibold text-slate-900 dark:text-slate-50 truncate">
+                              {{ blogSeoTitlePreview(lang) }}
+                            </p>
+                            <p class="mt-1 text-xs text-slate-700 dark:text-slate-200">
+                              {{ blogSeoDescriptionPreview(lang) }}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <ng-template #seoMissingLang>
+                        <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
+                          {{ 'adminUi.blog.seo.missingLang' | translate }}
+                        </div>
+                      </ng-template>
+                    </div>
+                  </div>
+                </div>
+              </details>
 
               <details class="rounded-lg border border-slate-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-900">
                 <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
@@ -4295,15 +6858,17 @@ class CmsDraftManager<T> {
                   {{ 'adminUi.content.revisions.select' | translate }}
                   <select
                     class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    [(ngModel)]="settingsRevisionKey"
-                  >
-                    <option [ngValue]="'site.assets'">{{ 'adminUi.site.assets.title' | translate }}</option>
-                    <option [ngValue]="'site.social'">{{ 'adminUi.site.social.title' | translate }}</option>
-                    <option [ngValue]="'site.checkout'">{{ 'adminUi.site.checkout.title' | translate }}</option>
-                    <option [ngValue]="'site.reports'">{{ 'adminUi.reports.title' | translate }}</option>
-                    <option [ngValue]="'seo.' + seoPage">{{ ('adminUi.site.seo.title' | translate) + ' · ' + seoPage.toUpperCase() }}</option>
-                  </select>
-                </label>
+	                    [(ngModel)]="settingsRevisionKey"
+	                  >
+	                    <option [ngValue]="'site.assets'">{{ 'adminUi.site.assets.title' | translate }}</option>
+	                    <option [ngValue]="'site.social'">{{ 'adminUi.site.social.title' | translate }}</option>
+	                    <option [ngValue]="'site.company'">{{ 'adminUi.site.company.title' | translate }}</option>
+                      <option [ngValue]="'site.navigation'">{{ 'adminUi.site.navigation.title' | translate }}</option>
+	                    <option [ngValue]="'site.checkout'">{{ 'adminUi.site.checkout.title' | translate }}</option>
+	                    <option [ngValue]="'site.reports'">{{ 'adminUi.reports.title' | translate }}</option>
+	                    <option [ngValue]="'seo.' + seoPage">{{ ('adminUi.site.seo.title' | translate) + ' · ' + seoPage.toUpperCase() }}</option>
+	                  </select>
+	                </label>
                 <app-content-revisions [contentKey]="settingsRevisionKey" [titleKey]="settingsRevisionTitleKey()"></app-content-revisions>
               </div>
             </details>
@@ -4341,6 +6906,21 @@ export class AdminComponent implements OnInit, OnDestroy {
   categories: AdminCategory[] = [];
   categoryName = '';
   categoryParentId = '';
+  categoryWizardOpen = signal(false);
+  categoryWizardStep = signal(0);
+  categoryWizardSlug = signal<string | null>(null);
+  readonly categoryWizardSteps = [
+    {
+      id: 'basics',
+      labelKey: 'adminUi.categories.wizard.steps.basics',
+      descriptionKey: 'adminUi.categories.wizard.desc.basics'
+    },
+    {
+      id: 'translations',
+      labelKey: 'adminUi.categories.wizard.steps.translations',
+      descriptionKey: 'adminUi.categories.wizard.desc.translations'
+    }
+  ];
   categoryTranslationsSlug: string | null = null;
   categoryTranslationsError = signal<string | null>(null);
   categoryTranslationExists: Record<'en' | 'ro', boolean> = { en: false, ro: false };
@@ -4348,6 +6928,9 @@ export class AdminComponent implements OnInit, OnDestroy {
     en: this.blankCategoryTranslation(),
     ro: this.blankCategoryTranslation()
   };
+  categoryDeleteConfirmOpen = signal(false);
+  categoryDeleteConfirmBusy = signal(false);
+  categoryDeleteConfirmTarget = signal<AdminCategory | null>(null);
   taxGroups: TaxGroupRead[] = [];
   taxGroupsLoading = false;
   taxGroupsError: string | null = null;
@@ -4360,11 +6943,17 @@ export class AdminComponent implements OnInit, OnDestroy {
   selectedIds = new Set<string>();
   allSelected = false;
   homeBlocksLang: UiLang = 'en';
-  newHomeBlockType: 'text' | 'image' | 'gallery' | 'banner' | 'carousel' = 'text';
+  newHomeBlockType: 'text' | 'columns' | 'cta' | 'faq' | 'testimonials' | 'image' | 'gallery' | 'banner' | 'carousel' = 'text';
   homeBlocks: HomeBlockDraft[] = [];
   draggingHomeBlockKey: string | null = null;
   homeInsertDragActive = false;
   sectionsMessage = '';
+
+  productGridProductSearchQuery: Record<string, string> = {};
+  productGridProductSearchResults: Record<string, AdminProductListItem[]> = {};
+  productGridProductSearchLoading: Record<string, boolean> = {};
+  productGridProductSearchError: Record<string, string | null> = {};
+  private productGridProductSearchTimers: Record<string, number> = {};
 
   featuredCollections: FeaturedCollection[] = [];
   collectionForm: { name: string; description?: string | null; product_ids: string[] } = {
@@ -4422,9 +7011,12 @@ export class AdminComponent implements OnInit, OnDestroy {
 	    title: string;
     body_markdown: string;
     summary: string;
-    tags: string;
-    cover_image_url: string;
-    reading_time_minutes: string;
+	    tags: string;
+	    series: string;
+	    cover_image_url: string;
+	    reading_time_minutes: string;
+	    pinned: boolean;
+	    pin_order: string;
 	    includeTranslation: boolean;
 	    translationTitle: string;
 	    translationBody: string;
@@ -4435,10 +7027,13 @@ export class AdminComponent implements OnInit, OnDestroy {
 	    published_until: '',
 	    title: '',
     body_markdown: '',
-    summary: '',
-    tags: '',
-    cover_image_url: '',
-    reading_time_minutes: '',
+	    summary: '',
+	    tags: '',
+	    series: '',
+	    cover_image_url: '',
+	    reading_time_minutes: '',
+	    pinned: false,
+	    pin_order: '1',
     includeTranslation: false,
     translationTitle: '',
     translationBody: ''
@@ -4452,15 +7047,31 @@ export class AdminComponent implements OnInit, OnDestroy {
     status: 'draft',
     published_at: '',
     published_until: '',
-    summary: '',
-    tags: '',
-    cover_image_url: '',
-    reading_time_minutes: ''
-  };
+	    summary: '',
+	    tags: '',
+	    series: '',
+	    cover_image_url: '',
+	    reading_time_minutes: '',
+	    pinned: false,
+	    pin_order: '1'
+	  };
   blogMeta: Record<string, any> = {};
-  blogImages: { id: string; url: string; alt_text?: string | null }[] = [];
+  blogImages: { id: string; url: string; alt_text?: string | null; sort_order: number; focal_x: number; focal_y: number }[] = [];
+  blogBulkSelection = new Set<string>();
+  blogBulkAction: 'publish' | 'unpublish' | 'schedule' | 'tags_add' | 'tags_remove' = 'publish';
+  blogBulkPublishAt = '';
+  blogBulkUnpublishAt = '';
+  blogBulkTags = '';
+  blogBulkSaving = false;
+  blogBulkError = '';
+  showBlogCoverLibrary = false;
   showBlogPreview = false;
+  blogA11yOpen = false;
+  blogSeoSnapshots: Record<UiLang, { title: string; body_markdown: string } | null> = { en: null, ro: null };
+  blogSeoSnapshotsKey: string | null = null;
+  blogSeoSnapshotsLoading = false;
   useRichBlogEditor = true;
+  blogImageLayout: 'default' | 'wide' | 'left' | 'right' | 'gallery' = 'default';
   blogSocialLangs: UiLang[] = ['en', 'ro'];
   blogPreviewUrl: string | null = null;
   blogPreviewToken: string | null = null;
@@ -4496,6 +7107,32 @@ export class AdminComponent implements OnInit, OnDestroy {
   socialError: string | null = null;
   socialThumbLoading: Record<string, boolean> = {};
   socialThumbErrors: Record<string, string> = {};
+  navigationForm: {
+    header_links: Array<{ id: string; url: string; label: LocalizedText }>;
+    footer_handcrafted_links: Array<{ id: string; url: string; label: LocalizedText }>;
+    footer_legal_links: Array<{ id: string; url: string; label: LocalizedText }>;
+  } = this.defaultNavigationForm();
+  navigationMessage: string | null = null;
+  navigationError: string | null = null;
+  private draggingNavList: 'header' | 'footer_handcrafted' | 'footer_legal' | null = null;
+  private draggingNavId: string | null = null;
+  companyForm: {
+    name: string;
+    registration_number: string;
+    cui: string;
+    address: string;
+    phone: string;
+    email: string;
+  } = {
+    name: '',
+    registration_number: '',
+    cui: '',
+    address: '',
+    phone: '',
+    email: ''
+  };
+  companyMessage: string | null = null;
+  companyError: string | null = null;
 	  checkoutSettingsForm: {
 	    shipping_fee_ron: number | string;
 	    free_shipping_threshold_ron: number | string;
@@ -4585,6 +7222,13 @@ export class AdminComponent implements OnInit, OnDestroy {
   contentPages: ContentPageListItem[] = [];
   contentPagesLoading = false;
   contentPagesError: string | null = null;
+  reusableBlocks: CmsReusableBlock[] = [];
+  reusableBlocksLoading = false;
+  reusableBlocksError: string | null = null;
+  reusableBlocksQuery = '';
+  private reusableBlocksMeta: Record<string, unknown> = {};
+  private readonly reusableBlocksKey = 'cms.snippets';
+  private reusableBlocksExists = false;
   redirects: ContentRedirectRead[] = [];
   redirectsMeta = { total_items: 0, total_pages: 1, page: 1, limit: 25 };
   redirectsLoading = false;
@@ -4593,15 +7237,54 @@ export class AdminComponent implements OnInit, OnDestroy {
   redirectsExporting = false;
   redirectsImporting = false;
   redirectsImportResult: ContentRedirectImportResult | null = null;
+  redirectCreateFrom = '';
+  redirectCreateTo = '';
+  redirectCreateSaving = false;
+  findReplaceFind = '';
+  findReplaceReplace = '';
+  findReplaceScope: 'all' | 'pages' | 'blog' | 'home' | 'site' = 'pages';
+  findReplaceCaseSensitive = true;
+  findReplaceLoading = false;
+  findReplaceApplying = false;
+  findReplaceError: string | null = null;
+  findReplacePreview: ContentFindReplacePreviewResponse | null = null;
+  findReplaceApplyResult: ContentFindReplaceApplyResponse | null = null;
+  private findReplacePreviewKey: string | null = null;
   linkCheckKey = 'page.about';
   linkCheckLoading = false;
   linkCheckError: string | null = null;
   linkCheckIssues: ContentLinkCheckIssue[] = [];
   newCustomPageTitle = '';
+  newCustomPageTemplate: PageCreationTemplate = 'blank';
   newCustomPageStatus: ContentStatusUi = 'draft';
   newCustomPagePublishedAt = '';
   newCustomPagePublishedUntil = '';
   creatingCustomPage = false;
+  readonly globalSections = CMS_GLOBAL_SECTIONS;
+  readonly allPageBlockTypes: PageBlockType[] = [
+    'text',
+    'columns',
+    'cta',
+    'faq',
+    'testimonials',
+    'product_grid',
+    'form',
+    'image',
+    'gallery',
+    'banner',
+    'carousel'
+  ];
+  readonly homeCmsLibraryTypes: ReadonlyArray<CmsBlockLibraryBlockType> = [
+    'text',
+    'columns',
+    'cta',
+    'faq',
+    'testimonials',
+    'image',
+    'gallery',
+    'banner',
+    'carousel'
+  ];
   pageBlocksKey: PageBuilderKey = 'page.about';
   newPageBlockType: PageBlockType = 'text';
   pageBlocks: Record<string, PageBlockDraft[]> = {};
@@ -4615,6 +7298,23 @@ export class AdminComponent implements OnInit, OnDestroy {
   pageBlocksNeedsTranslationEn: Record<string, boolean> = {};
 	  pageBlocksNeedsTranslationRo: Record<string, boolean> = {};
 	  pageBlocksTranslationSaving: Record<string, boolean> = {};
+
+  pagePreviewForSlug: string | null = null;
+  pagePreviewToken: string | null = null;
+  private pagePreviewOrigin: string | null = null;
+  pagePreviewExpiresAt: string | null = null;
+  private pagePreviewNonce = 0;
+
+  homePreviewToken: string | null = null;
+  private homePreviewOrigin: string | null = null;
+  homePreviewExpiresAt: string | null = null;
+  private homePreviewNonce = 0;
+
+    pagePublishChecklistOpen = false;
+    pagePublishChecklistLoading = false;
+    pagePublishChecklistError: string | null = null;
+    pagePublishChecklistKey: PageBuilderKey | null = null;
+    pagePublishChecklistResult: CmsPublishChecklistResult | null = null;
 	  draggingPageBlockKey: string | null = null;
 	  draggingPageBlocksKey: string | null = null;
 	  pageInsertDragActive = false;
@@ -4622,6 +7322,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 	  private cmsDraftPoller: number | null = null;
 	  private cmsHomeDraft = new CmsDraftManager<HomeBlockDraft[]>('adrianaart.cms.autosave.home.sections');
 	  private cmsPageDrafts = new Map<string, CmsDraftManager<PageBlocksDraftState>>();
+	  private cmsBlogDrafts = new Map<string, CmsDraftManager<BlogDraftState>>();
 	  coupons: AdminCoupon[] = [];
 	  newCoupon: Partial<AdminCoupon> = { code: '', percentage_off: 0, active: true, currency: 'RON' };
 	  stockEdits: Record<string, number> = {};
@@ -4650,6 +7351,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   constructor(
     private route: ActivatedRoute,
     private admin: AdminService,
+    private adminProducts: AdminProductsService,
     private blog: BlogService,
     private fxAdmin: FxAdminService,
     private taxesAdmin: TaxesAdminService,
@@ -4657,7 +7359,8 @@ export class AdminComponent implements OnInit, OnDestroy {
     public cmsPrefs: CmsEditorPrefsService,
     private toast: ToastService,
     private translate: TranslateService,
-    private markdown: MarkdownService
+    private markdown: MarkdownService,
+    private sanitizer: DomSanitizer
   ) {}
 
 	  private t(key: string, params?: Record<string, unknown>): string {
@@ -4681,6 +7384,15 @@ export class AdminComponent implements OnInit, OnDestroy {
 	    if (pageDraft.isReady()) {
 	      pageDraft.observe(this.currentPageDraftState(pageKey));
 	    }
+
+	    const blogKey = this.selectedBlogKey;
+	    if (blogKey) {
+	      const id = this.blogDraftId(blogKey, this.blogEditLang);
+	      const manager = this.cmsBlogDrafts.get(id);
+	      if (manager?.isReady()) {
+	        manager.observe(this.currentBlogDraftState());
+	      }
+	    }
 	  }
 
 	  private ensurePageDraft(pageKey: PageBuilderKey): CmsDraftManager<PageBlocksDraftState> {
@@ -4701,12 +7413,108 @@ export class AdminComponent implements OnInit, OnDestroy {
 	    };
 	  }
 
+    private normalizePageBlockDraft(block: PageBlockDraft): PageBlockDraft {
+      return { ...block, layout: this.toCmsBlockLayout(block.layout) };
+    }
+
 	  private applyPageDraftState(pageKey: PageBuilderKey, draft: PageBlocksDraftState): void {
-	    this.pageBlocks[pageKey] = Array.isArray(draft?.blocks) ? draft.blocks : [];
+	    this.pageBlocks[pageKey] = Array.isArray(draft?.blocks) ? draft.blocks.map((b) => this.normalizePageBlockDraft(b)) : [];
 	    this.pageBlocksStatus[pageKey] = draft?.status === 'published' ? 'published' : draft?.status === 'review' ? 'review' : 'draft';
 	    this.pageBlocksPublishedAt[pageKey] = draft?.publishedAt || '';
 	    this.pageBlocksPublishedUntil[pageKey] = draft?.publishedUntil || '';
 	    this.pageBlocksRequiresAuth[pageKey] = Boolean(draft?.requiresAuth);
+	  }
+
+	  private blogDraftId(key: string, lang: UiLang): string {
+	    return `${key}.${lang}`;
+	  }
+
+	  private ensureBlogDraft(key: string, lang: UiLang): CmsDraftManager<BlogDraftState> {
+	    const id = this.blogDraftId(key, lang);
+	    const existing = this.cmsBlogDrafts.get(id);
+	    if (existing) return existing;
+	    const created = new CmsDraftManager<BlogDraftState>(`adrianaart.cms.autosave.${id}`);
+	    this.cmsBlogDrafts.set(id, created);
+	    return created;
+	  }
+
+	  private currentBlogDraftState(): BlogDraftState {
+	    return {
+	      title: this.blogForm.title,
+	      body_markdown: this.blogForm.body_markdown,
+	      status:
+	        this.blogForm.status === 'published'
+	          ? 'published'
+	          : this.blogForm.status === 'review'
+	            ? 'review'
+	            : 'draft',
+	      published_at: this.blogForm.published_at,
+	      published_until: this.blogForm.published_until,
+	      summary: this.blogForm.summary,
+	      tags: this.blogForm.tags,
+	      series: this.blogForm.series,
+	      cover_image_url: this.blogForm.cover_image_url,
+	      reading_time_minutes: this.blogForm.reading_time_minutes,
+	      pinned: Boolean(this.blogForm.pinned),
+	      pin_order: this.blogForm.pin_order
+	    };
+	  }
+
+	  private applyBlogDraftState(draft: BlogDraftState): void {
+	    this.blogForm = {
+	      ...this.blogForm,
+	      ...draft
+	    };
+	  }
+
+	  blogDraftReady(): boolean {
+	    if (!this.selectedBlogKey) return false;
+	    const id = this.blogDraftId(this.selectedBlogKey, this.blogEditLang);
+	    const manager = this.cmsBlogDrafts.get(id);
+	    return manager?.isReady() ?? false;
+	  }
+
+	  blogDraftDirty(): boolean {
+	    if (!this.selectedBlogKey) return false;
+	    const id = this.blogDraftId(this.selectedBlogKey, this.blogEditLang);
+	    return this.cmsBlogDrafts.get(id)?.dirty ?? false;
+	  }
+
+	  blogDraftAutosaving(): boolean {
+	    if (!this.selectedBlogKey) return false;
+	    const id = this.blogDraftId(this.selectedBlogKey, this.blogEditLang);
+	    return this.cmsBlogDrafts.get(id)?.autosavePending ?? false;
+	  }
+
+	  blogDraftLastAutosavedAt(): string | null {
+	    if (!this.selectedBlogKey) return null;
+	    const id = this.blogDraftId(this.selectedBlogKey, this.blogEditLang);
+	    return this.cmsBlogDrafts.get(id)?.lastAutosavedAt ?? null;
+	  }
+
+	  blogDraftHasRestore(): boolean {
+	    if (!this.selectedBlogKey) return false;
+	    const manager = this.ensureBlogDraft(this.selectedBlogKey, this.blogEditLang);
+	    return manager.hasRestorableAutosave && !manager.dirty;
+	  }
+
+	  blogDraftRestoreAt(): string | null {
+	    if (!this.selectedBlogKey) return null;
+	    const manager = this.ensureBlogDraft(this.selectedBlogKey, this.blogEditLang);
+	    return manager.restorableAutosaveAt;
+	  }
+
+	  restoreBlogDraftAutosave(): void {
+	    if (!this.selectedBlogKey) return;
+	    const manager = this.ensureBlogDraft(this.selectedBlogKey, this.blogEditLang);
+	    const next = manager.restoreAutosave(this.currentBlogDraftState());
+	    if (next) this.applyBlogDraftState(next);
+	  }
+
+	  dismissBlogDraftAutosave(): void {
+	    if (!this.selectedBlogKey) return;
+	    const manager = this.ensureBlogDraft(this.selectedBlogKey, this.blogEditLang);
+	    manager.discardAutosave();
 	  }
 
 	  homeDraftReady(): boolean {
@@ -4877,6 +7685,10 @@ export class AdminComponent implements OnInit, OnDestroy {
         return 'adminUi.site.assets.title';
       case 'site.social':
         return 'adminUi.site.social.title';
+      case 'site.company':
+        return 'adminUi.site.company.title';
+      case 'site.navigation':
+        return 'adminUi.site.navigation.title';
       case 'site.checkout':
         return 'adminUi.site.checkout.title';
       case 'site.reports':
@@ -4905,6 +7717,17 @@ export class AdminComponent implements OnInit, OnDestroy {
     }
   }
 
+  cmsPreviewViewportWidth(): number {
+    switch (this.cmsPrefs.previewDevice()) {
+      case 'mobile':
+        return 390;
+      case 'tablet':
+        return 768;
+      default:
+        return 1024;
+    }
+  }
+
   private previewScrollSyncActive = false;
 
   syncSplitScroll(source: HTMLElement, target: HTMLElement): void {
@@ -4924,29 +7747,49 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
-	  ngOnInit(): void {
-	    this.routeSub = this.route.data.subscribe((data) => {
-	      const next = this.normalizeSection(data['section']);
-	      this.applySection(next);
-	    });
-	    if (typeof window !== 'undefined') {
-	      this.cmsDraftPoller = window.setInterval(() => this.observeCmsDrafts(), 250);
-	    }
-	  }
+  ngOnInit(): void {
+    this.routeSub = combineLatest([this.route.data, this.route.queryParams]).subscribe(([data, query]) => {
+      const next = this.normalizeSection(data['section']);
+      this.applySection(next);
 
-	  ngOnDestroy(): void {
-	    this.routeSub?.unsubscribe();
-	    this.routeSub = undefined;
-	    if (this.cmsDraftPoller !== null) {
-	      window.clearInterval(this.cmsDraftPoller);
-	      this.cmsDraftPoller = null;
-	    }
-	    this.cmsHomeDraft.dispose();
-	    for (const manager of this.cmsPageDrafts.values()) manager.dispose();
-	    for (const key of Object.keys(this.contentVersions)) {
-	      delete this.contentVersions[key];
-	    }
-	  }
+      const raw = typeof query['edit'] === 'string' ? query['edit'] : '';
+      const cleaned = raw.trim();
+      if (!cleaned) return;
+
+      if (next === 'blog') {
+        const key = cleaned.startsWith('blog.') ? cleaned : `blog.${cleaned}`;
+        if (this.selectedBlogKey === key) return;
+        this.loadBlogEditor(key);
+        return;
+      }
+
+      if (next === 'pages') {
+        const key = isCmsGlobalSectionKey(cleaned) ? cleaned : cleaned.startsWith('page.') ? cleaned : `page.${cleaned}`;
+        const normalized = key.trim();
+        if (!normalized || normalized === 'page.') return;
+        if (normalized === this.pageBlocksKey) return;
+        this.onPageBlocksKeyChange(normalized as PageBuilderKey);
+      }
+    });
+    if (typeof window !== 'undefined') {
+      this.cmsDraftPoller = window.setInterval(() => this.observeCmsDrafts(), 250);
+    }
+  }
+
+  ngOnDestroy(): void {
+    this.routeSub?.unsubscribe();
+    this.routeSub = undefined;
+    if (this.cmsDraftPoller !== null) {
+      window.clearInterval(this.cmsDraftPoller);
+      this.cmsDraftPoller = null;
+    }
+    this.cmsHomeDraft.dispose();
+    for (const manager of this.cmsPageDrafts.values()) manager.dispose();
+    for (const manager of this.cmsBlogDrafts.values()) manager.dispose();
+    for (const key of Object.keys(this.contentVersions)) {
+      delete this.contentVersions[key];
+    }
+  }
 
   loadAll(): void {
     this.loadForSection(this.section());
@@ -5005,7 +7848,10 @@ export class AdminComponent implements OnInit, OnDestroy {
 
     if (section === 'pages') {
       this.loadInfo();
+      this.loadCategories();
+      this.loadCollections();
       this.loadContentPages();
+      this.loadReusableBlocks();
       this.loadPageBlocks(this.pageBlocksKey);
       this.loadContentRedirects(true);
       this.loading.set(false);
@@ -5013,14 +7859,14 @@ export class AdminComponent implements OnInit, OnDestroy {
     }
 
     if (section === 'blog') {
-      this.admin.content().subscribe({ next: (c) => (this.contentBlocks = c), error: () => (this.contentBlocks = []) });
+      this.reloadContentBlocks();
       this.loadFlaggedComments();
       this.loading.set(false);
       return;
     }
 
     // settings
-    this.admin.content().subscribe({ next: (c) => (this.contentBlocks = c), error: () => (this.contentBlocks = []) });
+    this.reloadContentBlocks();
     this.admin.coupons().subscribe({ next: (c) => (this.coupons = c), error: () => (this.coupons = []) });
     this.admin.lowStock().subscribe({ next: (items) => (this.lowStock = items), error: () => (this.lowStock = []) });
     this.admin.audit().subscribe({
@@ -5031,17 +7877,12 @@ export class AdminComponent implements OnInit, OnDestroy {
       },
       error: () => this.toast.error(this.t('adminUi.audit.errors.loadTitle'), this.t('adminUi.audit.errors.loadCopy'))
     });
-    this.admin.getCategories().subscribe({
-      next: (cats) => {
-        this.categories = cats
-          .map((c) => ({ ...c, sort_order: c.sort_order ?? 0 }))
-          .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-      },
-      error: () => (this.categories = [])
-    });
+    this.loadCategories();
     this.loadTaxGroups();
     this.loadAssets();
     this.loadSocial();
+    this.loadCompany();
+    this.loadNavigation();
     this.loadCheckoutSettings();
     this.loadReportsSettings();
     this.loadSeo();
@@ -5306,9 +8147,80 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
+  startCategoryWizard(): void {
+    this.categoryWizardOpen.set(true);
+    this.categoryWizardStep.set(0);
+    this.categoryWizardSlug.set(null);
+  }
+
+  exitCategoryWizard(): void {
+    this.categoryWizardOpen.set(false);
+    this.categoryWizardStep.set(0);
+    this.categoryWizardSlug.set(null);
+  }
+
+  categoryWizardDescriptionKey(): string {
+    return this.categoryWizardSteps[this.categoryWizardStep()]?.descriptionKey ?? 'adminUi.categories.wizard.desc.basics';
+  }
+
+  categoryWizardNextLabelKey(): string {
+    return this.categoryWizardStep() >= this.categoryWizardSteps.length - 1 ? 'adminUi.actions.done' : 'adminUi.actions.next';
+  }
+
+  categoryWizardCanNext(): boolean {
+    if (!this.categoryWizardOpen()) return false;
+    if (this.categoryWizardStep() >= this.categoryWizardSteps.length - 1) return true;
+    return Boolean(this.categoryWizardSlug());
+  }
+
+  categoryWizardPrev(): void {
+    const next = this.categoryWizardStep() - 1;
+    if (next < 0) return;
+    this.categoryWizardStep.set(next);
+  }
+
+  categoryWizardNext(): void {
+    if (!this.categoryWizardOpen()) return;
+    if (this.categoryWizardStep() >= this.categoryWizardSteps.length - 1) {
+      this.exitCategoryWizard();
+      return;
+    }
+    if (!this.categoryWizardCanNext()) {
+      this.toast.error(this.t('adminUi.categories.wizard.addFirst'));
+      return;
+    }
+    this.categoryWizardStep.set(this.categoryWizardStep() + 1);
+    if (this.categoryWizardStep() === 1) {
+      this.openCategoryWizardTranslations();
+    }
+  }
+
+  goToCategoryWizardStep(index: number): void {
+    if (!this.categoryWizardOpen()) return;
+    if (index < 0 || index >= this.categoryWizardSteps.length) return;
+    if (index > 0 && !this.categoryWizardSlug()) {
+      this.toast.error(this.t('adminUi.categories.wizard.addFirst'));
+      this.categoryWizardStep.set(0);
+      return;
+    }
+    this.categoryWizardStep.set(index);
+    if (index === 1) {
+      this.openCategoryWizardTranslations();
+    }
+  }
+
+  openCategoryWizardTranslations(): void {
+    const slug = this.categoryWizardSlug();
+    if (!slug) return;
+    if (this.categoryTranslationsSlug !== slug) {
+      this.categoryTranslationsSlug = slug;
+      this.loadCategoryTranslations(slug);
+    }
+  }
+
   addCategory(): void {
     if (!this.categoryName) {
-      this.toast.error(this.t('adminUi.products.errors.required'));
+      this.toast.error(this.t('adminUi.categories.errors.required'));
       return;
     }
     const parent_id = (this.categoryParentId || '').trim() || null;
@@ -5318,6 +8230,14 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.categoryName = '';
         this.categoryParentId = '';
         this.toast.success(this.t('adminUi.categories.success.add'));
+        if (this.categoryWizardOpen() && this.categoryWizardStep() === 0) {
+          const slug = typeof cat?.slug === 'string' ? cat.slug : '';
+          if (slug) {
+            this.categoryWizardSlug.set(slug);
+            this.categoryWizardStep.set(1);
+            this.openCategoryWizardTranslations();
+          }
+        }
       },
       error: () => this.toast.error(this.t('adminUi.categories.errors.add'))
     });
@@ -5532,14 +8452,43 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
-  deleteCategory(slug: string): void {
+  openCategoryDeleteConfirm(cat: AdminCategory): void {
+    this.categoryDeleteConfirmTarget.set(cat);
+    this.categoryDeleteConfirmBusy.set(false);
+    this.categoryDeleteConfirmOpen.set(true);
+  }
+
+  closeCategoryDeleteConfirm(): void {
+    this.categoryDeleteConfirmOpen.set(false);
+    this.categoryDeleteConfirmBusy.set(false);
+    this.categoryDeleteConfirmTarget.set(null);
+  }
+
+  confirmDeleteCategory(): void {
+    const target = this.categoryDeleteConfirmTarget();
+    if (!target) return;
+    if (this.categoryDeleteConfirmBusy()) return;
+    this.categoryDeleteConfirmBusy.set(true);
+    this.deleteCategory(target.slug, {
+      done: (ok) => {
+        this.categoryDeleteConfirmBusy.set(false);
+        if (ok) this.closeCategoryDeleteConfirm();
+      }
+    });
+  }
+
+  deleteCategory(slug: string, opts?: { done?: (ok: boolean) => void }): void {
     this.admin.deleteCategory(slug).subscribe({
       next: () => {
         this.categories = this.categories.filter((c) => c.slug !== slug);
         if (this.categoryTranslationsSlug === slug) this.closeCategoryTranslations();
         this.toast.success(this.t('adminUi.categories.success.delete'));
+        opts?.done?.(true);
       },
-      error: () => this.toast.error(this.t('adminUi.categories.errors.delete'))
+      error: () => {
+        this.toast.error(this.t('adminUi.categories.errors.delete'));
+        opts?.done?.(false);
+      }
     });
   }
 
@@ -5955,6 +8904,180 @@ export class AdminComponent implements OnInit, OnDestroy {
     return this.contentBlocks.filter((c) => c.key.startsWith('blog.'));
   }
 
+  private pinnedSlotFromMeta(meta: Record<string, any> | null | undefined): number | null {
+    if (!meta) return null;
+    const pinned = meta['pinned'];
+    let pinnedFlag = false;
+    if (typeof pinned === 'boolean') pinnedFlag = pinned;
+    else if (typeof pinned === 'number') pinnedFlag = pinned === 1;
+    else if (typeof pinned === 'string') pinnedFlag = ['1', 'true', 'yes', 'on'].includes(pinned.trim().toLowerCase());
+    if (!pinnedFlag) return null;
+    const raw = Number(meta['pin_order']);
+    if (!Number.isFinite(raw)) return null;
+    const normalized = Math.min(3, Math.max(1, Math.trunc(raw)));
+    return normalized;
+  }
+
+  blogPinnedSlot(post: AdminContent): number | null {
+    return this.pinnedSlotFromMeta(post.meta || null);
+  }
+
+  blogPinnedSlotHasConflict(slot: number, key: string): boolean {
+    const normalized = Math.min(3, Math.max(1, Math.trunc(Number(slot))));
+    const matches = this.blogPosts().filter((p) => p.key !== key && this.blogPinnedSlot(p) === normalized);
+    return matches.length > 0;
+  }
+
+  blogPinnedConflicts(): Array<{ slot: number; posts: string }> {
+    const out: Array<{ slot: number; posts: string }> = [];
+    for (const slot of [1, 2, 3]) {
+      const posts = this.blogPosts().filter((p) => this.blogPinnedSlot(p) === slot);
+      if (posts.length <= 1) continue;
+      const labels = posts.map((p) => p.title || p.key).slice(0, 4);
+      const more = posts.length > labels.length ? ` (+${posts.length - labels.length})` : '';
+      out.push({ slot, posts: labels.join(', ') + more });
+    }
+    return out;
+  }
+
+  isBlogSelected(key: string): boolean {
+    return this.blogBulkSelection.has(key);
+  }
+
+  toggleBlogSelection(key: string, event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    if (target?.checked) {
+      this.blogBulkSelection.add(key);
+    } else {
+      this.blogBulkSelection.delete(key);
+    }
+    this.blogBulkError = '';
+  }
+
+  areAllBlogSelected(): boolean {
+    const posts = this.blogPosts();
+    if (!posts.length) return false;
+    return posts.every((post) => this.blogBulkSelection.has(post.key));
+  }
+
+  toggleSelectAllBlogs(event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    if (!target) return;
+    if (target.checked) {
+      this.blogPosts().forEach((post) => this.blogBulkSelection.add(post.key));
+    } else {
+      this.blogBulkSelection.clear();
+    }
+    this.blogBulkError = '';
+  }
+
+  clearBlogBulkSelection(): void {
+    this.blogBulkSelection.clear();
+    this.blogBulkError = '';
+  }
+
+  canApplyBlogBulk(): boolean {
+    if (this.blogBulkSelection.size === 0) return false;
+    if (this.blogBulkAction === 'schedule') {
+      const publishIso = this.toIsoFromLocal(this.blogBulkPublishAt);
+      if (!publishIso) return false;
+      if (this.blogBulkUnpublishAt) {
+        const unpublishIso = this.toIsoFromLocal(this.blogBulkUnpublishAt);
+        if (!unpublishIso) return false;
+        if (new Date(unpublishIso).getTime() <= new Date(publishIso).getTime()) return false;
+      }
+    }
+    if (this.blogBulkAction === 'tags_add' || this.blogBulkAction === 'tags_remove') {
+      return this.parseTags(this.blogBulkTags).length > 0;
+    }
+    return true;
+  }
+
+  blogBulkPreview(): string {
+    const count = this.blogBulkSelection.size;
+    if (!count) return this.t('adminUi.blog.bulk.previewEmpty');
+    switch (this.blogBulkAction) {
+      case 'publish':
+        return this.t('adminUi.blog.bulk.previewPublish', { count });
+      case 'unpublish':
+        return this.t('adminUi.blog.bulk.previewUnpublish', { count });
+      case 'schedule': {
+        const publishIso = this.toIsoFromLocal(this.blogBulkPublishAt);
+        const publishLabel = publishIso ? new Date(publishIso).toLocaleString() : '—';
+        const unpublishIso = this.toIsoFromLocal(this.blogBulkUnpublishAt);
+        const unpublishLabel = unpublishIso ? new Date(unpublishIso).toLocaleString() : '—';
+        return this.t('adminUi.blog.bulk.previewSchedule', { count, publish: publishLabel, unpublish: unpublishLabel });
+      }
+      case 'tags_add':
+        return this.t('adminUi.blog.bulk.previewTagsAdd', { count, tags: this.parseTags(this.blogBulkTags).join(', ') });
+      case 'tags_remove':
+        return this.t('adminUi.blog.bulk.previewTagsRemove', { count, tags: this.parseTags(this.blogBulkTags).join(', ') });
+      default:
+        return this.t('adminUi.blog.bulk.previewEmpty');
+    }
+  }
+
+  applyBlogBulkAction(): void {
+    if (!this.canApplyBlogBulk()) return;
+    this.blogBulkSaving = true;
+    this.blogBulkError = '';
+    const keys = Array.from(this.blogBulkSelection);
+    const detailRequests = keys.map((key) =>
+      this.admin.getContent(key).pipe(
+        map((block) => ({ key, block })),
+        catchError(() => of({ key, block: null }))
+      )
+    );
+    forkJoin(detailRequests).subscribe({
+      next: (rows) => {
+        const updates = rows
+          .map(({ key, block }) => {
+            if (!block) return { key, update$: null };
+            this.rememberContentVersion(key, block);
+            const payload = this.buildBlogBulkPayload(block);
+            if (!payload) return { key, update$: null };
+            return {
+              key,
+              update$: this.admin.updateContentBlock(key, this.withExpectedVersion(key, payload)).pipe(
+                map((res) => ({ key, res })),
+                catchError((error) => of({ key, error }))
+              )
+            };
+          })
+          .filter((row) => row.update$ !== null) as Array<{ key: string; update$: any }>;
+
+        if (!updates.length) {
+          this.blogBulkSaving = false;
+          this.blogBulkError = this.t('adminUi.blog.bulk.noChanges');
+          return;
+        }
+
+        forkJoin(updates.map((row) => row.update$)).subscribe({
+          next: (results) => {
+            const failures = results.filter((r: any) => r?.error);
+            const successCount = results.length - failures.length;
+            if (successCount) {
+              this.toast.success(this.t('adminUi.blog.bulk.success', { count: successCount }));
+            }
+            if (failures.length) {
+              this.toast.error(this.t('adminUi.blog.bulk.errors', { count: failures.length }));
+            }
+            this.blogBulkSaving = false;
+            this.reloadContentBlocks();
+          },
+          error: () => {
+            this.blogBulkSaving = false;
+            this.blogBulkError = this.t('adminUi.blog.bulk.errors', { count: keys.length });
+          }
+        });
+      },
+      error: () => {
+        this.blogBulkSaving = false;
+        this.blogBulkError = this.t('adminUi.blog.bulk.loadError');
+      }
+    });
+  }
+
   extractBlogSlug(key: string): string {
     return key.startsWith('blog.') ? key.slice('blog.'.length) : key;
   }
@@ -5967,6 +9090,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 	    this.showBlogCreate = true;
 	    this.selectedBlogKey = null;
 	    this.blogImages = [];
+	    this.showBlogCoverLibrary = false;
 	    this.blogCreate = {
 	      baseLang: 'en',
 	      status: 'draft',
@@ -5974,15 +9098,18 @@ export class AdminComponent implements OnInit, OnDestroy {
 	      published_until: '',
 	      title: '',
       body_markdown: '',
-      summary: '',
-      tags: '',
-      cover_image_url: '',
-      reading_time_minutes: '',
+	      summary: '',
+	      tags: '',
+	      series: '',
+	      cover_image_url: '',
+	      reading_time_minutes: '',
+	      pinned: false,
+      pin_order: '1',
       includeTranslation: false,
       translationTitle: '',
       translationBody: ''
     };
-  }
+	  }
 
   cancelBlogCreate(): void {
     this.showBlogCreate = false;
@@ -5991,6 +9118,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   closeBlogEditor(): void {
     this.selectedBlogKey = null;
     this.blogImages = [];
+    this.showBlogCoverLibrary = false;
     this.blogPreviewUrl = null;
     this.blogPreviewToken = null;
     this.blogPreviewExpiresAt = null;
@@ -6018,17 +9146,32 @@ export class AdminComponent implements OnInit, OnDestroy {
     if (summary) {
       meta['summary'] = { [baseLang]: summary };
     }
-    const tags = this.parseTags(this.blogCreate.tags);
-    if (tags.length) {
-      meta['tags'] = tags;
-    }
-    const cover = this.blogCreate.cover_image_url.trim();
-    if (cover) {
-      meta['cover_image_url'] = cover;
-    }
+	    const tags = this.parseTags(this.blogCreate.tags);
+	    if (tags.length) {
+	      meta['tags'] = tags;
+	    }
+	    const series = this.blogCreate.series.trim();
+	    if (series) {
+	      meta['series'] = series;
+	    }
+	    const cover = this.blogCreate.cover_image_url.trim();
+	    if (cover) {
+	      meta['cover_image_url'] = cover;
+	    }
 	    const rt = Number(String(this.blogCreate.reading_time_minutes || '').trim());
 	    if (Number.isFinite(rt) && rt > 0) {
 	      meta['reading_time_minutes'] = Math.trunc(rt);
+	    }
+	    if (this.blogCreate.pinned) {
+        const rawOrder = Number(String(this.blogCreate.pin_order || '').trim());
+        const normalized = Number.isFinite(rawOrder) ? Math.min(3, Math.max(1, Math.trunc(rawOrder))) : 1;
+        const conflict = this.blogPosts().find((post) => this.blogPinnedSlot(post) === normalized);
+        if (conflict) {
+          this.toast.error(this.t('adminUi.blog.pins.saveConflict', { slot: normalized, title: conflict.title || conflict.key }));
+          return;
+        }
+	      meta['pinned'] = true;
+	      meta['pin_order'] = normalized;
 	    }
 	    const published_at = this.blogCreate.published_at ? new Date(this.blogCreate.published_at).toISOString() : undefined;
 	    const published_until = this.blogCreate.published_until ? new Date(this.blogCreate.published_until).toISOString() : undefined;
@@ -6111,6 +9254,8 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.blogForm.published_until = block.published_until ? this.toLocalDateTime(block.published_until) : '';
         this.blogMeta = block.meta || this.blogMeta || {};
         this.syncBlogMetaToForm(lang);
+        this.ensureBlogDraft(key, lang).initFromServer(this.currentBlogDraftState());
+        this.setBlogSeoSnapshot(lang, block.title, block.body_markdown);
       },
       error: () => this.toast.error(this.t('adminUi.blog.errors.loadContent'))
     });
@@ -6127,6 +9272,25 @@ export class AdminComponent implements OnInit, OnDestroy {
     const nextMeta = this.buildBlogMeta(this.blogEditLang);
     const metaChanged = JSON.stringify(nextMeta) !== JSON.stringify(this.blogMeta || {});
     const isBase = this.blogEditLang === this.blogBaseLang;
+    if (isBase && nextMeta['pinned']) {
+      const slot = Number(nextMeta['pin_order']);
+      if (Number.isFinite(slot)) {
+        const normalized = Math.min(3, Math.max(1, Math.trunc(slot)));
+        const conflict = this.blogPosts().find((post) => post.key !== key && this.blogPinnedSlot(post) === normalized);
+        if (conflict) {
+          this.toast.error(this.t('adminUi.blog.pins.saveConflict', { slot: normalized, title: conflict.title || conflict.key }));
+          return;
+        }
+      }
+    }
+    if (isBase && this.blogForm.status === 'published') {
+      const issues = this.blogA11yIssues();
+      if (issues.length) {
+        this.blogA11yOpen = true;
+        const ok = confirm(this.t('adminUi.blog.a11y.confirmPublishAnyway', { count: issues.length }));
+        if (!ok) return;
+      }
+    }
     const published_at = isBase
       ? this.blogForm.published_at
         ? new Date(this.blogForm.published_at).toISOString()
@@ -6150,6 +9314,7 @@ export class AdminComponent implements OnInit, OnDestroy {
         next: (block) => {
           this.rememberContentVersion(key, block);
           this.blogMeta = nextMeta;
+          this.ensureBlogDraft(key, this.blogEditLang).markServerSaved(this.currentBlogDraftState());
           this.toast.success(this.t('adminUi.blog.success.saved'));
           this.reloadContentBlocks();
           this.loadBlogEditor(key);
@@ -6178,6 +9343,7 @@ export class AdminComponent implements OnInit, OnDestroy {
           this.setBlogEditLang(this.blogEditLang);
         };
         if (!metaChanged) {
+          this.ensureBlogDraft(key, this.blogEditLang).markServerSaved(this.currentBlogDraftState());
           onDone();
           return;
         }
@@ -6185,6 +9351,7 @@ export class AdminComponent implements OnInit, OnDestroy {
           next: (metaBlock) => {
             this.rememberContentVersion(key, metaBlock);
             this.blogMeta = nextMeta;
+            this.ensureBlogDraft(key, this.blogEditLang).markServerSaved(this.currentBlogDraftState());
             onDone();
           },
           error: (err) => {
@@ -6224,6 +9391,248 @@ export class AdminComponent implements OnInit, OnDestroy {
       if (ok) this.toast.info(this.t('adminUi.blog.preview.success.copied'));
       else this.toast.error(this.t('adminUi.blog.preview.errors.copy'));
     });
+  }
+
+  pagePreviewSlug(pageKey: PageBuilderKey): string | null {
+    const raw = (pageKey || '').trim();
+    if (!raw.startsWith('page.')) return null;
+    const slug = raw.slice('page.'.length).trim();
+    return slug ? slug : null;
+  }
+
+  pagePublicPath(slug: string): string {
+    const value = (slug || '').trim();
+    if (!value) return '/pages';
+    if (value === 'about') return '/about';
+    if (value === 'contact') return '/contact';
+    return `/pages/${value}`;
+  }
+
+  private previewOriginFromResponse(resp: ContentPreviewTokenResponse): string {
+    const raw = (resp?.url || '').trim();
+    if (!raw) return typeof window !== 'undefined' ? window.location.origin : '';
+    try {
+      return new URL(raw).origin;
+    } catch {
+      try {
+        return typeof window !== 'undefined' ? new URL(raw, window.location.origin).origin : '';
+      } catch {
+        return typeof window !== 'undefined' ? window.location.origin : '';
+      }
+    }
+  }
+
+  pagePreviewShareUrl(slug: string): string | null {
+    const value = (slug || '').trim();
+    if (!value) return null;
+    if (!this.pagePreviewToken || this.pagePreviewForSlug !== value) return null;
+
+    const origin = (this.pagePreviewOrigin || '').trim() || (typeof window !== 'undefined' ? window.location.origin : '');
+    if (!origin) return null;
+
+    const url = new URL(this.pagePublicPath(value), origin);
+    url.searchParams.set('preview', this.pagePreviewToken);
+    url.searchParams.set('lang', this.cmsPrefs.previewLang());
+    url.searchParams.set('theme', this.cmsPrefs.previewTheme());
+    return url.toString();
+  }
+
+  pagePreviewIframeSrc(slug: string): SafeResourceUrl | null {
+    const baseUrl = this.pagePreviewShareUrl(slug);
+    if (!baseUrl) return null;
+    const url = new URL(baseUrl);
+    url.searchParams.set('__ts', String(this.pagePreviewNonce || 0));
+    return this.sanitizer.bypassSecurityTrustResourceUrl(url.toString());
+  }
+
+  generatePagePreviewLink(slug: string): void {
+    const value = (slug || '').trim();
+    if (!value) return;
+    this.admin.createPagePreviewToken(value, { lang: this.cmsPrefs.previewLang() }).subscribe({
+      next: (resp) => {
+        this.pagePreviewForSlug = value;
+        this.pagePreviewToken = resp.token;
+        this.pagePreviewExpiresAt = resp.expires_at;
+        this.pagePreviewOrigin = this.previewOriginFromResponse(resp);
+        this.pagePreviewNonce = Date.now();
+        const url = this.pagePreviewShareUrl(value);
+        if (url) {
+          this.toast.success(this.t('adminUi.content.previewLinks.success.ready'));
+          void this.copyToClipboard(url).then((ok) => {
+            if (ok) this.toast.info(this.t('adminUi.content.previewLinks.success.copied'));
+          });
+        } else {
+          this.toast.success(this.t('adminUi.content.previewLinks.success.ready'));
+        }
+      },
+      error: () => this.toast.error(this.t('adminUi.content.previewLinks.errors.generate'))
+    });
+  }
+
+  refreshPagePreview(): void {
+    if (!this.pagePreviewToken) return;
+    this.pagePreviewNonce = Date.now();
+  }
+
+  homePreviewShareUrl(): string | null {
+    if (!this.homePreviewToken) return null;
+    const origin = (this.homePreviewOrigin || '').trim() || (typeof window !== 'undefined' ? window.location.origin : '');
+    if (!origin) return null;
+    const url = new URL('/', origin);
+    url.searchParams.set('preview', this.homePreviewToken);
+    url.searchParams.set('lang', this.cmsPrefs.previewLang());
+    url.searchParams.set('theme', this.cmsPrefs.previewTheme());
+    return url.toString();
+  }
+
+  homePreviewIframeSrc(): SafeResourceUrl | null {
+    const baseUrl = this.homePreviewShareUrl();
+    if (!baseUrl) return null;
+    const url = new URL(baseUrl);
+    url.searchParams.set('__ts', String(this.homePreviewNonce || 0));
+    return this.sanitizer.bypassSecurityTrustResourceUrl(url.toString());
+  }
+
+  generateHomePreviewLink(): void {
+    this.admin.createHomePreviewToken({ lang: this.cmsPrefs.previewLang() }).subscribe({
+      next: (resp) => {
+        this.homePreviewToken = resp.token;
+        this.homePreviewExpiresAt = resp.expires_at;
+        this.homePreviewOrigin = this.previewOriginFromResponse(resp);
+        this.homePreviewNonce = Date.now();
+        const url = this.homePreviewShareUrl();
+        if (url) {
+          this.toast.success(this.t('adminUi.content.previewLinks.success.ready'));
+          void this.copyToClipboard(url).then((ok) => {
+            if (ok) this.toast.info(this.t('adminUi.content.previewLinks.success.copied'));
+          });
+        } else {
+          this.toast.success(this.t('adminUi.content.previewLinks.success.ready'));
+        }
+      },
+      error: () => this.toast.error(this.t('adminUi.content.previewLinks.errors.generate'))
+    });
+  }
+
+  refreshHomePreview(): void {
+    if (!this.homePreviewToken) return;
+    this.homePreviewNonce = Date.now();
+  }
+
+  copyPreviewLink(url: string): void {
+    const value = (url || '').trim();
+    if (!value) return;
+    void this.copyToClipboard(value).then((ok) => {
+      if (ok) this.toast.info(this.t('adminUi.content.previewLinks.success.copied'));
+      else this.toast.error(this.t('adminUi.content.previewLinks.errors.copy'));
+    });
+  }
+
+  private setBlogSeoSnapshot(lang: UiLang, title: string, body_markdown: string): void {
+    this.blogSeoSnapshots[lang] = { title: title || '', body_markdown: body_markdown || '' };
+  }
+
+  private loadBlogSeoSnapshots(key: string): void {
+    this.blogSeoSnapshotsKey = key;
+    this.blogSeoSnapshotsLoading = true;
+    const langs: UiLang[] = ['en', 'ro'];
+    type BlogSeoRow = { lang: UiLang; title: string; body_markdown: string; missing?: true };
+    const requests = langs.map((lang) =>
+      this.admin.getContent(key, lang).pipe(
+        map((block) => ({ lang, title: block.title || '', body_markdown: block.body_markdown || '' } as BlogSeoRow)),
+        catchError(() => of({ lang, title: '', body_markdown: '', missing: true } as BlogSeoRow))
+      )
+    );
+    forkJoin(requests).subscribe({
+      next: (rows: BlogSeoRow[]) => {
+        if (this.selectedBlogKey !== key || this.blogSeoSnapshotsKey !== key) return;
+        for (const row of rows) {
+          const lang = row.lang;
+          if (row.missing) this.blogSeoSnapshots[lang] = null;
+          else this.setBlogSeoSnapshot(lang, row.title, row.body_markdown);
+        }
+      },
+      complete: () => {
+        if (this.blogSeoSnapshotsKey === key) this.blogSeoSnapshotsLoading = false;
+      }
+    });
+  }
+
+  blogSeoHasContent(lang: UiLang): boolean {
+    if (!this.selectedBlogKey) return false;
+    if (lang === this.blogEditLang) return Boolean((this.blogForm.title || '').trim() || (this.blogForm.body_markdown || '').trim());
+    return Boolean(this.blogSeoSnapshots[lang]?.title || this.blogSeoSnapshots[lang]?.body_markdown);
+  }
+
+  blogSeoTitleFull(lang: UiLang): string {
+    const rawTitle =
+      lang === this.blogEditLang
+        ? (this.blogForm.title || '').trim()
+        : (this.blogSeoSnapshots[lang]?.title || '').trim();
+    if (!rawTitle) return '';
+    return `${rawTitle} | momentstudio`;
+  }
+
+  blogSeoDescriptionFull(lang: UiLang): string {
+    return this.blogSeoDescriptionSource(lang).slice(0, 160).trim();
+  }
+
+  blogSeoTitlePreview(lang: UiLang): string {
+    return this.truncateForPreview(this.blogSeoTitleFull(lang), 62);
+  }
+
+  blogSeoDescriptionPreview(lang: UiLang): string {
+    return this.truncateForPreview(this.blogSeoDescriptionSource(lang), 160);
+  }
+
+  blogSeoIssues(lang: UiLang): Array<{ key: string; params?: Record<string, unknown> }> {
+    const title = this.blogSeoTitleFull(lang);
+    const metaDescription = this.blogSeoDescriptionFull(lang);
+    const sourceDescription = this.blogSeoDescriptionSource(lang);
+    const titleLen = title.length;
+    const descMetaLen = metaDescription.length;
+    const descSourceLen = sourceDescription.length;
+    const issues: Array<{ key: string; params?: Record<string, unknown> }> = [];
+    if (!title.trim()) issues.push({ key: 'adminUi.blog.seo.issues.missingTitle' });
+    if (!metaDescription.trim()) issues.push({ key: 'adminUi.blog.seo.issues.missingDescription' });
+    if (titleLen > 70) issues.push({ key: 'adminUi.blog.seo.issues.titleTooLong', params: { count: titleLen } });
+    if (titleLen > 0 && titleLen < 25) issues.push({ key: 'adminUi.blog.seo.issues.titleTooShort', params: { count: titleLen } });
+    if (descSourceLen > 160) issues.push({ key: 'adminUi.blog.seo.issues.descriptionTooLong', params: { count: descSourceLen } });
+    if (descMetaLen > 0 && descMetaLen < 70) issues.push({ key: 'adminUi.blog.seo.issues.descriptionTooShort', params: { count: descMetaLen } });
+    const summary = this.getBlogSummary(this.blogMeta || {}, lang);
+    if (!summary.trim() && metaDescription.trim()) issues.push({ key: 'adminUi.blog.seo.issues.derivedFromBody' });
+    if (!this.blogPreviewToken && this.blogForm.status !== 'published') issues.push({ key: 'adminUi.blog.seo.issues.previewTokenRecommended' });
+    return issues;
+  }
+
+  private truncateForPreview(value: string, max: number): string {
+    const text = String(value || '').replace(/\s+/g, ' ').trim();
+    if (!text) return '';
+    if (text.length <= max) return text;
+    return text.slice(0, Math.max(0, max - 1)).trimEnd() + '…';
+  }
+
+  private toSeoDescription(markdownOrText: string): string {
+    const cleaned = String(markdownOrText || '')
+      .replace(/```[\s\S]*?```/g, ' ')
+      .replace(/`[^`]*`/g, ' ')
+      .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/[#>*_~]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return cleaned;
+  }
+
+  private blogSeoDescriptionSource(lang: UiLang): string {
+    const summary = this.getBlogSummary(this.blogMeta || {}, lang);
+    const body =
+      lang === this.blogEditLang
+        ? (this.blogForm.body_markdown || '').trim()
+        : (this.blogSeoSnapshots[lang]?.body_markdown || '').trim();
+    const source = (summary || '').trim() || body;
+    return this.toSeoDescription(source);
   }
 
   blogPublicUrl(lang: UiLang): string {
@@ -6425,6 +9834,24 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.updateBlogBody(textarea, next, codeStart, codeStart + selected.length);
   }
 
+  insertBlogEmbed(target: HTMLTextAreaElement | RichEditorComponent, kind: 'product' | 'category' | 'collection'): void {
+    const hintKey =
+      kind === 'product'
+        ? 'adminUi.blog.embeds.prompt.product'
+        : kind === 'category'
+          ? 'adminUi.blog.embeds.prompt.category'
+          : 'adminUi.blog.embeds.prompt.collection';
+    const raw = prompt(this.t(hintKey), '') || '';
+    const slug = raw.trim();
+    if (!slug) return;
+    const snippet = `{{${kind}:${slug}}}`;
+    if (target instanceof HTMLTextAreaElement) {
+      this.insertAtCursor(target, snippet);
+    } else {
+      target.insertMarkdown(snippet);
+    }
+  }
+
   uploadAndInsertBlogImage(target: HTMLTextAreaElement | RichEditorComponent, event: Event): void {
     if (!this.selectedBlogKey) return;
     const input = event.target as HTMLInputElement;
@@ -6433,14 +9860,22 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.admin.uploadContentImage(this.selectedBlogKey, file).subscribe({
       next: (block) => {
         const images = (block.images || [])
-          .map((img) => ({ id: img.id, url: img.url, alt_text: img.alt_text, sort_order: img.sort_order ?? 0 }))
+          .map((img) => ({
+            id: img.id,
+            url: img.url,
+            alt_text: img.alt_text,
+            sort_order: img.sort_order ?? 0,
+            focal_x: img.focal_x ?? 50,
+            focal_y: img.focal_y ?? 50
+          }))
           .sort((a, b) => a.sort_order - b.sort_order);
-        this.blogImages = images.map((img) => ({ id: img.id, url: img.url, alt_text: img.alt_text }));
+        this.blogImages = images;
         this.toast.success(this.t('adminUi.blog.images.success.uploaded'));
         const inserted = images[images.length - 1];
         if (inserted?.url) {
           const alt = file.name.replace(/\.[^.]+$/, '').replace(/[\r\n]+/g, ' ').trim() || 'image';
-          const snippet = `![${alt}](${inserted.url})`;
+          const layoutToken = this.blogImageLayout === 'default' ? '' : this.blogImageLayout;
+          const snippet = layoutToken ? `![${alt}](${inserted.url} "${layoutToken}")` : `![${alt}](${inserted.url})`;
           if (target instanceof HTMLTextAreaElement) {
             this.insertAtCursor(target, snippet);
           } else {
@@ -6454,11 +9889,304 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
+  onBlogImageDragOver(event: DragEvent): void {
+    const transfer = event?.dataTransfer;
+    const types = Array.from(transfer?.types || []);
+    if (!types.includes('Files')) return;
+    event.preventDefault();
+    if (transfer) transfer.dropEffect = 'copy';
+  }
+
+  async onBlogImageDrop(target: HTMLTextAreaElement | RichEditorComponent, event: DragEvent): Promise<void> {
+    const transfer = event?.dataTransfer;
+    const files = Array.from(transfer?.files || []).filter((file) => file && file.type.startsWith('image/'));
+    if (!files.length) return;
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!this.selectedBlogKey) return;
+    let insertedCount = 0;
+
+    for (const file of files) {
+      try {
+        const block = await firstValueFrom(this.admin.uploadContentImage(this.selectedBlogKey, file));
+        const images = (block.images || [])
+          .map((img) => ({
+            id: img.id,
+            url: img.url,
+            alt_text: img.alt_text,
+            sort_order: img.sort_order ?? 0,
+            focal_x: img.focal_x ?? 50,
+            focal_y: img.focal_y ?? 50
+          }))
+          .sort((a, b) => a.sort_order - b.sort_order);
+        this.blogImages = images;
+        const inserted = images[images.length - 1];
+        if (!inserted?.url) continue;
+
+        const alt = file.name.replace(/\.[^.]+$/, '').replace(/[\r\n]+/g, ' ').trim() || 'image';
+        const layoutToken = this.blogImageLayout === 'default' ? '' : this.blogImageLayout;
+        const snippet = layoutToken ? `![${alt}](${inserted.url} "${layoutToken}")` : `![${alt}](${inserted.url})`;
+        if (target instanceof HTMLTextAreaElement) {
+          this.insertAtCursor(target, snippet);
+        } else {
+          target.insertMarkdown(snippet);
+        }
+        insertedCount += 1;
+      } catch {
+        this.toast.error(this.t('adminUi.blog.images.errors.upload'));
+        return;
+      }
+    }
+
+    if (insertedCount) {
+      this.toast.success(this.t('adminUi.blog.images.success.uploaded'));
+      this.toast.info(this.t('adminUi.blog.images.success.insertedMarkdown'));
+    }
+  }
+
   insertBlogImageMarkdown(url: string, altText?: string | null): void {
     const alt = (altText || 'image').replace(/[\r\n]+/g, ' ').trim();
     const snippet = `\n\n![${alt}](${url})\n`;
     this.blogForm.body_markdown = (this.blogForm.body_markdown || '').trimEnd() + snippet;
     this.toast.info(this.t('adminUi.blog.images.success.insertedMarkdown'));
+  }
+
+  blogA11yIssues(): Array<{ index: number; url: string; alt: string }> {
+    const markdown = this.blogForm.body_markdown || '';
+    const issues: Array<{ index: number; url: string; alt: string }> = [];
+    const re = /!\[([^\]]*)\]\(([^)\s]+)([^)]*)\)/g;
+    let match: RegExpExecArray | null;
+    let idx = 0;
+    while ((match = re.exec(markdown))) {
+      const alt = String(match[1] || '').trim();
+      const url = String(match[2] || '').trim();
+      const altKey = alt.toLowerCase();
+      const missing = !alt || altKey === 'image' || altKey === 'photo' || altKey === 'picture';
+      if (url && missing) issues.push({ index: idx, url, alt });
+      idx += 1;
+    }
+    return issues;
+  }
+
+  promptFixBlogImageAlt(imageIndex: number): void {
+    const markdown = this.blogForm.body_markdown || '';
+    const re = /!\[([^\]]*)\]\(([^)\s]+)([^)]*)\)/g;
+    let match: RegExpExecArray | null;
+    let idx = 0;
+    while ((match = re.exec(markdown))) {
+      if (idx !== imageIndex) {
+        idx += 1;
+        continue;
+      }
+      const url = String(match[2] || '').trim();
+      const suggestion = this.suggestAltFromUrl(url);
+      const next = (prompt(this.t('adminUi.blog.a11y.promptAlt'), suggestion) || '').trim();
+      if (!next) return;
+      this.setBlogMarkdownImageAlt(imageIndex, next);
+      this.toast.success(this.t('adminUi.blog.a11y.fixed'));
+      this.blogA11yOpen = true;
+      return;
+    }
+  }
+
+  private suggestAltFromUrl(url: string): string {
+    const cleaned = String(url || '').split('?')[0].split('#')[0].trim();
+    const filename = cleaned.split('/').pop() || '';
+    const base = filename.replace(/\.[^.]+$/, '');
+    return base.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim() || 'image';
+  }
+
+  private setBlogMarkdownImageAlt(imageIndex: number, alt: string): void {
+    const markdown = this.blogForm.body_markdown || '';
+    const safeAlt = String(alt || '').replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!safeAlt) return;
+
+    const re = /!\[([^\]]*)\]\(([^)\s]+)([^)]*)\)/g;
+    let match: RegExpExecArray | null;
+    let idx = 0;
+    let out = '';
+    let lastIndex = 0;
+    while ((match = re.exec(markdown))) {
+      const start = match.index;
+      const end = re.lastIndex;
+      out += markdown.slice(lastIndex, start);
+      if (idx === imageIndex) {
+        out += `![${safeAlt}](${match[2]}${match[3]})`;
+      } else {
+        out += markdown.slice(start, end);
+      }
+      lastIndex = end;
+      idx += 1;
+    }
+    out += markdown.slice(lastIndex);
+    this.blogForm.body_markdown = out;
+  }
+
+  blogWritingAids(): { words: number; minutes: number; headings: Array<{ level: number; text: string }> } {
+    const markdown = this.blogForm.body_markdown || '';
+    const words = this.countMarkdownWords(markdown);
+    const minutes = words ? Math.max(1, Math.ceil(words / 200)) : 0;
+    return { words, minutes, headings: this.extractMarkdownHeadings(markdown) };
+  }
+
+  applyBlogReadingTimeEstimate(): void {
+    const aids = this.blogWritingAids();
+    if (!aids.minutes) return;
+    this.blogForm.reading_time_minutes = String(aids.minutes);
+    this.toast.info(this.t('adminUi.blog.writing.applied', { minutes: aids.minutes }));
+  }
+
+  private countMarkdownWords(markdown: string): number {
+    const cleaned = String(markdown || '')
+      .replace(/```[\s\S]*?```/g, ' ')
+      .replace(/`[^`]*`/g, ' ')
+      .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/[#>*_~`-]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const matches = cleaned.match(/[\p{L}\p{N}]+/gu);
+    return matches?.length ?? 0;
+  }
+
+  private extractMarkdownHeadings(markdown: string): Array<{ level: number; text: string }> {
+    const lines = String(markdown || '').split('\n');
+    const out: Array<{ level: number; text: string }> = [];
+    let inCode = false;
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (line.startsWith('```')) {
+        inCode = !inCode;
+        continue;
+      }
+      if (inCode) continue;
+      const match = /^(#{1,6})\s+(.+)$/.exec(line);
+      if (!match) continue;
+      const level = match[1].length;
+      if (level > 3) continue;
+      const text = match[2]
+        .replace(/\s+#+\s*$/, '')
+        .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+        .trim();
+      if (!text) continue;
+      out.push({ level, text });
+      if (out.length >= 40) break;
+    }
+    return out;
+  }
+
+  blogCoverPreviewUrl(): string | null {
+    const explicit = (this.blogForm.cover_image_url || '').trim();
+    if (explicit) return explicit;
+    const first = this.blogImages[0];
+    return first?.url ? String(first.url) : null;
+  }
+
+  blogCoverPreviewAsset():
+    | { id: string; url: string; sort_order: number; focal_x: number; focal_y: number; alt_text?: string | null }
+    | null {
+    const url = this.blogCoverPreviewUrl();
+    if (!url) return null;
+    return this.blogImages.find((img) => img.url === url) ?? null;
+  }
+
+  blogCoverPreviewFocalPosition(): string {
+    const img = this.blogCoverPreviewAsset();
+    const x = Math.max(0, Math.min(100, Math.round(Number(img?.focal_x ?? 50))));
+    const y = Math.max(0, Math.min(100, Math.round(Number(img?.focal_y ?? 50))));
+    return `${x}% ${y}%`;
+  }
+
+  clearBlogCoverOverride(): void {
+    this.blogForm.cover_image_url = '';
+  }
+
+  uploadBlogCoverImage(event: Event): void {
+    if (!this.selectedBlogKey) return;
+    if (this.blogEditLang !== this.blogBaseLang) return;
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    this.admin.uploadContentImage(this.selectedBlogKey, file).subscribe({
+      next: (block) => {
+        const images = (block.images || [])
+          .map((img) => ({
+            id: img.id,
+            url: img.url,
+            alt_text: img.alt_text,
+            sort_order: img.sort_order ?? 0,
+            focal_x: img.focal_x ?? 50,
+            focal_y: img.focal_y ?? 50
+          }))
+          .sort((a, b) => a.sort_order - b.sort_order);
+        this.blogImages = images;
+        const inserted = images[images.length - 1];
+        if (inserted?.url) {
+          this.blogForm.cover_image_url = inserted.url;
+        }
+        this.toast.success(this.t('adminUi.blog.images.success.uploaded'));
+        input.value = '';
+      },
+      error: () => this.toast.error(this.t('adminUi.blog.images.errors.upload'))
+    });
+  }
+
+  selectBlogCoverAsset(asset: ContentImageAssetRead): void {
+    const url = (asset?.url || '').trim();
+    if (!url) return;
+    if (this.blogEditLang !== this.blogBaseLang) return;
+    this.blogForm.cover_image_url = url;
+    const id = String(asset.id || '').trim();
+    if (!id) return;
+    const next = [...this.blogImages];
+    const idx = next.findIndex((img) => img.id === id);
+    const row = {
+      id,
+      url,
+      alt_text: asset.alt_text ?? null,
+      sort_order: Number.isFinite(asset.sort_order as any) ? Number(asset.sort_order) : 0,
+      focal_x: Number.isFinite(asset.focal_x as any) ? Number(asset.focal_x) : 50,
+      focal_y: Number.isFinite(asset.focal_y as any) ? Number(asset.focal_y) : 50
+    };
+    if (idx >= 0) next[idx] = { ...next[idx], ...row };
+    else next.push(row);
+    next.sort((a, b) => a.sort_order - b.sort_order);
+    this.blogImages = next;
+    this.showBlogCoverLibrary = false;
+  }
+
+  editBlogCoverFocalPoint(): void {
+    if (this.blogEditLang !== this.blogBaseLang) return;
+    const img = this.blogCoverPreviewAsset();
+    if (!img) return;
+    const entered = window.prompt(this.t('adminUi.site.assets.library.focalPrompt'), `${img.focal_x}, ${img.focal_y}`);
+    if (entered === null) return;
+    const parts = entered
+      .split(',')
+      .map((p) => p.trim())
+      .filter(Boolean);
+    if (parts.length < 2) {
+      this.toast.error(this.t('adminUi.site.assets.library.focalErrorsFormat'));
+      return;
+    }
+    const focalX = Math.max(0, Math.min(100, Math.round(Number(parts[0]))));
+    const focalY = Math.max(0, Math.min(100, Math.round(Number(parts[1]))));
+    if (!Number.isFinite(focalX) || !Number.isFinite(focalY)) {
+      this.toast.error(this.t('adminUi.site.assets.library.focalErrorsFormat'));
+      return;
+    }
+    this.admin.updateContentImageFocalPoint(img.id, focalX, focalY).subscribe({
+      next: (updated) => {
+        this.blogImages = this.blogImages.map((item) =>
+          item.id === img.id ? { ...item, focal_x: updated.focal_x, focal_y: updated.focal_y } : item
+        );
+        this.toast.success(this.t('adminUi.site.assets.library.focalSaved'));
+      },
+      error: () => this.toast.error(this.t('adminUi.site.assets.library.focalErrorsSave'))
+    });
   }
 
   private prefixBlogLines(textarea: HTMLTextAreaElement, prefix: string): void {
@@ -6503,6 +10231,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   private loadBlogEditor(key: string): void {
     this.selectedBlogKey = key;
     this.resetBlogForm();
+    this.showBlogCoverLibrary = false;
     this.blogPreviewUrl = null;
     this.blogPreviewExpiresAt = null;
     this.blogVersions = [];
@@ -6514,19 +10243,34 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.blogBaseLang = (block.lang === 'ro' ? 'ro' : 'en') as 'en' | 'ro';
         this.blogEditLang = this.blogBaseLang;
         this.blogMeta = block.meta || {};
-        this.blogForm = {
-          title: block.title,
-          body_markdown: block.body_markdown,
-          status: block.status,
-          published_at: block.published_at ? this.toLocalDateTime(block.published_at) : '',
-          published_until: block.published_until ? this.toLocalDateTime(block.published_until) : '',
-          summary: '',
-          tags: '',
-          cover_image_url: '',
-          reading_time_minutes: ''
-        };
+	        this.blogForm = {
+	          title: block.title,
+	          body_markdown: block.body_markdown,
+	          status: block.status,
+	          published_at: block.published_at ? this.toLocalDateTime(block.published_at) : '',
+	          published_until: block.published_until ? this.toLocalDateTime(block.published_until) : '',
+	          summary: '',
+	          tags: '',
+	          series: '',
+	          cover_image_url: '',
+	          reading_time_minutes: '',
+	          pinned: false,
+	          pin_order: '1'
+	        };
         this.syncBlogMetaToForm(this.blogEditLang);
-        this.blogImages = (block.images || []).map((img) => ({ id: img.id, url: img.url, alt_text: img.alt_text }));
+        this.ensureBlogDraft(key, this.blogEditLang).initFromServer(this.currentBlogDraftState());
+        this.loadBlogSeoSnapshots(key);
+        const images = (block.images || [])
+          .map((img) => ({
+            id: img.id,
+            url: img.url,
+            alt_text: img.alt_text,
+            sort_order: img.sort_order ?? 0,
+            focal_x: img.focal_x ?? 50,
+            focal_y: img.focal_y ?? 50
+          }))
+          .sort((a, b) => a.sort_order - b.sort_order);
+        this.blogImages = images;
         this.loadBlogVersions();
       },
       error: () => this.toast.error(this.t('adminUi.blog.errors.loadPost'))
@@ -6534,21 +10278,30 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   private reloadContentBlocks(): void {
-    this.admin.content().subscribe({ next: (c) => (this.contentBlocks = c) });
+    this.admin.content().subscribe({
+      next: (c) => {
+        this.contentBlocks = c;
+        this.syncContentVersions(c);
+        this.pruneBlogBulkSelection();
+      }
+    });
   }
 
   private resetBlogForm(): void {
-    this.blogForm = {
-      title: '',
-      body_markdown: '',
-      status: 'draft',
-      published_at: '',
-      published_until: '',
-      summary: '',
-      tags: '',
-      cover_image_url: '',
-      reading_time_minutes: ''
-    };
+	    this.blogForm = {
+	      title: '',
+	      body_markdown: '',
+	      status: 'draft',
+	      published_at: '',
+	      published_until: '',
+	      summary: '',
+	      tags: '',
+	      series: '',
+	      cover_image_url: '',
+	      reading_time_minutes: '',
+	      pinned: false,
+	      pin_order: '1'
+	    };
     this.blogMeta = {};
   }
 
@@ -6584,6 +10337,85 @@ export class AdminComponent implements OnInit, OnDestroy {
     return out;
   }
 
+  private toIsoFromLocal(value: string): string | null {
+    const trimmed = (value || '').trim();
+    if (!trimmed) return null;
+    const date = new Date(trimmed);
+    if (!Number.isFinite(date.getTime())) return null;
+    return date.toISOString();
+  }
+
+  private buildBlogBulkPayload(block: { meta?: Record<string, any> | null }): Record<string, unknown> | null {
+    switch (this.blogBulkAction) {
+      case 'publish':
+        return { status: 'published', published_at: null };
+      case 'unpublish':
+        return { status: 'draft' };
+      case 'schedule': {
+        const publishIso = this.toIsoFromLocal(this.blogBulkPublishAt);
+        if (!publishIso) return null;
+        const unpublishIso = this.toIsoFromLocal(this.blogBulkUnpublishAt);
+        if (unpublishIso && new Date(unpublishIso).getTime() <= new Date(publishIso).getTime()) {
+          this.blogBulkError = this.t('adminUi.blog.bulk.invalidSchedule');
+          return null;
+        }
+        return {
+          status: 'published',
+          published_at: publishIso,
+          published_until: unpublishIso ?? null
+        };
+      }
+      case 'tags_add':
+      case 'tags_remove': {
+        const tagsInput = this.parseTags(this.blogBulkTags);
+        if (!tagsInput.length) return null;
+        const meta = { ...(block.meta || {}) } as Record<string, unknown>;
+        const existingRaw = meta['tags'];
+        const existing = Array.isArray(existingRaw)
+          ? existingRaw.map((t) => String(t))
+          : typeof existingRaw === 'string'
+          ? this.parseTags(existingRaw)
+          : [];
+        const merged = this.blogBulkAction === 'tags_add' ? this.mergeTags(existing, tagsInput) : this.removeTags(existing, tagsInput);
+        if (merged.length) meta['tags'] = merged;
+        else delete meta['tags'];
+        return { meta };
+      }
+      default:
+        return null;
+    }
+  }
+
+  private mergeTags(existing: string[], incoming: string[]): string[] {
+    const out: string[] = [];
+    const seen = new Set<string>();
+    for (const value of [...existing, ...incoming]) {
+      const trimmed = String(value || '').trim();
+      if (!trimmed) continue;
+      const key = trimmed.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(trimmed);
+    }
+    return out;
+  }
+
+  private removeTags(existing: string[], remove: string[]): string[] {
+    const removeSet = new Set(remove.map((t) => String(t || '').trim().toLowerCase()).filter(Boolean));
+    return existing.filter((t) => !removeSet.has(String(t || '').trim().toLowerCase()));
+  }
+
+  private pruneBlogBulkSelection(): void {
+    const blogKeys = new Set(this.blogPosts().map((p) => p.key));
+    for (const key of Array.from(this.blogBulkSelection)) {
+      if (!blogKeys.has(key)) this.blogBulkSelection.delete(key);
+    }
+  }
+
+  private syncContentVersions(blocks: AdminContent[]): void {
+    blocks.forEach((block) => this.rememberContentVersion(block.key, block));
+  }
+
   private getBlogSummary(meta: Record<string, any>, lang: 'en' | 'ro'): string {
     const summary = meta?.['summary'];
     if (summary && typeof summary === 'object' && !Array.isArray(summary)) {
@@ -6604,26 +10436,42 @@ export class AdminComponent implements OnInit, OnDestroy {
       this.blogForm.tags = tags.join(', ');
     } else if (typeof tags === 'string') {
       this.blogForm.tags = tags;
-    } else {
-      this.blogForm.tags = '';
-    }
+	    } else {
+	      this.blogForm.tags = '';
+	    }
 
-    const cover = meta['cover_image_url'] || meta['cover_image'] || '';
-    this.blogForm.cover_image_url = typeof cover === 'string' ? cover : '';
-    const rt = meta['reading_time_minutes'] ?? meta['reading_time'] ?? '';
-    this.blogForm.reading_time_minutes = rt ? String(rt) : '';
+	    const series = meta['series'];
+	    this.blogForm.series = typeof series === 'string' ? series : '';
+
+	    const cover = meta['cover_image_url'] || meta['cover_image'] || '';
+	    this.blogForm.cover_image_url = typeof cover === 'string' ? cover : '';
+	    const rt = meta['reading_time_minutes'] ?? meta['reading_time'] ?? '';
+	    this.blogForm.reading_time_minutes = rt ? String(rt) : '';
+
+    const pinned = meta['pinned'];
+    this.blogForm.pinned = pinned === true || pinned === 'true';
+    const rawPinOrder = meta['pin_order'];
+    const parsedPinOrder = Number(
+      typeof rawPinOrder === 'number' ? rawPinOrder : typeof rawPinOrder === 'string' ? rawPinOrder.trim() : '1'
+    );
+    const normalized = Number.isFinite(parsedPinOrder) ? Math.min(3, Math.max(1, Math.trunc(parsedPinOrder))) : 1;
+    this.blogForm.pin_order = String(normalized);
   }
 
   private buildBlogMeta(lang: 'en' | 'ro'): Record<string, any> {
     const meta: Record<string, any> = { ...(this.blogMeta || {}) };
 
-    const tags = this.parseTags(this.blogForm.tags);
-    if (tags.length) meta['tags'] = tags;
-    else delete meta['tags'];
+	    const tags = this.parseTags(this.blogForm.tags);
+	    if (tags.length) meta['tags'] = tags;
+	    else delete meta['tags'];
 
-    const cover = this.blogForm.cover_image_url.trim();
-    if (cover) meta['cover_image_url'] = cover;
-    else delete meta['cover_image_url'];
+	    const series = this.blogForm.series.trim();
+	    if (series) meta['series'] = series;
+	    else delete meta['series'];
+
+	    const cover = this.blogForm.cover_image_url.trim();
+	    if (cover) meta['cover_image_url'] = cover;
+	    else delete meta['cover_image_url'];
 
     const rt = Number(String(this.blogForm.reading_time_minutes || '').trim());
     if (Number.isFinite(rt) && rt > 0) meta['reading_time_minutes'] = Math.trunc(rt);
@@ -6641,6 +10489,16 @@ export class AdminComponent implements OnInit, OnDestroy {
     else delete summary[lang];
     if (Object.keys(summary).length) meta['summary'] = summary;
     else delete meta['summary'];
+
+    if (this.blogForm.pinned) {
+      meta['pinned'] = true;
+      const rawOrder = Number(String(this.blogForm.pin_order || '').trim());
+      const normalized = Number.isFinite(rawOrder) ? Math.min(3, Math.max(1, Math.trunc(rawOrder))) : 1;
+      meta['pin_order'] = normalized;
+    } else {
+      delete meta['pinned'];
+      delete meta['pin_order'];
+    }
 
     return meta;
   }
@@ -6998,13 +10856,103 @@ export class AdminComponent implements OnInit, OnDestroy {
 	        })
         }
 	    });
-	  }
+		  }
 
-  loadSocial(): void {
-    this.socialError = null;
-    this.socialMessage = null;
-    this.admin.getContent('site.social').subscribe({
+  loadCompany(): void {
+    this.companyError = null;
+    this.companyMessage = null;
+    this.admin.getContent('site.company').subscribe({
       next: (block) => {
+        this.rememberContentVersion('site.company', block);
+        const meta = (block.meta || {}) as Record<string, any>;
+        const company = (meta['company'] || {}) as Record<string, any>;
+        this.companyForm = {
+          name: String(company['name'] || '').trim(),
+          registration_number: String(company['registration_number'] || '').trim(),
+          cui: String(company['cui'] || '').trim(),
+          address: String(company['address'] || '').trim(),
+          phone: String(company['phone'] || '').trim(),
+          email: String(company['email'] || '').trim()
+        };
+        this.companyMessage = null;
+      },
+      error: () => {
+        delete this.contentVersions['site.company'];
+        this.companyForm = {
+          name: '',
+          registration_number: '',
+          cui: '',
+          address: '',
+          phone: '',
+          email: ''
+        };
+      }
+    });
+  }
+
+  companyMissingFields(): string[] {
+    const missing: string[] = [];
+    if (!(this.companyForm.name || '').trim()) missing.push('adminUi.site.company.fields.name');
+    if (!(this.companyForm.registration_number || '').trim()) missing.push('adminUi.site.company.fields.registrationNumber');
+    if (!(this.companyForm.cui || '').trim()) missing.push('adminUi.site.company.fields.cui');
+    if (!(this.companyForm.address || '').trim()) missing.push('adminUi.site.company.fields.address');
+    if (!(this.companyForm.phone || '').trim()) missing.push('adminUi.site.company.fields.phone');
+    if (!(this.companyForm.email || '').trim()) missing.push('adminUi.site.company.fields.email');
+    return missing;
+  }
+
+  saveCompany(): void {
+    this.companyMessage = null;
+    this.companyError = null;
+    if (this.companyMissingFields().length) {
+      this.companyError = this.t('adminUi.site.company.errors.required');
+      return;
+    }
+    const payload = {
+      title: 'Company information',
+      body_markdown: 'Company identification details (used in footer).',
+      status: 'published',
+      meta: {
+        version: 1,
+        company: {
+          name: (this.companyForm.name || '').trim(),
+          registration_number: (this.companyForm.registration_number || '').trim(),
+          cui: (this.companyForm.cui || '').trim(),
+          address: (this.companyForm.address || '').trim(),
+          phone: (this.companyForm.phone || '').trim(),
+          email: (this.companyForm.email || '').trim()
+        }
+      }
+    };
+    const onSuccess = (block?: { version?: number } | null) => {
+      this.rememberContentVersion('site.company', block);
+      this.companyMessage = this.t('adminUi.site.company.success.save');
+      this.companyError = null;
+    };
+    this.admin.updateContentBlock('site.company', this.withExpectedVersion('site.company', payload)).subscribe({
+      next: (block) => onSuccess(block),
+      error: (err) => {
+        if (this.handleContentConflict(err, 'site.company', () => this.loadCompany())) {
+          this.companyError = this.t('adminUi.site.company.errors.save');
+          this.companyMessage = null;
+          return;
+        }
+        this.admin.createContent('site.company', payload).subscribe({
+          next: (created) => onSuccess(created),
+          error: () => {
+            this.companyError = this.t('adminUi.site.company.errors.save');
+            this.companyMessage = null;
+          }
+        });
+      }
+    });
+  }
+
+	  loadSocial(): void {
+	    this.socialError = null;
+	    this.socialMessage = null;
+	    this.admin.getContent('site.social').subscribe({
+	      next: (block) => {
         this.rememberContentVersion('site.social', block);
         const meta = (block.meta || {}) as Record<string, any>;
         const contact = (meta['contact'] || {}) as Record<string, any>;
@@ -7114,6 +11062,253 @@ export class AdminComponent implements OnInit, OnDestroy {
         }
 	    });
 	  }
+
+  private newNavigationId(prefix: string): string {
+    const rand = Math.random().toString(36).slice(2, 8);
+    return `${prefix}_${Date.now().toString(36)}_${rand}`;
+  }
+
+  private defaultNavigationForm(): {
+    header_links: Array<{ id: string; url: string; label: LocalizedText }>;
+    footer_handcrafted_links: Array<{ id: string; url: string; label: LocalizedText }>;
+    footer_legal_links: Array<{ id: string; url: string; label: LocalizedText }>;
+  } {
+    return {
+      header_links: [
+        { id: this.newNavigationId('nav'), url: '/', label: { en: 'Home', ro: 'Acasă' } },
+        { id: this.newNavigationId('nav'), url: '/blog', label: { en: 'Blog', ro: 'Blog' } },
+        { id: this.newNavigationId('nav'), url: '/shop', label: { en: 'Shop', ro: 'Magazin' } },
+        { id: this.newNavigationId('nav'), url: '/about', label: { en: 'Our story', ro: 'Povestea noastră' } },
+        { id: this.newNavigationId('nav'), url: '/contact', label: { en: 'Contact', ro: 'Contact' } },
+        { id: this.newNavigationId('nav'), url: '/pages/terms', label: { en: 'Terms & Conditions', ro: 'Termeni și condiții' } }
+      ],
+      footer_handcrafted_links: [
+        { id: this.newNavigationId('nav'), url: '/shop', label: { en: 'Shop', ro: 'Magazin' } },
+        { id: this.newNavigationId('nav'), url: '/about', label: { en: 'Our story', ro: 'Povestea noastră' } },
+        { id: this.newNavigationId('nav'), url: '/contact', label: { en: 'Contact', ro: 'Contact' } },
+        { id: this.newNavigationId('nav'), url: '/pages/terms', label: { en: 'Terms & Conditions', ro: 'Termeni și condiții' } }
+      ],
+      footer_legal_links: [
+        { id: this.newNavigationId('nav'), url: '/pages/terms', label: { en: 'Terms & Conditions', ro: 'Termeni și condiții' } },
+        { id: this.newNavigationId('nav'), url: '/pages/privacy-policy', label: { en: 'Privacy Policy', ro: 'Politica de confidențialitate' } },
+        { id: this.newNavigationId('nav'), url: '/pages/anpc', label: { en: 'ANPC', ro: 'ANPC' } }
+      ]
+    };
+  }
+
+  private parseNavigationLinks(value: unknown): Array<{ id: string; url: string; label: LocalizedText }> {
+    if (!Array.isArray(value)) return [];
+    const out: Array<{ id: string; url: string; label: LocalizedText }> = [];
+    const seen = new Set<string>();
+    for (const [idx, raw] of value.entries()) {
+      if (!raw || typeof raw !== 'object') continue;
+      const rec = raw as Record<string, unknown>;
+      const idRaw = typeof rec['id'] === 'string' ? rec['id'].trim() : '';
+      const url = typeof rec['url'] === 'string' ? rec['url'].trim() : '';
+      const labelRaw = rec['label'];
+      const labelRec = labelRaw && typeof labelRaw === 'object' ? (labelRaw as Record<string, unknown>) : {};
+      const en = typeof labelRec['en'] === 'string' ? labelRec['en'].trim() : '';
+      const ro = typeof labelRec['ro'] === 'string' ? labelRec['ro'].trim() : '';
+      if (!url || !en || !ro) continue;
+      const id = idRaw || `nav_${idx + 1}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      out.push({ id, url, label: { en, ro } });
+    }
+    return out;
+  }
+
+  loadNavigation(): void {
+    this.navigationError = null;
+    this.navigationMessage = null;
+    this.admin.getContent('site.navigation').subscribe({
+      next: (block) => {
+        this.rememberContentVersion('site.navigation', block);
+        const meta = (block.meta || {}) as Record<string, any>;
+        const header_links = this.parseNavigationLinks(meta['header_links']);
+        const footer_handcrafted_links = this.parseNavigationLinks(meta['footer_handcrafted_links']);
+        const footer_legal_links = this.parseNavigationLinks(meta['footer_legal_links']);
+        this.navigationForm = {
+          header_links,
+          footer_handcrafted_links,
+          footer_legal_links
+        };
+      },
+      error: () => {
+        delete this.contentVersions['site.navigation'];
+        this.navigationForm = this.defaultNavigationForm();
+      }
+    });
+  }
+
+  addNavigationLink(list: 'header' | 'footer_handcrafted' | 'footer_legal'): void {
+    const item = { id: this.newNavigationId('nav'), url: '', label: this.emptyLocalizedText() };
+    if (list === 'header') {
+      this.navigationForm.header_links = [...this.navigationForm.header_links, item];
+      return;
+    }
+    if (list === 'footer_handcrafted') {
+      this.navigationForm.footer_handcrafted_links = [...this.navigationForm.footer_handcrafted_links, item];
+      return;
+    }
+    this.navigationForm.footer_legal_links = [...this.navigationForm.footer_legal_links, item];
+  }
+
+  removeNavigationLink(list: 'header' | 'footer_handcrafted' | 'footer_legal', id: string): void {
+    const key = (id || '').trim();
+    if (!key) return;
+    if (list === 'header') {
+      this.navigationForm.header_links = this.navigationForm.header_links.filter((l) => l.id !== key);
+      return;
+    }
+    if (list === 'footer_handcrafted') {
+      this.navigationForm.footer_handcrafted_links = this.navigationForm.footer_handcrafted_links.filter((l) => l.id !== key);
+      return;
+    }
+    this.navigationForm.footer_legal_links = this.navigationForm.footer_legal_links.filter((l) => l.id !== key);
+  }
+
+  moveNavigationLink(list: 'header' | 'footer_handcrafted' | 'footer_legal', id: string, delta: number): void {
+    const key = (id || '').trim();
+    if (!key) return;
+    const items =
+      list === 'header'
+        ? [...this.navigationForm.header_links]
+        : list === 'footer_handcrafted'
+          ? [...this.navigationForm.footer_handcrafted_links]
+          : [...this.navigationForm.footer_legal_links];
+
+    const fromIdx = items.findIndex((l) => l.id === key);
+    const toIdx = fromIdx + delta;
+    if (fromIdx < 0 || toIdx < 0 || toIdx >= items.length) return;
+    const [moved] = items.splice(fromIdx, 1);
+    items.splice(toIdx, 0, moved);
+
+    if (list === 'header') this.navigationForm.header_links = items;
+    else if (list === 'footer_handcrafted') this.navigationForm.footer_handcrafted_links = items;
+    else this.navigationForm.footer_legal_links = items;
+  }
+
+  resetNavigationDefaults(): void {
+    if (!window.confirm(this.t('adminUi.site.navigation.confirms.resetDefaults'))) return;
+    this.navigationForm = this.defaultNavigationForm();
+    this.navigationError = null;
+    this.navigationMessage = null;
+  }
+
+  onNavigationDragStart(list: 'header' | 'footer_handcrafted' | 'footer_legal', id: string): void {
+    this.draggingNavList = list;
+    this.draggingNavId = (id || '').trim();
+  }
+
+  onNavigationDragOver(event: DragEvent): void {
+    event.preventDefault();
+  }
+
+  onNavigationDrop(list: 'header' | 'footer_handcrafted' | 'footer_legal', targetId: string): void {
+    const draggingList = this.draggingNavList;
+    const draggingId = (this.draggingNavId || '').trim();
+    const target = (targetId || '').trim();
+    if (!draggingList || !draggingId || draggingList !== list || draggingId === target) {
+      this.draggingNavList = null;
+      this.draggingNavId = null;
+      return;
+    }
+    const items =
+      list === 'header'
+        ? [...this.navigationForm.header_links]
+        : list === 'footer_handcrafted'
+          ? [...this.navigationForm.footer_handcrafted_links]
+          : [...this.navigationForm.footer_legal_links];
+    const fromIdx = items.findIndex((l) => l.id === draggingId);
+    const toIdx = items.findIndex((l) => l.id === target);
+    if (fromIdx < 0 || toIdx < 0) {
+      this.draggingNavList = null;
+      this.draggingNavId = null;
+      return;
+    }
+    const [moved] = items.splice(fromIdx, 1);
+    items.splice(toIdx, 0, moved);
+
+    if (list === 'header') this.navigationForm.header_links = items;
+    else if (list === 'footer_handcrafted') this.navigationForm.footer_handcrafted_links = items;
+    else this.navigationForm.footer_legal_links = items;
+
+    this.draggingNavList = null;
+    this.draggingNavId = null;
+  }
+
+  saveNavigation(): void {
+    this.navigationMessage = null;
+    this.navigationError = null;
+
+    const cleanList = (items: Array<{ id: string; url: string; label: LocalizedText }>) => {
+      const out: Array<{ id: string; url: string; label: LocalizedText }> = [];
+      let invalid = false;
+      const seen = new Set<string>();
+      for (const item of items) {
+        const id = (item?.id || '').trim() || this.newNavigationId('nav');
+        const url = (item?.url || '').trim();
+        const en = (item?.label?.en || '').trim();
+        const ro = (item?.label?.ro || '').trim();
+        const isBlank = !url && !en && !ro;
+        if (isBlank) continue;
+        if (!url || !en || !ro) {
+          invalid = true;
+          continue;
+        }
+        if (seen.has(id)) continue;
+        seen.add(id);
+        out.push({ id, url, label: { en, ro } });
+      }
+      return { out, invalid };
+    };
+
+    const header = cleanList(this.navigationForm.header_links);
+    const handcrafted = cleanList(this.navigationForm.footer_handcrafted_links);
+    const legal = cleanList(this.navigationForm.footer_legal_links);
+
+    if (header.invalid || handcrafted.invalid || legal.invalid) {
+      this.navigationError = this.t('adminUi.site.navigation.errors.invalid');
+      return;
+    }
+
+    const payload = {
+      title: 'Site navigation',
+      body_markdown: 'Header and footer navigation menus.',
+      status: 'published',
+      meta: {
+        version: 1,
+        header_links: header.out,
+        footer_handcrafted_links: handcrafted.out,
+        footer_legal_links: legal.out
+      }
+    };
+
+    const onSuccess = (block?: { version?: number } | null) => {
+      this.rememberContentVersion('site.navigation', block);
+      this.navigationMessage = this.t('adminUi.site.navigation.success.save');
+      this.navigationError = null;
+    };
+
+    this.admin.updateContentBlock('site.navigation', this.withExpectedVersion('site.navigation', payload)).subscribe({
+      next: (block) => onSuccess(block),
+      error: (err) => {
+        if (this.handleContentConflict(err, 'site.navigation', () => this.loadNavigation())) {
+          this.navigationError = this.t('adminUi.site.navigation.errors.save');
+          this.navigationMessage = null;
+          return;
+        }
+        this.admin.createContent('site.navigation', payload).subscribe({
+          next: (created) => onSuccess(created),
+          error: () => {
+            this.navigationError = this.t('adminUi.site.navigation.errors.save');
+            this.navigationMessage = null;
+          }
+        });
+      }
+    });
+  }
 
   private parseSocialPages(
     raw: unknown,
@@ -7296,44 +11491,100 @@ export class AdminComponent implements OnInit, OnDestroy {
     void loadKey('page.contact', 'contact');
   }
 
-	  saveInfo(key: 'page.about' | 'page.faq' | 'page.shipping' | 'page.contact', body: string): void {
-    this.infoMessage = null;
-    this.infoError = null;
+  saveInfoUi(key: 'page.about' | 'page.faq' | 'page.shipping' | 'page.contact', body: LocalizedText): void {
+    if (this.cmsPrefs.translationLayout() === 'sideBySide') {
+      this.saveInfoBoth(key, body);
+      return;
+    }
+    this.saveInfo(key, body[this.infoLang] || '', this.infoLang);
+  }
+
+  private saveInfoInternal(
+    key: 'page.about' | 'page.faq' | 'page.shipping' | 'page.contact',
+    body: string,
+    lang: UiLang,
+    onSuccess: () => void,
+    onError: () => void
+  ): void {
     const payload = {
       body_markdown: body,
       status: 'published',
-      lang: this.infoLang
-	    };
+      lang
+    };
     const createPayload = {
       title: key,
       ...payload
     };
-	    const onSuccess = (block?: any | null) => {
-        this.rememberContentVersion(key, block);
-        this.pageBlocksNeedsTranslationEn[key] = Boolean(block?.needs_translation_en);
-        this.pageBlocksNeedsTranslationRo[key] = Boolean(block?.needs_translation_ro);
-        this.loadContentPages();
-	      this.infoMessage = this.t('adminUi.site.pages.success.save');
-	      this.infoError = null;
-	    };
-	    this.admin.updateContentBlock(key, this.withExpectedVersion(key, payload)).subscribe({
-	      next: (block) => onSuccess(block),
-	      error: (err) => {
-          if (this.handleContentConflict(err, key, () => this.loadInfo())) {
+
+    const onSuccessWithBlock = (block?: any | null) => {
+      this.rememberContentVersion(key, block);
+      this.pageBlocksNeedsTranslationEn[key] = Boolean(block?.needs_translation_en);
+      this.pageBlocksNeedsTranslationRo[key] = Boolean(block?.needs_translation_ro);
+      this.loadContentPages();
+      onSuccess();
+    };
+
+    this.admin.updateContentBlock(key, this.withExpectedVersion(key, payload)).subscribe({
+      next: (block) => onSuccessWithBlock(block),
+      error: (err) => {
+        if (this.handleContentConflict(err, key, () => this.loadInfo())) {
+          onError();
+          return;
+        }
+        this.admin.createContent(key, createPayload).subscribe({
+          next: (created) => onSuccessWithBlock(created),
+          error: () => onError()
+        });
+      }
+    });
+  }
+
+  saveInfo(key: 'page.about' | 'page.faq' | 'page.shipping' | 'page.contact', body: string, lang: UiLang = this.infoLang): void {
+    this.infoMessage = null;
+    this.infoError = null;
+    this.saveInfoInternal(
+      key,
+      body,
+      lang,
+      () => {
+        this.infoMessage = this.t('adminUi.site.pages.success.save');
+        this.infoError = null;
+      },
+      () => {
+        this.infoError = this.t('adminUi.site.pages.errors.save');
+        this.infoMessage = null;
+      }
+    );
+  }
+
+  saveInfoBoth(key: 'page.about' | 'page.faq' | 'page.shipping' | 'page.contact', body: LocalizedText): void {
+    this.infoMessage = null;
+    this.infoError = null;
+    this.saveInfoInternal(
+      key,
+      body.en || '',
+      'en',
+      () => {
+        this.saveInfoInternal(
+          key,
+          body.ro || '',
+          'ro',
+          () => {
+            this.infoMessage = this.t('adminUi.site.pages.success.save');
+            this.infoError = null;
+          },
+          () => {
             this.infoError = this.t('adminUi.site.pages.errors.save');
             this.infoMessage = null;
-            return;
           }
-	        this.admin.createContent(key, createPayload).subscribe({
-	          next: (created) => onSuccess(created),
-	          error: () => {
-	            this.infoError = this.t('adminUi.site.pages.errors.save');
-	            this.infoMessage = null;
-	          }
-	        })
-        }
-	    });
-	  }
+        );
+      },
+      () => {
+        this.infoError = this.t('adminUi.site.pages.errors.save');
+        this.infoMessage = null;
+      }
+    );
+  }
 
   togglePageNeedsTranslation(pageKey: PageBuilderKey, lang: UiLang, event: Event): void {
     const key = (pageKey || '').trim();
@@ -7370,14 +11621,16 @@ export class AdminComponent implements OnInit, OnDestroy {
           this.pageBlocksNeedsTranslationEn[page.key] = Boolean(page.needs_translation_en);
           this.pageBlocksNeedsTranslationRo[page.key] = Boolean(page.needs_translation_ro);
         }
-        this.contentPagesLoading = false;
-        if (!this.contentPages.length) return;
-        const exists = this.contentPages.some((p) => p.key === this.pageBlocksKey);
-        if (!exists) {
-          const preferred = this.contentPages.find((p) => p.key === 'page.about')?.key || this.contentPages[0].key;
-          this.pageBlocksKey = preferred as PageBuilderKey;
-        }
-      },
+	        this.contentPagesLoading = false;
+	        if (!this.contentPages.length) return;
+	        if (isCmsGlobalSectionKey(this.pageBlocksKey)) return;
+	        const exists = this.contentPages.some((p) => p.key === this.pageBlocksKey);
+	        if (!exists) {
+	          const preferred = this.contentPages.find((p) => p.key === 'page.about')?.key || this.contentPages[0].key;
+	          this.pageBlocksKey = preferred as PageBuilderKey;
+	          this.ensureNewPageBlockTypeForKey(this.pageBlocksKey);
+	        }
+	      },
       error: () => {
         this.contentPagesLoading = false;
         this.contentPages = [];
@@ -7386,9 +11639,177 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
+  loadReusableBlocks(): void {
+    this.reusableBlocksLoading = true;
+    this.reusableBlocksError = null;
+    this.admin.getContent(this.reusableBlocksKey).subscribe({
+      next: (block) => {
+        this.rememberContentVersion(this.reusableBlocksKey, block);
+        this.reusableBlocksMeta = ((block as { meta?: Record<string, unknown> | null }).meta || {}) as Record<string, unknown>;
+        this.reusableBlocks = this.parseReusableBlocks(this.reusableBlocksMeta);
+        this.reusableBlocksExists = true;
+        this.reusableBlocksLoading = false;
+      },
+      error: (err) => {
+        this.reusableBlocksLoading = false;
+        if (err?.status === 404) {
+          delete this.contentVersions[this.reusableBlocksKey];
+          this.reusableBlocksMeta = {};
+          this.reusableBlocks = [];
+          this.reusableBlocksExists = false;
+          return;
+        }
+        this.reusableBlocksMeta = {};
+        this.reusableBlocks = [];
+        this.reusableBlocksExists = false;
+        this.reusableBlocksError = this.t('adminUi.content.reusableBlocks.errors.load');
+      }
+    });
+  }
+
+  filteredReusableBlocks(): CmsReusableBlock[] {
+    const query = (this.reusableBlocksQuery || '').trim().toLowerCase();
+    const base = [...(this.reusableBlocks || [])];
+    base.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+    if (!query) return base;
+    return base.filter((b) => (b.title || '').toLowerCase().includes(query) || (b.id || '').toLowerCase().includes(query));
+  }
+
+  savePageBlockAsReusable(pageKey: PageBuilderKey, blockKey: string): void {
+    const blocks = this.pageBlocks[pageKey] || [];
+    const target = blocks.find((b) => b.key === blockKey);
+    if (!target) return;
+
+    const defaultTitle = (target.title?.[this.infoLang] || target.title?.en || target.title?.ro || '').trim() || this.pageBlockLabel(target);
+    const title = (window.prompt(this.t('adminUi.content.reusableBlocks.prompts.name'), defaultTitle) || '').trim();
+    if (!title) return;
+
+    const idBase = this.slugifyReusableBlockId(title);
+    if (!idBase) return;
+    const existing = this.reusableBlocks.find((b) => b.id === idBase);
+    if (existing) {
+      const ok = window.confirm(this.t('adminUi.content.reusableBlocks.prompts.overwriteConfirm', { title: existing.title }));
+      if (!ok) return;
+    }
+
+    const { key: blockDraftKey, ...rest } = target;
+    void blockDraftKey;
+    const snapshot = this.deepCloneJson(rest) as Omit<PageBlockDraft, 'key'>;
+    snapshot.enabled = true;
+    snapshot.layout = this.toCmsBlockLayout(snapshot.layout);
+
+    const next: CmsReusableBlock = { id: idBase, title, block: snapshot };
+    const updated = existing ? this.reusableBlocks.map((b) => (b.id === idBase ? next : b)) : [...this.reusableBlocks, next];
+    this.persistReusableBlocks(updated, { successKey: 'adminUi.content.reusableBlocks.success.saved' });
+  }
+
+  insertReusableBlockIntoPage(pageKey: PageBuilderKey, id: string): void {
+    const found = this.reusableBlocks.find((b) => b.id === id);
+    if (!found) return;
+    const current = [...(this.pageBlocks[pageKey] || [])];
+    const existingKeys = new Set(current.map((b) => b.key));
+    const type = found.block.type;
+    const base = `${type}_${id}_${Date.now()}`;
+    let nextKey = base;
+    let suffix = 1;
+    while (existingKeys.has(nextKey)) {
+      nextKey = `${base}_${suffix++}`;
+    }
+
+    const snapshot = this.deepCloneJson(found.block) as Omit<PageBlockDraft, 'key'>;
+    const draft = { ...snapshot, key: nextKey, enabled: true, layout: this.toCmsBlockLayout(snapshot.layout) } satisfies PageBlockDraft;
+    current.push(draft);
+    this.pageBlocks[pageKey] = current;
+  }
+
+  deleteReusableBlock(id: string): void {
+    const found = this.reusableBlocks.find((b) => b.id === id);
+    if (!found) return;
+    const ok = window.confirm(this.t('adminUi.content.reusableBlocks.prompts.deleteConfirm', { title: found.title }));
+    if (!ok) return;
+    const updated = this.reusableBlocks.filter((b) => b.id !== id);
+    this.persistReusableBlocks(updated, { successKey: 'adminUi.content.reusableBlocks.success.deleted' });
+  }
+
+  private persistReusableBlocks(next: CmsReusableBlock[], opts?: { successKey?: string }): void {
+    const meta = { ...(this.reusableBlocksMeta || {}), snippets: next } as Record<string, unknown>;
+    const payload = this.withExpectedVersion(this.reusableBlocksKey, { meta });
+
+    const onSaved = (block: { version?: number; meta?: Record<string, unknown> | null } | null | undefined) => {
+      this.rememberContentVersion(this.reusableBlocksKey, block);
+      this.reusableBlocksMeta = ((block as { meta?: Record<string, unknown> | null }).meta || {}) as Record<string, unknown>;
+      this.reusableBlocks = this.parseReusableBlocks(this.reusableBlocksMeta);
+      this.reusableBlocksExists = true;
+      if (opts?.successKey) this.toast.success(this.t(opts.successKey));
+    };
+
+    const onError = (err: any) => {
+      if (this.handleContentConflict(err, this.reusableBlocksKey, () => this.loadReusableBlocks())) return;
+      this.toast.error(this.t('adminUi.content.reusableBlocks.errors.save'));
+    };
+
+    if (this.reusableBlocksExists) {
+      this.admin.updateContentBlock(this.reusableBlocksKey, payload).subscribe({ next: onSaved, error: onError });
+      return;
+    }
+
+    const createPayload = {
+      title: 'Reusable blocks',
+      body_markdown: 'Internal CMS reusable blocks storage.',
+      status: 'draft',
+      meta
+    };
+    this.admin.createContent(this.reusableBlocksKey, createPayload).subscribe({ next: onSaved, error: onError });
+  }
+
+  private parseReusableBlocks(meta: Record<string, unknown> | null | undefined): CmsReusableBlock[] {
+    const raw = meta?.['snippets'];
+    if (!Array.isArray(raw)) return [];
+    const parsed: CmsReusableBlock[] = [];
+    const seen = new Set<string>();
+    for (const item of raw) {
+      if (!item || typeof item !== 'object') continue;
+      const rec = item as Record<string, unknown>;
+      const id = typeof rec['id'] === 'string' ? rec['id'].trim() : '';
+      const title = typeof rec['title'] === 'string' ? rec['title'].trim() : '';
+      const block = rec['block'];
+      if (!id || !title || !block || typeof block !== 'object') continue;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      parsed.push({ id, title, block: block as Omit<PageBlockDraft, 'key'> });
+    }
+    return parsed;
+  }
+
+  private deepCloneJson<T>(value: T): T {
+    try {
+      return JSON.parse(JSON.stringify(value)) as T;
+    } catch {
+      return value;
+    }
+  }
+
+  private slugifyReusableBlockId(value: string): string {
+    const raw = (value || '').trim().toLowerCase();
+    if (!raw) return '';
+    const cleaned = raw
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .replace(/-+/g, '-');
+    return cleaned || '';
+  }
+
   onPageBlocksKeyChange(next: PageBuilderKey): void {
     if (!next || this.pageBlocksKey === next) return;
     this.pageBlocksKey = next;
+    this.pagePreviewForSlug = null;
+    this.pagePreviewToken = null;
+    this.pagePreviewExpiresAt = null;
+    this.pagePreviewOrigin = null;
+    this.pagePreviewNonce = 0;
+    this.ensureNewPageBlockTypeForKey(next);
     this.loadPageBlocks(next);
   }
 
@@ -7429,10 +11850,10 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
-  createCustomPage(): void {
-    const title = (this.newCustomPageTitle || '').trim();
-    if (!title) return;
-    const baseSlug = this.slugifyPageSlug(title);
+	  createCustomPage(): void {
+	    const title = (this.newCustomPageTitle || '').trim();
+	    if (!title) return;
+	    const baseSlug = this.slugifyPageSlug(title);
     if (this.isReservedPageSlug(baseSlug)) {
       this.toast.error(this.t('adminUi.site.pages.errors.reservedTitle'), this.t('adminUi.site.pages.errors.reservedCopy'));
       return;
@@ -7457,26 +11878,27 @@ export class AdminComponent implements OnInit, OnDestroy {
           ? new Date(this.newCustomPagePublishedUntil).toISOString()
           : null
         : null;
-    const payload = {
-      title,
-      body_markdown: 'Page builder',
-      status: this.newCustomPageStatus,
-      published_at,
-      published_until,
-      meta: { version: 2, blocks: [] }
-    };
+	    const payload = {
+	      title,
+	      body_markdown: 'Page builder',
+	      status: this.newCustomPageStatus,
+	      published_at,
+	      published_until,
+	      meta: { version: 2, blocks: this.pageTemplateBlocks(this.newCustomPageTemplate) }
+	    };
     const done = () => {
       this.creatingCustomPage = false;
     };
     this.admin.createContent(key, payload).subscribe({
-      next: () => {
-        done();
-        this.toast.success(this.t('adminUi.site.pages.success.created'));
-        this.newCustomPageTitle = '';
-        this.newCustomPageStatus = 'draft';
-        this.newCustomPagePublishedAt = '';
-        this.newCustomPagePublishedUntil = '';
-        this.loadContentPages();
+	      next: () => {
+	        done();
+	        this.toast.success(this.t('adminUi.site.pages.success.created'));
+	        this.newCustomPageTitle = '';
+	        this.newCustomPageTemplate = 'blank';
+	        this.newCustomPageStatus = 'draft';
+	        this.newCustomPagePublishedAt = '';
+	        this.newCustomPagePublishedUntil = '';
+	        this.loadContentPages();
         this.pageBlocksKey = key;
         this.loadPageBlocks(key);
       },
@@ -7486,11 +11908,115 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.toast.error(detail || this.t('adminUi.site.pages.errors.create'));
       }
     });
-  }
+	  }
 
-  loadContentRedirects(reset: boolean = false): void {
-    if (reset) {
-      this.redirectsMeta = { ...this.redirectsMeta, page: 1 };
+	  private pageTemplateBlocks(template: PageCreationTemplate): Array<Record<string, unknown>> {
+	    const prose: CmsBlockLayout = { spacing: 'none', background: 'none', align: 'left', max_width: 'prose' };
+	    const textBlock = (
+	      key: string,
+	      titleEn: string,
+	      titleRo: string,
+	      bodyEn: string,
+	      bodyRo: string,
+	      layout: CmsBlockLayout = prose
+	    ): Record<string, unknown> => ({
+	      key,
+	      type: 'text',
+	      enabled: true,
+	      title: { en: titleEn, ro: titleRo },
+	      body_markdown: { en: bodyEn, ro: bodyRo },
+	      layout
+	    });
+
+	    if (template === 'about') {
+	      return [
+	        textBlock(
+	          'about_intro',
+	          'Our story',
+	          'Povestea noastră',
+	          `Write a short introduction about who you are and what you make.\n\n- Where are you based?\n- What inspires your work?\n- What materials do you use?`,
+	          `Scrie o introducere scurtă despre cine ești și ce creezi.\n\n- Unde lucrezi?\n- Ce te inspiră?\n- Ce materiale folosești?`
+	        ),
+	        textBlock(
+	          'about_process',
+	          "How it's made",
+	          'Cum este realizat',
+	          `Describe your process step by step.\n\n1. Idea & sketch\n2. Materials\n3. Crafting\n4. Finishing touches`,
+	          `Descrie procesul pas cu pas.\n\n1. Idee și schiță\n2. Materiale\n3. Realizare\n4. Finisaje`
+	        ),
+	        textBlock(
+	          'about_care',
+	          'Care & longevity',
+	          'Îngrijire și durabilitate',
+	          `Add care instructions and tips to keep items looking great.\n\nTip: link to your Care page if you have one.`,
+	          `Adaugă instrucțiuni de îngrijire și sfaturi pentru păstrarea produselor.\n\nSfat: adaugă un link către pagina de Îngrijire dacă există.`
+	        )
+	      ];
+	    }
+
+	    if (template === 'faq') {
+	      return [
+	        textBlock(
+	          'faq_intro',
+	          'Frequently asked questions',
+	          'Întrebări frecvente',
+	          `Add your FAQs here.\n\n### How long does shipping take?\nAnswer...\n\n### Do you take custom orders?\nAnswer...\n\n### How can I contact you?\nAnswer...`,
+	          `Adaugă aici întrebările frecvente.\n\n### Cât durează livrarea?\nRăspuns...\n\n### Realizezi comenzi personalizate?\nRăspuns...\n\n### Cum te pot contacta?\nRăspuns...`
+	        ),
+	        textBlock(
+	          'faq_policies',
+	          'Policies',
+	          'Politici',
+	          `### Returns & cancellations\nAnswer...\n\n### Payments\nAnswer...`,
+	          `### Returnări și anulări\nRăspuns...\n\n### Plăți\nRăspuns...`
+	        )
+	      ];
+	    }
+
+	    if (template === 'shipping') {
+	      return [
+	        textBlock(
+	          'shipping_rates',
+	          'Shipping',
+	          'Livrare',
+	          `Explain shipping zones, pricing, and estimated delivery times.\n\n- Processing time: ...\n- Delivery time: ...\n- Courier: ...`,
+	          `Explică zonele de livrare, costurile și timpul estimat.\n\n- Timp de procesare: ...\n- Timp de livrare: ...\n- Curier: ...`
+	        ),
+	        textBlock(
+	          'shipping_tracking',
+	          'Tracking & delivery issues',
+	          'Urmărire și probleme la livrare',
+	          `Explain tracking, failed delivery attempts, and how customers can get help.\n\nEmail: ...\nPhone: ...`,
+	          `Explică urmărirea coletului, tentativele eșuate și cum poate clientul primi ajutor.\n\nEmail: ...\nTelefon: ...`
+	        )
+	      ];
+	    }
+
+	    if (template === 'returns') {
+	      return [
+	        textBlock(
+	          'returns_policy',
+	          'Returns & cancellations',
+	          'Returnări și anulări',
+	          `Explain your return window, condition requirements, and cancellation policy.\n\n- Window: ... days\n- Condition: ...\n- How to start a return: ...`,
+	          `Explică perioada de retur, condițiile produsului și politica de anulare.\n\n- Perioadă: ... zile\n- Condiție: ...\n- Cum începi un retur: ...`
+	        ),
+	        textBlock(
+	          'returns_refunds',
+	          'Refunds',
+	          'Rambursări',
+	          `Explain how refunds are issued and typical timelines.\n\n- Payment method: ...\n- Timeline: ...`,
+	          `Explică modul de rambursare și termenele obișnuite.\n\n- Metodă de plată: ...\n- Termen: ...`
+	        )
+	      ];
+	    }
+
+	    return [];
+	  }
+
+	  loadContentRedirects(reset: boolean = false): void {
+	    if (reset) {
+	      this.redirectsMeta = { ...this.redirectsMeta, page: 1 };
     }
     this.redirectsLoading = true;
     this.redirectsError = null;
@@ -7588,6 +12114,133 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
+  createContentRedirect(): void {
+    if (this.redirectCreateSaving) return;
+    const from = (this.redirectCreateFrom || '').trim();
+    const to = (this.redirectCreateTo || '').trim();
+    if (!from || !to) return;
+
+    this.redirectCreateSaving = true;
+    this.admin.upsertContentRedirect({ from_key: from, to_key: to }).subscribe({
+      next: () => {
+        this.redirectCreateSaving = false;
+        this.redirectCreateFrom = '';
+        this.redirectCreateTo = '';
+        this.toast.success(this.t('adminUi.site.pages.redirects.success.created'));
+        this.loadContentRedirects(true);
+      },
+      error: (err) => {
+        const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
+        this.redirectCreateSaving = false;
+        this.toast.error(detail || this.t('adminUi.site.pages.redirects.errors.create'));
+      }
+    });
+  }
+
+  private findReplaceKeyPrefix(): string | undefined {
+    if (this.findReplaceScope === 'blog') return 'blog.';
+    if (this.findReplaceScope === 'home') return 'home.';
+    if (this.findReplaceScope === 'site') return 'site.';
+    if (this.findReplaceScope === 'pages') return 'page.';
+    return undefined;
+  }
+
+  private findReplacePayloadKey(payload: { find: string; replace: string; key_prefix?: string | null; case_sensitive: boolean }): string {
+    return JSON.stringify({
+      find: payload.find,
+      replace: payload.replace,
+      key_prefix: payload.key_prefix ?? null,
+      case_sensitive: payload.case_sensitive
+    });
+  }
+
+  previewFindReplace(): void {
+    if (this.findReplaceLoading || this.findReplaceApplying) return;
+    const find = (this.findReplaceFind || '').trim();
+    if (!find) {
+      this.toast.error(this.t('adminUi.content.findReplace.errors.findRequired'));
+      return;
+    }
+    const payload = {
+      find,
+      replace: this.findReplaceReplace || '',
+      key_prefix: this.findReplaceKeyPrefix() ?? undefined,
+      case_sensitive: this.findReplaceCaseSensitive,
+      limit: 200
+    };
+
+    this.findReplaceLoading = true;
+    this.findReplaceError = null;
+    this.findReplacePreview = null;
+    this.findReplaceApplyResult = null;
+    this.findReplacePreviewKey = null;
+
+    this.admin.previewFindReplaceContent(payload).subscribe({
+      next: (res) => {
+        this.findReplacePreview = res || null;
+        this.findReplaceLoading = false;
+        this.findReplacePreviewKey = this.findReplacePayloadKey({
+          find: payload.find,
+          replace: payload.replace,
+          key_prefix: payload.key_prefix ?? null,
+          case_sensitive: payload.case_sensitive
+        });
+      },
+      error: (err) => {
+        const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
+        this.findReplaceError = detail || this.t('adminUi.content.findReplace.errors.preview');
+        this.findReplacePreview = null;
+        this.findReplaceLoading = false;
+      }
+    });
+  }
+
+  applyFindReplace(): void {
+    if (this.findReplaceLoading || this.findReplaceApplying) return;
+    const find = (this.findReplaceFind || '').trim();
+    if (!find) {
+      this.toast.error(this.t('adminUi.content.findReplace.errors.findRequired'));
+      return;
+    }
+    const payload = {
+      find,
+      replace: this.findReplaceReplace || '',
+      key_prefix: this.findReplaceKeyPrefix() ?? undefined,
+      case_sensitive: this.findReplaceCaseSensitive
+    };
+    const key = this.findReplacePayloadKey(payload);
+
+    if (!this.findReplacePreview || this.findReplacePreviewKey !== key) {
+      this.toast.error(this.t('adminUi.content.findReplace.errors.previewFirst'));
+      return;
+    }
+
+    const items = this.findReplacePreview.total_items || 0;
+    const matches = this.findReplacePreview.total_matches || 0;
+    if (!window.confirm(this.t('adminUi.content.findReplace.confirms.apply', { items, matches }))) return;
+
+    this.findReplaceApplying = true;
+    this.findReplaceError = null;
+
+    this.admin.applyFindReplaceContent(payload).subscribe({
+      next: (res) => {
+        this.findReplaceApplyResult = res || null;
+        this.findReplaceApplying = false;
+        this.toast.success(
+          this.t('adminUi.content.findReplace.success.apply', {
+            blocks: res?.updated_blocks ?? 0,
+            replacements: res?.total_replacements ?? 0
+          })
+        );
+      },
+      error: (err) => {
+        const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
+        this.findReplaceApplying = false;
+        this.toast.error(detail || this.t('adminUi.content.findReplace.errors.apply'));
+      }
+    });
+  }
+
   runLinkCheck(keyOverride?: string): void {
     const key = (keyOverride ?? this.linkCheckKey ?? '').trim();
     if (!key) return;
@@ -7616,6 +12269,44 @@ export class AdminComponent implements OnInit, OnDestroy {
       return `/pages/${slug}`;
     }
     return value;
+  }
+
+  pageKeySupportsRequiresAuth(key: string): boolean {
+    return (key || '').trim().startsWith('page.');
+  }
+
+  pageBlockTypeLabelKey(type: PageBlockType): string {
+    if (type === 'image') return 'adminUi.home.sections.blocks.image';
+    if (type === 'columns') return 'adminUi.home.sections.blocks.columns';
+    if (type === 'cta') return 'adminUi.home.sections.blocks.cta';
+    if (type === 'faq') return 'adminUi.home.sections.blocks.faq';
+    if (type === 'testimonials') return 'adminUi.home.sections.blocks.testimonials';
+    if (type === 'product_grid') return 'adminUi.home.sections.blocks.product_grid';
+    if (type === 'form') return 'adminUi.home.sections.blocks.form';
+    if (type === 'gallery') return 'adminUi.home.sections.blocks.gallery';
+    if (type === 'banner') return 'adminUi.home.sections.blocks.banner';
+    if (type === 'carousel') return 'adminUi.home.sections.blocks.carousel';
+    return 'adminUi.home.sections.blocks.text';
+  }
+
+  allowedPageBlockTypesForKey(pageKey: PageBuilderKey): PageBlockType[] {
+    const allowed = cmsGlobalSectionAllowedTypes(pageKey);
+    if (allowed && allowed.length) return [...allowed] as PageBlockType[];
+    return this.allPageBlockTypes;
+  }
+
+  allowedCmsLibraryTypes(pageKey: PageBuilderKey): ReadonlyArray<CmsBlockLibraryBlockType> | null {
+    const allowed = cmsGlobalSectionAllowedTypes(pageKey);
+    if (!allowed || !allowed.length) return null;
+    return allowed as ReadonlyArray<CmsBlockLibraryBlockType>;
+  }
+
+  private ensureNewPageBlockTypeForKey(pageKey: PageBuilderKey): void {
+    const allowed = this.allowedPageBlockTypesForKey(pageKey);
+    if (!allowed.length) return;
+    if (!allowed.includes(this.newPageBlockType)) {
+      this.newPageBlockType = allowed[0];
+    }
   }
 
   canRenamePageKey(key: string): boolean {
@@ -7653,6 +12344,20 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.pageBlocksKey = res.new_key as PageBuilderKey;
         this.loadContentPages();
         this.loadPageBlocks(this.pageBlocksKey);
+        const wantRedirect = window.confirm(
+          this.t('adminUi.site.pages.builder.redirectConfirm', { old: oldSlug, next: nextSlug })
+        );
+        if (!wantRedirect) return;
+        this.admin.upsertContentRedirect({ from_key: res.old_key, to_key: res.new_key }).subscribe({
+          next: () => {
+            this.toast.success(this.t('adminUi.site.pages.redirects.success.created'));
+            this.loadContentRedirects(true);
+          },
+          error: (err) => {
+            const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
+            this.toast.error(detail || this.t('adminUi.site.pages.redirects.errors.create'));
+          }
+        });
       },
       error: (err) => {
         const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
@@ -7712,6 +12417,12 @@ export class AdminComponent implements OnInit, OnDestroy {
       const typeRaw = typeof rec['type'] === 'string' ? String(rec['type']).trim() : '';
       if (
         typeRaw !== 'text' &&
+        typeRaw !== 'columns' &&
+        typeRaw !== 'cta' &&
+        typeRaw !== 'faq' &&
+        typeRaw !== 'testimonials' &&
+        typeRaw !== 'product_grid' &&
+        typeRaw !== 'form' &&
         typeRaw !== 'image' &&
         typeRaw !== 'gallery' &&
         typeRaw !== 'banner' &&
@@ -7731,6 +12442,23 @@ export class AdminComponent implements OnInit, OnDestroy {
         enabled,
         title: this.toLocalizedText(rec['title']),
         body_markdown: this.emptyLocalizedText(),
+        columns: [
+          { title: this.emptyLocalizedText(), body_markdown: this.emptyLocalizedText() },
+          { title: this.emptyLocalizedText(), body_markdown: this.emptyLocalizedText() }
+        ],
+        columns_breakpoint: 'md',
+        cta_label: this.emptyLocalizedText(),
+        cta_url: '',
+        cta_new_tab: false,
+        faq_items: [{ question: this.emptyLocalizedText(), answer_markdown: this.emptyLocalizedText() }],
+        testimonials: [{ quote_markdown: this.emptyLocalizedText(), author: this.emptyLocalizedText(), role: this.emptyLocalizedText() }],
+        product_grid_source: 'category',
+        product_grid_category_slug: '',
+        product_grid_collection_slug: '',
+        product_grid_product_slugs: '',
+        product_grid_limit: 6,
+        form_type: 'contact',
+        form_topic: 'contact',
         url: '',
         link_url: '',
         focal_x: 50,
@@ -7740,11 +12468,99 @@ export class AdminComponent implements OnInit, OnDestroy {
         images: [],
         slide: this.emptySlideDraft(),
         slides: [this.emptySlideDraft()],
-        settings: this.defaultCarouselSettings()
+        settings: this.defaultCarouselSettings(),
+        layout: this.toCmsBlockLayout(rec['layout'])
       };
 
       if (typeRaw === 'text') {
         draft.body_markdown = this.toLocalizedText(rec['body_markdown']);
+      } else if (typeRaw === 'columns') {
+        const columnsRaw = rec['columns'];
+        const cols: CmsColumnsColumnDraft[] = [];
+        if (Array.isArray(columnsRaw)) {
+          for (const colRaw of columnsRaw) {
+            if (!colRaw || typeof colRaw !== 'object') continue;
+            const colRec = colRaw as Record<string, unknown>;
+            cols.push({
+              title: this.toLocalizedText(colRec['title']),
+              body_markdown: this.toLocalizedText(colRec['body_markdown'])
+            });
+            if (cols.length >= 3) break;
+          }
+        }
+        if (cols.length >= 2) draft.columns = cols;
+        const bpRaw = rec['columns_breakpoint'] ?? rec['breakpoint'] ?? rec['stack_at'];
+        const bp = typeof bpRaw === 'string' ? String(bpRaw).trim() : '';
+        draft.columns_breakpoint = bp === 'sm' || bp === 'md' || bp === 'lg' ? bp : 'md';
+      } else if (typeRaw === 'cta') {
+        draft.body_markdown = this.toLocalizedText(rec['body_markdown']);
+        draft.cta_label = this.toLocalizedText(rec['cta_label']);
+        draft.cta_url = typeof rec['cta_url'] === 'string' ? String(rec['cta_url']).trim() : '';
+        draft.cta_new_tab = this.toBooleanValue(rec['cta_new_tab'], false);
+      } else if (typeRaw === 'faq') {
+        const itemsRaw = rec['items'];
+        const items: CmsFaqItemDraft[] = [];
+        if (Array.isArray(itemsRaw)) {
+          for (const itemRaw of itemsRaw) {
+            if (!itemRaw || typeof itemRaw !== 'object') continue;
+            const itemRec = itemRaw as Record<string, unknown>;
+            items.push({
+              question: this.toLocalizedText(itemRec['question']),
+              answer_markdown: this.toLocalizedText(itemRec['answer_markdown'])
+            });
+            if (items.length >= 20) break;
+          }
+        }
+        if (items.length) draft.faq_items = items;
+      } else if (typeRaw === 'testimonials') {
+        const itemsRaw = rec['items'];
+        const items: CmsTestimonialDraft[] = [];
+        if (Array.isArray(itemsRaw)) {
+          for (const itemRaw of itemsRaw) {
+            if (!itemRaw || typeof itemRaw !== 'object') continue;
+            const itemRec = itemRaw as Record<string, unknown>;
+            items.push({
+              quote_markdown: this.toLocalizedText(itemRec['quote_markdown']),
+              author: this.toLocalizedText(itemRec['author']),
+              role: this.toLocalizedText(itemRec['role'])
+            });
+            if (items.length >= 12) break;
+          }
+        }
+        if (items.length) draft.testimonials = items;
+      } else if (typeRaw === 'product_grid') {
+        const sourceRaw = typeof rec['source'] === 'string' ? String(rec['source']).trim().toLowerCase() : '';
+        draft.product_grid_source = sourceRaw === 'collection' ? 'collection' : sourceRaw === 'products' ? 'products' : 'category';
+        draft.product_grid_category_slug = typeof rec['category_slug'] === 'string' ? String(rec['category_slug']).trim() : '';
+        draft.product_grid_collection_slug = typeof rec['collection_slug'] === 'string' ? String(rec['collection_slug']).trim() : '';
+        const slugsRaw = rec['product_slugs'];
+        const slugs: string[] = [];
+        const pushSlug = (value: string) => {
+          const cleaned = value.trim();
+          if (!cleaned) return;
+          if (slugs.includes(cleaned)) return;
+          slugs.push(cleaned);
+        };
+        if (Array.isArray(slugsRaw)) {
+          for (const item of slugsRaw) {
+            if (typeof item !== 'string') continue;
+            pushSlug(item);
+            if (slugs.length >= 50) break;
+          }
+        } else if (typeof slugsRaw === 'string') {
+          for (const part of slugsRaw.split(/[,\n]/g)) {
+            pushSlug(part);
+            if (slugs.length >= 50) break;
+          }
+        }
+        draft.product_grid_product_slugs = slugs.join('\n');
+        const desired = Number(rec['limit']);
+        draft.product_grid_limit = Number.isFinite(desired) ? Math.max(1, Math.min(24, Math.trunc(desired))) : 6;
+      } else if (typeRaw === 'form') {
+        const formTypeRaw = typeof rec['form_type'] === 'string' ? String(rec['form_type']).trim().toLowerCase() : '';
+        draft.form_type = formTypeRaw === 'newsletter' ? 'newsletter' : 'contact';
+        const topicRaw = typeof rec['topic'] === 'string' ? String(rec['topic']).trim().toLowerCase() : '';
+        draft.form_topic = topicRaw === 'support' || topicRaw === 'refund' || topicRaw === 'dispute' ? (topicRaw as CmsContactTopic) : 'contact';
       } else if (typeRaw === 'image') {
         draft.url = typeof rec['url'] === 'string' ? String(rec['url']).trim() : '';
         draft.link_url = typeof rec['link_url'] === 'string' ? String(rec['link_url']).trim() : '';
@@ -7796,10 +12612,16 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.insertPageBlockAt(pageKey, type, current.length, template);
   }
 
-  private insertPageBlockAt(pageKey: PageBuilderKey, type: CmsBlockLibraryBlockType, index: number, template: CmsBlockLibraryTemplate): void {
-    const current = [...(this.pageBlocks[pageKey] || [])];
-    const existing = new Set(current.map((b) => b.key));
-    const base = `${type}_${Date.now()}`;
+	  private insertPageBlockAt(pageKey: PageBuilderKey, type: CmsBlockLibraryBlockType, index: number, template: CmsBlockLibraryTemplate): string | null {
+	    const allowed = this.allowedPageBlockTypesForKey(pageKey);
+	    if (allowed.length && !allowed.includes(type as PageBlockType)) {
+	      this.toast.error(this.t('adminUi.site.pages.builder.errors.blockTypeNotAllowed'));
+	      return null;
+	    }
+
+	    const current = [...(this.pageBlocks[pageKey] || [])];
+	    const existing = new Set(current.map((b) => b.key));
+	    const base = `${type}_${Date.now()}`;
     let key = base;
     let suffix = 1;
     while (existing.has(key)) {
@@ -7811,6 +12633,23 @@ export class AdminComponent implements OnInit, OnDestroy {
       enabled: true,
       title: this.emptyLocalizedText(),
       body_markdown: this.emptyLocalizedText(),
+      columns: [
+        { title: this.emptyLocalizedText(), body_markdown: this.emptyLocalizedText() },
+        { title: this.emptyLocalizedText(), body_markdown: this.emptyLocalizedText() }
+      ],
+      columns_breakpoint: 'md',
+      cta_label: this.emptyLocalizedText(),
+      cta_url: '',
+      cta_new_tab: false,
+      faq_items: [{ question: this.emptyLocalizedText(), answer_markdown: this.emptyLocalizedText() }],
+      testimonials: [{ quote_markdown: this.emptyLocalizedText(), author: this.emptyLocalizedText(), role: this.emptyLocalizedText() }],
+      product_grid_source: 'category',
+      product_grid_category_slug: '',
+      product_grid_collection_slug: '',
+      product_grid_product_slugs: '',
+      product_grid_limit: 6,
+      form_type: 'contact',
+      form_topic: 'contact',
       url: '',
       link_url: '',
       focal_x: 50,
@@ -7820,22 +12659,94 @@ export class AdminComponent implements OnInit, OnDestroy {
       images: [],
       slide: this.emptySlideDraft(),
       slides: [this.emptySlideDraft()],
-      settings: this.defaultCarouselSettings()
+      settings: this.defaultCarouselSettings(),
+      layout: this.defaultCmsBlockLayout()
     };
 
     if (template === 'starter') {
       this.applyStarterTemplateToCustomBlock(type, draft);
     }
 
-    const safeIndex = Math.max(0, Math.min(index, current.length));
-    current.splice(safeIndex, 0, draft);
-    this.pageBlocks[pageKey] = current;
-  }
+	    const safeIndex = Math.max(0, Math.min(index, current.length));
+	    current.splice(safeIndex, 0, draft);
+	    this.pageBlocks[pageKey] = current;
+	    return key;
+	  }
 
   private applyStarterTemplateToCustomBlock(type: CmsBlockLibraryBlockType, block: PageBlockDraft | HomeBlockDraft): void {
     if (type === 'text') {
       block.title = { en: 'Section title', ro: 'Titlu secțiune' };
       block.body_markdown = { en: 'Write your content here...', ro: 'Scrie conținutul aici...' };
+      return;
+    }
+
+    if (type === 'columns') {
+      block.title = { en: 'Columns', ro: 'Coloane' };
+      block.columns_breakpoint = 'md';
+      block.columns = [
+        {
+          title: { en: 'Column 1', ro: 'Coloana 1' },
+          body_markdown: { en: 'Add text here…', ro: 'Adaugă text aici…' }
+        },
+        {
+          title: { en: 'Column 2', ro: 'Coloana 2' },
+          body_markdown: { en: 'Add text here…', ro: 'Adaugă text aici…' }
+        }
+      ];
+      return;
+    }
+
+    if (type === 'cta') {
+      block.title = { en: 'Call to action', ro: 'Apel la acțiune' };
+      block.body_markdown = { en: 'Add a short message and a button.', ro: 'Adaugă un mesaj scurt și un buton.' };
+      block.cta_label = { en: 'Shop now', ro: 'Cumpără acum' };
+      block.cta_url = '/shop';
+      return;
+    }
+
+    if (type === 'faq') {
+      block.title = { en: 'FAQ', ro: 'Întrebări frecvente' };
+      block.faq_items = [
+        {
+          question: { en: 'How long does shipping take?', ro: 'Cât durează livrarea?' },
+          answer_markdown: { en: 'Usually 1–3 business days.', ro: 'De obicei 1–3 zile lucrătoare.' }
+        },
+        {
+          question: { en: 'Can I return an item?', ro: 'Pot returna un produs?' },
+          answer_markdown: { en: 'Yes. Please contact us for details.', ro: 'Da. Te rugăm să ne contactezi pentru detalii.' }
+        }
+      ];
+      return;
+    }
+
+    if (type === 'testimonials') {
+      block.title = { en: 'Testimonials', ro: 'Testimoniale' };
+      block.testimonials = [
+        {
+          quote_markdown: { en: '“Amazing quality and fast delivery.”', ro: '„Calitate excelentă și livrare rapidă.”' },
+          author: { en: 'Customer name', ro: 'Nume client' },
+          role: { en: 'Verified buyer', ro: 'Client verificat' }
+        },
+        {
+          quote_markdown: { en: '“Beautiful craftsmanship.”', ro: '„Măiestrie deosebită.”' },
+          author: { en: 'Customer name', ro: 'Nume client' },
+          role: { en: 'Verified buyer', ro: 'Client verificat' }
+        }
+      ];
+      return;
+    }
+
+    if (type === 'product_grid') {
+      block.title = { en: 'Shoppable grid', ro: 'Grilă de produse' };
+      block.product_grid_source = 'category';
+      block.product_grid_limit = 6;
+      return;
+    }
+
+    if (type === 'form') {
+      block.title = { en: 'Contact form', ro: 'Formular de contact' };
+      block.form_type = 'contact';
+      block.form_topic = 'contact';
       return;
     }
 
@@ -7899,7 +12810,21 @@ export class AdminComponent implements OnInit, OnDestroy {
       const scope = parsed.scope;
       if (scope !== 'home' && scope !== 'page') return null;
       const type = parsed.type;
-      if (type !== 'text' && type !== 'image' && type !== 'gallery' && type !== 'banner' && type !== 'carousel') return null;
+       if (
+         type !== 'text' &&
+         type !== 'columns' &&
+         type !== 'cta' &&
+         type !== 'faq' &&
+         type !== 'testimonials' &&
+         type !== 'product_grid' &&
+         type !== 'form' &&
+         type !== 'image' &&
+         type !== 'gallery' &&
+         type !== 'banner' &&
+         type !== 'carousel'
+       ) {
+        return null;
+      }
       const template = parsed.template === 'starter' ? 'starter' : 'blank';
       return { scope, type, template };
     } catch {
@@ -7954,13 +12879,38 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.pageInsertDragActive = false;
   }
 
-  onPageBlockDragOver(event: DragEvent): void {
-    event.preventDefault();
-  }
+	  onPageBlockDragOver(event: DragEvent): void {
+	    event.preventDefault();
+	  }
 
-  onPageBlockDropZone(event: DragEvent, pageKey: PageBuilderKey, index: number): void {
-    event.preventDefault();
-    const current = [...(this.pageBlocks[pageKey] || [])];
+	  onCmsMediaDragOver(event: DragEvent): void {
+	    if (!this.dragEventHasFiles(event)) return;
+	    event.preventDefault();
+	    if (event.dataTransfer) {
+	      event.dataTransfer.dropEffect = 'copy';
+	    }
+	  }
+
+	  onPageMediaDropOnContainer(event: DragEvent, pageKey: PageBuilderKey): void {
+	    if (event.target !== event.currentTarget) return;
+	    const files = this.extractCmsImageFiles(event);
+	    if (!files.length) return;
+	    event.preventDefault();
+	    const index = (this.pageBlocks[pageKey] || []).length;
+	    void this.insertPageMediaFiles(pageKey, index, files);
+	  }
+
+	  onHomeMediaDropOnContainer(event: DragEvent): void {
+	    if (event.target !== event.currentTarget) return;
+	    const files = this.extractCmsImageFiles(event);
+	    if (!files.length) return;
+	    event.preventDefault();
+	    void this.insertHomeMediaFiles(this.homeBlocks.length, files);
+	  }
+
+	  onPageBlockDropZone(event: DragEvent, pageKey: PageBuilderKey, index: number): void {
+	    event.preventDefault();
+	    const current = [...(this.pageBlocks[pageKey] || [])];
 
     if (this.draggingPageBlocksKey === pageKey && this.draggingPageBlockKey) {
       const from = current.findIndex((b) => b.key === this.draggingPageBlockKey);
@@ -7983,18 +12933,28 @@ export class AdminComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.insertPageBlockAt(pageKey, payload.type, index, payload.template);
-    this.pageInsertDragActive = false;
-  }
+	    this.insertPageBlockAt(pageKey, payload.type, index, payload.template);
+	    this.pageInsertDragActive = false;
+	  }
 
-  onPageBlockDrop(event: DragEvent, pageKey: PageBuilderKey, targetKey: string): void {
-    event.preventDefault();
+	  onPageBlockDrop(event: DragEvent, pageKey: PageBuilderKey, targetKey: string): void {
+	    event.preventDefault();
 
-    const payload = this.readCmsBlockPayload(event);
-    if (payload && payload.scope === 'page') {
-      const current = [...(this.pageBlocks[pageKey] || [])];
-      const to = current.findIndex((b) => b.key === targetKey);
-      if (to !== -1) {
+	    const mediaFiles = this.extractCmsImageFiles(event);
+	    if (mediaFiles.length) {
+	      const current = [...(this.pageBlocks[pageKey] || [])];
+	      const to = current.findIndex((b) => b.key === targetKey);
+	      const safeIndex = to !== -1 ? to : current.length;
+	      void this.insertPageMediaFiles(pageKey, safeIndex, mediaFiles);
+	      this.pageInsertDragActive = false;
+	      return;
+	    }
+
+	    const payload = this.readCmsBlockPayload(event);
+	    if (payload && payload.scope === 'page') {
+	      const current = [...(this.pageBlocks[pageKey] || [])];
+	      const to = current.findIndex((b) => b.key === targetKey);
+	      if (to !== -1) {
         this.insertPageBlockAt(pageKey, payload.type, to, payload.template);
       }
       this.pageInsertDragActive = false;
@@ -8015,11 +12975,222 @@ export class AdminComponent implements OnInit, OnDestroy {
     current.splice(nextIndex, 0, moved);
     this.pageBlocks[pageKey] = current;
     this.onPageBlockDragEnd();
-  }
+	  }
 
-  setPageImageBlockUrl(pageKey: PageBuilderKey, blockKey: string, asset: ContentImageAssetRead): void {
-    const value = (asset?.url || '').trim();
-    if (!value) return;
+	  private dragEventHasFiles(event: DragEvent): boolean {
+	    const dt = event.dataTransfer;
+	    if (!dt) return false;
+	    if (dt.files && dt.files.length > 0) return true;
+	    try {
+	      return Array.from(dt.types || []).includes('Files');
+	    } catch {
+	      return false;
+	    }
+	  }
+
+	  private extractCmsImageFiles(event: DragEvent): File[] {
+	    const dt = event.dataTransfer;
+	    if (!dt) return [];
+	    const files = Array.from(dt.files || []);
+	    return files.filter((f) => Boolean(f));
+	  }
+
+	  private normalizeCmsImageFiles(files: File[]): File[] {
+	    const allowed = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+	    const maxBytes = 5 * 1024 * 1024;
+	    const cleaned = (files || []).filter((f) => f && allowed.has(f.type) && f.size <= maxBytes);
+	    if (!cleaned.length) {
+	      this.toast.error(this.t('adminUi.content.mediaDrop.errors.noImages'));
+	      return [];
+	    }
+	    return cleaned.slice(0, 12);
+	  }
+
+	  private filenameToAltText(filename: string): string {
+	    const base = (filename || '').trim().replace(/\.[^/.]+$/, '');
+	    const normalized = base
+	      .replace(/[_-]+/g, ' ')
+	      .replace(/\s+/g, ' ')
+	      .trim();
+	    if (!normalized) return 'Image';
+	    return normalized.length > 80 ? normalized.slice(0, 80).trim() : normalized;
+	  }
+
+	  private lastUploadedContentImage(block: any): { url: string; focal_x: number; focal_y: number } | null {
+	    const images = Array.isArray(block?.images) ? block.images : [];
+	    if (!images.length) return null;
+	    const last = images[images.length - 1] as any;
+	    const url = typeof last?.url === 'string' ? String(last.url).trim() : '';
+	    if (!url) return null;
+	    return {
+	      url,
+	      focal_x: this.toFocalValue(last?.focal_x),
+	      focal_y: this.toFocalValue(last?.focal_y)
+	    };
+	  }
+
+	  private contentTitleForKey(key: string): string {
+	    const value = (key || '').trim();
+	    return this.contentPages.find((p) => p.key === value)?.title || cmsGlobalSectionDefaultTitle(value) || value || 'Content';
+	  }
+
+	  private async uploadCmsImageToKey(contentKey: string, file: File): Promise<{ url: string; focal_x: number; focal_y: number } | null> {
+	    try {
+	      const block = await firstValueFrom(this.admin.uploadContentImage(contentKey, file));
+	      this.rememberContentVersion(contentKey, block);
+	      return this.lastUploadedContentImage(block);
+	    } catch (err: any) {
+	      if (err?.status !== 404) throw err;
+	      const createPayload = {
+	        title: this.contentTitleForKey(contentKey),
+	        body_markdown: 'CMS assets',
+	        status: 'draft',
+	        meta: { version: 2, blocks: [] }
+	      };
+	      try {
+	        const created = await firstValueFrom(this.admin.createContent(contentKey, createPayload));
+	        this.rememberContentVersion(contentKey, created);
+	      } catch (createErr: any) {
+	        if (createErr?.status !== 409) throw createErr;
+	      }
+	      const block = await firstValueFrom(this.admin.uploadContentImage(contentKey, file));
+	      this.rememberContentVersion(contentKey, block);
+	      return this.lastUploadedContentImage(block);
+	    }
+	  }
+
+	  private async insertPageMediaFiles(pageKey: PageBuilderKey, index: number, files: File[]): Promise<void> {
+	    const normalized = this.normalizeCmsImageFiles(files);
+	    if (!normalized.length) return;
+	    const allowed = this.allowedPageBlockTypesForKey(pageKey);
+	    const canImage = allowed.includes('image');
+	    const canGallery = allowed.includes('gallery');
+
+	    const mode: 'image' | 'gallery' | 'multiImage' =
+	      normalized.length > 1 ? (canGallery ? 'gallery' : canImage ? 'multiImage' : 'image') : canImage ? 'image' : 'gallery';
+	    if (mode === 'image' && !canImage && !canGallery) {
+	      this.toast.error(this.t('adminUi.site.pages.builder.errors.blockTypeNotAllowed'));
+	      return;
+	    }
+	    if (mode === 'gallery' && !canGallery && !canImage) {
+	      this.toast.error(this.t('adminUi.site.pages.builder.errors.blockTypeNotAllowed'));
+	      return;
+	    }
+	    if (mode === 'multiImage' && !canImage) {
+	      this.toast.error(this.t('adminUi.site.pages.builder.errors.blockTypeNotAllowed'));
+	      return;
+	    }
+
+	    const uploads: Array<{ url: string; focal_x: number; focal_y: number; alt: string }> = [];
+	    for (const file of normalized) {
+	      const uploaded = await this.uploadCmsImageToKey(String(pageKey), file);
+	      if (!uploaded) continue;
+	      uploads.push({ ...uploaded, alt: this.filenameToAltText(file.name) });
+	    }
+	    if (!uploads.length) return;
+
+	    const safeIndex = Math.max(0, Math.min(index, (this.pageBlocks[pageKey] || []).length));
+	    if (mode === 'image') {
+	      const createdKey = this.insertPageBlockAt(pageKey, 'image', safeIndex, 'blank');
+	      if (!createdKey) return;
+	      const u = uploads[0];
+	      this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) =>
+	        b.key === createdKey
+	          ? {
+	              ...b,
+	              url: u.url,
+	              focal_x: u.focal_x,
+	              focal_y: u.focal_y,
+	              alt: { ...b.alt, en: u.alt, ro: u.alt }
+	            }
+	          : b
+	      );
+	    } else if (mode === 'gallery') {
+	      const createdKey = this.insertPageBlockAt(pageKey, 'gallery', safeIndex, 'blank');
+	      if (!createdKey) return;
+	      this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+	        if (b.key !== createdKey || b.type !== 'gallery') return b;
+	        return {
+	          ...b,
+	          images: uploads.map((u) => ({
+	            url: u.url,
+	            alt: { en: u.alt, ro: u.alt },
+	            caption: this.emptyLocalizedText(),
+	            focal_x: u.focal_x,
+	            focal_y: u.focal_y
+	          }))
+	        };
+	      });
+	    } else {
+	      let cursor = safeIndex;
+	      for (const u of uploads) {
+	        const createdKey = this.insertPageBlockAt(pageKey, 'image', cursor, 'blank');
+	        if (!createdKey) break;
+	        this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) =>
+	          b.key === createdKey
+	            ? {
+	                ...b,
+	                url: u.url,
+	                focal_x: u.focal_x,
+	                focal_y: u.focal_y,
+	                alt: { ...b.alt, en: u.alt, ro: u.alt }
+	              }
+	            : b
+	        );
+	        cursor += 1;
+	      }
+	    }
+	    this.toast.success(this.t('adminUi.content.mediaDrop.inserted', { count: uploads.length }));
+	  }
+
+	  private async insertHomeMediaFiles(index: number, files: File[]): Promise<void> {
+	    const normalized = this.normalizeCmsImageFiles(files);
+	    if (!normalized.length) return;
+	    const uploads: Array<{ url: string; focal_x: number; focal_y: number; alt: string }> = [];
+	    for (const file of normalized) {
+	      const uploaded = await this.uploadCmsImageToKey('site.assets', file);
+	      if (!uploaded) continue;
+	      uploads.push({ ...uploaded, alt: this.filenameToAltText(file.name) });
+	    }
+	    if (!uploads.length) return;
+
+	    const safeIndex = Math.max(0, Math.min(index, this.homeBlocks.length));
+	    if (uploads.length === 1) {
+	      const createdKey = this.insertHomeBlockAt('image', safeIndex, 'blank');
+	      const u = uploads[0];
+	      this.homeBlocks = this.homeBlocks.map((b) =>
+	        b.key === createdKey
+	          ? {
+	              ...b,
+	              url: u.url,
+	              focal_x: u.focal_x,
+	              focal_y: u.focal_y,
+	              alt: { ...b.alt, en: u.alt, ro: u.alt }
+	            }
+	          : b
+	      );
+	    } else {
+	      const createdKey = this.insertHomeBlockAt('gallery', safeIndex, 'blank');
+	      this.homeBlocks = this.homeBlocks.map((b) => {
+	        if (b.key !== createdKey || b.type !== 'gallery') return b;
+	        return {
+	          ...b,
+	          images: uploads.map((u) => ({
+	            url: u.url,
+	            alt: { en: u.alt, ro: u.alt },
+	            caption: this.emptyLocalizedText(),
+	            focal_x: u.focal_x,
+	            focal_y: u.focal_y
+	          }))
+	        };
+	      });
+	    }
+	    this.toast.success(this.t('adminUi.content.mediaDrop.inserted', { count: uploads.length }));
+	  }
+
+	  setPageImageBlockUrl(pageKey: PageBuilderKey, blockKey: string, asset: ContentImageAssetRead): void {
+	    const value = (asset?.url || '').trim();
+	    if (!value) return;
     const focalX = this.toFocalValue(asset.focal_x);
     const focalY = this.toFocalValue(asset.focal_y);
     this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) =>
@@ -8138,14 +13309,199 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
-  savePageBlocks(pageKey: PageBuilderKey): void {
-    this.pageBlocksMessage[pageKey] = null;
-    this.pageBlocksError[pageKey] = null;
+  addPageColumnsColumn(pageKey: PageBuilderKey, blockKey: string): void {
+    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+      if (b.key !== blockKey || b.type !== 'columns') return b;
+      const cols = [...(b.columns || [])];
+      if (cols.length >= 3) return b;
+      cols.push({ title: this.emptyLocalizedText(), body_markdown: this.emptyLocalizedText() });
+      return { ...b, columns: cols };
+    });
+  }
+
+  removePageColumnsColumn(pageKey: PageBuilderKey, blockKey: string, idx: number): void {
+    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+      if (b.key !== blockKey || b.type !== 'columns') return b;
+      const cols = [...(b.columns || [])];
+      if (cols.length <= 2) return b;
+      if (idx < 0 || idx >= cols.length) return b;
+      cols.splice(idx, 1);
+      return { ...b, columns: cols };
+    });
+  }
+
+  private parseProductGridSlugs(raw: string): string[] {
+    const unique: string[] = [];
+    for (const part of (raw || '').split(/[,\n]/g)) {
+      const slug = part.trim();
+      if (!slug) continue;
+      if (unique.includes(slug)) continue;
+      unique.push(slug);
+      if (unique.length >= 50) break;
+    }
+    return unique;
+  }
+
+  productGridSelectedSlugs(block: { product_grid_product_slugs: string }): string[] {
+    return this.parseProductGridSlugs(block?.product_grid_product_slugs || '');
+  }
+
+  addProductGridProductSlug(block: { product_grid_product_slugs: string }, slug: string): void {
+    const cleaned = (slug || '').trim();
+    if (!cleaned) return;
+    const slugs = this.parseProductGridSlugs(block?.product_grid_product_slugs || '');
+    if (slugs.includes(cleaned)) return;
+    slugs.push(cleaned);
+    block.product_grid_product_slugs = slugs.join('\n');
+  }
+
+  removeProductGridProductSlug(block: { product_grid_product_slugs: string }, slug: string): void {
+    const cleaned = (slug || '').trim();
+    if (!cleaned) return;
+    const slugs = this.parseProductGridSlugs(block?.product_grid_product_slugs || '');
+    const next = slugs.filter((s) => s !== cleaned);
+    block.product_grid_product_slugs = next.join('\n');
+  }
+
+  queueProductGridProductSearch(blockKey: string, query: string): void {
+    this.productGridProductSearchQuery[blockKey] = query;
+
+    const trimmed = (query || '').trim();
+    if (!trimmed) {
+      this.productGridProductSearchResults[blockKey] = [];
+      this.productGridProductSearchError[blockKey] = null;
+      this.productGridProductSearchLoading[blockKey] = false;
+      const existing = this.productGridProductSearchTimers[blockKey];
+      if (existing && typeof window !== 'undefined') {
+        window.clearTimeout(existing);
+      }
+      delete this.productGridProductSearchTimers[blockKey];
+      return;
+    }
+
+    if (typeof window === 'undefined') return;
+    const existing = this.productGridProductSearchTimers[blockKey];
+    if (existing) window.clearTimeout(existing);
+    this.productGridProductSearchTimers[blockKey] = window.setTimeout(() => {
+      this.searchProductGridProducts(blockKey);
+    }, 250);
+  }
+
+  searchProductGridProducts(blockKey: string): void {
+    const query = (this.productGridProductSearchQuery[blockKey] || '').trim();
+    if (!query) {
+      this.productGridProductSearchResults[blockKey] = [];
+      this.productGridProductSearchError[blockKey] = null;
+      this.productGridProductSearchLoading[blockKey] = false;
+      return;
+    }
+
+    this.productGridProductSearchLoading[blockKey] = true;
+    this.productGridProductSearchError[blockKey] = null;
+    this.adminProducts.search({ q: query, limit: 8, page: 1 }).subscribe({
+      next: (resp) => {
+        this.productGridProductSearchResults[blockKey] = resp?.items || [];
+        this.productGridProductSearchLoading[blockKey] = false;
+      },
+      error: () => {
+        this.productGridProductSearchResults[blockKey] = [];
+        this.productGridProductSearchLoading[blockKey] = false;
+        this.productGridProductSearchError[blockKey] = this.t('adminUi.home.sections.errors.searchProducts');
+      }
+    });
+  }
+
+  addPageFaqItem(pageKey: PageBuilderKey, blockKey: string): void {
+    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+      if (b.key !== blockKey || b.type !== 'faq') return b;
+      const items = [...(b.faq_items || [])];
+      if (items.length >= 20) return b;
+      items.push({ question: this.emptyLocalizedText(), answer_markdown: this.emptyLocalizedText() });
+      return { ...b, faq_items: items };
+    });
+  }
+
+  removePageFaqItem(pageKey: PageBuilderKey, blockKey: string, idx: number): void {
+    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+      if (b.key !== blockKey || b.type !== 'faq') return b;
+      const items = [...(b.faq_items || [])];
+      if (items.length <= 1) return b;
+      if (idx < 0 || idx >= items.length) return b;
+      items.splice(idx, 1);
+      return { ...b, faq_items: items };
+    });
+  }
+
+  addPageTestimonial(pageKey: PageBuilderKey, blockKey: string): void {
+    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+      if (b.key !== blockKey || b.type !== 'testimonials') return b;
+      const items = [...(b.testimonials || [])];
+      if (items.length >= 12) return b;
+      items.push({ quote_markdown: this.emptyLocalizedText(), author: this.emptyLocalizedText(), role: this.emptyLocalizedText() });
+      return { ...b, testimonials: items };
+    });
+  }
+
+  removePageTestimonial(pageKey: PageBuilderKey, blockKey: string, idx: number): void {
+    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+      if (b.key !== blockKey || b.type !== 'testimonials') return b;
+      const items = [...(b.testimonials || [])];
+      if (items.length <= 1) return b;
+      if (idx < 0 || idx >= items.length) return b;
+      items.splice(idx, 1);
+      return { ...b, testimonials: items };
+    });
+  }
+
+  private buildPageBlocksMeta(pageKey: PageBuilderKey): Record<string, unknown> {
     const blocks = (this.pageBlocks[pageKey] || []).map((b) => {
       const base: Record<string, unknown> = { key: b.key, type: b.type, enabled: b.enabled };
       base['title'] = b.title;
+      base['layout'] = b.layout || this.defaultCmsBlockLayout();
       if (b.type === 'text') {
         base['body_markdown'] = b.body_markdown;
+      } else if (b.type === 'columns') {
+        base['columns'] = (b.columns || []).slice(0, 3).map((col) => ({ title: col.title, body_markdown: col.body_markdown }));
+        base['columns_breakpoint'] = b.columns_breakpoint;
+      } else if (b.type === 'cta') {
+        base['body_markdown'] = b.body_markdown;
+        base['cta_label'] = b.cta_label;
+        base['cta_url'] = b.cta_url;
+        base['cta_new_tab'] = Boolean(b.cta_new_tab);
+      } else if (b.type === 'faq') {
+        base['items'] = (b.faq_items || []).slice(0, 20).map((item) => ({ question: item.question, answer_markdown: item.answer_markdown }));
+      } else if (b.type === 'testimonials') {
+        base['items'] = (b.testimonials || []).slice(0, 12).map((item) => ({
+          quote_markdown: item.quote_markdown,
+          author: item.author,
+          role: item.role
+        }));
+      } else if (b.type === 'product_grid') {
+        base['source'] = b.product_grid_source;
+        const desiredLimit = Number(b.product_grid_limit || 6);
+        const limit = Math.max(1, Math.min(24, Number.isFinite(desiredLimit) ? Math.trunc(desiredLimit) : 6));
+        base['limit'] = limit;
+
+        if (b.product_grid_source === 'category') {
+          const categorySlug = (b.product_grid_category_slug || '').trim();
+          if (categorySlug) base['category_slug'] = categorySlug;
+        } else if (b.product_grid_source === 'collection') {
+          const collectionSlug = (b.product_grid_collection_slug || '').trim();
+          if (collectionSlug) base['collection_slug'] = collectionSlug;
+        } else if (b.product_grid_source === 'products') {
+          const unique: string[] = [];
+          for (const raw of (b.product_grid_product_slugs || '').split(/[,\n]/g)) {
+            const slug = raw.trim();
+            if (!slug) continue;
+            if (unique.includes(slug)) continue;
+            unique.push(slug);
+            if (unique.length >= 50) break;
+          }
+          if (unique.length) base['product_slugs'] = unique;
+        }
+      } else if (b.type === 'form') {
+        base['form_type'] = b.form_type;
+        if (b.form_type === 'contact') base['topic'] = b.form_topic;
       } else if (b.type === 'image') {
         base['url'] = b.url;
         base['link_url'] = b.link_url;
@@ -8170,13 +13526,221 @@ export class AdminComponent implements OnInit, OnDestroy {
       return base;
     });
 
-    const meta = { ...(this.pageBlocksMeta[pageKey] || {}), blocks } as Record<string, unknown>;
-    if (this.pageBlocksRequiresAuth[pageKey]) {
+    const meta = { ...(this.pageBlocksMeta[pageKey] || {}), version: 2, blocks } as Record<string, unknown>;
+    if (this.pageKeySupportsRequiresAuth(pageKey) && this.pageBlocksRequiresAuth[pageKey]) {
       meta['requires_auth'] = true;
     } else {
       delete meta['requires_auth'];
     }
+    return meta;
+  }
+
+  private pagePublishChecklistBlockLabel(block: PageBlockDraft, idx: number): string {
+    const title = (block.title?.[this.infoLang] || block.title?.en || block.title?.ro || '').trim();
+    const base = title ? title : this.pageBlockLabel(block);
+    return `${idx + 1}. ${base}`;
+  }
+
+  private computePagePublishChecklistLocal(pageKey: PageBuilderKey): Pick<CmsPublishChecklistResult, 'missingTranslations' | 'missingAlt' | 'emptySections'> {
+    const missingTranslations: UiLang[] = [];
+    if (this.pageBlocksNeedsTranslationEn[pageKey]) missingTranslations.push('en');
+    if (this.pageBlocksNeedsTranslationRo[pageKey]) missingTranslations.push('ro');
+
+    const missingAlt: string[] = [];
+    const emptySections: string[] = [];
+    const blocks = this.pageBlocks[pageKey] || [];
+    const enabledBlocks = blocks.filter((b) => Boolean(b?.enabled));
+
+    if (!enabledBlocks.length) {
+      emptySections.push(this.t('adminUi.content.publishChecklist.emptyAllDisabled'));
+    }
+
+    enabledBlocks.forEach((block, idx) => {
+      const label = this.pagePublishChecklistBlockLabel(block, idx);
+      if (block.type === 'text') {
+        const en = (block.body_markdown?.en || '').trim();
+        const ro = (block.body_markdown?.ro || '').trim();
+        if (!en && !ro) emptySections.push(label);
+        return;
+      }
+      if (block.type === 'columns') {
+        const cols = block.columns || [];
+        const hasAny = cols.some((col) => {
+          const titleEn = (col?.title?.en || '').trim();
+          const titleRo = (col?.title?.ro || '').trim();
+          const bodyEn = (col?.body_markdown?.en || '').trim();
+          const bodyRo = (col?.body_markdown?.ro || '').trim();
+          return Boolean(titleEn || titleRo || bodyEn || bodyRo);
+        });
+        if (!hasAny) emptySections.push(label);
+        return;
+      }
+      if (block.type === 'cta') {
+        const titleEn = (block.title?.en || '').trim();
+        const titleRo = (block.title?.ro || '').trim();
+        const bodyEn = (block.body_markdown?.en || '').trim();
+        const bodyRo = (block.body_markdown?.ro || '').trim();
+        const ctaEn = (block.cta_label?.en || '').trim();
+        const ctaRo = (block.cta_label?.ro || '').trim();
+        const url = (block.cta_url || '').trim();
+        if (!(titleEn || titleRo || bodyEn || bodyRo || ctaEn || ctaRo || url)) emptySections.push(label);
+        return;
+      }
+      if (block.type === 'faq') {
+        const items = block.faq_items || [];
+        const hasAny = items.some((item) => {
+          const qEn = (item?.question?.en || '').trim();
+          const qRo = (item?.question?.ro || '').trim();
+          const aEn = (item?.answer_markdown?.en || '').trim();
+          const aRo = (item?.answer_markdown?.ro || '').trim();
+          return Boolean(qEn || qRo || aEn || aRo);
+        });
+        if (!hasAny) emptySections.push(label);
+        return;
+      }
+      if (block.type === 'testimonials') {
+        const items = block.testimonials || [];
+        const hasAny = items.some((item) => {
+          const qEn = (item?.quote_markdown?.en || '').trim();
+          const qRo = (item?.quote_markdown?.ro || '').trim();
+          const aEn = (item?.author?.en || '').trim();
+          const aRo = (item?.author?.ro || '').trim();
+          const rEn = (item?.role?.en || '').trim();
+          const rRo = (item?.role?.ro || '').trim();
+          return Boolean(qEn || qRo || aEn || aRo || rEn || rRo);
+        });
+        if (!hasAny) emptySections.push(label);
+        return;
+      }
+      if (block.type === 'product_grid') {
+        const source = block.product_grid_source;
+        if (source === 'category') {
+          if (!(block.product_grid_category_slug || '').trim()) emptySections.push(label);
+          return;
+        }
+        if (source === 'collection') {
+          if (!(block.product_grid_collection_slug || '').trim()) emptySections.push(label);
+          return;
+        }
+        const hasAny = (block.product_grid_product_slugs || '').split(/[,\n]/g).some((raw) => Boolean(raw.trim()));
+        if (!hasAny) emptySections.push(label);
+        return;
+      }
+      if (block.type === 'form') {
+        return;
+      }
+      if (block.type === 'image') {
+        const url = (block.url || '').trim();
+        if (!url) {
+          emptySections.push(label);
+          return;
+        }
+        if (!(block.alt?.en || '').trim()) missingAlt.push(`${label} (EN)`);
+        if (!(block.alt?.ro || '').trim()) missingAlt.push(`${label} (RO)`);
+        return;
+      }
+      if (block.type === 'gallery') {
+        const images = block.images || [];
+        const withUrls = images.filter((img) => Boolean((img?.url || '').trim()));
+        if (!withUrls.length) {
+          emptySections.push(label);
+          return;
+        }
+        withUrls.forEach((img, imgIdx) => {
+          const imgLabel = `${label} · ${this.t('adminUi.content.publishChecklist.imageLabel', { index: imgIdx + 1 })}`;
+          if (!(img.alt?.en || '').trim()) missingAlt.push(`${imgLabel} (EN)`);
+          if (!(img.alt?.ro || '').trim()) missingAlt.push(`${imgLabel} (RO)`);
+        });
+        return;
+      }
+      if (block.type === 'banner') {
+        const url = (block.slide?.image_url || '').trim();
+        if (!url) {
+          emptySections.push(label);
+          return;
+        }
+        if (!(block.slide?.alt?.en || '').trim()) missingAlt.push(`${label} (EN)`);
+        if (!(block.slide?.alt?.ro || '').trim()) missingAlt.push(`${label} (RO)`);
+        return;
+      }
+      if (block.type === 'carousel') {
+        const slides = block.slides || [];
+        const withUrls = slides.filter((s) => Boolean((s?.image_url || '').trim()));
+        if (!withUrls.length) {
+          emptySections.push(label);
+          return;
+        }
+        withUrls.forEach((slide, slideIdx) => {
+          const slideLabel = `${label} · ${this.t('adminUi.content.publishChecklist.slideLabel', { index: slideIdx + 1 })}`;
+          if (!(slide.alt?.en || '').trim()) missingAlt.push(`${slideLabel} (EN)`);
+          if (!(slide.alt?.ro || '').trim()) missingAlt.push(`${slideLabel} (RO)`);
+        });
+      }
+    });
+
+    return { missingTranslations, missingAlt, emptySections };
+  }
+
+  openPagePublishChecklist(pageKey: PageBuilderKey): void {
+    this.pagePublishChecklistOpen = true;
+    this.pagePublishChecklistKey = pageKey;
+    this.pagePublishChecklistLoading = true;
+    this.pagePublishChecklistError = null;
+    const local = this.computePagePublishChecklistLocal(pageKey);
+    this.pagePublishChecklistResult = { ...local, linkIssues: [] };
+
+    const meta = this.buildPageBlocksMeta(pageKey);
+    this.admin.linkCheckContentPreview({ key: pageKey, meta, body_markdown: '', images: [] }).subscribe({
+      next: (resp) => {
+        this.pagePublishChecklistLoading = false;
+        const current = this.pagePublishChecklistResult;
+        if (!current) return;
+        this.pagePublishChecklistResult = { ...current, linkIssues: resp?.issues || [] };
+      },
+      error: (err) => {
+        this.pagePublishChecklistLoading = false;
+        this.pagePublishChecklistError = err?.error?.detail || this.t('adminUi.content.publishChecklist.errors.linkCheck');
+      }
+    });
+  }
+
+  closePagePublishChecklist(): void {
+    this.pagePublishChecklistOpen = false;
+    this.pagePublishChecklistLoading = false;
+    this.pagePublishChecklistError = null;
+    this.pagePublishChecklistKey = null;
+    this.pagePublishChecklistResult = null;
+  }
+
+  pagePublishChecklistHasIssues(): boolean {
+    const checklist = this.pagePublishChecklistResult;
+    if (!checklist) return false;
+    return Boolean(
+      checklist.missingTranslations.length ||
+        checklist.missingAlt.length ||
+        checklist.emptySections.length ||
+        checklist.linkIssues.length
+    );
+  }
+
+  confirmPagePublishChecklist(): void {
+    const key = this.pagePublishChecklistKey;
+    if (!key) return;
+    this.closePagePublishChecklist();
+    this.savePageBlocks(key, { bypassChecklist: true });
+  }
+
+  savePageBlocks(pageKey: PageBuilderKey, opts?: { bypassChecklist?: boolean }): void {
+    this.pageBlocksMessage[pageKey] = null;
+    this.pageBlocksError[pageKey] = null;
+
     const status: ContentStatusUi = this.pageBlocksStatus[pageKey] || 'draft';
+    if (!opts?.bypassChecklist && status === 'published') {
+      this.openPagePublishChecklist(pageKey);
+      return;
+    }
+
+    const meta = this.buildPageBlocksMeta(pageKey);
     const published_at =
       status === 'published'
         ? this.pageBlocksPublishedAt[pageKey]
@@ -8210,6 +13774,8 @@ export class AdminComponent implements OnInit, OnDestroy {
 	        this.pageBlocksMessage[pageKey] = ok;
 	        this.pageBlocksError[pageKey] = null;
 	        this.ensurePageDraft(pageKey).markServerSaved(this.currentPageDraftState(pageKey), true);
+          const slug = this.pagePreviewSlug(pageKey);
+          if (slug && this.pagePreviewForSlug === slug) this.refreshPagePreview();
 	      },
       error: (err) => {
         if (this.handleContentConflict(err, pageKey, reload)) {
@@ -8217,13 +13783,13 @@ export class AdminComponent implements OnInit, OnDestroy {
           this.pageBlocksMessage[pageKey] = null;
           return;
         }
-        if (err?.status === 404) {
-          const createPayload = {
-            title: this.contentPages.find((p) => p.key === pageKey)?.title || pageKey,
-            body_markdown: 'Page builder',
-            status,
-            lang: this.infoLang,
-            published_at,
+	        if (err?.status === 404) {
+	          const createPayload = {
+	            title: this.contentPages.find((p) => p.key === pageKey)?.title || cmsGlobalSectionDefaultTitle(pageKey) || pageKey,
+	            body_markdown: 'Page builder',
+	            status,
+	            lang: this.infoLang,
+	            published_at,
             published_until,
             meta
           };
@@ -8241,6 +13807,8 @@ export class AdminComponent implements OnInit, OnDestroy {
 	              this.pageBlocksMessage[pageKey] = ok;
 	              this.pageBlocksError[pageKey] = null;
 	              this.ensurePageDraft(pageKey).markServerSaved(this.currentPageDraftState(pageKey), true);
+                const slug = this.pagePreviewSlug(pageKey);
+                if (slug && this.pagePreviewForSlug === slug) this.refreshPagePreview();
 	            },
             error: () => {
               this.pageBlocksError[pageKey] = errMsg;
@@ -8283,6 +13851,46 @@ export class AdminComponent implements OnInit, OnDestroy {
     const raw = typeof value === 'number' ? value : Number(value);
     if (!Number.isFinite(raw)) return fallback;
     return Math.max(0, Math.min(100, Math.round(raw)));
+  }
+
+  private toBooleanValue(value: unknown, fallback = false): boolean {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value === 1;
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on') return true;
+      if (normalized === '0' || normalized === 'false' || normalized === 'no' || normalized === 'off') return false;
+    }
+    return fallback;
+  }
+
+  private defaultCmsBlockLayout(): CmsBlockLayout {
+    return { spacing: 'none', background: 'none', align: 'left', max_width: 'full' };
+  }
+
+  private toCmsBlockLayout(value: unknown): CmsBlockLayout {
+    const rec = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+    const spacingRaw = typeof rec['spacing'] === 'string' ? String(rec['spacing']).trim() : '';
+    const backgroundRaw = typeof rec['background'] === 'string' ? String(rec['background']).trim() : '';
+    const alignRaw = typeof rec['align'] === 'string' ? String(rec['align']).trim() : '';
+    const maxWidthValue = rec['max_width'] ?? rec['maxWidth'];
+    const maxWidthRaw = typeof maxWidthValue === 'string' ? String(maxWidthValue).trim() : '';
+
+    const spacing: CmsBlockLayoutSpacing =
+      spacingRaw === 'sm' || spacingRaw === 'md' || spacingRaw === 'lg' || spacingRaw === 'none'
+        ? (spacingRaw as CmsBlockLayoutSpacing)
+        : 'none';
+    const background: CmsBlockLayoutBackground =
+      backgroundRaw === 'muted' || backgroundRaw === 'accent' || backgroundRaw === 'none'
+        ? (backgroundRaw as CmsBlockLayoutBackground)
+        : 'none';
+    const align: CmsBlockLayoutAlign = alignRaw === 'center' ? 'center' : 'left';
+    const max_width: CmsBlockLayoutMaxWidth =
+      maxWidthRaw === 'narrow' || maxWidthRaw === 'prose' || maxWidthRaw === 'wide' || maxWidthRaw === 'full'
+        ? (maxWidthRaw as CmsBlockLayoutMaxWidth)
+        : 'full';
+
+    return { spacing, background, align, max_width };
   }
 
   focalPosition(focalX: unknown, focalY: unknown): string {
@@ -8444,6 +14052,23 @@ export class AdminComponent implements OnInit, OnDestroy {
       enabled,
       title: this.emptyLocalizedText(),
       body_markdown: this.emptyLocalizedText(),
+      columns: [
+        { title: this.emptyLocalizedText(), body_markdown: this.emptyLocalizedText() },
+        { title: this.emptyLocalizedText(), body_markdown: this.emptyLocalizedText() }
+      ],
+      columns_breakpoint: 'md',
+      cta_label: this.emptyLocalizedText(),
+      cta_url: '',
+      cta_new_tab: false,
+      faq_items: [{ question: this.emptyLocalizedText(), answer_markdown: this.emptyLocalizedText() }],
+      testimonials: [{ quote_markdown: this.emptyLocalizedText(), author: this.emptyLocalizedText(), role: this.emptyLocalizedText() }],
+      product_grid_source: 'category',
+      product_grid_category_slug: '',
+      product_grid_collection_slug: '',
+      product_grid_product_slugs: '',
+      product_grid_limit: 6,
+      form_type: 'contact',
+      form_topic: 'contact',
       url: '',
       link_url: '',
       focal_x: 50,
@@ -8470,6 +14095,12 @@ export class AdminComponent implements OnInit, OnDestroy {
   isCustomHomeBlock(block: HomeBlockDraft): boolean {
     return (
       block.type === 'text' ||
+      block.type === 'columns' ||
+      block.type === 'cta' ||
+      block.type === 'faq' ||
+      block.type === 'testimonials' ||
+      block.type === 'product_grid' ||
+      block.type === 'form' ||
       block.type === 'image' ||
       block.type === 'gallery' ||
       block.type === 'banner' ||
@@ -8511,17 +14142,18 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.insertHomeBlockAt(type, this.homeBlocks.length, template);
   }
 
-  private insertHomeBlockAt(type: CmsBlockLibraryBlockType, index: number, template: CmsBlockLibraryTemplate): void {
-    const key = this.nextCustomBlockKey(type);
-    const draft = this.makeHomeBlockDraft(key, type, true);
-    if (template === 'starter') {
-      this.applyStarterTemplateToCustomBlock(type, draft);
-    }
-    const current = [...this.homeBlocks];
-    const safeIndex = Math.max(0, Math.min(index, current.length));
-    current.splice(safeIndex, 0, draft);
-    this.homeBlocks = current;
-  }
+	  private insertHomeBlockAt(type: CmsBlockLibraryBlockType, index: number, template: CmsBlockLibraryTemplate): string {
+	    const key = this.nextCustomBlockKey(type);
+	    const draft = this.makeHomeBlockDraft(key, type, true);
+	    if (template === 'starter') {
+	      this.applyStarterTemplateToCustomBlock(type, draft);
+	    }
+	    const current = [...this.homeBlocks];
+	    const safeIndex = Math.max(0, Math.min(index, current.length));
+	    current.splice(safeIndex, 0, draft);
+	    this.homeBlocks = current;
+	    return key;
+	  }
 
   onHomeBlockDragStart(key: string): void {
     this.homeInsertDragActive = true;
@@ -8566,14 +14198,23 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.homeInsertDragActive = false;
   }
 
-  onHomeBlockDrop(event: DragEvent, targetKey: string): void {
-    event.preventDefault();
+	  onHomeBlockDrop(event: DragEvent, targetKey: string): void {
+	    event.preventDefault();
 
-    const payload = this.readCmsBlockPayload(event);
-    if (payload && payload.scope === 'home') {
-      const to = this.homeBlocks.findIndex((b) => b.key === targetKey);
-      if (to !== -1) {
-        this.insertHomeBlockAt(payload.type, to, payload.template);
+	    const mediaFiles = this.extractCmsImageFiles(event);
+	    if (mediaFiles.length) {
+	      const to = this.homeBlocks.findIndex((b) => b.key === targetKey);
+	      const safeIndex = to !== -1 ? to : this.homeBlocks.length;
+	      void this.insertHomeMediaFiles(safeIndex, mediaFiles);
+	      this.homeInsertDragActive = false;
+	      return;
+	    }
+
+	    const payload = this.readCmsBlockPayload(event);
+	    if (payload && payload.scope === 'home') {
+	      const to = this.homeBlocks.findIndex((b) => b.key === targetKey);
+	      if (to !== -1) {
+	          this.insertHomeBlockAt(payload.type, to, payload.template);
       }
       this.homeInsertDragActive = false;
       return;
@@ -8676,6 +14317,69 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
+  addHomeColumnsColumn(blockKey: string): void {
+    this.homeBlocks = this.homeBlocks.map((b) => {
+      if (b.key !== blockKey || b.type !== 'columns') return b;
+      const cols = [...(b.columns || [])];
+      if (cols.length >= 3) return b;
+      cols.push({ title: this.emptyLocalizedText(), body_markdown: this.emptyLocalizedText() });
+      return { ...b, columns: cols };
+    });
+  }
+
+  removeHomeColumnsColumn(blockKey: string, idx: number): void {
+    this.homeBlocks = this.homeBlocks.map((b) => {
+      if (b.key !== blockKey || b.type !== 'columns') return b;
+      const cols = [...(b.columns || [])];
+      if (cols.length <= 2) return b;
+      if (idx < 0 || idx >= cols.length) return b;
+      cols.splice(idx, 1);
+      return { ...b, columns: cols };
+    });
+  }
+
+  addHomeFaqItem(blockKey: string): void {
+    this.homeBlocks = this.homeBlocks.map((b) => {
+      if (b.key !== blockKey || b.type !== 'faq') return b;
+      const items = [...(b.faq_items || [])];
+      if (items.length >= 20) return b;
+      items.push({ question: this.emptyLocalizedText(), answer_markdown: this.emptyLocalizedText() });
+      return { ...b, faq_items: items };
+    });
+  }
+
+  removeHomeFaqItem(blockKey: string, idx: number): void {
+    this.homeBlocks = this.homeBlocks.map((b) => {
+      if (b.key !== blockKey || b.type !== 'faq') return b;
+      const items = [...(b.faq_items || [])];
+      if (items.length <= 1) return b;
+      if (idx < 0 || idx >= items.length) return b;
+      items.splice(idx, 1);
+      return { ...b, faq_items: items };
+    });
+  }
+
+  addHomeTestimonial(blockKey: string): void {
+    this.homeBlocks = this.homeBlocks.map((b) => {
+      if (b.key !== blockKey || b.type !== 'testimonials') return b;
+      const items = [...(b.testimonials || [])];
+      if (items.length >= 12) return b;
+      items.push({ quote_markdown: this.emptyLocalizedText(), author: this.emptyLocalizedText(), role: this.emptyLocalizedText() });
+      return { ...b, testimonials: items };
+    });
+  }
+
+  removeHomeTestimonial(blockKey: string, idx: number): void {
+    this.homeBlocks = this.homeBlocks.map((b) => {
+      if (b.key !== blockKey || b.type !== 'testimonials') return b;
+      const items = [...(b.testimonials || [])];
+      if (items.length <= 1) return b;
+      if (idx < 0 || idx >= items.length) return b;
+      items.splice(idx, 1);
+      return { ...b, testimonials: items };
+    });
+  }
+
   setBannerSlideImage(blockKey: string, asset: ContentImageAssetRead): void {
     const value = (asset?.url || '').trim();
     if (!value) return;
@@ -8764,14 +14468,18 @@ export class AdminComponent implements OnInit, OnDestroy {
             const enabledRaw = rec['enabled'];
             const enabled = enabledRaw === false ? false : true;
             const builtIn = this.normalizeHomeSectionId(typeRaw);
-            const type: HomeBlockType | null =
-              builtIn ||
-              (typeRaw === 'text' ||
-              typeRaw === 'image' ||
-              typeRaw === 'gallery' ||
-              typeRaw === 'banner' ||
-              typeRaw === 'carousel'
-                ? (typeRaw as HomeBlockType)
+              const type: HomeBlockType | null =
+                builtIn ||
+                (typeRaw === 'text' ||
+                typeRaw === 'columns' ||
+                typeRaw === 'cta' ||
+                typeRaw === 'faq' ||
+                typeRaw === 'testimonials' ||
+                typeRaw === 'image' ||
+                typeRaw === 'gallery' ||
+                typeRaw === 'banner' ||
+                typeRaw === 'carousel'
+                  ? (typeRaw as HomeBlockType)
                 : null);
             if (!type) continue;
 
@@ -8788,6 +14496,57 @@ export class AdminComponent implements OnInit, OnDestroy {
             draft.title = this.toLocalizedText(rec['title']);
             if (type === 'text') {
               draft.body_markdown = this.toLocalizedText(rec['body_markdown']);
+            } else if (type === 'columns') {
+              const columnsRaw = rec['columns'];
+              const cols: CmsColumnsColumnDraft[] = [];
+              if (Array.isArray(columnsRaw)) {
+                for (const colRaw of columnsRaw) {
+                  if (!colRaw || typeof colRaw !== 'object') continue;
+                  const colRec = colRaw as Record<string, unknown>;
+                  cols.push({ title: this.toLocalizedText(colRec['title']), body_markdown: this.toLocalizedText(colRec['body_markdown']) });
+                  if (cols.length >= 3) break;
+                }
+              }
+              if (cols.length >= 2) draft.columns = cols;
+              const bpRaw = rec['columns_breakpoint'] ?? rec['breakpoint'] ?? rec['stack_at'];
+              const bp = typeof bpRaw === 'string' ? String(bpRaw).trim() : '';
+              draft.columns_breakpoint = bp === 'sm' || bp === 'md' || bp === 'lg' ? bp : 'md';
+            } else if (type === 'cta') {
+              draft.body_markdown = this.toLocalizedText(rec['body_markdown']);
+              draft.cta_label = this.toLocalizedText(rec['cta_label']);
+              draft.cta_url = typeof rec['cta_url'] === 'string' ? String(rec['cta_url']).trim() : '';
+              draft.cta_new_tab = this.toBooleanValue(rec['cta_new_tab'], false);
+            } else if (type === 'faq') {
+              const itemsRaw = rec['items'];
+              const items: CmsFaqItemDraft[] = [];
+              if (Array.isArray(itemsRaw)) {
+                for (const itemRaw of itemsRaw) {
+                  if (!itemRaw || typeof itemRaw !== 'object') continue;
+                  const itemRec = itemRaw as Record<string, unknown>;
+                  items.push({
+                    question: this.toLocalizedText(itemRec['question']),
+                    answer_markdown: this.toLocalizedText(itemRec['answer_markdown'])
+                  });
+                  if (items.length >= 20) break;
+                }
+              }
+              if (items.length) draft.faq_items = items;
+            } else if (type === 'testimonials') {
+              const itemsRaw = rec['items'];
+              const items: CmsTestimonialDraft[] = [];
+              if (Array.isArray(itemsRaw)) {
+                for (const itemRaw of itemsRaw) {
+                  if (!itemRaw || typeof itemRaw !== 'object') continue;
+                  const itemRec = itemRaw as Record<string, unknown>;
+                  items.push({
+                    quote_markdown: this.toLocalizedText(itemRec['quote_markdown']),
+                    author: this.toLocalizedText(itemRec['author']),
+                    role: this.toLocalizedText(itemRec['role'])
+                  });
+                  if (items.length >= 12) break;
+                }
+              }
+              if (items.length) draft.testimonials = items;
             } else if (type === 'image') {
               draft.url = typeof rec['url'] === 'string' ? String(rec['url']).trim() : '';
               draft.link_url = typeof rec['link_url'] === 'string' ? String(rec['link_url']).trim() : '';
@@ -8884,6 +14643,26 @@ export class AdminComponent implements OnInit, OnDestroy {
       if (b.type === 'text') {
         base['title'] = b.title;
         base['body_markdown'] = b.body_markdown;
+      } else if (b.type === 'columns') {
+        base['title'] = b.title;
+        base['columns'] = (b.columns || []).slice(0, 3).map((col) => ({ title: col.title, body_markdown: col.body_markdown }));
+        base['columns_breakpoint'] = b.columns_breakpoint;
+      } else if (b.type === 'cta') {
+        base['title'] = b.title;
+        base['body_markdown'] = b.body_markdown;
+        base['cta_label'] = b.cta_label;
+        base['cta_url'] = b.cta_url;
+        base['cta_new_tab'] = Boolean(b.cta_new_tab);
+      } else if (b.type === 'faq') {
+        base['title'] = b.title;
+        base['items'] = (b.faq_items || []).slice(0, 20).map((item) => ({ question: item.question, answer_markdown: item.answer_markdown }));
+      } else if (b.type === 'testimonials') {
+        base['title'] = b.title;
+        base['items'] = (b.testimonials || []).slice(0, 12).map((item) => ({
+          quote_markdown: item.quote_markdown,
+          author: item.author,
+          role: item.role
+        }));
       } else if (b.type === 'image') {
         base['title'] = b.title;
         base['url'] = b.url;
@@ -8935,6 +14714,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 	        this.rememberContentVersion('home.sections', block);
 	        this.sectionsMessage = ok;
 	        this.cmsHomeDraft.markServerSaved(this.homeBlocks, true);
+        this.refreshHomePreview();
 	      },
 	      error: (err) => {
 	        if (this.handleContentConflict(err, 'home.sections', () => this.loadSections())) {
@@ -8947,6 +14727,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 	              this.rememberContentVersion('home.sections', created);
 	              this.sectionsMessage = ok;
 	              this.cmsHomeDraft.markServerSaved(this.homeBlocks, true);
+                this.refreshHomePreview();
 	            },
 	            error: () => (this.sectionsMessage = errMsg)
 	          });
@@ -8954,6 +14735,18 @@ export class AdminComponent implements OnInit, OnDestroy {
 	          this.sectionsMessage = errMsg;
         }
       }
+    });
+  }
+
+  // Categories
+  loadCategories(): void {
+    this.admin.getCategories().subscribe({
+      next: (cats) => {
+        this.categories = cats
+          .map((c) => ({ ...c, sort_order: c.sort_order ?? 0 }))
+          .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+      },
+      error: () => (this.categories = [])
     });
   }
 

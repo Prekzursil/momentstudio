@@ -1,7 +1,51 @@
-import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
+import { test, expect, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 
 const OWNER_IDENTIFIER = process.env.E2E_OWNER_IDENTIFIER || 'owner';
 const OWNER_PASSWORD = process.env.E2E_OWNER_PASSWORD || 'Password123';
+
+async function waitForConsentCheckboxReady(page: Page, checkbox: Locator, checkboxIndex: number): Promise<void> {
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    if (await checkbox.isChecked()) return;
+    if (await checkbox.isEnabled()) return;
+    await page.waitForTimeout(250);
+  }
+
+  throw new Error(`Consent checkbox ${checkboxIndex} stayed disabled for too long.`);
+}
+
+async function acceptConsentIfNeeded(page: Page, checkboxIndex: number): Promise<void> {
+  const checkbox = page.locator('#checkout-step-4 input[type="checkbox"]').nth(checkboxIndex);
+  await waitForConsentCheckboxReady(page, checkbox, checkboxIndex);
+  if (await checkbox.isChecked()) return;
+  if (!(await checkbox.isEnabled())) {
+    throw new Error(`Consent checkbox ${checkboxIndex} is disabled but not checked.`);
+  }
+
+  await checkbox.click();
+
+  const dialog = page.locator('div[role="dialog"][aria-modal="true"]').last();
+  const acceptButton = dialog.getByRole('button', { name: 'Accept' });
+  await expect(acceptButton).toBeVisible();
+
+  if (await acceptButton.isDisabled()) {
+    const body = dialog.locator('div.overflow-y-auto').first();
+    await body.evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+      el.dispatchEvent(new Event('scroll'));
+    });
+
+    await expect(acceptButton).toBeEnabled();
+  }
+  await acceptButton.click();
+  await expect(dialog).toBeHidden();
+  await expect(checkbox).toBeChecked();
+}
+
+async function acceptCheckoutConsents(page: Page): Promise<void> {
+  await acceptConsentIfNeeded(page, 0);
+  await acceptConsentIfNeeded(page, 1);
+}
 
 async function loginUi(page: Page): Promise<void> {
   await page.goto('/login');
@@ -149,6 +193,8 @@ test('coupons v2: apply coupon and prevent reuse after redemption', async ({ pag
   // Complete a COD checkout (redemption happens on order creation for COD).
   const shippingEmail = OWNER_IDENTIFIER.includes('@') ? OWNER_IDENTIFIER : `${OWNER_IDENTIFIER}@example.com`;
   await fillShippingAddress(page, shippingEmail);
+  await acceptCheckoutConsents(page);
+  await expect(page.getByRole('button', { name: 'Place order' })).toBeEnabled();
   await page.getByRole('button', { name: 'Place order' }).click();
 
   await expect(page).toHaveURL(/\/checkout\/success$/);

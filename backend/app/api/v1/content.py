@@ -1,15 +1,17 @@
 import csv
 import httpx
+from datetime import datetime, timedelta, timezone
 from io import StringIO
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Query, Response
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, and_, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.dependencies import get_current_user_optional, get_session, require_admin_section
-from app.models.content import ContentBlock, ContentBlockVersion, ContentImage, ContentRedirect, ContentImageTag
+from app.core.security import create_content_preview_token, decode_content_preview_token
+from app.models.content import ContentBlock, ContentBlockVersion, ContentImage, ContentRedirect, ContentImageTag, ContentStatus
 from app.models.user import User
 from app.schemas.content import (
     ContentAuditRead,
@@ -18,7 +20,10 @@ from app.schemas.content import (
     ContentBlockUpdate,
     ContentImageAssetListResponse,
     ContentImageAssetRead,
+    ContentImageAssetUsageResponse,
+    ContentImageEditRequest,
     ContentImageFocalPointUpdate,
+    ContentPreviewTokenResponse,
     ContentPageListItem,
     ContentPageRenameRequest,
     ContentPageRenameResponse,
@@ -26,11 +31,20 @@ from app.schemas.content import (
     ContentRedirectRead,
     ContentRedirectImportResult,
     ContentRedirectImportError,
+    ContentRedirectUpsertRequest,
     ContentBlockVersionListItem,
     ContentBlockVersionRead,
+    ContentSchedulingItem,
+    ContentSchedulingListResponse,
     ContentImageTagsUpdate,
     ContentLinkCheckResponse,
+    ContentLinkCheckPreviewRequest,
     ContentTranslationStatusUpdate,
+    ContentFindReplacePreviewRequest,
+    ContentFindReplaceApplyRequest,
+    ContentFindReplacePreviewResponse,
+    ContentFindReplaceApplyResponse,
+    HomePreviewResponse,
     SitemapPreviewResponse,
     StructuredDataValidationResponse,
 )
@@ -123,6 +137,53 @@ async def get_static_page(
     return block
 
 
+@router.get("/pages/{slug}/preview", response_model=ContentBlockRead)
+async def preview_static_page(
+    slug: str,
+    response: Response,
+    token: str = Query(..., min_length=1, description="Preview token"),
+    session: AsyncSession = Depends(get_session),
+    lang: str | None = Query(default=None, pattern="^(en|ro)$"),
+    user: User | None = Depends(get_current_user_optional),
+) -> ContentBlockRead:
+    key = decode_content_preview_token(token)
+    slug_value = content_service.slugify_page_slug(slug)
+    expected_key = f"page.{slug_value}" if slug_value else ""
+    if not key or not expected_key or key != expected_key:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid preview token")
+    response.headers["Cache-Control"] = "private, no-store"
+    block = await content_service.get_block_by_key(session, expected_key, lang=lang)
+    if not block:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+    if _requires_auth(block) and not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    return block
+
+
+@router.post("/pages/{slug}/preview-token", response_model=ContentPreviewTokenResponse)
+async def create_page_preview_token(
+    slug: str,
+    session: AsyncSession = Depends(get_session),
+    lang: str | None = Query(default=None, pattern="^(en|ro)$"),
+    expires_minutes: int = Query(default=60, ge=5, le=7 * 24 * 60),
+    _: User = Depends(require_admin_section("content")),
+) -> ContentPreviewTokenResponse:
+    slug_value = content_service.slugify_page_slug(slug)
+    if not slug_value:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+    key = f"page.{slug_value}"
+    block = await content_service.get_block_by_key(session, key)
+    if not block:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)
+    token = create_content_preview_token(content_key=key, expires_at=expires_at)
+
+    chosen_lang = lang or (block.lang if getattr(block, "lang", None) in ("en", "ro") else "en") or "en"
+    url = f"{settings.frontend_origin.rstrip('/')}/pages/{slug_value}?preview={token}&lang={chosen_lang}"
+    return ContentPreviewTokenResponse(token=token, expires_at=expires_at, url=url)
+
+
 @router.get("/{key}", response_model=ContentBlockRead)
 async def get_content(
     key: str,
@@ -138,6 +199,45 @@ async def get_content(
     return block
 
 
+@router.get("/home/preview", response_model=HomePreviewResponse)
+async def preview_home(
+    response: Response,
+    token: str = Query(..., min_length=1, description="Preview token"),
+    session: AsyncSession = Depends(get_session),
+    lang: str | None = Query(default=None, pattern="^(en|ro)$"),
+) -> HomePreviewResponse:
+    key = decode_content_preview_token(token)
+    if not key or key != "home.sections":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid preview token")
+    response.headers["Cache-Control"] = "private, no-store"
+
+    sections = await content_service.get_block_by_key(session, "home.sections", lang=lang)
+    if not sections:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+
+    story = await content_service.get_block_by_key(session, "home.story", lang=lang)
+    return HomePreviewResponse(sections=sections, story=story)
+
+
+@router.post("/home/preview-token", response_model=ContentPreviewTokenResponse)
+async def create_home_preview_token(
+    session: AsyncSession = Depends(get_session),
+    lang: str | None = Query(default=None, pattern="^(en|ro)$"),
+    expires_minutes: int = Query(default=60, ge=5, le=7 * 24 * 60),
+    _: User = Depends(require_admin_section("content")),
+) -> ContentPreviewTokenResponse:
+    block = await content_service.get_block_by_key(session, "home.sections")
+    if not block:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)
+    token = create_content_preview_token(content_key="home.sections", expires_at=expires_at)
+
+    chosen_lang = lang or (block.lang if getattr(block, "lang", None) in ("en", "ro") else "en") or "en"
+    url = f"{settings.frontend_origin.rstrip('/')}/?preview={token}&lang={chosen_lang}"
+    return ContentPreviewTokenResponse(token=token, expires_at=expires_at, url=url)
+
+
 @router.post("/admin/social/thumbnail", response_model=SocialThumbnailResponse)
 async def admin_fetch_social_thumbnail(
     payload: SocialThumbnailRequest,
@@ -150,6 +250,89 @@ async def admin_fetch_social_thumbnail(
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Could not fetch thumbnail") from exc
     return SocialThumbnailResponse(thumbnail_url=thumbnail_url)
+
+
+@router.get("/admin/scheduling", response_model=ContentSchedulingListResponse)
+async def admin_list_scheduling(
+    session: AsyncSession = Depends(get_session),
+    window_days: int = Query(default=90, ge=1, le=365),
+    window_start: datetime | None = Query(default=None, description="ISO datetime (optional)"),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=200),
+    _: User = Depends(require_admin_section("content")),
+) -> ContentSchedulingListResponse:
+    now = datetime.now(timezone.utc)
+    start = window_start
+    if start is None:
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=timezone.utc)
+    start = start.astimezone(timezone.utc)
+    window_end = start + timedelta(days=window_days)
+
+    key_filter = or_(
+        ContentBlock.key.like("page.%"),
+        ContentBlock.key.like("blog.%"),
+        ContentBlock.key.like("site.%"),
+    )
+
+    publish_filter = and_(
+        ContentBlock.published_at.is_not(None),
+        ContentBlock.published_at >= now,
+        ContentBlock.published_at < window_end,
+    )
+    unpublish_filter = and_(
+        ContentBlock.published_until.is_not(None),
+        ContentBlock.published_until >= now,
+        ContentBlock.published_until < window_end,
+    )
+
+    filters = [
+        key_filter,
+        ContentBlock.status == ContentStatus.published,
+        or_(publish_filter, unpublish_filter),
+    ]
+
+    publish_event = case((publish_filter, ContentBlock.published_at), else_=None)
+    unpublish_event = case((unpublish_filter, ContentBlock.published_until), else_=None)
+    next_event = case(
+        (publish_event.is_(None), unpublish_event),
+        (unpublish_event.is_(None), publish_event),
+        (publish_event <= unpublish_event, publish_event),
+        else_=unpublish_event,
+    )
+
+    total = await session.scalar(select(func.count()).select_from(ContentBlock).where(*filters))
+    total_items = int(total or 0)
+    total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
+    offset = (page - 1) * limit
+
+    result = await session.execute(
+        select(ContentBlock)
+        .where(*filters)
+        .order_by(next_event.asc(), ContentBlock.key.asc())
+        .offset(offset)
+        .limit(limit)
+    )
+    blocks = list(result.scalars().all())
+
+    items = [
+        ContentSchedulingItem(
+            key=b.key,
+            title=b.title,
+            status=b.status,
+            lang=b.lang,
+            published_at=b.published_at,
+            published_until=b.published_until,
+            updated_at=b.updated_at,
+        )
+        for b in blocks
+    ]
+
+    return ContentSchedulingListResponse(
+        items=items,
+        meta={"total_items": total_items, "total_pages": total_pages, "page": page, "limit": limit},
+    )
 
 
 @router.get("/admin/redirects", response_model=ContentRedirectListResponse)
@@ -207,6 +390,63 @@ async def admin_list_redirects(
     return ContentRedirectListResponse(
         items=items,
         meta={"total_items": total_items, "total_pages": total_pages, "page": page, "limit": limit},
+    )
+
+
+@router.post("/admin/redirects", response_model=ContentRedirectRead)
+async def admin_upsert_redirect(
+    payload: ContentRedirectUpsertRequest,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> ContentRedirectRead:
+    from_key_raw = (payload.from_key or "").strip()
+    to_key_raw = (payload.to_key or "").strip()
+    from_key = _redirect_display_value_to_key(from_key_raw)
+    to_key = _redirect_display_value_to_key(to_key_raw)
+    if not from_key or not to_key or from_key == to_key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid redirect")
+
+    target = await session.scalar(select(ContentBlock.key).where(ContentBlock.key == to_key))
+    if not target:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Redirect target not found")
+
+    redirect_map_rows = (await session.execute(select(ContentRedirect.from_key, ContentRedirect.to_key))).all()
+    redirect_map = {fk: tk for fk, tk in redirect_map_rows if fk and tk}
+    redirect_map[from_key] = to_key
+    chain_error = _redirect_chain_error(from_key, redirect_map)
+    if chain_error == "loop":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Redirect loop detected")
+    if chain_error == "too_deep":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Redirect chain too deep")
+
+    existing = await session.scalar(select(ContentRedirect).where(ContentRedirect.from_key == from_key))
+    if existing:
+        existing.to_key = to_key
+        session.add(existing)
+        await session.commit()
+        await session.refresh(existing)
+        return ContentRedirectRead(
+            id=existing.id,
+            from_key=existing.from_key,
+            to_key=existing.to_key,
+            created_at=existing.created_at,
+            updated_at=existing.updated_at,
+            target_exists=True,
+            chain_error=None,
+        )
+
+    redirect = ContentRedirect(from_key=from_key, to_key=to_key)
+    session.add(redirect)
+    await session.commit()
+    await session.refresh(redirect)
+    return ContentRedirectRead(
+        id=redirect.id,
+        from_key=redirect.from_key,
+        to_key=redirect.to_key,
+        created_at=redirect.created_at,
+        updated_at=redirect.updated_at,
+        target_exists=True,
+        chain_error=None,
     )
 
 
@@ -506,6 +746,8 @@ async def admin_list_content_images(
         items.append(
             ContentImageAssetRead(
                 id=img.id,
+                root_image_id=getattr(img, "root_image_id", None),
+                source_image_id=getattr(img, "source_image_id", None),
                 url=img.url,
                 alt_text=img.alt_text,
                 sort_order=img.sort_order,
@@ -559,6 +801,8 @@ async def admin_update_content_image_tags(
 
     return ContentImageAssetRead(
         id=image.id,
+        root_image_id=getattr(image, "root_image_id", None),
+        source_image_id=getattr(image, "source_image_id", None),
         url=image.url,
         alt_text=image.alt_text,
         sort_order=image.sort_order,
@@ -597,6 +841,8 @@ async def admin_update_content_image_focal_point(
 
     return ContentImageAssetRead(
         id=image.id,
+        root_image_id=getattr(image, "root_image_id", None),
+        source_image_id=getattr(image, "source_image_id", None),
         url=image.url,
         alt_text=image.alt_text,
         sort_order=image.sort_order,
@@ -608,6 +854,83 @@ async def admin_update_content_image_focal_point(
     )
 
 
+@router.post("/admin/assets/images/{image_id}/edit", response_model=ContentImageAssetRead, status_code=status.HTTP_201_CREATED)
+async def admin_edit_content_image(
+    image_id: UUID,
+    payload: ContentImageEditRequest,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> ContentImageAssetRead:
+    image = await session.scalar(select(ContentImage).where(ContentImage.id == image_id))
+    if not image:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+
+    edited = await content_service.edit_image_asset(session, image=image, payload=payload, actor_id=admin.id)
+
+    tags = (
+        await session.execute(select(ContentImageTag.tag).where(ContentImageTag.content_image_id == edited.id))
+    ).scalars().all()
+    tags_sorted = sorted(set(tags))
+
+    content_key = ""
+    if getattr(edited, "content_block_id", None):
+        content_key = (await session.scalar(select(ContentBlock.key).where(ContentBlock.id == edited.content_block_id))) or ""
+
+    return ContentImageAssetRead(
+        id=edited.id,
+        root_image_id=getattr(edited, "root_image_id", None),
+        source_image_id=getattr(edited, "source_image_id", None),
+        url=edited.url,
+        alt_text=edited.alt_text,
+        sort_order=edited.sort_order,
+        focal_x=getattr(edited, "focal_x", 50),
+        focal_y=getattr(edited, "focal_y", 50),
+        created_at=edited.created_at,
+        content_key=content_key,
+        tags=tags_sorted,
+    )
+
+
+@router.get("/admin/assets/images/{image_id}/usage", response_model=ContentImageAssetUsageResponse)
+async def admin_get_content_image_usage(
+    image_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> ContentImageAssetUsageResponse:
+    image = await session.scalar(select(ContentImage).where(ContentImage.id == image_id))
+    if not image:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+
+    content_key = ""
+    if getattr(image, "content_block_id", None):
+        content_key = (await session.scalar(select(ContentBlock.key).where(ContentBlock.id == image.content_block_id))) or ""
+
+    url = (getattr(image, "url", None) or "").strip()
+    keys = await content_service.get_asset_usage_keys(session, url=url)
+
+    return ContentImageAssetUsageResponse(
+        image_id=image.id,
+        url=url,
+        stored_in_key=content_key or None,
+        keys=keys,
+    )
+
+
+@router.delete("/admin/assets/images/{image_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def admin_delete_content_image(
+    image_id: UUID,
+    delete_versions: bool = Query(default=False, description="Delete original and edited versions (if any)"),
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> Response:
+    image = await session.scalar(select(ContentImage).where(ContentImage.id == image_id))
+    if not image:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+
+    await content_service.delete_image_asset(session, image=image, actor_id=admin.id, delete_versions=delete_versions)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get("/admin/tools/link-check", response_model=ContentLinkCheckResponse)
 async def admin_link_check(
     key: str = Query(..., description="Content key to check"),
@@ -616,6 +939,66 @@ async def admin_link_check(
 ) -> ContentLinkCheckResponse:
     issues = await content_service.check_content_links(session, key=key)
     return ContentLinkCheckResponse(issues=issues)
+
+
+@router.post("/admin/tools/link-check/preview", response_model=ContentLinkCheckResponse)
+async def admin_link_check_preview(
+    payload: ContentLinkCheckPreviewRequest,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> ContentLinkCheckResponse:
+    issues = await content_service.check_content_links_preview(
+        session,
+        key=payload.key,
+        body_markdown=payload.body_markdown,
+        meta=payload.meta,
+        images=payload.images,
+    )
+    return ContentLinkCheckResponse(issues=issues)
+
+
+@router.post("/admin/tools/find-replace/preview", response_model=ContentFindReplacePreviewResponse)
+async def admin_find_replace_preview(
+    payload: ContentFindReplacePreviewRequest,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> ContentFindReplacePreviewResponse:
+    items, total_items, total_matches, truncated = await content_service.preview_find_replace(
+        session,
+        find=payload.find,
+        replace=payload.replace,
+        key_prefix=payload.key_prefix,
+        case_sensitive=payload.case_sensitive,
+        limit=payload.limit,
+    )
+    return ContentFindReplacePreviewResponse(
+        items=items,
+        total_items=total_items,
+        total_matches=total_matches,
+        truncated=truncated,
+    )
+
+
+@router.post("/admin/tools/find-replace/apply", response_model=ContentFindReplaceApplyResponse)
+async def admin_find_replace_apply(
+    payload: ContentFindReplaceApplyRequest,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> ContentFindReplaceApplyResponse:
+    updated_blocks, updated_translations, total_replacements, errors = await content_service.apply_find_replace(
+        session,
+        find=payload.find,
+        replace=payload.replace,
+        key_prefix=payload.key_prefix,
+        case_sensitive=payload.case_sensitive,
+        actor_id=admin.id,
+    )
+    return ContentFindReplaceApplyResponse(
+        updated_blocks=updated_blocks,
+        updated_translations=updated_translations,
+        total_replacements=total_replacements,
+        errors=errors,
+    )
 
 
 @router.get("/admin/pages/list", response_model=list[ContentPageListItem])

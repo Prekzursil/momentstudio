@@ -4,7 +4,7 @@ import { ApiService } from './api.service';
 import { parseMoney } from '../shared/money';
 import { map } from 'rxjs/operators';
 
-export type SortOption = 'newest' | 'price_asc' | 'price_desc' | 'name_asc' | 'name_desc';
+export type SortOption = 'recommended' | 'newest' | 'price_asc' | 'price_desc' | 'name_asc' | 'name_desc';
 
 export interface Category {
   id: string;
@@ -12,11 +12,17 @@ export interface Category {
   name: string;
   parent_id?: string | null;
   sort_order?: number;
+  thumbnail_url?: string | null;
+  banner_url?: string | null;
+  is_visible?: boolean;
 }
 
 export interface ProductImage {
+  id?: string;
   url: string;
   alt_text?: string | null;
+  caption?: string | null;
+  sort_order?: number | null;
 }
 
 export interface ProductVariant {
@@ -45,6 +51,9 @@ export interface Product {
   sale_type?: 'percent' | 'amount' | null;
   sale_value?: number | null;
   currency: string;
+  status?: 'draft' | 'published' | 'archived' | string;
+  is_active?: boolean;
+  is_featured?: boolean;
   stock_quantity?: number | null;
   allow_backorder?: boolean | null;
   rating_average?: number;
@@ -90,6 +99,7 @@ export interface ProductFilterParams {
   min_price?: number;
   max_price?: number;
   is_featured?: boolean;
+  include_unpublished?: boolean;
   tags?: string[];
   sort?: SortOption;
   page?: number;
@@ -122,8 +132,8 @@ export class CatalogService {
     } as Product;
   }
 
-  listCategories(): Observable<Category[]> {
-    return this.api.get<Category[]>('/catalog/categories');
+  listCategories(lang?: 'en' | 'ro', opts?: { include_hidden?: boolean }): Observable<Category[]> {
+    return this.api.get<Category[]>('/catalog/categories', { lang, include_hidden: opts?.include_hidden });
   }
 
   listProducts(params: ProductFilterParams): Observable<ProductListResponse> {
@@ -135,6 +145,7 @@ export class CatalogService {
       min_price: params.min_price,
       max_price: params.max_price,
       is_featured: params.is_featured,
+      include_unpublished: params.include_unpublished,
       tags: params.tags?.length ? params.tags : undefined,
       sort: params.sort,
       page: params.page ?? 1,

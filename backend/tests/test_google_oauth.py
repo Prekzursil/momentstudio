@@ -13,6 +13,7 @@ from app.core.config import settings
 from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
+from app.models.content import ContentBlock, ContentStatus
 from app.models.passkeys import UserPasskey
 from app.models.user import User, UserRole
 from app.services import auth as auth_service
@@ -26,6 +27,28 @@ def test_app():
     async def init_models() -> None:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+        async with SessionLocal() as session:
+            session.add_all(
+                [
+                    ContentBlock(
+                        key="page.terms-and-conditions",
+                        title="Terms",
+                        body_markdown="Terms",
+                        status=ContentStatus.published,
+                        version=1,
+                        published_at=datetime.now(timezone.utc),
+                    ),
+                    ContentBlock(
+                        key="page.privacy-policy",
+                        title="Privacy",
+                        body_markdown="Privacy",
+                        status=ContentStatus.published,
+                        version=1,
+                        published_at=datetime.now(timezone.utc),
+                    ),
+                ]
+            )
+            await session.commit()
 
     asyncio.run(init_models())
 
@@ -238,6 +261,8 @@ def test_google_link_and_unlink(monkeypatch: pytest.MonkeyPatch, test_app):
             "last_name": "User",
             "date_of_birth": "2000-01-01",
             "phone": "+40723204204",
+            "accept_terms": True,
+            "accept_privacy": True,
         },
     )
     assert res.status_code == 201
@@ -331,6 +356,8 @@ def test_google_created_user_can_set_password_and_login(monkeypatch: pytest.Monk
             "phone": "+40723204204",
             "password": "newpass123",
             "preferred_language": "en",
+            "accept_terms": True,
+            "accept_privacy": True,
         },
     )
     assert res.status_code == 200, res.text
@@ -365,6 +392,8 @@ def test_admin_cleanup_incomplete_google_accounts(monkeypatch: pytest.MonkeyPatc
             "last_name": "Admin",
             "date_of_birth": "2000-01-01",
             "phone": "+40723204204",
+            "accept_terms": True,
+            "accept_privacy": True,
         },
     )
     assert res.status_code == 201, res.text
@@ -453,6 +482,8 @@ def test_upload_avatar_updates_avatar_url(monkeypatch: pytest.MonkeyPatch, tmp_p
             "last_name": "User",
             "date_of_birth": "2000-01-01",
             "phone": "+40723204204",
+            "accept_terms": True,
+            "accept_privacy": True,
         },
     )
     assert res.status_code == 201, res.text
@@ -493,6 +524,8 @@ def test_google_avatar_opt_in_and_cleanup(monkeypatch: pytest.MonkeyPatch, test_
             "last_name": "Google",
             "date_of_birth": "2000-01-01",
             "phone": "+40723204204",
+            "accept_terms": True,
+            "accept_privacy": True,
         },
     )
     assert res.status_code == 201, res.text

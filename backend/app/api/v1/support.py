@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -37,6 +37,7 @@ from app.schemas.support import (
     SupportSlaSettingsUpdate,
 )
 from app.services import auth as auth_service
+from app.services import captcha as captcha_service
 from app.services import content as content_service
 from app.services import email as email_service
 from app.services import support as support_service
@@ -104,9 +105,11 @@ def _mask_contact_submission_read(record: ContactSubmissionRead) -> ContactSubmi
 async def submit_contact(
     payload: ContactSubmissionCreate,
     background_tasks: BackgroundTasks,
+    request: Request,
     session: AsyncSession = Depends(get_session),
     current_user: User | None = Depends(get_current_user_optional),
 ) -> ContactSubmissionRead:
+    await captcha_service.verify(payload.captcha_token, remote_ip=request.client.host if request.client else None)
     record = await support_service.create_contact_submission(
         session,
         topic=payload.topic,

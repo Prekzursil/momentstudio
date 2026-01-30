@@ -100,6 +100,8 @@ describe('Checkout auth gating', () => {
     tick();
 
     cmp.shippingCountryInput = 'RO';
+    cmp.acceptTerms = true;
+    cmp.acceptPrivacy = true;
     cmp.placeOrder({ valid: true, control: { updateValueAndValidity: () => {} } } as any);
     tick();
 

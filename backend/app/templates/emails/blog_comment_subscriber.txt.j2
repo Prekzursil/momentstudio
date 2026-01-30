@@ -1,0 +1,16 @@
+{% if lang == 'ro' -%}
+Comentariu nou la articolul urmărit: {{ post_title }}
+De la: {{ commenter_name }}
+
+{{ comment_body }}
+
+Vezi: {{ post_url }}
+{%- else -%}
+New comment on the post you follow: {{ post_title }}
+From: {{ commenter_name }}
+
+{{ comment_body }}
+
+View: {{ post_url }}
+{%- endif %}
+

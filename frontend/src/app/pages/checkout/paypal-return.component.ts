@@ -11,6 +11,8 @@ import { ContainerComponent } from '../../layout/container.component';
 const CHECKOUT_SUCCESS_KEY = 'checkout_last_order';
 const CHECKOUT_PAYPAL_PENDING_KEY = 'checkout_paypal_pending';
 
+type MockOutcome = 'success' | 'decline';
+
 @Component({
   selector: 'app-paypal-return',
   standalone: true,
@@ -53,6 +55,7 @@ export class PayPalReturnComponent implements OnInit {
   loading = true;
   errorMessage = '';
   private token = '';
+  private mock: MockOutcome | null = null;
 
   constructor(
     private route: ActivatedRoute,
@@ -88,6 +91,10 @@ export class PayPalReturnComponent implements OnInit {
 
   ngOnInit(): void {
     this.token = this.route.snapshot.queryParamMap.get('token') || '';
+    const mockRaw = (this.route.snapshot.queryParamMap.get('mock') || '').toLowerCase();
+    if (mockRaw === 'success' || mockRaw === 'decline') {
+      this.mock = mockRaw;
+    }
     if (!this.token) {
       this.loading = false;
       this.errorMessage = this.translate.instant('checkout.paypalMissingToken');
@@ -108,8 +115,9 @@ export class PayPalReturnComponent implements OnInit {
     this.errorMessage = '';
 
     const orderId = this.pendingOrderId();
-    const payload: { paypal_order_id: string; order_id?: string } = { paypal_order_id: token };
+    const payload: { paypal_order_id: string; order_id?: string; mock?: MockOutcome } = { paypal_order_id: token };
     if (orderId) payload.order_id = orderId;
+    if (this.mock) payload.mock = this.mock;
 
     this.api
       .post<{ order_id: string; reference_code?: string; status: string; paypal_capture_id?: string | null }>(

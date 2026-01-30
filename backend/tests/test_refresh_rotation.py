@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -7,6 +8,7 @@ from app.core.security import decode_token
 from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
+from app.models.content import ContentBlock, ContentStatus
 
 
 def test_refresh_token_rotation() -> None:
@@ -16,6 +18,28 @@ def test_refresh_token_rotation() -> None:
     async def init_models() -> None:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+        async with SessionLocal() as session:
+            session.add_all(
+                [
+                    ContentBlock(
+                        key="page.terms-and-conditions",
+                        title="Terms",
+                        body_markdown="Terms",
+                        status=ContentStatus.published,
+                        version=1,
+                        published_at=datetime.now(timezone.utc),
+                    ),
+                    ContentBlock(
+                        key="page.privacy-policy",
+                        title="Privacy",
+                        body_markdown="Privacy",
+                        status=ContentStatus.published,
+                        version=1,
+                        published_at=datetime.now(timezone.utc),
+                    ),
+                ]
+            )
+            await session.commit()
 
     asyncio.run(init_models())
 
@@ -35,6 +59,8 @@ def test_refresh_token_rotation() -> None:
         "last_name": "User",
         "date_of_birth": "2000-01-01",
         "phone": "+40723204204",
+        "accept_terms": True,
+        "accept_privacy": True,
     }
     res = client.post("/api/v1/auth/register", json=register_payload)
     assert res.status_code == 201, res.text

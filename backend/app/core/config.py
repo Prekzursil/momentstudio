@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/adrianaart"
     backup_last_at: str | None = None
     secret_key: str = "dev-secret-key"
+    # Payments provider mode used by our API endpoints.
+    # - real: use Stripe/PayPal APIs (default)
+    # - mock: deterministic local-only provider for CI/E2E (never use in production)
+    payments_provider: str = "real"
     stripe_secret_key: str = "sk_test_placeholder"
     stripe_publishable_key: str | None = None
     stripe_webhook_secret: str | None = None
@@ -126,10 +130,15 @@ class Settings(BaseSettings):
     google_allowed_domains: list[str] = []
     google_completion_token_exp_minutes: int = 30
 
-    # CAPTCHA (login/register only; Google OAuth is exempt)
+    # CAPTCHA (used in auth + optional blog comment protection; Google OAuth is exempt)
     captcha_enabled: bool = False
     captcha_provider: str = "turnstile"
     turnstile_secret_key: str | None = None
+
+    # Blog comments: spam controls
+    blog_comments_rate_limit_count: int = 10
+    blog_comments_rate_limit_window_seconds: int = 60
+    blog_comments_max_links: int = 2
 
     # FX rates (used for display-only approximations; checkout remains in RON)
     fx_rates_url: str = "https://www.bnr.ro/nbrfxrates.xml"

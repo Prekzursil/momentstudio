@@ -4,12 +4,16 @@ from typing import Dict
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from app.core.config import settings
 from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
 from app.models.passkeys import UserPasskey
+from app.models.content import ContentBlock
+from app.models.user import User
 from app.models.user import UserRole
 from app.schemas.user import UserCreate
 from app.services.auth import create_user, issue_tokens_for_user
@@ -69,6 +73,7 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
 
     admin_token = create_user_token(SessionLocal, email="admin@example.com", role=UserRole.admin)
+    admin2_token = create_user_token(SessionLocal, email="admin2@example.com", role=UserRole.admin)
     user_token = create_user_token(SessionLocal, email="user@example.com", role=UserRole.customer)
     flagger_token = create_user_token(SessionLocal, email="flagger@example.com", role=UserRole.customer)
     flagger2_token = create_user_token(SessionLocal, email="flagger2@example.com", role=UserRole.customer)
@@ -179,6 +184,40 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     )
     assert create2.status_code == 201, create2.text
 
+    # Verify author payload and author filter.
+    create3 = client.post(
+        "/api/v1/content/admin/blog.third-post",
+        json={
+            "title": "Third post",
+            "body_markdown": "Third content.",
+            "status": "published",
+            "lang": "en",
+        },
+        headers=auth_headers(admin2_token),
+    )
+    assert create3.status_code == 201, create3.text
+
+    third_detail = client.get("/api/v1/blog/posts/third-post", params={"lang": "en"})
+    assert third_detail.status_code == 200, third_detail.text
+    author = third_detail.json().get("author") or {}
+    author_id = author.get("id")
+    assert author_id, third_detail.json()
+
+    filtered_author = client.get("/api/v1/blog/posts", params={"lang": "en", "author_id": author_id})
+    assert filtered_author.status_code == 200, filtered_author.text
+    assert filtered_author.json()["meta"]["total_items"] == 1
+    assert filtered_author.json()["items"][0]["slug"] == "third-post"
+
+    neighbors_first = client.get("/api/v1/blog/posts/first-post/neighbors", params={"lang": "en"})
+    assert neighbors_first.status_code == 200, neighbors_first.text
+    assert neighbors_first.json()["previous"]["slug"] == "second-post"
+    assert neighbors_first.json()["next"] is None
+
+    neighbors_second = client.get("/api/v1/blog/posts/second-post/neighbors", params={"lang": "en"})
+    assert neighbors_second.status_code == 200, neighbors_second.text
+    assert neighbors_second.json()["previous"]["slug"] == "third-post"
+    assert neighbors_second.json()["next"]["slug"] == "first-post"
+
     filtered_tag = client.get("/api/v1/blog/posts", params={"lang": "en", "tag": "ceramics"})
     assert filtered_tag.status_code == 200, filtered_tag.text
     assert filtered_tag.json()["meta"]["total_items"] == 1
@@ -205,7 +244,7 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     assert expired.status_code == 201, expired.text
     expired_listing = client.get("/api/v1/blog/posts", params={"lang": "en"})
     assert expired_listing.status_code == 200, expired_listing.text
-    assert expired_listing.json()["meta"]["total_items"] == 2
+    assert expired_listing.json()["meta"]["total_items"] == 3
     expired_detail = client.get("/api/v1/blog/posts/expired-post", params={"lang": "en"})
     assert expired_detail.status_code == 404, expired_detail.text
 
@@ -226,8 +265,8 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
 
     listing_after_schedule = client.get("/api/v1/blog/posts", params={"lang": "en"})
     assert listing_after_schedule.status_code == 200, listing_after_schedule.text
-    assert listing_after_schedule.json()["meta"]["total_items"] == 2
-    assert {i["slug"] for i in listing_after_schedule.json()["items"]} == {"first-post", "second-post"}
+    assert listing_after_schedule.json()["meta"]["total_items"] == 3
+    assert {i["slug"] for i in listing_after_schedule.json()["items"]} == {"first-post", "second-post", "third-post"}
 
     scheduled_detail = client.get("/api/v1/blog/posts/scheduled-post", params={"lang": "en"})
     assert scheduled_detail.status_code == 404, scheduled_detail.text
@@ -238,6 +277,7 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     assert sitemap.status_code == 200
     assert "blog/first-post?lang=en" in sitemap.text
     assert "blog/second-post?lang=en" in sitemap.text
+    assert "blog/third-post?lang=en" in sitemap.text
     assert "blog/scheduled-post?lang=en" not in sitemap.text
     assert "blog/expired-post?lang=en" not in sitemap.text
 
@@ -337,6 +377,46 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     assert by_id[comment_id]["parent_id"] is None
     assert by_id[reply_id]["parent_id"] == comment_id
 
+    threads = client.get(
+        "/api/v1/blog/posts/first-post/comment-threads",
+        params={"sort": "newest", "page": 1, "limit": 10},
+    )
+    assert threads.status_code == 200, threads.text
+    threads_json = threads.json()
+    assert threads_json["total_comments"] == 2
+    assert threads_json["meta"]["total_items"] == 1
+    assert threads_json["items"][0]["root"]["id"] == comment_id
+    assert {r["id"] for r in threads_json["items"][0]["replies"]} == {reply_id}
+
+    second_root = client.post(
+        "/api/v1/blog/posts/first-post/comments",
+        json={"body": "Second root"},
+        headers=auth_headers(user_token),
+    )
+    assert second_root.status_code == 201, second_root.text
+    second_root_id = second_root.json()["id"]
+    reply2 = client.post(
+        "/api/v1/blog/posts/first-post/comments",
+        json={"body": "Reply A", "parent_id": second_root_id},
+        headers=auth_headers(flagger_token),
+    )
+    assert reply2.status_code == 201, reply2.text
+    reply3 = client.post(
+        "/api/v1/blog/posts/first-post/comments",
+        json={"body": "Reply B", "parent_id": second_root_id},
+        headers=auth_headers(flagger2_token),
+    )
+    assert reply3.status_code == 201, reply3.text
+
+    threads_top = client.get(
+        "/api/v1/blog/posts/first-post/comment-threads",
+        params={"sort": "top", "page": 1, "limit": 10},
+    )
+    assert threads_top.status_code == 200, threads_top.text
+    top_items = threads_top.json()["items"]
+    assert top_items[0]["root"]["id"] == second_root_id
+    assert top_items[1]["root"]["id"] == comment_id
+
     # Moderation: users can flag comments, admins can review/resolve/hide/unhide.
     flagged = client.post(
         f"/api/v1/blog/comments/{comment_id}/flag",
@@ -411,11 +491,183 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     assert unpublish.status_code == 200, unpublish.text
     listing_after_unpublish = client.get("/api/v1/blog/posts", params={"lang": "en"})
     assert listing_after_unpublish.status_code == 200, listing_after_unpublish.text
-    assert listing_after_unpublish.json()["meta"]["total_items"] == 1
-    assert {i["slug"] for i in listing_after_unpublish.json()["items"]} == {"first-post"}
+    assert listing_after_unpublish.json()["meta"]["total_items"] == 2
+    assert {i["slug"] for i in listing_after_unpublish.json()["items"]} == {"first-post", "third-post"}
     detail_unpublished = client.get("/api/v1/blog/posts/second-post", params={"lang": "en"})
     assert detail_unpublished.status_code == 404, detail_unpublished.text
     sitemap_after_unpublish = client.get("/api/v1/sitemap.xml")
     assert sitemap_after_unpublish.status_code == 200
     assert "blog/first-post?lang=en" in sitemap_after_unpublish.text
     assert "blog/second-post?lang=en" not in sitemap_after_unpublish.text
+    assert "blog/third-post?lang=en" in sitemap_after_unpublish.text
+
+
+def test_blog_comment_spam_controls(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    admin_token = create_user_token(SessionLocal, email="admin@example.com", role=UserRole.admin)
+    user_token = create_user_token(SessionLocal, email="user@example.com", role=UserRole.customer)
+
+    create_post = client.post(
+        "/api/v1/content/admin/blog.first-post",
+        json={
+            "title": "Salut",
+            "body_markdown": "Postare RO",
+            "status": "published",
+            "lang": "ro",
+            "meta": {"summary": {"ro": "Rezumat RO", "en": "Summary EN"}},
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert create_post.status_code == 201, create_post.text
+
+    old_rate_limit = settings.blog_comments_rate_limit_count
+    old_rate_window = settings.blog_comments_rate_limit_window_seconds
+    old_max_links = settings.blog_comments_max_links
+    settings.blog_comments_rate_limit_count = 2
+    settings.blog_comments_rate_limit_window_seconds = 60
+    settings.blog_comments_max_links = 0
+    try:
+        link_blocked = client.post(
+            "/api/v1/blog/posts/first-post/comments",
+            json={"body": "Check https://example.com"},
+            headers=auth_headers(user_token),
+        )
+        assert link_blocked.status_code == 400, link_blocked.text
+        assert "link" in link_blocked.json()["detail"].lower()
+
+        ok1 = client.post(
+            "/api/v1/blog/posts/first-post/comments",
+            json={"body": "One"},
+            headers=auth_headers(user_token),
+        )
+        assert ok1.status_code == 201, ok1.text
+        ok2 = client.post(
+            "/api/v1/blog/posts/first-post/comments",
+            json={"body": "Two"},
+            headers=auth_headers(user_token),
+        )
+        assert ok2.status_code == 201, ok2.text
+        limited = client.post(
+            "/api/v1/blog/posts/first-post/comments",
+            json={"body": "Three"},
+            headers=auth_headers(user_token),
+        )
+        assert limited.status_code == 429, limited.text
+    finally:
+        settings.blog_comments_rate_limit_count = old_rate_limit
+        settings.blog_comments_rate_limit_window_seconds = old_rate_window
+        settings.blog_comments_max_links = old_max_links
+
+
+def test_blog_comment_subscription_toggle(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    admin_token = create_user_token(SessionLocal, email="admin@example.com", role=UserRole.admin)
+    user_token = create_user_token(SessionLocal, email="user@example.com", role=UserRole.customer)
+
+    async def verify_user() -> None:
+        async with SessionLocal() as session:
+            user = await session.scalar(select(User).where(User.email == "user@example.com"))
+            assert user is not None
+            user.email_verified = True
+            session.add(user)
+            await session.commit()
+
+    asyncio.run(verify_user())
+
+    create_post = client.post(
+        "/api/v1/content/admin/blog.first-post",
+        json={
+            "title": "Salut",
+            "body_markdown": "Postare RO",
+            "status": "published",
+            "lang": "ro",
+            "meta": {"summary": {"ro": "Rezumat RO", "en": "Summary EN"}},
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert create_post.status_code == 201, create_post.text
+
+    initial = client.get("/api/v1/blog/posts/first-post/comment-subscription", headers=auth_headers(user_token))
+    assert initial.status_code == 200, initial.text
+    assert initial.json()["enabled"] is False
+
+    enabled = client.put(
+        "/api/v1/blog/posts/first-post/comment-subscription",
+        json={"enabled": True},
+        headers=auth_headers(user_token),
+    )
+    assert enabled.status_code == 200, enabled.text
+    assert enabled.json()["enabled"] is True
+
+    after_enable = client.get("/api/v1/blog/posts/first-post/comment-subscription", headers=auth_headers(user_token))
+    assert after_enable.status_code == 200, after_enable.text
+    assert after_enable.json()["enabled"] is True
+
+    disabled = client.put(
+        "/api/v1/blog/posts/first-post/comment-subscription",
+        json={"enabled": False},
+        headers=auth_headers(user_token),
+    )
+    assert disabled.status_code == 200, disabled.text
+    assert disabled.json()["enabled"] is False
+
+
+def test_blog_view_count_deduped_per_session_and_skips_bots(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    admin_token = create_user_token(SessionLocal, email="admin@example.com", role=UserRole.admin)
+
+    now = datetime.now(timezone.utc)
+    past = (now - timedelta(days=1)).isoformat()
+
+    create = client.post(
+        "/api/v1/content/admin/blog.view-post",
+        json={
+            "title": "View post",
+            "body_markdown": "Content",
+            "status": "published",
+            "lang": "en",
+            "published_at": past,
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert create.status_code == 201, create.text
+
+    def get_view_count() -> int:
+        async def _query() -> int:
+            async with SessionLocal() as session:
+                block = await session.scalar(select(ContentBlock).where(ContentBlock.key == "blog.view-post"))
+                assert block is not None
+                return int(block.view_count or 0)
+
+        return asyncio.run(_query())
+
+    assert get_view_count() == 0
+
+    first = client.get("/api/v1/blog/posts/view-post", params={"lang": "en"})
+    assert first.status_code == 200, first.text
+    assert get_view_count() == 1
+    assert client.cookies.get("blog_viewed"), "Expected de-dupe cookie to be set"
+
+    second = client.get("/api/v1/blog/posts/view-post", params={"lang": "en"})
+    assert second.status_code == 200, second.text
+    assert get_view_count() == 1
+
+    client.cookies.clear()
+    third = client.get("/api/v1/blog/posts/view-post", params={"lang": "en"})
+    assert third.status_code == 200, third.text
+    assert get_view_count() == 2
+
+    client.cookies.clear()
+    bot = client.get(
+        "/api/v1/blog/posts/view-post",
+        params={"lang": "en"},
+        headers={"User-Agent": "Googlebot"},
+    )
+    assert bot.status_code == 200, bot.text
+    assert get_view_count() == 2

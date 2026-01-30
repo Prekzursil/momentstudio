@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 import hmac
 from typing import Callable, Dict
+from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
@@ -16,7 +17,9 @@ from app.main import app
 from app.core.config import settings
 from app.db.base import Base
 from app.db.session import get_session
+from app.models.legal import LegalConsent, LegalConsentContext
 from app.models.passkeys import UserPasskey
+from app.models.content import ContentBlock, ContentStatus
 from app.models.user import User, UserRole, UserDisplayNameHistory, UserUsernameHistory
 
 
@@ -28,6 +31,28 @@ def test_app() -> Dict[str, object]:
     async def init_models() -> None:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+        async with SessionLocal() as session:
+            session.add_all(
+                [
+                    ContentBlock(
+                        key="page.terms-and-conditions",
+                        title="Terms",
+                        body_markdown="Terms",
+                        status=ContentStatus.published,
+                        version=1,
+                        published_at=datetime.now(timezone.utc),
+                    ),
+                    ContentBlock(
+                        key="page.privacy-policy",
+                        title="Privacy",
+                        body_markdown="Privacy",
+                        status=ContentStatus.published,
+                        version=1,
+                        published_at=datetime.now(timezone.utc),
+                    ),
+                ]
+            )
+            await session.commit()
 
     asyncio.run(init_models())
 
@@ -57,6 +82,8 @@ def make_register_payload(
     middle_name: str | None = None,
     date_of_birth: str = "2000-01-01",
     phone: str = "+40723204204",
+    accept_terms: bool = True,
+    accept_privacy: bool = True,
 ) -> dict[str, object]:
     payload: dict[str, object] = {
         "email": email,
@@ -67,6 +94,8 @@ def make_register_payload(
         "last_name": last_name,
         "date_of_birth": date_of_birth,
         "phone": phone,
+        "accept_terms": accept_terms,
+        "accept_privacy": accept_privacy,
     }
     if middle_name is not None:
         payload["middle_name"] = middle_name
@@ -121,6 +150,46 @@ def test_register_and_login_flow(test_app: Dict[str, object]) -> None:
     refreshed = res.json()
     assert refreshed["access_token"]
     assert refreshed["refresh_token"]
+
+
+def test_register_requires_legal_consents(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+
+    register_payload = make_register_payload(
+        email="noconsent@example.com",
+        username="noconsent",
+        name="No Consent",
+        accept_terms=False,
+        accept_privacy=False,
+    )
+    res = client.post("/api/v1/auth/register", json=register_payload)
+    assert res.status_code == 400, res.text
+    assert res.json().get("detail") == "Legal consents required"
+
+
+def test_register_records_legal_consents(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    register_payload = make_register_payload(email="consented@example.com", username="consented", name="Consented")
+    res = client.post("/api/v1/auth/register", json=register_payload)
+    assert res.status_code == 201, res.text
+    user_id = UUID(res.json()["user"]["id"])
+
+    async def read_consents() -> list[LegalConsent]:
+        async with SessionLocal() as session:
+            rows = (
+                (await session.execute(select(LegalConsent).where(LegalConsent.user_id == user_id)))
+                .scalars()
+                .all()
+            )
+            return list(rows)
+
+    consents = asyncio.run(read_consents())
+    assert len(consents) == 2
+    assert {c.doc_key for c in consents} == {"page.terms-and-conditions", "page.privacy-policy"}
+    assert all(c.context == LegalConsentContext.register for c in consents)
+    assert all(c.doc_version == 1 for c in consents)
 
 
 def test_cooldowns_endpoint_returns_next_allowed_times(test_app: Dict[str, object]) -> None:

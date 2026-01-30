@@ -27,14 +27,12 @@ import { ButtonComponent } from './button.component';
                 <app-button [label]="slide.cta_label" [routerLink]="slide.cta_url"></app-button>
               </ng-container>
               <ng-template #externalCta>
-                <a
-                  class="inline-flex items-center justify-center rounded-full font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 bg-slate-900 text-white hover:bg-slate-800 focus-visible:outline-slate-900 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white px-4 py-2.5 text-sm"
+                <app-button
+                  [label]="slide.cta_label"
                   [href]="slide.cta_url"
                   target="_blank"
                   rel="noopener noreferrer"
-                >
-                  {{ slide.cta_label }}
-                </a>
+                ></app-button>
               </ng-template>
             </div>
           </div>
@@ -97,14 +95,12 @@ import { ButtonComponent } from './button.component';
                   <app-button [label]="slide.cta_label" [routerLink]="slide.cta_url"></app-button>
                 </ng-container>
                 <ng-template #externalFullCta>
-                  <a
-                    class="inline-flex items-center justify-center rounded-full font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 bg-slate-900 text-white hover:bg-slate-800 focus-visible:outline-slate-900 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white px-4 py-2.5 text-sm"
+                  <app-button
+                    [label]="slide.cta_label"
                     [href]="slide.cta_url"
                     target="_blank"
                     rel="noopener noreferrer"
-                  >
-                    {{ slide.cta_label }}
-                  </a>
+                  ></app-button>
                 </ng-template>
               </div>
             </div>

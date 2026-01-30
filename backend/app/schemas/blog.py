@@ -12,13 +12,22 @@ class BlogPostListItem(BaseModel):
     excerpt: str
     published_at: datetime | None = None
     cover_image_url: str | None = None
+    cover_focal_x: int | None = None
+    cover_focal_y: int | None = None
     tags: list[str] = Field(default_factory=list)
+    series: str | None = None
+    author_name: str | None = None
     reading_time_minutes: int | None = None
 
 
 class BlogPostListResponse(BaseModel):
     items: list[BlogPostListItem]
     meta: PaginationMeta
+
+
+class BlogPostNeighbors(BaseModel):
+    previous: BlogPostListItem | None = None
+    next: BlogPostListItem | None = None
 
 
 class BlogPreviewTokenResponse(BaseModel):
@@ -36,6 +45,14 @@ class BlogPostImage(BaseModel):
     sort_order: int
 
 
+class BlogPostAuthor(BaseModel):
+    id: UUID
+    name: str | None = None
+    name_tag: int | None = None
+    username: str | None = None
+    avatar_url: str | None = None
+
+
 class BlogPostRead(BaseModel):
     slug: str
     title: str
@@ -47,7 +64,12 @@ class BlogPostRead(BaseModel):
     meta: dict | None = None
     summary: str | None = None
     cover_image_url: str | None = None
+    cover_focal_x: int | None = None
+    cover_focal_y: int | None = None
     tags: list[str] = Field(default_factory=list)
+    series: str | None = None
+    author_name: str | None = None
+    author: BlogPostAuthor | None = None
     reading_time_minutes: int | None = None
 
 
@@ -62,6 +84,7 @@ class BlogCommentAuthor(BaseModel):
 class BlogCommentCreate(BaseModel):
     body: str = Field(min_length=1, max_length=2000)
     parent_id: UUID | None = None
+    captcha_token: str | None = Field(default=None, max_length=5000)
 
 
 class BlogCommentFlagCreate(BaseModel):
@@ -91,6 +114,17 @@ class BlogCommentRead(BaseModel):
 class BlogCommentListResponse(BaseModel):
     items: list[BlogCommentRead]
     meta: PaginationMeta
+
+
+class BlogCommentThreadRead(BaseModel):
+    root: BlogCommentRead
+    replies: list[BlogCommentRead] = Field(default_factory=list)
+
+
+class BlogCommentThreadListResponse(BaseModel):
+    items: list[BlogCommentThreadRead]
+    meta: PaginationMeta
+    total_comments: int = 0
 
 
 class BlogCommentAdminRead(BaseModel):

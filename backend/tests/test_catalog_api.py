@@ -1,4 +1,5 @@
 import asyncio
+import csv
 import io
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -1031,6 +1032,113 @@ def test_slug_history_recently_viewed_and_csv(test_app: Dict[str, object]) -> No
     body = import_res.json()
     assert body["errors"] == []
     assert body["created"] >= 0
+
+
+def test_category_csv_import_dry_run_and_apply(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_admin_token(SessionLocal, email="catimportadmin@example.com")
+
+    existing = client.post(
+        "/api/v1/catalog/categories",
+        json={"name": "Existing Cat"},
+        headers=auth_headers(admin_token),
+    )
+    assert existing.status_code == 201, existing.text
+
+    csv_content = "\n".join(
+        [
+            "slug,name,parent_slug,sort_order,is_visible,description,name_ro,description_ro,name_en,description_en",
+            "parent-cat,Parent,,1,true,Parent desc,Parinte,,Parent,",
+            "child-cat,Child,parent-cat,2,true,,Copil,Descr RO,Child,Desc EN",
+            "existing-cat,Existing Updated,,0,false,New desc,Existent RO,,Existing EN,",
+            "",
+        ]
+    )
+
+    dry_res = client.post(
+        "/api/v1/catalog/categories/import",
+        params={"dry_run": True},
+        files={"file": ("categories.csv", io.BytesIO(csv_content.encode("utf-8")), "text/csv")},
+        headers=auth_headers(admin_token),
+    )
+    assert dry_res.status_code == 200, dry_res.text
+    dry_body = dry_res.json()
+    assert dry_body["errors"] == []
+    assert dry_body["created"] == 2
+    assert dry_body["updated"] == 1
+
+    async def _get_category_name(slug: str) -> str | None:
+        async with SessionLocal() as session:
+            category = await session.scalar(select(Category).where(Category.slug == slug))
+            return category.name if category else None
+
+    assert asyncio.run(_get_category_name("parent-cat")) is None
+    assert asyncio.run(_get_category_name("child-cat")) is None
+    assert asyncio.run(_get_category_name("existing-cat")) == "Existing Cat"
+
+    apply_res = client.post(
+        "/api/v1/catalog/categories/import",
+        params={"dry_run": False},
+        files={"file": ("categories.csv", io.BytesIO(csv_content.encode("utf-8")), "text/csv")},
+        headers=auth_headers(admin_token),
+    )
+    assert apply_res.status_code == 200, apply_res.text
+    apply_body = apply_res.json()
+    assert apply_body["errors"] == []
+    assert apply_body["created"] == 2
+    assert apply_body["updated"] == 1
+
+    async def _fetch_category(slug: str) -> Category:
+        async with SessionLocal() as session:
+            category = await session.scalar(select(Category).where(Category.slug == slug))
+            assert category is not None
+            return category
+
+    parent = asyncio.run(_fetch_category("parent-cat"))
+    child = asyncio.run(_fetch_category("child-cat"))
+    updated = asyncio.run(_fetch_category("existing-cat"))
+    assert child.parent_id == parent.id
+    assert updated.name == "Existing Updated"
+    assert updated.is_visible is False
+
+    async def _fetch_translation(slug: str, lang: str) -> CategoryTranslation:
+        async with SessionLocal() as session:
+            category = await session.scalar(select(Category).where(Category.slug == slug))
+            assert category is not None
+            translation = await session.scalar(
+                select(CategoryTranslation).where(
+                    CategoryTranslation.category_id == category.id,
+                    CategoryTranslation.lang == lang,
+                )
+            )
+            assert translation is not None
+            return translation
+
+    ro_child = asyncio.run(_fetch_translation("child-cat", "ro"))
+    en_child = asyncio.run(_fetch_translation("child-cat", "en"))
+    assert ro_child.name == "Copil"
+    assert ro_child.description == "Descr RO"
+    assert en_child.name == "Child"
+    assert en_child.description == "Desc EN"
+
+    export_res = client.get("/api/v1/catalog/categories/export", headers=auth_headers(admin_token))
+    assert export_res.status_code == 200, export_res.text
+    reader = csv.DictReader(io.StringIO(export_res.text))
+    exported = {row.get("slug"): row for row in reader if row.get("slug")}
+    assert "parent-cat" in exported
+    assert exported["child-cat"]["parent_slug"] == "parent-cat"
+    assert exported["existing-cat"]["is_visible"] in {"false", "False", "0"}
+
+    template_res = client.get(
+        "/api/v1/catalog/categories/export",
+        params={"template": True},
+        headers=auth_headers(admin_token),
+    )
+    assert template_res.status_code == 200, template_res.text
+    assert template_res.text.splitlines() == [
+        "slug,name,parent_slug,sort_order,is_visible,description,name_ro,description_ro,name_en,description_en"
+    ]
 
 
 def test_preorder_shipping_meta_and_sort(test_app: Dict[str, object]) -> None:

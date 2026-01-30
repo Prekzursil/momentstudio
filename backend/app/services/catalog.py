@@ -290,6 +290,8 @@ async def upsert_product_image_translation(
     image: ProductImage,
     lang: str,
     payload: ProductImageTranslationUpsert,
+    user_id: uuid.UUID | None = None,
+    source: str | None = None,
 ) -> ProductImageTranslation:
     existing = await session.scalar(
         select(ProductImageTranslation).where(ProductImageTranslation.image_id == image.id, ProductImageTranslation.lang == lang)
@@ -304,16 +306,39 @@ async def upsert_product_image_translation(
         session.add(existing)
         await session.commit()
         await session.refresh(existing)
+        await _log_product_action(
+            session,
+            image.product_id,
+            "image_translation_upsert",
+            user_id,
+            {"source": source, "image_id": str(image.id), "lang": lang}
+            if source
+            else {"image_id": str(image.id), "lang": lang},
+        )
         return existing
 
     created = ProductImageTranslation(image_id=image.id, lang=lang, alt_text=alt_text, caption=caption)
     session.add(created)
     await session.commit()
     await session.refresh(created)
+    await _log_product_action(
+        session,
+        image.product_id,
+        "image_translation_upsert",
+        user_id,
+        {"source": source, "image_id": str(image.id), "lang": lang} if source else {"image_id": str(image.id), "lang": lang},
+    )
     return created
 
 
-async def delete_product_image_translation(session: AsyncSession, *, image: ProductImage, lang: str) -> None:
+async def delete_product_image_translation(
+    session: AsyncSession,
+    *,
+    image: ProductImage,
+    lang: str,
+    user_id: uuid.UUID | None = None,
+    source: str | None = None,
+) -> None:
     existing = await session.scalar(
         select(ProductImageTranslation).where(ProductImageTranslation.image_id == image.id, ProductImageTranslation.lang == lang)
     )
@@ -321,6 +346,13 @@ async def delete_product_image_translation(session: AsyncSession, *, image: Prod
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product image translation not found")
     await session.delete(existing)
     await session.commit()
+    await _log_product_action(
+        session,
+        image.product_id,
+        "image_translation_delete",
+        user_id,
+        {"source": source, "image_id": str(image.id), "lang": lang} if source else {"image_id": str(image.id), "lang": lang},
+    )
 
 
 def get_product_image_optimization_stats(image: ProductImage) -> dict[str, int | None]:
@@ -654,6 +686,9 @@ async def create_category(session: AsyncSession, payload: CategoryCreate) -> Cat
         slug=candidate,
         name=payload.name,
         description=payload.description,
+        thumbnail_url=getattr(payload, "thumbnail_url", None),
+        banner_url=getattr(payload, "banner_url", None),
+        is_visible=getattr(payload, "is_visible", True),
         sort_order=payload.sort_order,
         parent_id=payload.parent_id,
         tax_group_id=payload.tax_group_id,
@@ -706,20 +741,7 @@ async def reorder_categories(session: AsyncSession, payload: list[CategoryReorde
         return []
     session.add_all(updated)
     await session.commit()
-    return [
-        CategoryRead(
-            id=cat.id,
-            slug=cat.slug,
-            name=cat.name,
-            description=cat.description,
-            sort_order=cat.sort_order,
-            parent_id=cat.parent_id,
-            tax_group_id=getattr(cat, "tax_group_id", None),
-            created_at=cat.created_at,
-            updated_at=cat.updated_at,
-        )
-        for cat in updated
-    ]
+    return [CategoryRead.model_validate(cat) for cat in updated]
 
 
 async def create_product(
@@ -748,6 +770,23 @@ async def create_product(
     product_data["slug"] = candidate_slug
     product_data["sku"] = sku
     product_data["currency"] = payload.currency.upper()
+    custom_count = await session.scalar(
+        select(func.count(Product.id)).where(
+            Product.is_deleted.is_(False),
+            Product.category_id == payload.category_id,
+            Product.sort_order != 0,
+        )
+    )
+    if int(custom_count or 0) > 0:
+        max_sort = await session.scalar(
+            select(func.max(Product.sort_order)).where(
+                Product.is_deleted.is_(False),
+                Product.category_id == payload.category_id,
+            )
+        )
+        product_data["sort_order"] = int(max_sort or 0) + 1
+    else:
+        product_data["sort_order"] = 0
     product = Product(**product_data)
     _sync_sale_fields(product)
     _set_publish_timestamp(product, payload.status)
@@ -770,7 +809,12 @@ async def create_product(
 
 
 async def update_product(
-    session: AsyncSession, product: Product, payload: ProductUpdate, commit: bool = True, user_id: uuid.UUID | None = None
+    session: AsyncSession,
+    product: Product,
+    payload: ProductUpdate,
+    commit: bool = True,
+    user_id: uuid.UUID | None = None,
+    source: str | None = None,
 ) -> Product:
     was_out_of_stock = is_out_of_stock(product)
     before_stock_quantity = int(getattr(product, "stock_quantity", 0) or 0)
@@ -925,7 +969,10 @@ async def update_product(
         if was_out_of_stock and not is_now_out_of_stock:
             await fulfill_back_in_stock_requests(session, product=product)
         if changes:
-            await _log_product_action(session, product.id, "update", user_id, {"changes": changes, "patch": patch_snapshot})
+            audit_payload: dict[str, object] = {"changes": changes, "patch": patch_snapshot}
+            if source:
+                audit_payload["source"] = source
+            await _log_product_action(session, product.id, "update", user_id, audit_payload)
         await _maybe_alert_low_stock(session, product)
     else:
         await session.flush()
@@ -1135,7 +1182,14 @@ async def restore_product_image(session: AsyncSession, product: Product, image_i
     await _log_product_action(session, product.id, "image_restored", user_id, {"image_id": image_id, "url": image.url})
 
 
-async def update_product_image_sort(session: AsyncSession, product: Product, image_id: str, sort_order: int) -> Product:
+async def update_product_image_sort(
+    session: AsyncSession,
+    product: Product,
+    image_id: str,
+    sort_order: int,
+    user_id: uuid.UUID | None = None,
+    source: str | None = None,
+) -> Product:
     image = next((img for img in product.images if str(img.id) == str(image_id)), None)
     if not image:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
@@ -1143,6 +1197,15 @@ async def update_product_image_sort(session: AsyncSession, product: Product, ima
     session.add(image)
     await session.commit()
     await session.refresh(product, attribute_names=["images"])
+    await _log_product_action(
+        session,
+        product.id,
+        "image_sort",
+        user_id,
+        {"source": source, "image_id": image_id, "sort_order": sort_order}
+        if source
+        else {"image_id": image_id, "sort_order": sort_order},
+    )
     return product
 
 
@@ -1194,7 +1257,10 @@ async def restore_soft_deleted_product(
 
 
 async def bulk_update_products(
-    session: AsyncSession, updates: list[BulkProductUpdateItem], user_id: uuid.UUID | None = None
+    session: AsyncSession,
+    updates: list[BulkProductUpdateItem],
+    user_id: uuid.UUID | None = None,
+    source: str | None = None,
 ) -> list[Product]:
     product_ids = [item.product_id for item in updates]
     category_ids = {
@@ -1210,6 +1276,28 @@ async def bulk_update_products(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="One or more categories not found")
     product_result = await session.execute(select(Product).where(Product.id.in_(product_ids)))
     products = {p.id: p for p in product_result.scalars()}
+    category_sort_meta: dict[uuid.UUID, dict[str, int | bool]] = {}
+    if category_ids:
+        stats_rows = (
+            await session.execute(
+                select(
+                    Product.category_id,
+                    func.coalesce(func.max(Product.sort_order), 0),
+                    func.count(Product.id).filter(Product.sort_order != 0),
+                )
+                .where(Product.is_deleted.is_(False), Product.category_id.in_(category_ids))
+                .group_by(Product.category_id)
+            )
+        ).all()
+        for cat_id, max_sort, custom_count in stats_rows:
+            if not cat_id:
+                continue
+            category_sort_meta[cat_id] = {
+                "max": int(max_sort or 0),
+                "has_custom": int(custom_count or 0) > 0,
+            }
+        for cat_id in category_ids:
+            category_sort_meta.setdefault(cat_id, {"max": 0, "has_custom": False})
 
     updated: list[Product] = []
     restocked: set[uuid.UUID] = set()
@@ -1217,6 +1305,7 @@ async def bulk_update_products(
         product = products.get(item.product_id)
         if not product:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Product {item.product_id} not found")
+        before_category_id = product.category_id
         was_out_of_stock = is_out_of_stock(product)
         before_stock_quantity = int(getattr(product, "stock_quantity", 0) or 0)
         before_sale_type = getattr(product, "sale_type", None)
@@ -1230,6 +1319,8 @@ async def bulk_update_products(
             "sale_end_at",
             "sale_auto_publish",
             "stock_quantity",
+            "is_featured",
+            "sort_order",
             "category_id",
             "publish_scheduled_for",
             "unpublish_scheduled_for",
@@ -1256,6 +1347,15 @@ async def bulk_update_products(
                 continue
             if data[field] is not None:
                 setattr(product, field, data[field])
+
+        if "category_id" in data and product.category_id != before_category_id and "sort_order" not in data:
+            meta = category_sort_meta.get(product.category_id)
+            if meta and bool(meta.get("has_custom")):
+                next_sort = int(meta.get("max") or 0) + 1
+                product.sort_order = next_sort
+                meta["max"] = next_sort
+            else:
+                product.sort_order = 0
 
         publish_scheduled_for = _tz_aware(getattr(product, "publish_scheduled_for", None))
         unpublish_scheduled_for = _tz_aware(getattr(product, "unpublish_scheduled_for", None))
@@ -1300,23 +1400,22 @@ async def bulk_update_products(
         await session.refresh(product)
         if product.id in restocked:
             await fulfill_back_in_stock_requests(session, product=product)
-        await _log_product_action(
-            session,
-            product.id,
-            "bulk_update",
-            user_id,
-            {
-                "base_price": product.base_price,
-                "sale_type": product.sale_type,
-                "sale_value": product.sale_value,
-                "sale_price": product.sale_price,
-                "stock_quantity": product.stock_quantity,
-                "category_id": str(product.category_id) if product.category_id else None,
-                "publish_scheduled_for": getattr(product, "publish_scheduled_for", None),
-                "unpublish_scheduled_for": getattr(product, "unpublish_scheduled_for", None),
-                "status": str(product.status),
-            },
-        )
+        payload = {
+            "base_price": product.base_price,
+            "sale_type": product.sale_type,
+            "sale_value": product.sale_value,
+            "sale_price": product.sale_price,
+            "stock_quantity": product.stock_quantity,
+            "is_featured": product.is_featured,
+            "sort_order": getattr(product, "sort_order", 0),
+            "category_id": str(product.category_id) if product.category_id else None,
+            "publish_scheduled_for": getattr(product, "publish_scheduled_for", None),
+            "unpublish_scheduled_for": getattr(product, "unpublish_scheduled_for", None),
+            "status": str(product.status),
+        }
+        if source:
+            payload["source"] = source
+        await _log_product_action(session, product.id, "bulk_update", user_id, payload)
     return updated
 
 
@@ -1547,6 +1646,7 @@ async def get_product_price_bounds(
     is_featured: bool | None,
     search: str | None,
     tags: list[str] | None,
+    include_unpublished: bool = False,
 ) -> tuple[float, float, str | None]:
     now_dt = datetime.now(timezone.utc)
     sale_active = _sale_active_clause(now_dt)
@@ -1556,14 +1656,19 @@ async def get_product_price_bounds(
         func.max(effective_price),
         func.count(func.distinct(Product.currency)),
         func.min(Product.currency),
-    ).where(
-        Product.is_deleted.is_(False),
-        Product.is_active.is_(True),
-        Product.status == ProductStatus.published,
-    )
+    ).where(Product.is_deleted.is_(False))
+    if not include_unpublished:
+        query = query.where(Product.is_active.is_(True), Product.status == ProductStatus.published)
 
     if category_slug:
         category_ids = await _get_category_and_descendant_ids_by_slug(session, category_slug)
+        if category_ids and not include_unpublished:
+            visible_ids = (
+                await session.execute(
+                    select(Category.id).where(Category.id.in_(category_ids), Category.is_visible.is_(True))
+                )
+            ).scalars().all()
+            category_ids = list(visible_ids)
         if category_ids:
             query = query.where(Product.category_id.in_(category_ids))
         else:
@@ -1601,6 +1706,7 @@ async def list_products_with_filters(
     limit: int,
     offset: int,
     lang: str | None = None,
+    include_unpublished: bool = False,
 ):
     now_dt = datetime.now(timezone.utc)
     sale_active = _sale_active_clause(now_dt)
@@ -1621,10 +1727,19 @@ async def list_products_with_filters(
     base_query = (
         select(Product)
         .options(*options)
-        .where(Product.is_deleted.is_(False), Product.is_active.is_(True), Product.status == ProductStatus.published)
+        .where(Product.is_deleted.is_(False))
     )
+    if not include_unpublished:
+        base_query = base_query.where(Product.is_active.is_(True), Product.status == ProductStatus.published)
     if category_slug:
         category_ids = await _get_category_and_descendant_ids_by_slug(session, category_slug)
+        if category_ids and not include_unpublished:
+            visible_ids = (
+                await session.execute(
+                    select(Category.id).where(Category.id.in_(category_ids), Category.is_visible.is_(True))
+                )
+            ).scalars().all()
+            category_ids = list(visible_ids)
         if category_ids:
             base_query = base_query.where(Product.category_id.in_(category_ids))
         else:
@@ -1649,7 +1764,9 @@ async def list_products_with_filters(
     total_result = await session.execute(total_query)
     total_items = total_result.scalar_one()
 
-    if sort == "price_asc":
+    if sort == "recommended":
+        base_query = base_query.order_by(Product.sort_order.asc(), Product.created_at.desc())
+    elif sort == "price_asc":
         base_query = base_query.order_by(effective_price.asc())
     elif sort == "price_desc":
         base_query = base_query.order_by(effective_price.desc())
@@ -1684,7 +1801,12 @@ async def _get_or_create_tags(session: AsyncSession, names: list[str]) -> list[T
     return tags
 
 
-async def duplicate_product(session: AsyncSession, product: Product) -> Product:
+async def duplicate_product(
+    session: AsyncSession,
+    product: Product,
+    user_id: uuid.UUID | None = None,
+    source: str | None = None,
+) -> Product:
     base_slug = f"{product.slug}-copy"
     new_slug = base_slug
     counter = 1
@@ -1696,6 +1818,22 @@ async def duplicate_product(session: AsyncSession, product: Product) -> Product:
             counter += 1
             new_slug = f"{base_slug}-{counter}"
     new_sku = await _generate_unique_sku(session, new_slug)
+    custom_count = await session.scalar(
+        select(func.count(Product.id)).where(
+            Product.is_deleted.is_(False),
+            Product.category_id == product.category_id,
+            Product.sort_order != 0,
+        )
+    )
+    sort_order = 0
+    if int(custom_count or 0) > 0:
+        max_sort = await session.scalar(
+            select(func.max(Product.sort_order)).where(
+                Product.is_deleted.is_(False),
+                Product.category_id == product.category_id,
+            )
+        )
+        sort_order = int(max_sort or 0) + 1
 
     clone = Product(
         category_id=product.category_id,
@@ -1711,6 +1849,7 @@ async def duplicate_product(session: AsyncSession, product: Product) -> Product:
         currency=product.currency,
         is_active=False,
         is_featured=False,
+        sort_order=sort_order,
         stock_quantity=product.stock_quantity,
         status=ProductStatus.draft,
         allow_backorder=product.allow_backorder,
@@ -1725,7 +1864,15 @@ async def duplicate_product(session: AsyncSession, product: Product) -> Product:
         meta_title=product.meta_title,
         meta_description=product.meta_description,
     )
-    clone.images = [ProductImage(url=img.url, alt_text=img.alt_text, sort_order=img.sort_order) for img in product.images]
+    clone.images = [
+        ProductImage(
+            url=img.url,
+            alt_text=img.alt_text,
+            caption=getattr(img, "caption", None),
+            sort_order=img.sort_order,
+        )
+        for img in product.images
+    ]
     clone.variants = [
         ProductVariant(name=variant.name, additional_price_delta=variant.additional_price_delta, stock_quantity=variant.stock_quantity)
         for variant in product.variants
@@ -1736,6 +1883,10 @@ async def duplicate_product(session: AsyncSession, product: Product) -> Product:
     session.add(clone)
     await session.commit()
     await session.refresh(clone)
+    payload = {"from_product_id": str(product.id), "from_slug": product.slug}
+    if source:
+        payload["source"] = source
+    await _log_product_action(session, clone.id, "duplicate", user_id, payload)
     return clone
 
 
@@ -2054,6 +2205,54 @@ async def export_products_csv(session: AsyncSession) -> str:
     return buf.getvalue()
 
 
+async def export_categories_csv(session: AsyncSession, template: bool = False) -> str:
+    buf = io.StringIO()
+    fieldnames = [
+        "slug",
+        "name",
+        "parent_slug",
+        "sort_order",
+        "is_visible",
+        "description",
+        "name_ro",
+        "description_ro",
+        "name_en",
+        "description_en",
+    ]
+    writer = csv.DictWriter(buf, fieldnames=fieldnames)
+    writer.writeheader()
+    if template:
+        return buf.getvalue()
+
+    result = await session.execute(
+        select(Category)
+        .options(selectinload(Category.translations))
+        .order_by(Category.sort_order.asc(), Category.slug.asc())
+    )
+    categories = result.scalars().unique().all()
+    id_to_slug = {c.id: c.slug for c in categories}
+
+    for c in categories:
+        translations = {t.lang: t for t in (c.translations or [])}
+        ro = translations.get("ro")
+        en = translations.get("en")
+        writer.writerow(
+            {
+                "slug": c.slug,
+                "name": c.name,
+                "parent_slug": id_to_slug.get(c.parent_id, "") if c.parent_id else "",
+                "sort_order": c.sort_order,
+                "is_visible": "true" if c.is_visible else "false",
+                "description": c.description or "",
+                "name_ro": ro.name if ro else "",
+                "description_ro": ro.description or "" if ro and ro.description else "",
+                "name_en": en.name if en else "",
+                "description_en": en.description or "" if en and en.description else "",
+            }
+        )
+    return buf.getvalue()
+
+
 async def import_products_csv(session: AsyncSession, content: str, dry_run: bool = True):
     reader = csv.DictReader(io.StringIO(content))
     created = 0
@@ -2142,6 +2341,218 @@ async def import_products_csv(session: AsyncSession, content: str, dry_run: bool
     else:
         if not dry_run:
             await session.commit()
+    return {"created": created, "updated": updated, "errors": errors}
+
+
+async def import_categories_csv(session: AsyncSession, content: str, dry_run: bool = True):
+    reader = csv.DictReader(io.StringIO(content))
+    created = 0
+    updated = 0
+    errors: list[str] = []
+    rows: list[dict] = []
+    seen: set[str] = set()
+
+    for idx, row in enumerate(reader, start=2):
+        slug = (row.get("slug") or "").strip()
+        name = (row.get("name") or "").strip()
+        if not slug or not name:
+            errors.append(f"Row {idx}: missing slug or name")
+            continue
+        if slug != slugify(slug):
+            errors.append(f"Row {idx}: invalid slug {slug}")
+            continue
+        if slug in seen:
+            errors.append(f"Row {idx}: duplicate slug {slug}")
+            continue
+        seen.add(slug)
+
+        parent_slug = (row.get("parent_slug") or "").strip() or None
+        if parent_slug and parent_slug == slug:
+            errors.append(f"Row {idx}: parent_slug cannot match slug")
+            continue
+
+        sort_order_raw = str(row.get("sort_order") or "").strip()
+        sort_order = 0
+        if sort_order_raw:
+            try:
+                sort_order = int(sort_order_raw)
+            except Exception:
+                errors.append(f"Row {idx}: invalid sort_order {sort_order_raw}")
+                continue
+
+        is_visible_raw = str(row.get("is_visible") or "").strip()
+        is_visible: bool | None = None
+        if is_visible_raw:
+            is_visible = is_visible_raw.lower() not in {"false", "0", "no"}
+
+        description = (row.get("description") or "").strip() or None
+        name_ro = (row.get("name_ro") or "").strip()
+        name_en = (row.get("name_en") or "").strip()
+        description_ro = (row.get("description_ro") or "").strip() or None
+        description_en = (row.get("description_en") or "").strip() or None
+        if description_ro and not name_ro:
+            errors.append(f"Row {idx}: description_ro provided without name_ro")
+            continue
+        if description_en and not name_en:
+            errors.append(f"Row {idx}: description_en provided without name_en")
+            continue
+
+        rows.append(
+            {
+                "idx": idx,
+                "slug": slug,
+                "name": name,
+                "description": description,
+                "parent_slug": parent_slug,
+                "sort_order": sort_order,
+                "is_visible": is_visible,
+                "name_ro": name_ro,
+                "name_en": name_en,
+                "description_ro": description_ro,
+                "description_en": description_en,
+            }
+        )
+
+    file_slugs = {r["slug"] for r in rows}
+    if file_slugs:
+        existing_slug_result = await session.execute(select(Category.slug).where(Category.slug.in_(file_slugs)))
+        existing_slugs = set(existing_slug_result.scalars().all())
+        created = len(file_slugs - existing_slugs)
+        updated = len(file_slugs & existing_slugs)
+    else:
+        existing_slugs = set()
+
+    if rows:
+        parent_candidates = {r["parent_slug"] for r in rows if r["parent_slug"] and r["parent_slug"] not in file_slugs}
+        if parent_candidates:
+            parent_slug_result = await session.execute(select(Category.slug).where(Category.slug.in_(parent_candidates)))
+            found = set(parent_slug_result.scalars().all())
+            missing = parent_candidates - found
+            if missing:
+                missing_set = set(missing)
+                for row in rows:
+                    parent_slug = row["parent_slug"]
+                    if parent_slug and parent_slug in missing_set:
+                        errors.append(f"Row {row['idx']}: parent category {parent_slug} not found")
+
+    if dry_run and rows:
+        hierarchy_result = await session.execute(select(Category.id, Category.slug, Category.parent_id))
+        category_rows = hierarchy_result.all()
+        id_to_slug = {cat_id: slug for cat_id, slug, _parent_id in category_rows}
+        parent_slug_by_slug = {slug: id_to_slug.get(parent_id) if parent_id else None for _id, slug, parent_id in category_rows}
+        proposed_parent_by_slug = {r["slug"]: r["parent_slug"] for r in rows}
+
+        for row in rows:
+            slug = row["slug"]
+            current = row["parent_slug"]
+            seen_slugs: set[str] = set()
+            while current is not None:
+                if current == slug:
+                    errors.append(f"Row {row['idx']}: Category parent would create a cycle")
+                    break
+                if current in seen_slugs:
+                    errors.append(f"Row {row['idx']}: Invalid category hierarchy")
+                    break
+                seen_slugs.add(current)
+                if current in proposed_parent_by_slug:
+                    current = proposed_parent_by_slug[current]
+                else:
+                    current = parent_slug_by_slug.get(current)
+
+    if dry_run:
+        return {"created": created, "updated": updated, "errors": errors}
+
+    if errors:
+        await session.rollback()
+        return {"created": created, "updated": updated, "errors": errors}
+
+    all_slugs = set(file_slugs)
+    all_slugs.update(r["parent_slug"] for r in rows if r["parent_slug"])
+    category_result = await session.execute(select(Category).where(Category.slug.in_(all_slugs)))
+    by_slug: dict[str, Category] = {c.slug: c for c in category_result.scalars().all()}
+
+    for row in rows:
+        slug = row["slug"]
+        category = by_slug.get(slug)
+        if category:
+            category.name = row["name"]
+            category.description = row["description"]
+            category.sort_order = row["sort_order"]
+            if row["is_visible"] is not None:
+                category.is_visible = row["is_visible"]
+            session.add(category)
+            continue
+
+        category = Category(
+            slug=slug,
+            name=row["name"],
+            description=row["description"],
+            sort_order=row["sort_order"],
+            is_visible=row["is_visible"] if row["is_visible"] is not None else True,
+            parent_id=None,
+        )
+        session.add(category)
+        by_slug[slug] = category
+
+    await session.flush()
+
+    for row in rows:
+        slug = row["slug"]
+        category = by_slug.get(slug)
+        if not category:
+            errors.append(f"Row {row['idx']}: category {slug} not found after upsert")
+            continue
+
+        parent_slug = row["parent_slug"]
+        parent = by_slug.get(parent_slug) if parent_slug else None
+        parent_id = parent.id if parent is not None else None
+        try:
+            await _validate_category_parent_assignment(session, category_id=category.id, parent_id=parent_id)
+        except HTTPException as exc:
+            errors.append(f"Row {row['idx']}: {exc.detail}")
+            continue
+        category.parent_id = parent_id
+        session.add(category)
+
+    if errors:
+        await session.rollback()
+        return {"created": created, "updated": updated, "errors": errors}
+
+    for row in rows:
+        category = by_slug.get(row["slug"])
+        if not category:
+            continue
+
+        for lang in ("ro", "en"):
+            name_key = f"name_{lang}"
+            desc_key = f"description_{lang}"
+            raw_name = (row.get(name_key) or "").strip()
+            raw_desc = row.get(desc_key)
+            if not raw_name:
+                continue
+            description_value = (raw_desc or "").strip() or None
+
+            existing = await session.scalar(
+                select(CategoryTranslation).where(
+                    CategoryTranslation.category_id == category.id,
+                    CategoryTranslation.lang == lang,
+                )
+            )
+            if existing:
+                existing.name = raw_name
+                existing.description = description_value
+                session.add(existing)
+            else:
+                session.add(
+                    CategoryTranslation(
+                        category_id=category.id,
+                        lang=lang,
+                        name=raw_name,
+                        description=description_value,
+                    )
+                )
+
+    await session.commit()
     return {"created": created, "updated": updated, "errors": errors}
 
 

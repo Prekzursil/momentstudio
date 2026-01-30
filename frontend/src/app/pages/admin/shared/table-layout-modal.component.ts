@@ -96,6 +96,7 @@ export class TableLayoutModalComponent implements OnChanges {
   @Input() open = false;
   @Input() columns: AdminTableLayoutColumnDef[] = [];
   @Input() layout: AdminTableLayoutV1 | null = null;
+  @Input() defaults: AdminTableLayoutV1 | null = null;
 
   @Output() applied = new EventEmitter<AdminTableLayoutV1>();
   @Output() closed = new EventEmitter<void>();
@@ -105,15 +106,15 @@ export class TableLayoutModalComponent implements OnChanges {
   draftDensity: AdminTableDensity = 'comfortable';
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['open'] || changes['columns'] || changes['layout']) {
+    if (changes['open'] || changes['columns'] || changes['layout'] || changes['defaults']) {
       if (this.open) this.resetDraft();
     }
   }
 
   resetToDefaults(): void {
-    const next = defaultAdminTableLayout(this.columns);
+    const next = this.defaults ? sanitizeAdminTableLayout(this.defaults, this.columns) : defaultAdminTableLayout(this.columns);
     this.draftOrder = [...next.order];
-    this.draftHidden = new Set<string>();
+    this.draftHidden = new Set<string>(next.hidden || []);
     this.draftDensity = next.density;
   }
 
@@ -156,10 +157,13 @@ export class TableLayoutModalComponent implements OnChanges {
   }
 
   private resetDraft(): void {
-    const base = this.layout ? sanitizeAdminTableLayout(this.layout, this.columns) : defaultAdminTableLayout(this.columns);
+    const base = this.layout
+      ? sanitizeAdminTableLayout(this.layout, this.columns)
+      : this.defaults
+        ? sanitizeAdminTableLayout(this.defaults, this.columns)
+        : defaultAdminTableLayout(this.columns);
     this.draftOrder = [...base.order];
     this.draftHidden = new Set<string>(base.hidden || []);
     this.draftDensity = base.density;
   }
 }
-

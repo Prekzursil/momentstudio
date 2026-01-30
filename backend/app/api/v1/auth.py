@@ -10,7 +10,7 @@ from jose import jwt
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field, EmailStr, field_validator
-from sqlalchemy import func, select
+from sqlalchemy import func, select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from webauthn.helpers import base64url_to_bytes
 
@@ -36,6 +36,8 @@ from app.models.user import (
     UserSecurityEvent,
     UserUsernameHistory,
 )
+from app.models.content import ContentBlock, ContentStatus
+from app.models.legal import LegalConsent, LegalConsentContext
 from app.models.user_export import UserDataExportJob, UserDataExportStatus
 from app.schemas.auth import (
     AuthResponse,
@@ -92,6 +94,30 @@ google_rate_limit = per_identifier_limiter(
     settings.auth_rate_limit_google,
     60,
 )
+
+_REQUIRED_REGISTRATION_CONSENT_KEYS = ("page.terms-and-conditions", "page.privacy-policy")
+
+
+async def _require_published_consent_docs(session: AsyncSession, keys: tuple[str, ...]) -> dict[str, int]:
+    now = datetime.now(timezone.utc)
+    rows = (
+        await session.execute(
+            select(ContentBlock.key, ContentBlock.version).where(
+                ContentBlock.key.in_(keys),
+                ContentBlock.status == ContentStatus.published,
+                or_(ContentBlock.published_at.is_(None), ContentBlock.published_at <= now),
+                or_(ContentBlock.published_until.is_(None), ContentBlock.published_until > now),
+            )
+        )
+    ).all()
+    versions = {str(key): int(version) for key, version in rows if key and version is not None}
+    missing = [key for key in keys if key not in versions]
+    if missing:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Legal documents are not configured (missing published content: {', '.join(missing)})",
+        )
+    return versions
 
 
 def _build_google_state(kind: str, user_id: str | None = None) -> str:
@@ -332,6 +358,8 @@ class RegisterRequest(BaseModel):
     password: str = Field(min_length=6, max_length=128)
     preferred_language: str | None = Field(default=None, pattern="^(en|ro)$")
     captcha_token: str | None = Field(default=None, description="CAPTCHA token (required when CAPTCHA is enabled)")
+    accept_terms: bool = Field(default=False, description="Accept Terms & Conditions")
+    accept_privacy: bool = Field(default=False, description="Accept Privacy Policy")
 
     @field_validator("name", "first_name", "last_name", "username", mode="before")
     @classmethod
@@ -461,6 +489,9 @@ async def register(
     response: Response = None,
 ) -> AuthResponse:
     await captcha_service.verify(payload.captcha_token, remote_ip=request.client.host if request.client else None)
+    if not payload.accept_terms or not payload.accept_privacy:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Legal consents required")
+    consent_versions = await _require_published_consent_docs(session, _REQUIRED_REGISTRATION_CONSENT_KEYS)
     user = await auth_service.create_user(
         session,
         UserCreate(
@@ -476,6 +507,18 @@ async def register(
             preferred_language=payload.preferred_language,
         ),
     )
+    accepted_at = datetime.now(timezone.utc)
+    for key, version in consent_versions.items():
+        session.add(
+            LegalConsent(
+                doc_key=key,
+                doc_version=version,
+                context=LegalConsentContext.register,
+                user_id=user.id,
+                accepted_at=accepted_at,
+            )
+        )
+    await session.commit()
     metrics.record_signup()
     record = await auth_service.create_email_verification(session, user)
     background_tasks.add_task(
@@ -2111,6 +2154,8 @@ class GoogleCompleteRequest(BaseModel):
     phone: str = Field(min_length=7, max_length=32, description="E.164 format")
     password: str = Field(min_length=6, max_length=128)
     preferred_language: str | None = Field(default=None, pattern="^(en|ro)$")
+    accept_terms: bool = Field(default=False, description="Accept Terms & Conditions")
+    accept_privacy: bool = Field(default=False, description="Accept Privacy Policy")
 
     @field_validator("name", "first_name", "last_name", "username", mode="before")
     @classmethod
@@ -2155,6 +2200,9 @@ async def google_complete_registration(
     session: AsyncSession = Depends(get_session),
     response: Response = None,
 ) -> AuthResponse:
+    if not payload.accept_terms or not payload.accept_privacy:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Legal consents required")
+    consent_versions = await _require_published_consent_docs(session, _REQUIRED_REGISTRATION_CONSENT_KEYS)
     user = await auth_service.complete_google_registration(
         session,
         current_user,
@@ -2168,6 +2216,18 @@ async def google_complete_registration(
         password=payload.password,
         preferred_language=payload.preferred_language,
     )
+    accepted_at = datetime.now(timezone.utc)
+    for key, version in consent_versions.items():
+        session.add(
+            LegalConsent(
+                doc_key=key,
+                doc_version=version,
+                context=LegalConsentContext.register,
+                user_id=user.id,
+                accepted_at=accepted_at,
+            )
+        )
+    await session.commit()
     background_tasks.add_task(
         email_service.send_welcome_email,
         user.email,

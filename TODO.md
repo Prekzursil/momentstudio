@@ -9,8 +9,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Add frontend `.env.example` (API_BASE_URL, STRIPE_ENV + publishable keys, APP_ENV).
 - [x] Payments config: add `STRIPE_ENV` toggle (sandbox/live) + env-specific keys for backend/frontend/docker.
 - [x] Payments config: allow `PAYPAL_CURRENCY=RON` (skip FX conversion when using RON).
-- [ ] E2E: add Playwright flow for Stripe Checkout success + decline/cancel (sandbox/test mode).
-- [ ] E2E: add PayPal sandbox e2e for success + decline/cancel (with a stable CI strategy or feature flag).
+- [x] E2E: add Playwright flow for Stripe Checkout success + decline/cancel (sandbox/test mode).
+- [x] E2E: add PayPal sandbox e2e for success + decline/cancel (with a stable CI strategy or feature flag).
 - [x] Add `.gitignore` for Python, Node, env files, build artifacts.
 - [x] GitHub Actions for backend (lint, tests, type-checks).
 - [x] GitHub Actions for frontend (lint, tests, build).
@@ -26,6 +26,25 @@ Below is a structured checklist you can turn into issues.
 - [x] DX: detect port collisions in `start.sh` (e.g., `docker compose` already bound to `4200`) and pick a free port or print a clear remediation hint.
 - [x] Frontend: eliminate Node 24 `DEP0060 util._extend` deprecation warning (identify dependency via `--trace-deprecation` and upgrade/replace).
 - [x] Docs: document seeded owner credentials and that `docker compose down -v` resets the DB (owner needs `bootstrap-owner` again).
+- [x] Frontend deps: address `npm audit` vulnerabilities (upgrade/overrides as needed).
+- [x] CI hardening: pin tool versions in workflows (e.g. `pip-audit`, `ruff`, `mypy`) to reduce surprise breakage.
+- [x] CI: add a quick smoke for i18n key consistency (detect orphaned/typo keys).
+
+## Legal & Compliance (NETOPIA/ANPC/GDPR)
+- [x] Legal pages: add CMS-backed pages `page.terms` (index), `page.terms-and-conditions`, `page.privacy-policy`, `page.anpc` (RO+EN required).
+- [x] Legal content: ensure Terms & Conditions covers payment methods + delivery + return/cancellation policy (NETOPIA requirement), or clearly links to those sections/pages.
+- [x] CMS enforcement: block publishing legal pages unless **both RO + EN** are present (no fallback) + ensure version history/rollback works.
+- [x] Navigation: add header “Terms & Conditions” link between Contact and View Admin; add footer link under “Handcrafted Art”.
+- [x] Footer/company info: display full company identification details required by NETOPIA (name, RC number, CUI, address, phone, email) and keep them CMS-configurable.
+- [x] Admin UX: add a friendly editor for `site.company` (avoid raw JSON meta editing) and validate required fields for production readiness.
+- [x] NETOPIA logos: add Visa/Mastercard/NETOPIA Payments logos (from `Identitate-Parteneri-NETOPIA-Payments.zip`) and display them in footer + checkout.
+- [x] ANPC content: add bilingual ANPC/ADR info page including required links and consumer guidance.
+- [x] Consent tracking (DB): store acceptance records with doc key + version + timestamp + (user_id or order_id) + context (register/checkout).
+- [x] Registration gating: require legal consent checkbox(es) before allowing registration (UI + backend enforcement).
+- [x] Checkout gating: require legal consent checkbox(es) before placing an order (guest + logged-in; UI + backend enforcement).
+- [x] Consent UX: checkbox click opens a “read before accept” modal; require scrolling to bottom before enabling Accept.
+- [x] Re-consent policy: force re-acceptance when legal docs change (by version) for both registration and checkout.
+- [x] Tests: unit tests for publish enforcement + API validation; Playwright tests for modal gating and register/checkout blocking.
 
 ## Backend - Core & Auth
 - [x] Scaffold FastAPI app with versioned `/api/v1` router.
@@ -346,36 +365,40 @@ Below is a structured checklist you can turn into issues.
 - [x] A11y: localize shop filter aria labels and improve keyboard affordances for price range inputs.
 
 ### Storefront Catalog – Next Improvements (Backlog)
-- [ ] Shop: active filter chips – Show selected category/price/tags as removable chips + “Clear all”.
-- [ ] Shop: preserve scroll position – When returning from product detail, restore catalog scroll and filters.
-- [ ] Shop: result count – Display “X results” and current page range above the grid.
-- [ ] Shop: quick view modal – Open product quick view from card (gallery + key details + add to cart).
-- [ ] Shop: mobile sticky actions – Keep filter/sort controls accessible while scrolling on mobile.
-- [ ] Shop: “Load more” pagination – Optional progressive loading as an alternative to classic pagination.
-- [ ] Shop: better empty states – Suggest clearing filters / show popular categories when no results.
-- [ ] Shop: skeleton grid – Product card skeletons to reduce layout shift during loading.
+- [x] Shop: active filter chips – Show selected category/price/tags as removable chips + “Clear all”.
+- [x] Shop: preserve scroll position – When returning from product detail, restore catalog scroll and filters.
+- [x] Shop: result count – Display “X results” and current page range above the grid.
+- [x] Shop: quick view modal – Open product quick view from card (gallery + key details + add to cart).
+- [x] Shop: mobile sticky actions – Keep filter/sort controls accessible while scrolling on mobile.
+- [x] Shop: “Load more” pagination – Optional progressive loading as an alternative to classic pagination.
+- [x] Shop: better empty states – Suggest clearing filters / show popular categories when no results.
+- [x] Shop: skeleton grid – Product card skeletons to reduce layout shift during loading.
+- [x] Shop return UX: make product breadcrumb “Shop” preserve last shop filters/scroll when available.
 
 ### Storefront Admin Quick Edit (No Dashboard) – Next Improvements (Backlog)
-- [ ] Storefront Admin Mode: toggle – Add an “Edit mode” toggle for admins (header button) that reveals inline controls.
-- [ ] Storefront Admin Mode: permissions – Gate edit mode behind admin role + require recent auth for sensitive actions.
-- [ ] Storefront Categories: drag reorder – Reorder nav categories via drag-and-drop directly in the header/category grid.
-- [ ] Storefront Categories: quick rename – Inline rename category (RO/EN) from the category list with optimistic save.
-- [ ] Storefront Categories: quick create – Create a new category from the Shop page (no route change) and insert into nav.
-- [ ] Storefront Categories: quick subcategory – Create a subcategory under the current category from `/shop/:category`.
-- [ ] Storefront Categories: quick image – Upload/change category thumbnail/banner from the category page in edit mode.
-- [ ] Storefront Categories: hide/show – Toggle category visibility (hide from storefront) with a clear “hidden” badge.
-- [ ] Storefront Categories: merge shortcut – “Merge into…” action surfaced from the category page (server-side preview/confirm).
-- [ ] Storefront Categories: safe delete – Delete category from storefront only if unused; otherwise prompt reassignment/merge.
-- [ ] Storefront Products: inline edit badges – Show small “Edit” chips on product cards for admins (price/stock/status).
-- [ ] Storefront Products: quick publish – One-click publish/unpublish/archive from product card or product detail (admin-only).
-- [ ] Storefront Products: quick stock/price – Inline stock + price editing on the Shop grid for admins (spreadsheet-lite).
-- [ ] Storefront Products: bulk select – Multi-select products on Shop page and apply bulk actions (status/category/feature).
-- [ ] Storefront Products: drag reorder (category) – Custom sort order per category with drag-and-drop on the category page.
-- [ ] Storefront Products: pin/feature – Pin products to top of a category (per-category featured list) from storefront.
-- [ ] Storefront Products: quick duplicate – Duplicate a product from product detail in edit mode (clone images, mark draft).
-- [ ] Storefront Products: image manager – Reorder images and edit alt text/captions from product detail in edit mode.
-- [ ] Storefront Admin Mode: undo window – After edits (reorder/publish/price), offer a short “Undo” toast.
-- [ ] Storefront Admin Mode: audit trail – Record all storefront edits in the admin audit log with “source=storefront”.
+- [x] Storefront Admin Mode: toggle – Add an “Edit mode” toggle for admins (header button) that reveals inline controls.
+- [x] Storefront Admin Mode: permissions – Gate edit mode behind admin role + require recent auth for sensitive actions.
+- [x] Storefront Categories: drag reorder – Reorder nav categories via drag-and-drop directly in the header/category grid.
+- [x] Storefront Categories: quick rename – Inline rename category (RO/EN) from the category list with optimistic save.
+- [x] Storefront Categories: quick create – Create a new category from the Shop page (no route change) and insert into nav.
+- [x] Storefront Categories: quick subcategory – Create a subcategory under the current category from `/shop/:category`.
+- [x] Storefront Categories: quick image – Upload/change category thumbnail/banner from the category page in edit mode.
+- [x] Storefront Categories: hide/show – Toggle category visibility (hide from storefront) with a clear “hidden” badge.
+- [x] Storefront Categories: merge shortcut – “Merge into…” action surfaced from the category page (server-side preview/confirm).
+- [x] Storefront Categories: safe delete – Delete category from storefront only if unused; otherwise prompt reassignment/merge.
+- [x] Storefront Products: inline edit badges – Show small “Edit” chips on product cards for admins (price/stock/status).
+- [x] Storefront Products: quick publish – One-click publish/unpublish/archive from product card or product detail (admin-only).
+- [x] Storefront Products: quick stock/price – Inline stock + price editing on the Shop grid for admins (spreadsheet-lite).
+- [x] Storefront Products: bulk select – Multi-select products on Shop page and apply bulk actions (status/category/feature).
+- [x] Storefront Products: include drafts in edit mode – Allow admins to see/edit draft/archived items on `/shop` when edit mode is enabled.
+- [x] Storefront Products: drag reorder (category) – Custom sort order per category with drag-and-drop on the category page.
+- [x] Storefront Products: reorder for large categories – Support drag reordering when a category spans multiple pages (load-all mode or cross-page ordering).
+- [x] Catalog: respect hidden categories in listings – Do not allow browsing hidden category products via `/shop/:slug` unless storefront edit mode is enabled.
+- [x] Storefront Products: pin/feature – Pin products to top of a category (per-category featured list) from storefront.
+- [x] Storefront Products: quick duplicate – Duplicate a product from product detail in edit mode (clone images, mark draft).
+- [x] Storefront Products: image manager – Reorder images and edit alt text/captions from product detail in edit mode.
+- [x] Storefront Admin Mode: undo window – After edits (reorder/publish/price), offer a short “Undo” toast.
+- [x] Storefront Admin Mode: audit trail – Record all storefront edits in the admin audit log with “source=storefront”.
 
 ## Blog & Community
 - [x] Nav: add “Blog” link between Home and Shop (header + drawer).
@@ -404,46 +427,50 @@ Below is a structured checklist you can turn into issues.
 - [x] Notifications: localize account notification settings UI + improve email templates.
 
 ### Blog – Next Improvements (Backlog)
-- [ ] Blog list: featured hero – Highlight the newest/pinned post with a large, image-forward hero card.
-- [ ] Blog list: pinned posts – Allow pinning 1–3 posts to the top of `/blog` (admin-managed ordering).
-- [ ] Blog list: sort controls – Add sorting (newest/oldest/most viewed/most commented) with persisted selection.
-- [ ] Blog list: filter UX – Sticky filter bar (tags/search) with clear chips and “Reset” action.
-- [ ] Blog list: tag pages – Add `/blog/tag/:tag` landing pages with SEO meta and pagination.
-- [ ] Blog list: series/categories – Add optional blog “series” taxonomy (separate from shop categories) with pages and filters.
-- [ ] Blog list: nicer cards – Improve typography, spacing, hover states, and consistent cover image aspect ratios.
-- [ ] Blog list: image loading polish – Use blur-up placeholders + prevent layout shift for cover images.
-- [ ] Blog list: empty states – Better “no results” UX (suggest clearing filters and show popular tags).
-- [ ] Blog list: reading meta – Show author, publish date, and reading time more prominently on cards.
-- [ ] Blog list: RSS/Atom feed – Provide `/blog/rss.xml` (and/or Atom) with latest posts and translations.
-- [ ] Blog list: JSON feed – Provide `/blog/feed.json` for integrations and modern feed readers.
-- [ ] Blog post: typography refresh – Better line length, font sizes, headings, and spacing for a more premium look.
-- [ ] Blog post: reading progress – Add a top progress bar and “Back to top” affordance.
-- [ ] Blog post: table of contents – Auto-generate TOC from headings with scroll-spy and anchor links.
-- [ ] Blog post: heading permalinks – Add link icons on headings for easy sharing of sections.
-- [ ] Blog post: next/previous nav – Add “Next post / Previous post” navigation at the bottom.
-- [ ] Blog post: related posts – Show related posts by tags/series with thumbnails.
-- [ ] Blog post: share bar – Add share buttons (copy link + WhatsApp/Facebook) with accessible labels.
-- [ ] Blog post: inline image lightbox – Click in-article images to open a gallery/lightbox with captions.
-- [ ] Blog post: rich image layouts – Support wide/left/right aligned images and multi-image galleries in content.
-- [ ] Blog post: code blocks – Syntax highlighting + “Copy” button + line wrapping toggle.
-- [ ] Blog post: callout blocks – Support “Tip/Note/Warning” callouts with icons and theme-aware styling.
-- [ ] Blog post: embedded product cards – Allow inserting product/category/collection cards inside posts (shoppable content).
-- [ ] Blog post: author card – Author bio + avatar + links, plus “More from this author”.
-- [ ] Blog post: print-friendly styles – Clean print stylesheet (no nav, readable typography, proper image sizing).
-- [ ] Blog post: comments UX – Pagination + sorting (newest/oldest/top) and improved empty/loading states.
-- [ ] Blog comments: spam controls – Rate limits + link limits + optional CAPTCHA on comment submit.
-- [ ] Blog: newsletter subscribe – Inline subscribe block and optional “subscribe to comments” on a post.
-- [ ] Storefront admin quick edit: edit buttons – Show “Edit” on blog cards/posts for admins (links to admin editor).
-- [ ] Storefront admin quick edit: publish toggle – Allow publish/unpublish/schedule from the blog page in admin mode.
-- [ ] Storefront admin quick edit: inline meta – Quick edit title/summary/tags from the post page (drawer/modal).
-- [ ] Admin blog list: bulk actions – Bulk publish/unpublish, tag add/remove, and schedule changes with preview.
-- [ ] Admin editor: cover image workflow – Upload/select cover image with crop + focal point + mobile preview.
-- [ ] Admin editor: drag-drop images – Drag-and-drop images into the editor (auto-upload + insert markdown/WYSIWYG block).
-- [ ] Admin editor: accessibility checks – Warn on missing alt text/captions and offer quick fixes before publish.
-- [ ] Admin editor: autosave + recovery – Autosave drafts and offer “restore last autosave” after crashes/refresh.
-- [ ] Admin editor: writing aids – Word count, reading-time recalculation, and headings outline sidebar.
-- [ ] Blog SEO: preview panel – Preview meta/OG/twitter cards per language and validate truncation/warnings.
-- [ ] Blog perf: prefetch + caching – Prefetch post data on hover and add caching for list/detail to speed up loads.
+- [x] Blog list: featured hero – Highlight the newest/pinned post with a large, image-forward hero card.
+- [x] Blog list: pinned posts – Allow pinning 1–3 posts to the top of `/blog` (admin-managed ordering).
+- [x] Blog list: sort controls – Add sorting (newest/oldest/most viewed/most commented) with persisted selection.
+- [x] Blog list: filter UX – Sticky filter bar (tags/search) with clear chips and “Reset” action.
+- [x] Blog list: tag pages – Add `/blog/tag/:tag` landing pages with SEO meta and pagination.
+- [x] Blog list: series/categories – Add optional blog “series” taxonomy (separate from shop categories) with pages and filters.
+- [x] Blog list: nicer cards – Improve typography, spacing, hover states, and consistent cover image aspect ratios.
+- [x] Blog list: image loading polish – Use blur-up placeholders + prevent layout shift for cover images.
+- [x] Blog list: empty states – Better “no results” UX (suggest clearing filters and show popular tags).
+- [x] Blog list: reading meta – Show author, publish date, and reading time more prominently on cards.
+- [x] Blog list: RSS/Atom feed – Provide `/blog/rss.xml` (and/or Atom) with latest posts and translations.
+- [x] Blog list: JSON feed – Provide `/blog/feed.json` for integrations and modern feed readers.
+- [x] Blog post: typography refresh – Better line length, font sizes, headings, and spacing for a more premium look.
+- [x] Blog post: reading progress – Add a top progress bar and “Back to top” affordance.
+- [x] Blog post: table of contents – Auto-generate TOC from headings with scroll-spy and anchor links.
+- [x] Blog post: heading permalinks – Add link icons on headings for easy sharing of sections.
+- [x] Blog post: next/previous nav – Add “Next post / Previous post” navigation at the bottom.
+- [x] Blog post: related posts – Show related posts by tags/series with thumbnails.
+- [x] Blog post: share bar – Add share buttons (copy link + WhatsApp/Facebook) with accessible labels.
+- [x] Blog post: inline image lightbox – Click in-article images to open a gallery/lightbox with captions.
+- [x] Blog post: rich image layouts – Support wide/left/right aligned images and multi-image galleries in content.
+- [x] Blog editor: image layout hints – Document supported image title hints (`"wide"`, `"left"`, `"right"`, `"gallery"`) and add quick-insert helpers in the editor UI.
+- [x] Blog post: code blocks – Syntax highlighting + “Copy” button + line wrapping toggle.
+- [x] Blog post: callout blocks – Support “Tip/Note/Warning” callouts with icons and theme-aware styling.
+- [x] Blog post: embedded product cards – Allow inserting product/category/collection cards inside posts (shoppable content).
+- [x] Blog post: author card – Author bio + avatar + links, plus “More from this author”.
+- [x] Blog post: print-friendly styles – Clean print stylesheet (no nav, readable typography, proper image sizing).
+- [x] Blog post: comments UX – Pagination + sorting (newest/oldest/top) and improved empty/loading states.
+- [x] Blog comments: spam controls – Rate limits + link limits + optional CAPTCHA on comment submit.
+- [x] Blog: newsletter subscribe – Inline subscribe block and optional “subscribe to comments” on a post.
+- [x] Storefront admin quick edit: edit buttons – Show “Edit” on blog cards/posts for admins (links to admin editor).
+- [x] Storefront admin quick edit: publish toggle – Allow publish/unpublish/schedule from the blog page in admin mode.
+- [x] Storefront admin quick edit: inline meta – Quick edit title/summary/tags from the post page (drawer/modal).
+- [x] Admin blog list: bulk actions – Bulk publish/unpublish, tag add/remove, and schedule changes with preview.
+- [x] Admin editor: cover image workflow – Upload/select cover image with crop + focal point + mobile preview.
+- [x] Admin editor: drag-drop images – Drag-and-drop images into the editor (auto-upload + insert markdown/WYSIWYG block).
+- [x] Admin editor: accessibility checks – Warn on missing alt text/captions and offer quick fixes before publish.
+- [x] Admin editor: autosave + recovery – Autosave drafts and offer “restore last autosave” after crashes/refresh.
+- [x] Admin editor: writing aids – Word count, reading-time recalculation, and headings outline sidebar.
+- [x] Blog SEO: preview panel – Preview meta/OG/twitter cards per language and validate truncation/warnings.
+- [x] Blog perf: prefetch + caching – Prefetch post data on hover and add caching for list/detail to speed up loads.
+- [x] Blog list: pinned posts – Prevent conflicting pin slots (1–3) and surface warnings in admin UI.
+- [x] Blog stats: view counting – De-dupe per session + bot filtering (current counter increments on each page view).
+- [x] Blog list: image loading polish – Add real LQIP/blurhash placeholders for cover images (optional).
 ## Frontend - Cart & Checkout
 - [x] Cart page/drawer with quantities and totals.
 - [x] Cart UX: make cart item image/title link to the product page (`/products/:slug`).
@@ -870,30 +897,32 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin UX: saved table layouts – Persist column visibility/order/density per admin table (orders/products/users).
 
 ### Admin Dashboard UX – Simplification (Backlog)
-- [ ] Admin UX: simplified mode – Add a “Simple / Advanced” toggle (default Simple) to hide advanced settings and jargon.
-- [ ] Admin UX: progressive disclosure – Collapse rarely used fields behind “Show advanced” per form section.
-- [ ] Admin UX: plain-language labels – Replace technical labels (slug/SKU) with friendly copy + examples and tooltips.
-- [ ] Admin UX: guided wizards – Step-by-step flows for “Add product”, “Add category”, and “Publish product”.
-- [ ] Admin UX: safer defaults – Pre-fill sensible defaults and reduce required fields for first-time product creation.
-- [ ] Admin UX: declutter tables – Reduce visible columns by default; add “Customize columns” for power users.
-- [ ] Admin UX: inline help panels – Contextual “What is this?” help with screenshots/examples per page.
-- [ ] Admin UX: confirmation language – Make destructive/irreversible actions use clear language + consequence checklist.
-- [ ] Admin UX: success feedback – More obvious success states (“Saved”, “Published”, “Hidden”) with next-step CTAs.
-- [ ] Admin UX: role-based presets – Provide “Owner (basic)” preset that hides technical/ops sections for non-technical admins.
+- [x] Admin UX: simplified mode – Add a “Simple / Advanced” toggle (default Simple) to hide advanced settings and jargon.
+- [x] Admin UX: progressive disclosure – Collapse rarely used fields behind “Show advanced” per form section.
+- [x] Admin UX: plain-language labels – Replace technical labels (slug/SKU) with friendly copy + examples and tooltips.
+- [x] Admin UX: guided wizards – Step-by-step flows for “Add product”, “Add category”, and “Publish product”.
+- [x] Admin UX: safer defaults – Pre-fill sensible defaults and reduce required fields for first-time product creation.
+- [x] Admin UX: declutter tables – Reduce visible columns by default; add “Customize columns” for power users.
+- [x] Admin UX: inline help panels – Contextual “What is this?” help with screenshots/examples per page.
+- [x] Admin UX: confirmation language – Make destructive/irreversible actions use clear language + consequence checklist.
+- [x] Admin UX: success feedback – More obvious success states (“Saved”, “Published”, “Hidden”) with next-step CTAs.
+- [x] Admin UX: role-based presets – Provide “Owner (basic)” preset that hides technical/ops sections for non-technical admins.
+- [x] Admin UX: help panel screenshots – Add optional screenshot/example media for help panels (products/orders/users/categories).
 
 ### Admin Catalog – Next Improvements (Backlog)
-- [ ] Admin Products: status selector – Expose draft/published/archived on create/edit with confirmation and audit entry.
-- [ ] Admin Products: status badges – Add table badges for status (draft/published/archived) and active/inactive.
-- [ ] Admin Products: status filters – Filter products list by status and include an “Archived” tab/view.
-- [ ] Admin Products: bulk status updates – Apply draft/publish/archive to selected products with preview and optional undo window.
-- [ ] Admin Products: quick status toggle – One-click publish/unpublish/archive from the products table row actions.
-- [ ] Admin Products: create category inline (product form) – “Add category” from the category selector without navigating away.
-- [ ] Admin Products: create category inline (filters) – Allow creating a category while filtering/browsing products.
-- [ ] Admin Products: category CRUD shortcut – Open category manager as a drawer/modal from `/admin/products` (avoid separate route hop).
-- [ ] Admin Categories: merge tool – Merge categories (optionally include subcategories) and reassign products with preview.
-- [ ] Admin Categories: safe delete – Block deleting in-use categories; require reassignment or merge.
-- [ ] Admin Categories: bulk import – CSV import for categories (name, parent, sort order, translations) with dry-run validation.
-- [ ] Admin Products: bulk category create+assign – Create a new category and immediately apply it to selected products.
+- [x] Admin Products: status selector – Expose draft/published/archived on create/edit with confirmation and audit entry.
+- [x] Admin Products: status badges – Add table badges for status (draft/published/archived) and active/inactive.
+- [x] Admin Products: status filters – Filter products list by status and include an “Archived” tab/view.
+- [x] Admin Products: bulk status updates – Apply draft/publish/archive to selected products with preview and optional undo window.
+- [x] Admin Products: quick status toggle – One-click publish/unpublish/archive from the products table row actions.
+- [x] Admin Products: create category inline (product form) – “Add category” from the category selector without navigating away.
+- [x] Admin Products: create category inline (filters) – Allow creating a category while filtering/browsing products.
+- [x] Admin Products: category CRUD shortcut – Open category manager as a drawer/modal from `/admin/products` (avoid separate route hop).
+- [x] Admin Categories: merge tool – Merge categories (optionally include subcategories) and reassign products with preview.
+- [x] Admin Categories: safe delete – Block deleting in-use categories; require reassignment or merge.
+- [x] Admin Categories: bulk import – CSV import for categories (name, parent, sort order, translations) with dry-run validation.
+- [x] Admin Products: bulk category create+assign – Create a new category and immediately apply it to selected products.
+- [x] Admin Categories: CSV export/template – Download a template/export of categories to streamline bulk edits + re-import.
 
 ### Admin Dashboard – UX & Workflow (Backlog)
 - [x] Admin UI: command palette – Add Ctrl/Cmd+K quick launcher for navigation + common actions.
@@ -930,29 +959,39 @@ Below is a structured checklist you can turn into issues.
 - [x] CMS editor: accessible reordering – Keyboard-friendly reorder controls and screen-reader announcements for block moves.
 - [x] CMS editor: undo/redo – Full undo/redo stack for content edits, including reorder and block adds/removes.
 - [x] CMS editor: autosave drafts – Autosave with “restore autosave” after refresh/crash and a visible save state.
-- [ ] CMS editor: publish checklist – Pre-publish checklist (missing translations, missing alt text, broken links, empty sections).
-- [ ] CMS editor: inline style controls – Block inspector for spacing, background, alignment, and max-width (theme-aware).
-- [ ] CMS editor: reusable blocks – Save a section as a reusable snippet and insert it on other pages.
-- [ ] CMS editor: global sections – Manage global blocks (announcement bar, footer promo, header banners) used site-wide.
-- [ ] CMS editor: page templates – Create pages from templates (About/FAQ/Shipping/Returns) with prebuilt sections.
-- [ ] CMS editor: inline media drag-drop – Drag images into the editor to auto-upload and insert with caption + alt.
-- [ ] CMS assets: image editor – Crop/rotate/resize tools in the asset library with non-destructive versions.
-- [ ] CMS assets: “where used” – Show usage references for each asset (pages/sections/posts) before deleting.
-- [ ] CMS assets: focal point preview – Preview focal point across common crops (hero/card/mobile) before saving.
-- [ ] CMS preview: shareable draft links – Tokenized preview links for unpublished drafts (pages + home sections).
-- [ ] CMS preview: language toggle – Preview RO/EN (fallbacks visible) without leaving the editor.
-- [ ] CMS preview: theme toggle – Preview light/dark rendering inside the editor.
-- [ ] CMS preview: iframe viewport emulation – Render preview in an iframe at selected device widths so Tailwind breakpoints match.
-- [ ] CMS scheduling: calendar view – Visual calendar for scheduled publish/unpublish across pages/blog/home banners.
-- [ ] CMS redirects: inline creation – When changing a page URL, offer creating a redirect in the same flow.
-- [ ] CMS navigation: menu builder – Visual editor for header/footer links with drag-drop ordering and per-language labels.
-- [ ] CMS content: side-by-side translation – RO/EN side-by-side editing with “copy from” shortcuts.
-- [ ] CMS content: find & replace – Search/replace across CMS content blocks (with preview of affected pages).
-- [ ] CMS blocks: columns/layout – Add layout blocks (2–3 columns, split hero) with responsive controls.
-- [ ] CMS blocks: testimonials/FAQ – Add visual blocks for testimonials, FAQ accordions, and CTAs.
-- [ ] CMS blocks: product grids – Insert product/category/collection grids into pages (shoppable sections).
-- [ ] CMS blocks: form builder – Basic contact/newsletter form blocks with validation and success messaging.
-- [ ] Storefront admin mode: “Edit this page” – Admin-only button on storefront pages linking to the correct CMS editor/section.
+- [x] CMS editor: publish checklist – Pre-publish checklist (missing translations, missing alt text, broken links, empty sections).
+- [x] CMS editor: inline style controls – Block inspector for spacing, background, alignment, and max-width (theme-aware).
+- [x] CMS editor: reusable blocks – Save a section as a reusable snippet and insert it on other pages.
+- [x] CMS editor: global sections – Manage global blocks (announcement bar, footer promo, header banners) used site-wide.
+- [x] CMS editor: page templates – Create pages from templates (About/FAQ/Shipping/Returns) with prebuilt sections.
+- [x] CMS editor: announcement precedence – Allow stacking CMS announcement with Ops banner (currently Ops banner overrides).
+- [x] CMS editor: inline media drag-drop – Drag images into the editor to auto-upload and insert with caption + alt.
+- [x] CMS assets: image editor – Crop/rotate/resize tools in the asset library with non-destructive versions.
+- [x] CMS assets: “where used” – Show usage references for each asset (pages/sections/posts) before deleting.
+- [x] CMS assets: focal point preview – Preview focal point across common crops (hero/card/mobile) before saving.
+- [x] CMS preview: shareable draft links – Tokenized preview links for unpublished drafts (pages + home sections).
+- [x] CMS preview: language toggle – Preview RO/EN (fallbacks visible) without leaving the editor.
+- [x] CMS preview: theme toggle – Preview light/dark rendering inside the editor.
+- [x] CMS preview: iframe viewport emulation – Render preview in an iframe at selected device widths so Tailwind breakpoints match.
+- [x] CMS scheduling: calendar view – Visual calendar for scheduled publish/unpublish across pages/blog/home banners.
+- [x] CMS redirects: inline creation – When changing a page URL, offer creating a redirect in the same flow.
+- [x] CMS navigation: menu builder – Visual editor for header/footer links with drag-drop ordering and per-language labels.
+- [x] CMS content: side-by-side translation – RO/EN side-by-side editing with “copy from” shortcuts.
+- [x] CMS content: find & replace – Search/replace across CMS content blocks (with preview of affected pages).
+- [x] CMS blocks: columns/layout – Add layout blocks (2–3 columns, split hero) with responsive controls.
+- [x] CMS blocks: testimonials/FAQ – Add visual blocks for testimonials, FAQ accordions, and CTAs.
+- [x] CMS blocks: product grids – Insert product/category/collection grids into pages (shoppable sections).
+- [x] CMS blocks: form builder – Basic contact/newsletter form blocks with validation and success messaging.
+- [x] Storefront admin mode: “Edit this page” – Admin-only button on storefront pages linking to the correct CMS editor/section.
+- [x] CMS assets: delete asset – Add a delete action gated by “where used” + safe file cleanup (original + thumbnails).
+- [x] CMS assets: edited versions – Group edited copies under the original asset (lineage + quick revert).
+- [x] CMS scheduling: dedicated API – Add `/content/admin/scheduling` (window + pagination) so the scheduling view isn’t limited to the admin dashboard’s latest-content cap.
+- [x] CMS redirects: quick create UI – Add a small “Create redirect” inline form in the redirects manager (no CSV needed).
+- [x] CMS blocks: CTA external URLs – Support external `http(s)` links (and optional new-tab) for CTA buttons instead of routerLink-only.
+- [x] UI: Button component external links – Support `href` + optional `target`/`rel` in `app-button` to avoid duplicating anchor styles across CMS CTA/banners.
+- [x] CMS blocks: product grids picker – Add admin select/autocomplete for categories, collections, and product slugs (avoid manual typing).
+- [x] CMS blocks: forms captcha – Optional Turnstile captcha for newsletter/contact blocks to reduce spam.
+- [x] CMS assets: delete original w/ versions – Add a “delete all versions” option for original assets (cascade, with usage safety checks).
 
 ## Data Portability & Backups (Extended)
 - [x] CLI command `python -m app.cli export-data` exporting users (no passwords), products, categories, orders, addresses to JSON.
@@ -999,3 +1038,4 @@ Below is a structured checklist you can turn into issues.
 - [x] Catalog: investigate product detail page sometimes failing to load from listings (route/slug/API error).
 - [x] Admin Dashboard analytics: exclude cancelled/refunded/pending orders from sales totals and “sold” KPIs.
 - [x] Data hygiene: replace any “oz” units in seeded/sample products with metric variants (e.g., ml) and avoid reintroducing.
+- [x] i18n: move category name required message from `adminUi.products.errors.required` to `adminUi.categories.errors.required` and update call sites.

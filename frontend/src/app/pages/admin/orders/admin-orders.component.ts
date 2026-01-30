@@ -11,6 +11,7 @@ import { ButtonComponent } from '../../../shared/button.component';
 import { ErrorStateComponent } from '../../../shared/error-state.component';
 import { extractRequestId } from '../../../shared/http-error';
 import { InputComponent } from '../../../shared/input.component';
+import { HelpPanelComponent } from '../../../shared/help-panel.component';
 import { SkeletonComponent } from '../../../shared/skeleton.component';
 import { ToastService } from '../../../core/toast.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
@@ -75,6 +76,11 @@ const ORDERS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
   { id: 'actions', labelKey: 'adminUi.orders.table.actions', required: true }
 ];
 
+const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
+  ...defaultAdminTableLayout(ORDERS_TABLE_COLUMNS),
+  hidden: ['tags']
+});
+
 @Component({
   selector: 'app-admin-orders',
   standalone: true,
@@ -87,6 +93,7 @@ const ORDERS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
     ButtonComponent,
     ErrorStateComponent,
     InputComponent,
+    HelpPanelComponent,
     SkeletonComponent,
     LocalizedCurrencyPipe,
     TableLayoutModalComponent
@@ -111,11 +118,25 @@ const ORDERS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
         [open]="layoutModalOpen()"
         [columns]="tableColumns"
         [layout]="tableLayout()"
+        [defaults]="tableDefaults"
         (closed)="closeLayoutModal()"
         (applied)="applyTableLayout($event)"
       ></app-table-layout-modal>
 
       <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
+        <app-help-panel
+          [titleKey]="'adminUi.help.title'"
+          [subtitleKey]="'adminUi.orders.help.subtitle'"
+          [mediaSrc]="'assets/help/admin-orders-help.svg'"
+          [mediaAltKey]="'adminUi.orders.help.mediaAlt'"
+        >
+          <ul class="list-disc pl-5 text-xs text-slate-600 dark:text-slate-300">
+            <li>{{ 'adminUi.orders.help.points.status' | translate }}</li>
+            <li>{{ 'adminUi.orders.help.points.tags' | translate }}</li>
+            <li>{{ 'adminUi.orders.help.points.export' | translate }}</li>
+          </ul>
+        </app-help-panel>
+
 	        <div class="grid gap-3 lg:grid-cols-[1fr_220px_220px_220px_220px_auto] items-end">
 	          <app-input [label]="'adminUi.orders.search' | translate" [(value)]="q"></app-input>
 
@@ -627,9 +648,10 @@ export class AdminOrdersComponent implements OnInit {
 
   readonly orderRowHeight = 44;
   readonly tableColumns = ORDERS_TABLE_COLUMNS;
+  readonly tableDefaults = defaultOrdersTableLayout();
 
   layoutModalOpen = signal(false);
-  tableLayout = signal<AdminTableLayoutV1>(defaultAdminTableLayout(ORDERS_TABLE_COLUMNS));
+  tableLayout = signal<AdminTableLayoutV1>(defaultOrdersTableLayout());
 
   loading = signal(true);
   error = signal<string | null>(null);
@@ -699,7 +721,7 @@ export class AdminOrdersComponent implements OnInit {
 
   ngOnInit(): void {
     this.favorites.init();
-    this.tableLayout.set(loadAdminTableLayout(this.tableLayoutStorageKey(), this.tableColumns));
+    this.tableLayout.set(loadAdminTableLayout(this.tableLayoutStorageKey(), this.tableColumns, this.tableDefaults));
     this.presets = this.loadPresets();
     this.loadExportState();
     this.maybeApplyFiltersFromState();

@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Dict
 from uuid import UUID
@@ -13,7 +14,9 @@ from app.db.base import Base
 from app.db.session import get_session
 from app.models.cart import Cart
 from app.models.catalog import Category, Product, ProductImage, ProductStatus
+from app.models.content import ContentBlock, ContentStatus
 from app.models.order import Order
+from app.models.legal import LegalConsent, LegalConsentContext
 from app.models.user import User
 from app.core import security
 from app.services import cart as cart_service
@@ -34,6 +37,28 @@ def checkout_app() -> Dict[str, object]:
     async def init_models() -> None:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+        async with SessionLocal() as session:
+            session.add_all(
+                [
+                    ContentBlock(
+                        key="page.terms-and-conditions",
+                        title="Terms",
+                        body_markdown="Terms",
+                        status=ContentStatus.published,
+                        version=1,
+                        published_at=datetime.now(timezone.utc),
+                    ),
+                    ContentBlock(
+                        key="page.privacy-policy",
+                        title="Privacy",
+                        body_markdown="Privacy",
+                        status=ContentStatus.published,
+                        version=1,
+                        published_at=datetime.now(timezone.utc),
+                    ),
+                ]
+            )
+            await session.commit()
 
     asyncio.run(init_models())
 
@@ -245,6 +270,8 @@ def test_guest_checkout_email_verification_and_create_account(
             "country": "US",
             "shipping_method_id": None,
             "promo_code": None,
+            "accept_terms": True,
+            "accept_privacy": True,
             "save_address": True,
         },
     )
@@ -440,6 +467,8 @@ def test_authenticated_checkout_promo_and_shipping(checkout_app: Dict[str, objec
             "last_name": "User",
             "date_of_birth": "2000-01-01",
             "phone": "+40723204204",
+            "accept_terms": True,
+            "accept_privacy": True,
         },
     )
     assert register.status_code == 201, register.text
@@ -604,6 +633,8 @@ def test_checkout_respects_product_delivery_exceptions(checkout_app: Dict[str, o
             "last_name": "User",
             "date_of_birth": "2000-01-01",
             "phone": "+40723204204",
+            "accept_terms": True,
+            "accept_privacy": True,
         },
     )
     assert register.status_code == 201, register.text
@@ -721,6 +752,8 @@ def test_authenticated_checkout_creates_separate_billing_address(
             "last_name": "Buyer",
             "date_of_birth": "2000-01-01",
             "phone": "+40723204204",
+            "accept_terms": True,
+            "accept_privacy": True,
         },
     )
     assert register.status_code == 201, register.text
@@ -816,6 +849,8 @@ def test_authenticated_checkout_cod_skips_payment_intent(checkout_app: Dict[str,
             "last_name": "Buyer",
             "date_of_birth": "2000-01-01",
             "phone": "+40723204204",
+            "accept_terms": True,
+            "accept_privacy": True,
         },
     )
     assert register.status_code == 201, register.text
@@ -954,6 +989,8 @@ def test_authenticated_checkout_paypal_flow_requires_auth_to_capture(
             "last_name": "Buyer",
             "date_of_birth": "2000-01-01",
             "phone": "+40723204204",
+            "accept_terms": True,
+            "accept_privacy": True,
         },
     )
     assert register.status_code == 201, register.text
@@ -1110,6 +1147,8 @@ def test_paypal_webhook_captures_order_without_return(
             "last_name": "Buyer",
             "date_of_birth": "2000-01-01",
             "phone": "+40723204204",
+            "accept_terms": True,
+            "accept_privacy": True,
         },
     )
     assert register.status_code == 201, register.text
@@ -1220,6 +1259,8 @@ def test_checkout_sends_admin_alert_fallback_when_no_owner(
             "last_name": "Two",
             "date_of_birth": "2000-01-01",
             "phone": "+40723204204",
+            "accept_terms": True,
+            "accept_privacy": True,
         },
     )
     assert register.status_code == 201, register.text
@@ -1304,3 +1345,137 @@ def test_checkout_sends_admin_alert_fallback_when_no_owner(
     assert webhook.status_code == 200, webhook.text
     assert captured.get("admin_email") == "ops@example.com"
     assert captured.get("admin_customer_email") == "buyer2@example.com"
+
+
+def test_checkout_requires_reconsent_when_legal_docs_change(
+    checkout_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client: TestClient = checkout_app["client"]  # type: ignore[assignment]
+    SessionLocal = checkout_app["session_factory"]  # type: ignore[assignment]
+
+    async def seed() -> dict[str, str]:
+        async with SessionLocal() as session:
+            category = Category(slug="legal", name="Legal")
+            product = Product(
+                category=category,
+                slug="legal-prod",
+                sku="LEGAL-1",
+                name="Legal Product",
+                base_price=Decimal("50.00"),
+                currency="RON",
+                stock_quantity=10,
+                status=ProductStatus.published,
+                images=[ProductImage(url="/media/img1.png", alt_text="img")],
+            )
+            session.add(product)
+            await session.commit()
+            await session.refresh(product)
+            return {"product_id": str(product.id)}
+
+    seeded = asyncio.run(seed())
+
+    register = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "legalbuyer@example.com",
+            "username": "legalbuyer",
+            "password": "secret123",
+            "name": "Legal Buyer",
+            "first_name": "Legal",
+            "last_name": "Buyer",
+            "date_of_birth": "2000-01-01",
+            "phone": "+40723204204",
+            "accept_terms": True,
+            "accept_privacy": True,
+        },
+    )
+    assert register.status_code == 201, register.text
+    token = register.json()["tokens"]["access_token"]
+    user_id = UUID(register.json()["user"]["id"])
+
+    async def mark_verified() -> None:
+        async with SessionLocal() as session:
+            user = await session.get(User, user_id)
+            assert user is not None
+            user.email_verified = True
+            session.add(user)
+            await session.commit()
+
+    asyncio.run(mark_verified())
+
+    add_res = client.post(
+        "/api/v1/cart/items",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"product_id": seeded["product_id"], "quantity": 1},
+    )
+    assert add_res.status_code in (200, 201), add_res.text
+
+    async def bump_legal_versions() -> None:
+        async with SessionLocal() as session:
+            blocks = (
+                (
+                    await session.execute(
+                        select(ContentBlock).where(
+                            ContentBlock.key.in_(("page.terms-and-conditions", "page.privacy-policy"))
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            assert len(blocks) == 2
+            for block in blocks:
+                block.version = int(block.version) + 1
+                session.add(block)
+            await session.commit()
+
+    asyncio.run(bump_legal_versions())
+
+    async def fake_create_checkout_session(**_: object) -> dict[str, str]:
+        return {"session_id": "cs_test", "checkout_url": "https://stripe.example/checkout"}
+
+    monkeypatch.setattr(payments, "create_checkout_session", fake_create_checkout_session)
+
+    base_payload: dict[str, object] = {
+        "line1": "123 Test St",
+        "line2": None,
+        "city": "Testville",
+        "region": "TS",
+        "postal_code": "12345",
+        "country": "US",
+        "shipping_method_id": None,
+        "promo_code": None,
+        "save_address": False,
+        "payment_method": "stripe",
+    }
+
+    res = client.post(
+        "/api/v1/orders/checkout",
+        headers={"Authorization": f"Bearer {token}"},
+        json=base_payload,
+    )
+    assert res.status_code == 400, res.text
+    assert res.json().get("detail") == "Legal consents required"
+
+    res2 = client.post(
+        "/api/v1/orders/checkout",
+        headers={"Authorization": f"Bearer {token}"},
+        json={**base_payload, "accept_terms": True, "accept_privacy": True},
+    )
+    assert res2.status_code == 201, res2.text
+
+    async def read_consents() -> list[LegalConsent]:
+        async with SessionLocal() as session:
+            return (
+                (await session.execute(select(LegalConsent).where(LegalConsent.user_id == user_id)))
+                .scalars()
+                .all()
+            )
+
+    consents = asyncio.run(read_consents())
+    max_versions: dict[str, int] = {}
+    for consent in consents:
+        max_versions[consent.doc_key] = max(int(max_versions.get(consent.doc_key, 0)), int(consent.doc_version))
+    assert max_versions.get("page.terms-and-conditions") == 2
+    assert max_versions.get("page.privacy-policy") == 2
+    assert any(c.context == LegalConsentContext.checkout for c in consents)

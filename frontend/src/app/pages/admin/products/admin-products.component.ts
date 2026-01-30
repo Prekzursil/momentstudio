@@ -9,6 +9,7 @@ import { ButtonComponent } from '../../../shared/button.component';
 import { ErrorStateComponent } from '../../../shared/error-state.component';
 import { extractRequestId } from '../../../shared/http-error';
 import { InputComponent } from '../../../shared/input.component';
+import { HelpPanelComponent } from '../../../shared/help-panel.component';
 import { ModalComponent } from '../../../shared/modal.component';
 import { SkeletonComponent } from '../../../shared/skeleton.component';
 import {
@@ -21,6 +22,10 @@ import { CatalogService, Category } from '../../../core/catalog.service';
 import { MarkdownService } from '../../../core/markdown.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 import {
+  AdminCategory,
+  AdminCategoriesImportResult,
+  AdminCategoryDeletePreview,
+  AdminCategoryMergePreview,
   AdminDeletedProductImage,
   AdminProductAuditEntry,
   AdminProductImageOptimizationStats,
@@ -35,6 +40,7 @@ import { AdminRecentService } from '../../../core/admin-recent.service';
 import { ToastService } from '../../../core/toast.service';
 import { AuthService } from '../../../core/auth.service';
 import { AdminFavoriteItem, AdminFavoritesService } from '../../../core/admin-favorites.service';
+import { AdminUiPrefsService } from '../../../core/admin-ui-prefs.service';
 import {
   AdminTableLayoutV1,
   adminTableCellPaddingClass,
@@ -51,6 +57,70 @@ type ProductStatusFilter = 'all' | 'draft' | 'published' | 'archived';
 type ProductTranslationFilter = 'all' | 'missing_any' | 'missing_en' | 'missing_ro';
 type ProductView = 'active' | 'deleted';
 
+type ProductWizardKind = 'create' | 'publish';
+type ProductWizardStepId = 'basics' | 'content' | 'save' | 'images' | 'publish';
+
+type ProductWizardStep = {
+  id: ProductWizardStepId;
+  labelKey: string;
+  descriptionKey: string;
+  anchorId: string;
+};
+
+const PRODUCT_CREATE_WIZARD_STEPS: ProductWizardStep[] = [
+  {
+    id: 'basics',
+    labelKey: 'adminUi.products.wizard.steps.basics',
+    descriptionKey: 'adminUi.products.wizard.desc.basics',
+    anchorId: 'product-wizard-top'
+  },
+  {
+    id: 'content',
+    labelKey: 'adminUi.products.wizard.steps.content',
+    descriptionKey: 'adminUi.products.wizard.desc.content',
+    anchorId: 'product-wizard-content'
+  },
+  {
+    id: 'save',
+    labelKey: 'adminUi.products.wizard.steps.save',
+    descriptionKey: 'adminUi.products.wizard.desc.save',
+    anchorId: 'product-wizard-save'
+  },
+  {
+    id: 'images',
+    labelKey: 'adminUi.products.wizard.steps.images',
+    descriptionKey: 'adminUi.products.wizard.desc.images',
+    anchorId: 'product-wizard-images'
+  },
+  {
+    id: 'publish',
+    labelKey: 'adminUi.products.wizard.steps.publish',
+    descriptionKey: 'adminUi.products.wizard.desc.publish',
+    anchorId: 'product-wizard-publish'
+  }
+];
+
+const PRODUCT_PUBLISH_WIZARD_STEPS: ProductWizardStep[] = [
+  {
+    id: 'content',
+    labelKey: 'adminUi.products.wizard.steps.review',
+    descriptionKey: 'adminUi.products.wizard.desc.review',
+    anchorId: 'product-wizard-content'
+  },
+  {
+    id: 'images',
+    labelKey: 'adminUi.products.wizard.steps.images',
+    descriptionKey: 'adminUi.products.wizard.desc.images',
+    anchorId: 'product-wizard-images'
+  },
+  {
+    id: 'publish',
+    labelKey: 'adminUi.products.wizard.steps.publish',
+    descriptionKey: 'adminUi.products.wizard.desc.publish',
+    anchorId: 'product-wizard-publish'
+  }
+];
+
 const PRODUCTS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
   { id: 'select', labelKey: 'adminUi.products.table.select', required: true },
   { id: 'name', labelKey: 'adminUi.products.table.name', required: true },
@@ -62,6 +132,11 @@ const PRODUCTS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
   { id: 'updated', labelKey: 'adminUi.products.table.updated' },
   { id: 'actions', labelKey: 'adminUi.products.table.actions', required: true }
 ];
+
+const defaultProductsTableLayout = (): AdminTableLayoutV1 => ({
+  ...defaultAdminTableLayout(PRODUCTS_TABLE_COLUMNS),
+  hidden: ['category', 'active', 'updated']
+});
 
 type ProductBadgeKey = 'new' | 'limited' | 'handmade';
 
@@ -155,6 +230,7 @@ type PriceHistoryChart = {
     ButtonComponent,
     ErrorStateComponent,
     InputComponent,
+    HelpPanelComponent,
     ModalComponent,
     SkeletonComponent,
     LocalizedCurrencyPipe,
@@ -174,6 +250,8 @@ type PriceHistoryChart = {
           <app-button size="sm" variant="ghost" [label]="'adminUi.products.csv.import' | translate" (action)="openCsvImport()"></app-button>
           <app-button size="sm" variant="ghost" [label]="densityToggleLabelKey() | translate" (action)="toggleDensity()"></app-button>
           <app-button size="sm" variant="ghost" [label]="'adminUi.tableLayout.title' | translate" (action)="openLayoutModal()"></app-button>
+          <app-button size="sm" variant="ghost" [label]="'adminUi.categories.title' | translate" (action)="openCategoryManager()"></app-button>
+          <app-button size="sm" variant="ghost" [label]="'adminUi.products.wizard.start' | translate" (action)="startCreateWizard()"></app-button>
           <app-button size="sm" [label]="'adminUi.products.new' | translate" (action)="startNew()"></app-button>
         </div>
       </div>
@@ -182,6 +260,7 @@ type PriceHistoryChart = {
         [open]="layoutModalOpen()"
         [columns]="tableColumns"
         [layout]="tableLayout()"
+        [defaults]="tableDefaults"
         (closed)="closeLayoutModal()"
         (applied)="applyTableLayout($event)"
       ></app-table-layout-modal>
@@ -264,7 +343,460 @@ type PriceHistoryChart = {
         </div>
       </app-modal>
 
+      <app-modal
+        [open]="statusConfirmOpen()"
+        [title]="'adminUi.products.confirmStatus.title' | translate"
+        [subtitle]="'adminUi.products.confirmStatus.subtitle' | translate"
+        [closeLabel]="'adminUi.actions.cancel' | translate"
+        [cancelLabel]="'adminUi.actions.cancel' | translate"
+        [confirmLabel]="statusConfirmBusy() ? ('adminUi.actions.loading' | translate) : ('adminUi.actions.save' | translate)"
+        [confirmDisabled]="statusConfirmBusy()"
+        (closed)="closeStatusConfirm()"
+        (confirm)="confirmStatusChange()"
+      >
+        <div class="grid gap-3">
+          <div
+            *ngIf="statusConfirmPrev() as prev"
+            class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+          >
+            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              {{ 'adminUi.products.confirmStatus.summary' | translate }}
+            </p>
+            <p class="mt-1 text-sm text-slate-900 dark:text-slate-50">
+              <span class="font-semibold">{{ ('adminUi.status.' + prev.status) | translate }}</span>
+              →
+              <span class="font-semibold">{{ ('adminUi.status.' + (statusConfirmTarget()?.status || form.status)) | translate }}</span>
+            </p>
+          </div>
+
+          <ul class="list-disc pl-5 text-sm text-slate-700 dark:text-slate-200">
+            <li *ngIf="(statusConfirmTarget()?.status || form.status) === 'published'">
+              {{ 'adminUi.products.confirmStatus.points.published' | translate }}
+            </li>
+            <li *ngIf="(statusConfirmTarget()?.status || form.status) === 'draft'">
+              {{ 'adminUi.products.confirmStatus.points.draft' | translate }}
+            </li>
+            <li *ngIf="(statusConfirmTarget()?.status || form.status) === 'archived'">
+              {{ 'adminUi.products.confirmStatus.points.archived' | translate }}
+            </li>
+            <li>{{ 'adminUi.products.confirmStatus.points.audit' | translate }}</li>
+          </ul>
+        </div>
+      </app-modal>
+
+      <app-modal
+        [open]="bulkStatusConfirmOpen()"
+        [title]="'adminUi.products.bulk.status.title' | translate: { count: selected.size }"
+        [subtitle]="'adminUi.products.bulk.status.subtitle' | translate"
+        [closeLabel]="'adminUi.actions.cancel' | translate"
+        [cancelLabel]="'adminUi.actions.cancel' | translate"
+        [confirmLabel]="bulkStatusConfirmBusy() ? ('adminUi.actions.loading' | translate) : ('adminUi.products.bulk.status.apply' | translate)"
+        [confirmDisabled]="bulkStatusConfirmBusy()"
+        (closed)="closeBulkStatusConfirm()"
+        (confirm)="confirmBulkStatusChange()"
+      >
+        <div class="grid gap-3">
+          <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
+            <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              {{ 'adminUi.products.bulk.status.target' | translate }}
+            </p>
+            <p class="mt-1 text-sm text-slate-900 dark:text-slate-50">
+              <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold" [ngClass]="statusPillClass(bulkStatusTarget)">
+                {{ ('adminUi.status.' + bulkStatusTarget) | translate }}
+              </span>
+            </p>
+          </div>
+
+          <div class="grid gap-2">
+            <div
+              *ngFor="let product of selectedProductsOnPage(); trackBy: trackProductId"
+              class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+            >
+              <div class="min-w-0">
+                <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">{{ product.name }}</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ product.slug }}</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold" [ngClass]="statusPillClass(product.status)">
+                  {{ ('adminUi.status.' + product.status) | translate }}
+                </span>
+                <span class="text-slate-400">→</span>
+                <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold" [ngClass]="statusPillClass(bulkStatusTarget)">
+                  {{ ('adminUi.status.' + bulkStatusTarget) | translate }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <p class="text-xs text-slate-500 dark:text-slate-400">
+            {{ 'adminUi.products.bulk.status.undoHint' | translate }}
+          </p>
+
+          <div
+            *ngIf="bulkError()"
+            class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-2 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+          >
+            {{ bulkError() }}
+          </div>
+        </div>
+      </app-modal>
+
+      <app-modal
+        [open]="categoryManagerOpen()"
+        [title]="'adminUi.categories.title' | translate"
+        [showActions]="false"
+        [closeLabel]="'adminUi.actions.cancel' | translate"
+        (closed)="closeCategoryManager()"
+      >
+        <div class="grid gap-4">
+          <div class="flex flex-wrap items-end justify-between gap-2">
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 flex-1">
+              {{ 'adminUi.products.table.category' | translate }}
+              <select
+                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                [(ngModel)]="categoryManagerSlug"
+                (ngModelChange)="onCategoryManagerSelect($event)"
+              >
+                <option value="">{{ 'adminUi.products.selectCategory' | translate }}</option>
+                <option *ngFor="let cat of categories()" [value]="cat.slug">{{ cat.name }}</option>
+              </select>
+            </label>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.categories.add' | translate"
+              (action)="openCreateCategoryFromManager()"
+              [disabled]="categoryManagerUpdateBusy() || mergeSaving() || deleteSaving()"
+            ></app-button>
+          </div>
+
+          <div *ngIf="categoryManagerSelectedCategory() as cat" class="grid gap-4">
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
+              <p class="font-semibold text-slate-900 dark:text-slate-50">{{ cat.name }}</p>
+              <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.categories.slug' | translate }}: {{ cat.slug }}</p>
+            </div>
+
+            <div class="grid gap-2">
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.categories.parent' | translate }}
+                <select
+                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="categoryManagerParentId"
+                  [disabled]="categoryManagerUpdateBusy() || mergePreviewLoading() || mergeSaving() || deletePreviewLoading() || deleteSaving()"
+                >
+                  <option value="">{{ 'adminUi.categories.parentNone' | translate }}</option>
+                  <option *ngFor="let parent of categoryParentOptions(cat)" [value]="parent.id">{{ parent.name }}</option>
+                </select>
+              </label>
+              <div class="flex items-center justify-end gap-2">
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.actions.reset' | translate"
+                  (action)="resetCategoryManagerParent()"
+                  [disabled]="categoryManagerUpdateBusy()"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  [label]="categoryManagerUpdateBusy() ? ('adminUi.actions.loading' | translate) : ('adminUi.actions.save' | translate)"
+                  (action)="saveCategoryManagerParent()"
+                  [disabled]="categoryManagerUpdateBusy()"
+                ></app-button>
+              </div>
+              <p *ngIf="categoryManagerUpdateError()" class="text-xs text-rose-700 dark:text-rose-300">
+                {{ categoryManagerUpdateError() }}
+              </p>
+            </div>
+
+            <div class="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+              <p class="text-xs font-semibold text-slate-800 dark:text-slate-100">
+                {{ 'adminUi.storefront.categories.mergeTitle' | translate }}
+              </p>
+              <label class="grid gap-1">
+                <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.storefront.categories.mergeInto' | translate }}
+                </span>
+                <select
+                  class="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="mergeTargetSlug"
+                  (ngModelChange)="onMergeTargetChange()"
+                  [disabled]="categoryManagerUpdateBusy() || mergePreviewLoading() || mergeSaving() || deletePreviewLoading() || deleteSaving()"
+                >
+                  <option value="">{{ 'adminUi.storefront.categories.mergeSelectPlaceholder' | translate }}</option>
+                  <option *ngFor="let target of mergeTargetOptions(cat)" [value]="target.slug">{{ target.name }}</option>
+                </select>
+              </label>
+              <p *ngIf="mergePreview() as preview" class="text-xs text-slate-600 dark:text-slate-300">
+                {{
+                  'adminUi.storefront.categories.mergePreviewInfo'
+                    | translate : { products: preview.product_count, children: preview.child_count }
+                }}
+              </p>
+              <p *ngIf="mergeError()" class="text-xs text-rose-700 dark:text-rose-300">{{ mergeError() }}</p>
+              <div class="flex flex-wrap justify-end gap-2">
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="mergePreviewLoading() ? ('adminUi.actions.loading' | translate) : ('adminUi.storefront.categories.mergePreview' | translate)"
+                  [disabled]="mergePreviewLoading() || mergeSaving() || !mergeTargetSlug"
+                  (action)="previewCategoryMerge()"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  [label]="mergeSaving() ? ('adminUi.actions.loading' | translate) : ('adminUi.storefront.categories.mergeAction' | translate)"
+                  [disabled]="mergeSaving() || !(mergePreview()?.can_merge)"
+                  (action)="mergeCategorySelected()"
+                ></app-button>
+              </div>
+            </div>
+
+            <div class="grid gap-3 rounded-xl border border-rose-200 bg-rose-50 p-3 dark:border-rose-900/40 dark:bg-rose-950/30">
+              <p class="text-xs font-semibold text-rose-900 dark:text-rose-100">
+                {{ 'adminUi.storefront.categories.deleteTitle' | translate }}
+              </p>
+              <p *ngIf="deletePreview() as preview" class="text-xs text-rose-800 dark:text-rose-200">
+                {{
+                  'adminUi.storefront.categories.deletePreviewInfo'
+                    | translate : { products: preview.product_count, children: preview.child_count }
+                }}
+              </p>
+              <p *ngIf="deleteError()" class="text-xs text-rose-800 dark:text-rose-200">{{ deleteError() }}</p>
+              <div class="flex flex-wrap justify-end gap-2">
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="deletePreviewLoading() ? ('adminUi.actions.loading' | translate) : ('adminUi.storefront.categories.deletePreview' | translate)"
+                  [disabled]="deletePreviewLoading() || deleteSaving()"
+                  (action)="previewCategoryDelete()"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  [label]="deleteSaving() ? ('adminUi.actions.loading' | translate) : ('adminUi.storefront.categories.deleteAction' | translate)"
+                  [disabled]="deleteSaving() || !(deletePreview()?.can_delete)"
+                  (action)="deleteCategorySelectedSafe()"
+                ></app-button>
+              </div>
+            </div>
+          </div>
+
+          <details
+            class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/20 dark:text-slate-200"
+          >
+            <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+              {{ 'adminUi.categories.csv.title' | translate }}
+            </summary>
+
+            <div class="mt-3 grid gap-3">
+              <p class="text-xs text-slate-600 dark:text-slate-300">{{ 'adminUi.categories.csv.hint' | translate }}</p>
+              <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.categories.csv.formatHint' | translate }}</p>
+
+              <div class="flex flex-wrap justify-end gap-2">
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.categories.csv.downloadTemplate' | translate"
+                  (action)="downloadCategoriesCsv(true)"
+                  [disabled]="categoryImportBusy()"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.categories.csv.export' | translate"
+                  (action)="downloadCategoriesCsv(false)"
+                  [disabled]="categoryImportBusy()"
+                ></app-button>
+              </div>
+
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.categories.csv.file' | translate }}
+                <input
+                  type="file"
+                  accept=".csv"
+                  (change)="onCategoryImportFileChange($event)"
+                  class="block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-slate-700 dark:file:bg-slate-100 dark:file:text-slate-900 dark:hover:file:bg-slate-200"
+                />
+              </label>
+
+              <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                <input type="checkbox" [(ngModel)]="categoryImportDryRun" [disabled]="categoryImportBusy()" />
+                {{ 'adminUi.categories.csv.dryRun' | translate }}
+              </label>
+
+              <div class="flex justify-end">
+                <app-button
+                  size="sm"
+                  [label]="categoryImportBusy() ? ('adminUi.actions.loading' | translate) : ('adminUi.categories.csv.run' | translate)"
+                  (action)="runCategoryImport()"
+                  [disabled]="categoryImportBusy() || !categoryImportFile"
+                ></app-button>
+              </div>
+
+              <p *ngIf="categoryImportError()" class="text-sm text-rose-700 dark:text-rose-300">{{ categoryImportError() }}</p>
+
+              <div *ngIf="categoryImportResult() as result" class="grid gap-2">
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.categories.csv.result' | translate }}
+                </p>
+                <div class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
+                  <div>{{ 'adminUi.categories.csv.created' | translate }}: {{ result.created }}</div>
+                  <div>{{ 'adminUi.categories.csv.updated' | translate }}: {{ result.updated }}</div>
+                </div>
+
+                <div *ngIf="(result.errors || []).length > 0; else categoryCsvNoErrors" class="grid gap-2">
+                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                    {{ 'adminUi.categories.csv.errorsTitle' | translate }}
+                  </p>
+                  <ul class="list-disc pl-5 text-xs text-slate-600 dark:text-slate-300">
+                    <li *ngFor="let err of result.errors">{{ err }}</li>
+                  </ul>
+                </div>
+                <ng-template #categoryCsvNoErrors>
+                  <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.categories.csv.noErrors' | translate }}</p>
+                </ng-template>
+              </div>
+            </div>
+          </details>
+        </div>
+      </app-modal>
+
+      <app-modal
+        [open]="createCategoryOpen()"
+        [title]="'adminUi.categories.add' | translate"
+        [subtitle]="'adminUi.categories.slugAutoHint' | translate"
+        [closeLabel]="'adminUi.actions.cancel' | translate"
+        [cancelLabel]="'adminUi.actions.cancel' | translate"
+        [confirmLabel]="createCategoryBusy() ? ('adminUi.actions.loading' | translate) : ('adminUi.categories.add' | translate)"
+        [confirmDisabled]="createCategoryBusy() || !createCategoryName.trim()"
+        (closed)="closeCreateCategory()"
+        (confirm)="confirmCreateCategory()"
+      >
+        <div class="grid gap-3">
+          <app-input
+            [label]="'adminUi.products.table.name' | translate"
+            [(value)]="createCategoryName"
+            [disabled]="createCategoryBusy()"
+          ></app-input>
+
+          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            {{ 'adminUi.categories.parent' | translate }}
+            <select
+              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              [(ngModel)]="createCategoryParentId"
+              [disabled]="createCategoryBusy()"
+            >
+              <option value="">{{ 'adminUi.categories.parentNone' | translate }}</option>
+              <option *ngFor="let cat of categories()" [value]="cat.id">{{ cat.name }}</option>
+            </select>
+          </label>
+
+          <p class="text-xs text-slate-500 dark:text-slate-400">
+            {{ 'adminUi.categories.wizard.desc.translations' | translate }}
+          </p>
+
+          <div
+            *ngIf="createCategoryError()"
+            class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-2 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+          >
+            {{ createCategoryError() }}
+          </div>
+        </div>
+      </app-modal>
+
+      <app-modal
+        [open]="deleteImageConfirmOpen()"
+        [title]="'adminUi.products.confirmDeleteImage.title' | translate"
+        [subtitle]="'adminUi.products.confirmDeleteImage.subtitle' | translate"
+        [closeLabel]="'adminUi.actions.cancel' | translate"
+        [cancelLabel]="'adminUi.actions.cancel' | translate"
+        [confirmLabel]="deleteImageConfirmBusy() ? ('adminUi.actions.loading' | translate) : ('adminUi.actions.delete' | translate)"
+        [confirmDisabled]="deleteImageConfirmBusy()"
+        (closed)="closeDeleteImageConfirm()"
+        (confirm)="confirmDeleteImage()"
+      >
+        <div class="grid gap-3">
+          <div
+            *ngIf="deleteImageConfirmTarget() as target"
+            class="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+          >
+            <img [src]="target.url" [alt]="target.alt" class="h-12 w-12 rounded object-cover" />
+            <div class="min-w-0">
+              <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">{{ target.alt }}</p>
+              <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ target.url }}</p>
+            </div>
+          </div>
+
+          <ul class="list-disc pl-5 text-sm text-slate-700 dark:text-slate-200">
+            <li>{{ 'adminUi.products.confirmDeleteImage.points.storefront' | translate }}</li>
+            <li>{{ 'adminUi.products.confirmDeleteImage.points.restore' | translate }}</li>
+            <li>{{ 'adminUi.products.confirmDeleteImage.points.metadata' | translate }}</li>
+          </ul>
+        </div>
+      </app-modal>
+
 	      <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
+          <app-help-panel
+            [titleKey]="'adminUi.help.title'"
+            [subtitleKey]="'adminUi.products.help.subtitle'"
+            [mediaSrc]="'assets/help/admin-products-help.svg'"
+            [mediaAltKey]="'adminUi.products.help.mediaAlt'"
+          >
+            <ul class="list-disc pl-5 text-xs text-slate-600 dark:text-slate-300">
+              <li>{{ 'adminUi.products.help.points.search' | translate }}</li>
+              <li>{{ 'adminUi.products.help.points.bulk' | translate }}</li>
+              <li>{{ 'adminUi.products.help.points.columns' | translate }}</li>
+              <li>{{ 'adminUi.products.help.points.wizard' | translate }}</li>
+            </ul>
+          </app-help-panel>
+
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <button
+                type="button"
+                class="px-3 py-1.5 text-xs font-semibold"
+                [class.bg-slate-900]="status === 'all'"
+                [class.text-white]="status === 'all'"
+                [class.text-slate-700]="status !== 'all'"
+                [class.dark:text-slate-200]="status !== 'all'"
+                (click)="setStatusFilter('all')"
+              >
+                {{ 'adminUi.products.all' | translate }}
+              </button>
+              <button
+                type="button"
+                class="px-3 py-1.5 text-xs font-semibold"
+                [class.bg-slate-900]="status === 'draft'"
+                [class.text-white]="status === 'draft'"
+                [class.text-slate-700]="status !== 'draft'"
+                [class.dark:text-slate-200]="status !== 'draft'"
+                (click)="setStatusFilter('draft')"
+              >
+                {{ 'adminUi.status.draft' | translate }}
+              </button>
+              <button
+                type="button"
+                class="px-3 py-1.5 text-xs font-semibold"
+                [class.bg-slate-900]="status === 'published'"
+                [class.text-white]="status === 'published'"
+                [class.text-slate-700]="status !== 'published'"
+                [class.dark:text-slate-200]="status !== 'published'"
+                (click)="setStatusFilter('published')"
+              >
+                {{ 'adminUi.status.published' | translate }}
+              </button>
+              <button
+                type="button"
+                class="px-3 py-1.5 text-xs font-semibold"
+                [class.bg-slate-900]="status === 'archived'"
+                [class.text-white]="status === 'archived'"
+                [class.text-slate-700]="status !== 'archived'"
+                [class.dark:text-slate-200]="status !== 'archived'"
+                (click)="setStatusFilter('archived')"
+              >
+                {{ 'adminUi.status.archived' | translate }}
+              </button>
+            </div>
+          </div>
+
 		        <div class="grid gap-3 lg:grid-cols-[1fr_180px_220px_240px_220px_auto] items-end">
 		          <app-input [label]="'adminUi.products.search' | translate" [(value)]="q"></app-input>
 
@@ -292,8 +824,17 @@ type PriceHistoryChart = {
             </select>
           </label>
 
-          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-            {{ 'adminUi.products.table.category' | translate }}
+          <div class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            <div class="flex items-center justify-between gap-2">
+              <span>{{ 'adminUi.products.table.category' | translate }}</span>
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.categories.add' | translate"
+                (action)="openCreateCategory('filters')"
+                [disabled]="loading()"
+              ></app-button>
+            </div>
             <select
               class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
               [(ngModel)]="categorySlug"
@@ -301,7 +842,7 @@ type PriceHistoryChart = {
               <option value="">{{ 'adminUi.products.allCategories' | translate }}</option>
               <option *ngFor="let cat of categories()" [value]="cat.slug">{{ cat.name }}</option>
             </select>
-          </label>
+          </div>
 
           <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
             {{ 'adminUi.products.table.translations' | translate }}
@@ -403,11 +944,28 @@ type PriceHistoryChart = {
                   (action)="clearSaleForSelected()"
                   [disabled]="bulkBusy() || inlineBusy()"
                 ></app-button>
+              </div>
+            </div>
+
+            <div class="grid gap-3 lg:grid-cols-[240px_auto] items-end">
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.products.table.status' | translate }}
+                <select
+                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="bulkStatusTarget"
+                  [disabled]="bulkBusy() || inlineBusy()"
+                >
+                  <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
+                  <option value="published">{{ 'adminUi.status.published' | translate }}</option>
+                  <option value="archived">{{ 'adminUi.status.archived' | translate }}</option>
+                </select>
+              </label>
+
+              <div class="flex flex-wrap items-center justify-end gap-2">
                 <app-button
                   size="sm"
-                  variant="ghost"
-                  [label]="'adminUi.products.bulk.publish' | translate"
-                  (action)="publishSelected()"
+                  [label]="'adminUi.products.bulk.status.apply' | translate"
+                  (action)="openBulkStatusConfirm()"
                   [disabled]="bulkBusy() || inlineBusy()"
                 ></app-button>
               </div>
@@ -428,12 +986,21 @@ type PriceHistoryChart = {
                 </select>
               </label>
 
-              <app-button
-                size="sm"
-                [label]="'adminUi.products.bulk.category.apply' | translate"
-                (action)="applyCategoryToSelected()"
-                [disabled]="bulkBusy() || inlineBusy()"
-              ></app-button>
+              <div class="flex flex-wrap items-center justify-end gap-2">
+                <app-button
+                  size="sm"
+                  [label]="'adminUi.products.bulk.category.apply' | translate"
+                  (action)="applyCategoryToSelected()"
+                  [disabled]="bulkBusy() || inlineBusy()"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.products.bulk.category.addAndApply' | translate"
+                  (action)="openCreateCategoryFromBulkAssign()"
+                  [disabled]="bulkBusy() || inlineBusy()"
+                ></app-button>
+              </div>
             </div>
 
             <div class="h-px bg-slate-200 dark:bg-slate-800/70"></div>
@@ -745,9 +1312,18 @@ type PriceHistoryChart = {
                     </ng-template>
                   </td>
                   <td *ngSwitchCase="'status'" [ngClass]="cellPaddingClass()">
-                    <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold" [ngClass]="statusPillClass(product.status)">
-                      {{ ('adminUi.status.' + product.status) | translate }}
-                    </span>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold" [ngClass]="statusPillClass(product.status)">
+                        {{ ('adminUi.status.' + product.status) | translate }}
+                      </span>
+                      <span
+                        *ngIf="product.status === 'published'"
+                        class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
+                        [ngClass]="product.is_active ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200'"
+                      >
+                        {{ product.is_active ? ('adminUi.products.active' | translate) : ('adminUi.products.inactive' | translate) }}
+                      </span>
+                    </div>
                     <div
                       *ngIf="product.publish_scheduled_for || product.unpublish_scheduled_for"
                       class="mt-1 grid gap-0.5 text-xs text-slate-500 dark:text-slate-400"
@@ -829,6 +1405,29 @@ type PriceHistoryChart = {
 	                          ></app-button>
 	                        </ng-container>
 	                        <ng-template #activeRowActions>
+                            <app-button
+                              *ngIf="product.status !== 'archived'"
+                              size="sm"
+                              variant="ghost"
+                              [label]="
+                                product.status === 'published'
+                                  ? ('adminUi.products.quickStatus.unpublish' | translate)
+                                  : ('adminUi.products.quickStatus.publish' | translate)
+                              "
+                              (action)="quickSetStatus(product, product.status === 'published' ? 'draft' : 'published')"
+                              [disabled]="bulkBusy() || inlineBusy() || quickStatusBusyId()"
+                            ></app-button>
+                            <app-button
+                              size="sm"
+                              variant="ghost"
+                              [label]="
+                                product.status === 'archived'
+                                  ? ('adminUi.products.quickStatus.unarchive' | translate)
+                                  : ('adminUi.products.quickStatus.archive' | translate)
+                              "
+                              (action)="quickSetStatus(product, product.status === 'archived' ? 'draft' : 'archived')"
+                              [disabled]="bulkBusy() || inlineBusy() || quickStatusBusyId()"
+                            ></app-button>
 	                          <app-button
 	                            size="sm"
 	                            variant="ghost"
@@ -874,16 +1473,91 @@ type PriceHistoryChart = {
         </ng-template>
       </section>
 
-      <section *ngIf="editorOpen()" class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
+      <section
+        *ngIf="editorOpen()"
+        id="product-wizard-top"
+        class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900"
+      >
         <div class="flex items-center justify-between gap-3">
           <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
             {{ editingSlug() ? ('adminUi.products.edit' | translate) : ('adminUi.products.create' | translate) }}
           </h2>
-          <app-button size="sm" variant="ghost" [label]="'adminUi.products.actions.cancel' | translate" (action)="closeEditor()"></app-button>
+          <div class="flex flex-wrap items-center justify-end gap-2">
+            <app-button
+              *ngIf="editingSlug()"
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.products.wizard.publish' | translate"
+              (action)="startPublishWizard()"
+            ></app-button>
+            <app-button size="sm" variant="ghost" [label]="'adminUi.products.actions.cancel' | translate" (action)="closeEditor()"></app-button>
+          </div>
         </div>
 
         <div *ngIf="editorError()" class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
           {{ editorError() }}
+        </div>
+
+        <div
+          *ngIf="wizardKind()"
+          class="rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900 dark:border-indigo-900/40 dark:bg-indigo-950/30 dark:text-indigo-100"
+        >
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="grid gap-1">
+              <p class="font-semibold">{{ wizardTitleKey() | translate }}</p>
+              <p class="text-xs text-indigo-800 dark:text-indigo-200">{{ wizardStepDescriptionKey() | translate }}</p>
+            </div>
+            <app-button size="sm" variant="ghost" [label]="'adminUi.actions.exit' | translate" (action)="exitWizard()"></app-button>
+          </div>
+
+          <div class="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              *ngFor="let step of wizardSteps(); let idx = index"
+              type="button"
+              class="rounded-full border border-indigo-200 bg-white px-3 py-1 text-xs font-semibold text-indigo-900 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/10 dark:text-indigo-100 dark:hover:bg-indigo-900/30"
+              [class.bg-indigo-600]="idx === wizardStep()"
+              [class.text-white]="idx === wizardStep()"
+              [class.border-indigo-600]="idx === wizardStep()"
+              [class.hover:bg-indigo-700]="idx === wizardStep()"
+              [class.dark:bg-indigo-500/30]="idx === wizardStep()"
+              [class.dark:hover:bg-indigo-500/40]="idx === wizardStep()"
+              (click)="goToWizardStep(idx)"
+            >
+              {{ step.labelKey | translate }}
+            </button>
+          </div>
+
+          <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.actions.back' | translate"
+              (action)="wizardPrev()"
+              [disabled]="wizardStep() === 0"
+            ></app-button>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <app-button
+                *ngIf="wizardCurrentStepId() === 'save'"
+                size="sm"
+                [label]="'adminUi.products.form.save' | translate"
+                (action)="wizardSave()"
+              ></app-button>
+              <app-button
+                *ngIf="wizardCurrentStepId() === 'publish'"
+                size="sm"
+                [label]="'adminUi.products.wizard.publishNow' | translate"
+                (action)="wizardPublishNow()"
+                [disabled]="!editingSlug()"
+              ></app-button>
+              <app-button
+                size="sm"
+                [label]="wizardNextLabelKey() | translate"
+                (action)="wizardNext()"
+                [disabled]="!wizardCanNext()"
+              ></app-button>
+            </div>
+          </div>
         </div>
 
 	        <div class="grid gap-3 md:grid-cols-2">
@@ -903,6 +1577,9 @@ type PriceHistoryChart = {
                   </ng-template>
 	              </ng-template>
 	            </div>
+              <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.products.form.slugHelp' | translate }}
+              </span>
 	          </div>
 
             <div
@@ -971,8 +1648,17 @@ type PriceHistoryChart = {
               </ng-container>
             </div>
 
-	          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	            {{ 'adminUi.products.table.category' | translate }}
+	          <div class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+              <div class="flex items-center justify-between gap-2">
+                <span>{{ 'adminUi.products.table.category' | translate }}</span>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.categories.add' | translate"
+                  (action)="openCreateCategory('product_form')"
+                  [disabled]="createCategoryOpen()"
+                ></app-button>
+              </div>
 	            <select
 	              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
               [(ngModel)]="form.category_id"
@@ -980,7 +1666,7 @@ type PriceHistoryChart = {
               <option value="" disabled>{{ 'adminUi.products.selectCategory' | translate }}</option>
               <option *ngFor="let cat of adminCategories()" [value]="cat.id">{{ cat.name }}</option>
             </select>
-          </label>
+          </div>
 
           <app-input
             [label]="'adminUi.products.table.price' | translate"
@@ -1057,240 +1743,256 @@ type PriceHistoryChart = {
 	            </div>
 	          </div>
           <app-input [label]="'adminUi.products.table.stock' | translate" type="number" [(value)]="form.stock_quantity"></app-input>
-          <app-input
-            [label]="'adminUi.lowStock.thresholdLabel' | translate"
-            [hint]="'adminUi.lowStock.thresholdHint' | translate"
-            type="number"
-            [(value)]="form.low_stock_threshold"
-          ></app-input>
+          <details
+            id="product-wizard-publish"
+            class="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+            [open]="uiPrefs.mode() === 'advanced' || wizardForcesAdvancedOpen()"
+          >
+            <summary class="cursor-pointer select-none text-sm font-semibold text-slate-900 dark:text-slate-50">
+              {{ 'adminUi.products.form.advancedSettings' | translate }}
+            </summary>
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              {{ 'adminUi.products.form.advancedHint' | translate }}
+            </p>
 
-          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-            {{ 'adminUi.products.table.status' | translate }}
-            <select
-              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-              [(ngModel)]="form.status"
-            >
-              <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
-              <option value="published">{{ 'adminUi.status.published' | translate }}</option>
-              <option value="archived">{{ 'adminUi.status.archived' | translate }}</option>
-            </select>
-          </label>
-
-          <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
-            <input type="checkbox" [(ngModel)]="form.is_active" />
-            {{ 'adminUi.products.form.active' | translate }}
-          </label>
-
-          <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
-            <input type="checkbox" [(ngModel)]="form.is_featured" />
-            {{ 'adminUi.products.form.featured' | translate }}
-          </label>
-
-	          <app-input
-              [label]="'adminUi.products.form.sku' | translate"
-              [value]="form.sku"
-              (valueChange)="onSkuChange($event)"
-            ></app-input>
-
-	          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	            {{ 'adminUi.products.form.publishAt' | translate }}
-	            <input
-              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-              type="datetime-local"
-              [(ngModel)]="form.publish_at"
-            />
-          </label>
-
-          <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-            <input type="checkbox" [(ngModel)]="form.is_bestseller" />
-            {{ 'adminUi.products.form.bestseller' | translate }}
-          </label>
-
-          <div class="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                {{ 'adminUi.products.badges.title' | translate }}
-              </p>
-              <span class="text-xs text-slate-500 dark:text-slate-400">
-                {{ 'adminUi.products.badges.hint' | translate }}
-              </span>
-            </div>
-
-            <div class="mt-3 grid gap-4">
-              <div class="grid gap-3 md:grid-cols-3 items-end">
-                <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
-                  <input type="checkbox" [(ngModel)]="form.badges.new.enabled" />
-                  {{ 'adminUi.products.badges.new' | translate }}
-                </label>
-
-                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  {{ 'adminUi.products.badges.startAt' | translate }}
-                  <input
-                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    type="datetime-local"
-                    [(ngModel)]="form.badges.new.start_at"
-                    [disabled]="!form.badges.new.enabled"
-                  />
-                </label>
-
-                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  {{ 'adminUi.products.badges.endAt' | translate }}
-                  <input
-                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    type="datetime-local"
-                    [(ngModel)]="form.badges.new.end_at"
-                    [disabled]="!form.badges.new.enabled"
-                  />
-                </label>
-              </div>
-
-              <div class="grid gap-3 md:grid-cols-3 items-end">
-                <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
-                  <input type="checkbox" [(ngModel)]="form.badges.limited.enabled" />
-                  {{ 'adminUi.products.badges.limited' | translate }}
-                </label>
-
-                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  {{ 'adminUi.products.badges.startAt' | translate }}
-                  <input
-                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    type="datetime-local"
-                    [(ngModel)]="form.badges.limited.start_at"
-                    [disabled]="!form.badges.limited.enabled"
-                  />
-                </label>
-
-                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  {{ 'adminUi.products.badges.endAt' | translate }}
-                  <input
-                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    type="datetime-local"
-                    [(ngModel)]="form.badges.limited.end_at"
-                    [disabled]="!form.badges.limited.enabled"
-                  />
-                </label>
-              </div>
-
-              <div class="grid gap-3 md:grid-cols-3 items-end">
-                <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
-                  <input type="checkbox" [(ngModel)]="form.badges.handmade.enabled" />
-                  {{ 'adminUi.products.badges.handmade' | translate }}
-                </label>
-
-                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  {{ 'adminUi.products.badges.startAt' | translate }}
-                  <input
-                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    type="datetime-local"
-                    [(ngModel)]="form.badges.handmade.start_at"
-                    [disabled]="!form.badges.handmade.enabled"
-                  />
-                </label>
-
-                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  {{ 'adminUi.products.badges.endAt' | translate }}
-                  <input
-                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    type="datetime-local"
-                    [(ngModel)]="form.badges.handmade.end_at"
-                    [disabled]="!form.badges.handmade.enabled"
-                  />
-                </label>
-              </div>
-            </div>
-          </div>
-
-          <div class="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                {{ 'adminUi.products.shipping.title' | translate }}
-              </p>
-              <span class="text-xs text-slate-500 dark:text-slate-400">
-                {{ 'adminUi.products.shipping.hint' | translate }}
-              </span>
-            </div>
-
-            <div class="mt-3 grid gap-3 md:grid-cols-4 items-end">
+            <div class="mt-3 grid gap-3 md:grid-cols-2">
               <app-input
-                [label]="'adminUi.products.shipping.weight' | translate"
+                [label]="'adminUi.lowStock.thresholdLabel' | translate"
+                [hint]="'adminUi.lowStock.thresholdHint' | translate"
                 type="number"
-                inputMode="numeric"
-                [value]="form.weight_grams"
-                (valueChange)="form.weight_grams = String($event ?? '')"
-                [min]="0"
-                [hint]="'adminUi.products.shipping.weightUnit' | translate"
+                [(value)]="form.low_stock_threshold"
               ></app-input>
 
-              <app-input
-                [label]="'adminUi.products.shipping.width' | translate"
-                type="number"
-                inputMode="decimal"
-                [value]="form.width_cm"
-                (valueChange)="form.width_cm = String($event ?? '')"
-                [min]="0"
-                [step]="0.01"
-                [hint]="'adminUi.products.shipping.cm' | translate"
-              ></app-input>
-
-              <app-input
-                [label]="'adminUi.products.shipping.height' | translate"
-                type="number"
-                inputMode="decimal"
-                [value]="form.height_cm"
-                (valueChange)="form.height_cm = String($event ?? '')"
-                [min]="0"
-                [step]="0.01"
-                [hint]="'adminUi.products.shipping.cm' | translate"
-              ></app-input>
-
-              <app-input
-                [label]="'adminUi.products.shipping.depth' | translate"
-                type="number"
-                inputMode="decimal"
-                [value]="form.depth_cm"
-                (valueChange)="form.depth_cm = String($event ?? '')"
-                [min]="0"
-                [step]="0.01"
-                [hint]="'adminUi.products.shipping.cm' | translate"
-              ></app-input>
-            </div>
-
-            <div class="mt-3 grid gap-3 md:grid-cols-3 items-end">
               <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.products.shipping.classLabel' | translate }}
+                {{ 'adminUi.products.table.status' | translate }}
                 <select
                   class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="form.shipping_class"
+                  [(ngModel)]="form.status"
                 >
-                  <option value="standard">{{ 'adminUi.products.shipping.class.standard' | translate }}</option>
-                  <option value="bulky">{{ 'adminUi.products.shipping.class.bulky' | translate }}</option>
-                  <option value="oversize">{{ 'adminUi.products.shipping.class.oversize' | translate }}</option>
+                  <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
+                  <option value="published">{{ 'adminUi.status.published' | translate }}</option>
+                  <option value="archived">{{ 'adminUi.status.archived' | translate }}</option>
                 </select>
               </label>
 
               <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
-                <input type="checkbox" [(ngModel)]="form.shipping_allow_locker" />
-                {{ 'adminUi.products.shipping.allowLocker' | translate }}
+                <input type="checkbox" [(ngModel)]="form.is_active" />
+                {{ 'adminUi.products.form.active' | translate }}
               </label>
 
-              <div class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                <span>{{ 'adminUi.products.shipping.disallowedCouriers' | translate }}</span>
-                <div class="flex flex-wrap items-center gap-4 text-sm font-normal text-slate-700 dark:text-slate-200">
-                  <label class="inline-flex items-center gap-2">
-                    <input type="checkbox" [(ngModel)]="form.shipping_disallowed_couriers.sameday" />
-                    {{ 'adminUi.products.shipping.courier.sameday' | translate }}
-                  </label>
-                  <label class="inline-flex items-center gap-2">
-                    <input type="checkbox" [(ngModel)]="form.shipping_disallowed_couriers.fan_courier" />
-                    {{ 'adminUi.products.shipping.courier.fan_courier' | translate }}
-                  </label>
-                </div>
-                <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
-                  {{ 'adminUi.products.shipping.disallowedHint' | translate }}
+              <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
+                <input type="checkbox" [(ngModel)]="form.is_featured" />
+                {{ 'adminUi.products.form.featured' | translate }}
+              </label>
+
+              <app-input
+                [label]="'adminUi.products.form.sku' | translate"
+                [value]="form.sku"
+                (valueChange)="onSkuChange($event)"
+                [hint]="'adminUi.products.form.skuHint' | translate"
+              ></app-input>
+
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.products.form.publishAt' | translate }}
+                <input
+                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  type="datetime-local"
+                  [(ngModel)]="form.publish_at"
+                />
+              </label>
+
+              <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                <input type="checkbox" [(ngModel)]="form.is_bestseller" />
+                {{ 'adminUi.products.form.bestseller' | translate }}
+              </label>
+            </div>
+
+            <div class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.products.badges.title' | translate }}
+                </p>
+                <span class="text-xs text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.products.badges.hint' | translate }}
                 </span>
               </div>
+
+              <div class="mt-3 grid gap-4">
+                <div class="grid gap-3 md:grid-cols-3 items-end">
+                  <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
+                    <input type="checkbox" [(ngModel)]="form.badges.new.enabled" />
+                    {{ 'adminUi.products.badges.new' | translate }}
+                  </label>
+
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'adminUi.products.badges.startAt' | translate }}
+                    <input
+                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      type="datetime-local"
+                      [(ngModel)]="form.badges.new.start_at"
+                      [disabled]="!form.badges.new.enabled"
+                    />
+                  </label>
+
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'adminUi.products.badges.endAt' | translate }}
+                    <input
+                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      type="datetime-local"
+                      [(ngModel)]="form.badges.new.end_at"
+                      [disabled]="!form.badges.new.enabled"
+                    />
+                  </label>
+                </div>
+
+                <div class="grid gap-3 md:grid-cols-3 items-end">
+                  <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
+                    <input type="checkbox" [(ngModel)]="form.badges.limited.enabled" />
+                    {{ 'adminUi.products.badges.limited' | translate }}
+                  </label>
+
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'adminUi.products.badges.startAt' | translate }}
+                    <input
+                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      type="datetime-local"
+                      [(ngModel)]="form.badges.limited.start_at"
+                      [disabled]="!form.badges.limited.enabled"
+                    />
+                  </label>
+
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'adminUi.products.badges.endAt' | translate }}
+                    <input
+                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      type="datetime-local"
+                      [(ngModel)]="form.badges.limited.end_at"
+                      [disabled]="!form.badges.limited.enabled"
+                    />
+                  </label>
+                </div>
+
+                <div class="grid gap-3 md:grid-cols-3 items-end">
+                  <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
+                    <input type="checkbox" [(ngModel)]="form.badges.handmade.enabled" />
+                    {{ 'adminUi.products.badges.handmade' | translate }}
+                  </label>
+
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'adminUi.products.badges.startAt' | translate }}
+                    <input
+                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      type="datetime-local"
+                      [(ngModel)]="form.badges.handmade.start_at"
+                      [disabled]="!form.badges.handmade.enabled"
+                    />
+                  </label>
+
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'adminUi.products.badges.endAt' | translate }}
+                    <input
+                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      type="datetime-local"
+                      [(ngModel)]="form.badges.handmade.end_at"
+                      [disabled]="!form.badges.handmade.enabled"
+                    />
+                  </label>
+                </div>
+              </div>
             </div>
-          </div>
+
+            <div class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.products.shipping.title' | translate }}
+                </p>
+                <span class="text-xs text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.products.shipping.hint' | translate }}
+                </span>
+              </div>
+
+              <div class="mt-3 grid gap-3 md:grid-cols-4 items-end">
+                <app-input
+                  [label]="'adminUi.products.shipping.weight' | translate"
+                  type="number"
+                  inputMode="numeric"
+                  [value]="form.weight_grams"
+                  (valueChange)="form.weight_grams = String($event ?? '')"
+                  [min]="0"
+                  [hint]="'adminUi.products.shipping.weightUnit' | translate"
+                ></app-input>
+
+                <app-input
+                  [label]="'adminUi.products.shipping.width' | translate"
+                  type="number"
+                  inputMode="decimal"
+                  [value]="form.width_cm"
+                  (valueChange)="form.width_cm = String($event ?? '')"
+                  [min]="0"
+                  [step]="0.01"
+                  [hint]="'adminUi.products.shipping.cm' | translate"
+                ></app-input>
+
+                <app-input
+                  [label]="'adminUi.products.shipping.height' | translate"
+                  type="number"
+                  inputMode="decimal"
+                  [value]="form.height_cm"
+                  (valueChange)="form.height_cm = String($event ?? '')"
+                  [min]="0"
+                  [step]="0.01"
+                  [hint]="'adminUi.products.shipping.cm' | translate"
+                ></app-input>
+
+                <app-input
+                  [label]="'adminUi.products.shipping.depth' | translate"
+                  type="number"
+                  inputMode="decimal"
+                  [value]="form.depth_cm"
+                  (valueChange)="form.depth_cm = String($event ?? '')"
+                  [min]="0"
+                  [step]="0.01"
+                  [hint]="'adminUi.products.shipping.cm' | translate"
+                ></app-input>
+              </div>
+
+              <div class="mt-3 grid gap-3 md:grid-cols-3 items-end">
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.products.shipping.classLabel' | translate }}
+                  <select
+                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="form.shipping_class"
+                  >
+                    <option value="standard">{{ 'adminUi.products.shipping.class.standard' | translate }}</option>
+                    <option value="bulky">{{ 'adminUi.products.shipping.class.bulky' | translate }}</option>
+                    <option value="oversize">{{ 'adminUi.products.shipping.class.oversize' | translate }}</option>
+                  </select>
+                </label>
+
+                <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
+                  <input type="checkbox" [(ngModel)]="form.shipping_allow_locker" />
+                  {{ 'adminUi.products.shipping.allowLocker' | translate }}
+                </label>
+
+                <div class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  <span>{{ 'adminUi.products.shipping.disallowedCouriers' | translate }}</span>
+                  <div class="flex flex-wrap items-center gap-4 text-sm font-normal text-slate-700 dark:text-slate-200">
+                    <label class="inline-flex items-center gap-2">
+                      <input type="checkbox" [(ngModel)]="form.shipping_disallowed_couriers.sameday" />
+                      {{ 'adminUi.products.shipping.courier.sameday' | translate }}
+                    </label>
+                    <label class="inline-flex items-center gap-2">
+                      <input type="checkbox" [(ngModel)]="form.shipping_disallowed_couriers.fan_courier" />
+                      {{ 'adminUi.products.shipping.courier.fan_courier' | translate }}
+                    </label>
+                  </div>
+                  <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
+                    {{ 'adminUi.products.shipping.disallowedHint' | translate }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </details>
 	        </div>
 
 	        <div class="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
@@ -1843,6 +2545,8 @@ type PriceHistoryChart = {
 	          </div>
 	        </div>
 
+          <div id="product-wizard-content" class="h-0 scroll-mt-24"></div>
+
 	        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
 	          {{ 'adminUi.products.form.shortDescription' | translate }}
 	          <textarea
@@ -2141,12 +2845,66 @@ type PriceHistoryChart = {
               </div>
             </div>
 
-		        <div class="flex items-center gap-2">
-		          <app-button [label]="'adminUi.products.form.save' | translate" (action)="save()"></app-button>
-		          <span *ngIf="editorMessage()" class="text-sm text-emerald-700 dark:text-emerald-300">{{ editorMessage() }}</span>
+		        <div id="product-wizard-save" class="grid gap-2">
+              <div class="flex flex-wrap items-center gap-2">
+		            <app-button [label]="'adminUi.products.form.save' | translate" (action)="save()"></app-button>
+
+                <label class="grid gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.products.table.status' | translate }}
+                  <select
+                    class="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="form.status"
+                  >
+                    <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
+                    <option value="published">{{ 'adminUi.status.published' | translate }}</option>
+                    <option value="archived">{{ 'adminUi.status.archived' | translate }}</option>
+                  </select>
+                </label>
+
+                <ng-container *ngIf="editorMessage()">
+                  <span
+                    class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200"
+                  >
+                    {{ 'adminUi.products.successFeedback.saved' | translate }}
+                  </span>
+                  <span
+                    class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  >
+                    {{ successStatusLabelKey() | translate }}
+                  </span>
+                  <span
+                    class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  >
+                    {{ successVisibilityLabelKey() | translate }}
+                  </span>
+                </ng-container>
+              </div>
+
+              <div *ngIf="editorMessage() && editingSlug() as slug" class="flex flex-wrap items-center gap-2">
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.products.successFeedback.cta.images' | translate"
+                  (action)="scrollToImagesSection()"
+                ></app-button>
+                <app-button
+                  *ngIf="savedStatus() !== 'published'"
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.products.successFeedback.cta.publish' | translate"
+                  (action)="startPublishWizard()"
+                ></app-button>
+                <app-button
+                  *ngIf="savedIsVisible()"
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.products.successFeedback.cta.view' | translate"
+                  [routerLink]="['/products', slug]"
+                ></app-button>
+              </div>
 		        </div>
 
-	        <div class="grid gap-3">
+	        <div id="product-wizard-images" class="grid gap-3">
 	          <div class="flex items-center justify-between">
 	            <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{{ 'adminUi.products.form.images' | translate }}</p>
 	            <div class="flex flex-wrap items-center gap-2">
@@ -2187,7 +2945,12 @@ type PriceHistoryChart = {
 	                    [label]="'adminUi.actions.edit' | translate"
 	                    (action)="toggleImageMeta(img.id)"
 	                  ></app-button>
-	                  <app-button size="sm" variant="ghost" [label]="'adminUi.actions.delete' | translate" (action)="deleteImage(img.id)"></app-button>
+	                  <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.actions.delete' | translate"
+                      (action)="openDeleteImageConfirm(img.id)"
+                    ></app-button>
 	                </div>
 	              </div>
 
@@ -2351,9 +3114,10 @@ export class AdminProductsComponent implements OnInit {
 
   readonly productRowHeight = 96;
   readonly tableColumns = PRODUCTS_TABLE_COLUMNS;
+  readonly tableDefaults = defaultProductsTableLayout();
 
   layoutModalOpen = signal(false);
-  tableLayout = signal<AdminTableLayoutV1>(defaultAdminTableLayout(PRODUCTS_TABLE_COLUMNS));
+  tableLayout = signal<AdminTableLayoutV1>(defaultProductsTableLayout());
 
   loading = signal(true);
   error = signal<string | null>(null);
@@ -2376,6 +3140,18 @@ export class AdminProductsComponent implements OnInit {
 	  editingCurrency = signal('RON');
 	  editorError = signal<string | null>(null);
 	  editorMessage = signal<string | null>(null);
+    lastSavedState = signal<{ status: ProductForm['status']; isActive: boolean } | null>(null);
+	  wizardKind = signal<ProductWizardKind | null>(null);
+	  wizardStep = signal(0);
+    private wizardAdvanceAfterSave = false;
+    private wizardExitAfterPublish = false;
+    statusConfirmOpen = signal(false);
+    statusConfirmBusy = signal(false);
+    statusConfirmPrev = signal<{ status: ProductForm['status']; isActive: boolean } | null>(null);
+    statusConfirmTarget = signal<{ status: ProductForm['status']; isActive: boolean } | null>(null);
+    deleteImageConfirmOpen = signal(false);
+    deleteImageConfirmBusy = signal(false);
+    deleteImageConfirmTarget = signal<{ id: string; url: string; alt: string } | null>(null);
   images = signal<Array<{ id: string; url: string; alt_text?: string | null; caption?: string | null }>>([]);
   deletedImagesOpen = signal(false);
   deletedImages = signal<AdminDeletedProductImage[]>([]);
@@ -2389,6 +3165,31 @@ export class AdminProductsComponent implements OnInit {
   imageMetaExists: Record<'en' | 'ro', boolean> = { en: false, ro: false };
   imageStats: AdminProductImageOptimizationStats | null = null;
   adminCategories = signal<Array<{ id: string; name: string }>>([]);
+  createCategoryOpen = signal(false);
+  createCategoryBusy = signal(false);
+  createCategoryError = signal<string | null>(null);
+  createCategoryName = '';
+  createCategoryParentId = '';
+  private createCategoryContext: 'filters' | 'product_form' | 'manager' | 'bulk_assign' = 'product_form';
+  categoryManagerOpen = signal(false);
+  categoryManagerSlug = '';
+  categoryManagerParentId = '';
+  categoryManagerUpdateBusy = signal(false);
+  categoryManagerUpdateError = signal<string | null>(null);
+  mergeTargetSlug = '';
+  mergePreview = signal<AdminCategoryMergePreview | null>(null);
+  mergePreviewLoading = signal(false);
+  mergeSaving = signal(false);
+  mergeError = signal<string | null>(null);
+  deletePreview = signal<AdminCategoryDeletePreview | null>(null);
+  deletePreviewLoading = signal(false);
+  deleteSaving = signal(false);
+  deleteError = signal<string | null>(null);
+  categoryImportFile: File | null = null;
+  categoryImportDryRun = true;
+  categoryImportBusy = signal(false);
+  categoryImportError = signal<string | null>(null);
+  categoryImportResult = signal<AdminCategoriesImportResult | null>(null);
 
   form: ProductForm = this.blankForm();
   private loadedTagSlugs: string[] = [];
@@ -2410,11 +3211,15 @@ export class AdminProductsComponent implements OnInit {
   bulkSaleType: 'percent' | 'amount' = 'percent';
   bulkSaleValue = '';
   bulkCategoryId = '';
+  bulkStatusTarget: ProductForm['status'] = 'published';
+  bulkStatusConfirmOpen = signal(false);
+  bulkStatusConfirmBusy = signal(false);
   bulkPublishScheduledFor = '';
   bulkUnpublishScheduledFor = '';
   bulkBusy = signal(false);
   bulkError = signal<string | null>(null);
   restoringProductId = signal<string | null>(null);
+  quickStatusBusyId = signal<string | null>(null);
 
   inlineEditId: string | null = null;
   inlineBasePrice = '';
@@ -2491,6 +3296,7 @@ export class AdminProductsComponent implements OnInit {
     private admin: AdminService,
     private auth: AuthService,
     private recent: AdminRecentService,
+    public uiPrefs: AdminUiPrefsService,
     private markdown: MarkdownService,
     private toast: ToastService,
     private translate: TranslateService,
@@ -2499,7 +3305,7 @@ export class AdminProductsComponent implements OnInit {
 
   ngOnInit(): void {
     this.favorites.init();
-    this.tableLayout.set(loadAdminTableLayout(this.tableLayoutStorageKey(), this.tableColumns));
+    this.tableLayout.set(loadAdminTableLayout(this.tableLayoutStorageKey(), this.tableColumns, this.tableDefaults));
     const state = history.state as any;
     const editSlug = typeof state?.editProductSlug === 'string' ? state.editProductSlug : '';
     this.pendingEditProductSlug = editSlug.trim() ? editSlug.trim() : null;
@@ -2549,6 +3355,29 @@ export class AdminProductsComponent implements OnInit {
     }, 0);
   }
 
+  successStatusLabelKey(): string {
+    return `adminUi.status.${this.savedStatus()}`;
+  }
+
+  successVisibilityLabelKey(): string {
+    return this.savedIsVisible() ? 'adminUi.products.successFeedback.visible' : 'adminUi.products.successFeedback.hidden';
+  }
+
+  savedStatus(): ProductForm['status'] {
+    return this.lastSavedState()?.status ?? this.form.status;
+  }
+
+  savedIsVisible(): boolean {
+    const snap = this.lastSavedState();
+    const status = snap?.status ?? this.form.status;
+    const isActive = snap?.isActive ?? this.form.is_active;
+    return status === 'published' && isActive;
+  }
+
+  scrollToImagesSection(): void {
+    this.scrollToWizardAnchor('product-wizard-images');
+  }
+
   visibleColumnIds(): string[] {
     return visibleAdminTableColumnIds(this.tableLayout(), this.tableColumns);
   }
@@ -2571,6 +3400,12 @@ export class AdminProductsComponent implements OnInit {
     this.clearSelection();
     this.cancelInlineEdit();
     this.load();
+  }
+
+  setStatusFilter(next: ProductStatusFilter): void {
+    if (this.status === next) return;
+    this.status = next;
+    this.applyFilters();
   }
 
   resetFilters(): void {
@@ -2736,6 +3571,510 @@ export class AdminProductsComponent implements OnInit {
     }
     this.selected = next;
     this.updateBulkPricePreview();
+  }
+
+  selectedProductsOnPage(): AdminProductListItem[] {
+    const selected = this.selected;
+    return this.products().filter((p) => selected.has(p.id));
+  }
+
+  openBulkStatusConfirm(): void {
+    this.bulkError.set(null);
+    if (!this.selected.size) return;
+    this.bulkStatusConfirmBusy.set(false);
+    this.bulkStatusConfirmOpen.set(true);
+  }
+
+  closeBulkStatusConfirm(): void {
+    this.bulkStatusConfirmOpen.set(false);
+    this.bulkStatusConfirmBusy.set(false);
+  }
+
+  confirmBulkStatusChange(): void {
+    const items = this.selectedProductsOnPage();
+    if (!items.length) {
+      this.closeBulkStatusConfirm();
+      return;
+    }
+
+    const nextStatus = this.bulkStatusTarget;
+    const payload = items.map((p) => ({ product_id: p.id, status: nextStatus }));
+    const undoPayload = items.map((p) => ({ product_id: p.id, status: p.status }));
+
+    this.bulkError.set(null);
+    this.bulkStatusConfirmBusy.set(true);
+    this.bulkBusy.set(true);
+    this.admin.bulkUpdateProducts(payload).subscribe({
+      next: () => {
+        const count = payload.length;
+        this.bulkBusy.set(false);
+        this.bulkStatusConfirmBusy.set(false);
+        this.closeBulkStatusConfirm();
+        this.toast.action(
+          this.translate.instant('adminUi.products.bulk.status.success', { count }),
+          this.translate.instant('adminUi.actions.undo'),
+          () => this.undoBulkStatusChange(undoPayload),
+          { tone: 'success', durationMs: 8000 }
+        );
+        this.clearSelection();
+        this.load();
+      },
+      error: () => {
+        this.bulkBusy.set(false);
+        this.bulkStatusConfirmBusy.set(false);
+        this.bulkError.set(this.t('adminUi.products.bulk.error'));
+      }
+    });
+  }
+
+  private undoBulkStatusChange(payload: Array<{ product_id: string; status: string }>): void {
+    if (!payload.length) return;
+    this.admin.bulkUpdateProducts(payload).subscribe({
+      next: () => {
+        this.toast.success(this.translate.instant('adminUi.products.bulk.status.undoSuccess'));
+        this.load();
+      },
+      error: () => this.toast.error(this.translate.instant('adminUi.products.bulk.status.undoError'))
+    });
+  }
+
+  openCreateCategory(context: 'filters' | 'product_form' | 'manager' | 'bulk_assign'): void {
+    this.createCategoryContext = context;
+    this.createCategoryName = '';
+    this.createCategoryParentId = '';
+    this.createCategoryError.set(null);
+    this.createCategoryBusy.set(false);
+    this.createCategoryOpen.set(true);
+  }
+
+  closeCreateCategory(): void {
+    this.createCategoryOpen.set(false);
+    this.createCategoryBusy.set(false);
+    this.createCategoryError.set(null);
+  }
+
+  confirmCreateCategory(): void {
+    const name = (this.createCategoryName || '').trim();
+    if (!name || this.createCategoryBusy()) return;
+    const parentId = (this.createCategoryParentId || '').trim();
+    const parent_id = parentId ? parentId : null;
+
+    this.createCategoryBusy.set(true);
+    this.createCategoryError.set(null);
+    this.admin.createCategory({ name, parent_id }).subscribe({
+      next: (cat) => {
+        this.createCategoryBusy.set(false);
+        this.createCategoryOpen.set(false);
+        this.toast.success(this.t('adminUi.categories.success.add'));
+
+        this.upsertCategoryLists(cat);
+        if (this.createCategoryContext === 'product_form') {
+          this.form.category_id = cat.id;
+        } else if (this.createCategoryContext === 'filters') {
+          this.categorySlug = cat.slug;
+        } else if (this.createCategoryContext === 'bulk_assign') {
+          this.bulkCategoryId = cat.id;
+          this.applyCategoryToSelected();
+        }
+      },
+      error: (err) => {
+        this.createCategoryBusy.set(false);
+        this.createCategoryError.set(err?.error?.detail || this.t('adminUi.categories.errors.add'));
+      }
+    });
+  }
+
+  private upsertCategoryLists(cat: AdminCategory): void {
+    const currentCategories = this.categories();
+    const nextCategory: Category = {
+      id: cat.id,
+      slug: cat.slug,
+      name: cat.name,
+      parent_id: cat.parent_id ?? null,
+      sort_order: cat.sort_order ?? undefined,
+      thumbnail_url: cat.thumbnail_url ?? null,
+      banner_url: cat.banner_url ?? null,
+      is_visible: cat.is_visible
+    };
+    const nextCategories = [...currentCategories];
+    const existingIdx = nextCategories.findIndex((c) => c.id === nextCategory.id);
+    if (existingIdx >= 0) {
+      nextCategories[existingIdx] = { ...nextCategories[existingIdx], ...nextCategory };
+    } else {
+      nextCategories.push(nextCategory);
+    }
+    this.categories.set(nextCategories);
+
+    const currentAdminCategories = this.adminCategories();
+    const nextAdminCategories = [...currentAdminCategories];
+    const existingAdminIdx = nextAdminCategories.findIndex((c) => c.id === cat.id);
+    const adminItem = { id: cat.id, name: cat.name };
+    if (existingAdminIdx >= 0) {
+      nextAdminCategories[existingAdminIdx] = adminItem;
+    } else {
+      nextAdminCategories.push(adminItem);
+    }
+    this.adminCategories.set(nextAdminCategories);
+  }
+
+  openCategoryManager(): void {
+    this.categoryManagerSlug = '';
+    this.categoryManagerParentId = '';
+    this.categoryManagerUpdateBusy.set(false);
+    this.categoryManagerUpdateError.set(null);
+    this.resetCategoryManagerActions();
+    this.categoryManagerOpen.set(true);
+    this.refreshCategoryLists();
+  }
+
+  closeCategoryManager(): void {
+    this.categoryManagerOpen.set(false);
+    this.categoryManagerUpdateBusy.set(false);
+    this.mergePreviewLoading.set(false);
+    this.mergeSaving.set(false);
+    this.deletePreviewLoading.set(false);
+    this.deleteSaving.set(false);
+  }
+
+  openCreateCategoryFromManager(): void {
+    this.closeCategoryManager();
+    this.openCreateCategory('manager');
+  }
+
+  openCreateCategoryFromBulkAssign(): void {
+    this.openCreateCategory('bulk_assign');
+  }
+
+  onCategoryManagerSelect(slug: string): void {
+    this.categoryManagerSlug = String(slug ?? '');
+    const cat = this.categoryManagerSelectedCategory();
+    this.categoryManagerParentId = (cat?.parent_id ?? '').trim();
+    this.categoryManagerUpdateError.set(null);
+    this.resetCategoryManagerActions();
+  }
+
+  categoryManagerSelectedCategory(): Category | null {
+    const slug = (this.categoryManagerSlug || '').trim();
+    if (!slug) return null;
+    return this.categories().find((c) => c.slug === slug) ?? null;
+  }
+
+  resetCategoryManagerParent(): void {
+    const cat = this.categoryManagerSelectedCategory();
+    this.categoryManagerUpdateError.set(null);
+    this.categoryManagerParentId = (cat?.parent_id ?? '').trim();
+  }
+
+  saveCategoryManagerParent(): void {
+    const cat = this.categoryManagerSelectedCategory();
+    if (!cat) return;
+    if (this.categoryManagerUpdateBusy()) return;
+
+    const nextParentId = (this.categoryManagerParentId || '').trim() || null;
+    const prevParentId = (cat.parent_id ?? '').trim() || null;
+    if (nextParentId === prevParentId) return;
+
+    this.categoryManagerUpdateBusy.set(true);
+    this.categoryManagerUpdateError.set(null);
+    this.admin.updateCategory(cat.slug, { parent_id: nextParentId }).subscribe({
+      next: (updated) => {
+        this.categoryManagerUpdateBusy.set(false);
+        this.toast.success(this.t('adminUi.categories.success.updateParent'));
+        this.categoryManagerParentId = (updated.parent_id ?? '').trim();
+        this.refreshCategoryLists();
+      },
+      error: (err) => {
+        this.categoryManagerUpdateBusy.set(false);
+        this.categoryManagerUpdateError.set(err?.error?.detail || this.t('adminUi.categories.errors.updateParent'));
+        this.categoryManagerParentId = prevParentId || '';
+      }
+    });
+  }
+
+  categoryParentOptions(cat: Category): Category[] {
+    const currentId = cat.id;
+    const excluded = this.categoryDescendantIds(currentId);
+    excluded.add(currentId);
+    return this.categories()
+      .filter((candidate) => !excluded.has(candidate.id))
+      .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
+  }
+
+  private categoryDescendantIds(rootId: string): Set<string> {
+    const childrenByParent = new Map<string, string[]>();
+    for (const cat of this.categories()) {
+      const parentId = (cat.parent_id ?? '').trim();
+      if (!parentId) continue;
+      const bucket = childrenByParent.get(parentId);
+      if (bucket) {
+        bucket.push(cat.id);
+      } else {
+        childrenByParent.set(parentId, [cat.id]);
+      }
+    }
+    const resolved = new Set<string>();
+    const stack = [...(childrenByParent.get(rootId) ?? [])];
+    while (stack.length) {
+      const next = stack.pop()!;
+      if (resolved.has(next)) continue;
+      resolved.add(next);
+      const kids = childrenByParent.get(next);
+      if (kids?.length) stack.push(...kids);
+    }
+    return resolved;
+  }
+
+  mergeTargetOptions(source: Category): Category[] {
+    const parentId = (source.parent_id ?? '').trim() || null;
+    return this.categories()
+      .filter((candidate) => ((candidate.parent_id ?? '').trim() || null) === parentId && candidate.slug !== source.slug)
+      .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
+  }
+
+  onMergeTargetChange(): void {
+    this.mergePreview.set(null);
+    this.mergeError.set(null);
+  }
+
+  previewCategoryMerge(): void {
+    const cat = this.categoryManagerSelectedCategory();
+    if (!cat) return;
+    if (this.mergePreviewLoading() || this.mergeSaving()) return;
+
+    const targetSlug = (this.mergeTargetSlug || '').trim();
+    if (!targetSlug) {
+      this.mergeError.set(this.t('adminUi.storefront.categories.mergeSelectTarget'));
+      return;
+    }
+
+    this.mergePreviewLoading.set(true);
+    this.mergeError.set(null);
+    this.mergePreview.set(null);
+    this.admin.previewMergeCategory(cat.slug, targetSlug).subscribe({
+      next: (preview) => {
+        this.mergePreviewLoading.set(false);
+        this.mergePreview.set(preview);
+        if (!preview.can_merge) {
+          this.mergeError.set(this.t(this.mergeReasonKey(preview.reason)));
+        }
+      },
+      error: () => {
+        this.mergePreviewLoading.set(false);
+        this.mergeError.set(this.t('adminUi.storefront.categories.mergePreviewError'));
+      }
+    });
+  }
+
+  mergeCategorySelected(): void {
+    const cat = this.categoryManagerSelectedCategory();
+    if (!cat) return;
+    if (this.mergeSaving()) return;
+
+    const targetSlug = (this.mergeTargetSlug || '').trim();
+    if (!targetSlug) {
+      this.mergeError.set(this.t('adminUi.storefront.categories.mergeSelectTarget'));
+      return;
+    }
+
+    const preview = this.mergePreview();
+    if (!preview) {
+      this.mergeError.set(this.t('adminUi.storefront.categories.mergePreviewRequired'));
+      return;
+    }
+    if (!preview.can_merge) {
+      this.mergeError.set(this.t(this.mergeReasonKey(preview.reason)));
+      return;
+    }
+
+    const targetName = this.categories().find((c) => c.slug === targetSlug)?.name ?? targetSlug;
+    const confirmed = confirm(
+      this.translate.instant('adminUi.storefront.categories.confirmMerge', {
+        source: cat.name,
+        target: targetName,
+        count: preview.product_count
+      })
+    );
+    if (!confirmed) return;
+
+    this.mergeSaving.set(true);
+    this.admin.mergeCategory(cat.slug, targetSlug).subscribe({
+      next: () => {
+        this.mergeSaving.set(false);
+        this.toast.success(this.t('adminUi.storefront.categories.mergeSuccess'));
+        this.categoryManagerSlug = '';
+        this.categoryManagerParentId = '';
+        this.resetCategoryManagerActions();
+        this.refreshCategoryLists();
+      },
+      error: () => {
+        this.mergeSaving.set(false);
+        this.mergeError.set(this.t('adminUi.storefront.categories.mergeError'));
+      }
+    });
+  }
+
+  private mergeReasonKey(reason: string | null | undefined): string {
+    if (reason === 'same_category') return 'adminUi.storefront.categories.mergeReasonSame';
+    if (reason === 'different_parent') return 'adminUi.storefront.categories.mergeReasonParent';
+    if (reason === 'source_has_children') return 'adminUi.storefront.categories.mergeReasonChildren';
+    return 'adminUi.storefront.categories.mergeNotAllowed';
+  }
+
+  previewCategoryDelete(): void {
+    const cat = this.categoryManagerSelectedCategory();
+    if (!cat) return;
+    if (this.deletePreviewLoading() || this.deleteSaving()) return;
+
+    this.deletePreviewLoading.set(true);
+    this.deleteError.set(null);
+    this.deletePreview.set(null);
+    this.admin.previewDeleteCategory(cat.slug).subscribe({
+      next: (preview) => {
+        this.deletePreviewLoading.set(false);
+        this.deletePreview.set(preview);
+        if (!preview.can_delete) {
+          this.deleteError.set(this.t('adminUi.storefront.categories.deleteNotAllowed'));
+        }
+      },
+      error: () => {
+        this.deletePreviewLoading.set(false);
+        this.deleteError.set(this.t('adminUi.storefront.categories.deletePreviewError'));
+      }
+    });
+  }
+
+  deleteCategorySelectedSafe(): void {
+    const cat = this.categoryManagerSelectedCategory();
+    if (!cat) return;
+    if (this.deleteSaving()) return;
+
+    const preview = this.deletePreview();
+    if (!preview) {
+      this.deleteError.set(this.t('adminUi.storefront.categories.deletePreviewRequired'));
+      return;
+    }
+    if (!preview.can_delete) {
+      this.deleteError.set(this.t('adminUi.storefront.categories.deleteNotAllowed'));
+      return;
+    }
+
+    const confirmed = confirm(this.translate.instant('adminUi.storefront.categories.confirmDelete', { name: cat.name }));
+    if (!confirmed) return;
+
+    this.deleteSaving.set(true);
+    this.admin.deleteCategory(cat.slug).subscribe({
+      next: () => {
+        this.deleteSaving.set(false);
+        this.toast.success(this.t('adminUi.storefront.categories.deleteSuccess'));
+        this.categoryManagerSlug = '';
+        this.categoryManagerParentId = '';
+        this.resetCategoryManagerActions();
+        this.refreshCategoryLists();
+      },
+      error: () => {
+        this.deleteSaving.set(false);
+        this.deleteError.set(this.t('adminUi.storefront.categories.deleteError'));
+      }
+    });
+  }
+
+  private resetCategoryManagerActions(): void {
+    this.mergeTargetSlug = '';
+    this.mergePreview.set(null);
+    this.mergePreviewLoading.set(false);
+    this.mergeSaving.set(false);
+    this.mergeError.set(null);
+    this.deletePreview.set(null);
+    this.deletePreviewLoading.set(false);
+    this.deleteSaving.set(false);
+    this.deleteError.set(null);
+  }
+
+  private refreshCategoryLists(): void {
+    this.catalog.listCategories(undefined, { include_hidden: true }).subscribe({
+      next: (cats) => this.categories.set(cats || []),
+      error: () => this.categories.set([])
+    });
+    this.admin.getCategories().subscribe({
+      next: (cats) => this.adminCategories.set((cats || []).map((c) => ({ id: c.id, name: c.name }))),
+      error: () => this.adminCategories.set([])
+    });
+  }
+
+  onCategoryImportFileChange(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    this.categoryImportFile = input?.files?.[0] ?? null;
+    this.categoryImportError.set(null);
+    this.categoryImportResult.set(null);
+  }
+
+  runCategoryImport(): void {
+    const file = this.categoryImportFile;
+    if (!file) return;
+    if (this.categoryImportBusy()) return;
+
+    this.categoryImportBusy.set(true);
+    this.categoryImportError.set(null);
+    this.categoryImportResult.set(null);
+
+    this.admin.importCategoriesCsv(file, this.categoryImportDryRun).subscribe({
+      next: (result) => {
+        this.categoryImportBusy.set(false);
+        this.categoryImportResult.set(result);
+        if ((result.errors || []).length) {
+          this.toast.error(this.t('adminUi.categories.csv.error'));
+          return;
+        }
+        this.toast.success(this.t('adminUi.categories.csv.success'));
+        if (!this.categoryImportDryRun) this.refreshCategoryLists();
+      },
+      error: (err) => {
+        this.categoryImportBusy.set(false);
+        this.categoryImportError.set(err?.error?.detail || this.t('adminUi.categories.csv.error'));
+      }
+    });
+  }
+
+  quickSetStatus(product: AdminProductListItem, nextStatus: ProductForm['status']): void {
+    const productId = product.id;
+    const prevStatus = product.status;
+    if (prevStatus === nextStatus) return;
+    if (this.quickStatusBusyId()) return;
+
+    this.quickStatusBusyId.set(productId);
+    this.admin.bulkUpdateProducts([{ product_id: productId, status: nextStatus }]).subscribe({
+      next: () => {
+        this.quickStatusBusyId.set(null);
+        const displayName = product.name || product.slug;
+        this.toast.action(
+          this.translate.instant('adminUi.products.quickStatus.success', { name: displayName }),
+          this.translate.instant('adminUi.actions.undo'),
+          () => this.undoQuickStatusChange(productId, prevStatus),
+          { tone: 'success', durationMs: 8000 }
+        );
+        if (this.selected.has(productId)) {
+          const nextSelected = new Set(this.selected);
+          nextSelected.delete(productId);
+          this.selected = nextSelected;
+          this.updateBulkPricePreview();
+        }
+        this.load();
+      },
+      error: () => {
+        this.quickStatusBusyId.set(null);
+        this.toast.error(this.translate.instant('adminUi.products.quickStatus.error'));
+      }
+    });
+  }
+
+  private undoQuickStatusChange(productId: string, status: string): void {
+    this.admin.bulkUpdateProducts([{ product_id: productId, status }]).subscribe({
+      next: () => {
+        this.toast.success(this.translate.instant('adminUi.products.quickStatus.undoSuccess'));
+        this.load();
+      },
+      error: () => this.toast.error(this.translate.instant('adminUi.products.quickStatus.undoError'))
+    });
   }
 
   onBulkSaleValueChange(next: string | number): void {
@@ -3189,6 +4528,13 @@ export class AdminProductsComponent implements OnInit {
     });
   }
 
+  downloadCategoriesCsv(template: boolean): void {
+    this.admin.exportCategoriesCsv(template).subscribe({
+      next: (blob) => this.downloadBlob(blob, template ? 'categories-template.csv' : 'categories.csv'),
+      error: () => this.toast.error(this.t('adminUi.categories.csv.exportError'))
+    });
+  }
+
   openCsvImport(): void {
     this.csvImportOpen.set(true);
     this.csvImportFile.set(null);
@@ -3276,13 +4622,138 @@ export class AdminProductsComponent implements OnInit {
     this.translationPreviewSanitized[lang] = sanitized;
   }
 
+  startCreateWizard(): void {
+    this.startNew();
+    this.wizardKind.set('create');
+    this.wizardStep.set(0);
+    this.scrollToWizardAnchor(PRODUCT_CREATE_WIZARD_STEPS[0].anchorId);
+  }
+
+  startPublishWizard(): void {
+    if (!this.editorOpen() || !this.editingSlug()) return;
+    this.wizardKind.set('publish');
+    this.wizardStep.set(0);
+    this.scrollToWizardAnchor(PRODUCT_PUBLISH_WIZARD_STEPS[0].anchorId);
+  }
+
+  exitWizard(): void {
+    this.wizardKind.set(null);
+    this.wizardStep.set(0);
+    this.wizardAdvanceAfterSave = false;
+    this.wizardExitAfterPublish = false;
+  }
+
+  wizardSteps(): ProductWizardStep[] {
+    const kind = this.wizardKind();
+    if (kind === 'publish') return PRODUCT_PUBLISH_WIZARD_STEPS;
+    if (kind === 'create') return PRODUCT_CREATE_WIZARD_STEPS;
+    return [];
+  }
+
+  wizardCurrentStepId(): ProductWizardStepId | null {
+    return this.wizardCurrent()?.id ?? null;
+  }
+
+  wizardTitleKey(): string {
+    return this.wizardKind() === 'publish' ? 'adminUi.products.wizard.publishTitle' : 'adminUi.products.wizard.createTitle';
+  }
+
+  wizardStepDescriptionKey(): string {
+    return this.wizardCurrent()?.descriptionKey ?? 'adminUi.products.wizard.desc.basics';
+  }
+
+  wizardNextLabelKey(): string {
+    const steps = this.wizardSteps();
+    if (!steps.length) return 'adminUi.actions.next';
+    return this.wizardStep() >= steps.length - 1 ? 'adminUi.actions.done' : 'adminUi.actions.next';
+  }
+
+  wizardCanNext(): boolean {
+    const steps = this.wizardSteps();
+    if (!steps.length) return false;
+    if (this.wizardStep() >= steps.length - 1) return true;
+    const current = this.wizardCurrent();
+    if (current?.id === 'save') return Boolean(this.editingSlug());
+    return true;
+  }
+
+  wizardPrev(): void {
+    const next = this.wizardStep() - 1;
+    if (next < 0) return;
+    this.wizardStep.set(next);
+    this.scrollToWizardAnchor(this.wizardCurrent()?.anchorId || 'product-wizard-top');
+  }
+
+  wizardNext(): void {
+    const steps = this.wizardSteps();
+    if (!steps.length) return;
+    if (this.wizardStep() >= steps.length - 1) {
+      this.exitWizard();
+      return;
+    }
+    if (!this.wizardCanNext()) {
+      this.toast.error(this.t('adminUi.products.errors.saveFirst'));
+      this.scrollToWizardAnchor('product-wizard-save');
+      return;
+    }
+    this.wizardStep.set(this.wizardStep() + 1);
+    this.scrollToWizardAnchor(this.wizardCurrent()?.anchorId || 'product-wizard-top');
+  }
+
+  goToWizardStep(index: number): void {
+    const steps = this.wizardSteps();
+    if (!steps.length) return;
+    if (index < 0 || index >= steps.length) return;
+    if (this.wizardKind() === 'create' && index > 2 && !this.editingSlug()) {
+      this.toast.error(this.t('adminUi.products.errors.saveFirst'));
+      this.wizardStep.set(2);
+      this.scrollToWizardAnchor('product-wizard-save');
+      return;
+    }
+    this.wizardStep.set(index);
+    this.scrollToWizardAnchor(steps[index].anchorId);
+  }
+
+  wizardSave(): void {
+    this.wizardAdvanceAfterSave = true;
+    this.save();
+  }
+
+  wizardPublishNow(): void {
+    this.form.status = 'published';
+    this.form.is_active = true;
+    this.wizardExitAfterPublish = true;
+    this.save();
+  }
+
+  wizardForcesAdvancedOpen(): boolean {
+    if (!this.wizardKind()) return false;
+    return this.wizardCurrentStepId() === 'publish';
+  }
+
+  private wizardCurrent(): ProductWizardStep | null {
+    const steps = this.wizardSteps();
+    const idx = this.wizardStep();
+    return steps[idx] ?? null;
+  }
+
+  private scrollToWizardAnchor(anchorId: string): void {
+    window.setTimeout(() => {
+      const el = document.getElementById(anchorId);
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 0);
+  }
+
 		  startNew(): void {
+        this.exitWizard();
 		    this.editorOpen.set(true);
 		    this.editingSlug.set(null);
 		    this.editingProductId.set(null);
 		    this.editingCurrency.set('RON');
 		    this.editorError.set(null);
 		    this.editorMessage.set(null);
+        this.lastSavedState.set(null);
         this.loadedTagSlugs = [];
 		    this.resetDuplicateCheck();
 		    this.resetRelationships();
@@ -3292,6 +4763,7 @@ export class AdminProductsComponent implements OnInit {
 	    this.resetDeletedImages();
 		    this.resetImageMeta();
 		    this.form = this.blankForm();
+        this.lastSavedState.set({ status: this.form.status, isActive: this.form.is_active });
 		    this.basePriceError = '';
 		    this.saleValueError = '';
 	    this.resetTranslations();
@@ -3302,12 +4774,14 @@ export class AdminProductsComponent implements OnInit {
   }
 
 		  closeEditor(): void {
+        this.exitWizard();
 		    this.editorOpen.set(false);
 		    this.editingSlug.set(null);
 		    this.editingProductId.set(null);
 		    this.editingCurrency.set('RON');
 		    this.editorError.set(null);
 		    this.editorMessage.set(null);
+        this.lastSavedState.set(null);
         this.loadedTagSlugs = [];
 		    this.resetDuplicateCheck();
 		    this.resetRelationships();
@@ -3324,9 +4798,11 @@ export class AdminProductsComponent implements OnInit {
   }
 
 		  edit(slug: string): void {
+        this.exitWizard();
 		    this.editorOpen.set(true);
 		    this.editorError.set(null);
 		    this.editorMessage.set(null);
+        this.lastSavedState.set(null);
 		    this.editingSlug.set(slug);
 		    this.editingProductId.set(null);
 		    this.editingCurrency.set('RON');
@@ -3426,6 +4902,7 @@ export class AdminProductsComponent implements OnInit {
           is_bestseller: tagSlugs.includes('bestseller'),
           badges: badgesState
         };
+        this.lastSavedState.set({ status: this.form.status, isActive: this.form.is_active });
         this.images.set(Array.isArray(prod.images) ? prod.images : []);
         this.setVariantsFromProduct(prod);
 	        const productId = this.editingProductId();
@@ -3643,10 +5120,55 @@ export class AdminProductsComponent implements OnInit {
     this.saleValueError = changed ? this.t('adminUi.products.sale.valueHint') : '';
   }
 
-  save(): void {
+  private shouldConfirmStatusChange(): boolean {
+    const prev = this.lastSavedState();
+    if (!prev) return false;
+    return prev.status !== this.form.status;
+  }
+
+  private openStatusConfirm(): void {
+    const prev = this.lastSavedState();
+    if (!prev) return;
+    this.statusConfirmPrev.set(prev);
+    this.statusConfirmTarget.set({ status: this.form.status, isActive: this.form.is_active });
+    this.statusConfirmBusy.set(false);
+    this.statusConfirmOpen.set(true);
+  }
+
+  closeStatusConfirm(): void {
+    this.statusConfirmOpen.set(false);
+    this.statusConfirmBusy.set(false);
+    this.statusConfirmPrev.set(null);
+    this.statusConfirmTarget.set(null);
+  }
+
+  confirmStatusChange(): void {
+    const target = this.statusConfirmTarget();
+    if (!target) return;
+    if (this.statusConfirmBusy()) return;
+    this.form.status = target.status;
+    this.form.is_active = target.isActive;
+    this.statusConfirmBusy.set(true);
+    this.save({
+      skipStatusConfirm: true,
+      done: () => {
+        this.statusConfirmBusy.set(false);
+        this.closeStatusConfirm();
+      }
+    });
+  }
+
+  save(opts?: { skipStatusConfirm?: boolean; done?: (ok: boolean) => void }): void {
+    if (!opts?.skipStatusConfirm && this.shouldConfirmStatusChange()) {
+      this.openStatusConfirm();
+      opts?.done?.(false);
+      return;
+    }
+
     const basePrice = this.parseMoneyInput(this.form.base_price);
     if (basePrice === null) {
       this.editorError.set(this.t('adminUi.products.form.priceFormatHint'));
+      opts?.done?.(false);
       return;
     }
 
@@ -3658,6 +5180,7 @@ export class AdminProductsComponent implements OnInit {
         const amount = this.parseMoneyInput(this.form.sale_value);
         if (amount === null) {
           this.editorError.set(this.t('adminUi.products.sale.valueHint'));
+          opts?.done?.(false);
           return;
         }
         sale_value = amount;
@@ -3665,6 +5188,7 @@ export class AdminProductsComponent implements OnInit {
         const percent = this.parseMoneyInput(this.form.sale_value);
         if (percent === null || percent < 0 || percent > 100) {
           this.editorError.set(this.t('adminUi.products.sale.percentHint'));
+          opts?.done?.(false);
           return;
         }
         sale_value = percent;
@@ -3673,6 +5197,7 @@ export class AdminProductsComponent implements OnInit {
 
     if (this.form.sale_enabled && this.form.sale_auto_publish && !this.form.sale_start_at) {
       this.editorError.set(this.t('adminUi.products.sale.startRequired'));
+      opts?.done?.(false);
       return;
     }
 
@@ -3682,6 +5207,7 @@ export class AdminProductsComponent implements OnInit {
       const parsed = Number(lowStockRaw);
       if (!Number.isFinite(parsed) || parsed < 0) {
         this.editorError.set(this.t('adminUi.lowStock.thresholdError'));
+        opts?.done?.(false);
         return;
       }
       low_stock_threshold = parsed;
@@ -3693,6 +5219,7 @@ export class AdminProductsComponent implements OnInit {
       const parsed = Number(weightRaw);
       if (!Number.isFinite(parsed) || parsed < 0 || !Number.isInteger(parsed)) {
         this.editorError.set(this.t('adminUi.products.shipping.weightHint'));
+        opts?.done?.(false);
         return;
       }
       weight_grams = parsed;
@@ -3711,6 +5238,7 @@ export class AdminProductsComponent implements OnInit {
     const depth_cm = parseDim(this.form.depth_cm);
     if ([width_cm, height_cm, depth_cm].some((val) => typeof val === 'number' && Number.isNaN(val))) {
       this.editorError.set(this.t('adminUi.products.shipping.dimensionsHint'));
+      opts?.done?.(false);
       return;
     }
 
@@ -3726,14 +5254,17 @@ export class AdminProductsComponent implements OnInit {
       const endDate = state.end_at ? new Date(state.end_at) : null;
       if (startDate && Number.isNaN(startDate.getTime())) {
         this.editorError.set(this.t('adminUi.products.badges.errors.invalidDate'));
+        opts?.done?.(false);
         return;
       }
       if (endDate && Number.isNaN(endDate.getTime())) {
         this.editorError.set(this.t('adminUi.products.badges.errors.invalidDate'));
+        opts?.done?.(false);
         return;
       }
       if (startDate && endDate && endDate.getTime() < startDate.getTime()) {
         this.editorError.set(this.t('adminUi.products.badges.errors.endBeforeStart'));
+        opts?.done?.(false);
         return;
       }
       badges.push({
@@ -3766,7 +5297,7 @@ export class AdminProductsComponent implements OnInit {
       is_featured: this.form.is_featured,
       sku: this.form.sku || null,
       long_description: this.form.long_description || null,
-      short_description: this.form.short_description.trim() ? this.form.short_description.trim().slice(0, 280) : null,
+      short_description: this.buildShortDescription(),
       publish_at: this.form.publish_at ? new Date(this.form.publish_at).toISOString() : null,
       tags: this.buildTags(),
       badges
@@ -3787,11 +5318,28 @@ export class AdminProductsComponent implements OnInit {
         }
         this.images.set(Array.isArray(prod?.images) ? prod.images : this.images());
 	        if (prod?.status) this.form.status = prod.status;
+          if (typeof prod?.is_active === 'boolean') this.form.is_active = prod.is_active;
+          this.lastSavedState.set({ status: this.form.status, isActive: this.form.is_active });
 	        if (newSlug) this.loadTranslations(newSlug);
 	        if (newSlug) this.loadRelationships(newSlug);
+          if (newSlug) this.loadAudit(newSlug);
 	        this.load();
+          opts?.done?.(true);
+          if (this.wizardExitAfterPublish) {
+            this.wizardExitAfterPublish = false;
+            this.wizardAdvanceAfterSave = false;
+            this.exitWizard();
+          } else if (this.wizardAdvanceAfterSave && this.wizardCurrentStepId() === 'save') {
+            this.wizardAdvanceAfterSave = false;
+            this.wizardNext();
+          } else {
+            this.wizardAdvanceAfterSave = false;
+          }
 	      },
-	      error: () => this.editorError.set(this.t('adminUi.products.errors.save'))
+	      error: () => {
+          this.editorError.set(this.t('adminUi.products.errors.save'));
+          opts?.done?.(false);
+        }
 	    });
 	  }
 
@@ -4273,9 +5821,41 @@ export class AdminProductsComponent implements OnInit {
     });
   }
 
-  deleteImage(imageId: string): void {
+  openDeleteImageConfirm(imageId: string): void {
+    const img = this.images().find((i) => i.id === imageId);
+    if (!img) return;
+    const alt = (img.alt_text || this.t('adminUi.products.form.image')).toString();
+    this.deleteImageConfirmTarget.set({ id: imageId, url: img.url, alt });
+    this.deleteImageConfirmBusy.set(false);
+    this.deleteImageConfirmOpen.set(true);
+  }
+
+  closeDeleteImageConfirm(): void {
+    this.deleteImageConfirmOpen.set(false);
+    this.deleteImageConfirmBusy.set(false);
+    this.deleteImageConfirmTarget.set(null);
+  }
+
+  confirmDeleteImage(): void {
     const slug = this.editingSlug();
-    if (!slug) return;
+    const target = this.deleteImageConfirmTarget();
+    if (!slug || !target) return;
+    if (this.deleteImageConfirmBusy()) return;
+    this.deleteImageConfirmBusy.set(true);
+    this.deleteImage(target.id, {
+      done: (ok) => {
+        this.deleteImageConfirmBusy.set(false);
+        if (ok) this.closeDeleteImageConfirm();
+      }
+    });
+  }
+
+  deleteImage(imageId: string, opts?: { done?: (ok: boolean) => void }): void {
+    const slug = this.editingSlug();
+    if (!slug) {
+      opts?.done?.(false);
+      return;
+    }
     this.admin.deleteProductImage(slug, imageId).subscribe({
       next: (prod: any) => {
         this.toast.success(this.t('adminUi.products.success.imageDelete'));
@@ -4286,8 +5866,12 @@ export class AdminProductsComponent implements OnInit {
         if (this.deletedImagesOpen()) {
           this.loadDeletedImages(slug);
         }
+        opts?.done?.(true);
       },
-      error: () => this.toast.error(this.t('adminUi.products.errors.deleteImage'))
+      error: () => {
+        this.toast.error(this.t('adminUi.products.errors.deleteImage'));
+        opts?.done?.(false);
+      }
     });
   }
 
@@ -4457,18 +6041,21 @@ export class AdminProductsComponent implements OnInit {
     this.load();
   }
 
-  private loadCategories(): void {
-    this.catalog.listCategories().subscribe({
-      next: (cats) => this.categories.set(cats || []),
-      error: () => this.categories.set([])
-    });
-  }
+	  private loadCategories(): void {
+	    this.catalog.listCategories(undefined, { include_hidden: true }).subscribe({
+	      next: (cats) => this.categories.set(cats || []),
+	      error: () => this.categories.set([])
+	    });
+	  }
 
   private loadAdminCategories(): void {
     this.admin.getCategories().subscribe({
       next: (cats: any[]) => {
         const mapped = (cats || []).map((c) => ({ id: c.id, name: c.name }));
         this.adminCategories.set(mapped);
+        if (this.editorOpen() && !this.editingSlug() && !this.form.category_id && mapped[0]) {
+          this.form.category_id = mapped[0].id;
+        }
         this.openPendingEditor();
       },
       error: () => {
@@ -4906,6 +6493,21 @@ export class AdminProductsComponent implements OnInit {
       seen.delete('bestseller');
     }
     return Array.from(seen);
+  }
+
+  private buildShortDescription(): string | null {
+    const direct = (this.form.short_description || '').trim();
+    if (direct) return direct.slice(0, 280);
+
+    const fallback = (this.form.long_description || '').trim();
+    if (!fallback) return null;
+
+    const firstLine = fallback
+      .split('\n')
+      .map((line) => line.trim())
+      .find((line) => Boolean(line));
+
+    return firstLine ? firstLine.slice(0, 280) : null;
   }
 
   private toLocalDateTime(value: string): string {

@@ -76,6 +76,50 @@ def _jpeg_bytes() -> bytes:
     return buf.getvalue()
 
 
+def test_content_asset_delete_versions_flag(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_admin_token(SessionLocal)
+
+    img_resp = client.post(
+        "/api/v1/content/admin/home.hero/images",
+        files={"file": ("hero.jpg", _jpeg_bytes(), "image/jpeg")},
+        headers=auth_headers(admin_token),
+    )
+    assert img_resp.status_code == 200
+
+    assets = client.get("/api/v1/content/admin/assets/images", headers=auth_headers(admin_token))
+    assert assets.status_code == 200, assets.text
+    first_img = assets.json()["items"][0]
+
+    edited = client.post(
+        f"/api/v1/content/admin/assets/images/{first_img['id']}/edit",
+        json={"rotate_cw": 90},
+        headers=auth_headers(admin_token),
+    )
+    assert edited.status_code == 201, edited.text
+    edited_json = edited.json()
+
+    blocked = client.delete(
+        f"/api/v1/content/admin/assets/images/{first_img['id']}",
+        headers=auth_headers(admin_token),
+    )
+    assert blocked.status_code == 409, blocked.text
+
+    deleted = client.delete(
+        f"/api/v1/content/admin/assets/images/{first_img['id']}",
+        params={"delete_versions": 1},
+        headers=auth_headers(admin_token),
+    )
+    assert deleted.status_code == 204, deleted.text
+
+    missing_edit = client.delete(
+        f"/api/v1/content/admin/assets/images/{edited_json['id']}",
+        headers=auth_headers(admin_token),
+    )
+    assert missing_edit.status_code == 404, missing_edit.text
+
+
 def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
@@ -217,6 +261,50 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     preview = client.get("/api/v1/content/admin/page.about/preview", params={"token": "preview-token"})
     assert preview.status_code == 200
 
+    # Shareable preview token works for draft page
+    page_token_resp = client.post(
+        "/api/v1/content/pages/about/preview-token",
+        headers=auth_headers(admin_token),
+    )
+    assert page_token_resp.status_code == 200, page_token_resp.text
+    page_token = page_token_resp.json()["token"]
+    page_preview = client.get(
+        "/api/v1/content/pages/about/preview",
+        params={"token": page_token},
+    )
+    assert page_preview.status_code == 200, page_preview.text
+    assert page_preview.headers.get("cache-control") == "private, no-store"
+    assert page_preview.json()["key"] == "page.about"
+
+    # Shareable preview token works for home preview
+    home_sections_create = client.post(
+        "/api/v1/content/admin/home.sections",
+        json={"title": "Home sections", "body_markdown": "Layout", "status": "draft", "meta": {}},
+        headers=auth_headers(admin_token),
+    )
+    assert home_sections_create.status_code in (200, 201), home_sections_create.text
+    home_story_create = client.post(
+        "/api/v1/content/admin/home.story",
+        json={"title": "Story", "body_markdown": "Draft story", "status": "draft"},
+        headers=auth_headers(admin_token),
+    )
+    assert home_story_create.status_code in (200, 201), home_story_create.text
+    home_token_resp = client.post(
+        "/api/v1/content/home/preview-token",
+        headers=auth_headers(admin_token),
+    )
+    assert home_token_resp.status_code == 200, home_token_resp.text
+    home_token = home_token_resp.json()["token"]
+    home_preview = client.get(
+        "/api/v1/content/home/preview",
+        params={"token": home_token},
+    )
+    assert home_preview.status_code == 200, home_preview.text
+    assert home_preview.headers.get("cache-control") == "private, no-store"
+    home_preview_json = home_preview.json()
+    assert home_preview_json["sections"]["key"] == "home.sections"
+    assert home_preview_json["story"]["key"] == "home.story"
+
     # Image upload
     img_resp = client.post(
         "/api/v1/content/admin/home.hero/images",
@@ -234,6 +322,8 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     first_img = data["items"][0]
     assert "focal_x" in first_img
     assert "focal_y" in first_img
+    assert first_img["root_image_id"] is None
+    assert first_img["source_image_id"] is None
 
     # Asset tags: set tags and filter by tag.
     tag_set = client.patch(
@@ -253,6 +343,36 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     assert focal_set.json()["focal_x"] == 25
     assert focal_set.json()["focal_y"] == 80
 
+    edited = client.post(
+        f"/api/v1/content/admin/assets/images/{first_img['id']}/edit",
+        json={"rotate_cw": 90},
+        headers=auth_headers(admin_token),
+    )
+    assert edited.status_code == 201, edited.text
+    edited_json = edited.json()
+    assert edited_json["id"] != first_img["id"]
+    assert edited_json["root_image_id"] == first_img["id"]
+    assert edited_json["source_image_id"] == first_img["id"]
+    assert edited_json["content_key"] == "home.hero"
+    assert set(edited_json["tags"]) == {"hero", "homepage"}
+    assert edited_json["focal_x"] == 20
+    assert edited_json["focal_y"] == 25
+
+    client.patch(
+        "/api/v1/content/admin/page.about",
+        json={"title": "About", "body_markdown": f"Uses {first_img['url']}", "status": "draft"},
+        headers=auth_headers(admin_token),
+    )
+    usage = client.get(
+        f"/api/v1/content/admin/assets/images/{first_img['id']}/usage",
+        headers=auth_headers(admin_token),
+    )
+    assert usage.status_code == 200, usage.text
+    usage_json = usage.json()
+    assert usage_json["stored_in_key"] == "home.hero"
+    usage_keys = usage_json["keys"]
+    assert "page.about" in usage_keys
+
     tagged = client.get(
         "/api/v1/content/admin/assets/images",
         params={"tag": "hero"},
@@ -268,6 +388,36 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     )
     assert assets_filtered.status_code == 200, assets_filtered.text
     assert all(item["content_key"] == "home.hero" for item in assets_filtered.json()["items"])
+
+    # Delete: blocked while used, then requires deleting edited versions first.
+    delete_used = client.delete(
+        f"/api/v1/content/admin/assets/images/{first_img['id']}",
+        headers=auth_headers(admin_token),
+    )
+    assert delete_used.status_code == 409, delete_used.text
+
+    client.patch(
+        "/api/v1/content/admin/page.about",
+        json={"title": "About", "body_markdown": "No usage", "status": "draft"},
+        headers=auth_headers(admin_token),
+    )
+    delete_with_versions = client.delete(
+        f"/api/v1/content/admin/assets/images/{first_img['id']}",
+        headers=auth_headers(admin_token),
+    )
+    assert delete_with_versions.status_code == 409, delete_with_versions.text
+
+    delete_edited = client.delete(
+        f"/api/v1/content/admin/assets/images/{edited_json['id']}",
+        headers=auth_headers(admin_token),
+    )
+    assert delete_edited.status_code == 204, delete_edited.text
+
+    delete_original = client.delete(
+        f"/api/v1/content/admin/assets/images/{first_img['id']}",
+        headers=auth_headers(admin_token),
+    )
+    assert delete_original.status_code == 204, delete_original.text
 
     # Audit log
     audit = client.get("/api/v1/content/admin/home.hero/audit", headers=auth_headers(admin_token))
@@ -301,6 +451,22 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
         json={"title": "New", "body_markdown": "New body", "status": "published"},
         headers=auth_headers(admin_token),
     )
+    redirect_upsert = client.post(
+        "/api/v1/content/admin/redirects",
+        json={"from_key": "page.old2", "to_key": "page.new"},
+        headers=auth_headers(admin_token),
+    )
+    assert redirect_upsert.status_code == 200, redirect_upsert.text
+    assert redirect_upsert.json()["from_key"] == "page.old2"
+    assert redirect_upsert.json()["to_key"] == "page.new"
+
+    missing_target = client.post(
+        "/api/v1/content/admin/redirects",
+        json={"from_key": "page.old3", "to_key": "page.does-not-exist"},
+        headers=auth_headers(admin_token),
+    )
+    assert missing_target.status_code == 400
+
     redirect_import = client.post(
         "/api/v1/content/admin/redirects/import",
         files={"file": ("redirects.csv", b"from,to\n/pages/old,/pages/new\n", "text/csv")},
@@ -397,6 +563,83 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     assert any(i["reason"] == "Product not found" for i in issues)
     assert any(i["reason"] == "Content not found" for i in issues)
 
+    preview = client.post(
+        "/api/v1/content/admin/tools/link-check/preview",
+        json={
+            "key": "site.preview",
+            "body_markdown": "![missing](/media/does-not-exist.png) [product](/products/missing) [page](/pages/missing-page)",
+            "meta": None,
+            "images": [],
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert preview.status_code == 200, preview.text
+    preview_issues = preview.json()["issues"]
+    assert any(i["reason"] == "Media file not found" for i in preview_issues)
+    assert any(i["reason"] == "Product not found" for i in preview_issues)
+    assert any(i["reason"] == "Content not found" for i in preview_issues)
+
+    # Find & replace (preview + apply) across body/meta/translations.
+    seed_fr = client.post(
+        "/api/v1/content/admin/page.findreplace",
+        json={
+            "title": "Findreplace",
+            "body_markdown": "hello old",
+            "status": "draft",
+            "lang": "en",
+            "meta": {"blocks": [{"type": "text", "body_markdown": {"en": "old in meta", "ro": "old in meta ro"}}]},
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert seed_fr.status_code == 201, seed_fr.text
+
+    tr_fr = client.patch(
+        "/api/v1/content/admin/page.findreplace",
+        json={"title": "Găsește", "body_markdown": "salut old", "lang": "ro"},
+        headers=auth_headers(admin_token),
+    )
+    assert tr_fr.status_code == 200, tr_fr.text
+
+    fr_preview = client.post(
+        "/api/v1/content/admin/tools/find-replace/preview",
+        json={"find": "old", "replace": "new", "key_prefix": "page.", "case_sensitive": True, "limit": 50},
+        headers=auth_headers(admin_token),
+    )
+    assert fr_preview.status_code == 200, fr_preview.text
+    preview_payload = fr_preview.json()
+    assert any(item["key"] == "page.findreplace" for item in preview_payload["items"])
+    assert preview_payload["total_items"] >= 1
+    assert preview_payload["total_matches"] >= 3
+
+    fr_apply = client.post(
+        "/api/v1/content/admin/tools/find-replace/apply",
+        json={"find": "old", "replace": "new", "key_prefix": "page.", "case_sensitive": True},
+        headers=auth_headers(admin_token),
+    )
+    assert fr_apply.status_code == 200, fr_apply.text
+    apply_payload = fr_apply.json()
+    assert apply_payload["updated_blocks"] >= 1
+    assert apply_payload["total_replacements"] >= 3
+    assert apply_payload["errors"] == []
+
+    base_after = client.get(
+        "/api/v1/content/admin/page.findreplace",
+        headers=auth_headers(admin_token),
+    )
+    assert base_after.status_code == 200, base_after.text
+    assert "old" not in base_after.json()["body_markdown"]
+    assert "new" in base_after.json()["body_markdown"]
+    assert "new in meta" in str(base_after.json().get("meta") or {})
+
+    ro_after = client.get(
+        "/api/v1/content/admin/page.findreplace",
+        params={"lang": "ro"},
+        headers=auth_headers(admin_token),
+    )
+    assert ro_after.status_code == 200, ro_after.text
+    assert "old" not in ro_after.json()["body_markdown"]
+    assert "new" in ro_after.json()["body_markdown"]
+
 
 def test_admin_fetch_social_thumbnail(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
@@ -442,3 +685,47 @@ def test_admin_fetch_social_thumbnail(monkeypatch: pytest.MonkeyPatch, test_app:
         headers=auth_headers(admin_token),
     )
     assert bad.status_code == 400
+
+
+def test_legal_pages_require_bilingual_before_publish(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_admin_token(SessionLocal)
+
+    create = client.post(
+        "/api/v1/content/admin/page.terms",
+        json={"title": "Terms", "body_markdown": "Terms placeholder", "status": "draft", "lang": "en"},
+        headers=auth_headers(admin_token),
+    )
+    assert create.status_code == 201, create.text
+
+    publish_missing_ro = client.patch(
+        "/api/v1/content/admin/page.terms",
+        json={"status": "published"},
+        headers=auth_headers(admin_token),
+    )
+    assert publish_missing_ro.status_code == 400, publish_missing_ro.text
+    assert "EN and RO" in str(publish_missing_ro.json().get("detail"))
+
+    add_ro = client.patch(
+        "/api/v1/content/admin/page.terms",
+        json={"title": "Termeni", "body_markdown": "Șablon termeni", "lang": "ro"},
+        headers=auth_headers(admin_token),
+    )
+    assert add_ro.status_code == 200, add_ro.text
+
+    publish_ok = client.patch(
+        "/api/v1/content/admin/page.terms",
+        json={"status": "published"},
+        headers=auth_headers(admin_token),
+    )
+    assert publish_ok.status_code == 200, publish_ok.text
+    assert publish_ok.json()["status"] == "published"
+
+    clear_ro = client.patch(
+        "/api/v1/content/admin/page.terms",
+        json={"title": "", "body_markdown": "", "lang": "ro"},
+        headers=auth_headers(admin_token),
+    )
+    assert clear_ro.status_code == 400, clear_ro.text
+    assert "EN and RO" in str(clear_ro.json().get("detail"))

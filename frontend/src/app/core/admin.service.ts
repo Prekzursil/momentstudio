@@ -2,6 +2,12 @@ import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from './api.service';
 
+export type AdminRequestSource = 'storefront';
+
+export type AdminRequestOptions = {
+  source?: AdminRequestSource;
+};
+
 export interface AdminSummary {
   products: number;
   orders: number;
@@ -220,6 +226,28 @@ export interface AdminContent {
   author?: { id: string; username: string; name?: string | null; name_tag?: number | null } | null;
 }
 
+export interface PaginationMeta {
+  total_items: number;
+  total_pages: number;
+  page: number;
+  limit: number;
+}
+
+export interface ContentSchedulingItem {
+  key: string;
+  title: string;
+  status: string;
+  lang?: string | null;
+  published_at?: string | null;
+  published_until?: string | null;
+  updated_at: string;
+}
+
+export interface ContentSchedulingListResponse {
+  items: ContentSchedulingItem[];
+  meta: PaginationMeta;
+}
+
 export interface AdminCoupon {
   id: string;
   code: string;
@@ -241,6 +269,9 @@ export interface AdminCategory {
   name: string;
   slug: string;
   description?: string | null;
+  thumbnail_url?: string | null;
+  banner_url?: string | null;
+  is_visible?: boolean;
   low_stock_threshold?: number | null;
   parent_id?: string | null;
   tax_group_id?: string | null;
@@ -251,6 +282,28 @@ export interface AdminCategoryTranslation {
   lang: 'en' | 'ro';
   name: string;
   description?: string | null;
+}
+
+export interface AdminCategoryDeletePreview {
+  slug: string;
+  product_count: number;
+  child_count: number;
+  can_delete: boolean;
+}
+
+export interface AdminCategoryMergePreview {
+  source_slug: string;
+  target_slug: string;
+  product_count: number;
+  child_count: number;
+  can_merge: boolean;
+  reason?: string | null;
+}
+
+export interface AdminCategoryMergeResult {
+  source_slug: string;
+  target_slug: string;
+  moved_products: number;
 }
 
 export interface AdminProductDetail extends AdminProduct {
@@ -318,6 +371,12 @@ export interface AdminProductAuditEntry {
 }
 
 export interface AdminProductsImportResult {
+  created: number;
+  updated: number;
+  errors: string[];
+}
+
+export interface AdminCategoriesImportResult {
   created: number;
   updated: number;
   errors: string[];
@@ -500,7 +559,13 @@ export interface ContentBlock {
   published_until?: string | null;
   needs_translation_en?: boolean;
   needs_translation_ro?: boolean;
-  images?: { id: string; url: string; alt_text?: string | null; sort_order?: number }[];
+  images?: { id: string; url: string; alt_text?: string | null; sort_order?: number; focal_x?: number; focal_y?: number }[];
+}
+
+export interface ContentPreviewTokenResponse {
+  token: string;
+  expires_at: string;
+  url: string;
 }
 
 export interface ContentBlockVersionListItem {
@@ -595,6 +660,8 @@ export interface StructuredDataValidationResponse {
 
 export interface ContentImageAssetRead {
   id: string;
+  root_image_id?: string | null;
+  source_image_id?: string | null;
   url: string;
   alt_text?: string | null;
   sort_order: number;
@@ -610,6 +677,21 @@ export interface ContentImageAssetListResponse {
   meta: { total_items: number; total_pages: number; page: number; limit: number };
 }
 
+export interface ContentImageEditRequest {
+  rotate_cw?: 0 | 90 | 180 | 270;
+  crop_aspect_w?: number;
+  crop_aspect_h?: number;
+  resize_max_width?: number;
+  resize_max_height?: number;
+}
+
+export interface ContentImageAssetUsageResponse {
+  image_id: string;
+  url: string;
+  stored_in_key?: string | null;
+  keys: string[];
+}
+
 export interface ContentLinkCheckIssue {
   key: string;
   kind: 'link' | 'image';
@@ -621,6 +703,60 @@ export interface ContentLinkCheckIssue {
 
 export interface ContentLinkCheckResponse {
   issues: ContentLinkCheckIssue[];
+}
+
+export interface ContentLinkCheckPreviewRequest {
+  key: string;
+  body_markdown?: string;
+  meta?: Record<string, any> | null;
+  images?: string[];
+}
+
+export interface ContentFindReplacePreviewRequest {
+  find: string;
+  replace?: string;
+  key_prefix?: string | null;
+  case_sensitive?: boolean;
+  limit?: number;
+}
+
+export interface ContentFindReplaceApplyRequest {
+  find: string;
+  replace?: string;
+  key_prefix?: string | null;
+  case_sensitive?: boolean;
+}
+
+export interface ContentFindReplacePreviewTranslationCount {
+  lang: string;
+  matches: number;
+}
+
+export interface ContentFindReplacePreviewItem {
+  key: string;
+  title: string;
+  matches: number;
+  base_matches: number;
+  translations: ContentFindReplacePreviewTranslationCount[];
+}
+
+export interface ContentFindReplacePreviewResponse {
+  items: ContentFindReplacePreviewItem[];
+  total_items: number;
+  total_matches: number;
+  truncated: boolean;
+}
+
+export interface ContentFindReplaceApplyError {
+  key: string;
+  error: string;
+}
+
+export interface ContentFindReplaceApplyResponse {
+  updated_blocks: number;
+  updated_translations: number;
+  total_replacements: number;
+  errors: ContentFindReplaceApplyError[];
 }
 
 export interface ContentSavePayload {
@@ -693,6 +829,10 @@ export class AdminService {
 
   content(): Observable<AdminContent[]> {
     return this.api.get<AdminContent[]>('/admin/dashboard/content');
+  }
+
+  contentScheduling(params?: { window_days?: number; window_start?: string; page?: number; limit?: number }): Observable<ContentSchedulingListResponse> {
+    return this.api.get<ContentSchedulingListResponse>('/content/admin/scheduling', params as any);
   }
 
   updateContentBlock(key: string, payload: ContentSavePayload): Observable<ContentBlock> {
@@ -776,44 +916,70 @@ export class AdminService {
     sale_type?: 'percent' | 'amount' | null;
     sale_value?: number | null;
     stock_quantity?: number | null;
+    is_featured?: boolean | null;
+    sort_order?: number | null;
     category_id?: string | null;
     publish_scheduled_for?: string | null;
     unpublish_scheduled_for?: string | null;
     status?: string | null;
-  }[]): Observable<any[]> {
-    return this.api.post<any[]>('/catalog/products/bulk-update', payload);
+  }[], opts?: AdminRequestOptions): Observable<any[]> {
+    return this.api.post<any[]>('/catalog/products/bulk-update', payload, undefined, opts?.source ? { source: opts.source } : undefined);
   }
 
   getCategories(): Observable<AdminCategory[]> {
     return this.api.get<AdminCategory[]>('/catalog/categories');
   }
 
-  createCategory(payload: Partial<AdminCategory>): Observable<AdminCategory> {
-    return this.api.post<AdminCategory>('/catalog/categories', payload);
+  createCategory(payload: Partial<AdminCategory>, opts?: AdminRequestOptions): Observable<AdminCategory> {
+    return this.api.post<AdminCategory>('/catalog/categories', payload, undefined, opts?.source ? { source: opts.source } : undefined);
   }
 
-  updateCategory(slug: string, payload: Partial<AdminCategory>): Observable<AdminCategory> {
-    return this.api.patch<AdminCategory>(`/catalog/categories/${slug}`, payload);
+  updateCategory(slug: string, payload: Partial<AdminCategory>, opts?: AdminRequestOptions): Observable<AdminCategory> {
+    return this.api.patch<AdminCategory>(`/catalog/categories/${slug}`, payload, undefined, opts?.source ? { source: opts.source } : undefined);
+  }
+
+  uploadCategoryImage(slug: string, kind: 'thumbnail' | 'banner', file: File, opts?: AdminRequestOptions): Observable<AdminCategory> {
+    const form = new FormData();
+    form.append('file', file);
+    return this.api.post<AdminCategory>(`/catalog/categories/${slug}/images/${kind}`, form, undefined, opts?.source ? { source: opts.source } : undefined);
+  }
+
+  previewDeleteCategory(slug: string): Observable<AdminCategoryDeletePreview> {
+    return this.api.get<AdminCategoryDeletePreview>(`/catalog/categories/${slug}/delete/preview`);
+  }
+
+  previewMergeCategory(sourceSlug: string, targetSlug: string): Observable<AdminCategoryMergePreview> {
+    return this.api.get<AdminCategoryMergePreview>(`/catalog/categories/${sourceSlug}/merge/preview`, { target_slug: targetSlug });
+  }
+
+  mergeCategory(sourceSlug: string, targetSlug: string, opts?: AdminRequestOptions): Observable<AdminCategoryMergeResult> {
+    return this.api.post<AdminCategoryMergeResult>(`/catalog/categories/${sourceSlug}/merge`, { target_slug: targetSlug }, undefined, opts?.source ? { source: opts.source } : undefined);
   }
 
   getCategoryTranslations(slug: string): Observable<AdminCategoryTranslation[]> {
     return this.api.get<AdminCategoryTranslation[]>(`/catalog/categories/${slug}/translations`);
   }
 
-  upsertCategoryTranslation(slug: string, lang: 'en' | 'ro', payload: { name: string; description?: string | null }): Observable<AdminCategoryTranslation> {
-    return this.api.put<AdminCategoryTranslation>(`/catalog/categories/${slug}/translations/${lang}`, payload);
+  upsertCategoryTranslation(slug: string, lang: 'en' | 'ro', payload: { name: string; description?: string | null }, opts?: AdminRequestOptions): Observable<AdminCategoryTranslation> {
+    return this.api.put<AdminCategoryTranslation>(`/catalog/categories/${slug}/translations/${lang}`, payload, undefined, opts?.source ? { source: opts.source } : undefined);
   }
 
-  deleteCategoryTranslation(slug: string, lang: 'en' | 'ro'): Observable<void> {
-    return this.api.delete<void>(`/catalog/categories/${slug}/translations/${lang}`);
+  deleteCategoryTranslation(slug: string, lang: 'en' | 'ro', opts?: AdminRequestOptions): Observable<void> {
+    return this.api.delete<void>(`/catalog/categories/${slug}/translations/${lang}`, undefined, opts?.source ? { source: opts.source } : undefined);
   }
 
-  deleteCategory(slug: string): Observable<AdminCategory> {
-    return this.api.delete<AdminCategory>(`/catalog/categories/${slug}`);
+  deleteCategory(slug: string, opts?: AdminRequestOptions): Observable<AdminCategory> {
+    return this.api.delete<AdminCategory>(`/catalog/categories/${slug}`, undefined, opts?.source ? { source: opts.source } : undefined);
   }
 
-  reorderCategories(items: { slug: string; sort_order: number }[]): Observable<AdminCategory[]> {
-    return this.api.post<AdminCategory[]>('/catalog/categories/reorder', items);
+  reorderCategories(items: { slug: string; sort_order: number }[], opts?: AdminRequestOptions): Observable<AdminCategory[]> {
+    return this.api.post<AdminCategory[]>('/catalog/categories/reorder', items, undefined, opts?.source ? { source: opts.source } : undefined);
+  }
+
+  importCategoriesCsv(file: File, dryRun = true): Observable<AdminCategoriesImportResult> {
+    const form = new FormData();
+    form.append('file', file);
+    return this.api.post<AdminCategoriesImportResult>('/catalog/categories/import', form, undefined, { dry_run: dryRun });
   }
 
   getProduct(slug: string): Observable<AdminProductDetail> {
@@ -822,6 +988,10 @@ export class AdminService {
 
   exportProductsCsv(): Observable<Blob> {
     return this.api.getBlob('/catalog/products/export');
+  }
+
+  exportCategoriesCsv(template = false): Observable<Blob> {
+    return this.api.getBlob('/catalog/categories/export', { template });
   }
 
   importProductsCsv(file: File, dryRun = true): Observable<AdminProductsImportResult> {
@@ -868,12 +1038,12 @@ export class AdminService {
     return this.api.post<AdminProductDetail>('/catalog/products', payload);
   }
 
-  updateProduct(slug: string, payload: Partial<AdminProductDetail>): Observable<AdminProductDetail> {
-    return this.api.patch<AdminProductDetail>(`/catalog/products/${slug}`, payload);
+  updateProduct(slug: string, payload: Partial<AdminProductDetail>, opts?: AdminRequestOptions): Observable<AdminProductDetail> {
+    return this.api.patch<AdminProductDetail>(`/catalog/products/${slug}`, payload, undefined, opts?.source ? { source: opts.source } : undefined);
   }
 
-  duplicateProduct(slug: string): Observable<AdminProductDetail> {
-    return this.api.post<AdminProductDetail>(`/catalog/products/${slug}/duplicate`, {});
+  duplicateProduct(slug: string, opts?: AdminRequestOptions): Observable<AdminProductDetail> {
+    return this.api.post<AdminProductDetail>(`/catalog/products/${slug}/duplicate`, {}, undefined, opts?.source ? { source: opts.source } : undefined);
   }
 
   deleteProduct(slug: string): Observable<void> {
@@ -910,11 +1080,10 @@ export class AdminService {
     return this.api.post<AdminProductDetail>(`/catalog/products/${slug}/images/${imageId}/restore`, {});
   }
 
-  reorderProductImage(slug: string, imageId: string, sortOrder: number): Observable<AdminProductDetail> {
-    return this.api.patch<AdminProductDetail>(
-      `/catalog/products/${slug}/images/${imageId}/sort?sort_order=${sortOrder}`,
-      {}
-    );
+  reorderProductImage(slug: string, imageId: string, sortOrder: number, opts?: AdminRequestOptions): Observable<AdminProductDetail> {
+    const params: Record<string, string | number> = { sort_order: sortOrder };
+    if (opts?.source) params['source'] = opts.source;
+    return this.api.patch<AdminProductDetail>(`/catalog/products/${slug}/images/${imageId}/sort`, {}, undefined, params);
   }
 
   updateProductVariants(
@@ -935,16 +1104,19 @@ export class AdminService {
     slug: string,
     imageId: string,
     lang: 'en' | 'ro',
-    payload: { alt_text?: string | null; caption?: string | null }
+    payload: { alt_text?: string | null; caption?: string | null },
+    opts?: AdminRequestOptions
   ): Observable<AdminProductImageTranslation> {
     return this.api.put<AdminProductImageTranslation>(
       `/catalog/products/${slug}/images/${imageId}/translations/${lang}`,
-      payload
+      payload,
+      undefined,
+      opts?.source ? { source: opts.source } : undefined
     );
   }
 
-  deleteProductImageTranslation(slug: string, imageId: string, lang: 'en' | 'ro'): Observable<void> {
-    return this.api.delete<void>(`/catalog/products/${slug}/images/${imageId}/translations/${lang}`);
+  deleteProductImageTranslation(slug: string, imageId: string, lang: 'en' | 'ro', opts?: AdminRequestOptions): Observable<void> {
+    return this.api.delete<void>(`/catalog/products/${slug}/images/${imageId}/translations/${lang}`, undefined, opts?.source ? { source: opts.source } : undefined);
   }
 
   getProductImageStats(slug: string, imageId: string): Observable<AdminProductImageOptimizationStats> {
@@ -1041,8 +1213,32 @@ export class AdminService {
     return this.api.patch<ContentImageAssetRead>(`/content/admin/assets/images/${encodeURIComponent(imageId)}/focal`, { focal_x, focal_y });
   }
 
+  editContentImage(imageId: string, payload: ContentImageEditRequest): Observable<ContentImageAssetRead> {
+    return this.api.post<ContentImageAssetRead>(`/content/admin/assets/images/${encodeURIComponent(imageId)}/edit`, payload);
+  }
+
+  getContentImageUsage(imageId: string): Observable<ContentImageAssetUsageResponse> {
+    return this.api.get<ContentImageAssetUsageResponse>(`/content/admin/assets/images/${encodeURIComponent(imageId)}/usage`);
+  }
+
+  deleteContentImage(imageId: string, params?: { delete_versions?: boolean }): Observable<void> {
+    return this.api.delete<void>(`/content/admin/assets/images/${encodeURIComponent(imageId)}`, undefined, params as any);
+  }
+
   linkCheckContent(key: string): Observable<ContentLinkCheckResponse> {
     return this.api.get<ContentLinkCheckResponse>('/content/admin/tools/link-check', { key });
+  }
+
+  linkCheckContentPreview(payload: ContentLinkCheckPreviewRequest): Observable<ContentLinkCheckResponse> {
+    return this.api.post<ContentLinkCheckResponse>('/content/admin/tools/link-check/preview', payload);
+  }
+
+  previewFindReplaceContent(payload: ContentFindReplacePreviewRequest): Observable<ContentFindReplacePreviewResponse> {
+    return this.api.post<ContentFindReplacePreviewResponse>('/content/admin/tools/find-replace/preview', payload);
+  }
+
+  applyFindReplaceContent(payload: ContentFindReplaceApplyRequest): Observable<ContentFindReplaceApplyResponse> {
+    return this.api.post<ContentFindReplaceApplyResponse>('/content/admin/tools/find-replace/apply', payload);
   }
 
   fetchSocialThumbnail(url: string): Observable<SocialThumbnailResponse> {
@@ -1055,6 +1251,10 @@ export class AdminService {
 
   renameContentPage(slug: string, newSlug: string): Observable<ContentPageRenameResponse> {
     return this.api.post<ContentPageRenameResponse>(`/content/admin/pages/${encodeURIComponent(slug)}/rename`, { new_slug: newSlug });
+  }
+
+  upsertContentRedirect(payload: { from_key: string; to_key: string }): Observable<ContentRedirectRead> {
+    return this.api.post<ContentRedirectRead>('/content/admin/redirects', payload);
   }
 
   listContentRedirects(params?: { q?: string; page?: number; limit?: number }): Observable<ContentRedirectListResponse> {
@@ -1081,5 +1281,24 @@ export class AdminService {
 
   validateStructuredData(): Observable<StructuredDataValidationResponse> {
     return this.api.get<StructuredDataValidationResponse>('/content/admin/seo/structured-data/validate');
+  }
+
+  createPagePreviewToken(
+    slug: string,
+    params: { lang?: string; expires_minutes?: number } = {}
+  ): Observable<ContentPreviewTokenResponse> {
+    const qs = new URLSearchParams();
+    if (params.lang) qs.set('lang', params.lang);
+    if (params.expires_minutes) qs.set('expires_minutes', String(params.expires_minutes));
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return this.api.post<ContentPreviewTokenResponse>(`/content/pages/${encodeURIComponent(slug)}/preview-token${suffix}`, {});
+  }
+
+  createHomePreviewToken(params: { lang?: string; expires_minutes?: number } = {}): Observable<ContentPreviewTokenResponse> {
+    const qs = new URLSearchParams();
+    if (params.lang) qs.set('lang', params.lang);
+    if (params.expires_minutes) qs.set('expires_minutes', String(params.expires_minutes));
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return this.api.post<ContentPreviewTokenResponse>(`/content/home/preview-token${suffix}`, {});
   }
 }

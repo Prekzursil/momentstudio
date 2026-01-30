@@ -1,8 +1,11 @@
 from datetime import date
+from typing import Literal
 from uuid import UUID
 from pydantic import BaseModel, EmailStr, Field
 
 from app.models.order import OrderStatus
+
+MockPaymentOutcome = Literal["success", "decline"]
 
 
 class GuestEmailVerificationRequest(BaseModel):
@@ -55,6 +58,8 @@ class GuestCheckoutRequest(BaseModel):
     invoice_company: str | None = Field(default=None, max_length=200)
     invoice_vat_id: str | None = Field(default=None, max_length=64)
     payment_method: str = Field(default="stripe", pattern="^(stripe|cod|paypal|netopia)$")
+    accept_terms: bool = Field(default=False, description="Accept Terms & Conditions")
+    accept_privacy: bool = Field(default=False, description="Accept Privacy Policy")
     courier: str = Field(default="sameday", pattern="^(sameday|fan_courier)$")
     delivery_type: str = Field(default="home", pattern="^(home|locker)$")
     locker_id: str | None = Field(default=None, max_length=80)
@@ -80,6 +85,7 @@ class GuestCheckoutResponse(BaseModel):
 class PayPalCaptureRequest(BaseModel):
     paypal_order_id: str = Field(min_length=1, max_length=255)
     order_id: UUID | None = None
+    mock: MockPaymentOutcome | None = Field(default=None, description="Mock outcome (only when PAYMENTS_PROVIDER=mock)")
 
 
 class PayPalCaptureResponse(BaseModel):
@@ -92,6 +98,7 @@ class PayPalCaptureResponse(BaseModel):
 class StripeConfirmRequest(BaseModel):
     session_id: str = Field(min_length=1, max_length=255)
     order_id: UUID | None = None
+    mock: MockPaymentOutcome | None = Field(default=None, description="Mock outcome (only when PAYMENTS_PROVIDER=mock)")
 
 
 class StripeConfirmResponse(BaseModel):
@@ -117,6 +124,8 @@ class CheckoutRequest(BaseModel):
     invoice_company: str | None = Field(default=None, max_length=200)
     invoice_vat_id: str | None = Field(default=None, max_length=64)
     payment_method: str = Field(default="stripe", pattern="^(stripe|cod|paypal|netopia)$")
+    accept_terms: bool = Field(default=False, description="Accept Terms & Conditions")
+    accept_privacy: bool = Field(default=False, description="Accept Privacy Policy")
     courier: str = Field(default="sameday", pattern="^(sameday|fan_courier)$")
     delivery_type: str = Field(default="home", pattern="^(home|locker)$")
     locker_id: str | None = Field(default=None, max_length=80)

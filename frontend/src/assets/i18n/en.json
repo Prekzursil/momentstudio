@@ -10,6 +10,7 @@
     "shop": "Shop",
     "about": "Our story",
     "contact": "Contact",
+    "terms": "Terms & Conditions",
     "page": "Page",
     "admin": "Admin",
     "viewAdmin": "View admin",
@@ -27,7 +28,8 @@
     "menu": "Menu",
     "preferences": "Preferences",
     "theme": "Theme",
-    "language": "Language"
+    "language": "Language",
+    "editMode": "Edit mode"
   },
   "notifications": {
     "title": "Notifications",
@@ -48,6 +50,18 @@
   },
   "footer": {
     "tagline": "Handcrafted Art",
+    "handcraftedArt": "Handcrafted Art",
+    "legal": "Legal",
+    "privacyPolicy": "Privacy Policy",
+    "anpc": "ANPC",
+    "companyInfo": "Company info",
+    "registrationNumber": "Registration no.",
+    "cui": "CUI/VAT",
+    "address": "Address",
+    "phone": "Phone",
+    "email": "Email",
+    "paymentsAccepted": "Payments accepted",
+    "paymentsAcceptedAlt": "Accepted payments: Netopia, Visa, Mastercard",
     "instagram": "Instagram",
     "facebook": "Facebook",
     "contact": "Contact"
@@ -63,6 +77,31 @@
     "restricted": {
       "title": "Sign in required",
       "copy": "This page is available to signed-in customers only."
+    },
+    "admin": {
+      "edit": "Edit this page"
+    },
+    "blocks": {
+      "productGrid": {
+        "errorTitle": "Could not load products.",
+        "errorCopy": "Please try again.",
+        "empty": "No products to show right now."
+      }
+    }
+  },
+  "legal": {
+    "consent": {
+      "loading": "Loading consent requirements…",
+      "required": "Please read and accept the Terms & Conditions and Privacy Policy."
+    },
+    "modal": {
+      "title": "Legal document",
+      "close": "Close",
+      "accept": "Accept",
+      "loading": "Loading…",
+      "scrollToAccept": "Scroll to the bottom to enable Accept.",
+      "missingDoc": "Missing document.",
+      "loadError": "Could not load the document. Please try again."
     }
   },
   "contact": {
@@ -762,12 +801,25 @@
   },
   "blog": {
     "title": "Blog",
+    "featuredLabel": "Featured",
     "searchLabel": "Search",
     "searchPlaceholder": "Search posts",
     "tagLabel": "Tag",
     "tagPlaceholder": "Filter by tag",
+    "seriesLabel": "Series",
+    "seriesPlaceholder": "Filter by series",
+    "sortLabel": "Sort",
+    "sortNewest": "Newest",
+    "sortOldest": "Oldest",
+    "sortMostViewed": "Most viewed",
+    "sortMostCommented": "Most commented",
     "searchCta": "Search",
-    "clearFilters": "Clear",
+    "clearFilters": "Reset",
+    "chipSearch": "Search: {{q}}",
+    "chipTag": "Tag: {{tag}}",
+    "chipSeries": "Series: {{series}}",
+    "seriesPill": "Series: {{series}}",
+    "byAuthor": "By {{author}}",
     "minutesRead": "{{minutes}} min read",
     "preview": {
       "banner": "Preview mode — this post is not published yet."
@@ -777,14 +829,66 @@
     "retry": "Retry",
     "emptyTitle": "No posts yet",
     "emptyCopy": "Check back soon for new articles.",
+    "noResultsTitle": "No results",
+    "noResultsCopy": "Try clearing filters or searching for something else.",
     "pageMeta": "Page {{page}} of {{totalPages}} · {{totalItems}} posts",
     "metaTitle": "Blog | momentstudio",
     "metaDescription": "Stories, updates, and behind-the-scenes from momentstudio.",
+    "tagMetaTitle": "Blog · #{{tag}} | momentstudio",
+    "tagMetaDescription": "Latest posts tagged \"{{tag}}\" on momentstudio.",
+    "seriesMetaTitle": "Blog · Series: {{series}} | momentstudio",
+    "seriesMetaDescription": "Posts in the \"{{series}}\" series on momentstudio.",
     "prev": "Prev",
     "next": "Next",
     "post": {
       "breadcrumb": "Post",
       "backToBlog": "Back to blog",
+      "backToTop": "Back to top",
+      "progressLabel": "Reading progress",
+      "tocTitle": "On this page",
+      "sectionLinkLabel": "Link to this section",
+      "previousPost": "Previous post",
+      "nextPost": "Next post",
+      "relatedTitle": "Related posts",
+      "shareTitle": "Share",
+      "shareCopy": "Copy link",
+      "shareWhatsApp": "WhatsApp",
+      "shareFacebook": "Facebook",
+      "shareCopiedTitle": "Copied",
+      "shareCopiedCopy": "Link copied to clipboard.",
+      "shareCopyErrorTitle": "Could not copy link",
+      "shareCopyErrorCopy": "Please copy the URL from the address bar.",
+      "lightbox": {
+        "close": "Close image viewer",
+        "previous": "Previous image",
+        "next": "Next image"
+      },
+      "callout": {
+        "tip": "Tip",
+        "note": "Note",
+        "warning": "Warning"
+      },
+      "embed": {
+        "categoryLabel": "Category",
+        "collectionLabel": "Collection",
+        "notFoundProduct": "Product not found.",
+        "notFoundCategory": "Category not found.",
+        "notFoundCollection": "Collection not found."
+      },
+      "author": {
+        "title": "About the author",
+        "moreFrom": "More from {{author}}"
+      },
+      "code": {
+        "copy": "Copy",
+        "wrap": "Wrap",
+        "unwrap": "Unwrap",
+        "languageFallback": "code",
+        "copiedTitle": "Copied",
+        "copiedCopy": "Code copied to clipboard.",
+        "copyErrorTitle": "Could not copy code",
+        "copyErrorCopy": "Please select and copy manually."
+      },
       "loadingTitle": "Loading…",
       "errorTitle": "Could not load this post.",
       "errorCopy": "Please try again in a moment.",
@@ -794,9 +898,26 @@
     "comments": {
       "title": "Comments ({{count}})",
       "refresh": "Refresh",
+      "sortLabel": "Sort",
+      "sortNewest": "Newest",
+      "sortOldest": "Oldest",
+      "sortTop": "Top",
+      "pageMeta": "Page {{page}} of {{totalPages}}",
+      "prev": "Prev",
+      "next": "Next",
+      "follow": "Email me about new comments",
+      "followTitle": "Comment updates",
+      "followEnabledCopy": "You'll get emails when new comments are posted on this article.",
+      "followDisabledCopy": "You won’t receive comment update emails for this article.",
+      "followVerifyTitle": "Verify your email",
+      "followVerifyCopy": "Verify your email address to subscribe to comment updates.",
+      "followErrorTitle": "Could not update subscription",
+      "followErrorCopy": "Please try again.",
       "errorTitle": "Could not load comments.",
       "errorCopy": "Please try again.",
       "empty": "No comments yet. Be the first to start the discussion.",
+      "emptyPage": "No comments on this page.",
+      "goToFirstPage": "Go to first page",
       "anonymous": "Customer",
       "reply": "Reply",
       "report": "Report",
@@ -817,9 +938,34 @@
       "submitting": "Posting…",
       "createErrorTitle": "Could not post comment",
       "createErrorCopy": "Please try again.",
+      "rateLimitedTitle": "Too many comments",
+      "rateLimitedCopy": "Please wait a moment and try again.",
+      "linkLimitTitle": "Too many links",
+      "linkLimitCopy": "Please remove some links and try again.",
       "confirmDelete": "Delete this comment?",
       "deleteErrorTitle": "Could not delete comment",
       "deleteErrorCopy": "Please try again."
+    },
+    "newsletter": {
+      "title": "Newsletter",
+      "copy": "Get occasional updates from momentstudio. No spam.",
+      "emailLabel": "Email",
+      "emailPlaceholder": "you@example.com",
+      "subscribe": "Subscribe",
+      "successCopy": "Thanks — please check your inbox for updates.",
+      "alreadyCopy": "You’re already subscribed.",
+      "errorTitle": "Could not subscribe",
+      "errorCopy": "Please try again."
+    },
+    "admin": {
+      "edit": "Edit",
+      "quickEdit": "Quick edit",
+      "quickEditClose": "Close quick edit",
+      "loadErrorCopy": "Could not load admin post details.",
+      "savedTitle": "Saved",
+      "savedCopy": "Changes applied.",
+      "saveErrorTitle": "Could not save",
+      "saveErrorCopy": "Please try again."
     }
   },
   "home": {
@@ -868,8 +1014,22 @@
   },
   "shop": {
     "title": "Shop",
+    "quickView": "Quick view",
+    "paginationPages": "Pages",
+    "prev": "Prev",
+    "next": "Next",
+    "loadMore": "Load more",
+    "loadingMore": "Loading…",
+    "loadedCount": "Showing {{shown}} of {{total}}",
+    "suggestedCategories": "Popular categories",
     "filters": "Filters",
     "reset": "Reset",
+    "activeFilters": "Active filters",
+    "clearAll": "Clear all",
+    "removeFilter": "Remove filter: {{filter}}",
+    "resultsMeta": "{{total}} results · {{from}}–{{to}}",
+    "priceChip": "Price {{min}}–{{max}} RON",
+    "searchChip": "Search: {{q}}",
     "searchPlaceholder": "Search products",
     "search": "Search",
     "categories": "Categories",
@@ -886,6 +1046,7 @@
     "priceHint": "Adjust sliders or inputs to refine results.",
     "tags": "Tags",
     "sort": "Sort",
+    "sortRecommended": "Recommended",
     "sortNew": "Newest",
     "sortPriceAsc": "Price: Low to High",
     "sortPriceDesc": "Price: High to Low",
@@ -1084,6 +1245,8 @@
     "paymentMethodUnavailable": "This payment method is not available for your current cart.",
     "paymentPayPalHint": "Pay with PayPal (you’ll be redirected).",
     "paymentCashHint": "Pay in cash upon delivery (RON).",
+    "acceptedCards": "Accepted",
+    "acceptedCardsAlt": "Accepted cards: Netopia, Visa, Mastercard",
     "paymentHelpLink": "Contact us",
     "paypalReturnTitle": "PayPal",
     "paypalCapturing": "Confirming your PayPal payment…",
@@ -1230,6 +1393,10 @@
     "captchaUnavailable": "CAPTCHA unavailable.",
     "captchaFailedTryAgain": "CAPTCHA failed. Please try again.",
     "captchaFailedLoad": "CAPTCHA failed to load.",
+    "acceptTermsPrefix": "I have read and accept the",
+    "acceptTermsLink": "Terms & Conditions",
+    "acceptPrivacyPrefix": "I have read and accept the",
+    "acceptPrivacyLink": "Privacy Policy",
     "currentPasswordRequired": "Current password is required to change your username.",
     "twoFactorRequired": "Two-factor verification required.",
     "twoFactorTitle": "Two-factor verification",
@@ -1274,6 +1441,104 @@
     "save": "Save"
   },
   "adminUi": {
+    "common": {
+      "edit": "Edit",
+      "duplicate": "Duplicate",
+      "loading": "Loading…",
+      "save": "Save",
+      "cancel": "Cancel",
+      "saving": "Saving…",
+      "undo": "Undo",
+      "close": "Close"
+    },
+    "storefront": {
+      "categories": {
+        "dragHint": "Drag to reorder categories. Click Edit to rename (RO/EN).",
+        "addRoot": "Add category",
+        "addSub": "Add subcategory",
+        "hide": "Hide",
+        "show": "Show",
+        "hidden": "Hidden",
+        "nameRo": "Name (RO)",
+        "nameEn": "Name (EN)",
+        "images": "Images",
+        "thumbnail": "Thumbnail",
+        "banner": "Banner",
+        "currentBanner": "Current banner is set.",
+        "loadError": "Could not load category translations.",
+        "namesRequired": "Please provide both RO and EN names.",
+        "createSuccess": "Category created.",
+        "createError": "Could not create category.",
+        "visibilitySuccess": "Category visibility updated.",
+        "visibilityError": "Could not update category visibility.",
+        "imageUploadSuccess": "Category image updated.",
+        "imageUploadError": "Could not upload category image.",
+        "mergeTitle": "Merge category",
+        "mergeInto": "Merge into",
+        "mergeSelectPlaceholder": "Select a category…",
+        "mergeSelectTarget": "Select a category to merge into.",
+        "mergePreview": "Preview",
+        "mergeAction": "Merge",
+        "mergePreviewInfo": "Moves {{products}} products; {{children}} subcategories.",
+        "mergePreviewError": "Could not preview merge.",
+        "mergePreviewRequired": "Preview the merge before continuing.",
+        "mergeReasonSame": "Select a different target category.",
+        "mergeReasonParent": "Categories must share the same parent.",
+        "mergeReasonChildren": "This category has subcategories. Merge/remove them first.",
+        "mergeNotAllowed": "This merge is not allowed.",
+        "confirmMerge": "Merge \"{{source}}\" into \"{{target}}\"? This will move {{count}} products and delete \"{{source}}\".",
+        "mergeSuccess": "Category merged.",
+        "mergeError": "Could not merge category.",
+        "deleteTitle": "Delete category",
+        "deletePreview": "Check",
+        "deleteAction": "Delete",
+        "deletePreviewInfo": "Products: {{products}} · Subcategories: {{children}}",
+        "deleteNotAllowed": "Cannot delete: Products: {{products}} · Subcategories: {{children}}",
+        "deletePreviewError": "Could not check whether the category can be deleted.",
+        "deletePreviewRequired": "Check delete conditions first.",
+        "confirmDelete": "Delete \"{{name}}\"? This cannot be undone.",
+        "deleteSuccess": "Category deleted.",
+        "deleteError": "Could not delete category.",
+        "saveSuccess": "Category updated.",
+        "saveError": "Could not save category.",
+        "reorderSuccess": "Category order updated.",
+        "reorderError": "Could not reorder categories."
+      },
+      "products": {
+        "bulkSelect": "Bulk select",
+        "bulkDone": "Done",
+        "bulkApply": "Apply",
+        "bulkSelectPage": "Select page",
+        "bulkClear": "Clear",
+        "pinToTop": "Pin to top",
+        "bulkStatus": "Status",
+        "bulkStatusPlaceholder": "No status change",
+        "bulkCategory": "Category",
+        "bulkCategoryPlaceholder": "No category change",
+        "bulkFeatured": "Featured",
+        "bulkFeaturedPlaceholder": "No featured change",
+        "bulkFeaturedOn": "Featured",
+        "bulkFeaturedOff": "Not featured",
+        "bulkNoSelection": "Select at least one product.",
+        "bulkNoChanges": "Choose at least one action (status/category/featured).",
+        "reorderHint": "Drag product cards to reorder this category.",
+        "reorderSuccess": "Product order updated.",
+        "reorderError": "Could not reorder products.",
+        "images": {
+          "manageTitle": "Manage images",
+          "manageCta": "Manage images",
+          "reorderHint": "Drag images to reorder.",
+          "reorderSuccess": "Image order updated.",
+          "reorderError": "Could not reorder images.",
+          "empty": "No images yet.",
+          "imageLabel": "Image {{index}}",
+          "metaHint": "Alt text and captions are bilingual (RO/EN).",
+        "metaLoadError": "Could not load image text."
+        }
+      },
+      "undoApplied": "Undone.",
+      "undoFailed": "Could not undo changes."
+    },
     "errors": {
       "title": "Something went wrong",
       "requestId": "Request ID",
@@ -1294,6 +1559,19 @@
       "support": "Support",
       "ops": "Ops",
       "content": "Content"
+    },
+    "uiMode": {
+      "title": "Admin mode",
+      "simple": "Simple",
+      "advanced": "Advanced",
+      "simpleHint": "Hide advanced tools and settings.",
+      "advancedHint": "Show all tools and settings."
+    },
+    "uiPreset": {
+      "title": "Preset",
+      "ownerBasic": "Owner (basic)",
+      "custom": "Custom",
+      "hint": "Owner (basic) hides inventory, ops, users, and other technical areas."
     },
     "security": {
       "mfaRequired": "Two-factor authentication or a passkey is required for admin access."
@@ -1505,12 +1783,15 @@
     },
       "actions": {
         "add": "Add",
+        "create": "Create",
         "apply": "Apply",
         "reset": "Reset",
         "delete": "Delete",
         "remove": "Remove",
         "save": "Save",
+        "update": "Update",
         "cancel": "Cancel",
+        "upload": "Upload",
         "retry": "Retry",
         "restore": "Restore",
         "undo": "Undo",
@@ -1525,12 +1806,18 @@
       "use": "Use",
       "prev": "Prev",
       "next": "Next",
+      "back": "Back",
+      "done": "Done",
+      "exit": "Exit",
       "open": "Open",
       "up": "Up",
       "down": "Down",
       "preview": "Preview",
       "hide": "Hide",
       "bulkActions": "Bulk actions"
+    },
+    "help": {
+      "title": "What is this?"
     },
     "recent": {
       "title": "Recently viewed",
@@ -2052,21 +2339,86 @@
           "focalSaved": "Focal point updated.",
           "focalErrorsSave": "Could not update focal point.",
           "focalErrorsFormat": "Enter focal point as \"x, y\" with values between 0 and 100.",
+          "focalTitle": "Focal point",
+          "focalPreviewHint": "Click on the image to preview and set the focal point before saving.",
+          "imageEdit": "Edit",
+          "whereUsed": "Used",
+          "usageTitle": "Where used",
+          "usageHint": "Click a key to filter the library to that scope.",
+          "usageLoading": "Loading usage…",
+          "usageEmpty": "No usage found.",
+          "usageStoredIn": "Stored in: {{key}}",
+          "editorTitle": "Edit image",
+          "editorHint": "Creates an edited copy. The original asset stays unchanged.",
+          "editorCreate": "Create edited copy",
+          "editorPreview": "Preview",
+          "editorRotationNote": "Rotation is applied when creating the copy.",
+          "rotateLabel": "Rotate",
+          "rotateNone": "No rotation",
+          "rotate90": "90° clockwise",
+          "rotate180": "180°",
+          "rotate270": "270° clockwise",
+          "cropLabel": "Crop",
+          "cropNone": "No crop",
+          "cropSquare": "Square (1:1)",
+          "cropHero": "Hero (16:7)",
+          "cropCard": "Card (4:3)",
+          "cropMobile": "Mobile (9:16)",
+          "resizeMaxWidth": "Max width (px)",
+          "resizeMaxHeight": "Max height (px)",
+          "editorErrorsNoop": "Choose at least one edit (rotate, crop, or resize).",
           "upload": "Upload image",
           "uploadHint": "Uploads are attached to {{key}} for easy organization.",
           "loading": "Loading assets…",
           "empty": "No images found.",
           "pagination": "Page {{page}} of {{total}}",
+          "editedBadge": "Edited",
+          "versionsTitle": "Edited versions ({{count}})",
+          "revertToOriginal": "Original",
+          "confirmDelete": "Delete this asset? This cannot be undone.",
+          "confirmDeleteWithVersions": "Delete this asset and its {{count}} edited versions? This cannot be undone.",
           "success": {
             "uploaded": "Uploaded.",
             "copied": "Copied to clipboard.",
-            "selected": "Selected."
+            "selected": "Selected.",
+            "edited": "Edited copy created.",
+            "deleted": "Deleted."
           },
           "errors": {
             "load": "Could not load assets.",
             "upload": "Could not upload image.",
-            "copy": "Could not copy to clipboard."
+            "copy": "Could not copy to clipboard.",
+            "usage": "Could not load usage references.",
+            "edit": "Could not create edited copy.",
+            "delete": "Could not delete asset.",
+            "deleteHasVersions": "Delete edited versions first.",
+            "deleteInUse": "Cannot delete: asset is used."
           }
+        }
+      },
+      "navigation": {
+        "title": "Site navigation",
+        "hint": "Manage storefront header/footer links. Each link needs a URL plus labels in both EN and RO.",
+        "headerLinks": "Header links",
+        "footerHandcraftedLinks": "Footer — Handcrafted Art",
+        "footerLegalLinks": "Footer — Legal",
+        "dragHint": "Drag to reorder links. Use ↑/↓ for precise moves.",
+        "empty": "No links.",
+        "fields": {
+          "labelEn": "Label (EN)",
+          "labelRo": "Label (RO)",
+          "url": "URL"
+        },
+        "resetDefaults": "Reset to defaults",
+        "confirms": {
+          "resetDefaults": "Reset navigation to defaults? This will overwrite your current edits."
+        },
+        "success": {
+          "save": "Navigation saved."
+        },
+        "errors": {
+          "save": "Could not save navigation.",
+          "invalid": "Each link must have URL + Label (EN) + Label (RO), or be left completely blank."
         }
       },
       "social": {
@@ -2090,6 +2442,28 @@
           "urlRequired": "URL is required.",
           "noThumbnail": "No thumbnail found.",
           "fetchFailed": "Could not fetch thumbnail."
+        }
+      },
+      "company": {
+        "title": "Company info",
+        "hint": "Displayed in the storefront footer and used for compliance. Fill in all fields before going live.",
+        "fields": {
+          "name": "Company name",
+          "registrationNumber": "Registration number (RC)",
+          "cui": "CUI / VAT",
+          "address": "Address",
+          "phone": "Phone",
+          "email": "Email"
+        },
+        "missing": {
+          "title": "Missing required fields"
+        },
+        "success": {
+          "save": "Saved."
+        },
+        "errors": {
+          "save": "Could not save.",
+          "required": "Please fill in all required fields."
         }
       },
       "checkout": {
@@ -2150,6 +2524,11 @@
         "success": { "save": "SEO saved." },
         "errors": { "save": "Could not save SEO." }
       },
+      "globalSections": {
+        "announcement": "Announcement bar",
+        "headerBanners": "Header banners",
+        "footerPromo": "Footer promo"
+      },
       "pages": {
         "title": "Static pages",
         "aboutLabel": "Our story (About)",
@@ -2164,9 +2543,19 @@
           "title": "Page builder blocks",
           "hint": "Optional: build richer About/Contact pages with blocks. If blocks are present, the storefront renders them instead of the Markdown body.",
           "newPageTitle": "New page title",
+          "template": "Template",
+          "templates": {
+            "blank": "Blank",
+            "about": "About",
+            "faq": "FAQ",
+            "shipping": "Shipping",
+            "returns": "Returns"
+          },
           "status": "Status",
           "createPage": "Create page",
           "page": "Page",
+          "globalSections": "Global sections",
+          "pagesGroup": "Pages",
           "publishAtOptional": "Publish at (optional)",
           "publishAtHint": "If this is in the future and status is published, the page will go live at that time.",
           "unpublishAtOptional": "Unpublish at (optional)",
@@ -2174,7 +2563,8 @@
           "requiresLogin": "Require login",
           "requiresLoginHint": "When enabled, only signed-in users can view this page (it will not appear in the sitemap).",
           "changeUrlPrompt": "New URL (slug) for this page",
-          "changeUrlConfirm": "Change URL from /pages/{{old}} to /pages/{{next}}? Existing links will redirect.",
+          "changeUrlConfirm": "Change URL from /pages/{{old}} to /pages/{{next}}?",
+          "redirectConfirm": "Create redirect from /pages/{{old}} to /pages/{{next}}? (Recommended)",
           "addBlock": "Add block",
           "translation": {
             "title": "Translation workflow",
@@ -2183,12 +2573,27 @@
             "success": "Translation status updated.",
             "errors": { "save": "Could not update translation status." }
           },
-          "success": { "save": "Blocks saved.", "rename": "Page URL updated (redirect created)." },
-          "errors": { "load": "Could not load page blocks.", "save": "Could not save blocks.", "rename": "Could not change page URL." }
+          "styles": {
+            "spacing": { "label": "Spacing", "none": "None", "sm": "Small", "md": "Medium", "lg": "Large" },
+            "background": { "label": "Background", "none": "None", "muted": "Muted", "accent": "Accent" },
+            "align": { "label": "Alignment", "left": "Left", "center": "Center" },
+            "maxWidth": { "label": "Max width", "full": "Full", "narrow": "Narrow", "prose": "Prose", "wide": "Wide" }
+          },
+          "success": { "save": "Blocks saved.", "rename": "Page URL updated." },
+          "errors": {
+            "load": "Could not load page blocks.",
+            "save": "Could not save blocks.",
+            "rename": "Could not change page URL.",
+            "blockTypeNotAllowed": "This block type isn't allowed in this section."
+          }
         },
         "redirects": {
           "title": "Redirects",
-          "hint": "Created automatically when changing a page URL. Stale redirects point to missing content.",
+          "hint": "Redirects preserve old links after changing a page URL. Stale redirects point to missing content.",
+          "createTitle": "Create redirect",
+          "createFrom": "From",
+          "createTo": "To",
+          "createHint": "Tip: You can paste URLs like /pages/old and /pages/new.",
           "search": "Search redirects",
           "export": "Export CSV",
           "import": "Import CSV",
@@ -2199,9 +2604,10 @@
           "loop": "Redirect loop detected.",
           "tooDeep": "Redirect chain too deep.",
           "deleteConfirm": "Delete this redirect?",
-          "success": { "deleted": "Redirect deleted.", "export": "Redirects exported.", "import": "Redirects imported." },
+          "success": { "created": "Redirect created.", "deleted": "Redirect deleted.", "export": "Redirects exported.", "import": "Redirects imported." },
           "errors": {
             "load": "Could not load redirects.",
+            "create": "Could not create redirect.",
             "delete": "Could not delete redirect.",
             "export": "Could not export redirects.",
             "import": "Could not import redirects."
@@ -2224,6 +2630,7 @@
         "subtitle": "Subtitle",
         "ctaLabel": "CTA label",
         "ctaUrl": "CTA URL",
+        "ctaNewTab": "Open in new tab",
         "imageUrl": "Hero image URL",
         "success": {
           "saved": "Hero saved.",
@@ -2238,31 +2645,48 @@
         "title": "Homepage sections order",
         "hint": "Drag to reorder sections and toggle visibility.",
         "addBlock": "Add custom block",
-        "blocks": {
-          "hero": "Hero",
-          "featured_products": "Featured products",
-          "sale_products": "On sale",
-          "new_arrivals": "New arrivals",
-          "featured_collections": "Featured collections",
-          "story": "Our story",
-          "recently_viewed": "Recently viewed",
-          "why": "Why",
-          "text": "Text",
-          "image": "Image",
-          "gallery": "Gallery",
-          "banner": "Banner",
-          "carousel": "Carousel"
-        },
+	        "blocks": {
+	          "hero": "Hero",
+	          "featured_products": "Featured products",
+	          "sale_products": "On sale",
+	          "new_arrivals": "New arrivals",
+	          "featured_collections": "Featured collections",
+	          "story": "Our story",
+	          "recently_viewed": "Recently viewed",
+	          "why": "Why",
+	          "text": "Text",
+	          "columns": "Columns",
+	          "cta": "Call to action",
+	          "faq": "FAQ",
+	          "testimonials": "Testimonials",
+            "product_grid": "Product grid",
+            "form": "Form",
+	          "image": "Image",
+	          "gallery": "Gallery",
+	          "banner": "Banner",
+	          "carousel": "Carousel"
+	        },
         "enabled": "Enabled",
         "drag": "drag",
-        "fields": {
-          "title": "Title",
-          "body": "Body (Markdown)",
-          "preview": "Preview",
-          "imageUrl": "Image URL",
-          "linkUrl": "Link URL (optional)",
-          "alt": "Alt text",
-          "caption": "Caption (optional)",
+	        "fields": {
+	          "title": "Title",
+	          "body": "Body (Markdown)",
+	          "columnsBreakpoint": "Columns from",
+	          "addColumn": "Add column",
+	          "column": "Column",
+	          "columnTitle": "Column title",
+	          "columnBody": "Column body (Markdown)",
+	          "question": "Question",
+	          "answer": "Answer (Markdown)",
+	          "testimonial": "Testimonial",
+	          "quote": "Quote (Markdown)",
+	          "author": "Author",
+	          "role": "Role (optional)",
+	          "preview": "Preview",
+	          "imageUrl": "Image URL",
+	          "linkUrl": "Link URL (optional)",
+	          "alt": "Alt text",
+	          "caption": "Caption (optional)",
           "focalX": "Focal X (%)",
           "focalY": "Focal Y (%)",
           "gallery": "Gallery images",
@@ -2277,7 +2701,18 @@
           "interval": "Interval (ms)",
           "arrows": "Arrows",
           "dots": "Dots",
-          "pauseOnHover": "Pause on hover"
+          "pauseOnHover": "Pause on hover",
+          "productGridSource": "Source",
+          "productGridCategorySlug": "Category slug",
+          "productGridCollectionSlug": "Collection slug",
+          "productGridProductSlugs": "Product slugs",
+          "productGridProductSlugsHint": "One slug per line (or comma-separated).",
+          "productGridProductSearch": "Search products",
+          "productGridProductSearchPlaceholder": "Search by name, SKU, or slug…",
+          "productGridProductSearchEmpty": "No products found.",
+          "productGridLimit": "Limit",
+          "formType": "Form type",
+          "formTopic": "Contact topic"
         },
         "variants": {
           "split": "Split",
@@ -2292,11 +2727,21 @@
           "dark": "Dark text",
           "light": "Light text"
         },
+        "productGridSources": {
+          "category": "Category",
+          "collection": "Collection",
+          "products": "Manual products"
+        },
+        "formTypes": {
+          "contact": "Contact",
+          "newsletter": "Newsletter"
+        },
         "success": {
           "save": "Sections order saved."
         },
         "errors": {
-          "save": "Could not save sections order."
+          "save": "Could not save sections order.",
+          "searchProducts": "Could not search products."
         }
       },
       "collections": {
@@ -2344,10 +2789,28 @@
         "summaryOptional": "Summary (optional)",
         "tags": "Tags (comma-separated)",
         "tagsPlaceholder": "e.g. ceramics, studio, news",
+        "seriesOptional": "Series (optional)",
+        "seriesPlaceholder": "e.g. studio-notes",
+        "seriesHint": "Groups posts under /blog/series/…",
         "coverImageUrlOptional": "Cover image URL (optional)",
         "coverImagePlaceholder": "https://…",
         "readingTimeOptional": "Reading time minutes (optional)",
+        "pinned": "Pin to top of blog",
+        "pinOrder": "Pin order (1–3)",
+        "pinOrderHint": "Pinned posts appear first on /blog.",
         "body": "Body"
+      },
+      "cover": {
+        "title": "Cover image",
+        "hint": "If left empty, the first uploaded image will be used as the cover.",
+        "choose": "Choose from uploads",
+        "upload": "Upload cover",
+        "clear": "Clear cover override",
+        "editFocal": "Edit focal point",
+        "focalLabel": "Focal: {{x}}, {{y}}",
+        "previewDesktop": "Desktop preview",
+        "previewMobile": "Mobile preview",
+        "libraryTitle": "Cover images"
       },
       "create": {
         "title": "Create blog post",
@@ -2369,16 +2832,34 @@
         "richEditor": "Rich editor",
         "livePreview": "Live preview",
         "previewEmpty": "Nothing to preview yet.",
-        "toolbarTip": "Tip: Use the toolbar to format markdown and insert images (uploads go to the post's content images)."
+        "toolbarTip": "Tip: Use the toolbar to format markdown and insert images (uploads go to the post's content images). Image layouts use the image title token: \"wide\", \"left\", \"right\", \"gallery\" (e.g. ![alt](url \"wide\")). Embeds: {{product:slug}}, {{category:slug}}, {{collection:slug}}."
       },
       "toolbar": {
         "link": "Link",
         "code": "Code",
+        "product": "Product",
+        "category": "Category",
+        "collection": "Collection",
         "list": "List"
+      },
+      "embeds": {
+        "prompt": {
+          "product": "Enter product slug (e.g. my-product):",
+          "category": "Enter category slug (e.g. ceramics):",
+          "collection": "Enter featured collection slug (e.g. studio-favorites):"
+        }
       },
       "images": {
         "title": "Images",
         "insertMarkdown": "Insert markdown",
+        "layout": {
+          "label": "Image layout",
+          "default": "Default",
+          "wide": "Wide",
+          "left": "Left",
+          "right": "Right",
+          "gallery": "Gallery"
+        },
         "success": {
           "uploaded": "Image uploaded",
           "insertedMarkdown": "Inserted image markdown"
@@ -2386,6 +2867,52 @@
         "errors": {
           "upload": "Could not upload image"
         }
+      },
+      "a11y": {
+        "title": "Accessibility checks",
+        "hint": "Add meaningful alt text for images (used for captions and screen readers) before publishing.",
+        "fixAlt": "Set alt text",
+        "promptAlt": "Alt text for this image:",
+        "fixed": "Alt text updated",
+        "confirmPublishAnyway": "This post has {{count}} image(s) without meaningful alt text. Publish anyway?"
+      },
+      "writing": {
+        "title": "Writing aids",
+        "words": "Words: {{count}}",
+        "estimate": "Estimated reading time: {{minutes}} min",
+        "applyEstimate": "Use estimate",
+        "applied": "Reading time set to {{minutes}} min.",
+        "outline": "Outline",
+        "outlineEmpty": "No headings found yet."
+      },
+      "seo": {
+        "title": "SEO preview",
+        "hint": "Previews the title/description snippets for search and social. Character counts are approximate and may truncate differently per device.",
+        "missingLang": "No content found for this language yet.",
+        "searchPreview": "Search preview",
+        "socialPreview": "Social preview",
+        "checks": "Checks",
+        "length": {
+          "title": "Title: {{count}} chars",
+          "description": "Description: {{count}} chars"
+        },
+        "issues": {
+          "missingTitle": "Missing title.",
+          "missingDescription": "Missing description.",
+          "titleTooLong": "Title is long ({{count}} chars) and may truncate.",
+          "titleTooShort": "Title is short ({{count}} chars).",
+          "descriptionTooLong": "Description is long ({{count}} chars) and may truncate.",
+          "descriptionTooShort": "Description is short ({{count}} chars).",
+          "derivedFromBody": "No summary set; description is derived from body content.",
+          "previewTokenRecommended": "Generate a preview token to validate OG images for drafts."
+        }
+      },
+      "pins": {
+        "badge": "Pinned #{{slot}}",
+        "conflictBadge": "Conflict",
+        "conflictsTitle": "Pinned slot conflicts",
+        "conflictLine": "Slot #{{slot}}: {{posts}}",
+        "saveConflict": "Pinned slot #{{slot}} is already used by \"{{title}}\". Unpin it or choose another slot."
       },
       "preview": {
         "title": "Preview link",
@@ -2464,6 +2991,33 @@
           "hide": "Could not hide comment",
           "delete": "Could not delete comment"
         }
+      },
+      "bulk": {
+        "selectAll": "Select all",
+        "selected": "{{count}} selected",
+        "clear": "Clear selection",
+        "actionLabel": "Bulk action",
+        "actionPublish": "Publish now",
+        "actionUnpublish": "Unpublish (set draft)",
+        "actionSchedule": "Schedule publish/unpublish",
+        "actionTagsAdd": "Add tags",
+        "actionTagsRemove": "Remove tags",
+        "publishAt": "Publish at",
+        "unpublishAt": "Unpublish at (optional)",
+        "tagsLabel": "Tags",
+        "tagsPlaceholder": "e.g. ceramics, studio",
+        "apply": "Apply",
+        "previewEmpty": "Select posts and choose an action to preview changes.",
+        "previewPublish": "Will publish {{count}} posts now.",
+        "previewUnpublish": "Will unpublish {{count}} posts.",
+        "previewSchedule": "Will schedule {{count}} posts: publish {{publish}}, unpublish {{unpublish}}.",
+        "previewTagsAdd": "Will add tags to {{count}} posts: {{tags}}.",
+        "previewTagsRemove": "Will remove tags from {{count}} posts: {{tags}}.",
+        "invalidSchedule": "Unpublish time must be after publish time.",
+        "noChanges": "No changes to apply.",
+        "loadError": "Could not load some posts for bulk update.",
+        "success": "Updated {{count}} posts.",
+        "errors": "{{count}} posts failed to update."
       },
       "success": {
         "created": "Blog post created",
@@ -2583,11 +3137,74 @@
     },
     "products": {
       "title": "Products",
-      "hint": "Search by name, slug, or SKU.",
+      "hint": "Search by name, URL, or product code (SKU).",
       "new": "New",
+      "wizard": {
+        "start": "Guided wizard",
+        "createTitle": "Guided setup: add product",
+        "publishTitle": "Guided setup: publish product",
+        "publish": "Publish wizard",
+        "publishNow": "Publish now",
+        "steps": {
+          "basics": "Basics",
+          "content": "Content",
+          "save": "Save",
+          "images": "Images",
+          "publish": "Publish",
+          "review": "Review"
+        },
+        "desc": {
+          "basics": "Fill out the essentials: name, category, price, and stock.",
+          "content": "Add a description and any translations (RO/EN).",
+          "save": "Save to create the product. This unlocks images and translations.",
+          "images": "Upload at least one photo and add alt text.",
+          "publish": "When you're ready, set Status to Published and save again.",
+          "review": "Check content and translations before publishing."
+        }
+      },
+      "help": {
+        "subtitle": "Quick guide to managing products.",
+        "mediaAlt": "Example view of the products list (tabs, bulk actions, quick actions).",
+        "points": {
+          "search": "Use Search + filters to find products by name, URL, or SKU.",
+          "bulk": "Select rows to unlock bulk actions (sale, category, scheduling, price changes).",
+          "columns": "Use “Table layout” to show/hide columns and switch density.",
+          "wizard": "Use “Guided wizard” when creating or publishing to follow a step-by-step flow."
+        }
+      },
+      "confirmDeleteImage": {
+        "title": "Delete this image?",
+        "subtitle": "This hides the image from the product gallery.",
+        "points": {
+          "storefront": "It will no longer appear on the storefront (gallery and social previews).",
+          "restore": "You can restore it later from “Show deleted”.",
+          "metadata": "Alt text and captions for this image will be removed from the gallery."
+        }
+      },
+      "confirmStatus": {
+        "title": "Confirm status change",
+        "subtitle": "This affects storefront visibility.",
+        "summary": "Status",
+        "points": {
+          "published": "Publishing can make this product visible to customers (if Active is enabled).",
+          "draft": "Draft products are hidden from the storefront.",
+          "archived": "Archived products are hidden from the storefront but remain in admin history.",
+          "audit": "This change will be recorded in the audit trail."
+        }
+      },
       "delete": "Delete",
       "edit": "Edit product",
       "inlineEdit": "Quick edit",
+      "quickStatus": {
+        "publish": "Publish",
+        "unpublish": "Unpublish",
+        "archive": "Archive",
+        "unarchive": "Unarchive",
+        "success": "Updated status for {{name}}.",
+        "error": "Could not update status.",
+        "undoSuccess": "Reverted status change.",
+        "undoError": "Could not undo status change."
+      },
       "create": "Create product",
       "selectCategory": "Select category",
       "search": "Search",
@@ -2618,10 +3235,12 @@
         "deleted": "Deleted"
       },
       "form": {
-        "slug": "Slug",
+        "slug": "Product URL",
         "slugAutoHint": "Auto-generated after save.",
+        "slugHelp": "Auto-generated from the name. Used in the product link.",
         "priceFormatHint": "Use numbers and a dot with up to 2 decimals (example: 123.45).",
-        "sku": "SKU",
+        "sku": "Product code (SKU)",
+        "skuHint": "Optional. Useful for inventory, exports, and internal tracking.",
         "shortDescription": "Short description",
         "shortDescriptionHint": "Shown in product cards and listings (max 280 characters).",
         "imageUrl": "Image URL",
@@ -2640,6 +3259,8 @@
         "bestseller": "Bestseller",
         "highlight": "Highlight",
         "publishAt": "Publish at",
+        "advancedSettings": "Advanced settings",
+        "advancedHint": "Shipping, scheduling, badges, and other optional settings.",
         "noImages": "No images yet.",
         "imageMeta": "Image SEO",
         "imageAltText": "Alt text",
@@ -2711,7 +3332,17 @@
         "applySale": "Apply sale",
         "clearSale": "Clear sale",
         "publish": "Publish",
-        "note": "Applying sale pricing forces products back to Draft. Use “Publish” once you're ready.",
+        "note": "Applying sale pricing forces products back to Draft. Use “Apply status” once you're ready.",
+        "status": {
+          "apply": "Apply status",
+          "title": "Change status for {{count}} products?",
+          "subtitle": "This updates storefront visibility.",
+          "target": "New status",
+          "undoHint": "Tip: after applying, you can Undo for a short time.",
+          "success": "Updated status for {{count}} products.",
+          "undoSuccess": "Reverted status change.",
+          "undoError": "Could not undo status change."
+        },
         "valueRequired": "Enter a sale value.",
         "success": "Updated selected products.",
         "published": "Published selected products.",
@@ -2720,6 +3351,7 @@
           "label": "Category",
           "placeholder": "Select category",
           "apply": "Apply category",
+          "addAndApply": "Add & apply category",
           "valueRequired": "Select a category."
         },
         "schedule": {
@@ -2751,6 +3383,8 @@
         "success": "Product updated.",
         "errors": {
           "save": "Inline update failed.",
+          "priceRequired": "Price is required.",
+          "priceInvalid": "Price must be a number ≥ 0.",
           "stockRequired": "Stock is required.",
           "stockInvalid": "Stock must be a whole number ≥ 0."
         }
@@ -2763,12 +3397,21 @@
         "imageDelete": "Image deleted",
         "imageRestore": "Image restored"
       },
+      "successFeedback": {
+        "saved": "Saved",
+        "visible": "Visible",
+        "hidden": "Hidden",
+        "cta": {
+          "images": "Next: images",
+          "publish": "Next: publish",
+          "view": "View product"
+        }
+      },
       "errors": {
         "loadList": "Could not load products.",
         "load": "Unable to load product",
         "save": "Failed to save product",
         "delete": "Failed to delete product",
-        "required": "Category name is required",
         "image": "Image upload failed",
         "deleteImage": "Failed to delete image",
         "loadDeletedImages": "Could not load deleted images.",
@@ -2941,6 +3584,55 @@
     "categories": {
       "title": "Categories",
       "add": "Add category",
+      "wizard": {
+        "start": "Guided wizard",
+        "title": "Guided setup: add category",
+        "addFirst": "Add the category first to continue.",
+        "steps": {
+          "basics": "Basics",
+          "translations": "Translations"
+        },
+        "desc": {
+          "basics": "Give the category a name and optional parent, then add it.",
+          "translations": "Add RO and EN translations so the category displays in both languages."
+        }
+      },
+      "help": {
+        "subtitle": "Quick guide to managing categories.",
+        "mediaAlt": "Example view of the categories manager (tree, fields, translations).",
+        "points": {
+          "slug": "Slugs are generated from the name and used in URLs.",
+          "parent": "Use Parent category to build a hierarchy (optional).",
+          "translations": "Add RO/EN translations for storefront navigation and filtering."
+        }
+      },
+      "csv": {
+        "title": "Bulk import (CSV)",
+        "hint": "Upload a CSV to create/update categories. Use Dry run first to validate.",
+        "formatHint": "Columns: slug, name, parent_slug, sort_order, is_visible, description, name_ro, description_ro, name_en, description_en.",
+        "downloadTemplate": "Download template",
+        "export": "Export categories CSV",
+        "file": "CSV file",
+        "dryRun": "Dry run (no changes)",
+        "run": "Run import",
+        "result": "Import result",
+        "created": "Created",
+        "updated": "Updated",
+        "errorsTitle": "Errors",
+        "noErrors": "No errors.",
+        "success": "Category import complete.",
+        "exportError": "Could not export categories CSV.",
+        "error": "Category import failed."
+      },
+      "confirmDelete": {
+        "title": "Delete category \"{{name}}\"?",
+        "subtitle": "This permanently removes the category from the storefront.",
+        "points": {
+          "permanent": "This cannot be undone.",
+          "inUse": "If products still use this category, deletion may fail — reassign products first.",
+          "urls": "Links that include this category slug may break."
+        }
+      },
       "slug": "Slug",
       "slugAutoHint": "Slug is auto-generated from the name.",
       "parent": "Parent category",
@@ -2969,6 +3661,7 @@
         "updateLowStockThreshold": "Low-stock threshold updated"
       },
       "errors": {
+        "required": "Category name is required",
         "add": "Failed to add category",
         "delete": "Failed to delete category",
         "reorder": "Failed to reorder categories",
@@ -2980,6 +3673,15 @@
       "title": "Orders",
       "hint": "Search by reference, id, email, or username.",
       "export": "Export CSV",
+      "help": {
+        "subtitle": "Quick guide to managing orders.",
+        "mediaAlt": "Example view of the orders list (search, status filters, export).",
+        "points": {
+          "status": "Use Status to focus on pending/payment/shipped states.",
+          "tags": "Use Tags like vip/gift/test to triage and filter faster.",
+          "export": "Use Export CSV to download orders, or save templates for recurring exports."
+        }
+      },
       "exportModal": {
         "title": "Export orders",
         "hint": "Pick columns or use a saved template.",
@@ -3357,6 +4059,15 @@
     "users": {
       "title": "Users",
       "hint": "Search by email, username, or display name.",
+      "help": {
+        "subtitle": "Quick guide to managing users.",
+        "mediaAlt": "Example view of the users list (search, role filter, PII toggle).",
+        "points": {
+          "search": "Use Search + Role to narrow down customers and admins.",
+          "pii": "Use “Reveal PII” only when needed (it may unlock additional data like email activity).",
+          "roles": "Changing roles and sensitive actions may require password confirmation."
+        }
+      },
       "gdprQueue": "GDPR queue",
       "segments": "Segments",
       "setRole": "Set role",
@@ -3586,14 +4297,41 @@
         "simpleHint": "Simple mode hides SEO and scheduling.",
         "advancedHint": "Advanced mode shows SEO, scheduling, and extra controls."
       },
+      "translation": {
+        "layoutLabel": "Translation layout",
+        "layouts": {
+          "single": "Single",
+          "sideBySide": "Side-by-side"
+        },
+        "copyRoToEn": "Copy RO → EN",
+        "copyEnToRo": "Copy EN → RO"
+      },
       "preview": {
         "deviceLabel": "Preview size",
         "desktop": "Desktop",
         "tablet": "Tablet",
         "mobile": "Mobile",
+        "languageLabel": "Preview language",
+        "themeLabel": "Preview theme",
         "layoutLabel": "Layout",
         "stacked": "Stacked",
         "split": "Split"
+      },
+      "previewLinks": {
+        "title": "Preview",
+        "hint": "Generate a preview link to load the iframe.",
+        "generate": "Generate link",
+        "open": "Open",
+        "copy": "Copy",
+        "expires": "Expires",
+        "success": {
+          "ready": "Preview link ready",
+          "copied": "Copied to clipboard"
+        },
+        "errors": {
+          "generate": "Could not generate preview link",
+          "copy": "Could not copy to clipboard"
+        }
       },
       "blockLibrary": {
         "title": "Block library",
@@ -3604,12 +4342,46 @@
           "blank": "Blank"
         },
         "dropHere": "Drop here to insert",
-        "items": {
-          "text": "Text section (markdown / rich editor).",
-          "image": "Single image with optional link and caption.",
-          "gallery": "Multi-image gallery with captions and focal points.",
-          "banner": "Hero banner with headline, CTA, and background image.",
-          "carousel": "Slider with multiple slides and autoplay settings."
+	        "items": {
+	          "text": "Text section (markdown / rich editor).",
+	          "columns": "2–3 columns layout with responsive stacking.",
+	          "cta": "Call-to-action block with button.",
+	          "faq": "FAQ accordion with questions and answers.",
+	          "testimonials": "Testimonials grid with quotes and authors.",
+            "product_grid": "Shoppable product grid sourced by category, collection, or manual selection.",
+            "form": "Contact or newsletter form with validation and success messaging.",
+	          "image": "Single image with optional link and caption.",
+	          "gallery": "Multi-image gallery with captions and focal points.",
+	          "banner": "Hero banner with headline, CTA, and background image.",
+	          "carousel": "Slider with multiple slides and autoplay settings."
+	        }
+	      },
+      "mediaDrop": {
+        "inserted": "Inserted {{count}} image(s).",
+        "errors": { "noImages": "Drop one or more PNG/JPEG/WEBP/GIF images (max 5MB)." }
+      },
+      "reusableBlocks": {
+        "title": "Reusable blocks",
+        "hint": "Save a section and reuse it on other pages.",
+        "search": "Search",
+        "loading": "Loading reusable blocks...",
+        "empty": "No reusable blocks yet.",
+        "actions": {
+          "save": "Save as reusable",
+          "insert": "Insert"
+        },
+        "prompts": {
+          "name": "Reusable block name",
+          "overwriteConfirm": "Overwrite reusable block “{{title}}”?",
+          "deleteConfirm": "Delete reusable block “{{title}}”?"
+        },
+        "success": {
+          "saved": "Reusable block saved.",
+          "deleted": "Reusable block deleted."
+        },
+        "errors": {
+          "load": "Could not load reusable blocks.",
+          "save": "Could not save reusable block."
         }
       },
       "reorder": {
@@ -3630,7 +4402,27 @@
         "home": "Home",
         "pages": "Pages",
         "blog": "Blog",
+        "scheduling": "Scheduling",
         "settings": "Settings"
+      },
+      "scheduling": {
+        "title": "Scheduling",
+        "hint": "Upcoming publish/unpublish times across pages, blog posts, and global banners.",
+        "window": "Window",
+        "window30": "30 days",
+        "window90": "90 days",
+        "window180": "180 days",
+        "empty": "No scheduled publish/unpublish events in this window.",
+        "publish": "Publish",
+        "unpublish": "Unpublish",
+        "kind": {
+          "page": "Page",
+          "blog": "Blog",
+          "global": "Global"
+        },
+        "errors": {
+          "load": "Could not load scheduling data."
+        }
       },
       "editing": "Editing",
       "titleLabel": "Title",
@@ -3658,6 +4450,42 @@
           "rollback": "Could not rollback"
         }
       },
+      "findReplace": {
+        "title": "Find & replace",
+        "hint": "Search and replace text across CMS content (including page builder blocks). Preview before applying.",
+        "find": "Find",
+        "replace": "Replace with",
+        "caseSensitive": "Case sensitive",
+        "preview": "Preview",
+        "apply": "Apply",
+        "loading": "Searching…",
+        "applying": "Applying…",
+        "empty": "No matches found.",
+        "summary": "{{items}} item(s), {{matches}} replacement(s).",
+        "truncated": "Showing first {{limit}} items.",
+        "result": "Updated {{blocks}} block(s), {{translations}} translation(s) ({{replacements}} replacements).",
+        "applyErrors": "Some items could not be updated:",
+        "scope": {
+          "label": "Scope",
+          "all": "All content",
+          "pages": "Pages",
+          "blog": "Blog posts",
+          "home": "Home",
+          "site": "Site globals"
+        },
+        "confirms": {
+          "apply": "Apply {{matches}} replacements across {{items}} content items? This will create new revisions for each item."
+        },
+        "success": {
+          "apply": "Applied {{replacements}} replacements ({{blocks}} blocks)."
+        },
+        "errors": {
+          "findRequired": "Enter a search term.",
+          "previewFirst": "Run a preview before applying.",
+          "preview": "Could not run find & replace preview.",
+          "apply": "Could not apply find & replace."
+        }
+      },
       "linkCheck": {
         "title": "Link checker",
         "hint": "Checks internal links and media references for the selected content key.",
@@ -3668,6 +4496,30 @@
         "empty": "No issues found.",
         "errors": {
           "load": "Could not run link checker."
+        }
+      },
+      "publishChecklist": {
+        "title": "Publish checklist",
+        "hint": "Review these items before publishing.",
+        "loading": "Running checks…",
+        "publish": "Publish",
+        "publishAnyway": "Publish anyway",
+        "ok": "OK",
+        "translationsMissing": "Missing translations: {{langs}}.",
+        "altMissing": "{{count}} image(s) are missing alt text.",
+        "emptyFound": "{{count}} section(s) look empty.",
+        "linksFound": "{{count}} broken link(s) found.",
+        "emptyAllDisabled": "No sections are enabled.",
+        "imageLabel": "Image {{index}}",
+        "slideLabel": "Slide {{index}}",
+        "sections": {
+          "translations": "Translations",
+          "altText": "Image alt text",
+          "empty": "Empty sections",
+          "links": "Broken links"
+        },
+        "errors": {
+          "linkCheck": "Could not run link checks."
         }
       },
       "errors": {

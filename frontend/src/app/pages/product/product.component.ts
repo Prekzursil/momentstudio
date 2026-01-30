@@ -19,6 +19,9 @@ import { WishlistService } from '../../core/wishlist.service';
 import { AuthService } from '../../core/auth.service';
 import { Router } from '@angular/router';
 import { MarkdownService } from '../../core/markdown.service';
+import { StorefrontAdminModeService } from '../../core/storefront-admin-mode.service';
+import { AdminService } from '../../core/admin.service';
+import { ProductImageManagerModalComponent } from '../../shared/product-image-manager-modal.component';
 
 @Component({
   selector: 'app-product-detail',
@@ -34,7 +37,8 @@ import { MarkdownService } from '../../core/markdown.service';
     LocalizedCurrencyPipe,
     BreadcrumbComponent,
     TranslateModule,
-    ImgFallbackDirective
+    ImgFallbackDirective,
+    ProductImageManagerModalComponent
   ],
   template: `
     <app-container classes="py-10">
@@ -57,7 +61,7 @@ import { MarkdownService } from '../../core/markdown.service';
             <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">{{ 'product.loadErrorCopy' | translate }}</p>
             <div class="mt-6 flex items-center justify-center gap-3">
               <app-button [label]="'product.retry' | translate" variant="ghost" (action)="retryLoad()"></app-button>
-              <app-button [label]="'product.backToShop' | translate" variant="ghost" [routerLink]="['/shop']"></app-button>
+              <app-button [label]="'product.backToShop' | translate" variant="ghost" (action)="backToShop()"></app-button>
             </div>
           </div>
         </ng-container>
@@ -99,6 +103,14 @@ import { MarkdownService } from '../../core/markdown.service';
                     [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
                   />
                 </button>
+              </div>
+              <div *ngIf="showStorefrontEdit()" class="flex justify-end">
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.storefront.products.images.manageCta' | translate"
+                  (action)="openImageManager()"
+                ></app-button>
               </div>
             </div>
 
@@ -182,7 +194,14 @@ import { MarkdownService } from '../../core/markdown.service';
                   (action)="cancelBackInStock()"
                   [disabled]="backInStockLoading"
                 ></app-button>
-                <app-button [label]="'product.backToShop' | translate" variant="ghost" [routerLink]="['/shop']"></app-button>
+                <app-button
+                  *ngIf="showStorefrontEdit()"
+                  [label]="'adminUi.common.duplicate' | translate"
+                  variant="ghost"
+                  (action)="duplicateFromStorefront()"
+                  [disabled]="duplicateSaving"
+                ></app-button>
+                <app-button [label]="'product.backToShop' | translate" variant="ghost" (action)="backToShop()"></app-button>
                 <app-button
                   [label]="wishlisted ? ('wishlist.saved' | translate) : ('wishlist.save' | translate)"
                   variant="ghost"
@@ -211,7 +230,13 @@ import { MarkdownService } from '../../core/markdown.service';
 		      <div *ngIf="upsellProducts.length" class="mt-12 grid gap-4">
 		        <div class="flex items-center justify-between">
 		          <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'product.upsells' | translate }}</h3>
-		          <a routerLink="/shop" class="text-sm font-medium text-indigo-600 dark:text-indigo-300">{{ 'product.backToShop' | translate }}</a>
+		          <button
+                type="button"
+                class="bg-transparent p-0 text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-300"
+                (click)="backToShop()"
+              >
+                {{ 'product.backToShop' | translate }}
+              </button>
 		        </div>
 		        <div class="flex gap-4 overflow-x-auto pb-2">
 	          <app-button
@@ -245,7 +270,13 @@ import { MarkdownService } from '../../core/markdown.service';
 		      <div *ngIf="relatedProducts.length" class="mt-12 grid gap-4">
 		        <div class="flex items-center justify-between">
 		          <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'product.relatedProducts' | translate }}</h3>
-		          <a routerLink="/shop" class="text-sm font-medium text-indigo-600 dark:text-indigo-300">{{ 'product.backToShop' | translate }}</a>
+		          <button
+                type="button"
+                class="bg-transparent p-0 text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-300"
+                (click)="backToShop()"
+              >
+                {{ 'product.backToShop' | translate }}
+              </button>
 		        </div>
 		        <div class="flex gap-4 overflow-x-auto pb-2">
 	          <app-button
@@ -279,7 +310,13 @@ import { MarkdownService } from '../../core/markdown.service';
 		      <div *ngIf="recentlyViewed.length" class="mt-12 grid gap-4">
 		        <div class="flex items-center justify-between">
 		          <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'product.recentlyViewed' | translate }}</h3>
-		          <a routerLink="/shop" class="text-sm font-medium text-indigo-600 dark:text-indigo-300">{{ 'product.backToShop' | translate }}</a>
+		          <button
+                type="button"
+                class="bg-transparent p-0 text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-300"
+                (click)="backToShop()"
+              >
+                {{ 'product.backToShop' | translate }}
+              </button>
 	        </div>
 	        <div class="flex gap-4 overflow-x-auto pb-2">
           <app-button
@@ -337,12 +374,28 @@ import { MarkdownService } from '../../core/markdown.service';
 	        </div>
 	      </div>
 
+        <app-product-image-manager-modal
+          [open]="imageManagerOpen"
+          [slug]="product.slug"
+          [productNameFallback]="product.name"
+          [currentLang]="uiLang"
+          [images]="product.images ?? []"
+          (closed)="imageManagerOpen = false"
+          (imagesChange)="onImagesChange($event)"
+        ></app-product-image-manager-modal>
+
 	      </ng-container>
 	
 	      <ng-template #missing>
 	        <div class="border border-dashed border-slate-200 rounded-2xl p-10 text-center dark:border-slate-800">
 	          <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'product.notFound' | translate }}</p>
-	          <a routerLink="/shop" class="text-indigo-600 dark:text-indigo-300 font-medium">{{ 'product.backToShop' | translate }}</a>
+	          <button
+              type="button"
+              class="bg-transparent p-0 font-medium text-indigo-600 hover:underline dark:text-indigo-300"
+              (click)="backToShop()"
+            >
+              {{ 'product.backToShop' | translate }}
+            </button>
         </div>
       </ng-template>
       </ng-template>
@@ -359,7 +412,9 @@ export class ProductComponent implements OnInit, OnDestroy {
   quantity = 1;
   activeImageIndex = 0;
   previewOpen = false;
+  imageManagerOpen = false;
   backInStockLoading = false;
+  duplicateSaving = false;
   backInStockRequest: BackInStockRequest | null = null;
   upsellProducts: Product[] = [];
   relatedProducts: Product[] = [];
@@ -373,6 +428,7 @@ export class ProductComponent implements OnInit, OnDestroy {
   private canonicalEl?: HTMLLinkElement;
   private document: Document = inject(DOCUMENT);
   private slug: string | null = null;
+  private shopReturnUrl: string | null = null;
   crumbs = [
     { label: 'nav.home', url: '/' },
     { label: 'nav.shop', url: '/shop' }
@@ -390,7 +446,9 @@ export class ProductComponent implements OnInit, OnDestroy {
     private markdown: MarkdownService,
     private wishlist: WishlistService,
     private auth: AuthService,
-    private router: Router
+    private router: Router,
+    private storefrontAdminMode: StorefrontAdminModeService,
+    private admin: AdminService
   ) {}
 
   ngOnDestroy(): void {
@@ -406,6 +464,11 @@ export class ProductComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.wishlist.ensureLoaded();
+    this.shopReturnUrl = this.readShopReturnUrl();
+    this.crumbs = [
+      { label: 'nav.home', url: '/' },
+      { label: 'nav.shop', url: this.shopReturnUrl || '/shop' }
+    ];
     this.routeSub = this.route.paramMap.subscribe((params) => {
       const slug = params.get('slug');
       if (slug === this.slug) {
@@ -414,6 +477,7 @@ export class ProductComponent implements OnInit, OnDestroy {
       this.slug = slug;
       this.activeImageIndex = 0;
       this.previewOpen = false;
+      this.imageManagerOpen = false;
       this.load();
     });
     this.langSub = this.translate.onLangChange.subscribe(() => {
@@ -423,8 +487,73 @@ export class ProductComponent implements OnInit, OnDestroy {
     });
   }
 
+  backToShop(): void {
+    const url = this.shopReturnUrl;
+    if (url) {
+      void this.router.navigateByUrl(url);
+      return;
+    }
+    void this.router.navigate(['/shop']);
+  }
+
+  private readShopReturnUrl(): string | null {
+    if (typeof sessionStorage === 'undefined') return null;
+    try {
+      const pending = sessionStorage.getItem('shop_return_pending');
+      if (pending !== '1') return null;
+      const url = (sessionStorage.getItem('shop_return_url') || '').trim();
+      if (!url.startsWith('/shop')) return null;
+      return url;
+    } catch {
+      return null;
+    }
+  }
+
   retryLoad(): void {
     this.load();
+  }
+
+  showStorefrontEdit(): boolean {
+    if (!this.storefrontAdminMode.enabled()) return false;
+    if (!this.auth.isAdmin()) return false;
+    if (this.auth.isImpersonating()) return false;
+    return Boolean(this.product?.slug);
+  }
+
+  get uiLang(): 'en' | 'ro' {
+    return this.translate.currentLang === 'ro' ? 'ro' : 'en';
+  }
+
+  openImageManager(): void {
+    if (!this.showStorefrontEdit()) return;
+    this.imageManagerOpen = true;
+  }
+
+  onImagesChange(images: any[]): void {
+    if (!this.product) return;
+    this.product.images = Array.isArray(images) ? images : this.product.images;
+    this.activeImageIndex = 0;
+  }
+
+  duplicateFromStorefront(): void {
+    if (!this.showStorefrontEdit()) return;
+    if (this.duplicateSaving) return;
+    const slug = (this.product?.slug || '').trim();
+    if (!slug) return;
+    this.duplicateSaving = true;
+    this.admin.duplicateProduct(slug, { source: 'storefront' }).subscribe({
+      next: (created) => {
+        this.duplicateSaving = false;
+        const newSlug = String((created as any)?.slug || '').trim();
+        this.toast.success(this.translate.instant('adminUi.products.success.duplicate'));
+        if (!newSlug) return;
+        void this.router.navigate(['/admin/products'], { state: { editProductSlug: newSlug } });
+      },
+      error: () => {
+        this.duplicateSaving = false;
+        this.toast.error(this.translate.instant('adminUi.products.errors.duplicate'));
+      }
+    });
   }
 
   private load(): void {
@@ -449,6 +578,11 @@ export class ProductComponent implements OnInit, OnDestroy {
     this.productLoadSub = this.catalog.getProduct(slug).subscribe({
       next: (product) => {
         if (this.slug !== slug) return;
+        if (Array.isArray(product.images)) {
+          product.images = [...product.images].sort(
+            (a: any, b: any) => Number(a?.sort_order ?? 0) - Number(b?.sort_order ?? 0)
+          );
+        }
         this.product = product;
         this.descriptionHtml = product.long_description ? this.markdown.render(product.long_description) : '';
         this.selectedVariantId = product.variants?.[0]?.id ?? null;
@@ -456,7 +590,7 @@ export class ProductComponent implements OnInit, OnDestroy {
         this.loadError = false;
         this.crumbs = [
           { label: 'nav.home', url: '/' },
-          { label: 'nav.shop', url: '/shop' },
+          { label: 'nav.shop', url: this.shopReturnUrl || '/shop' },
           { label: product.name, url: `/products/${product.slug}` }
         ];
         this.updateMeta(product);

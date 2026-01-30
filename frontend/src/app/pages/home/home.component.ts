@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, computed, signal } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { ButtonComponent } from '../../shared/button.component';
 import { CardComponent } from '../../shared/card.component';
@@ -14,7 +15,7 @@ import { ApiService } from '../../core/api.service';
 import { MarkdownService } from '../../core/markdown.service';
 import { BannerBlockComponent } from '../../shared/banner-block.component';
 import { CarouselBlockComponent } from '../../shared/carousel-block.component';
-import { CarouselSettings, Slide } from '../../shared/page-blocks';
+import { CarouselSettings, ColumnsBreakpoint, ColumnsCount, Slide } from '../../shared/page-blocks';
 
 type HomeSectionId =
   | 'featured_products'
@@ -25,7 +26,7 @@ type HomeSectionId =
   | 'recently_viewed'
   | 'why';
 
-type HomeBlockType = HomeSectionId | 'text' | 'image' | 'gallery' | 'banner' | 'carousel';
+type HomeBlockType = HomeSectionId | 'text' | 'columns' | 'cta' | 'faq' | 'testimonials' | 'image' | 'gallery' | 'banner' | 'carousel';
 
 interface HomeBlockBase {
   key: string;
@@ -77,7 +78,62 @@ interface HomeCarouselBlock extends HomeBlockBase {
   settings: CarouselSettings;
 }
 
-type HomeBlock = HomeBlockBase | HomeTextBlock | HomeImageBlock | HomeGalleryBlock | HomeBannerBlock | HomeCarouselBlock;
+interface HomeCtaBlock extends HomeBlockBase {
+  type: 'cta';
+  title?: string | null;
+  body_html: string;
+  cta_label?: string | null;
+  cta_url?: string | null;
+  cta_new_tab?: boolean;
+}
+
+interface HomeFaqItem {
+  question: string;
+  answer_html: string;
+}
+
+interface HomeFaqBlock extends HomeBlockBase {
+  type: 'faq';
+  title?: string | null;
+  items: HomeFaqItem[];
+}
+
+interface HomeTestimonialItem {
+  quote_html: string;
+  author?: string | null;
+  role?: string | null;
+}
+
+interface HomeTestimonialsBlock extends HomeBlockBase {
+  type: 'testimonials';
+  title?: string | null;
+  items: HomeTestimonialItem[];
+}
+
+interface HomeColumnsColumn {
+  title?: string | null;
+  body_html: string;
+}
+
+interface HomeColumnsBlock extends HomeBlockBase {
+  type: 'columns';
+  title?: string | null;
+  columns: HomeColumnsColumn[];
+  columns_count: ColumnsCount;
+  breakpoint: ColumnsBreakpoint;
+}
+
+type HomeBlock =
+  | HomeBlockBase
+  | HomeTextBlock
+  | HomeImageBlock
+  | HomeGalleryBlock
+  | HomeBannerBlock
+  | HomeCarouselBlock
+  | HomeColumnsBlock
+  | HomeCtaBlock
+  | HomeFaqBlock
+  | HomeTestimonialsBlock;
 
 interface ContentImage {
   url: string;
@@ -89,6 +145,11 @@ interface ContentBlockRead {
   body_markdown: string;
   meta?: Record<string, unknown> | null;
   images: ContentImage[];
+}
+
+interface HomePreviewResponse {
+  sections: ContentBlockRead;
+  story?: ContentBlockRead | null;
 }
 
 const DEFAULT_BLOCKS: HomeBlock[] = [
@@ -353,6 +414,85 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
             </ng-container>
           </ng-container>
 
+          <ng-container *ngSwitchCase="'columns'">
+            <ng-container *ngIf="asColumnsBlock(block) as cols">
+              <div class="grid gap-4">
+                <h2 *ngIf="cols.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ cols.title }}</h2>
+                <app-card>
+                  <div [ngClass]="columnsGridClasses(cols)">
+                    <div *ngFor="let col of cols.columns" class="grid gap-2">
+                      <h3 *ngIf="col.title" class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ col.title }}</h3>
+                      <div class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="col.body_html"></div>
+                    </div>
+                  </div>
+                </app-card>
+              </div>
+            </ng-container>
+          </ng-container>
+
+          <ng-container *ngSwitchCase="'cta'">
+            <ng-container *ngIf="asCtaBlock(block) as cta">
+              <div class="grid gap-4">
+                <h2 *ngIf="cta.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ cta.title }}</h2>
+                <app-card>
+                  <div class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="cta.body_html"></div>
+                  <div class="mt-4 flex" *ngIf="cta.cta_label && cta.cta_url">
+                    <ng-container *ngIf="isExternalHttpUrl(cta.cta_url); else internalCta">
+                      <app-button
+                        [label]="cta.cta_label"
+                        [href]="cta.cta_url"
+                        [target]="cta.cta_new_tab ? '_blank' : null"
+                        [rel]="cta.cta_new_tab ? 'noopener noreferrer' : null"
+                      ></app-button>
+                    </ng-container>
+                    <ng-template #internalCta>
+                      <app-button [label]="cta.cta_label" [routerLink]="cta.cta_url"></app-button>
+                    </ng-template>
+                  </div>
+                </app-card>
+              </div>
+            </ng-container>
+          </ng-container>
+
+          <ng-container *ngSwitchCase="'faq'">
+            <ng-container *ngIf="asFaqBlock(block) as faq">
+              <div class="grid gap-4">
+                <h2 *ngIf="faq.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ faq.title }}</h2>
+                <app-card>
+                  <div class="grid gap-2">
+                    <details
+                      *ngFor="let item of faq.items"
+                      class="rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900"
+                    >
+                      <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+                        {{ item.question }}
+                      </summary>
+                      <div class="mt-2 markdown text-base text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="item.answer_html"></div>
+                    </details>
+                  </div>
+                </app-card>
+              </div>
+            </ng-container>
+          </ng-container>
+
+          <ng-container *ngSwitchCase="'testimonials'">
+            <ng-container *ngIf="asTestimonialsBlock(block) as ts">
+              <div class="grid gap-4">
+                <h2 *ngIf="ts.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ ts.title }}</h2>
+                <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <app-card *ngFor="let t of ts.items">
+                    <div class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="t.quote_html"></div>
+                    <p *ngIf="t.author || t.role" class="mt-3 text-sm font-semibold text-slate-900 dark:text-slate-50">
+                      <span *ngIf="t.author">{{ t.author }}</span>
+                      <span *ngIf="t.author && t.role"> · </span>
+                      <span *ngIf="t.role" class="font-normal text-slate-500 dark:text-slate-400">{{ t.role }}</span>
+                    </p>
+                  </app-card>
+                </div>
+              </div>
+            </ng-container>
+          </ng-container>
+
           <ng-container *ngSwitchCase="'recently_viewed'">
             <div *ngIf="recentlyViewed.length" class="grid gap-4">
               <div class="flex items-center justify-between">
@@ -423,6 +563,8 @@ export class HomeComponent implements OnInit, OnDestroy {
   });
 
   private langSub?: Subscription;
+  private routeSub?: Subscription;
+  private previewToken = '';
 
   constructor(
     private catalog: CatalogService,
@@ -431,17 +573,22 @@ export class HomeComponent implements OnInit, OnDestroy {
     private meta: Meta,
     private translate: TranslateService,
     private auth: AuthService,
+    private route: ActivatedRoute,
     private api: ApiService,
     private markdown: MarkdownService
   ) {}
 
   ngOnInit(): void {
-    this.load();
+    this.routeSub = this.route.queryParams.subscribe((query) => {
+      this.previewToken = typeof query['preview'] === 'string' ? query['preview'] : '';
+      this.load();
+    });
     this.langSub = this.translate.onLangChange.subscribe(() => this.load());
   }
 
   ngOnDestroy(): void {
     this.langSub?.unsubscribe();
+    this.routeSub?.unsubscribe();
   }
 
   focalPosition(focalX?: number, focalY?: number): string {
@@ -453,13 +600,37 @@ export class HomeComponent implements OnInit, OnDestroy {
   private load(): void {
     this.setMetaTags();
     this.recentlyViewed = this.recentlyViewedService.list().slice(0, 6);
+    this.storyBlock.set(null);
+    this.storyHtml.set('');
+    this.storyLoading.set(true);
     this.loadLayout();
   }
 
   private loadLayout(): void {
+    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
+    if (this.previewToken) {
+      this.api.get<HomePreviewResponse>('/content/home/preview', { token: this.previewToken, lang }).subscribe({
+        next: (resp) => {
+          this.blocks.set(this.parseBlocks(resp?.sections?.meta, lang));
+          const story = resp?.story ?? null;
+          this.storyBlock.set(story);
+          this.storyHtml.set(story ? this.markdown.render(story.body_markdown || '') : '');
+          this.storyLoading.set(false);
+          this.loadSectionData({ skipStory: true });
+        },
+        error: () => {
+          this.blocks.set(DEFAULT_BLOCKS);
+          this.storyBlock.set(null);
+          this.storyHtml.set('');
+          this.storyLoading.set(false);
+          this.loadSectionData({ skipStory: true });
+        }
+      });
+      return;
+    }
+
     this.api.get<ContentBlockRead>('/content/home.sections').subscribe({
       next: (block) => {
-        const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
         this.blocks.set(this.parseBlocks(block.meta, lang));
         this.loadSectionData();
       },
@@ -533,6 +704,12 @@ export class HomeComponent implements OnInit, OnDestroy {
 
     const normalizeTextStyle = (value: unknown): 'light' | 'dark' => (readString(value) === 'light' ? 'light' : 'dark');
 
+    const normalizeColumnsBreakpoint = (value: unknown): ColumnsBreakpoint => {
+      const raw = readString(value);
+      if (raw === 'sm' || raw === 'md' || raw === 'lg') return raw;
+      return 'md';
+    };
+
     const parseSlide = (raw: unknown): Slide => {
       const rec = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
       return {
@@ -574,10 +751,14 @@ export class HomeComponent implements OnInit, OnDestroy {
         const type: HomeBlockType | null =
           normalizedBuiltIn ||
           (typeRaw === 'text' ||
+          typeRaw === 'cta' ||
+          typeRaw === 'faq' ||
+          typeRaw === 'testimonials' ||
           typeRaw === 'image' ||
           typeRaw === 'gallery' ||
           typeRaw === 'banner' ||
-          typeRaw === 'carousel'
+          typeRaw === 'carousel' ||
+          typeRaw === 'columns'
             ? (typeRaw as HomeBlockType)
             : null);
         if (!type) continue;
@@ -651,6 +832,91 @@ export class HomeComponent implements OnInit, OnDestroy {
             slides,
             settings: parseCarouselSettings(rec['settings'])
           });
+          continue;
+        }
+
+        if (type === 'columns') {
+          const columnsRaw = rec['columns'];
+          if (!Array.isArray(columnsRaw)) continue;
+          const columns: HomeColumnsColumn[] = [];
+          let hasAny = false;
+          for (const colRaw of columnsRaw) {
+            if (!colRaw || typeof colRaw !== 'object') continue;
+            const colRec = colRaw as Record<string, unknown>;
+            const colTitle = readLocalized(colRec['title']);
+            const body = readLocalized(colRec['body_markdown']) || '';
+            if (colTitle || body.trim()) hasAny = true;
+            columns.push({ title: colTitle, body_html: this.markdown.render(body) });
+            if (columns.length >= 3) break;
+          }
+          if (columns.length < 2 || !hasAny) continue;
+          configured.push({
+            key,
+            type,
+            enabled,
+            title: readLocalized(rec['title']),
+            columns,
+            columns_count: columns.length === 3 ? 3 : 2,
+            breakpoint: normalizeColumnsBreakpoint(rec['columns_breakpoint'] ?? rec['breakpoint'] ?? rec['stack_at'])
+          });
+          continue;
+        }
+
+        if (type === 'cta') {
+          const title = readLocalized(rec['title']);
+          const body = readLocalized(rec['body_markdown']) || '';
+          const ctaLabel = readLocalized(rec['cta_label']);
+          const ctaUrl = readString(rec['cta_url']);
+          const ctaNewTab = readBoolean(rec['cta_new_tab'], false);
+          const hasAny = Boolean(title || body.trim() || ctaLabel || ctaUrl);
+          if (!hasAny) continue;
+          configured.push({
+            key,
+            type,
+            enabled,
+            title,
+            body_html: this.markdown.render(body),
+            cta_label: ctaLabel,
+            cta_url: ctaUrl,
+            cta_new_tab: ctaNewTab
+          });
+          continue;
+        }
+
+        if (type === 'faq') {
+          const itemsRaw = rec['items'];
+          if (!Array.isArray(itemsRaw)) continue;
+          const items: HomeFaqItem[] = [];
+          for (const itemRaw of itemsRaw) {
+            if (!itemRaw || typeof itemRaw !== 'object') continue;
+            const itemRec = itemRaw as Record<string, unknown>;
+            const question = readLocalized(itemRec['question']);
+            if (!question) continue;
+            const answerMd = readLocalized(itemRec['answer_markdown']) || '';
+            items.push({ question, answer_html: this.markdown.render(answerMd) });
+            if (items.length >= 20) break;
+          }
+          if (!items.length) continue;
+          configured.push({ key, type, enabled, title: readLocalized(rec['title']), items });
+          continue;
+        }
+
+        if (type === 'testimonials') {
+          const itemsRaw = rec['items'];
+          if (!Array.isArray(itemsRaw)) continue;
+          const items: HomeTestimonialItem[] = [];
+          for (const itemRaw of itemsRaw) {
+            if (!itemRaw || typeof itemRaw !== 'object') continue;
+            const itemRec = itemRaw as Record<string, unknown>;
+            const quoteMd = readLocalized(itemRec['quote_markdown']) || '';
+            if (!quoteMd.trim()) continue;
+            const author = readLocalized(itemRec['author']);
+            const role = readLocalized(itemRec['role']);
+            items.push({ quote_html: this.markdown.render(quoteMd), author, role });
+            if (items.length >= 12) break;
+          }
+          if (!items.length) continue;
+          configured.push({ key, type, enabled, title: readLocalized(rec['title']), items });
           continue;
         }
 
@@ -738,7 +1004,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     return null;
   }
 
-  private loadSectionData(): void {
+  private loadSectionData(opts?: { skipStory?: boolean }): void {
     const ids = new Set(
       this.enabledBlocks()
         .map((b) => (this.isHomeSectionId(b.type) ? (b.type as HomeSectionId) : null))
@@ -748,7 +1014,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     if (ids.has('sale_products')) this.loadSaleProducts();
     if (ids.has('new_arrivals')) this.loadNewArrivals();
     if (ids.has('featured_collections')) this.loadCollections();
-    if (ids.has('story')) this.loadStory();
+    if (ids.has('story') && !opts?.skipStory) this.loadStory();
   }
 
   asTextBlock(block: HomeBlock): HomeTextBlock | null {
@@ -769,6 +1035,35 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   asCarouselBlock(block: HomeBlock): HomeCarouselBlock | null {
     return block.type === 'carousel' ? (block as HomeCarouselBlock) : null;
+  }
+
+  asColumnsBlock(block: HomeBlock): HomeColumnsBlock | null {
+    return block.type === 'columns' ? (block as HomeColumnsBlock) : null;
+  }
+
+  asCtaBlock(block: HomeBlock): HomeCtaBlock | null {
+    return block.type === 'cta' ? (block as HomeCtaBlock) : null;
+  }
+
+  isExternalHttpUrl(url: string | null | undefined): boolean {
+    const trimmed = (url || '').trim().toLowerCase();
+    return trimmed.startsWith('http://') || trimmed.startsWith('https://');
+  }
+
+  asFaqBlock(block: HomeBlock): HomeFaqBlock | null {
+    return block.type === 'faq' ? (block as HomeFaqBlock) : null;
+  }
+
+  asTestimonialsBlock(block: HomeBlock): HomeTestimonialsBlock | null {
+    return block.type === 'testimonials' ? (block as HomeTestimonialsBlock) : null;
+  }
+
+  columnsGridClasses(block: HomeColumnsBlock): string {
+    const matrix: Record<ColumnsCount, Record<ColumnsBreakpoint, string>> = {
+      2: { sm: 'sm:grid-cols-2', md: 'md:grid-cols-2', lg: 'lg:grid-cols-2' },
+      3: { sm: 'sm:grid-cols-3', md: 'md:grid-cols-3', lg: 'lg:grid-cols-3' }
+    };
+    return ['grid', 'gap-6', 'grid-cols-1', matrix[block.columns_count][block.breakpoint]].join(' ');
   }
 
   loadFeatured(): void {

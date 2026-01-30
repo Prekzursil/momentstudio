@@ -4,7 +4,18 @@ import { TranslateModule } from '@ngx-translate/core';
 import { ButtonComponent } from '../../../shared/button.component';
 
 export type CmsBlockLibraryContext = 'home' | 'page';
-export type CmsBlockLibraryBlockType = 'text' | 'image' | 'gallery' | 'banner' | 'carousel';
+export type CmsBlockLibraryBlockType =
+  | 'text'
+  | 'columns'
+  | 'cta'
+  | 'faq'
+  | 'testimonials'
+  | 'product_grid'
+  | 'form'
+  | 'image'
+  | 'gallery'
+  | 'banner'
+  | 'carousel';
 export type CmsBlockLibraryTemplate = 'blank' | 'starter';
 
 type BlockDef = {
@@ -57,7 +68,7 @@ type BlockDef = {
 
       <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
         <div
-          *ngFor="let b of blocks"
+          *ngFor="let b of filteredBlocks()"
           class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm cursor-grab active:cursor-grabbing dark:border-slate-800 dark:bg-slate-900"
           draggable="true"
           (dragstart)="onDragStart($event, b.type)"
@@ -76,6 +87,7 @@ type BlockDef = {
 })
 export class CmsBlockLibraryComponent {
   @Input() context: CmsBlockLibraryContext = 'page';
+  @Input() allowedTypes: ReadonlyArray<CmsBlockLibraryBlockType> | null = null;
   @Output() add = new EventEmitter<{ type: CmsBlockLibraryBlockType; template: CmsBlockLibraryTemplate }>();
   @Output() dragActive = new EventEmitter<boolean>();
 
@@ -87,6 +99,42 @@ export class CmsBlockLibraryComponent {
       titleKey: 'adminUi.home.sections.blocks.text',
       descKey: 'adminUi.content.blockLibrary.items.text',
       gradient: 'from-indigo-500/50 to-fuchsia-500/50'
+    },
+    {
+      type: 'columns',
+      titleKey: 'adminUi.home.sections.blocks.columns',
+      descKey: 'adminUi.content.blockLibrary.items.columns',
+      gradient: 'from-slate-500/50 to-slate-700/50'
+    },
+    {
+      type: 'cta',
+      titleKey: 'adminUi.home.sections.blocks.cta',
+      descKey: 'adminUi.content.blockLibrary.items.cta',
+      gradient: 'from-emerald-500/50 to-lime-500/50'
+    },
+    {
+      type: 'faq',
+      titleKey: 'adminUi.home.sections.blocks.faq',
+      descKey: 'adminUi.content.blockLibrary.items.faq',
+      gradient: 'from-sky-500/50 to-cyan-500/50'
+    },
+    {
+      type: 'testimonials',
+      titleKey: 'adminUi.home.sections.blocks.testimonials',
+      descKey: 'adminUi.content.blockLibrary.items.testimonials',
+      gradient: 'from-pink-500/50 to-rose-500/50'
+    },
+    {
+      type: 'product_grid',
+      titleKey: 'adminUi.home.sections.blocks.product_grid',
+      descKey: 'adminUi.content.blockLibrary.items.product_grid',
+      gradient: 'from-emerald-500/50 to-teal-500/50'
+    },
+    {
+      type: 'form',
+      titleKey: 'adminUi.home.sections.blocks.form',
+      descKey: 'adminUi.content.blockLibrary.items.form',
+      gradient: 'from-amber-500/50 to-orange-500/50'
     },
     {
       type: 'image',
@@ -114,6 +162,13 @@ export class CmsBlockLibraryComponent {
     }
   ];
 
+  filteredBlocks(): BlockDef[] {
+    const allowed = this.allowedTypes;
+    if (!allowed || allowed.length === 0) return this.blocks;
+    const allowedSet = new Set(allowed);
+    return this.blocks.filter((block) => allowedSet.has(block.type));
+  }
+
   addBlock(type: CmsBlockLibraryBlockType): void {
     this.add.emit({ type, template: this.template() });
   }
@@ -133,4 +188,3 @@ export class CmsBlockLibraryComponent {
     this.dragActive.emit(false);
   }
 }
-

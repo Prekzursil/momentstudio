@@ -31,6 +31,7 @@ jobs:
       - name: Build and start stack
         env:
           LOCKERS_USE_OVERPASS_FALLBACK: '0'
+          PAYMENTS_PROVIDER: 'mock'
         run: |
           docker compose -f infra/docker-compose.yml up -d --build
 

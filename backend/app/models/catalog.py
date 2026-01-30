@@ -23,6 +23,9 @@ class Category(Base):
     slug: Mapped[str] = mapped_column(String(120), unique=True, nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    thumbnail_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    banner_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    is_visible: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
     low_stock_threshold: Mapped[int | None] = mapped_column(nullable=True)
     sort_order: Mapped[int] = mapped_column(nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(
@@ -104,6 +107,7 @@ class Product(Base):
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="RON")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     is_featured: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     stock_quantity: Mapped[int] = mapped_column(nullable=False, default=0)
     low_stock_threshold: Mapped[int | None] = mapped_column(nullable=True)
     allow_backorder: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -146,7 +150,11 @@ class Product(Base):
 
     category: Mapped[Category] = relationship("Category", back_populates="products", lazy="joined")
     images: Mapped[list["ProductImage"]] = relationship(
-        "ProductImage", back_populates="product", cascade="all, delete-orphan", lazy="selectin"
+        "ProductImage",
+        back_populates="product",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="ProductImage.sort_order",
     )
     variants: Mapped[list["ProductVariant"]] = relationship(
         "ProductVariant", back_populates="product", cascade="all, delete-orphan", lazy="selectin"

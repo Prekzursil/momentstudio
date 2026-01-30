@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Meta, Title } from '@angular/platform-browser';
-import { Subscription } from 'rxjs';
+import { combineLatest, Subscription } from 'rxjs';
 import { ApiService } from '../../core/api.service';
 import { ContainerComponent } from '../../layout/container.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
@@ -10,8 +10,9 @@ import { CardComponent } from '../../shared/card.component';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { MarkdownService } from '../../core/markdown.service';
 import { PageBlock, pageBlocksToPlainText, parsePageBlocks } from '../../shared/page-blocks';
-import { BannerBlockComponent } from '../../shared/banner-block.component';
-import { CarouselBlockComponent } from '../../shared/carousel-block.component';
+import { ButtonComponent } from '../../shared/button.component';
+import { CmsPageBlocksComponent } from '../../shared/cms-page-blocks.component';
+import { StorefrontAdminModeService } from '../../core/storefront-admin-mode.service';
 
 interface ContentImage {
   url: string;
@@ -38,13 +39,26 @@ interface ContentBlock {
     BreadcrumbComponent,
     CardComponent,
     TranslateModule,
-    BannerBlockComponent,
-    CarouselBlockComponent
+    ButtonComponent,
+    CmsPageBlocksComponent
   ],
   template: `
     <app-container classes="py-10 grid gap-6 max-w-4xl">
       <app-breadcrumb [crumbs]="crumbs()"></app-breadcrumb>
-      <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ block()?.title || ('nav.page' | translate) }}</h1>
+
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">
+          {{ block()?.title || ('nav.page' | translate) }}
+        </h1>
+        <app-button
+          *ngIf="canEditPage()"
+          class="no-print"
+          size="sm"
+          variant="ghost"
+          [label]="'page.admin.edit' | translate"
+          (action)="editPage()"
+        ></app-button>
+      </div>
 
       <app-card>
         <div *ngIf="loading()" class="text-sm text-slate-600 dark:text-slate-300">
@@ -72,81 +86,7 @@ interface ContentBlock {
 
         <div *ngIf="!loading() && !hasError() && block()" class="grid gap-5">
           <ng-container *ngIf="pageBlocks().length; else markdownContent">
-            <div class="grid gap-6">
-              <ng-container *ngFor="let b of pageBlocks()">
-                <ng-container [ngSwitch]="b.type">
-                  <div *ngSwitchCase="'text'" class="grid gap-2">
-                    <h2 *ngIf="b.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">
-                      {{ b.title }}
-                    </h2>
-                    <div class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="b.body_html"></div>
-                  </div>
-
-                  <div *ngSwitchCase="'image'" class="grid gap-2">
-                    <h2 *ngIf="b.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">
-                      {{ b.title }}
-                    </h2>
-                    <a
-                      *ngIf="b.link_url; else plainImage"
-                      class="block"
-                      [href]="b.link_url"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <img
-                        [src]="b.url"
-                        [alt]="b.alt || b.title || ''"
-                        class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
-                        [style.object-position]="focalPosition(b.focal_x, b.focal_y)"
-                        loading="lazy"
-                      />
-                    </a>
-                    <ng-template #plainImage>
-                      <img
-                        [src]="b.url"
-                        [alt]="b.alt || b.title || ''"
-                        class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
-                        [style.object-position]="focalPosition(b.focal_x, b.focal_y)"
-                        loading="lazy"
-                      />
-                    </ng-template>
-                    <p *ngIf="b.caption" class="text-sm text-slate-600 dark:text-slate-300">{{ b.caption }}</p>
-                  </div>
-
-                  <div *ngSwitchCase="'gallery'" class="grid gap-2">
-                    <h2 *ngIf="b.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">
-                      {{ b.title }}
-                    </h2>
-                    <div class="grid gap-3 sm:grid-cols-2">
-                      <div *ngFor="let img of b.images" class="grid gap-2">
-                        <img
-                          [src]="img.url"
-                          [alt]="img.alt || b.title || ''"
-                          class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
-                          [style.object-position]="focalPosition(img.focal_x, img.focal_y)"
-                          loading="lazy"
-                        />
-                        <p *ngIf="img.caption" class="text-sm text-slate-600 dark:text-slate-300">{{ img.caption }}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div *ngSwitchCase="'banner'" class="grid gap-2">
-                    <h2 *ngIf="b.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">
-                      {{ b.title }}
-                    </h2>
-                    <app-banner-block [slide]="b.slide"></app-banner-block>
-                  </div>
-
-                  <div *ngSwitchCase="'carousel'" class="grid gap-2">
-                    <h2 *ngIf="b.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">
-                      {{ b.title }}
-                    </h2>
-                    <app-carousel-block [slides]="b.slides" [settings]="b.settings"></app-carousel-block>
-                  </div>
-                </ng-container>
-              </ng-container>
-            </div>
+            <app-cms-page-blocks [blocks]="pageBlocks()"></app-cms-page-blocks>
           </ng-container>
 
           <ng-template #markdownContent>
@@ -180,21 +120,34 @@ export class CmsPageComponent implements OnInit, OnDestroy {
   private langSub?: Subscription;
   private slugSub?: Subscription;
   private slug = '';
+  private previewToken = '';
   private suppressNextLoad = false;
 
   constructor(
     private api: ApiService,
     private route: ActivatedRoute,
     private router: Router,
+    private storefrontAdminMode: StorefrontAdminModeService,
     private translate: TranslateService,
     private title: Title,
     private meta: Meta,
     private markdown: MarkdownService
   ) {}
 
+  canEditPage(): boolean {
+    return this.storefrontAdminMode.enabled();
+  }
+
+  editPage(): void {
+    const slug = String(this.slug || '').trim();
+    if (!slug) return;
+    void this.router.navigate(['/admin/content/pages'], { queryParams: { edit: slug } });
+  }
+
   ngOnInit(): void {
-    this.slugSub = this.route.paramMap.subscribe((params) => {
+    this.slugSub = combineLatest([this.route.paramMap, this.route.queryParams]).subscribe(([params, query]) => {
       this.slug = params.get('slug') || '';
+      this.previewToken = typeof query['preview'] === 'string' ? query['preview'] : '';
       if (this.suppressNextLoad) {
         this.suppressNextLoad = false;
         return;
@@ -230,7 +183,10 @@ export class CmsPageComponent implements OnInit, OnDestroy {
     this.requiresLogin.set(false);
     this.pageBlocks.set([]);
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
-    this.api.get<ContentBlock>(`/content/pages/${encodeURIComponent(slug)}`, { lang }).subscribe({
+    const req = this.previewToken
+      ? this.api.get<ContentBlock>(`/content/pages/${encodeURIComponent(slug)}/preview`, { token: this.previewToken, lang })
+      : this.api.get<ContentBlock>(`/content/pages/${encodeURIComponent(slug)}`, { lang });
+    req.subscribe({
       next: (block) => {
         const canonicalSlug = this.slugFromKey(block.key);
         this.block.set(block);

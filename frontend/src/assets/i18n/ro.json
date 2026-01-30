@@ -10,6 +10,7 @@
     "shop": "Magazin",
     "about": "Povestea noastră",
     "contact": "Contact",
+    "terms": "Termeni și condiții",
     "page": "Pagină",
     "admin": "Admin",
     "viewAdmin": "Vezi admin",
@@ -27,7 +28,8 @@
     "menu": "Meniu",
     "preferences": "Preferințe",
     "theme": "Temă",
-    "language": "Limbă"
+    "language": "Limbă",
+    "editMode": "Mod editare"
   },
   "notifications": {
     "title": "Notificări",
@@ -48,6 +50,18 @@
   },
   "footer": {
     "tagline": "Artă Realizată Manual",
+    "handcraftedArt": "Artă realizată manual",
+    "legal": "Legal",
+    "privacyPolicy": "Politica de confidențialitate",
+    "anpc": "ANPC",
+    "companyInfo": "Date companie",
+    "registrationNumber": "Nr. înregistrare",
+    "cui": "CUI",
+    "address": "Adresă",
+    "phone": "Telefon",
+    "email": "Email",
+    "paymentsAccepted": "Plăți acceptate",
+    "paymentsAcceptedAlt": "Plăți acceptate: Netopia, Visa, Mastercard",
     "instagram": "Instagram",
     "facebook": "Facebook",
     "contact": "Contact"
@@ -63,6 +77,31 @@
     "restricted": {
       "title": "Este necesară autentificarea",
       "copy": "Această pagină este disponibilă doar pentru utilizatorii autentificați."
+    },
+    "admin": {
+      "edit": "Editează această pagină"
+    },
+    "blocks": {
+      "productGrid": {
+        "errorTitle": "Nu am putut încărca produsele.",
+        "errorCopy": "Te rugăm să încerci din nou.",
+        "empty": "Nu sunt produse de afișat momentan."
+      }
+    }
+  },
+  "legal": {
+    "consent": {
+      "loading": "Se încarcă cerințele de consimțământ…",
+      "required": "Te rugăm să citești și să accepți Termenii și condițiile și Politica de confidențialitate."
+    },
+    "modal": {
+      "title": "Document legal",
+      "close": "Închide",
+      "accept": "Accept",
+      "loading": "Se încarcă…",
+      "scrollToAccept": "Derulează până jos pentru a activa Accept.",
+      "missingDoc": "Lipsește documentul.",
+      "loadError": "Nu am putut încărca documentul. Te rugăm să încerci din nou."
     }
   },
   "contact": {
@@ -762,12 +801,25 @@
   },
   "blog": {
     "title": "Blog",
+    "featuredLabel": "Recomandat",
     "searchLabel": "Caută",
     "searchPlaceholder": "Caută articole",
     "tagLabel": "Etichetă",
     "tagPlaceholder": "Filtrează după etichetă",
+    "seriesLabel": "Serie",
+    "seriesPlaceholder": "Filtrează după serie",
+    "sortLabel": "Sortează",
+    "sortNewest": "Cele mai noi",
+    "sortOldest": "Cele mai vechi",
+    "sortMostViewed": "Cele mai vizualizate",
+    "sortMostCommented": "Cele mai comentate",
     "searchCta": "Căutare",
-    "clearFilters": "Șterge",
+    "clearFilters": "Resetează",
+    "chipSearch": "Caută: {{q}}",
+    "chipTag": "Etichetă: {{tag}}",
+    "chipSeries": "Serie: {{series}}",
+    "seriesPill": "Serie: {{series}}",
+    "byAuthor": "de {{author}}",
     "minutesRead": "{{minutes}} min citire",
     "preview": {
       "banner": "Mod previzualizare — acest articol nu este încă publicat."
@@ -777,14 +829,66 @@
     "retry": "Reîncearcă",
     "emptyTitle": "Nu există postări încă",
     "emptyCopy": "Revino curând pentru articole noi.",
+    "noResultsTitle": "Niciun rezultat",
+    "noResultsCopy": "Încearcă să resetezi filtrele sau să cauți altceva.",
     "pageMeta": "Pagina {{page}} din {{totalPages}} · {{totalItems}} postări",
     "metaTitle": "Blog | momentstudio",
     "metaDescription": "Povești, noutăți și culise de la momentstudio.",
+    "tagMetaTitle": "Blog · #{{tag}} | momentstudio",
+    "tagMetaDescription": "Ultimele postări etichetate „{{tag}}” pe momentstudio.",
+    "seriesMetaTitle": "Blog · Serie: {{series}} | momentstudio",
+    "seriesMetaDescription": "Postări din seria „{{series}}” pe momentstudio.",
     "prev": "Înapoi",
     "next": "Înainte",
     "post": {
       "breadcrumb": "Articol",
       "backToBlog": "Înapoi la blog",
+      "backToTop": "Înapoi sus",
+      "progressLabel": "Progres de citire",
+      "tocTitle": "Cuprins",
+      "sectionLinkLabel": "Link către această secțiune",
+      "previousPost": "Articol anterior",
+      "nextPost": "Articol următor",
+      "relatedTitle": "Articole similare",
+      "shareTitle": "Distribuie",
+      "shareCopy": "Copiază link",
+      "shareWhatsApp": "WhatsApp",
+      "shareFacebook": "Facebook",
+      "shareCopiedTitle": "Copiat",
+      "shareCopiedCopy": "Link copiat în clipboard.",
+      "shareCopyErrorTitle": "Nu am putut copia link-ul",
+      "shareCopyErrorCopy": "Copiază URL-ul din bara de adrese.",
+      "lightbox": {
+        "close": "Închide vizualizatorul",
+        "previous": "Imaginea anterioară",
+        "next": "Imaginea următoare"
+      },
+      "callout": {
+        "tip": "Sfat",
+        "note": "Notă",
+        "warning": "Atenție"
+      },
+      "embed": {
+        "categoryLabel": "Categorie",
+        "collectionLabel": "Colecție",
+        "notFoundProduct": "Produs indisponibil.",
+        "notFoundCategory": "Categoria nu a fost găsită.",
+        "notFoundCollection": "Colecția nu a fost găsită."
+      },
+      "author": {
+        "title": "Despre autor",
+        "moreFrom": "Mai multe de la {{author}}"
+      },
+      "code": {
+        "copy": "Copiază",
+        "wrap": "Împachetează",
+        "unwrap": "Dezactivează împachetarea",
+        "languageFallback": "cod",
+        "copiedTitle": "Copiat",
+        "copiedCopy": "Cod copiat în clipboard.",
+        "copyErrorTitle": "Nu am putut copia codul",
+        "copyErrorCopy": "Selectează și copiază manual."
+      },
       "loadingTitle": "Se încarcă…",
       "errorTitle": "Nu am putut încărca acest articol.",
       "errorCopy": "Încearcă din nou în câteva momente.",
@@ -794,9 +898,26 @@
     "comments": {
       "title": "Comentarii ({{count}})",
       "refresh": "Reîncarcă",
+      "sortLabel": "Sortează",
+      "sortNewest": "Cele mai noi",
+      "sortOldest": "Cele mai vechi",
+      "sortTop": "Top",
+      "pageMeta": "Pagina {{page}} din {{totalPages}}",
+      "prev": "Înapoi",
+      "next": "Înainte",
+      "follow": "Trimite-mi email când apar comentarii noi",
+      "followTitle": "Actualizări comentarii",
+      "followEnabledCopy": "Vei primi email când apar comentarii noi la acest articol.",
+      "followDisabledCopy": "Nu vei mai primi email pentru comentarii la acest articol.",
+      "followVerifyTitle": "Verifică emailul",
+      "followVerifyCopy": "Verifică adresa de email pentru a te abona la actualizările de comentarii.",
+      "followErrorTitle": "Nu am putut actualiza abonarea",
+      "followErrorCopy": "Încearcă din nou.",
       "errorTitle": "Nu am putut încărca comentariile.",
       "errorCopy": "Încearcă din nou.",
       "empty": "Nu există comentarii încă. Fii primul care începe discuția.",
+      "emptyPage": "Nu există comentarii pe această pagină.",
+      "goToFirstPage": "Mergi la prima pagină",
       "anonymous": "Client",
       "reply": "Răspunde",
       "report": "Raportează",
@@ -817,9 +938,34 @@
       "submitting": "Se publică…",
       "createErrorTitle": "Nu am putut publica comentariul",
       "createErrorCopy": "Încearcă din nou.",
+      "rateLimitedTitle": "Prea multe comentarii",
+      "rateLimitedCopy": "Așteaptă puțin și încearcă din nou.",
+      "linkLimitTitle": "Prea multe link-uri",
+      "linkLimitCopy": "Șterge câteva link-uri și încearcă din nou.",
       "confirmDelete": "Ștergi acest comentariu?",
       "deleteErrorTitle": "Nu am putut șterge comentariul",
       "deleteErrorCopy": "Încearcă din nou."
+    },
+    "newsletter": {
+      "title": "Newsletter",
+      "copy": "Primește ocazional noutăți de la momentstudio. Fără spam.",
+      "emailLabel": "Email",
+      "emailPlaceholder": "tu@exemplu.com",
+      "subscribe": "Abonează-te",
+      "successCopy": "Mulțumim — vei primi noutăți pe email.",
+      "alreadyCopy": "Ești deja abonat(ă).",
+      "errorTitle": "Nu am putut face abonarea",
+      "errorCopy": "Încearcă din nou."
+    },
+    "admin": {
+      "edit": "Editează",
+      "quickEdit": "Editare rapidă",
+      "quickEditClose": "Închide editarea rapidă",
+      "loadErrorCopy": "Nu am putut încărca detaliile de admin ale articolului.",
+      "savedTitle": "Salvat",
+      "savedCopy": "Modificările au fost aplicate.",
+      "saveErrorTitle": "Nu am putut salva",
+      "saveErrorCopy": "Încearcă din nou."
     }
   },
   "home": {
@@ -868,8 +1014,22 @@
   },
   "shop": {
     "title": "Magazin",
+    "quickView": "Vizualizare rapidă",
+    "paginationPages": "Pagini",
+    "prev": "Anterior",
+    "next": "Următor",
+    "loadMore": "Încarcă mai multe",
+    "loadingMore": "Se încarcă…",
+    "loadedCount": "Afișate {{shown}} din {{total}}",
+    "suggestedCategories": "Categorii populare",
     "filters": "Filtre",
     "reset": "Resetare",
+    "activeFilters": "Filtre active",
+    "clearAll": "Șterge tot",
+    "removeFilter": "Elimină filtrul: {{filter}}",
+    "resultsMeta": "{{total}} rezultate · {{from}}–{{to}}",
+    "priceChip": "Preț {{min}}–{{max}} RON",
+    "searchChip": "Căutare: {{q}}",
     "searchPlaceholder": "Caută produse",
     "search": "Căutare",
     "categories": "Categorii",
@@ -886,6 +1046,7 @@
     "priceHint": "Ajustează slider-ele sau câmpurile pentru a rafina rezultatele.",
     "tags": "Etichete",
     "sort": "Sortare",
+    "sortRecommended": "Recomandate",
     "sortNew": "Cele mai noi",
     "sortPriceAsc": "Preț: crescător",
     "sortPriceDesc": "Preț: descrescător",
@@ -1084,6 +1245,8 @@
     "paymentMethodUnavailable": "Această metodă de plată nu este disponibilă pentru coșul curent.",
     "paymentPayPalHint": "Plătește cu PayPal (vei fi redirecționat).",
     "paymentCashHint": "Plătești în numerar la livrare (RON).",
+    "acceptedCards": "Acceptat",
+    "acceptedCardsAlt": "Carduri acceptate: Netopia, Visa, Mastercard",
     "paymentHelpLink": "Contact",
     "paypalReturnTitle": "PayPal",
     "paypalCapturing": "Confirmăm plata PayPal…",
@@ -1230,6 +1393,10 @@
     "captchaUnavailable": "CAPTCHA nu este disponibilă.",
     "captchaFailedTryAgain": "CAPTCHA a eșuat. Încearcă din nou.",
     "captchaFailedLoad": "CAPTCHA nu a putut fi încărcată.",
+    "acceptTermsPrefix": "Am citit și accept",
+    "acceptTermsLink": "Termenii și condițiile",
+    "acceptPrivacyPrefix": "Am citit și accept",
+    "acceptPrivacyLink": "Politica de confidențialitate",
     "currentPasswordRequired": "Parola curentă este necesară pentru a schimba numele de utilizator.",
     "twoFactorRequired": "Este necesară verificarea în doi pași.",
     "twoFactorTitle": "Verificare în doi pași",
@@ -1274,6 +1441,104 @@
     "save": "Salvează"
   },
   "adminUi": {
+    "common": {
+      "edit": "Editează",
+      "duplicate": "Duplică",
+      "loading": "Se încarcă…",
+      "save": "Salvează",
+      "cancel": "Anulează",
+      "saving": "Se salvează…",
+      "undo": "Anulează",
+      "close": "Închide"
+    },
+    "storefront": {
+      "categories": {
+        "dragHint": "Trage pentru a reordona categoriile. Apasă Editează pentru a redenumi (RO/EN).",
+        "addRoot": "Adaugă categorie",
+        "addSub": "Adaugă subcategorie",
+        "hide": "Ascunde",
+        "show": "Arată",
+        "hidden": "Ascunsă",
+        "nameRo": "Nume (RO)",
+        "nameEn": "Nume (EN)",
+        "images": "Imagini",
+        "thumbnail": "Miniatură",
+        "banner": "Banner",
+        "currentBanner": "Bannerul curent este setat.",
+        "loadError": "Nu s-au putut încărca traducerile categoriei.",
+        "namesRequired": "Te rog completează numele în RO și EN.",
+        "createSuccess": "Categoria a fost creată.",
+        "createError": "Nu s-a putut crea categoria.",
+        "visibilitySuccess": "Vizibilitatea categoriei a fost actualizată.",
+        "visibilityError": "Nu s-a putut actualiza vizibilitatea categoriei.",
+        "imageUploadSuccess": "Imaginea categoriei a fost actualizată.",
+        "imageUploadError": "Nu s-a putut încărca imaginea categoriei.",
+        "mergeTitle": "Fuzionează categorie",
+        "mergeInto": "Fuzionează în",
+        "mergeSelectPlaceholder": "Alege o categorie…",
+        "mergeSelectTarget": "Alege categoria în care fuzionezi.",
+        "mergePreview": "Previzualizează",
+        "mergeAction": "Fuzionează",
+        "mergePreviewInfo": "Mută {{products}} produse; {{children}} subcategorii.",
+        "mergePreviewError": "Nu s-a putut previzualiza fuziunea.",
+        "mergePreviewRequired": "Previzualizează fuziunea înainte de a continua.",
+        "mergeReasonSame": "Alege o categorie țintă diferită.",
+        "mergeReasonParent": "Categoriile trebuie să aibă același părinte.",
+        "mergeReasonChildren": "Categoria are subcategorii. Fuzionează/șterge-le mai întâi.",
+        "mergeNotAllowed": "Fuziunea nu este permisă.",
+        "confirmMerge": "Fuzionezi „{{source}}” în „{{target}}”? Se vor muta {{count}} produse și se va șterge „{{source}}”.",
+        "mergeSuccess": "Categoria a fost fuzionată.",
+        "mergeError": "Nu s-a putut fuziona categoria.",
+        "deleteTitle": "Șterge categorie",
+        "deletePreview": "Verifică",
+        "deleteAction": "Șterge",
+        "deletePreviewInfo": "Produse: {{products}} · Subcategorii: {{children}}",
+        "deleteNotAllowed": "Nu se poate șterge: Produse: {{products}} · Subcategorii: {{children}}",
+        "deletePreviewError": "Nu s-a putut verifica dacă categoria poate fi ștearsă.",
+        "deletePreviewRequired": "Verifică întâi condițiile de ștergere.",
+        "confirmDelete": "Ștergi „{{name}}”? Acțiunea nu poate fi anulată.",
+        "deleteSuccess": "Categoria a fost ștearsă.",
+        "deleteError": "Nu s-a putut șterge categoria.",
+        "saveSuccess": "Categoria a fost actualizată.",
+        "saveError": "Nu s-a putut salva categoria.",
+        "reorderSuccess": "Ordinea categoriilor a fost actualizată.",
+        "reorderError": "Nu s-au putut reordona categoriile."
+      },
+      "products": {
+        "bulkSelect": "Selectare în masă",
+        "bulkDone": "Gata",
+        "bulkApply": "Aplică",
+        "bulkSelectPage": "Selectează pagina",
+        "bulkClear": "Golește",
+        "pinToTop": "Fixează sus",
+        "bulkStatus": "Stare",
+        "bulkStatusPlaceholder": "Fără schimbare de stare",
+        "bulkCategory": "Categorie",
+        "bulkCategoryPlaceholder": "Fără schimbare de categorie",
+        "bulkFeatured": "Recomandat",
+        "bulkFeaturedPlaceholder": "Fără schimbare",
+        "bulkFeaturedOn": "Recomandat",
+        "bulkFeaturedOff": "Nerecomandat",
+        "bulkNoSelection": "Selectează cel puțin un produs.",
+        "bulkNoChanges": "Alege cel puțin o acțiune (stare/categorie/recomandat).",
+        "reorderHint": "Trage cardurile produselor pentru a reordona categoria.",
+        "reorderSuccess": "Ordinea produselor a fost actualizată.",
+        "reorderError": "Nu s-au putut reordona produsele.",
+        "images": {
+          "manageTitle": "Gestionează imagini",
+          "manageCta": "Gestionează imagini",
+          "reorderHint": "Trage imaginile pentru a le reordona.",
+          "reorderSuccess": "Ordinea imaginilor a fost actualizată.",
+          "reorderError": "Nu s-au putut reordona imaginile.",
+          "empty": "Nu există imagini încă.",
+          "imageLabel": "Imaginea {{index}}",
+          "metaHint": "Textul alternativ și descrierile sunt bilingve (RO/EN).",
+        "metaLoadError": "Nu s-a putut încărca textul imaginii."
+        }
+      },
+      "undoApplied": "Modificările au fost anulate.",
+      "undoFailed": "Nu s-au putut anula modificările."
+    },
     "errors": {
       "title": "A apărut o problemă",
       "requestId": "ID cerere",
@@ -1294,6 +1559,19 @@
       "support": "Suport",
       "ops": "Operațiuni",
       "content": "Conținut"
+    },
+    "uiMode": {
+      "title": "Mod administrare",
+      "simple": "Simplu",
+      "advanced": "Avansat",
+      "simpleHint": "Ascunde uneltele și setările avansate.",
+      "advancedHint": "Arată toate uneltele și setările."
+    },
+    "uiPreset": {
+      "title": "Preset",
+      "ownerBasic": "Owner (de bază)",
+      "custom": "Personalizat",
+      "hint": "Owner (de bază) ascunde inventarul, operațiunile, utilizatorii și alte zone tehnice."
     },
     "security": {
       "mfaRequired": "Autentificarea cu doi factori sau o passkey este necesară pentru accesul de administrare."
@@ -1505,12 +1783,15 @@
     },
       "actions": {
         "add": "Adaugă",
+        "create": "Creează",
         "apply": "Aplică",
         "reset": "Resetează",
         "delete": "Șterge",
         "remove": "Elimină",
         "save": "Salvează",
+        "update": "Actualizează",
         "cancel": "Anulează",
+        "upload": "Încarcă",
         "retry": "Reîncearcă",
         "restore": "Restabilește",
         "undo": "Anulează",
@@ -1525,12 +1806,18 @@
       "use": "Folosește",
       "prev": "Anterior",
       "next": "Înainte",
+      "back": "Înapoi",
+      "done": "Gata",
+      "exit": "Ieși",
       "open": "Deschide",
       "up": "Sus",
       "down": "Jos",
       "preview": "Previzualizează",
       "hide": "Ascunde",
       "bulkActions": "Acțiuni în masă"
+    },
+    "help": {
+      "title": "Ce este asta?"
     },
     "recent": {
       "title": "Vizualizate recent",
@@ -2052,21 +2339,86 @@
           "focalSaved": "Punctul focal a fost actualizat.",
           "focalErrorsSave": "Nu am putut actualiza punctul focal.",
           "focalErrorsFormat": "Introdu punctul focal ca \"x, y\" cu valori între 0 și 100.",
+          "focalTitle": "Punct focal",
+          "focalPreviewHint": "Dă click pe imagine pentru a previzualiza și seta punctul focal înainte de salvare.",
+          "imageEdit": "Editează",
+          "whereUsed": "Utilizată",
+          "usageTitle": "Unde este utilizată",
+          "usageHint": "Apasă pe o cheie pentru a filtra biblioteca la acel scope.",
+          "usageLoading": "Se încarcă utilizările…",
+          "usageEmpty": "Nu s-au găsit utilizări.",
+          "usageStoredIn": "Stocată în: {{key}}",
+          "editorTitle": "Editează imaginea",
+          "editorHint": "Creează o copie editată. Imaginea originală rămâne neschimbată.",
+          "editorCreate": "Creează copie editată",
+          "editorPreview": "Previzualizare",
+          "editorRotationNote": "Rotirea se aplică la crearea copiei.",
+          "rotateLabel": "Rotire",
+          "rotateNone": "Fără rotire",
+          "rotate90": "90° în sensul acelor de ceasornic",
+          "rotate180": "180°",
+          "rotate270": "270° în sensul acelor de ceasornic",
+          "cropLabel": "Decupare",
+          "cropNone": "Fără decupare",
+          "cropSquare": "Pătrat (1:1)",
+          "cropHero": "Hero (16:7)",
+          "cropCard": "Card (4:3)",
+          "cropMobile": "Mobil (9:16)",
+          "resizeMaxWidth": "Lățime maximă (px)",
+          "resizeMaxHeight": "Înălțime maximă (px)",
+          "editorErrorsNoop": "Alege cel puțin o editare (rotire, decupare sau redimensionare).",
           "upload": "Încarcă imagine",
           "uploadHint": "Încărcările sunt atașate la {{key}} pentru organizare.",
           "loading": "Se încarcă imaginile…",
           "empty": "Nu există imagini.",
           "pagination": "Pagina {{page}} din {{total}}",
+          "editedBadge": "Editată",
+          "versionsTitle": "Versiuni editate ({{count}})",
+          "revertToOriginal": "Original",
+          "confirmDelete": "Ștergi această imagine? Acțiunea nu poate fi anulată.",
+          "confirmDeleteWithVersions": "Ștergi această imagine și cele {{count}} versiuni editate? Acțiunea nu poate fi anulată.",
           "success": {
             "uploaded": "Încărcată.",
             "copied": "Copiat în clipboard.",
-            "selected": "Selectată."
+            "selected": "Selectată.",
+            "edited": "Copia editată a fost creată.",
+            "deleted": "Ștearsă."
           },
           "errors": {
             "load": "Nu am putut încărca imaginile.",
             "upload": "Nu am putut încărca imaginea.",
-            "copy": "Nu am putut copia în clipboard."
+            "copy": "Nu am putut copia în clipboard.",
+            "usage": "Nu am putut încărca referințele de utilizare.",
+            "edit": "Nu am putut crea copia editată.",
+            "delete": "Nu am putut șterge imaginea.",
+            "deleteHasVersions": "Șterge mai întâi versiunile editate.",
+            "deleteInUse": "Nu poate fi ștearsă: imaginea este utilizată."
           }
+        }
+      },
+      "navigation": {
+        "title": "Navigație site",
+        "hint": "Gestionează linkurile din header/footer. Fiecare link are nevoie de un URL și etichete în EN și RO.",
+        "headerLinks": "Linkuri header",
+        "footerHandcraftedLinks": "Footer — Artă handmade",
+        "footerLegalLinks": "Footer — Legal",
+        "dragHint": "Trage pentru a reordona linkurile. Folosește ↑/↓ pentru mutări precise.",
+        "empty": "Nu există linkuri.",
+        "fields": {
+          "labelEn": "Etichetă (EN)",
+          "labelRo": "Etichetă (RO)",
+          "url": "URL"
+        },
+        "resetDefaults": "Resetează la valorile implicite",
+        "confirms": {
+          "resetDefaults": "Resetezi navigația la valorile implicite? Acest lucru va suprascrie modificările curente."
+        },
+        "success": {
+          "save": "Navigația a fost salvată."
+        },
+        "errors": {
+          "save": "Nu am putut salva navigația.",
+          "invalid": "Fiecare link trebuie să aibă URL + Etichetă (EN) + Etichetă (RO), sau să fie lăsat complet gol."
         }
       },
       "social": {
@@ -2090,6 +2442,28 @@
           "urlRequired": "URL-ul este obligatoriu.",
           "noThumbnail": "Nu s-a găsit nicio miniatură.",
           "fetchFailed": "Nu s-a putut prelua miniatura."
+        }
+      },
+      "company": {
+        "title": "Informații companie",
+        "hint": "Afișate în subsolul magazinului și folosite pentru conformitate. Completează toate câmpurile înainte de publicare.",
+        "fields": {
+          "name": "Denumire companie",
+          "registrationNumber": "Nr. Registrul Comerțului",
+          "cui": "CUI / TVA",
+          "address": "Adresă",
+          "phone": "Telefon",
+          "email": "Email"
+        },
+        "missing": {
+          "title": "Câmpuri obligatorii lipsă"
+        },
+        "success": {
+          "save": "Salvat."
+        },
+        "errors": {
+          "save": "Nu am putut salva.",
+          "required": "Completează toate câmpurile obligatorii."
         }
       },
       "checkout": {
@@ -2150,6 +2524,11 @@
         "success": { "save": "SEO salvat." },
         "errors": { "save": "Nu am putut salva SEO." }
       },
+      "globalSections": {
+        "announcement": "Bară de anunț",
+        "headerBanners": "Bannere antet",
+        "footerPromo": "Promo în subsol"
+      },
       "pages": {
         "title": "Pagini statice",
         "aboutLabel": "Povestea noastră",
@@ -2164,9 +2543,19 @@
           "title": "Blocuri tip page builder",
           "hint": "Opțional: construiește pagini mai bogate (Povestea noastră/Contact) din blocuri. Dacă există blocuri, magazinul le afișează în locul conținutului Markdown.",
           "newPageTitle": "Titlu pagină nouă",
+          "template": "Șablon",
+          "templates": {
+            "blank": "Gol",
+            "about": "Despre",
+            "faq": "Întrebări frecvente",
+            "shipping": "Livrare",
+            "returns": "Returnări"
+          },
           "status": "Stare",
           "createPage": "Creează pagină",
           "page": "Pagină",
+          "globalSections": "Secțiuni globale",
+          "pagesGroup": "Pagini",
           "publishAtOptional": "Publică la (opțional)",
           "publishAtHint": "Dacă este în viitor și starea este Publicat, pagina va deveni vizibilă la acel moment.",
           "unpublishAtOptional": "Ascunde la (opțional)",
@@ -2174,7 +2563,8 @@
           "requiresLogin": "Necesită autentificare",
           "requiresLoginHint": "Când este activat, doar utilizatorii autentificați pot vedea această pagină (nu va apărea în sitemap).",
           "changeUrlPrompt": "Noul URL (slug) pentru această pagină",
-          "changeUrlConfirm": "Schimbi URL-ul din /pages/{{old}} în /pages/{{next}}? Linkurile existente vor redirecționa.",
+          "changeUrlConfirm": "Schimbi URL-ul din /pages/{{old}} în /pages/{{next}}?",
+          "redirectConfirm": "Creezi o redirecționare din /pages/{{old}} în /pages/{{next}}? (Recomandat)",
           "addBlock": "Adaugă bloc",
           "translation": {
             "title": "Workflow traducere",
@@ -2183,12 +2573,27 @@
             "success": "Starea traducerii a fost actualizată.",
             "errors": { "save": "Nu am putut actualiza starea traducerii." }
           },
-          "success": { "save": "Blocurile au fost salvate.", "rename": "URL-ul paginii a fost actualizat (redirecționare creată)." },
-          "errors": { "load": "Nu am putut încărca blocurile.", "save": "Nu am putut salva blocurile.", "rename": "Nu s-a putut schimba URL-ul paginii." }
+          "styles": {
+            "spacing": { "label": "Spațiere", "none": "Niciuna", "sm": "Mică", "md": "Medie", "lg": "Mare" },
+            "background": { "label": "Fundal", "none": "Niciunul", "muted": "Neutru", "accent": "Accent" },
+            "align": { "label": "Aliniere", "left": "Stânga", "center": "Centru" },
+            "maxWidth": { "label": "Lățime maximă", "full": "Completă", "narrow": "Îngustă", "prose": "Proză", "wide": "Largă" }
+          },
+          "success": { "save": "Blocurile au fost salvate.", "rename": "URL-ul paginii a fost actualizat." },
+          "errors": {
+            "load": "Nu am putut încărca blocurile.",
+            "save": "Nu am putut salva blocurile.",
+            "rename": "Nu s-a putut schimba URL-ul paginii.",
+            "blockTypeNotAllowed": "Acest tip de bloc nu este permis în această secțiune."
+          }
         },
         "redirects": {
           "title": "Redirecționări",
-          "hint": "Create automat când schimbi URL-ul unei pagini. Redirecționările expirate indică către conținut lipsă.",
+          "hint": "Redirecționările păstrează linkurile vechi după schimbarea URL-ului unei pagini. Redirecționările expirate indică către conținut lipsă.",
+          "createTitle": "Creează redirecționare",
+          "createFrom": "De la",
+          "createTo": "Către",
+          "createHint": "Tip: poți lipi URL-uri precum /pages/vechi și /pages/nou.",
           "search": "Caută redirecționări",
           "export": "Export CSV",
           "import": "Import CSV",
@@ -2199,9 +2604,10 @@
           "loop": "A fost detectată o buclă de redirecționare.",
           "tooDeep": "Lanțul de redirecționare este prea lung.",
           "deleteConfirm": "Ștergi această redirecționare?",
-          "success": { "deleted": "Redirecționare ștearsă.", "export": "Redirecționări exportate.", "import": "Redirecționări importate." },
+          "success": { "created": "Redirecționare creată.", "deleted": "Redirecționare ștearsă.", "export": "Redirecționări exportate.", "import": "Redirecționări importate." },
           "errors": {
             "load": "Nu am putut încărca redirecționările.",
+            "create": "Nu am putut crea redirecționarea.",
             "delete": "Nu am putut șterge redirecționarea.",
             "export": "Nu am putut exporta redirecționările.",
             "import": "Nu am putut importa redirecționările."
@@ -2224,6 +2630,7 @@
         "subtitle": "Subtitlu",
         "ctaLabel": "Etichetă CTA",
         "ctaUrl": "URL CTA",
+        "ctaNewTab": "Deschide într-o filă nouă",
         "imageUrl": "URL imagine erou",
         "success": {
           "saved": "Erou salvat.",
@@ -2238,31 +2645,48 @@
         "title": "Ordinea secțiunilor de pe homepage",
         "hint": "Trage pentru a reordona secțiunile și a comuta vizibilitatea.",
         "addBlock": "Adaugă bloc personalizat",
-        "blocks": {
-          "hero": "Erou",
-          "featured_products": "Produse recomandate",
-          "sale_products": "La reducere",
-          "new_arrivals": "Cele mai noi",
-          "featured_collections": "Colecții recomandate",
-          "story": "Povestea noastră",
-          "recently_viewed": "Văzute recent",
-          "why": "De ce",
-          "text": "Text",
-          "image": "Imagine",
-          "gallery": "Galerie",
-          "banner": "Banner",
-          "carousel": "Carusel"
-        },
+	        "blocks": {
+	          "hero": "Erou",
+	          "featured_products": "Produse recomandate",
+	          "sale_products": "La reducere",
+	          "new_arrivals": "Cele mai noi",
+	          "featured_collections": "Colecții recomandate",
+	          "story": "Povestea noastră",
+	          "recently_viewed": "Văzute recent",
+	          "why": "De ce",
+	          "text": "Text",
+	          "columns": "Coloane",
+	          "cta": "Apel la acțiune",
+	          "faq": "Întrebări frecvente",
+	          "testimonials": "Testimoniale",
+            "product_grid": "Grilă de produse",
+            "form": "Formular",
+	          "image": "Imagine",
+	          "gallery": "Galerie",
+	          "banner": "Banner",
+	          "carousel": "Carusel"
+	        },
         "enabled": "Activată",
         "drag": "trage",
-        "fields": {
-          "title": "Titlu",
-          "body": "Conținut (Markdown)",
-          "preview": "Previzualizare",
-          "imageUrl": "URL imagine",
-          "linkUrl": "URL link (opțional)",
-          "alt": "Text alternativ",
-          "caption": "Legendă (opțional)",
+	        "fields": {
+	          "title": "Titlu",
+	          "body": "Conținut (Markdown)",
+	          "columnsBreakpoint": "Coloane de la",
+	          "addColumn": "Adaugă coloană",
+	          "column": "Coloană",
+	          "columnTitle": "Titlu coloană",
+	          "columnBody": "Conținut coloană (Markdown)",
+	          "question": "Întrebare",
+	          "answer": "Răspuns (Markdown)",
+	          "testimonial": "Testimonial",
+	          "quote": "Citat (Markdown)",
+	          "author": "Autor",
+	          "role": "Rol (opțional)",
+	          "preview": "Previzualizare",
+	          "imageUrl": "URL imagine",
+	          "linkUrl": "URL link (opțional)",
+	          "alt": "Text alternativ",
+	          "caption": "Legendă (opțional)",
           "focalX": "Focal X (%)",
           "focalY": "Focal Y (%)",
           "gallery": "Imagini galerie",
@@ -2277,7 +2701,18 @@
           "interval": "Interval (ms)",
           "arrows": "Săgeți",
           "dots": "Puncte",
-          "pauseOnHover": "Pauză la hover"
+          "pauseOnHover": "Pauză la hover",
+          "productGridSource": "Sursă",
+          "productGridCategorySlug": "Slug categorie",
+          "productGridCollectionSlug": "Slug colecție",
+          "productGridProductSlugs": "Slug-uri produse",
+          "productGridProductSlugsHint": "Un slug pe linie (sau separat prin virgulă).",
+          "productGridProductSearch": "Caută produse",
+          "productGridProductSearchPlaceholder": "Caută după nume, SKU sau slug…",
+          "productGridProductSearchEmpty": "Nu am găsit produse.",
+          "productGridLimit": "Limită",
+          "formType": "Tip formular",
+          "formTopic": "Subiect contact"
         },
         "variants": {
           "split": "Împărțit",
@@ -2292,11 +2727,21 @@
           "dark": "Text închis",
           "light": "Text deschis"
         },
+        "productGridSources": {
+          "category": "Categorie",
+          "collection": "Colecție",
+          "products": "Produse manuale"
+        },
+        "formTypes": {
+          "contact": "Contact",
+          "newsletter": "Newsletter"
+        },
         "success": {
           "save": "Ordinea secțiunilor a fost salvată."
         },
         "errors": {
-          "save": "Nu am putut salva ordinea secțiunilor."
+          "save": "Nu am putut salva ordinea secțiunilor.",
+          "searchProducts": "Nu am putut căuta produse."
         }
       },
       "collections": {
@@ -2344,10 +2789,28 @@
         "summaryOptional": "Rezumat (opțional)",
         "tags": "Etichete (separate prin virgulă)",
         "tagsPlaceholder": "ex. ceramică, atelier, noutăți",
+        "seriesOptional": "Serie (opțional)",
+        "seriesPlaceholder": "ex. note-din-atelier",
+        "seriesHint": "Grupează postările în /blog/series/…",
         "coverImageUrlOptional": "URL imagine copertă (opțional)",
         "coverImagePlaceholder": "https://…",
         "readingTimeOptional": "Timp de citire (minute) (opțional)",
+        "pinned": "Fixează sus în blog",
+        "pinOrder": "Ordine fixare (1–3)",
+        "pinOrderHint": "Articolele fixate apar primele în /blog.",
         "body": "Conținut"
+      },
+      "cover": {
+        "title": "Imagine copertă",
+        "hint": "Dacă e lăsat gol, prima imagine încărcată va fi folosită ca imagine de copertă.",
+        "choose": "Alege din încărcări",
+        "upload": "Încarcă copertă",
+        "clear": "Șterge coperta setată",
+        "editFocal": "Editează punctul de focalizare",
+        "focalLabel": "Focal: {{x}}, {{y}}",
+        "previewDesktop": "Previzualizare desktop",
+        "previewMobile": "Previzualizare mobil",
+        "libraryTitle": "Imagini copertă"
       },
       "create": {
         "title": "Creează articol de blog",
@@ -2369,16 +2832,34 @@
         "richEditor": "Editor bogat",
         "livePreview": "Previzualizare live",
         "previewEmpty": "Nimic de previzualizat încă.",
-        "toolbarTip": "Sfat: Folosește bara de instrumente pentru a formata markdown și a insera imagini (încărcările merg în imaginile de conținut ale articolului)."
+        "toolbarTip": "Sfat: Folosește bara de instrumente pentru a formata markdown și a insera imagini (încărcările merg în imaginile de conținut ale articolului). Layout-ul imaginilor folosește token-ul din titlul imaginii: \"wide\", \"left\", \"right\", \"gallery\" (ex: ![alt](url \"wide\")). Inserări: {{product:slug}}, {{category:slug}}, {{collection:slug}}."
       },
       "toolbar": {
         "link": "Link",
         "code": "Cod",
+        "product": "Produs",
+        "category": "Categorie",
+        "collection": "Colecție",
         "list": "Listă"
+      },
+      "embeds": {
+        "prompt": {
+          "product": "Introdu slug-ul produsului (ex. nume-produs):",
+          "category": "Introdu slug-ul categoriei (ex. ceramica):",
+          "collection": "Introdu slug-ul colecției (ex. favorite-atelier):"
+        }
       },
       "images": {
         "title": "Imagini",
         "insertMarkdown": "Inserează markdown",
+        "layout": {
+          "label": "Aspect imagine",
+          "default": "Implicit",
+          "wide": "Lată",
+          "left": "Stânga",
+          "right": "Dreapta",
+          "gallery": "Galerie"
+        },
         "success": {
           "uploaded": "Imagine încărcată",
           "insertedMarkdown": "Markdown pentru imagine inserat"
@@ -2386,6 +2867,52 @@
         "errors": {
           "upload": "Nu s-a putut încărca imaginea"
         }
+      },
+      "a11y": {
+        "title": "Verificări de accesibilitate",
+        "hint": "Adaugă text alternativ relevant pentru imagini (folosit ca legendă și pentru cititoare de ecran) înainte de publicare.",
+        "fixAlt": "Setează text alternativ",
+        "promptAlt": "Text alternativ pentru această imagine:",
+        "fixed": "Textul alternativ a fost actualizat",
+        "confirmPublishAnyway": "Acest articol are {{count}} imagini fără text alternativ relevant. Publici oricum?"
+      },
+      "writing": {
+        "title": "Instrumente de scriere",
+        "words": "Cuvinte: {{count}}",
+        "estimate": "Timp estimat de citire: {{minutes}} min",
+        "applyEstimate": "Folosește estimarea",
+        "applied": "Timpul de citire a fost setat la {{minutes}} min.",
+        "outline": "Cuprins",
+        "outlineEmpty": "Nu au fost găsite titluri încă."
+      },
+      "seo": {
+        "title": "Previzualizare SEO",
+        "hint": "Previzualizează titlul/descrierea pentru rezultate de căutare și social. Numărul de caractere este aproximativ și se poate trunchia diferit în funcție de dispozitiv.",
+        "missingLang": "Nu există conținut pentru această limbă încă.",
+        "searchPreview": "Previzualizare căutare",
+        "socialPreview": "Previzualizare social",
+        "checks": "Verificări",
+        "length": {
+          "title": "Titlu: {{count}} caractere",
+          "description": "Descriere: {{count}} caractere"
+        },
+        "issues": {
+          "missingTitle": "Lipsește titlul.",
+          "missingDescription": "Lipsește descrierea.",
+          "titleTooLong": "Titlul este lung ({{count}} caractere) și se poate trunchia.",
+          "titleTooShort": "Titlul este scurt ({{count}} caractere).",
+          "descriptionTooLong": "Descrierea este lungă ({{count}} caractere) și se poate trunchia.",
+          "descriptionTooShort": "Descrierea este scurtă ({{count}} caractere).",
+          "derivedFromBody": "Nu există rezumat; descrierea este derivată din conținutul articolului.",
+          "previewTokenRecommended": "Generează un token de previzualizare pentru a valida imaginile OG la ciorne."
+        }
+      },
+      "pins": {
+        "badge": "Fixat #{{slot}}",
+        "conflictBadge": "Conflict",
+        "conflictsTitle": "Conflicte de fixare",
+        "conflictLine": "Slot #{{slot}}: {{posts}}",
+        "saveConflict": "Slotul #{{slot}} este deja folosit de „{{title}}”. Debifează-l sau alege alt slot."
       },
       "preview": {
         "title": "Link previzualizare",
@@ -2464,6 +2991,33 @@
           "hide": "Nu am putut ascunde comentariul",
           "delete": "Nu am putut șterge comentariul"
         }
+      },
+      "bulk": {
+        "selectAll": "Selectează tot",
+        "selected": "{{count}} selectate",
+        "clear": "Golește selecția",
+        "actionLabel": "Acțiune în masă",
+        "actionPublish": "Publică acum",
+        "actionUnpublish": "Anulează publicarea (draft)",
+        "actionSchedule": "Programează publicare/anulare",
+        "actionTagsAdd": "Adaugă etichete",
+        "actionTagsRemove": "Elimină etichete",
+        "publishAt": "Publică la",
+        "unpublishAt": "Ascunde la (opțional)",
+        "tagsLabel": "Etichete",
+        "tagsPlaceholder": "ex. ceramică, studio",
+        "apply": "Aplică",
+        "previewEmpty": "Selectează articole și alege o acțiune pentru a vedea previzualizarea.",
+        "previewPublish": "Va publica {{count}} articole acum.",
+        "previewUnpublish": "Va anula publicarea pentru {{count}} articole.",
+        "previewSchedule": "Va programa {{count}} articole: publică {{publish}}, ascunde {{unpublish}}.",
+        "previewTagsAdd": "Va adăuga etichete la {{count}} articole: {{tags}}.",
+        "previewTagsRemove": "Va elimina etichete de la {{count}} articole: {{tags}}.",
+        "invalidSchedule": "Data de ascundere trebuie să fie după data de publicare.",
+        "noChanges": "Nu există modificări de aplicat.",
+        "loadError": "Nu am putut încărca unele articole pentru actualizarea în masă.",
+        "success": "Actualizate {{count}} articole.",
+        "errors": "{{count}} articole nu au putut fi actualizate."
       },
       "success": {
         "created": "Articol creat",
@@ -2583,11 +3137,74 @@
     },
     "products": {
       "title": "Produse",
-      "hint": "Caută după nume, slug sau SKU.",
+      "hint": "Caută după nume, URL sau cod produs (SKU).",
       "new": "Nou",
+      "wizard": {
+        "start": "Asistent ghidat",
+        "createTitle": "Configurare ghidată: adaugă produs",
+        "publishTitle": "Configurare ghidată: publică produs",
+        "publish": "Asistent publicare",
+        "publishNow": "Publică acum",
+        "steps": {
+          "basics": "Bază",
+          "content": "Conținut",
+          "save": "Salvează",
+          "images": "Imagini",
+          "publish": "Publică",
+          "review": "Revizuire"
+        },
+        "desc": {
+          "basics": "Completează esențialul: nume, categorie, preț și stoc.",
+          "content": "Adaugă o descriere și eventuale traduceri (RO/EN).",
+          "save": "Salvează pentru a crea produsul. Asta deblochează imaginile și traducerile.",
+          "images": "Încarcă cel puțin o fotografie și adaugă text alternativ.",
+          "publish": "Când ești gata, setează Status pe Publicat și salvează din nou.",
+          "review": "Verifică conținutul și traducerile înainte de publicare."
+        }
+      },
+      "help": {
+        "subtitle": "Ghid rapid pentru administrarea produselor.",
+        "mediaAlt": "Exemplu: lista de produse (taburi, acțiuni în masă, acțiuni rapide).",
+        "points": {
+          "search": "Folosește Căutare + filtre pentru a găsi produse după nume, URL sau SKU.",
+          "bulk": "Selectează rânduri pentru a debloca acțiuni în masă (reduceri, categorie, programare, preț).",
+          "columns": "Folosește „Aspect tabel” pentru a afișa/ascunde coloane și a schimba densitatea.",
+          "wizard": "Folosește „Asistent ghidat” la creare/publicare pentru un flux pas-cu-pas."
+        }
+      },
+      "confirmDeleteImage": {
+        "title": "Ștergi această imagine?",
+        "subtitle": "Imaginea va fi ascunsă din galeria produsului.",
+        "points": {
+          "storefront": "Nu va mai apărea în magazin (galerie și previzualizări sociale).",
+          "restore": "O poți restaura ulterior din „Arată șterse”.",
+          "metadata": "Textul alternativ și descrierile imaginii vor fi eliminate din galerie."
+        }
+      },
+      "confirmStatus": {
+        "title": "Confirmă schimbarea statusului",
+        "subtitle": "Aceasta afectează vizibilitatea în magazin.",
+        "summary": "Status",
+        "points": {
+          "published": "Publicarea poate face produsul vizibil pentru clienți (dacă „Activ” este bifat).",
+          "draft": "Produsele în ciornă sunt ascunse din magazin.",
+          "archived": "Produsele arhivate sunt ascunse din magazin, dar rămân în istoricul de administrare.",
+          "audit": "Schimbarea va fi înregistrată în istoricul de modificări."
+        }
+      },
       "delete": "Șterge",
       "edit": "Editează produs",
       "inlineEdit": "Editare rapidă",
+      "quickStatus": {
+        "publish": "Publică",
+        "unpublish": "Retrage",
+        "archive": "Arhivează",
+        "unarchive": "Dezarhivează",
+        "success": "Status actualizat pentru {{name}}.",
+        "error": "Nu am putut actualiza statusul.",
+        "undoSuccess": "Am revenit la statusul anterior.",
+        "undoError": "Nu am putut anula schimbarea de status."
+      },
       "create": "Creează produs",
       "selectCategory": "Selectează categoria",
       "search": "Caută",
@@ -2618,10 +3235,12 @@
         "deleted": "Șterse"
       },
       "form": {
-        "slug": "Slug",
+        "slug": "URL produs",
         "slugAutoHint": "Generat automat după salvare.",
+        "slugHelp": "Se generează automat din nume. Folosit în linkul produsului.",
         "priceFormatHint": "Folosește doar cifre și punct, cu maxim 2 zecimale (exemplu: 123.45).",
-        "sku": "SKU",
+        "sku": "Cod produs (SKU)",
+        "skuHint": "Opțional. Util pentru stoc, exporturi și evidență internă.",
         "shortDescription": "Descriere scurtă",
         "shortDescriptionHint": "Apare în carduri și liste (max 280 caractere).",
         "imageUrl": "URL imagine",
@@ -2640,6 +3259,8 @@
         "bestseller": "Cel mai vândut",
         "highlight": "Evidențiat",
         "publishAt": "Publică la",
+        "advancedSettings": "Setări avansate",
+        "advancedHint": "Livrare, programare, insigne și alte setări opționale.",
         "noImages": "Nu există imagini.",
         "imageMeta": "SEO imagine",
         "imageAltText": "Text alternativ",
@@ -2711,7 +3332,17 @@
         "applySale": "Aplică reducerea",
         "clearSale": "Șterge reducerea",
         "publish": "Publică",
-        "note": "Aplicarea reducerii mută produsele în Draft. Folosește „Publică” când ești gata.",
+        "note": "Aplicarea reducerii mută produsele în Draft. Folosește „Aplică status” când ești gata.",
+        "status": {
+          "apply": "Aplică status",
+          "title": "Schimbi statusul pentru {{count}} produse?",
+          "subtitle": "Aceasta afectează vizibilitatea în magazin.",
+          "target": "Status nou",
+          "undoHint": "Sfat: după aplicare, poți folosi „Anulează” pentru scurt timp.",
+          "success": "Status actualizat pentru {{count}} produse.",
+          "undoSuccess": "Schimbarea de status a fost anulată.",
+          "undoError": "Nu am putut anula schimbarea de status."
+        },
         "valueRequired": "Introdu valoarea reducerii.",
         "success": "Produsele selectate au fost actualizate.",
         "published": "Produsele selectate au fost publicate.",
@@ -2720,6 +3351,7 @@
           "label": "Categorie",
           "placeholder": "Selectează categoria",
           "apply": "Aplică categoria",
+          "addAndApply": "Adaugă și aplică categoria",
           "valueRequired": "Selectează o categorie."
         },
         "schedule": {
@@ -2751,6 +3383,8 @@
         "success": "Produs actualizat.",
         "errors": {
           "save": "Actualizarea rapidă a eșuat.",
+          "priceRequired": "Prețul este obligatoriu.",
+          "priceInvalid": "Prețul trebuie să fie un număr ≥ 0.",
           "stockRequired": "Stocul este obligatoriu.",
           "stockInvalid": "Stocul trebuie să fie un număr întreg ≥ 0."
         }
@@ -2763,12 +3397,21 @@
         "imageDelete": "Imagine ștearsă",
         "imageRestore": "Imagine restabilită"
       },
+      "successFeedback": {
+        "saved": "Salvat",
+        "visible": "Vizibil",
+        "hidden": "Ascuns",
+        "cta": {
+          "images": "Următorul pas: imagini",
+          "publish": "Următorul pas: publică",
+          "view": "Vezi produsul"
+        }
+      },
       "errors": {
         "loadList": "Nu am putut încărca produsele.",
         "load": "Nu am putut încărca produsul",
         "save": "Nu am putut salva produsul",
         "delete": "Nu am putut șterge produsul",
-        "required": "Numele categoriei este obligatoriu",
         "image": "Încărcarea imaginii a eșuat",
         "deleteImage": "Nu am putut șterge imaginea",
         "loadDeletedImages": "Nu am putut încărca imaginile șterse.",
@@ -2941,6 +3584,55 @@
     "categories": {
       "title": "Categorii",
       "add": "Adaugă categorie",
+      "wizard": {
+        "start": "Asistent ghidat",
+        "title": "Configurare ghidată: adaugă categorie",
+        "addFirst": "Adaugă mai întâi categoria pentru a continua.",
+        "steps": {
+          "basics": "Bază",
+          "translations": "Traduceri"
+        },
+        "desc": {
+          "basics": "Dă un nume categoriei și (opțional) alege un părinte, apoi adaug-o.",
+          "translations": "Adaugă traduceri RO și EN pentru afișare corectă în ambele limbi."
+        }
+      },
+      "help": {
+        "subtitle": "Ghid rapid pentru administrarea categoriilor.",
+        "mediaAlt": "Exemplu: managerul de categorii (arbore, câmpuri, traduceri).",
+        "points": {
+          "slug": "Slug-urile se generează din nume și sunt folosite în URL-uri.",
+          "parent": "Folosește categoria părinte pentru ierarhie (opțional).",
+          "translations": "Adaugă traduceri RO/EN pentru navigare și filtrare în magazin."
+        }
+      },
+      "csv": {
+        "title": "Import în masă (CSV)",
+        "hint": "Încarcă un CSV pentru a crea/actualiza categorii. Folosește Previzualizare mai întâi pentru validare.",
+        "formatHint": "Coloane: slug, name, parent_slug, sort_order, is_visible, description, name_ro, description_ro, name_en, description_en.",
+        "downloadTemplate": "Descarcă șablon",
+        "export": "Exportă categorii CSV",
+        "file": "Fișier CSV",
+        "dryRun": "Previzualizare (fără schimbări)",
+        "run": "Rulează importul",
+        "result": "Rezultat import",
+        "created": "Create",
+        "updated": "Actualizate",
+        "errorsTitle": "Erori",
+        "noErrors": "Fără erori.",
+        "success": "Importul categoriilor a fost finalizat.",
+        "exportError": "Nu am putut exporta CSV-ul cu categorii.",
+        "error": "Importul categoriilor a eșuat."
+      },
+      "confirmDelete": {
+        "title": "Ștergi categoria „{{name}}”?",
+        "subtitle": "Aceasta va elimina permanent categoria din magazin.",
+        "points": {
+          "permanent": "Acțiunea nu poate fi anulată.",
+          "inUse": "Dacă există produse care folosesc categoria, ștergerea poate eșua — reasignează produsele înainte.",
+          "urls": "Linkurile care includ slug-ul categoriei pot să nu mai funcționeze."
+        }
+      },
       "slug": "Slug",
       "slugAutoHint": "Slug-ul este generat automat din nume.",
       "parent": "Categorie părinte",
@@ -2969,6 +3661,7 @@
         "updateLowStockThreshold": "Pragul de stoc redus a fost actualizat"
       },
       "errors": {
+        "required": "Numele categoriei este obligatoriu",
         "add": "Nu am putut adăuga categoria",
         "delete": "Nu am putut șterge categoria",
         "reorder": "Nu am putut reordona categoriile",
@@ -2980,6 +3673,15 @@
       "title": "Comenzi",
       "hint": "Caută după referință, ID, email sau utilizator.",
       "export": "Exportă CSV",
+      "help": {
+        "subtitle": "Ghid rapid pentru administrarea comenzilor.",
+        "mediaAlt": "Exemplu: lista de comenzi (căutare, filtre de status, export).",
+        "points": {
+          "status": "Folosește Status pentru a te concentra pe stări precum în așteptare/plată/livrat.",
+          "tags": "Folosește etichete precum vip/gift/test pentru triere și filtre rapide.",
+          "export": "Folosește Export CSV pentru descărcări și salvează șabloane pentru exporturi recurente."
+        }
+      },
       "exportModal": {
         "title": "Export comenzi",
         "hint": "Alege coloanele sau folosește un șablon salvat.",
@@ -3357,6 +4059,15 @@
     "users": {
       "title": "Utilizatori",
       "hint": "Caută după email, utilizator sau nume afișat.",
+      "help": {
+        "subtitle": "Ghid rapid pentru administrarea utilizatorilor.",
+        "mediaAlt": "Exemplu: lista de utilizatori (căutare, filtru rol, toggle PII).",
+        "points": {
+          "search": "Folosește Căutare + Rol pentru a restrânge lista (clienți/admini).",
+          "pii": "Folosește „Afișează PII” doar când e necesar (poate debloca date suplimentare).",
+          "roles": "Schimbarea rolurilor și acțiunile sensibile pot cere confirmarea parolei."
+        }
+      },
       "gdprQueue": "Coada GDPR",
       "segments": "Segmente",
       "setRole": "Setează rol",
@@ -3586,14 +4297,41 @@
         "simpleHint": "Modul Simplu ascunde SEO și programarea.",
         "advancedHint": "Modul Avansat arată SEO, programarea și controale suplimentare."
       },
+      "translation": {
+        "layoutLabel": "Layout traduceri",
+        "layouts": {
+          "single": "O limbă",
+          "sideBySide": "Alăturat"
+        },
+        "copyRoToEn": "Copiază RO → EN",
+        "copyEnToRo": "Copiază EN → RO"
+      },
       "preview": {
         "deviceLabel": "Dimensiune previzualizare",
         "desktop": "Desktop",
         "tablet": "Tabletă",
         "mobile": "Mobil",
+        "languageLabel": "Limbă previzualizare",
+        "themeLabel": "Temă previzualizare",
         "layoutLabel": "Aspect",
         "stacked": "Vertical",
         "split": "Împărțit"
+      },
+      "previewLinks": {
+        "title": "Previzualizare",
+        "hint": "Generează un link de previzualizare pentru a încărca iframe-ul.",
+        "generate": "Generează link",
+        "open": "Deschide",
+        "copy": "Copiază",
+        "expires": "Expiră",
+        "success": {
+          "ready": "Link de previzualizare gata",
+          "copied": "Copiat în clipboard"
+        },
+        "errors": {
+          "generate": "Nu s-a putut genera linkul de previzualizare",
+          "copy": "Nu s-a putut copia în clipboard"
+        }
       },
       "blockLibrary": {
         "title": "Biblioteca de blocuri",
@@ -3604,12 +4342,46 @@
           "blank": "Gol"
         },
         "dropHere": "Lasă aici pentru a insera",
-        "items": {
-          "text": "Secțiune de text (markdown / editor rich).",
-          "image": "O singură imagine cu link și legendă opționale.",
-          "gallery": "Galerie cu mai multe imagini, legende și puncte focale.",
-          "banner": "Banner tip hero cu titlu, CTA și imagine de fundal.",
-          "carousel": "Carusel cu mai multe slide-uri și setări de autoplay."
+	        "items": {
+	          "text": "Secțiune de text (markdown / editor rich).",
+	          "columns": "Aspect cu 2–3 coloane și aliniere responsivă.",
+	          "cta": "Bloc CTA cu buton.",
+	          "faq": "Accordion FAQ cu întrebări și răspunsuri.",
+	          "testimonials": "Grilă de testimoniale cu citate și autori.",
+            "product_grid": "Grilă de produse din categorie, colecție sau selecție manuală.",
+            "form": "Formular de contact sau newsletter cu validare și mesaj de succes.",
+	          "image": "O singură imagine cu link și legendă opționale.",
+	          "gallery": "Galerie cu mai multe imagini, legende și puncte focale.",
+	          "banner": "Banner tip hero cu titlu, CTA și imagine de fundal.",
+	          "carousel": "Carusel cu mai multe slide-uri și setări de autoplay."
+	        }
+	      },
+      "mediaDrop": {
+        "inserted": "Au fost inserate {{count}} imagine(i).",
+        "errors": { "noImages": "Trage una sau mai multe imagini PNG/JPEG/WEBP/GIF (max 5MB)." }
+      },
+      "reusableBlocks": {
+        "title": "Blocuri reutilizabile",
+        "hint": "Salvează o secțiune și reutilizeaz-o pe alte pagini.",
+        "search": "Caută",
+        "loading": "Se încarcă blocurile reutilizabile...",
+        "empty": "Nu există încă blocuri reutilizabile.",
+        "actions": {
+          "save": "Salvează ca reutilizabil",
+          "insert": "Inserează"
+        },
+        "prompts": {
+          "name": "Nume bloc reutilizabil",
+          "overwriteConfirm": "Suprascrii blocul reutilizabil „{{title}}”?",
+          "deleteConfirm": "Ștergi blocul reutilizabil „{{title}}”?"
+        },
+        "success": {
+          "saved": "Bloc reutilizabil salvat.",
+          "deleted": "Bloc reutilizabil șters."
+        },
+        "errors": {
+          "load": "Nu am putut încărca blocurile reutilizabile.",
+          "save": "Nu am putut salva blocul reutilizabil."
         }
       },
       "reorder": {
@@ -3630,7 +4402,27 @@
         "home": "Acasă",
         "pages": "Pagini",
         "blog": "Blog",
+        "scheduling": "Programare",
         "settings": "Setări"
+      },
+      "scheduling": {
+        "title": "Programare",
+        "hint": "Evenimente viitoare de publicare/anulare a publicării pentru pagini, blog și bannere globale.",
+        "window": "Fereastră",
+        "window30": "30 zile",
+        "window90": "90 zile",
+        "window180": "180 zile",
+        "empty": "Nu există evenimente programate în această fereastră.",
+        "publish": "Publicare",
+        "unpublish": "Anulează publicarea",
+        "kind": {
+          "page": "Pagină",
+          "blog": "Blog",
+          "global": "Global"
+        },
+        "errors": {
+          "load": "Nu am putut încărca datele de programare."
+        }
       },
       "editing": "Se editează",
       "titleLabel": "Titlu",
@@ -3658,6 +4450,42 @@
           "rollback": "Nu am putut reveni"
         }
       },
+      "findReplace": {
+        "title": "Căutare & înlocuire",
+        "hint": "Caută și înlocuiește text în conținutul CMS (inclusiv blocurile din page builder). Previzualizează înainte de aplicare.",
+        "find": "Caută",
+        "replace": "Înlocuiește cu",
+        "caseSensitive": "Sensibil la majuscule",
+        "preview": "Previzualizează",
+        "apply": "Aplică",
+        "loading": "Caut…",
+        "applying": "Aplic…",
+        "empty": "Nu s-au găsit potriviri.",
+        "summary": "{{items}} element(e), {{matches}} înlocuire(i).",
+        "truncated": "Se afișează primele {{limit}} elemente.",
+        "result": "Actualizat {{blocks}} bloc(uri), {{translations}} traducere(i) ({{replacements}} înlocuire(i)).",
+        "applyErrors": "Unele elemente nu au putut fi actualizate:",
+        "scope": {
+          "label": "Domeniu",
+          "all": "Tot conținutul",
+          "pages": "Pagini",
+          "blog": "Articole blog",
+          "home": "Acasă",
+          "site": "Secțiuni globale"
+        },
+        "confirms": {
+          "apply": "Aplici {{matches}} înlocuiri pentru {{items}} elemente? Se vor crea revizii noi pentru fiecare element."
+        },
+        "success": {
+          "apply": "Aplicate {{replacements}} înlocuiri ({{blocks}} blocuri)."
+        },
+        "errors": {
+          "findRequired": "Introdu un termen de căutare.",
+          "previewFirst": "Rulează mai întâi previzualizarea.",
+          "preview": "Nu s-a putut rula previzualizarea.",
+          "apply": "Nu s-a putut aplica înlocuirea."
+        }
+      },
       "linkCheck": {
         "title": "Verificare linkuri",
         "hint": "Verifică linkurile interne și referințele media pentru cheia de conținut selectată.",
@@ -3668,6 +4496,30 @@
         "empty": "Nu au fost găsite probleme.",
         "errors": {
           "load": "Nu am putut rula verificarea."
+        }
+      },
+      "publishChecklist": {
+        "title": "Listă de verificare pentru publicare",
+        "hint": "Verifică aceste elemente înainte de publicare.",
+        "loading": "Se verifică…",
+        "publish": "Publică",
+        "publishAnyway": "Publică oricum",
+        "ok": "OK",
+        "translationsMissing": "Lipsesc traduceri: {{langs}}.",
+        "altMissing": "{{count}} imagine(i) nu au text alternativ.",
+        "emptyFound": "{{count}} secțiune(i) par goale.",
+        "linksFound": "{{count}} link(uri) nefuncționale găsite.",
+        "emptyAllDisabled": "Nicio secțiune nu este activă.",
+        "imageLabel": "Imaginea {{index}}",
+        "slideLabel": "Slide-ul {{index}}",
+        "sections": {
+          "translations": "Traduceri",
+          "altText": "Text alternativ imagini",
+          "empty": "Secțiuni goale",
+          "links": "Linkuri nefuncționale"
+        },
+        "errors": {
+          "linkCheck": "Nu am putut verifica linkurile."
         }
       },
       "errors": {

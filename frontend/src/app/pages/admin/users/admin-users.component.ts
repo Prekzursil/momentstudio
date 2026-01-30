@@ -23,6 +23,7 @@ import { ButtonComponent } from '../../../shared/button.component';
 import { ErrorStateComponent } from '../../../shared/error-state.component';
 import { extractRequestId } from '../../../shared/http-error';
 import { InputComponent } from '../../../shared/input.component';
+import { HelpPanelComponent } from '../../../shared/help-panel.component';
 import { SkeletonComponent } from '../../../shared/skeleton.component';
 import { formatIdentity } from '../../../shared/user-identity';
 import {
@@ -49,6 +50,11 @@ const USERS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
   { id: 'actions', labelKey: 'adminUi.users.table.actions', required: true }
 ];
 
+const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
+  ...defaultAdminTableLayout(USERS_TABLE_COLUMNS),
+  hidden: ['email']
+});
+
 @Component({
   selector: 'app-admin-users',
   standalone: true,
@@ -62,6 +68,7 @@ const USERS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
     ButtonComponent,
     ErrorStateComponent,
     InputComponent,
+    HelpPanelComponent,
     SkeletonComponent,
     CustomerTimelineComponent,
     TableLayoutModalComponent
@@ -94,12 +101,26 @@ const USERS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
         [open]="layoutModalOpen()"
         [columns]="tableColumns"
         [layout]="tableLayout()"
+        [defaults]="tableDefaults"
         (closed)="closeLayoutModal()"
         (applied)="applyTableLayout($event)"
       ></app-table-layout-modal>
 
       <div class="grid gap-6 lg:grid-cols-[1.25fr_0.75fr] items-start">
         <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
+          <app-help-panel
+            [titleKey]="'adminUi.help.title'"
+            [subtitleKey]="'adminUi.users.help.subtitle'"
+            [mediaSrc]="'assets/help/admin-users-help.svg'"
+            [mediaAltKey]="'adminUi.users.help.mediaAlt'"
+          >
+            <ul class="list-disc pl-5 text-xs text-slate-600 dark:text-slate-300">
+              <li>{{ 'adminUi.users.help.points.search' | translate }}</li>
+              <li>{{ 'adminUi.users.help.points.pii' | translate }}</li>
+              <li>{{ 'adminUi.users.help.points.roles' | translate }}</li>
+            </ul>
+          </app-help-panel>
+
           <div class="grid gap-3 lg:grid-cols-[1fr_240px_auto] items-end">
             <app-input [label]="'adminUi.users.search' | translate" [(value)]="q"></app-input>
 
@@ -878,9 +899,10 @@ export class AdminUsersComponent implements OnInit {
 
   readonly userRowHeight = 44;
   readonly tableColumns = USERS_TABLE_COLUMNS;
+  readonly tableDefaults = defaultUsersTableLayout();
 
   layoutModalOpen = signal(false);
-  tableLayout = signal<AdminTableLayoutV1>(defaultAdminTableLayout(USERS_TABLE_COLUMNS));
+  tableLayout = signal<AdminTableLayoutV1>(defaultUsersTableLayout());
 
   loading = signal(true);
   error = signal<string | null>(null);
@@ -955,7 +977,7 @@ export class AdminUsersComponent implements OnInit {
 
   ngOnInit(): void {
     this.favorites.init();
-    this.tableLayout.set(loadAdminTableLayout(this.tableLayoutStorageKey(), this.tableColumns));
+    this.tableLayout.set(loadAdminTableLayout(this.tableLayoutStorageKey(), this.tableColumns, this.tableDefaults));
     const state = history.state as any;
     const appliedSavedView = this.maybeApplyFiltersFromState(state);
     if (!appliedSavedView) {

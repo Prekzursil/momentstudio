@@ -89,6 +89,9 @@ from app.services import notifications as notification_service
 from app.services import promo_usage
 from app.services import pricing
 from app.services import pii as pii_service
+from app.services import legal_consents as legal_consents_service
+from app.services.payment_provider import is_mock_payments
+from app.models.legal import LegalConsentContext
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -349,6 +352,12 @@ async def checkout(
     current_user=Depends(require_verified_email),
     session_id: str | None = Depends(cart_api.session_header),
 ) -> GuestCheckoutResponse:
+    required_versions = await legal_consents_service.required_doc_versions(session)
+    accepted_versions = await legal_consents_service.latest_accepted_versions(session, user_id=current_user.id)
+    needs_consent = not legal_consents_service.is_satisfied(required_versions, accepted_versions)
+    if needs_consent and (not payload.accept_terms or not payload.accept_privacy):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Legal consents required")
+
     user_cart = await cart_service.get_cart(session, current_user.id, session_id)
     if not user_cart.items:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty")
@@ -545,6 +554,16 @@ async def checkout(
         shipping_amount=totals.shipping,
         total_amount=totals.total,
     )
+    if needs_consent:
+        legal_consents_service.add_consent_records(
+            session,
+            context=LegalConsentContext.checkout,
+            required_versions=required_versions,
+            accepted_at=datetime.now(timezone.utc),
+            user_id=current_user.id,
+            order_id=order.id,
+        )
+        await session.commit()
     if applied_coupon:
         await coupons_service.reserve_coupon_for_order(
             session,
@@ -605,6 +624,8 @@ async def capture_paypal_order(
     if not paypal_order_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="PayPal order id is required")
 
+    mock_mode = is_mock_payments()
+
     order = (
         (
             await session.execute(
@@ -650,7 +671,13 @@ async def capture_paypal_order(
     if order.status not in {OrderStatus.pending_payment, OrderStatus.pending_acceptance, OrderStatus.paid}:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order cannot be captured")
 
-    capture_id = await paypal_service.capture_order(paypal_order_id=paypal_order_id)
+    if mock_mode:
+        outcome = str(payload.mock or "success").strip().lower()
+        if outcome == "decline":
+            raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail="Payment declined")
+        capture_id = f"paypal_mock_capture_{secrets.token_hex(8)}"
+    else:
+        capture_id = await paypal_service.capture_order(paypal_order_id=paypal_order_id)
     if order.status == OrderStatus.pending_payment:
         order.status = OrderStatus.pending_acceptance
         session.add(OrderEvent(order_id=order.id, event="status_change", note="pending_payment -> pending_acceptance"))
@@ -713,21 +740,24 @@ async def confirm_stripe_checkout(
     if not session_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Session id is required")
 
-    if not payments.is_stripe_configured():
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe not configured")
+    mock_mode = is_mock_payments()
+    checkout_session = None
+    if not mock_mode:
+        if not payments.is_stripe_configured():
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe not configured")
 
-    payments.init_stripe()
-    try:
-        checkout_session = payments.stripe.checkout.Session.retrieve(session_id)  # type: ignore[attr-defined]
-    except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Stripe session lookup failed") from exc
+        payments.init_stripe()
+        try:
+            checkout_session = payments.stripe.checkout.Session.retrieve(session_id)  # type: ignore[attr-defined]
+        except Exception as exc:
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Stripe session lookup failed") from exc
 
-    payment_status = (
-        getattr(checkout_session, "payment_status", None)
-        or (checkout_session.get("payment_status") if hasattr(checkout_session, "get") else None)
-    )
-    if str(payment_status or "").lower() != "paid":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment not completed")
+        payment_status = (
+            getattr(checkout_session, "payment_status", None)
+            or (checkout_session.get("payment_status") if hasattr(checkout_session, "get") else None)
+        )
+        if str(payment_status or "").lower() != "paid":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment not completed")
 
     order = (
         (
@@ -761,12 +791,17 @@ async def confirm_stripe_checkout(
         else:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
 
-    payment_intent_id = (
-        getattr(checkout_session, "payment_intent", None)
-        or (checkout_session.get("payment_intent") if hasattr(checkout_session, "get") else None)
-    )
-    if payment_intent_id and not order.stripe_payment_intent_id:
-        order.stripe_payment_intent_id = str(payment_intent_id)
+    if mock_mode:
+        outcome = str(payload.mock or "success").strip().lower()
+        if outcome == "decline":
+            raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail="Payment declined")
+    else:
+        payment_intent_id = (
+            getattr(checkout_session, "payment_intent", None)
+            or (checkout_session.get("payment_intent") if hasattr(checkout_session, "get") else None)
+        )
+        if payment_intent_id and not order.stripe_payment_intent_id:
+            order.stripe_payment_intent_id = str(payment_intent_id)
 
     already_captured = any(getattr(evt, "event", None) == "payment_captured" for evt in (order.events or []))
     captured_added = False
@@ -1212,6 +1247,10 @@ async def guest_checkout(
     if not cart.guest_email_verified_at or _normalize_email(cart.guest_email or "") != email:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email verification required")
 
+    required_versions = await legal_consents_service.required_doc_versions(session)
+    if not payload.accept_terms or not payload.accept_privacy:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Legal consents required")
+
     user_id = None
     customer_name = (payload.name or "").strip()
     if not customer_name:
@@ -1414,6 +1453,15 @@ async def guest_checkout(
         shipping_amount=totals.shipping,
         total_amount=totals.total,
     )
+    legal_consents_service.add_consent_records(
+        session,
+        context=LegalConsentContext.checkout,
+        required_versions=required_versions,
+        accepted_at=datetime.now(timezone.utc),
+        user_id=user_id,
+        order_id=order.id,
+    )
+    await session.commit()
 
     if (payment_method or "").strip().lower() == "cod":
         background_tasks.add_task(

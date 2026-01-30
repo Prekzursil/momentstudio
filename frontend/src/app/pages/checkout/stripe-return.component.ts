@@ -11,6 +11,8 @@ import { ContainerComponent } from '../../layout/container.component';
 const CHECKOUT_SUCCESS_KEY = 'checkout_last_order';
 const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
 
+type MockOutcome = 'success' | 'decline';
+
 @Component({
   selector: 'app-stripe-return',
   standalone: true,
@@ -54,6 +56,7 @@ export class StripeReturnComponent implements OnInit {
   loading = true;
   errorMessage = '';
   private sessionId = '';
+  private mock: MockOutcome | null = null;
 
   constructor(
     private route: ActivatedRoute,
@@ -89,6 +92,10 @@ export class StripeReturnComponent implements OnInit {
 
   ngOnInit(): void {
     this.sessionId = this.route.snapshot.queryParamMap.get('session_id') || '';
+    const mockRaw = (this.route.snapshot.queryParamMap.get('mock') || '').toLowerCase();
+    if (mockRaw === 'success' || mockRaw === 'decline') {
+      this.mock = mockRaw;
+    }
     if (!this.sessionId) {
       this.loading = false;
       this.errorMessage = this.translate.instant('checkout.stripeMissingSession');
@@ -109,8 +116,9 @@ export class StripeReturnComponent implements OnInit {
     this.errorMessage = '';
 
     const orderId = this.pendingOrderId();
-    const payload: { session_id: string; order_id?: string } = { session_id: sessionId };
+    const payload: { session_id: string; order_id?: string; mock?: MockOutcome } = { session_id: sessionId };
     if (orderId) payload.order_id = orderId;
+    if (this.mock) payload.mock = this.mock;
 
     this.api.post<{ order_id: string; reference_code?: string; status: string }>('/orders/stripe/confirm', payload).subscribe({
       next: () => {

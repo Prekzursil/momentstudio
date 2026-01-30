@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any, Literal, cast
+from uuid import uuid4
 
 import stripe
 from fastapi import HTTPException, status
@@ -13,6 +14,7 @@ from app.models.cart import Cart
 from app.models.promo import PromoCode, StripeCouponMapping
 from app.models.webhook import StripeWebhookEvent
 from app.core import metrics
+from app.services.payment_provider import is_mock_payments
 
 stripe = cast(Any, stripe)
 
@@ -187,6 +189,12 @@ async def create_checkout_session(
     metadata includes our provided metadata so webhooks/confirm endpoints can map
     back to internal entities.
     """
+    if is_mock_payments():
+        session_id = f"cs_mock_{uuid4().hex}"
+        base = settings.frontend_origin.rstrip("/")
+        checkout_url = f"{base}/checkout/mock/stripe?session_id={session_id}"
+        return {"session_id": session_id, "checkout_url": checkout_url}
+
     if not is_stripe_configured():
         metrics.record_payment_failure()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe not configured")
@@ -262,11 +270,13 @@ async def create_checkout_session(
         metrics.record_payment_failure()
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Stripe checkout session creation failed") from exc
 
-    session_id = getattr(session_obj, "id", None) or (session_obj.get("id") if hasattr(session_obj, "get") else None)
-    checkout_url = getattr(session_obj, "url", None) or (session_obj.get("url") if hasattr(session_obj, "get") else None)
-    if not session_id or not checkout_url:
+    session_id_raw = getattr(session_obj, "id", None) or (session_obj.get("id") if hasattr(session_obj, "get") else None)
+    checkout_url_raw = getattr(session_obj, "url", None) or (
+        session_obj.get("url") if hasattr(session_obj, "get") else None
+    )
+    if not session_id_raw or not checkout_url_raw:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Stripe checkout session missing url")
-    return {"session_id": str(session_id), "checkout_url": str(checkout_url)}
+    return {"session_id": str(session_id_raw), "checkout_url": str(checkout_url_raw)}
 
 
 def _stripe_event_payload_summary(event: Any) -> dict[str, Any]:

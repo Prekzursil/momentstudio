@@ -1,12 +1,17 @@
 import { DOCUMENT } from '@angular/common';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute } from '@angular/router';
+import { RouterTestingModule } from '@angular/router/testing';
 import { Meta, Title } from '@angular/platform-browser';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { of } from 'rxjs';
 
 import { BlogPostComponent } from './blog-post.component';
+import { AdminService } from '../../core/admin.service';
 import { BlogService, BlogPost } from '../../core/blog.service';
+import { CatalogService } from '../../core/catalog.service';
+import { NewsletterService } from '../../core/newsletter.service';
+import { StorefrontAdminModeService } from '../../core/storefront-admin-mode.service';
 import { ToastService } from '../../core/toast.service';
 import { MarkdownService } from '../../core/markdown.service';
 import { AuthService } from '../../core/auth.service';
@@ -33,7 +38,14 @@ describe('BlogPostComponent', () => {
   beforeEach(() => {
     meta = jasmine.createSpyObj<Meta>('Meta', ['updateTag']);
     title = jasmine.createSpyObj<Title>('Title', ['setTitle']);
-    blog = jasmine.createSpyObj<BlogService>('BlogService', ['getPost', 'getPreviewPost', 'listComments']);
+    blog = jasmine.createSpyObj<BlogService>('BlogService', [
+      'getPost',
+      'getPreviewPost',
+      'getNeighbors',
+      'listPosts',
+      'listCommentThreads',
+      'getCommentSubscription'
+    ]);
     toast = jasmine.createSpyObj<ToastService>('ToastService', ['error', 'success']);
     markdown = jasmine.createSpyObj<MarkdownService>('MarkdownService', ['render']);
     auth = jasmine.createSpyObj<AuthService>('AuthService', ['isAuthenticated', 'user']);
@@ -41,7 +53,12 @@ describe('BlogPostComponent', () => {
 
     blog.getPost.and.returnValue(of(post));
     blog.getPreviewPost.and.returnValue(of(post));
-    blog.listComments.and.returnValue(of({ items: [], meta: { total_items: 0, total_pages: 1, page: 1, limit: 50 } }));
+    blog.getNeighbors.and.returnValue(of({ previous: null, next: null }));
+    blog.listPosts.and.returnValue(of({ items: [], meta: { total_items: 0, total_pages: 1, page: 1, limit: 10 } }));
+    blog.listCommentThreads.and.returnValue(
+      of({ items: [], meta: { total_items: 0, total_pages: 1, page: 1, limit: 10 }, total_comments: 0 })
+    );
+    blog.getCommentSubscription.and.returnValue(of({ enabled: false }));
     markdown.render.and.returnValue('<p>Body</p>');
     auth.isAuthenticated.and.returnValue(false);
     auth.user.and.returnValue(null);
@@ -49,13 +66,17 @@ describe('BlogPostComponent', () => {
 
   function configure(): void {
     TestBed.configureTestingModule({
-      imports: [BlogPostComponent, TranslateModule.forRoot()],
+      imports: [BlogPostComponent, TranslateModule.forRoot(), RouterTestingModule.withRoutes([])],
       providers: [
         { provide: Title, useValue: title },
         { provide: Meta, useValue: meta },
         { provide: BlogService, useValue: blog },
+        { provide: AdminService, useValue: jasmine.createSpyObj<AdminService>('AdminService', ['getContent', 'updateContentBlock']) },
+        { provide: CatalogService, useValue: jasmine.createSpyObj<CatalogService>('CatalogService', ['getProduct', 'listCategories', 'listFeaturedCollections']) },
+        { provide: NewsletterService, useValue: jasmine.createSpyObj<NewsletterService>('NewsletterService', ['subscribe']) },
         { provide: ToastService, useValue: toast },
         { provide: MarkdownService, useValue: markdown },
+        { provide: StorefrontAdminModeService, useValue: { enabled: () => false } },
         { provide: AuthService, useValue: auth },
         { provide: ActivatedRoute, useValue: { params: of({}), queryParams: of({}) } },
         { provide: DOCUMENT, useValue: doc }
