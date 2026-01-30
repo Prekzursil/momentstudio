@@ -43,6 +43,7 @@ type OrderAction =
   | 'shipmentDelete'
   | 'deliveryEmail'
   | 'packingSlip'
+  | 'receiptPdf'
   | 'labelUpload'
   | 'labelDownload'
   | 'labelPrint'
@@ -409,6 +410,13 @@ type OrderAction =
                       [label]="'adminUi.orders.actions.packingSlip' | translate"
                       [disabled]="action() !== null"
                       (action)="downloadPackingSlip()"
+                    ></app-button>
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.orders.actions.receiptPdf' | translate"
+                      [disabled]="action() !== null"
+                      (action)="downloadReceiptPdf()"
                     ></app-button>
 	                  </div>
 	                </div>
@@ -2489,6 +2497,27 @@ export class AdminOrderDetailComponent implements OnInit {
       },
       error: () => {
         this.toast.error(this.translate.instant('adminUi.orders.errors.packingSlip'));
+        this.action.set(null);
+      }
+    });
+  }
+
+  downloadReceiptPdf(): void {
+    const orderId = this.orderId;
+    if (!orderId) return;
+    this.action.set('receiptPdf');
+    this.api.downloadReceiptPdf(orderId).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `receipt-${this.orderRef() || orderId}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.action.set(null);
+      },
+      error: () => {
+        this.toast.error(this.translate.instant('adminUi.orders.errors.receiptPdf'));
         this.action.set(null);
       }
     });

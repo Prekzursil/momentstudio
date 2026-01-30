@@ -91,6 +91,11 @@ export interface FailureCount {
   since_hours: number;
 }
 
+export interface WebhookBacklogCount {
+  pending: number;
+  since_hours: number;
+}
+
 export interface WebhookEventRead {
   provider: WebhookProvider;
   event_id: string;
@@ -173,6 +178,10 @@ export class OpsService {
 
   getWebhookFailureStats(params?: { since_hours?: number }): Observable<FailureCount> {
     return this.api.get<FailureCount>('/ops/admin/webhooks/stats', params as any);
+  }
+
+  getWebhookBacklogStats(params?: { since_hours?: number }): Observable<WebhookBacklogCount> {
+    return this.api.get<WebhookBacklogCount>('/ops/admin/webhooks/backlog', params as any);
   }
 
   getWebhookDetail(provider: WebhookProvider, eventId: string): Observable<WebhookEventDetail> {

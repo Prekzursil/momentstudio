@@ -6,6 +6,7 @@ import { TranslateModule } from '@ngx-translate/core';
 import { ButtonComponent } from '../../shared/button.component';
 import { SkeletonComponent } from '../../shared/skeleton.component';
 import { AccountComponent } from './account.component';
+import { AnalyticsService } from '../../core/analytics.service';
 
 @Component({
   selector: 'app-account-privacy',
@@ -58,6 +59,19 @@ import { AccountComponent } from './account.component';
         </div>
 
         <p *ngIf="account.exportError" class="text-xs text-rose-700 dark:text-rose-300">{{ account.exportError }}</p>
+      </div>
+
+      <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 grid gap-2">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <p class="font-semibold text-slate-900 dark:text-slate-50">{{ 'account.privacy.analytics.title' | translate }}</p>
+            <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'account.privacy.analytics.copy' | translate }}</p>
+          </div>
+          <label class="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+            <input type="checkbox" [(ngModel)]="analyticsOptIn" />
+            <span>{{ 'account.privacy.analytics.toggleLabel' | translate }}</span>
+          </label>
+        </div>
       </div>
 
       <div class="rounded-xl border border-rose-200 bg-rose-50 p-3 dark:border-rose-900/40 dark:bg-rose-950/30 grid gap-3">
@@ -175,5 +189,14 @@ import { AccountComponent } from './account.component';
 })
 export class AccountPrivacyComponent {
   protected readonly account = inject(AccountComponent);
+  private readonly analytics = inject(AnalyticsService);
   showDeletionPassword = false;
+
+  get analyticsOptIn(): boolean {
+    return this.analytics.enabled();
+  }
+
+  set analyticsOptIn(value: boolean) {
+    this.analytics.setEnabled(Boolean(value));
+  }
 }

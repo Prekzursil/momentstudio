@@ -43,7 +43,7 @@ def seed_checkout_settings_redirect(session_factory) -> None:
                 body_markdown="Redirect target for checkout settings.",
                 status=ContentStatus.published,
                 version=1,
-                published_at=datetime.now(timezone.utc),
+                published_at=datetime(2020, 1, 1, tzinfo=timezone.utc),
                 meta={
                     "version": 1,
                     "shipping_fee_ron": 20.0,
@@ -74,4 +74,3 @@ def test_cart_totals_use_redirected_checkout_settings() -> None:
     finally:
         client.close()
         app.dependency_overrides.clear()
-

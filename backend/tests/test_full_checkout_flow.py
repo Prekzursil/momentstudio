@@ -43,7 +43,7 @@ def full_app() -> Dict[str, object]:
                         body_markdown="Terms",
                         status=ContentStatus.published,
                         version=1,
-                        published_at=datetime.now(timezone.utc),
+                        published_at=datetime(2020, 1, 1, tzinfo=timezone.utc),
                     ),
                     ContentBlock(
                         key="page.privacy-policy",
@@ -51,7 +51,7 @@ def full_app() -> Dict[str, object]:
                         body_markdown="Privacy",
                         status=ContentStatus.published,
                         version=1,
-                        published_at=datetime.now(timezone.utc),
+                        published_at=datetime(2020, 1, 1, tzinfo=timezone.utc),
                     ),
                 ]
             )

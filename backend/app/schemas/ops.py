@@ -140,3 +140,8 @@ class EmailEventRead(BaseModel):
 class FailureCount(BaseModel):
     failed: int = 0
     since_hours: int
+
+
+class WebhookBacklogCount(BaseModel):
+    pending: int = 0
+    since_hours: int

@@ -10,6 +10,7 @@ import { ThemeService, ThemePreference } from './core/theme.service';
 import { TranslateService } from '@ngx-translate/core';
 import { LanguageService } from './core/language.service';
 import { AuthService } from './core/auth.service';
+import { AnalyticsService } from './core/analytics.service';
 import { Subscription } from 'rxjs';
 
 @Component({
@@ -47,11 +48,13 @@ export class AppComponent implements OnDestroy {
     private translate: TranslateService,
     private lang: LanguageService,
     private auth: AuthService,
-    private route: ActivatedRoute
+    private route: ActivatedRoute,
+    private analytics: AnalyticsService
   ) {
     // Language is handled by LanguageService (localStorage + preferred_language + browser fallback).
     // Revalidate any persisted session on startup to avoid "logged in but unauthorized" UI states.
     this.auth.ensureAuthenticated({ silent: true }).subscribe({ error: () => void 0 });
+    this.analytics.startSession();
 
     this.querySub = this.route.queryParams.subscribe((params) => {
       const lang = typeof params['lang'] === 'string' ? params['lang'].trim().toLowerCase() : '';

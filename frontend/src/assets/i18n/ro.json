@@ -31,6 +31,16 @@
     "language": "Limbă",
     "editMode": "Mod editare"
   },
+  "pwa": {
+    "install": "Instalează aplicația",
+    "installAccepted": "Instalarea a început.",
+    "installDismissed": "Instalarea a fost anulată.",
+    "offlineBadge": "Offline",
+    "offlineTitle": "Ești offline",
+    "offlineBody": "Unele funcții necesită conexiune la internet.",
+    "retry": "Reîncearcă",
+    "goHome": "Acasă"
+  },
   "notifications": {
     "title": "Notificări",
     "loading": "Se încarcă…",
@@ -282,6 +292,11 @@
         },
         "downloaded": "Export descărcat",
         "downloadError": "Nu am putut descărca exportul."
+      },
+      "analytics": {
+        "title": "Analitice de utilizare",
+        "copy": "Activează pentru a trimite statistici anonime (sesiuni, coș, checkout, comenzi) care ne ajută să îmbunătățim magazinul.",
+        "toggleLabel": "Trimite analitice anonime de utilizare"
       },
       "deletion": {
         "title": "Șterge contul",
@@ -1087,6 +1102,9 @@
     "quantity": "Cantitate",
     "addToCart": "Adaugă în coș",
     "backToShop": "Înapoi la magazin",
+    "share": "Distribuie",
+    "shareCopied": "Link copiat.",
+    "shareReady": "Link-ul este pregătit.",
     "upsells": "Recomandări",
     "relatedProducts": "Produse similare",
     "recentlyViewed": "Văzute recent",
@@ -1247,6 +1265,8 @@
     "paymentCashHint": "Plătești în numerar la livrare (RON).",
     "acceptedCards": "Acceptat",
     "acceptedCardsAlt": "Carduri acceptate: Netopia, Visa, Mastercard",
+    "analyticsOptInLabel": "Trimite analitice anonime (opțional)",
+    "analyticsOptInCopy": "Ne ajută să înțelegem funnel-ul (sesiuni → coș → checkout → comenzi). Poți dezactiva oricând din Cont → Confidențialitate.",
     "paymentHelpLink": "Contact",
     "paypalReturnTitle": "PayPal",
     "paypalCapturing": "Confirmăm plata PayPal…",
@@ -1715,6 +1735,18 @@
           "sales": "Vânzări"
         }
       },
+      "funnel": {
+        "title": "Funnel (opt-in)",
+        "note": "Contoarele sunt bazate pe utilizatori care au optat pentru analitice anonime.",
+        "sessions": "Sesiuni",
+        "carts": "Coșuri",
+        "checkouts": "Checkout",
+        "orders": "Comenzi",
+        "toCart": "Sesiune → coș",
+        "toCheckout": "Coș → checkout",
+        "toOrder": "Checkout → comandă",
+        "error": "Nu am putut încărca metricile funnel-ului."
+      },
       "widgetsTitle": "Widgeturi panou",
       "widgets": {
         "kpis": "KPI astăzi",
@@ -2055,6 +2087,19 @@
     "ops": {
       "title": "Operațiuni",
       "subtitle": "Operațiuni magazin, bannere, simulator livrare și webhook-uri.",
+      "health": {
+        "title": "Panou de sănătate",
+        "hint": "Semnale rapide pentru disponibilitate și backlog-uri de procesare.",
+        "backend": "Backend (DB gata)",
+        "webhooksFailed": "Webhook-uri eșuate",
+        "webhooksBacklog": "Backlog webhook",
+        "emailFailures": "Email-uri eșuate",
+        "lastHours": "Ultimele {{hours}}h",
+        "lastChecked": "Ultima verificare",
+        "errors": {
+          "load": "Nu am putut încărca semnalele de sănătate."
+        }
+      },
       "banner": {
         "title": "Bannere mentenanță",
         "hint": "Programează bannere pentru anunțuri (mentenanță, promoții).",
@@ -3673,6 +3718,34 @@
       "title": "Comenzi",
       "hint": "Caută după referință, ID, email sau utilizator.",
       "export": "Exportă CSV",
+      "exports": {
+        "nav": "Documente",
+        "title": "Documente comenzi",
+        "hint": "Avize, bonuri (PDF) și etichete de livrare generate în admin.",
+        "back": "Înapoi la comenzi",
+        "download": "Descarcă",
+        "empty": "Nu există documente încă.",
+        "ordersCount": "comenzi",
+        "table": {
+          "kind": "Tip",
+          "orders": "Comandă/Comenzi",
+          "file": "Fișier",
+          "created": "Creat",
+          "expires": "Expiră",
+          "actions": "Acțiuni"
+        },
+        "kinds": {
+          "packingSlip": "Aviz",
+          "packingSlipsBatch": "Avize (batch)",
+          "shippingLabel": "Etichetă livrare",
+          "receipt": "Bon (PDF)"
+        },
+        "errors": {
+          "load": "Nu am putut încărca documentele.",
+          "download": "Nu am putut descărca documentul.",
+          "expired": "Acest document a expirat."
+        }
+      },
       "help": {
         "subtitle": "Ghid rapid pentru administrarea comenzilor.",
         "mediaAlt": "Exemplu: lista de comenzi (căutare, filtre de status, export).",
@@ -3885,6 +3958,7 @@
         "voidPayment": "Anulează plata",
         "deliveryEmail": "Trimite email de livrare",
         "packingSlip": "Descarcă packing slip",
+        "receiptPdf": "Descarcă bon (PDF)",
         "partialRefund": "Rambursare parțială",
         "addNote": "Adaugă notă",
         "refund": "Solicită rambursare"
@@ -4049,6 +4123,7 @@
         "noteRequired": "Nota este obligatorie.",
         "deliveryEmail": "Nu am putut trimite emailul de livrare.",
         "packingSlip": "Nu am putut descărca packing slip-ul.",
+        "receiptPdf": "Nu am putut descărca bonul.",
         "shippingLabelUpload": "Nu am putut încărca eticheta.",
         "shippingLabelDownload": "Nu am putut descărca eticheta.",
         "shippingLabelDelete": "Nu am putut șterge eticheta.",

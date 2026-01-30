@@ -21,6 +21,7 @@ import {
   AdminDashboardSearchResultType,
   AdminDashboardWindowMetric,
   AdminChannelBreakdownResponse,
+  AdminFunnelMetricsResponse,
   ScheduledPromoItem,
   ScheduledPublishItem,
   AdminService,
@@ -636,6 +637,67 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
                       [clickable]="true"
                       (action)="openOrdersRange()"
                     ></app-card>
+                  </div>
+
+                  <div class="mt-4">
+                    <app-card [title]="'adminUi.dashboard.funnel.title' | translate">
+                      <p class="text-xs text-slate-500 dark:text-slate-400">
+                        {{ 'adminUi.dashboard.funnel.note' | translate }}
+                      </p>
+
+                      <div *ngIf="funnelLoading()" class="mt-3">
+                        <app-skeleton [rows]="2"></app-skeleton>
+                      </div>
+
+                      <div
+                        *ngIf="funnelError()"
+                        class="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+                      >
+                        {{ funnelError() }}
+                      </div>
+
+                      <div *ngIf="!funnelLoading() && !funnelError() && funnelMetrics() as funnel" class="mt-3 grid gap-4 md:grid-cols-2">
+                        <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
+                          <div class="flex items-center justify-between">
+                            <span>{{ 'adminUi.dashboard.funnel.sessions' | translate }}</span>
+                            <span class="font-semibold text-slate-900 dark:text-slate-50">{{ funnel.counts.sessions | number: '1.0-0' }}</span>
+                          </div>
+                          <div class="flex items-center justify-between">
+                            <span>{{ 'adminUi.dashboard.funnel.carts' | translate }}</span>
+                            <span class="font-semibold text-slate-900 dark:text-slate-50">{{ funnel.counts.carts | number: '1.0-0' }}</span>
+                          </div>
+                          <div class="flex items-center justify-between">
+                            <span>{{ 'adminUi.dashboard.funnel.checkouts' | translate }}</span>
+                            <span class="font-semibold text-slate-900 dark:text-slate-50">{{ funnel.counts.checkouts | number: '1.0-0' }}</span>
+                          </div>
+                          <div class="flex items-center justify-between">
+                            <span>{{ 'adminUi.dashboard.funnel.orders' | translate }}</span>
+                            <span class="font-semibold text-slate-900 dark:text-slate-50">{{ funnel.counts.orders | number: '1.0-0' }}</span>
+                          </div>
+                        </div>
+
+                        <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
+                          <div class="flex items-center justify-between">
+                            <span>{{ 'adminUi.dashboard.funnel.toCart' | translate }}</span>
+                            <span class="font-semibold text-slate-900 dark:text-slate-50">
+                              {{ funnel.conversions.to_cart === null ? '—' : (funnel.conversions.to_cart | percent: '1.0-0') }}
+                            </span>
+                          </div>
+                          <div class="flex items-center justify-between">
+                            <span>{{ 'adminUi.dashboard.funnel.toCheckout' | translate }}</span>
+                            <span class="font-semibold text-slate-900 dark:text-slate-50">
+                              {{ funnel.conversions.to_checkout === null ? '—' : (funnel.conversions.to_checkout | percent: '1.0-0') }}
+                            </span>
+                          </div>
+                          <div class="flex items-center justify-between">
+                            <span>{{ 'adminUi.dashboard.funnel.toOrder' | translate }}</span>
+                            <span class="font-semibold text-slate-900 dark:text-slate-50">
+                              {{ funnel.conversions.to_order === null ? '—' : (funnel.conversions.to_order | percent: '1.0-0') }}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </app-card>
                   </div>
 
                   <div class="grid gap-3">
@@ -1302,6 +1364,9 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
   channelBreakdown = signal<AdminChannelBreakdownResponse | null>(null);
   channelBreakdownLoading = signal(false);
   channelBreakdownError = signal<string | null>(null);
+  funnelMetrics = signal<AdminFunnelMetricsResponse | null>(null);
+  funnelLoading = signal(false);
+  funnelError = signal<string | null>(null);
   lastUpdatedAt = signal<string | null>(null);
   liveRefreshEnabled = signal(false);
   salesMetric = signal<'gross' | 'net'>('net');
@@ -1396,6 +1461,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     this.loadLiveRefreshPreference();
     this.loadSalesMetricPreference();
     this.loadSummary();
+    this.loadFunnelMetrics();
     this.loadChannelBreakdown();
     this.loadScheduledTasks();
     this.loadBackgroundJobs();
@@ -1492,6 +1558,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     if (this.loading()) return;
     this.refreshSummarySilent();
     this.refreshChannelBreakdownSilent();
+    this.refreshFunnelSilent();
     this.loadScheduledTasks();
     this.loadBackgroundJobs();
   }
@@ -1777,6 +1844,33 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     });
   }
 
+  private loadFunnelMetrics(): void {
+    this.funnelLoading.set(true);
+    this.funnelError.set(null);
+    this.admin.funnel(this.buildSummaryParams()).subscribe({
+      next: (data) => {
+        this.funnelMetrics.set(data);
+        this.funnelLoading.set(false);
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.translate.instant('adminUi.dashboard.funnel.error');
+        this.funnelError.set(msg);
+        this.funnelLoading.set(false);
+      }
+    });
+  }
+
+  private refreshFunnelSilent(): void {
+    this.admin.funnel(this.buildSummaryParams()).subscribe({
+      next: (data) => {
+        this.funnelMetrics.set(data);
+      },
+      error: () => {
+        // ignore background refresh failures
+      }
+    });
+  }
+
   private startLiveRefresh(): void {
     this.stopLiveRefresh();
     this.refreshNow();
@@ -1913,12 +2007,14 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
   onRangePresetChange(): void {
     if (this.rangePreset === 'custom') return;
     this.loadSummary();
+    this.loadFunnelMetrics();
     this.loadChannelBreakdown();
   }
 
   applyRange(): void {
     if (this.rangePreset !== 'custom') {
       this.loadSummary();
+      this.loadFunnelMetrics();
       this.loadChannelBreakdown();
       return;
     }
@@ -1933,6 +2029,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
       return;
     }
     this.loadSummary();
+    this.loadFunnelMetrics();
     this.loadChannelBreakdown();
   }
 

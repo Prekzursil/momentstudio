@@ -1,4 +1,4 @@
-import { APP_INITIALIZER, ApplicationConfig, importProvidersFrom, inject } from '@angular/core';
+import { APP_INITIALIZER, ApplicationConfig, importProvidersFrom, inject, isDevMode } from '@angular/core';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { provideAnimations } from '@angular/platform-browser/animations';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
@@ -8,6 +8,8 @@ import { TranslateLoader, TranslateModule } from '@ngx-translate/core';
 import { TranslateHttpLoader } from '@ngx-translate/http-loader';
 import { HttpClient } from '@angular/common/http';
 import { AdminClientErrorLoggerService } from './core/admin-client-error-logger.service';
+import { provideServiceWorker } from '@angular/service-worker';
+import { appConfig as runtimeConfig } from './core/app-config';
 
 export function httpLoaderFactory(http: HttpClient) {
   return new TranslateHttpLoader(http, 'assets/i18n/', '.json');
@@ -18,6 +20,10 @@ export const appConfig: ApplicationConfig = {
     provideRouter(routes, withComponentInputBinding()),
     provideAnimations(),
     provideHttpClient(withInterceptors([authAndErrorInterceptor])),
+    provideServiceWorker('ngsw-worker.js', {
+      enabled: !isDevMode() && runtimeConfig.appEnv === 'production',
+      registrationStrategy: 'registerWhenStable:30000'
+    }),
     {
       provide: APP_INITIALIZER,
       multi: true,

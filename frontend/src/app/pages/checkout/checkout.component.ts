@@ -1225,6 +1225,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
 
   private trackCheckoutStart(): void {
     if (this.checkoutStartTracked) return;
+    if (!this.analytics.enabled()) return;
     const items = this.items();
     if (!items.length) return;
     this.checkoutStartTracked = true;
@@ -1790,6 +1791,18 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
 	    this.errorMessage = '';
 	    this.paymentNotReady = false;
 	  }
+
+    get analyticsOptIn(): boolean {
+      return this.analytics.enabled();
+    }
+
+    setAnalyticsOptIn(value: boolean): void {
+      const next = Boolean(value);
+      this.analytics.setEnabled(next);
+      if (next) {
+        this.trackCheckoutStart();
+      }
+    }
 
     private currentShippingCountryCode(): string {
       return (

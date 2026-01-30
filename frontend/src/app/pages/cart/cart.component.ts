@@ -20,6 +20,7 @@ import { CatalogService, Product } from '../../core/catalog.service';
 import { ProductCardComponent } from '../../shared/product-card.component';
 import { LockerProvider } from '../../core/shipping.service';
 import { CheckoutDeliveryType, CheckoutPrefsService } from '../../core/checkout-prefs.service';
+import { AnalyticsService } from '../../core/analytics.service';
 
 type SavedForLaterItem = {
   product_id: string;
@@ -468,6 +469,7 @@ export class CartComponent implements OnInit {
   deliveryType: CheckoutDeliveryType = 'home';
   savedForLater: SavedForLaterItem[] = [];
   redirectedFromCheckout = false;
+  private cartViewTracked = false;
 
   constructor(
     private cart: CartStore,
@@ -479,7 +481,8 @@ export class CartComponent implements OnInit {
     private catalog: CatalogService,
     private checkoutPrefs: CheckoutPrefsService,
     private translate: TranslateService,
-    private route: ActivatedRoute
+    private route: ActivatedRoute,
+    private analytics: AnalyticsService
   ) {
     const prefs = this.checkoutPrefs.loadDeliveryPrefs();
     this.courier = prefs.courier;
@@ -512,6 +515,23 @@ export class CartComponent implements OnInit {
       if (productIds === this.recommendationsKey) return;
       this.recommendationsKey = productIds;
       this.loadRecommendations(new Set(productIds.split(',')));
+    });
+
+    effect(() => {
+      if (this.cartViewTracked) return;
+      if (this.syncing()) return;
+      if (!this.analytics.enabled()) return;
+      const items = this.items();
+      if (!items.length) return;
+      this.cartViewTracked = true;
+      const units = items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+      this.analytics.track('view_cart', {
+        line_items: items.length,
+        units,
+        subtotal: this.quoteSubtotal(),
+        total: this.quoteTotal(),
+        currency: this.currency
+      });
     });
   }
 

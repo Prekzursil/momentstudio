@@ -109,6 +109,7 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
         </div>
         <div class="flex items-center gap-2">
           <app-button size="sm" variant="ghost" [label]="'adminUi.orders.export' | translate" (action)="openExportModal()"></app-button>
+          <app-button size="sm" variant="ghost" [label]="'adminUi.orders.exports.nav' | translate" (action)="openExports()"></app-button>
           <app-button size="sm" variant="ghost" [label]="densityToggleLabelKey() | translate" (action)="toggleDensity()"></app-button>
           <app-button size="sm" variant="ghost" [label]="'adminUi.tableLayout.title' | translate" (action)="openLayoutModal()"></app-button>
         </div>
@@ -1135,6 +1136,10 @@ export class AdminOrdersComponent implements OnInit {
 
   open(orderId: string): void {
     void this.router.navigate(['/admin/orders', orderId]);
+  }
+
+  openExports(): void {
+    void this.router.navigate(['/admin/orders/exports']);
   }
 
   openExportModal(): void {

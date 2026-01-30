@@ -89,7 +89,7 @@ async def seed_page(session_factory, *, key: str, title: str) -> None:
             body_markdown="Hello",
             status=ContentStatus.published,
             version=1,
-            published_at=datetime.now(timezone.utc),
+            published_at=datetime(2020, 1, 1, tzinfo=timezone.utc),
             meta={"version": 2, "blocks": []},
         )
         session.add(block)
@@ -213,7 +213,7 @@ def test_admin_can_list_and_delete_redirects(test_app: Dict[str, object]) -> Non
                     body_markdown="Hello",
                     status=ContentStatus.published,
                     version=1,
-                    published_at=datetime.now(timezone.utc),
+                    published_at=datetime(2020, 1, 1, tzinfo=timezone.utc),
                     meta={"version": 2, "blocks": []},
                 )
             )
@@ -258,7 +258,7 @@ def test_admin_upsert_redirect_accepts_display_values(test_app: Dict[str, object
                     body_markdown="Hello",
                     status=ContentStatus.published,
                     version=1,
-                    published_at=datetime.now(timezone.utc),
+                    published_at=datetime(2020, 1, 1, tzinfo=timezone.utc),
                     meta={"version": 2, "blocks": []},
                 )
             )
