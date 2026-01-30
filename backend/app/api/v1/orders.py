@@ -517,8 +517,8 @@ async def checkout(
         paypal_order_id, paypal_approval_url = await paypal_service.create_order(
             total_ron=totals.total,
             reference=str(user_cart.id),
-            return_url=f"{settings.frontend_origin}/checkout/paypal/return",
-            cancel_url=f"{settings.frontend_origin}/checkout/paypal/cancel",
+            return_url=f"{settings.frontend_origin.rstrip('/')}/checkout/paypal/return",
+            cancel_url=f"{settings.frontend_origin.rstrip('/')}/checkout/paypal/cancel",
             item_total_ron=totals.subtotal,
             shipping_ron=totals.shipping,
             tax_ron=totals.tax,
@@ -1466,8 +1466,8 @@ async def guest_checkout(
         paypal_order_id, paypal_approval_url = await paypal_service.create_order(
             total_ron=totals.total,
             reference=str(cart.id),
-            return_url=f"{settings.frontend_origin}/checkout/paypal/return",
-            cancel_url=f"{settings.frontend_origin}/checkout/paypal/cancel",
+            return_url=f"{settings.frontend_origin.rstrip('/')}/checkout/paypal/return",
+            cancel_url=f"{settings.frontend_origin.rstrip('/')}/checkout/paypal/cancel",
             item_total_ron=totals.subtotal,
             shipping_ron=totals.shipping,
             tax_ron=totals.tax,

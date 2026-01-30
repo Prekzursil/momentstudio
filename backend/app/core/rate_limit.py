@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+import math
 from collections import defaultdict, deque
 from typing import Awaitable, Callable, DefaultDict, Deque, Hashable, Iterable
 
@@ -17,7 +18,14 @@ def _prune(bucket: WindowBucket, now: float, window_seconds: int) -> None:
 def _enforce_limit(bucket: WindowBucket, limit: int, window_seconds: int, now: float) -> None:
     _prune(bucket, now, window_seconds)
     if len(bucket) >= limit:
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many requests")
+        retry_after_seconds = 1
+        if bucket:
+            retry_after_seconds = max(1, int(math.ceil(bucket[0] + window_seconds - now)))
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many requests",
+            headers={"Retry-After": str(retry_after_seconds)},
+        )
     bucket.append(now)
 
 

@@ -24,6 +24,19 @@
 ### Analytics
 - [x] Analytics: add lightweight funnel metrics (sessions → carts → checkouts → orders) with opt-in tracking.
 
+### Reliability
+- [x] Reliability: fix BackpressureMiddleware disable semantics + avoid asyncio internals; add regression tests.
+- [x] Reliability: standardize 429 responses (Retry-After + request_id) for rate limits and backpressure.
+
+### Payments
+- [x] Payments: harden PayPal return/cancel URL building (strip trailing slash) across both checkout flows.
+- [ ] Payments: add backend payment capabilities endpoint and use it to disable Netopia checkout until configured (still visible for review).
+
+### Checkout
+- [x] Checkout: remove unused checkout shipping methods resolver call (shipping is fixed) to reduce network + confusion.
+- [ ] Checkout: honor `allow_backorder` in cart stock validation so backorderable products can be purchased.
+- [ ] Checkout: add idempotency guard to prevent duplicate orders from the same cart (double-submit/retry).
+
 ---
 
 Below is a structured checklist you can turn into issues.
