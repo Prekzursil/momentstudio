@@ -413,11 +413,12 @@ Below is a structured checklist you can turn into issues.
 
 ### Storefront – Homepage & PWA
 - [x] Storefront: add product share controls (copy link / share sheet) on product pages.
-- [x] Storefront: add optional PWA install prompt + offline fallback page.
+- [x] Storefront: add offline fallback page (`/offline`) + online/offline indicator.
 - [x] Storefront: remove borders and adjust sizing on the homepage hero banner image.
 - [x] Storefront: move the homepage hero banner image into frontend assets and use it by default.
 - [x] Storefront: optimize the homepage hero banner image (WebP/AVIF + responsive sizes).
 - [x] Storefront: allow configuring the homepage hero banner image via CMS without code changes.
+- [x] Storefront: remove PWA install prompt button and related code.
 
 ## Blog & Community
 - [x] Nav: add “Blog” link between Home and Shop (header + drawer).

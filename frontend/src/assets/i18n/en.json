@@ -32,9 +32,6 @@
     "editMode": "Edit mode"
   },
   "pwa": {
-    "install": "Install app",
-    "installAccepted": "Install started.",
-    "installDismissed": "Install dismissed.",
     "offlineBadge": "Offline",
     "offlineTitle": "You're offline",
     "offlineBody": "Some features require an internet connection.",

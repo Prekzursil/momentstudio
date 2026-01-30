@@ -32,9 +32,6 @@
     "editMode": "Mod editare"
   },
   "pwa": {
-    "install": "Instalează aplicația",
-    "installAccepted": "Instalarea a început.",
-    "installDismissed": "Instalarea a fost anulată.",
     "offlineBadge": "Offline",
     "offlineTitle": "Ești offline",
     "offlineBody": "Unele funcții necesită conexiune la internet.",

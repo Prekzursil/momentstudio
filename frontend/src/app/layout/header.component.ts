@@ -119,15 +119,6 @@ import { Subscription } from 'rxjs';
             >
               ⚠️
             </a>
-            <button
-              *ngIf="pwaCanInstall()"
-              type="button"
-              class="inline-flex items-center justify-center h-10 w-10 rounded-full bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100"
-              [attr.aria-label]="'pwa.install' | translate"
-              (click)="installApp()"
-            >
-              ⬇️
-            </button>
             <a
               *ngIf="!isAuthenticated()"
               routerLink="/login"
@@ -431,12 +422,11 @@ export class HeaderComponent implements OnDestroy {
 	  readonly isStaff = computed(() => this.auth.isStaff());
 	  readonly isAdmin = computed(() => this.auth.isAdmin());
 	  readonly isImpersonating = computed(() => this.auth.isImpersonating());
-	  readonly storefrontEditMode = this.storefrontAdminMode.enabled;
-	  readonly notifications = computed(() => this.notificationsService.items());
-	  readonly notificationsLoading = computed(() => this.notificationsService.loading());
-	  readonly unreadCount = computed(() => this.notificationsService.unreadCount());
-    readonly pwaCanInstall = computed(() => this.pwa.canInstall() && !this.pwa.isInstalled());
-    readonly pwaOnline = computed(() => this.pwa.isOnline());
+		  readonly storefrontEditMode = this.storefrontAdminMode.enabled;
+		  readonly notifications = computed(() => this.notificationsService.items());
+		  readonly notificationsLoading = computed(() => this.notificationsService.loading());
+		  readonly unreadCount = computed(() => this.notificationsService.unreadCount());
+	    readonly pwaOnline = computed(() => this.pwa.isOnline());
 
   private readonly fallbackStorefrontLinks: NavLink[] = [
     { label: 'nav.home', path: '/' },
@@ -486,10 +476,10 @@ export class HeaderComponent implements OnDestroy {
 	    private storefrontAdminMode: StorefrontAdminModeService,
 	    private notificationsService: NotificationsService,
 	    private ops: OpsService,
-      private pwa: PwaService,
-	    private toast: ToastService,
-	    private translate: TranslateService
-	  ) {
+	      private pwa: PwaService,
+		    private toast: ToastService,
+		    private translate: TranslateService
+		  ) {
     this.authEffect = effect(() => {
       const authed = this.isAuthenticated();
       if (!authed) {
@@ -546,21 +536,10 @@ export class HeaderComponent implements OnDestroy {
 	    });
 	  }
 
-  async installApp(): Promise<void> {
-    const outcome = await this.pwa.promptInstall();
-    if (outcome === 'accepted') {
-      this.toast.success(this.translate.instant('pwa.installAccepted'));
-      return;
-    }
-    if (outcome === 'dismissed') {
-      this.toast.success(this.translate.instant('pwa.installDismissed'));
-    }
-  }
-
-	  toggleDrawer(): void {
-	    this.drawerOpen = !this.drawerOpen;
-	    if (this.drawerOpen) {
-	      this.searchOpen = false;
+		  toggleDrawer(): void {
+		    this.drawerOpen = !this.drawerOpen;
+		    if (this.drawerOpen) {
+		      this.searchOpen = false;
 	      this.userMenuOpen = false;
       this.notificationsOpen = false;
     }
