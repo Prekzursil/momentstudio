@@ -384,6 +384,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Shop: better empty states – Suggest clearing filters / show popular categories when no results.
 - [x] Shop: skeleton grid – Product card skeletons to reduce layout shift during loading.
 - [x] Shop return UX: make product breadcrumb “Shop” preserve last shop filters/scroll when available.
+- [x] Storefront: fix product detail page loading on first navigation (NgOptimizedImage sizing + change detection).
 
 ### Storefront Admin Quick Edit (No Dashboard) – Next Improvements (Backlog)
 - [x] Storefront Admin Mode: toggle – Add an “Edit mode” toggle for admins (header button) that reveals inline controls.

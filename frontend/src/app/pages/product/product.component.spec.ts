@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { DOCUMENT } from '@angular/common';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
+import { RouterTestingModule } from '@angular/router/testing';
 import { Meta, Title } from '@angular/platform-browser';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ReplaySubject, of } from 'rxjs';
@@ -18,7 +19,6 @@ describe('ProductComponent', () => {
   let cart: jasmine.SpyObj<CartStore>;
   let catalog: jasmine.SpyObj<CatalogService>;
   let auth: jasmine.SpyObj<AuthService>;
-  let router: jasmine.SpyObj<Router>;
   let routeParam$: ReplaySubject<any>;
 
   beforeEach(() => {
@@ -30,21 +30,21 @@ describe('ProductComponent', () => {
       'getUpsellProducts',
       'getRelatedProducts',
     ]);
-    auth = jasmine.createSpyObj<AuthService>('AuthService', ['isAuthenticated']);
-    router = jasmine.createSpyObj<Router>('Router', ['navigateByUrl']);
+    auth = jasmine.createSpyObj<AuthService>('AuthService', ['isAuthenticated', 'isAdmin', 'isImpersonating']);
+    auth.isAdmin.and.returnValue(false);
+    auth.isImpersonating.and.returnValue(false);
     routeParam$ = new ReplaySubject(1);
     routeParam$.next(convertToParamMap({ slug: 'prod' }));
     catalog.getUpsellProducts.and.returnValue(of([] as any));
     catalog.getRelatedProducts.and.returnValue(of([] as any));
 
     TestBed.configureTestingModule({
-      imports: [ProductComponent, TranslateModule.forRoot()],
+      imports: [RouterTestingModule.withRoutes([]), ProductComponent, TranslateModule.forRoot()],
       providers: [
         { provide: ToastService, useValue: toast },
         { provide: CartStore, useValue: cart },
         { provide: CatalogService, useValue: catalog },
         { provide: AuthService, useValue: auth },
-        { provide: Router, useValue: router },
         { provide: RecentlyViewedService, useValue: { add: () => [] } },
         { provide: WishlistService, useValue: { ensureLoaded: () => {}, isWishlisted: () => false } },
         {
@@ -56,7 +56,7 @@ describe('ProductComponent', () => {
         },
         { provide: Title, useValue: jasmine.createSpyObj<Title>('Title', ['setTitle']) },
         { provide: Meta, useValue: jasmine.createSpyObj<Meta>('Meta', ['updateTag']) },
-        { provide: DOCUMENT, useValue: document.implementation.createHTMLDocument('product-test') }
+        { provide: DOCUMENT, useValue: document }
       ]
     });
 
@@ -82,6 +82,11 @@ describe('ProductComponent', () => {
       true
     );
     translate.use('en');
+  });
+
+  afterEach(() => {
+    document.querySelector('link[rel="canonical"]')?.remove();
+    document.querySelectorAll('script[type="application/ld+json"]').forEach((el) => el.remove());
   });
 
   it('adds to cart and shows toast when in stock', () => {
