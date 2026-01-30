@@ -26,6 +26,9 @@ Below is a structured checklist you can turn into issues.
 - [x] DX: detect port collisions in `start.sh` (e.g., `docker compose` already bound to `4200`) and pick a free port or print a clear remediation hint.
 - [x] Frontend: eliminate Node 24 `DEP0060 util._extend` deprecation warning (identify dependency via `--trace-deprecation` and upgrade/replace).
 - [x] Docs: document seeded owner credentials and that `docker compose down -v` resets the DB (owner needs `bootstrap-owner` again).
+- [x] Frontend deps: address `npm audit` vulnerabilities (upgrade/overrides as needed).
+- [x] CI hardening: pin tool versions in workflows (e.g. `pip-audit`, `ruff`, `mypy`) to reduce surprise breakage.
+- [x] CI: add a quick smoke for i18n key consistency (detect orphaned/typo keys).
 
 ## Legal & Compliance (NETOPIA/ANPC/GDPR)
 - [x] Legal pages: add CMS-backed pages `page.terms` (index), `page.terms-and-conditions`, `page.privacy-policy`, `page.anpc` (RO+EN required).

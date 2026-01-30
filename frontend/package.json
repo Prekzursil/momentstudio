@@ -11,6 +11,7 @@
     "pretest": "node scripts/generate-config.mjs",
     "test": "ng test",
     "lint": "eslint .",
+    "i18n:check": "node scripts/check-i18n.mjs",
     "e2e": "playwright test"
   },
   "private": true,
@@ -70,8 +71,9 @@
     "@toast-ui/editor": {
       "dompurify": "3.3.1"
     },
+    "hono": "4.11.7",
     "lodash": "4.17.23",
-    "tar": "7.5.6",
+    "tar": "7.5.7",
     "undici": "7.18.2"
   }
 }

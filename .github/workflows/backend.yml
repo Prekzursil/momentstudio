@@ -16,12 +16,14 @@ jobs:
         with:
           python-version: '3.12'
           cache: 'pip'
-          cache-dependency-path: backend/requirements.txt
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-ci.txt
       - name: Install dependencies
         run: |
           cd backend
           python -m pip install --upgrade pip
-          pip install -r requirements.txt ruff mypy pip-audit
+          pip install -r requirements.txt -r requirements-ci.txt
       - name: Ruff lint
         run: |
           cd backend

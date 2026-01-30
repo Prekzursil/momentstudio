@@ -48,6 +48,11 @@ jobs:
         run: |
           cd frontend
           npm run lint
+      - name: i18n key check
+        if: steps.detect.outputs.missing != 'true'
+        run: |
+          cd frontend
+          npm run i18n:check
 
       - name: Run tests
         if: steps.detect.outputs.missing != 'true'
