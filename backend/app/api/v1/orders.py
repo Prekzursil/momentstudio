@@ -266,17 +266,26 @@ def _sanitize_filename(value: str | None) -> str:
 
 @router.post("", response_model=OrderRead, status_code=status.HTTP_201_CREATED)
 async def create_order(
+    response: Response,
     background_tasks: BackgroundTasks,
     payload: OrderCreate,
     session: AsyncSession = Depends(get_session),
     current_user=Depends(require_verified_email),
 ):
     cart_result = await session.execute(
-        select(Cart).options(selectinload(Cart.items)).where(Cart.user_id == current_user.id)
+        select(Cart).options(selectinload(Cart.items)).where(Cart.user_id == current_user.id).with_for_update()
     )
     cart = cart_result.scalar_one_or_none()
     if not cart or not cart.items:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty")
+
+    if cart.last_order_id:
+        existing_order = await order_service.get_order_by_id(session, cart.last_order_id)
+        if existing_order:
+            response.status_code = status.HTTP_200_OK
+            return existing_order
+        cart.last_order_id = None
+        session.add(cart)
 
     shipping_country: str | None = None
     for address_id in [payload.shipping_address_id, payload.billing_address_id]:
@@ -350,6 +359,7 @@ async def create_order(
 @router.post("/checkout", response_model=GuestCheckoutResponse, status_code=status.HTTP_201_CREATED)
 async def checkout(
     payload: CheckoutRequest,
+    response: Response,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     current_user=Depends(require_verified_email),
@@ -364,6 +374,28 @@ async def checkout(
     user_cart = await cart_service.get_cart(session, current_user.id, session_id)
     if not user_cart.items:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty")
+
+    last_order_id = await session.scalar(
+        select(Cart.last_order_id).where(Cart.id == user_cart.id).with_for_update()
+    )
+    if last_order_id:
+        existing_order = await order_service.get_order_by_id(session, last_order_id)
+        if existing_order:
+            response.status_code = status.HTTP_200_OK
+            return GuestCheckoutResponse(
+                order_id=existing_order.id,
+                reference_code=existing_order.reference_code,
+                paypal_order_id=existing_order.paypal_order_id,
+                paypal_approval_url=getattr(existing_order, "paypal_approval_url", None),
+                stripe_session_id=existing_order.stripe_checkout_session_id,
+                stripe_checkout_url=getattr(existing_order, "stripe_checkout_url", None),
+                payment_method=existing_order.payment_method,
+            )
+        # Stale pointer; clear it to allow checkout to proceed.
+        cart_row = await session.get(Cart, user_cart.id)
+        if cart_row:
+            cart_row.last_order_id = None
+            session.add(cart_row)
 
     shipping_method = None
     if payload.shipping_method_id:
@@ -540,7 +572,9 @@ async def checkout(
         payment_method=payment_method,
         payment_intent_id=payment_intent_id,
         stripe_checkout_session_id=stripe_session_id,
+        stripe_checkout_url=stripe_checkout_url,
         paypal_order_id=paypal_order_id,
+        paypal_approval_url=paypal_approval_url,
         courier=courier,
         delivery_type=delivery_type,
         locker_id=locker_id,
@@ -1280,6 +1314,7 @@ async def guest_email_verification_status(
 @router.post("/guest-checkout", response_model=GuestCheckoutResponse, status_code=status.HTTP_201_CREATED)
 async def guest_checkout(
     payload: GuestCheckoutRequest,
+    response: Response,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     session_id: str | None = Depends(cart_api.session_header),
@@ -1287,18 +1322,38 @@ async def guest_checkout(
     if not session_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing guest session id")
 
+    cart = await cart_service.get_cart(session, None, session_id)
+    if not cart.items:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty")
+
     email = _normalize_email(str(payload.email))
+    if not cart.guest_email_verified_at or _normalize_email(cart.guest_email or "") != email:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email verification required")
+
+    last_order_id = await session.scalar(
+        select(Cart.last_order_id).where(Cart.id == cart.id).with_for_update()
+    )
+    if last_order_id:
+        existing_order = await order_service.get_order_by_id(session, last_order_id)
+        if existing_order:
+            response.status_code = status.HTTP_200_OK
+            return GuestCheckoutResponse(
+                order_id=existing_order.id,
+                reference_code=existing_order.reference_code,
+                paypal_order_id=existing_order.paypal_order_id,
+                paypal_approval_url=getattr(existing_order, "paypal_approval_url", None),
+                stripe_session_id=existing_order.stripe_checkout_session_id,
+                stripe_checkout_url=getattr(existing_order, "stripe_checkout_url", None),
+                payment_method=existing_order.payment_method,
+            )
+        cart.last_order_id = None
+        session.add(cart)
+
     if await auth_service.is_email_taken(session, email):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered; please sign in to checkout.",
         )
-
-    cart = await cart_service.get_cart(session, None, session_id)
-    if not cart.items:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty")
-    if not cart.guest_email_verified_at or _normalize_email(cart.guest_email or "") != email:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email verification required")
 
     required_versions = await legal_consents_service.required_doc_versions(session)
     if not payload.accept_terms or not payload.accept_privacy:
@@ -1489,7 +1544,9 @@ async def guest_checkout(
         payment_method=payment_method,
         payment_intent_id=payment_intent_id,
         stripe_checkout_session_id=stripe_session_id,
+        stripe_checkout_url=stripe_checkout_url,
         paypal_order_id=paypal_order_id,
+        paypal_approval_url=paypal_approval_url,
         courier=courier,
         delivery_type=delivery_type,
         locker_id=locker_id,

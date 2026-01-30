@@ -28,6 +28,7 @@ export interface CartQuote {
 }
 
 const STORAGE_KEY = 'cart_cache';
+const UNLIMITED_CART_STOCK = 9_999;
 
 @Injectable({ providedIn: 'root' })
 export class CartStore {
@@ -101,7 +102,7 @@ export class CartStore {
           price: Number(res.unit_price_at_add ?? payload.price ?? 0),
           currency: res.currency ?? payload.currency ?? 'RON',
           quantity: res.quantity,
-          stock: res.max_quantity ?? payload.stock ?? 99,
+          stock: res.max_quantity == null ? UNLIMITED_CART_STOCK : Number(res.max_quantity ?? payload.stock ?? 99),
           image: res.image_url ?? payload.image ?? '',
           note: res.note ?? null
         }))
@@ -222,7 +223,7 @@ export class CartStore {
       price: Number(i.unit_price_at_add),
       currency: i.currency ?? currency,
       quantity: i.quantity,
-      stock: i.max_quantity ?? 99,
+      stock: i.max_quantity == null ? UNLIMITED_CART_STOCK : Number(i.max_quantity ?? 99),
       image: i.image_url ?? '',
       note: i.note ?? null
     }));

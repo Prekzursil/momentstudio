@@ -26,6 +26,8 @@ from app.services import notifications as notification_service
 from app.services import coupons_v2 as coupons_service
 from app.services import promo_usage
 from app.api.v1 import cart as cart_api
+from app.schemas.payment_capabilities import PaymentsCapabilitiesResponse, PaymentMethodCapability
+from app.services.payment_provider import is_mock_payments
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 
@@ -33,6 +35,52 @@ router = APIRouter(prefix="/payments", tags=["payments"])
 def _account_orders_url(order: Order) -> str:
     token = str(order.reference_code or order.id)
     return f"/account/orders?q={quote_plus(token)}"
+
+
+@router.get("/capabilities", response_model=PaymentsCapabilitiesResponse)
+async def payment_capabilities() -> PaymentsCapabilitiesResponse:
+    mock_mode = is_mock_payments()
+
+    stripe_configured = payments.is_stripe_configured()
+    stripe_enabled = bool(mock_mode or stripe_configured)
+    stripe_reason = None if stripe_enabled else "Stripe is not configured"
+
+    paypal_configured = paypal_service.is_paypal_configured()
+    paypal_enabled = bool(mock_mode or paypal_configured)
+    paypal_reason = None if paypal_enabled else "PayPal is not configured"
+
+    netopia_configured = netopia_service.is_netopia_configured()
+    netopia_supported = True
+    netopia_enabled = False
+    if not settings.netopia_enabled:
+        netopia_reason = "Netopia is disabled"
+    elif not netopia_configured:
+        netopia_reason = "Netopia is not configured"
+    else:
+        netopia_reason = "Netopia checkout is not implemented yet"
+
+    return PaymentsCapabilitiesResponse(
+        payments_provider=str(getattr(settings, "payments_provider", "") or "real"),
+        stripe=PaymentMethodCapability(
+            supported=True,
+            configured=stripe_configured,
+            enabled=stripe_enabled,
+            reason=stripe_reason,
+        ),
+        paypal=PaymentMethodCapability(
+            supported=True,
+            configured=paypal_configured,
+            enabled=paypal_enabled,
+            reason=paypal_reason,
+        ),
+        netopia=PaymentMethodCapability(
+            supported=netopia_supported,
+            configured=netopia_configured,
+            enabled=netopia_enabled,
+            reason=netopia_reason,
+        ),
+        cod=PaymentMethodCapability(supported=True, configured=True, enabled=True, reason=None),
+    )
 
 
 @router.post("/intent", status_code=status.HTTP_200_OK)

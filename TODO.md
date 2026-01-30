@@ -30,12 +30,12 @@
 
 ### Payments
 - [x] Payments: harden PayPal return/cancel URL building (strip trailing slash) across both checkout flows.
-- [ ] Payments: add backend payment capabilities endpoint and use it to disable Netopia checkout until configured (still visible for review).
+- [x] Payments: add backend payment capabilities endpoint and use it to disable Netopia checkout until configured (still visible for review).
 
 ### Checkout
 - [x] Checkout: remove unused checkout shipping methods resolver call (shipping is fixed) to reduce network + confusion.
-- [ ] Checkout: honor `allow_backorder` in cart stock validation so backorderable products can be purchased.
-- [ ] Checkout: add idempotency guard to prevent duplicate orders from the same cart (double-submit/retry).
+- [x] Checkout: honor `allow_backorder` in cart stock validation so backorderable products can be purchased.
+- [x] Checkout: add idempotency guard to prevent duplicate orders from the same cart (double-submit/retry).
 
 ---
 

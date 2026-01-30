@@ -399,7 +399,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
 	  private paymentNotReadyTimer: ReturnType<typeof setTimeout> | null = null;
 	  paymentMethod: CheckoutPaymentMethod = 'cod';
 	  paypalEnabled = Boolean(appConfig.paypalEnabled);
-	  netopiaEnabled = Boolean(appConfig.netopiaEnabled);
+	  netopiaEnabled = false;
 	  private syncDebounceHandle: ReturnType<typeof setTimeout> | null = null;
   private queuedSyncItems: CartItem[] | null = null;
   private checkoutRedirectedToCart = false;
@@ -1742,6 +1742,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
   ngOnInit(): void {
     this.autoApplyBestCoupon = this.loadAutoApplyBestCouponPreference();
     this.applyPrefetchedPricingSettings();
+    this.loadPaymentCapabilities();
     this.route.queryParamMap.subscribe((params) => {
       const promo = (params.get('promo') || '').trim();
       if (!promo) return;
@@ -1764,6 +1765,23 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
 	    this.loadGuestEmailVerificationStatus();
       this.loadLegalConsentStatus();
 	  }
+
+    private loadPaymentCapabilities(): void {
+      this.api.get<{
+        paypal?: { enabled?: boolean };
+        netopia?: { enabled?: boolean };
+      }>('/payments/capabilities')
+      .subscribe({
+        next: (cap) => {
+          this.paypalEnabled = Boolean(cap?.paypal?.enabled);
+          this.netopiaEnabled = Boolean(cap?.netopia?.enabled);
+          this.ensurePaymentMethodAvailable();
+        },
+        error: () => {
+          // Keep app-config defaults when the backend cannot be reached.
+        }
+      });
+    }
 
 	  ngOnDestroy(): void {
 	    if (this.syncDebounceHandle) {
