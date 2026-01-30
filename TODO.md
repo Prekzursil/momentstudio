@@ -37,10 +37,6 @@
 - [x] Checkout: honor `allow_backorder` in cart stock validation so backorderable products can be purchased.
 - [x] Checkout: add idempotency guard to prevent duplicate orders from the same cart (double-submit/retry).
 
----
-
-Below is a structured checklist you can turn into issues.
-
 ## Project & Infra
 - [x] Initialize monorepo with `backend/`, `frontend/`, `infra/`.
 - [x] Add `docker-compose.yml` for API, frontend, Postgres.
