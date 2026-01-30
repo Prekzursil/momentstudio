@@ -1,24 +1,1059 @@
-# Project Backlog
+# TODO / Roadmap
 
-This file tracks **open work**. The previous “full roadmap” (now completed) is archived in `docs/TODO-archive.md`.
+## Open backlog
 
-## High priority
+### High priority
 - [ ] Docs: add a production deployment guide (reverse proxy, env vars, migrations, backups, first-owner bootstrap).
 - [ ] DX: update `.pre-commit-config.yaml` to match the current toolchain (ESLint v9 flat config, remove deprecated hooks).
 - [ ] Infra: add a local helper to run the CI Docker smoke flow (same steps as `compose-smoke`).
-- [ ] Security: require admin 2FA toggle + recovery codes; document recommended default for production.
 - [ ] Observability: add an ops “health dashboard” view in admin (surface uptime, recent errors, backpressure signals).
 
-## Medium priority
-- [ ] CMS: add “diff preview” before publishing (draft vs published) for pages/blog/global sections.
-- [ ] CMS: add bulk tools for redirects (import/export, detect loops, dry-run preview).
-- [ ] Orders: add batch print/export center (packing slips, invoices, labels) with retention.
-- [ ] Catalog: add variant matrix editor (bulk update price/stock across options) for faster inventory updates.
-- [ ] UX: run an accessibility pass (keyboard nav, focus states, contrast) and fix any critical issues.
+### Medium priority
+- [ ] Orders: add an export center/history for generated PDFs/labels (packing slips, invoices, shipping labels) with retention + re-download links.
 
-## Low priority
+### Low priority
 - [ ] Storefront: add product share controls (copy link / share sheet) on product pages.
 - [ ] Storefront: add optional PWA install prompt + offline fallback page.
-- [ ] Admin: add keyboard shortcuts for common actions (search, save, next/prev).
-- [ ] Blog: add editorial workflow states (draft/review/published) with author attribution.
 - [ ] Analytics: add lightweight funnel metrics (sessions → carts → checkouts → orders) with opt-in tracking.
+
+---
+
+Below is a structured checklist you can turn into issues.
+
+## Project & Infra
+- [x] Initialize monorepo with `backend/`, `frontend/`, `infra/`.
+- [x] Add `docker-compose.yml` for API, frontend, Postgres.
+- [x] Add backend `.env.example` (DATABASE_URL, SECRET_KEY, STRIPE_ENV + Stripe keys, SMTP_*, FRONTEND_ORIGIN).
+- [x] Add frontend `.env.example` (API_BASE_URL, STRIPE_ENV + publishable keys, APP_ENV).
+- [x] Payments config: add `STRIPE_ENV` toggle (sandbox/live) + env-specific keys for backend/frontend/docker.
+- [x] Payments config: allow `PAYPAL_CURRENCY=RON` (skip FX conversion when using RON).
+- [x] E2E: add Playwright flow for Stripe Checkout success + decline/cancel (sandbox/test mode).
+- [x] E2E: add PayPal sandbox e2e for success + decline/cancel (with a stable CI strategy or feature flag).
+- [x] Add `.gitignore` for Python, Node, env files, build artifacts.
+- [x] GitHub Actions for backend (lint, tests, type-checks).
+- [x] GitHub Actions for frontend (lint, tests, build).
+- [x] CI: pin Node 24 + npm 11.7.0 in workflows/Dockerfiles.
+- [x] Frontend tooling: migrate ESLint to v9 flat config (`eslint.config.mjs`).
+- [x] CI: run frontend lint in `Frontend CI`.
+- [x] Repo hygiene: ignore local `.serena/` artifacts.
+- [x] CONTRIBUTING.md with branching, commit style, runbook.
+- [x] ARCHITECTURE.md with high-level design and data flow.
+- [x] DX: run `alembic upgrade head` in `start.sh` before starting the backend to avoid schema drift.
+- [x] CI: add deployment/release job (e.g., container build + push) once runtime code lands.
+- [x] E2E: add real browser tests (Playwright) for checkout + admin flows and wire them into CI (Docker-backed).
+- [x] DX: detect port collisions in `start.sh` (e.g., `docker compose` already bound to `4200`) and pick a free port or print a clear remediation hint.
+- [x] Frontend: eliminate Node 24 `DEP0060 util._extend` deprecation warning (identify dependency via `--trace-deprecation` and upgrade/replace).
+- [x] Docs: document seeded owner credentials and that `docker compose down -v` resets the DB (owner needs `bootstrap-owner` again).
+- [x] Frontend deps: address `npm audit` vulnerabilities (upgrade/overrides as needed).
+- [x] CI hardening: pin tool versions in workflows (e.g. `pip-audit`, `ruff`, `mypy`) to reduce surprise breakage.
+- [x] CI: add a quick smoke for i18n key consistency (detect orphaned/typo keys).
+
+## Legal & Compliance (NETOPIA/ANPC/GDPR)
+- [x] Legal pages: add CMS-backed pages `page.terms` (index), `page.terms-and-conditions`, `page.privacy-policy`, `page.anpc` (RO+EN required).
+- [x] Legal content: ensure Terms & Conditions covers payment methods + delivery + return/cancellation policy (NETOPIA requirement), or clearly links to those sections/pages.
+- [x] CMS enforcement: block publishing legal pages unless **both RO + EN** are present (no fallback) + ensure version history/rollback works.
+- [x] Navigation: add header “Terms & Conditions” link between Contact and View Admin; add footer link under “Handcrafted Art”.
+- [x] Footer/company info: display full company identification details required by NETOPIA (name, RC number, CUI, address, phone, email) and keep them CMS-configurable.
+- [x] Admin UX: add a friendly editor for `site.company` (avoid raw JSON meta editing) and validate required fields for production readiness.
+- [x] NETOPIA logos: add Visa/Mastercard/NETOPIA Payments logos (from `Identitate-Parteneri-NETOPIA-Payments.zip`) and display them in footer + checkout.
+- [x] ANPC content: add bilingual ANPC/ADR info page including required links and consumer guidance.
+- [x] Consent tracking (DB): store acceptance records with doc key + version + timestamp + (user_id or order_id) + context (register/checkout).
+- [x] Registration gating: require legal consent checkbox(es) before allowing registration (UI + backend enforcement).
+- [x] Checkout gating: require legal consent checkbox(es) before placing an order (guest + logged-in; UI + backend enforcement).
+- [x] Consent UX: checkbox click opens a “read before accept” modal; require scrolling to bottom before enabling Accept.
+- [x] Re-consent policy: force re-acceptance when legal docs change (by version) for both registration and checkout.
+- [x] Tests: unit tests for publish enforcement + API validation; Playwright tests for modal gating and register/checkout blocking.
+
+## Backend - Core & Auth
+- [x] Scaffold FastAPI app with versioned `/api/v1` router.
+- [x] Settings via `pydantic-settings`.
+- [x] SQLAlchemy engine/session for Postgres.
+- [x] User model + Alembic migration.
+- [x] Password hashing/verification.
+- [x] Auth endpoints: register, login (access+refresh), refresh, logout.
+- [x] JWT guard dependency + role guard for admin.
+- [x] Roles: add unique `owner` role (admin permissions) and enforce single owner.
+- [x] Admin: prevent modifying owner via role endpoint; add owner transfer API endpoint.
+- [x] Notifications: route new order + low-stock alerts to owner email (fallback to ADMIN_ALERT_EMAIL).
+- [x] Ops: add `python -m app.cli bootstrap-owner` to create/transfer the owner account (sets username/display name, verifies email).
+- [x] Admin UX: add an owner-only “Transfer ownership” control in the admin dashboard (type-to-confirm + current password + audit log entry).
+- [x] Notifications: route support/dispute/refund/contact notifications to the owner email and document the policy.
+- [x] Notifications: add in-app notifications (list/unread-count/mark read/dismiss) and show them in the header (auto-hide read after 3 days).
+- [x] Tests for auth flows (register/login/refresh/invalid creds).
+- [x] HTTP-only refresh token cookie issued on login/refresh and cleared on logout.
+- [x] Auth: extend user profile fields for registration (first/middle/last name, date of birth, phone) + migration.
+- [x] Auth: require phone + DOB on registration (no age enforcement) and validate phone as E.164.
+- [x] Auth: extend /auth/me profile update + response schema to include new profile fields.
+- [x] Tests: update auth + Postgres integration tests for new registration/profile fields.
+- [x] Auth: add optional CAPTCHA verification for login/register (Cloudflare Turnstile) via env config (backend + frontend).
+- [x] Auth/Profile: add email change endpoint with 30-day cooldown + history tracking (disabled while Google is linked).
+- [x] Auth/Profile: support secondary emails (add/verify/remove, set primary, login via verified secondary) with global uniqueness enforcement.
+- [x] Auth: migrate frontend auth storage to cookie-based refresh sessions (avoid persisting refresh tokens in localStorage; wire “Keep me signed in” to cookie/session TTL).
+- [x] Auth: make refresh token rotation multi-tab safe (tolerate concurrent refresh across tabs/devices without forcing a logout).
+- [x] Auth/Profile: enforce username (7d) + display name (1h) change cooldowns and reuse display name tags when reverting.
+- [x] Profile: add “use Google photo” + “remove avatar” endpoints; default to local placeholder avatar (Google photo opt-in).
+
+## Backend - Catalog & Products
+- [x] Category model + migration.
+- [x] Categories: add parent/child hierarchy (subcategories) and include descendants when filtering products by category.
+- [x] Product model + migration.
+- [x] ProductImage model + migration.
+- [x] (Optional) ProductVariant model + migration.
+- [x] GET /categories (public).
+- [x] GET /products with pagination, search, category, price filters.
+- [x] GET /products/{slug} detail.
+- [x] Admin create/update product endpoints.
+- [x] Admin soft-delete product.
+- [x] Admin product image upload/delete.
+- [x] Image storage service (local first, S3-ready).
+- [x] Seed example products/categories for dev.
+- [x] SKU generation and uniqueness enforcement.
+- [x] Slug collision handling and validator.
+- [x] Auto-generate product/category slugs (admin UX) and make slugs immutable; free product slugs on delete.
+- [x] Product status enums (draft/published/archived).
+- [x] Track publish date and last_modified.
+- [x] Bulk price/stock update endpoint for admins.
+- [x] Product labels/tags schema and filters.
+- [x] Product option schema (color/size) without variants.
+- [x] Admin product duplication/cloning.
+- [x] Product reviews model + moderation queue.
+- [x] Average rating + review count on product list/detail.
+- [x] Related products/recommendations service (rule-based).
+- [x] Recently viewed products service (per session).
+- [x] Admin export products CSV.
+- [x] Admin import products CSV with dry-run validation.
+- [x] Product slug history/redirects for legacy slugs (slugs are immutable going forward).
+- [x] Server-side pagination metadata (total pages/items).
+- [x] Sort options: newest, price asc/desc, name asc/desc.
+- [x] Backorder/preorder flag + estimated restock date.
+- [x] Per-product shipping dimensions/weight fields.
+- [x] Per-product metadata for SEO (meta title/description).
+- [x] Rich text/markdown validation for product descriptions.
+- [x] Admin audit log for product mutations.
+- [x] Price and currency validation helpers.
+- [x] Product feed (JSON/CSV) for marketing channels.
+- [x] Featured collection endpoints.
+- [x] Catalog: restrict public product list/detail/bounds/feed to published + active only (admin can still access drafts/archived).
+
+## Backend - Cart & Checkout
+- [x] Cart + CartItem models + migrations.
+- [x] Guest cart support (session_id).
+- [x] GET /cart (guest or user).
+- [x] POST /cart/items add.
+- [x] PATCH /cart/items/{id} update qty.
+- [x] DELETE /cart/items/{id} remove.
+- [x] Stock validation in cart endpoints.
+- [x] Merge guest cart into user cart on login.
+- [x] Max quantity per item enforcement.
+- [x] Reserve stock on checkout start (optional).
+- [x] Cart subtotal/tax/shipping calculation helper.
+- [x] Promo code model + validation hook.
+- [x] Coupons v2: add Promotion/Coupon models + migrations (public/assigned, limits, validity).
+- [x] Coupons v2: add eligibility + validate endpoints (auth-only).
+- [x] Coupons v2: reserve/redeem/void coupons per order (caps enforced with row locks).
+- [x] Coupons v2: apply coupons to cart totals (including free shipping).
+- [x] Coupons v2: require login to apply coupons (no guest coupons).
+- [x] Coupons v2: issue first-order reward coupon after first delivered order (+ email).
+- [x] Coupons v2: add admin UI for promotions/coupons assignment and revocation.
+- [x] Coupons v2: add scope rules (product/category inclusion/exclusion).
+- [x] Coupons v2: admin UI – resolve scoped product IDs to names (avoid showing raw UUID chips).
+- [x] Coupons v2: admin UI – bulk assign/revoke coupons (CSV upload or segment-based selection).
+- [x] Coupons v2: bulk assign/revoke – add segment targeting (marketing opt-in, email verified) with preview + background job.
+- [x] Coupons v2: bulk segment jobs – list recent jobs per coupon (status/progress) and allow cancel/retry.
+- [x] Abandoned cart job (email reminder) scaffold.
+- [x] Cart item note (gift message) support.
+- [x] Cart cleanup job for stale guest carts.
+- [x] Variant selection validation (options match product).
+- [x] Cart analytics events (add/remove/update).
+
+## Backend - Orders, Payment, Addresses
+- [x] Address model + migration; CRUD /me/addresses.
+- [x] Order + OrderItem models + migrations.
+- [x] Service to build order from cart (price snapshot).
+- [x] Stripe integration: PaymentIntent create, return client secret.
+- [x] Stripe webhook: record payment capture/failure events; keep orders pending until admin acceptance.
+- [x] Payments: send order confirmation + owner alerts only after Stripe/PayPal payment capture (avoid pre-payment receipts).
+- [x] Checkout returns: include `order_id` in Stripe/PayPal confirm/capture to support guest “create account” flows and reduce token-only replay.
+- [x] Stripe PaymentIntent: compute `amount_cents` using Decimal (avoid float rounding drift).
+- [x] GET /orders and /orders/{id}.
+- [x] Admin order list/filter + status/tracking update.
+- [x] Order status enums and transitions (pending/paid/shipped/cancelled/refunded).
+- [x] Order reference code generator.
+- [x] Shipping method model (flat-rate, weight-based).
+- [x] Tax calculation strategy (basic rules).
+- [x] Payment failure retry flow.
+- [x] Refund endpoint stub (manual).
+- [x] Order timeline/audit log (status changes, notes).
+- [x] Packing slip/invoice PDF stub.
+- [x] Order item fulfillment tracking (shipped qty).
+- [x] Capture/void support for Stripe intents.
+- [x] Coupons v2: redeem/release coupons on admin capture/void/refund actions (keep reservation/redemption consistent).
+- [x] Admin order export CSV.
+- [x] Reorder endpoint (copy past order to cart).
+- [x] Address validation hook (country/postal rules).
+- [x] Checkout: support separate billing address (fallback to shipping) and attach billing/shipping addresses to orders.
+- [x] Payments: add Cash on delivery (RON) option stored on orders (payment_method) and allow admin to ship COD orders from pending.
+- [x] Payments: add PayPal option in checkout (keep RON as primary currency) and document supported methods.
+- [x] Orders: include payment method + delivery details in customer/owner emails (COD vs card, courier/tracking).
+- [x] Orders: require a cancel reason when rejecting an order and surface it in emails + “My orders”; notify owner when a manual refund is required.
+- [x] Orders: split “pending” into payment vs admin-acceptance states (e.g., `pending_payment` vs `pending_acceptance`) to avoid UX ambiguity.
+- [x] Receipts: add a PII-redacted shareable receipt mode (hide full addresses/email by default) and configurable token TTL/revocation.
+- [x] Payments: add PayPal webhooks to capture/settle orders even if the buyer never returns to the site.
+- [x] Payments: itemize Stripe Checkout line items (products + shipping + discount) instead of a single aggregated line.
+- [x] Payments: map internal promo codes to reusable Stripe coupons/promotion codes (avoid per-checkout coupon creation).
+- [x] Payments: implement Netopia callback/webhook settlement + signature verification once enabled.
+- [x] Money: migrate monetary fields to Decimal end-to-end (models + schemas + calculations), eliminating float casts.
+- [x] Tax: make tax/VAT strategy configurable (rate, exemptions) instead of hard-coded `0.1`.
+- [x] Receipts: add Share/Revoke actions in Account + Admin UI (copy link, show expiry, revoke token).
+- [x] Sale: add per-product + bulk sale pricing (percent/amount) and show effective price in storefront.
+- [x] Sale: add “Sale” filter in shop and optional homepage “Sale products” block (CMS toggle).
+- [x] Catalog/Cart: prevent purchasing draft/unpublished products (cart add + order build validation).
+- [x] Sale: add sale scheduling (start/end) and optional auto-publish at start.
+- [x] Sale: add a dedicated `on_sale` filter param (avoid reserving `category_slug=sale`).
+- [x] Money: migrate Product/Variant monetary fields to Decimal end-to-end (models + schemas + UI parsing), remove remaining float annotations.
+- [x] Orders: add admin filters for “Pending (any)” (covers `pending_payment` + `pending_acceptance`) and optionally highlight “Awaiting payment” vs “Awaiting acceptance”.
+- [x] Payments: increment promo `times_used` on successful payment capture (and avoid counting abandoned checkouts).
+- [x] Payments: add admin tooling to invalidate Stripe coupon mappings when a promo is edited/disabled.
+
+## Backend - CMS & Content
+- [x] ContentBlock model + migration.
+- [x] Seed default blocks (home hero, about, FAQ, shipping/returns, care).
+- [x] GET /content/{key} public.
+- [x] Admin edit content blocks; validate markdown/HTML safety.
+- [x] Admin hardening: optimistic locking for content edits (`expected_version`) and 409 conflict on stale writes.
+- [x] Content versioning with draft/publish states.
+- [x] Image uploads for content blocks.
+- [x] Rich text sanitization rules.
+- [x] Homepage layout blocks (hero, grid, testimonials).
+- [x] FAQ ordering/priorities.
+- [x] Admin preview endpoint with token.
+- [x] Content change audit log.
+- [x] Static page slugs for SEO (about/faq/shipping/returns/care).
+- [x] CMS: add dynamic pages under `/pages/:slug` (content keys `page.<slug>`).
+- [x] CMS: add banner + carousel blocks (shared slide schema) and migrate legacy homepage hero to a banner block.
+- [x] CMS: allow changing page URLs with redirects (advanced).
+- [x] CMS: redirects – add admin UI to list/manage redirects (view/delete stale entries).
+- [x] CMS: pages – enforce reserved slug validation server-side on page creation (not just frontend).
+
+## Backend - Email & Notifications
+- [x] Email settings (SMTP).
+- [x] Generic email service (text + HTML).
+- [x] Order confirmation email.
+- [x] Password reset email + one-time token flow.
+- [x] Logging/error handling around email sending.
+- [x] Background task for sending emails.
+- [x] Shipping update email (with tracking link).
+- [x] Delivery confirmation email.
+- [x] Cart abandonment email template.
+- [x] Product back-in-stock notification flow.
+- [x] Admin alert on low stock thresholds.
+- [x] Error alerting to Slack/email (critical exceptions).
+- [x] Template system for emails with variables.
+- [x] Email preview endpoint (dev-only).
+- [x] Rate limiting for email sends per user/session.
+- [x] Emails: send bilingual (RO+EN) content in a single email for transactional notifications (welcome, verification, password reset/changed, email change, order status updates, owner alerts).
+- [x] Emails: include product links in the order confirmation email (links to `/products/:slug`).
+- [x] Emails: send welcome email when a guest checkout creates an account.
+- [x] Emails: send coupon assignment/revocation notifications (bilingual) with an account link.
+- [x] Receipt UX: add a shareable HTML receipt view (`/receipt/:token`) with clickable product links + a real PDF renderer with embedded hyperlinks (token PDF endpoint).
+
+## Backend - Security, Observability, Testing
+- [x] CORS config for dev/prod.
+- [x] Rate limiting on login/register/password reset.
+- [x] Validate file types/sizes for uploads.
+- [x] Structured logging with request ID.
+- [x] Health/readiness endpoints.
+- [x] Pytest suite for services (auth, catalog, cart, checkout).
+- [x] Integration tests against in-memory SQLite (API/service flows).
+- [x] mypy type-checking and fixes.
+- [x] CI smoke test hitting health/readiness.
+- [x] API rate limit tests.
+- [x] Structured logging format (JSON) toggle.
+- [x] Request ID propagation to logs.
+- [x] Secure password reset tokens (expiry, blacklist).
+- [x] JWT rotation and blacklist on logout.
+- [x] Content Security Policy headers.
+- [x] HTTPS/secure cookies config for production.
+- [x] Audit log middleware (user + IP).
+- [x] Request/response logging with PII redaction.
+- [x] Slow query logging and performance metrics.
+- [x] Lint/type-check jobs extended (mypy, ruff).
+- [x] Load testing plan (k6/locust) and scripts.
+- [x] SQL injection and XSS validation tests.
+- [x] Dependency vulnerability scanning (pip/npm).
+- [x] Frontend deps: resolve `npm audit` vulnerabilities (pin/upgrade).
+- [x] Backpressure handling (429) for expensive endpoints.
+- [x] Maintenance mode toggle.
+
+## Frontend - Shell & Shared
+- [x] Scaffold Angular app with routing + strict TS.
+- [x] Tailwind CSS and design tokens.
+- [x] Main layout (header/footer/responsive nav).
+- [x] Shared components: button, input, card, modal, toast.
+- [x] Frontend build: replace CommonJS `qrcode` dependency (avoid Angular optimization bailout).
+- [x] Fix shared standalone components missing `NgIf` imports so buttons/labels render correctly.
+- [x] Header: improve theme/language control layout and add a global product search field.
+- [x] Footer: remove year suffix from tagline and replace Pinterest link with Facebook.
+- [x] Footer: turn Facebook/Instagram links into drop-up menus for multiple pages.
+- [x] Frontend: add `/about` route rendering CMS `page.about` content.
+- [x] Header: make theme/language dropdown options readable in dark mode.
+- [x] Header: avoid search/nav overlap on medium screens (use nav drawer + show search on wide screens).
+- [x] Header: keep product search accessible on windowed/small screens (show search at `lg`, provide a search overlay below `lg`).
+- [x] UI: hide admin CTA/nav items unless the signed-in user is an admin.
+- [x] Header: move “View admin” into the nav bar (after Contact) and hide it unless the user is admin/owner.
+- [x] Header: replace “Account” label with a username dropdown (My profile + Sign out).
+- [x] Header: add notifications bell dropdown (unread badge, mark read/dismiss; read auto-hides after 3 days).
+- [x] Branding: rebrand AdrianaArt → momentstudio across UI/docs/meta and backend app name.
+- [x] Branding: update header branding (flower mark + momentstudio wordmark).
+- [x] Header: add descriptive alt text for the flower brand mark.
+- [x] Header UX: reduce desktop clutter and support more nav items (wrap/overflow or two-row layout).
+- [x] Header UX: widen the desktop search bar without pushing nav/actions off-screen.
+- [x] Header UX: improve spacing between brand and nav categories; keep layout resilient when adding more links.
+- [x] Mobile UX: consolidate header actions (search/theme/lang) for a cleaner top bar and easier tapping.
+- [x] Mobile UX: improve nav drawer auth actions (show Account when signed in, hide Sign in, add Sign out).
+- [x] i18n: localize theme option labels (System/Light/Dark) and consider icon-based theme display.
+- [x] Mobile UX: show signed-in user summary in nav drawer (name/email + optional avatar) for better context.
+- [x] Auth: add unique username field for users (required for new accounts; backfill existing users).
+- [x] Auth: allow login via username or email (single identifier field in UI + backend support).
+- [x] Profile: add non-unique display name discriminator (e.g., `name#1234`) and decide where to show it (comments, account, admin).
+- [x] Profile: add username/display name history (user + admin views).
+- [x] Theme UX: replace theme `<select>` with an icon segmented control (System/Light/Dark) on desktop + drawer.
+- [x] Frontend: add `/contact` route/page with phone/email and link it from header/footer.
+- [x] Global error handling / boundary route.
+- [x] API service layer + interceptors.
+- [x] Theme tokens (spacing, typography, colors).
+- [x] Dark/light mode toggle.
+- [x] Respect system `prefers-color-scheme` by default and keep theme state in localStorage (light/dark/system).
+- [x] Add header theme switcher (light/dark/system) that updates the document root class and tokens in real time.
+- [x] Audit shared components/layout for dark-mode contrast (backgrounds, borders, text, cards, inputs, modals, toasts) and fix any hardcoded light colors.
+- [x] Add unit checks for theme switching (default follows system; toggle persists across reloads).
+- [x] Form validation utilities (error messages, async validation).
+- [x] Toast/snackbar service and global overlay.
+- [x] Loading spinner/skeleton components.
+- [x] Page-level breadcrumb component.
+- [x] Accessible modal focus trapping.
+- [x] IntersectionObserver-based lazy image component.
+- [x] Global HTTP error handler (401/403/500).
+- [x] Responsive nav drawer with keyboard navigation.
+- [x] Route guards for auth/admin.
+- [x] ESLint/Prettier strict config.
+- [x] DX: eliminate frontend lint/build warnings (no-floating-promises, tsconfig entrypoints, serve config, bundle budgets).
+
+## Frontend - Storefront
+- [x] Homepage hero with "Shop now" CTA.
+- [x] Featured products grid on homepage.
+- [x] Category listing with grid + pagination.
+- [x] Filter sidebar (category, price range, tags).
+- [x] Shop: prevent price range sliders overflowing the sidebar (stack vertically).
+- [x] Search bar hitting /products.
+- [x] Product card component (image, name, price, stock badge).
+- [x] Product detail page with gallery, variants, quantity/add-to-cart.
+- [x] Storefront: product page add-to-cart respects selected variant (currently always sends `variant_id: null`).
+- [x] Handmade uniqueness note.
+- [x] Sort controls (price/name/newest).
+- [x] Price range slider.
+- [x] Tag/label pills (featured/new/limited).
+- [x] Product gallery zoom/lightbox.
+- [x] Persist filters in query params.
+- [x] Shop: support `/shop/:category` route + `sub=<slug>` query param for subcategories.
+- [x] Empty state for product lists.
+- [x] Error state/retry for product lists.
+- [x] Breadcrumbs for category/product pages.
+- [x] Recently viewed carousel.
+- [x] Localized currency display.
+- [x] SEO meta tags per product/category.
+- [x] CMS/Home: render homepage banners/carousels from `home.sections` (shared slide schema) with RO/EN support and sensible fallbacks.
+- [x] CMS/Home: drive homepage section ordering from `home.sections` content block and support enabling/disabling sections.
+- [x] CMS/Home: add a CMS-editable “Our story” teaser section via `home.story` (markdown + CTA to `/about`).
+- [x] CMS/Site settings: manage Instagram/Facebook links (labels + URLs + optional thumbnails) via a `site.social` content block (meta JSON) and reuse in footer/contact/home.
+- [x] CMS/Contact: render contact page copy from `page.contact` content block and source phone/email from `site.social` (or env) as a single source of truth.
+- [x] Contact UX: use contact-specific loading/error copy (avoid reusing About strings).
+- [x] Social UX: fix `adrianaartizanat` labels in `site.social` defaults (IG/FB) and correct existing seeds.
+- [x] Social UX: add optional “fetch thumbnail” helper (manual thumbnail URL fallback; evaluate oEmbed/Graph API + caching).
+- [x] Shop: add API-powered price bounds (min/max) so the price range UI can cap to real data without an extra list request (and optionally per-filter bounds).
+- [x] Frontend: extract repeated image placeholder-on-error handlers into a shared directive/helper for consistency.
+- [x] Pricing: show EN approx EUR/USD for RON prices (display-only; checkout remains in RON) using live FX rates.
+- [x] Pricing: add FX rate source/TTL settings (backend env: `FX_RATES_URL`, `FX_RATES_CACHE_TTL_SECONDS`).
+- [x] Pricing: add optional admin override/fallback for FX rates (store last-known rates; use when upstream is down).
+- [x] Pricing: make FX rate persistence idempotent (avoid `uq_fx_rates_is_override` errors under concurrent refresh/seed by using a Postgres upsert instead of insert-then-retry).
+- [x] Pricing: enforce single-currency RON across products/orders and document the policy.
+- [x] Pricing: add admin UI to view/set/clear FX rate overrides and display last-known/as-of timestamps.
+- [x] Shop perf: include min/max price bounds in `/catalog/products` response to avoid an extra `/price-bounds` call per filter change.
+- [x] Pricing: add scheduled FX refresh job (background) so first-page loads never block on upstream fetch.
+- [x] A11y: localize shop filter aria labels and improve keyboard affordances for price range inputs.
+
+### Storefront Catalog – Next Improvements (Backlog)
+- [x] Shop: active filter chips – Show selected category/price/tags as removable chips + “Clear all”.
+- [x] Shop: preserve scroll position – When returning from product detail, restore catalog scroll and filters.
+- [x] Shop: result count – Display “X results” and current page range above the grid.
+- [x] Shop: quick view modal – Open product quick view from card (gallery + key details + add to cart).
+- [x] Shop: mobile sticky actions – Keep filter/sort controls accessible while scrolling on mobile.
+- [x] Shop: “Load more” pagination – Optional progressive loading as an alternative to classic pagination.
+- [x] Shop: better empty states – Suggest clearing filters / show popular categories when no results.
+- [x] Shop: skeleton grid – Product card skeletons to reduce layout shift during loading.
+- [x] Shop return UX: make product breadcrumb “Shop” preserve last shop filters/scroll when available.
+
+### Storefront Admin Quick Edit (No Dashboard) – Next Improvements (Backlog)
+- [x] Storefront Admin Mode: toggle – Add an “Edit mode” toggle for admins (header button) that reveals inline controls.
+- [x] Storefront Admin Mode: permissions – Gate edit mode behind admin role + require recent auth for sensitive actions.
+- [x] Storefront Categories: drag reorder – Reorder nav categories via drag-and-drop directly in the header/category grid.
+- [x] Storefront Categories: quick rename – Inline rename category (RO/EN) from the category list with optimistic save.
+- [x] Storefront Categories: quick create – Create a new category from the Shop page (no route change) and insert into nav.
+- [x] Storefront Categories: quick subcategory – Create a subcategory under the current category from `/shop/:category`.
+- [x] Storefront Categories: quick image – Upload/change category thumbnail/banner from the category page in edit mode.
+- [x] Storefront Categories: hide/show – Toggle category visibility (hide from storefront) with a clear “hidden” badge.
+- [x] Storefront Categories: merge shortcut – “Merge into…” action surfaced from the category page (server-side preview/confirm).
+- [x] Storefront Categories: safe delete – Delete category from storefront only if unused; otherwise prompt reassignment/merge.
+- [x] Storefront Products: inline edit badges – Show small “Edit” chips on product cards for admins (price/stock/status).
+- [x] Storefront Products: quick publish – One-click publish/unpublish/archive from product card or product detail (admin-only).
+- [x] Storefront Products: quick stock/price – Inline stock + price editing on the Shop grid for admins (spreadsheet-lite).
+- [x] Storefront Products: bulk select – Multi-select products on Shop page and apply bulk actions (status/category/feature).
+- [x] Storefront Products: include drafts in edit mode – Allow admins to see/edit draft/archived items on `/shop` when edit mode is enabled.
+- [x] Storefront Products: drag reorder (category) – Custom sort order per category with drag-and-drop on the category page.
+- [x] Storefront Products: reorder for large categories – Support drag reordering when a category spans multiple pages (load-all mode or cross-page ordering).
+- [x] Catalog: respect hidden categories in listings – Do not allow browsing hidden category products via `/shop/:slug` unless storefront edit mode is enabled.
+- [x] Storefront Products: pin/feature – Pin products to top of a category (per-category featured list) from storefront.
+- [x] Storefront Products: quick duplicate – Duplicate a product from product detail in edit mode (clone images, mark draft).
+- [x] Storefront Products: image manager – Reorder images and edit alt text/captions from product detail in edit mode.
+- [x] Storefront Admin Mode: undo window – After edits (reorder/publish/price), offer a short “Undo” toast.
+- [x] Storefront Admin Mode: audit trail – Record all storefront edits in the admin audit log with “source=storefront”.
+
+## Blog & Community
+- [x] Nav: add “Blog” link between Home and Shop (header + drawer).
+- [x] Backend: add public blog endpoints (list + detail) backed by ContentBlocks with optional translations (fallback to available language).
+- [x] Backend: add blog comments/discussion model and endpoints (list/create/delete) with auth + basic moderation.
+- [x] Frontend: add `/blog` list page (pagination, loading/error, meta tags).
+- [x] Frontend: add `/blog/:slug` post page (render content + comments/discussion thread UI).
+- [x] Admin: add blog post authoring (create/edit/publish) with language selection and optional translation.
+- [x] Frontend: render sanitized Markdown for blog posts (cover image + “Back to blog”).
+- [x] Editor: add Markdown editor toolbar (H1/H2, bold/italic, link, code block, list) + live preview.
+- [x] Media: add “insert image” action that uploads to `/content/admin/blog.{slug}/images` and inserts the URL into Markdown.
+- [x] SEO: add canonical link tags for blog list/post pages.
+- [x] SEO: include blog URLs in sitemap.xml and add OpenGraph meta per post.
+- [x] Testing: add blog unit/integration coverage (SEO meta/canonical, OG image caching, sitemap inclusion, Postgres smoke).
+- [x] Metadata: add summary, cover_image, tags, reading_time to ContentBlock.meta and show them in list/cards.
+- [x] Filters: tag filter + search within blog posts (server-side).
+- [x] Draft previews: shareable preview URL (token-based) for unpublished posts.
+- [x] Scheduling: support publish_at / scheduled publishing and “unpublish”.
+- [x] WYSIWYG editor (Toast UI) with Markdown import/export.
+- [x] Revisions: show version history and diff/rollback per post.
+- [x] Revisions v2: include meta/translations/published_at in version snapshots + rollback.
+- [x] Editor: improve dark-mode styling for the rich editor UI.
+- [x] Social preview images (OG image generation per post).
+- [x] Moderation: admin tools to hide/delete comments and review flagged content.
+- [x] Notifications: optional email notifications for new comments (admin/user opt-in).
+- [x] Notifications: localize account notification settings UI + improve email templates.
+
+### Blog – Next Improvements (Backlog)
+- [x] Blog list: featured hero – Highlight the newest/pinned post with a large, image-forward hero card.
+- [x] Blog list: pinned posts – Allow pinning 1–3 posts to the top of `/blog` (admin-managed ordering).
+- [x] Blog list: sort controls – Add sorting (newest/oldest/most viewed/most commented) with persisted selection.
+- [x] Blog list: filter UX – Sticky filter bar (tags/search) with clear chips and “Reset” action.
+- [x] Blog list: tag pages – Add `/blog/tag/:tag` landing pages with SEO meta and pagination.
+- [x] Blog list: series/categories – Add optional blog “series” taxonomy (separate from shop categories) with pages and filters.
+- [x] Blog list: nicer cards – Improve typography, spacing, hover states, and consistent cover image aspect ratios.
+- [x] Blog list: image loading polish – Use blur-up placeholders + prevent layout shift for cover images.
+- [x] Blog list: empty states – Better “no results” UX (suggest clearing filters and show popular tags).
+- [x] Blog list: reading meta – Show author, publish date, and reading time more prominently on cards.
+- [x] Blog list: RSS/Atom feed – Provide `/blog/rss.xml` (and/or Atom) with latest posts and translations.
+- [x] Blog list: JSON feed – Provide `/blog/feed.json` for integrations and modern feed readers.
+- [x] Blog post: typography refresh – Better line length, font sizes, headings, and spacing for a more premium look.
+- [x] Blog post: reading progress – Add a top progress bar and “Back to top” affordance.
+- [x] Blog post: table of contents – Auto-generate TOC from headings with scroll-spy and anchor links.
+- [x] Blog post: heading permalinks – Add link icons on headings for easy sharing of sections.
+- [x] Blog post: next/previous nav – Add “Next post / Previous post” navigation at the bottom.
+- [x] Blog post: related posts – Show related posts by tags/series with thumbnails.
+- [x] Blog post: share bar – Add share buttons (copy link + WhatsApp/Facebook) with accessible labels.
+- [x] Blog post: inline image lightbox – Click in-article images to open a gallery/lightbox with captions.
+- [x] Blog post: rich image layouts – Support wide/left/right aligned images and multi-image galleries in content.
+- [x] Blog editor: image layout hints – Document supported image title hints (`"wide"`, `"left"`, `"right"`, `"gallery"`) and add quick-insert helpers in the editor UI.
+- [x] Blog post: code blocks – Syntax highlighting + “Copy” button + line wrapping toggle.
+- [x] Blog post: callout blocks – Support “Tip/Note/Warning” callouts with icons and theme-aware styling.
+- [x] Blog post: embedded product cards – Allow inserting product/category/collection cards inside posts (shoppable content).
+- [x] Blog post: author card – Author bio + avatar + links, plus “More from this author”.
+- [x] Blog post: print-friendly styles – Clean print stylesheet (no nav, readable typography, proper image sizing).
+- [x] Blog post: comments UX – Pagination + sorting (newest/oldest/top) and improved empty/loading states.
+- [x] Blog comments: spam controls – Rate limits + link limits + optional CAPTCHA on comment submit.
+- [x] Blog: newsletter subscribe – Inline subscribe block and optional “subscribe to comments” on a post.
+- [x] Storefront admin quick edit: edit buttons – Show “Edit” on blog cards/posts for admins (links to admin editor).
+- [x] Storefront admin quick edit: publish toggle – Allow publish/unpublish/schedule from the blog page in admin mode.
+- [x] Storefront admin quick edit: inline meta – Quick edit title/summary/tags from the post page (drawer/modal).
+- [x] Admin blog list: bulk actions – Bulk publish/unpublish, tag add/remove, and schedule changes with preview.
+- [x] Admin editor: cover image workflow – Upload/select cover image with crop + focal point + mobile preview.
+- [x] Admin editor: drag-drop images – Drag-and-drop images into the editor (auto-upload + insert markdown/WYSIWYG block).
+- [x] Admin editor: accessibility checks – Warn on missing alt text/captions and offer quick fixes before publish.
+- [x] Admin editor: autosave + recovery – Autosave drafts and offer “restore last autosave” after crashes/refresh.
+- [x] Admin editor: writing aids – Word count, reading-time recalculation, and headings outline sidebar.
+- [x] Blog SEO: preview panel – Preview meta/OG/twitter cards per language and validate truncation/warnings.
+- [x] Blog perf: prefetch + caching – Prefetch post data on hover and add caching for list/detail to speed up loads.
+- [x] Blog list: pinned posts – Prevent conflicting pin slots (1–3) and surface warnings in admin UI.
+- [x] Blog stats: view counting – De-dupe per session + bot filtering (current counter increments on each page view).
+- [x] Blog list: image loading polish – Add real LQIP/blurhash placeholders for cover images (optional).
+## Frontend - Cart & Checkout
+- [x] Cart page/drawer with quantities and totals.
+- [x] Cart UX: make cart item image/title link to the product page (`/products/:slug`).
+- [x] Update quantity/remove items; stock error messaging.
+- [x] Checkout steps: shipping address, promo, payment (Stripe).
+- [x] Order summary during checkout.
+- [x] Success page with order summary + continue shopping.
+- [x] Guest cart persistence in localStorage.
+- [x] Apply promo code UI.
+- [x] Coupons v2: show eligible coupons in checkout (signed-in only).
+- [x] Coupons v2: block guest coupon entry and require sign-in.
+- [x] Shipping method selection UI.
+- [x] Address form with validation and country selector.
+- [x] Checkout: allow selecting saved account addresses (autofill shipping/billing).
+- [x] Checkout: replace country/region dropdowns with free-form inputs (suggestions + ISO code mapping).
+- [x] Payment form with Stripe elements.
+- [x] Checkout: add billing address section with “same as shipping” toggle and attach billing to orders.
+- [x] Payments UX: add payment method selector with icons (card via Stripe, cash on delivery).
+- [x] Checkout: add a billing address section with a “same as shipping” toggle and persist/attach it to orders.
+- [x] Payments UX: add payment method icons and implement Cash on delivery (RON) as an additional option (PayPal optional follow-up).
+- [x] Checkout error states and retry.
+- [x] Save address checkbox for checkout.
+- [x] Order confirmation page with next steps.
+- [x] Cart mini-icon badge with item count.
+- [x] Pricing UI: show RON amounts with `.` and max 2 decimals (no locale comma); EN may include ≈EUR/USD hints.
+- [x] Edge cases: out-of-stock and price changes during checkout.
+- [x] Checkout totals driven by backend shipping/promo validation (no hardcoded amounts).
+- [x] Checkout: require verified email before placing an order (signed-in or guest).
+- [x] Checkout: reintroduce guest checkout with an email verification step and optional “create account” toggle (without weakening the verified-email policy) + update tests.
+- [x] Frontend cart/checkout tests (unit/integration-style) against backend cart/payment intent/order APIs.
+- [x] Ensure frontend CI runs with Angular toolchain/Chrome to cover cart/checkout flows.
+- [x] Wire cart state to backend cart APIs (load/add/update/remove) instead of local-only.
+- [x] Replace checkout payment placeholder with Stripe Elements + PaymentIntent from backend.
+- [x] Submit checkout to backend to create order, validate stock/pricing, and handle failures.
+- [x] Use backend shipping methods and promo validation instead of hardcoded values.
+- [x] Persist/save checkout address via backend (guest or user) and reuse on account.
+- [x] Tests: cart sync returns product metadata (name/slug/image/currency) and totals reflect shipping/promo.
+- [x] Tests: payment intent amount derived from backend totals (seeded cart).
+- [x] Frontend test: Checkout component calls `/cart/sync`, `/payments/intent`, `/orders/checkout` and handles errors/retry.
+- [x] Frontend test: CartStore add/remove via backend merges quantities and is resilient to errors.
+- [x] Frontend test: ProductComponent “Add to cart” posts to backend and shows toast (mock CartStore).
+- [x] Checkout: add courier selection (home delivery vs locker) and show it in order details/emails.
+- [x] Payments UX: add PayPal (optional) and show all payment options with icons + clear copy.
+- [x] Shipping: integrate official locker APIs for Sameday + Fan Courier (env-configured; optional Overpass fallback for local dev).
+### Cart & Checkout – Next Improvements (Backlog)
+- [x] Cart/Checkout: translate remaining hard-coded UI strings and error messages (no raw English).
+- [x] Cart: show quantity validation errors per item (avoid a single global error banner).
+- [x] Cart: add “Clear cart” action with confirmation (keep backend in sync).
+- [x] Cart: show discount breakdown in summary (sale vs coupon vs shipping) using backend quote totals.
+- [x] Cart: add promo code apply UI (signed-in only for coupons) with applied-code chip + remove action.
+- [x] Cart: add item notes/gift messages UI and persist to backend cart items.
+- [x] Cart: add skeleton loading state while cart syncs/loads from backend.
+- [x] Cart: replace quantity input with +/- stepper (debounced) and clamp to stock.
+- [x] Cart: show low-stock messaging (“Only X left”) and highlight when at max quantity.
+- [x] Cart: add “Move to wishlist” action for signed-in users.
+- [x] Cart: add recommendations (“You may also like”) using category/featured products.
+- [x] Cart: show free-shipping threshold progress (configurable) and suggested add-ons.
+- [x] Cart: show estimated delivery window based on courier selection (if available).
+- [x] Cart: persist delivery type/courier selections and prefill checkout.
+- [x] Cart: add “Save for later” list (separate from wishlist; optional).
+- [x] Checkout: redirect to cart when cart is empty (with helpful message).
+- [x] Checkout: stepper UI polish (completion checkmarks + scroll-to-next on continue).
+- [x] Checkout: block placing an order while cart sync is pending (prevent stale totals).
+- [x] Checkout: debounce cart sync and show explicit “Syncing…” indicator.
+- [x] Checkout: preselect default saved shipping/billing addresses and allow quick switch.
+- [x] Checkout: allow editing a selected saved address inline (opens modal) and re-apply it.
+- [x] Checkout: improve guest email verification UX (clearer errors, resend cooldown, avoid masking specific errors).
+- [x] Checkout: show eligible + ineligible coupons with reasons and estimated savings.
+- [x] Checkout: optionally auto-apply the best eligible coupon (toggleable).
+- [x] Checkout: clearly show stacking rules (sale price + coupon) and why some coupons can’t be applied.
+- [x] Checkout: order summary breakdown (subtotal, discount, shipping, VAT) with consistent formatting.
+- [x] Checkout: include item thumbnails + per-line totals in the order summary.
+- [x] Checkout: ensure guest “create account” preserves saved address + preferences on submit.
+- [x] Checkout: add helper copy and links per payment method (Stripe/PayPal/COD/Netopia).
+- [x] Checkout: improve Stripe return/cancel screens (clear status, retry CTA, support link).
+- [x] Checkout: improve PayPal return/cancel screens (clear status, retry CTA, support link).
+- [x] Checkout: show loader when payment method is “not ready” instead of a hard error.
+- [x] Checkout: show inline field validation (per field) with `aria-describedby` and consistent styling.
+- [x] Checkout: add “Copy from shipping” button for billing address when not “same as shipping”.
+- [x] Checkout: add “Save as default shipping/billing” toggles when saving address (signed-in).
+- [x] Checkout: expose courier price/ETA differences more clearly (radio cards).
+- [x] Checkout: add phone field to shipping address if courier requires it (configurable).
+- [x] Checkout: add optional invoice details (company name, VAT ID) under billing.
+- [x] Payments UX: hide/disable payment methods that are not available for current cart/currency/country.
+- [x] Payments UX: remember last-used payment method and default to it on next checkout.
+- [x] Payments UX: prevent double-submits and show progress on “Place order” (incl. network retries).
+- [x] Checkout: allow saving/editing phone on saved addresses and prefill it in checkout.
+- [x] Receipts/Admin: show invoice details (company/VAT) on order detail + receipt PDF (redact in share links).
+- [x] A11y: add aria-labels for cart remove/quantity controls and ensure full keyboard support.
+- [x] A11y: announce validation errors via `aria-live` on checkout and move focus to first error.
+- [x] A11y: ensure focus management when steps change or modals open/close.
+- [x] Checkout A11y: tie guest “create account” phone validation to the field (`aria-invalid`/`aria-describedby`) instead of only showing a passive hint.
+- [x] Performance: split the monolithic `CheckoutComponent` into smaller components (shipping/promo/payment).
+- [x] Performance: add route-level prefetching/resolvers for shipping methods and CMS pricing settings.
+- [x] Observability: add client-side analytics events for cart/checkout steps (start, abandon, success).
+- [x] Testing: add Playwright e2e for cart → checkout → COD success.
+- [x] Testing: add Playwright e2e for coupons eligibility + guest restriction.
+- [x] Testing: add Playwright e2e for PayPal and Stripe return/cancel flows (smoke).
+- [x] Checkout: audit `phone_required_*` defaults between cart totals, CMS settings, and backend checkout enforcement (avoid UI/backend mismatch).
+
+## Frontend - Auth & Account
+- [x] Login page with validation.
+- [x] Registration page.
+- [x] Password reset request + reset form.
+- [x] Account dashboard (profile, address book, order history, order detail).
+- [x] Account: add "My coupons" page (list, copy, and deep-link to checkout).
+- [x] Change password form.
+- [x] Auth UX: add show/hide toggles for password inputs (register + change password).
+- [x] Email verification flow UI.
+- [x] Address book CRUD UI.
+- [x] Order history pagination + filters.
+- [x] Saved payment method placeholder.
+- [x] Profile avatar upload (optional).
+- [x] Session timeout/logout messaging.
+- [x] Wire login/register/password reset flows to backend auth endpoints (replace mocks).
+- [x] Fetch real profile, addresses, and order history from backend; replace account dashboard mock data.
+- [x] Implement avatar upload wired to storage backend.
+- [x] Add backend email verification tokens/endpoints + frontend resend/confirm wiring.
+- [x] Security: remove saved payment methods section (cards handled via Stripe/PayPal/Netopia checkout flows).
+- [x] Client/session idle-timeout handling (auto logout + messaging).
+- [x] Replace address prompt UX with form/modal wired to address CRUD APIs.
+- [x] Integrate Stripe Elements card entry UI instead of manual payment_method prompts.
+- [x] Account: show a verification-needed banner near email with resend/confirm UI and hide it once verified.
+- [x] Security: require current password to change username (backend + UI).
+- [x] Account UX: account overview landing with summary cards (Orders, Addresses, Wishlist, Notifications, Security) and “last order status” + “default address” summaries.
+- [x] Account UX: profile basics editor (avatar, display name, phone, preferred language + theme) with optional profile completeness indicator.
+- [x] Account UX: orders UI improvements (status chips, expandable details, tracking link, invoice/receipt download, and “Reorder”).
+- [x] Account UX: address book improvements (mark defaults, inline validation, “use as billing too”, and mobile-friendly inputs/autofill).
+- [x] Account UX: security center polish (change password + link/unlink Google).
+- [x] Account UX: notifications grouped toggles (blog replies/admin alerts/marketing) with email preview and last updated timestamp.
+- [x] Account UX: error/loading polish for profile sections (skeletons, empty states, avoid blocking overlays).
+- [x] Account UX: privacy/self-service (data export + account deletion flow with confirmation + cooldown).
+- [x] Account UX: community “My comments” list (links + status) and reply notification context.
+- [x] Auth UX: upgrade registration to a 2-step wizard (account + personal) with required DOB + phone country picker (default RO).
+- [x] Auth UX: add live format validation for email/username/phone and show “already used” errors only on submit (avoid enumeration).
+- [x] Account UX: extend profile editor to manage first/middle/last name, DOB, and phone with country code.
+- [x] Tests: add/update frontend unit tests for registration wizard and profile field wiring.
+- [x] Account: manage secondary emails (add/verify/remove, set primary) and allow login via verified secondary emails.
+- [x] Forms: audit and set proper HTML `autocomplete` attributes across checkout/profile/tickets/contact forms for better browser autofill.
+- [x] Auth UX: ensure header/profile dropdown always reflects server auth state after restart (clear stale UI on 401/refresh failure) and sign-out works consistently in all menus.
+- [x] Wishlist: investigate reports of add/remove not persisting and add e2e coverage for save/unsave flows.
+- [x] Account UX: unify email management UI in Security (single email section; reduce duplication; align Change password placement).
+- [x] Account UX: translate Security page strings (remove hard-coded English).
+- [x] Security: show QR code during 2FA setup and prompt for 2FA inline on login.
+- [x] Payments: remove `/payment-methods` API + DB table (reduce storage/compliance scope).
+### Account UX – Next Improvements (Backlog)
+- [x] Account UX: lazy-load per-section data (don’t fetch orders/addresses/comments on every Account route).
+- [x] Account UX: add “Retry” actions for section load failures (per card, not just global error).
+- [x] Account i18n: translate remaining hard-coded AccountState strings (toasts/prompts/labels).
+- [x] Account UX: warn on unsaved changes (Profile/Addresses/Notifications).
+- [x] Account nav: show badges (unread notifications, coupons count, pending orders).
+- [x] Account UX: remember last visited tab and restore on `/account`.
+- [x] Account mobile: collapse sidebar into a dropdown or bottom nav.
+- [x] Account desktop: make sidebar sticky.
+- [x] Account UX: add per-section skeleton loaders (avoid whole-page skeletons).
+- [x] Account a11y: add an `aria-live` region for critical status updates/toasts.
+- [x] Orders: migrate to server-side pagination (don’t fetch all orders at once).
+- [x] Orders: add search by reference code + date-range filter.
+- [x] Orders: surface payment method + payment state prominently on each order.
+- [x] Orders: show delivery tracking status (when available) alongside tracking number.
+- [x] Orders: add “Request return” flow from eligible orders.
+- [x] Orders: add item-level reorder (not only whole-order reorder).
+- [x] Orders: move receipt/invoice actions to the order header for quick access.
+- [x] Orders: allow cancel request for eligible states (with confirmation + reason).
+- [x] Orders: show “manual refund required” banner with next steps (when applicable).
+- [x] Receipts: show share expiry + revoke/copy states in Account orders UI.
+- [x] Addresses: add country-specific validation hints (postal code, required fields).
+- [x] Addresses: optional address autocomplete (feature-flag).
+- [x] Addresses: support “billing same as shipping” per address.
+- [x] Addresses: add “Duplicate address” action.
+- [x] Addresses: convert address label to a dropdown (Home/Work/Other) with custom fallback.
+- [x] Wishlist: add bulk actions (remove selected / add selected to cart).
+- [x] Wishlist: show stock + price-change chips since saved.
+- [x] Wishlist: add “notify me when back in stock” for wishlist items.
+- [x] Coupons: show ineligible reasons + “you need X more subtotal” progress.
+- [x] Coupons: suggest best coupon for the current cart (without auto-applying).
+- [x] Notifications: add template previews per notification type.
+- [x] Notifications: show last-updated timestamp per preference group.
+- [x] Notifications: clarify transactional vs marketing preferences (copy + grouping).
+- [x] Security: list active sessions/devices + revoke others.
+- [x] Security: show a recent security activity feed (logins/email changes/password changes).
+- [x] Security: add 2FA (TOTP) + recovery codes.
+- [x] Security: add passkeys (WebAuthn) for sign-in.
+- [x] Security: add password strength meter + show/hide toggles where missing.
+- [x] Security: show cooldown timers (username/display name/email changes).
+- [x] Emails: improve per-email verification state/actions UX (clearer status + inline actions).
+- [x] Emails: add resend-verification cooldown countdown (anti-spam UX).
+- [x] Emails: require re-auth for more sensitive actions (unlink Google/remove primary/etc).
+- [x] Google linking: clarify “unlink required” restriction with better copy and UX.
+- [x] Profile: separate “public identity” vs “private account info” sections.
+- [x] Profile: improve phone input UX (formatting preview, validation hints).
+- [x] Profile: add avatar crop/preview UI before upload.
+- [x] Profile: add a public-profile preview card (how you appear in comments).
+- [x] Privacy: show export progress + notify when ready (background job UX).
+- [x] Privacy: show deletion cooldown progress + consequences checklist.
+- [x] Support: show recent tickets inside Account (overview or dedicated section).
+
+## Frontend - Admin Dashboard
+- [x] /admin layout with sidebar + guard.
+- [x] Admin UX: refactor `/admin` to a route-based layout (Option B) with dedicated pages (start with Orders).
+- [x] Admin UX: add `/admin/products` page (catalog workflows) and wire it into the admin sidebar.
+- [x] Admin UX: add `/admin/users` page (users + security workflows) and wire it into the admin sidebar.
+- [x] Product list table (sort/search).
+- [x] Product create/edit form (slug auto-generated, category, price, stock, description, images, variants).
+- [x] Admin products: validate price input as `123.45` (digits + `.` with max 2 decimals) and show a hint/placeholder.
+- [x] Admin orders list with filters + order detail/status update.
+- [x] Admin orders: add actions (retry/capture/void/refund note, delivery email, packing slip download).
+- [x] Content editor for hero and static pages.
+- [x] Basic user list (view customers, promote/demote admins).
+- [x] Admin UX: treat `owner` as admin and prevent editing owner role.
+- [x] Bulk product actions (activate/deactivate, delete).
+- [x] Product image reorder UI.
+- [x] Category CRUD UI with drag-and-drop ordering.
+- [x] Order status update with timeline view.
+- [x] Coupon/promo management UI.
+- [x] Content preview/publish controls.
+- [x] Admin activity audit view.
+- [x] Admin login session management (force logout).
+- [x] Inventory low-stock dashboard.
+- [x] Sales analytics: sales last 30d (GMV) on dashboard.
+- [x] Wire admin dashboard widgets to backend (products/orders/users/content/coupons) and remove mock data.
+- [x] Connect admin audit log to backend audit endpoints.
+- [x] Connect admin session force-logout to backend session management.
+- [x] Calculate low-stock and sales analytics from real backend metrics instead of mock data.
+- [x] Backend tests: admin dashboard endpoints (summary, lists, audit, maintenance, category reorder, sitemap/robots/feed, session revoke, user role, image reorder).
+- [x] Frontend tests: AdminService/admin component for order status, coupon add/toggle, category reorder drag/drop, maintenance toggle (mock HTTP).
+- [x] Backend tests: admin filters/coupons/audit/image reorder/low-stock with sqlite override.
+- [x] Frontend tests: AdminService + admin component flows (sessions revoke, role update, low-stock, coupons, maintenance get/set, category reorder drag-drop).
+- [x] Admin i18n: localize remaining hardcoded strings in admin pages (assets/social/SEO/info) and ensure RO/EN parity.
+- [x] Admin UX: split `/admin/content` into subroutes (home/pages/blog/settings) and reduce the monolithic admin CMS page size.
+- [x] Admin UX: split `/admin/dashboard` into a dedicated component focused on metrics/owner ops (keep CMS elsewhere).
+- [x] Admin audit log UX: add filters (entity/user/action), pagination, and CSV export.
+- [x] E2E: extend Playwright coverage to CMS flows (home.sections edit, page updates, blog publish).
+- [x] Support inbox: add contact form submissions (store + admin view) and route notifications to owner (email + in-app).
+- [x] Returns/RMA: design and implement an admin workflow (create RMA, statuses, customer emails).
+- [x] Shipping labels: add an admin workflow (provider integration or label upload + tracking association).
+- [x] CMS UX: add revision history + rollback UI for ContentBlocks (home/pages/settings) and show diffs before restoring.
+- [x] CMS UX: introduce a visual homepage “page builder” via `home.sections` (blocks: text, image, gallery) with live preview and reordering.
+- [x] CMS UX: extend the page builder blocks to static pages (e.g., `page.about`, `page.contact`) beyond Markdown-only editing.
+- [x] CMS UX: add an asset library (upload/browse/reuse images) and allow selecting existing uploads for hero/page blocks.
+- [x] Admin i18n/content: expose RO/EN translation fields for products and categories (optional; fallback to available language).
+- [x] Storefront: add “Notify me when back in stock” UI on product detail (out-of-stock), wired to the back-in-stock request flow.
+
+## UX, Performance, SEO & Accessibility
+- [x] Mobile-first responsive design across pages(full mobile compatibility).
+- [x] Loading skeletons/spinners for lists and details.
+- [x] Toast notifications for key actions.
+- [x] Image optimization (srcset/lazy loading/modern formats).
+- [x] SEO meta tags per page; Open Graph; sitemap/robots.
+- [x] Lighthouse perf + accessibility fixes.
+- [x] Keyboard navigation, contrast, accessible labels.
+- [x] Prefetch critical API calls on navigation.
+- [x] Asset compression and caching headers guidance.
+- [x] ARIA labels for form controls and buttons.
+- [x] Focus styles consistent across components.
+- [x] Skip-to-content link.
+- [x] Motion-reduced animations option.
+- [x] 404/500 error pages with helpful actions.
+- [x] Structured data (JSON-LD) for products.
+- [x] Breadcrumb structured data for SEO.
+- [x] Perf budget and bundle analysis (Angular).
+
+## Internationalization & Localization (RO/EN)
+- [x] Pick frontend i18n strategy (Angular i18n vs ngx-translate) and set up RO/EN language switching.
+- [x] Base translation files for `en` and `ro` (navigation, footer, auth, cart, checkout, admin).
+- [x] Language toggle in header with persisted choice (localStorage/cookie).
+- [x] Store preferred language on user profile and default to it after login.
+- [x] Internationalize storefront text (home, shop, product detail, cart, checkout, account) – frontend strings wired to i18n.
+- [x] Internationalize storefront shell text for home + shop pages (partial storefront i18n).
+- [x] RO/EN translations for validation/error messages in forms (login, register, checkout, admin).
+- [x] Internationalize admin dashboard labels/messages.
+- [x] `product_translations` (or JSONB) for localized product name/short/long description per language.
+- [x] `category_translations` (or JSONB) for localized category name/description per language.
+- [x] Localized content blocks for static pages (About, FAQ, Shipping, etc.).
+- [x] Content API supports `lang` query param with sensible fallbacks and `Accept-Language` defaults.
+- [x] Localize email templates (order confirmation, password reset) into RO/EN based on user preference.
+- [x] Localized SEO meta tags per language (home, category, product, about).
+- [x] Tests rendering pages in RO/EN to verify translations/directionality.
+
+## Auth – Google OAuth & Account Linking
+- [x] Add Google identity fields to `User` (google_sub, google_email, google_picture_url) + migration.
+- [x] Settings for Google OAuth client ID/secret, redirect URI, allowed domains.
+- [x] `/auth/google/start` builds consent URL and redirects.
+- [x] `/auth/google/callback` exchanges code, fetches profile, maps to local user.
+- [x] Handle email collision: prompt linking instead of duplicate creation when email matches existing user.
+- [x] Google login when `google_sub` exists issues standard access/refresh tokens.
+- [x] Google OAuth: require registration completion (incl. password) before issuing session tokens (redirect to `/register?complete=1`).
+- [x] Google OAuth: use a short-lived completion token so users aren’t “logged in” until required profile fields are saved.
+- [x] Google OAuth: add server-side enforcement (deny protected APIs until profile is complete) + optional cleanup of abandoned incomplete accounts (recommended for production hardening).
+- [x] Google OAuth: opportunistically clean up abandoned incomplete accounts (e.g., >30 days old) during Google callback handling (no cron/env needed).
+- [x] `/auth/google/link` for logged-in users to link Google (password confirmation).
+- [x] `/auth/google/unlink` to disconnect Google profile (must retain password).
+- [x] Validation to prevent linking a Google account already linked elsewhere.
+- [x] Frontend login/register “Continue with Google” flow and callback handling.
+- [x] Account settings “Connected accounts” section with link/unlink actions.
+- [x] Log security events for linking/unlinking and first-time Google logins.
+- [x] Unit tests for Google OAuth flows (happy path, link existing, conflicting emails, unlink).
+- [x] README docs for Google OAuth setup/testing (console steps, redirect URLs).
+
+## Admin Dashboard – CMS & UX Enhancements
+- [x] Admin UI for editing homepage hero per language (headline, subtitle, CTA, hero image).
+- [x] Admin sidebar: add a dedicated `/admin/content` entry/route for CMS + blog tooling.
+- [x] Admin i18n: localize blog/CMS admin UI strings (RO/EN) to avoid hardcoded English.
+- [x] Admin UI for managing Collections (named groups of products to feature).
+- [x] Drag-and-drop ordering for homepage sections (hero, collections, bestsellers, new arrivals).
+- [x] Home CMS: make storefront render homepage sections from `home.sections` (order + enabled toggles) and add a CMS-driven `home.story` section.
+- [x] Admin UI for global assets (logo, favicon, social preview image).
+- [x] SEO settings in admin to set meta title/description per page per language.
+- [x] WYSIWYG/markdown editor for About/FAQ/Shipping content with RO/EN tabs.
+- [x] Live preview mode in admin for page changes before publishing.
+- [x] Version metadata (“last updated by/at”) for content blocks.
+- [x] Admin dashboard overview with key metrics (open orders, recent orders, low-stock, sales last 30d).
+- [x] Admin tools for inline/bulk stock editing in product table.
+- [x] Duplicate product action in admin (clone with images, mark draft).
+- [x] Admin controls for bestseller/highlight badges on storefront cards.
+- [x] Scheduling for product publish/unpublish; show upcoming scheduled products.
+- [x] Admin maintenance mode toggle (customer-facing maintenance page, admin bypass).
+- [x] Admin audit log page listing important events (login, product changes, content updates, Google linking).
+
+### Admin Dashboard – Next Improvements (Backlog)
+- [x] Admin Dashboard: add “Today” KPI strip – Show today’s orders/GMV/refunds vs yesterday with percent deltas.
+- [x] Admin Dashboard: add configurable date ranges – Allow last 7/30/90/custom ranges across all widgets.
+- [x] Admin Dashboard: widget personalization – Let admins hide/reorder dashboard widgets and persist per user.
+- [x] Admin Dashboard: alert cards for anomalies – Highlight spikes in failed payments, stockouts, or refund requests.
+- [x] Admin Dashboard: system health panel – Show DB status and last backup timestamp.
+- [x] Admin Dashboard: quick actions toolbar – Add buttons for “Create product”, “Create coupon”, “Export orders”, etc.
+- [x] Admin Dashboard: global search – Search across orders/products/users by id/email/slug with typeahead.
+- [x] Admin Dashboard: recent activity feed – Show last admin actions with deep links to affected entities.
+- [x] Admin Dashboard: scheduled tasks overview – Show upcoming publish schedules and promo schedules.
+- [x] Admin Dashboard: configurable low-stock thresholds – Per-category/product threshold overrides + “critical” highlight.
+- [x] Admin Orders: saved filter presets – Persist common filter sets (e.g., “Pending acceptance”, “Cash awaiting shipment”).
+- [x] Admin Orders: bulk status updates – Select multiple orders and set status/assign courier with one action.
+- [x] Admin Orders: bulk email resend – Resend confirmation/delivery emails for selected orders with audit notes.
+- [x] Admin Orders: printable batch packing slips – Generate a merged PDF for selected orders.
+- [x] Admin Orders: shipping label management – Upload/store labels per order and show print/download history.
+- [x] Admin Orders: one-click refund flow – Guided refund wizard with amount breakdown and required notes.
+- [x] Admin Orders: partial refunds UI – Support item-level partial refunds and sync with payment provider.
+- [x] Admin Orders: timeline diff view – Show field diffs (status, tracking, address changes) between events.
+- [x] Admin Orders: customer notes – Allow internal notes per order (visible only to admins).
+- [x] Admin Orders: tag/label system – Add tags like “VIP”, “Fraud risk”, “Gift” and filter by tag.
+- [x] Admin Orders: fraud signals panel – Show velocity checks, mismatched country, multiple failed payments, etc.
+- [x] Admin Orders: address edit + re-rate shipping – Edit shipping address and recompute shipping cost (audit + constraints).
+- [x] Admin Orders: timeline diff view – include address diffs once address edit lands (shipping/billing before/after blocks).
+- [x] Admin Orders: split shipments – Support partial fulfillment with per-item shipped qty and multiple tracking numbers.
+- [x] Admin Orders: export improvements – Add CSV export columns picker + saved export templates.
+- [x] Admin Orders: print/i18n hardening – Ensure PDFs render diacritics and locale number/date formats.
+- [x] Admin Orders: partial refunds validation – Enforce per-item refunded qty/amount caps (cumulative) and validate amount vs selected items when items are provided.
+- [x] Admin Orders: partial refund notifications – Email customer on partial refund (amount + note) and include the refund in receipt/share views.
+- [x] Admin Products: inline price editing – Spreadsheet-style editing for price/sale/stock with validation.
+- [x] Admin Products: bulk price adjustments – Apply +/- percent/amount to selected products with preview.
+- [x] Admin Products: bulk category assignment – Add/remove categories for selected products.
+- [x] Admin Products: bulk publish scheduling – Set publish/unpublish dates for multiple products.
+- [x] Admin Products: image alt text + captions – Manage SEO alt text per image per language.
+- [x] Admin Products: image optimization stats – Display image size and offer one-click reprocess/resize.
+- [x] Admin Products: variant matrix editor – Edit variant attributes/prices/stock in a grid.
+- [x] Admin Inventory: stock adjustment ledger – Record stock changes with reason (“restock”, “damage”, “manual correction”).
+- [x] Admin Inventory: low-stock restock list – A “to restock” queue with supplier notes and export.
+- [x] Admin Inventory: reserved stock visibility – Show stock reserved in carts/orders vs available.
+- [x] Admin Products: duplicate detection – Warn on duplicate slugs/SKUs/names; provide merge guidance.
+- [x] Admin Products: SEO preview – Live preview of storefront card + meta snippet per language.
+- [x] Admin Products: product relationships – Define “related products” and “upsells” used in storefront.
+- [x] Admin Products: soft-delete recovery – View and restore deleted products/images.
+- [x] Admin Products: audit trail for edits – Show per-field history for product changes.
+- [x] Admin Products: import/export CSV – Import products/stock/prices via CSV with validation + error report.
+- [x] Admin Products: markdown preview – Inline preview for descriptions with sanitation warnings.
+- [x] Admin Products: per-product shipping overrides – Set weight/size shipping class and exceptions.
+- [x] Admin Products: translation completeness – Dashboard for missing RO/EN fields (name/description/content).
+- [x] Admin Products: feature flags per product – Toggle badges like “New”, “Limited”, “Handmade” with scheduling.
+- [x] Admin Users: customer profile page – View user details, addresses, orders, tickets, and activity.
+- [x] Admin Users: internal customer notes – Add private notes + “VIP” flag with audit trail.
+- [x] Admin Users: safe impersonation – View storefront as a user (read-only) with explicit audit + timeout.
+- [x] Admin Users: account lock/ban tools – Temporarily lock account or require password reset (security workflow).
+- [x] Admin Users: email verification controls – Resend verification, view history, and owner-only overrides.
+- [x] Admin Users: granular roles – Add roles like support/fulfillment/content with per-section permissions.
+- [x] Admin Users: session overview – Show active sessions with geo/IP and revoke per session.
+- [x] Admin Users: GDPR tooling – Export/delete request queue with statuses, SLAs, and audit.
+- [x] Admin Users: segmentation – Build customer segments (repeat buyers, high AOV) for analytics/campaigns.
+- [x] Admin Users: targeted coupon grant – Issue a one-off coupon to a customer and email them via template.
+- [x] Admin Coupons: advanced rules UI – Minimum subtotal, category include/exclude, first-order only, etc.
+- [x] Admin Coupons: stacking preview – Show how coupons interact with sale pricing and shipping discounts.
+- [x] Admin Coupons: redemption analytics – Usage over time, conversion lift, and top discounted products.
+- [x] Admin Promotions: scheduling calendar – Visual calendar for promo start/end and conflicts.
+- [x] Admin Promotions: A/B promo testing – Optional randomized assignment and performance reporting.
+- [x] Admin Pricing: price history charts – Track price changes per product (and sale periods).
+- [x] Admin Pricing: FX override audit – Show who changed FX overrides and allow “revert” action.
+- [x] Admin Pricing: rounding rules config – Configure rounding strategy for display/checkout.
+- [x] Admin Taxes: configurable tax groups – Manage VAT rates per country/category (future-proofing).
+- [x] Admin Promotions: code generator upgrades – Generate codes with patterns/prefixes and collision checks.
+- [x] Admin CMS: content diff before publish – Side-by-side diff between draft and published versions.
+- [x] Admin CMS: scheduled publishing – Schedule page/blog publish/unpublish windows.
+- [x] Admin CMS: content rollback – Restore a previous version with one click (audit).
+- [x] Admin CMS: broken link checker – Validate internal links/images and surface warnings.
+- [x] Admin CMS: media library tags – Organize assets with tags and search filters.
+- [x] Admin CMS: image focal point – Set focal point for responsive crops (hero/cards).
+- [x] Admin CMS: translation workflow – Mark items “needs translation” and track completion per language.
+- [x] Admin SEO: redirects bulk tools – Bulk import/export redirects and detect redirect loops.
+- [x] Admin SEO: sitemap preview – Show which URLs appear in sitemap by language.
+- [x] Admin SEO: structured data validator – Validate JSON-LD for products/pages and show errors.
+- [x] Admin Blog: editorial workflow – Draft/review/publish states with author attribution.
+- [x] Admin Blog: social preview tooling – Generate social preview images per post per language.
+- [x] Admin CMS: page access controls – Optionally restrict certain pages to logged-in users.
+- [x] Admin Support: unified inbox filters – Filter by status, channel, customer, and assignee.
+- [x] Admin Support: assign/mention – Assign tickets and @mention other admins with notifications.
+- [x] Admin Support: canned responses – Template replies with variables and EN/RO variants.
+- [x] Support: email guest submissions on staff replies (bilingual) so non-logged-in customers receive updates.
+- [x] Admin Returns: RMA status board – Kanban view for returns pipeline (requested/approved/received/refunded).
+- [x] Admin Returns: return label support – Upload/provide shipping labels for returns.
+- [x] Admin Ops: maintenance banners – Schedule storefront announcement banners (planned downtime/promos).
+- [x] Admin Ops: shipping rate simulator – Test shipping methods/rules for a sample cart/address.
+- [x] Admin Ops: webhook monitor – View recent provider webhooks and retry failed deliveries.
+- [x] Admin Security: enforce 2FA for admins – Require TOTP/passkey for owner/admin roles.
+- [x] Admin Security: IP allowlist – Optional allowlist/denylist for admin access with safe bypass flow.
+- [x] Admin Audit: retention + export – Export audit logs with retention policies and redaction options.
+- [x] Admin Audit: tamper-evident logging – Optional hash-chaining for stronger audit integrity.
+- [x] Admin Compliance: default PII masking – Mask customer PII by default with explicit reveal permission.
+- [x] Admin Security: sensitive action re-auth – Require password confirmation for refunds/role changes.
+- [x] Admin Security: admin login alerts – Notify owner of new admin login/device.
+- [x] Admin UX: keyboard shortcuts – Add shortcuts for global search, navigation, and common order actions.
+- [x] Admin UX: table virtualization – Improve performance for large lists (orders/products/users).
+- [x] Admin UX: accessibility audit – Ensure focus management, ARIA labels, and keyboard navigation.
+- [x] Admin UX: standardized error UI – Unified error state with retry and copyable correlation ID.
+- [x] Admin Observability: client error logging – Capture admin UI errors to a backend log endpoint.
+- [x] Admin UX: onboarding tour – First-run guided tour for owner (shipping, payments, content, taxes).
+- [x] Admin UX: saved table layouts – Persist column visibility/order/density per admin table (orders/products/users).
+
+### Admin Dashboard UX – Simplification (Backlog)
+- [x] Admin UX: simplified mode – Add a “Simple / Advanced” toggle (default Simple) to hide advanced settings and jargon.
+- [x] Admin UX: progressive disclosure – Collapse rarely used fields behind “Show advanced” per form section.
+- [x] Admin UX: plain-language labels – Replace technical labels (slug/SKU) with friendly copy + examples and tooltips.
+- [x] Admin UX: guided wizards – Step-by-step flows for “Add product”, “Add category”, and “Publish product”.
+- [x] Admin UX: safer defaults – Pre-fill sensible defaults and reduce required fields for first-time product creation.
+- [x] Admin UX: declutter tables – Reduce visible columns by default; add “Customize columns” for power users.
+- [x] Admin UX: inline help panels – Contextual “What is this?” help with screenshots/examples per page.
+- [x] Admin UX: confirmation language – Make destructive/irreversible actions use clear language + consequence checklist.
+- [x] Admin UX: success feedback – More obvious success states (“Saved”, “Published”, “Hidden”) with next-step CTAs.
+- [x] Admin UX: role-based presets – Provide “Owner (basic)” preset that hides technical/ops sections for non-technical admins.
+- [x] Admin UX: help panel screenshots – Add optional screenshot/example media for help panels (products/orders/users/categories).
+
+### Admin Catalog – Next Improvements (Backlog)
+- [x] Admin Products: status selector – Expose draft/published/archived on create/edit with confirmation and audit entry.
+- [x] Admin Products: status badges – Add table badges for status (draft/published/archived) and active/inactive.
+- [x] Admin Products: status filters – Filter products list by status and include an “Archived” tab/view.
+- [x] Admin Products: bulk status updates – Apply draft/publish/archive to selected products with preview and optional undo window.
+- [x] Admin Products: quick status toggle – One-click publish/unpublish/archive from the products table row actions.
+- [x] Admin Products: create category inline (product form) – “Add category” from the category selector without navigating away.
+- [x] Admin Products: create category inline (filters) – Allow creating a category while filtering/browsing products.
+- [x] Admin Products: category CRUD shortcut – Open category manager as a drawer/modal from `/admin/products` (avoid separate route hop).
+- [x] Admin Categories: merge tool – Merge categories (optionally include subcategories) and reassign products with preview.
+- [x] Admin Categories: safe delete – Block deleting in-use categories; require reassignment or merge.
+- [x] Admin Categories: bulk import – CSV import for categories (name, parent, sort order, translations) with dry-run validation.
+- [x] Admin Products: bulk category create+assign – Create a new category and immediately apply it to selected products.
+- [x] Admin Categories: CSV export/template – Download a template/export of categories to streamline bulk edits + re-import.
+
+### Admin Dashboard – UX & Workflow (Backlog)
+- [x] Admin UI: command palette – Add Ctrl/Cmd+K quick launcher for navigation + common actions.
+- [x] Admin sidebar: nav search – Filter sidebar entries and highlight matches (keyboard friendly).
+- [x] Admin navigation: breadcrumbs – Add a breadcrumb bar across admin pages with quick back/parent links.
+- [x] Admin headers: page intro – Add short “what you can do here” copy + primary CTA per page (non-technical friendly).
+- [x] Admin tables: quick density toggle – One-click Compact/Comfortable toggle without opening layout settings.
+- [x] Admin tables: sticky bulk bar – Show a sticky bulk-actions bar when rows are selected (consistent across pages).
+- [x] Admin: recent items – “Recently viewed” (orders/products/users/pages) with one-click reopen.
+- [x] Admin: recent items per-user – Scope the recent list to the current admin user ID (avoid mixing on shared devices).
+- [x] Admin: favorites – Pin frequently used pages, filters, and entities (saved in profile).
+- [x] Admin: favorites – Support pinned saved filters/presets (orders/products/users).
+- [x] Admin: background jobs center – Show long-running tasks (exports/imports/emails) with progress + retry/cancel.
+- [x] Admin: global notifications – Surface important admin-only alerts (failed webhooks, email failures, low stock) with deep links.
+- [x] Admin dashboard: live refresh – Optional auto-refresh with “last updated” timestamp and pause control.
+- [x] Admin analytics: revenue definitions – Toggle/tooltip for “Gross sales” vs “Net sales (after refunds)” with clear definitions.
+- [x] Admin analytics: exclude test orders – Add “Mark as test” on orders and exclude test orders from KPIs by default.
+- [x] Admin analytics: drilldowns – Click KPIs to open the relevant list pre-filtered to the metric (orders/products/users).
+- [x] Admin analytics: channel breakdown – Break sales/orders down by payment method, courier, and delivery type with filters.
+- [x] Admin reports: scheduled email – Weekly/monthly email summary (sales, top products, low stock) configurable in admin.
+- [x] Admin UX: safe training mode – Optional read-only “Training mode” to prevent destructive actions for new staff.
+- [x] Admin permissions: role presets – “Owner basic / Support / Content / Fulfillment” presets that reduce visible complexity.
+- [x] Admin support: SLA timers – Add SLA timers and overdue highlighting for tickets/contacts (configurable thresholds).
+- [x] Admin support: unified timeline – Show customer timeline (orders + tickets + emails) inside order/user views.
+- [x] Admin support: unified timeline – Include successful email sends (not just failures) via an email audit log.
+- [x] Admin ops: email failures – Add recipient filter UI + deep-link support (uses `to_email` filter).
+
+### Admin CMS – Visual & Intuitive Editing (Backlog)
+- [x] CMS editor: simple/advanced toggle – Default to Simple mode and hide SEO/meta/scheduling behind Advanced.
+- [x] CMS editor: device preview frames – Desktop/tablet/mobile preview with quick toggles and responsive breakpoints.
+- [x] CMS editor: split-view editing – Edit on the left, live preview on the right (with scroll sync).
+- [x] CMS editor: block library gallery – Visual block picker with thumbnails, descriptions, and “starter” templates.
+- [x] CMS editor: drag-and-drop insert – Drag blocks into the page with drop targets between sections.
+- [x] CMS editor: accessible reordering – Keyboard-friendly reorder controls and screen-reader announcements for block moves.
+- [x] CMS editor: undo/redo – Full undo/redo stack for content edits, including reorder and block adds/removes.
+- [x] CMS editor: autosave drafts – Autosave with “restore autosave” after refresh/crash and a visible save state.
+- [x] CMS editor: publish checklist – Pre-publish checklist (missing translations, missing alt text, broken links, empty sections).
+- [x] CMS editor: inline style controls – Block inspector for spacing, background, alignment, and max-width (theme-aware).
+- [x] CMS editor: reusable blocks – Save a section as a reusable snippet and insert it on other pages.
+- [x] CMS editor: global sections – Manage global blocks (announcement bar, footer promo, header banners) used site-wide.
+- [x] CMS editor: page templates – Create pages from templates (About/FAQ/Shipping/Returns) with prebuilt sections.
+- [x] CMS editor: announcement precedence – Allow stacking CMS announcement with Ops banner (currently Ops banner overrides).
+- [x] CMS editor: inline media drag-drop – Drag images into the editor to auto-upload and insert with caption + alt.
+- [x] CMS assets: image editor – Crop/rotate/resize tools in the asset library with non-destructive versions.
+- [x] CMS assets: “where used” – Show usage references for each asset (pages/sections/posts) before deleting.
+- [x] CMS assets: focal point preview – Preview focal point across common crops (hero/card/mobile) before saving.
+- [x] CMS preview: shareable draft links – Tokenized preview links for unpublished drafts (pages + home sections).
+- [x] CMS preview: language toggle – Preview RO/EN (fallbacks visible) without leaving the editor.
+- [x] CMS preview: theme toggle – Preview light/dark rendering inside the editor.
+- [x] CMS preview: iframe viewport emulation – Render preview in an iframe at selected device widths so Tailwind breakpoints match.
+- [x] CMS scheduling: calendar view – Visual calendar for scheduled publish/unpublish across pages/blog/home banners.
+- [x] CMS redirects: inline creation – When changing a page URL, offer creating a redirect in the same flow.
+- [x] CMS navigation: menu builder – Visual editor for header/footer links with drag-drop ordering and per-language labels.
+- [x] CMS content: side-by-side translation – RO/EN side-by-side editing with “copy from” shortcuts.
+- [x] CMS content: find & replace – Search/replace across CMS content blocks (with preview of affected pages).
+- [x] CMS blocks: columns/layout – Add layout blocks (2–3 columns, split hero) with responsive controls.
+- [x] CMS blocks: testimonials/FAQ – Add visual blocks for testimonials, FAQ accordions, and CTAs.
+- [x] CMS blocks: product grids – Insert product/category/collection grids into pages (shoppable sections).
+- [x] CMS blocks: form builder – Basic contact/newsletter form blocks with validation and success messaging.
+- [x] Storefront admin mode: “Edit this page” – Admin-only button on storefront pages linking to the correct CMS editor/section.
+- [x] CMS assets: delete asset – Add a delete action gated by “where used” + safe file cleanup (original + thumbnails).
+- [x] CMS assets: edited versions – Group edited copies under the original asset (lineage + quick revert).
+- [x] CMS scheduling: dedicated API – Add `/content/admin/scheduling` (window + pagination) so the scheduling view isn’t limited to the admin dashboard’s latest-content cap.
+- [x] CMS redirects: quick create UI – Add a small “Create redirect” inline form in the redirects manager (no CSV needed).
+- [x] CMS blocks: CTA external URLs – Support external `http(s)` links (and optional new-tab) for CTA buttons instead of routerLink-only.
+- [x] UI: Button component external links – Support `href` + optional `target`/`rel` in `app-button` to avoid duplicating anchor styles across CMS CTA/banners.
+- [x] CMS blocks: product grids picker – Add admin select/autocomplete for categories, collections, and product slugs (avoid manual typing).
+- [x] CMS blocks: forms captcha – Optional Turnstile captcha for newsletter/contact blocks to reduce spam.
+- [x] CMS assets: delete original w/ versions – Add a “delete all versions” option for original assets (cascade, with usage safety checks).
+
+## Data Portability & Backups (Extended)
+- [x] CLI command `python -m app.cli export-data` exporting users (no passwords), products, categories, orders, addresses to JSON.
+- [x] CLI command `import-data` to bootstrap a new DB from JSON exports with idempotent upserts.
+- [x] Infra helper script to archive DB dump + JSON exports + media into timestamped `.tar.gz`.
+- [x] Document “Move to a new server” flow in README (restore DB/media, run migrations, import as needed).
+- [x] Example cron/systemd timer config for scheduled backups in production.
+- [x] `check-backup` script to restore latest backup into disposable Docker container and hit `/api/v1/health`.
+- [x] Admin-triggered “Download my data” export endpoint with auth/logging.
+
+## Media & File Handling Improvements
+- [x] `storage.save_upload` generates unique filenames (UUID + extension) to avoid collisions/traversal.
+- [x] Server-side validation for uploaded image type and size across endpoints.
+- [x] Store relative media paths and derive full URLs via MEDIA_ROOT/CDN base.
+- [x] Thumbnail/preview generation for product images (small/medium/large).
+- [x] Script to scan for orphaned media files and delete/archive safely.
+- [x] Ensure product/image deletes remove files from disk/S3 and log the operation.
+
+## Bugs / Technical Debt / Misc Features
+- [x] Config option to enforce Decimal end-to-end for prices; tests for exact totals.
+- [x] Pagination metadata (total items/pages) in product list API responses.
+- [x] Standardize error response format across APIs.
+- [x] Structured logging around cart/checkout (cart id, user id, request id).
+- [x] Rate limiting on `/auth/login`, `/auth/register`, `/auth/google/*` with consistent 429 response.
+- [x] Wishlist/save-for-later feature per user.
+- [x] Recently viewed products widget using cookie/localStorage list (storefront).
+- [x] Integration test covering register → login → add to cart → checkout (mock payment) → see order.
+- [x] Smoke test for Google OAuth using mocked Google endpoint.
+- [x] Metrics counters for signups, logins, failed logins, orders created, payment failures.
+- [x] robots.txt and sitemap.xml generation (with i18n URLs).
+- [x] Per-language canonical URLs for product pages.
+- [x] Document “local-only dev” mode (SQLite + local media + Stripe test) and “prod-like” mode (Postgres + S3 + SMTP).
+- [x] Fix theme switching to override system (Tailwind `darkMode: 'class'`) and sync `color-scheme` to match selected theme.
+- [x] UX: prevent toast notifications from blocking interactions and dedupe repeated error toasts.
+- [x] UX: make Stripe CardElement readable in dark mode and update styles on theme changes (checkout + account).
+- [x] Perf: fix account idle-timer event listener cleanup (avoid leaking listeners with `.bind(this)`).
+- [x] Follow-up: set `<meta name="theme-color">` dynamically based on selected theme (mobile address bar).
+- [x] Follow-up: add early theme bootstrap in `frontend/src/index.html` to avoid flash of incorrect theme on load.
+- [x] Checkout: fix address modal overflow on smaller screens (prevent action buttons/inputs rendering off-screen).
+- [x] Notifications: deep-link notification clicks to relevant page (avoid always landing on account settings).
+- [x] Notifications: add archived/dismissed notifications view so hidden items remain discoverable.
+- [x] Receipts: improve share link UX (explicit “Copy link” button + visible confirmation for copy action).
+- [x] CI: make compose-smoke E2E resilient (mock locker lookup / disable Overpass fallback to reduce flakiness).
+- [x] Catalog: investigate product detail page sometimes failing to load from listings (route/slug/API error).
+- [x] Admin Dashboard analytics: exclude cancelled/refunded/pending orders from sales totals and “sold” KPIs.
+- [x] Data hygiene: replace any “oz” units in seeded/sample products with metric variants (e.g., ml) and avoid reintroducing.
+- [x] i18n: move category name required message from `adminUi.products.errors.required` to `adminUi.categories.errors.required` and update call sites.
