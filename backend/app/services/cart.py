@@ -450,6 +450,8 @@ async def add_item(
     session: AsyncSession,
     cart: Cart,
     payload: CartItemCreate,
+    *,
+    commit: bool = True,
 ) -> CartItem:
     cart.last_order_id = None
     session.add(cart)
@@ -490,8 +492,11 @@ async def add_item(
         max_quantity=payload.max_quantity,
     )
     session.add(item)
-    await session.commit()
-    await session.refresh(item)
+    if commit:
+        await session.commit()
+        await session.refresh(item)
+    else:
+        await session.flush()
     record_cart_event(
         "add_item", {"cart_id": str(cart.id), "product_id": str(product.id), "quantity": payload.quantity}
     )
@@ -542,6 +547,7 @@ async def sync_cart(session: AsyncSession, cart: Cart, items: list[CartSyncItem]
     # clear existing items
     for existing in list(cart.items):
         await session.delete(existing)
+    cart.items.clear()
     await session.flush()
     for item in items:
         await add_item(
@@ -554,7 +560,9 @@ async def sync_cart(session: AsyncSession, cart: Cart, items: list[CartSyncItem]
                 note=item.note,
                 max_quantity=item.max_quantity,
             ),
+            commit=False,
         )
+    await session.commit()
     await session.refresh(cart)
 
 

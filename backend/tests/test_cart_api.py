@@ -281,3 +281,29 @@ def test_cart_sync_metadata_and_totals(test_app: Dict[str, object]) -> None:
     # subtotal 10*2=20, tax 10% =>2, shipping 20 => total 42
     assert float(totals["subtotal"]) == pytest.approx(20.0)
     assert float(totals["total"]) == pytest.approx(42.0, rel=1e-2)
+
+
+def test_cart_sync_replaces_existing_items(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    product_id = seed_product(SessionLocal)
+    session_id = "guest-meta-2"
+
+    first = client.post(
+        "/api/v1/cart/sync",
+        json={"items": [{"product_id": str(product_id), "quantity": 1}]},
+        headers={"X-Session-Id": session_id},
+    )
+    assert first.status_code == 200, first.text
+
+    second = client.post(
+        "/api/v1/cart/sync",
+        json={"items": [{"product_id": str(product_id), "quantity": 2}]},
+        headers={"X-Session-Id": session_id},
+    )
+    assert second.status_code == 200, second.text
+    payload = second.json()
+    assert len(payload["items"]) == 1
+    assert payload["items"][0]["product_id"] == str(product_id)
+    assert payload["items"][0]["quantity"] == 2
