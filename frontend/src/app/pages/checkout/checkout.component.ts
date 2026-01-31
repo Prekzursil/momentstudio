@@ -398,6 +398,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
 		  paymentNotReady = false;
 	  private paymentNotReadyTimer: ReturnType<typeof setTimeout> | null = null;
 	  paymentMethod: CheckoutPaymentMethod = 'cod';
+	  stripeEnabled = Boolean(appConfig.stripeEnabled);
 	  paypalEnabled = Boolean(appConfig.paypalEnabled);
 	  netopiaEnabled = false;
 	  private syncDebounceHandle: ReturnType<typeof setTimeout> | null = null;
@@ -1768,11 +1769,13 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
 
     private loadPaymentCapabilities(): void {
       this.api.get<{
+        stripe?: { enabled?: boolean };
         paypal?: { enabled?: boolean };
         netopia?: { enabled?: boolean };
       }>('/payments/capabilities')
       .subscribe({
         next: (cap) => {
+          this.stripeEnabled = Boolean(appConfig.stripeEnabled) && Boolean(cap?.stripe?.enabled);
           this.paypalEnabled = Boolean(cap?.paypal?.enabled);
           this.netopiaEnabled = Boolean(cap?.netopia?.enabled);
           this.ensurePaymentMethodAvailable();
@@ -1836,6 +1839,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       if (method === 'cod') return currency === 'RON' && country === 'RO';
       if (method === 'netopia') return this.netopiaEnabled && currency === 'RON' && country === 'RO';
       if (method === 'paypal') return this.paypalEnabled && currency === 'RON';
+      if (method === 'stripe') return this.stripeEnabled;
       return true;
     }
 
@@ -1854,7 +1858,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       for (const candidate of candidates) {
         if (this.isPaymentMethodAvailable(candidate)) return candidate;
       }
-      return 'stripe';
+      return 'cod';
 	  }
 
 	  private showPaymentNotReady(): void {

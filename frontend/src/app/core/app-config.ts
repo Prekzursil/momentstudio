@@ -2,6 +2,7 @@ export interface AppConfig {
   apiBaseUrl: string;
   appEnv: string;
   appVersion: string;
+  stripeEnabled: boolean;
   stripePublishableKey: string;
   paypalEnabled: boolean;
   netopiaEnabled: boolean;
@@ -20,6 +21,7 @@ const defaults: AppConfig = {
   apiBaseUrl: '/api/v1',
   appEnv: 'development',
   appVersion: '',
+  stripeEnabled: true,
   stripePublishableKey: '',
   paypalEnabled: false,
   netopiaEnabled: false,

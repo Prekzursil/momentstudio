@@ -19,6 +19,7 @@ API_BASE_URL="${API_BASE_URL:-/api/v1}"
 APP_ENV="${APP_ENV:-production}"
 APP_VERSION="${APP_VERSION:-}"
 STRIPE_ENV_RAW="${STRIPE_ENV:-sandbox}"
+STRIPE_ENABLED_RAW="${STRIPE_ENABLED:-}"
 STRIPE_PUBLISHABLE_KEY_SANDBOX="${STRIPE_PUBLISHABLE_KEY_SANDBOX:-}"
 STRIPE_PUBLISHABLE_KEY_TEST="${STRIPE_PUBLISHABLE_KEY_TEST:-}"
 STRIPE_PUBLISHABLE_KEY_LIVE="${STRIPE_PUBLISHABLE_KEY_LIVE:-}"
@@ -46,6 +47,11 @@ if [ -z "$STRIPE_PUBLISHABLE_KEY" ]; then
   fi
 fi
 
+stripe_enabled="true"
+if [ -n "${STRIPE_ENABLED_RAW}" ]; then
+  stripe_enabled="$(truthy "$STRIPE_ENABLED_RAW")"
+fi
+
 mkdir -p "$(dirname "$CONFIG_PATH")"
 
 cat > "$CONFIG_PATH" <<EOF
@@ -54,6 +60,7 @@ window.__APP_CONFIG__ = {
   "apiBaseUrl": "$(escape "$API_BASE_URL")",
   "appEnv": "$(escape "$APP_ENV")",
   "appVersion": "$(escape "$APP_VERSION")",
+  "stripeEnabled": ${stripe_enabled},
   "stripePublishableKey": "$(escape "$STRIPE_PUBLISHABLE_KEY")",
   "paypalEnabled": $(truthy "$PAYPAL_ENABLED"),
   "netopiaEnabled": $(truthy "$NETOPIA_ENABLED"),
