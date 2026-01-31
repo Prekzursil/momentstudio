@@ -412,6 +412,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Storefront Admin Mode: undo window – After edits (reorder/publish/price), offer a short “Undo” toast.
 - [x] Storefront Admin Mode: audit trail – Record all storefront edits in the admin audit log with “source=storefront”.
 - [x] Storefront Products: set a product’s main image from the image manager (moves it to the first position).
+- [x] Shop: product cards – Add “Add to cart” button (default variant) alongside quick view + view details.
+- [x] Shop: product cards – Clicking the product image/title opens quick view (keeps view details for navigation).
 
 ### Storefront – Homepage & PWA
 - [x] Storefront: add product share controls (copy link / share sheet) on product pages.
