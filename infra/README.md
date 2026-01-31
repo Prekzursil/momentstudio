@@ -6,6 +6,8 @@ The Docker Compose stack lives in `infra/docker-compose.yml` and starts:
 - FastAPI backend (`backend`) on `localhost:8001`
 - Angular frontend (`frontend`) on `localhost:4201`
 
+For production deployment (VPS), see `infra/prod/`.
+
 ## Quick start
 
 From the repo root:

@@ -1,0 +1,103 @@
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # Passed into the Caddyfile via {$PUBLIC_DOMAIN} / {$CADDY_EMAIL}
+      PUBLIC_DOMAIN: ${PUBLIC_DOMAIN:?set PUBLIC_DOMAIN in infra/prod/.env}
+      CADDY_EMAIL: ${CADDY_EMAIL:?set CADDY_EMAIL in infra/prod/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    logging: &default_logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in infra/prod/.env}
+      POSTGRES_DB: ${POSTGRES_DB:-adrianaart}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-adrianaart}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    logging: *default_logging
+
+  backend:
+    build:
+      context: ../..
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ../../backend/.env
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-adrianaart}
+      FRONTEND_ORIGIN: https://${PUBLIC_DOMAIN:-momentstudio.ro}
+    volumes:
+      - ../../uploads:/app/uploads
+      - ../../private_uploads:/app/private_uploads
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/ready', timeout=2).read()",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    # Trust reverse proxy headers (Caddy). Backend is not exposed publicly in this compose.
+    command:
+      [
+        "uvicorn",
+        "app.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+        "--proxy-headers",
+        "--forwarded-allow-ips",
+        "*",
+      ]
+    logging: *default_logging
+
+  frontend:
+    build:
+      context: ../..
+      dockerfile: frontend/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ../../frontend/.env
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      # Use IPv4 explicitly: Alpine wget resolves localhost to ::1 first, while nginx
+      # in this image listens on 0.0.0.0:80 (no IPv6), which makes the healthcheck fail.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    logging: *default_logging
+
+volumes:
+  db_data:
+  caddy_data:
+  caddy_config:

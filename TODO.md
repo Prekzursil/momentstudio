@@ -32,6 +32,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Docs: add a production deployment guide (reverse proxy, env vars, migrations, backups, first-owner bootstrap).
 - [x] DX: update `.pre-commit-config.yaml` to match the current toolchain (ESLint v9 flat config, remove deprecated hooks).
 - [x] Infra: add a local helper to run the CI Docker smoke flow (same steps as `compose-smoke`).
+- [x] Infra: add production Docker Compose (Caddy) + VPS deploy/backup/restore scripts (`infra/prod/`).
 
 ## Legal & Compliance (NETOPIA/ANPC/GDPR)
 - [x] Legal pages: add CMS-backed pages `page.terms` (index), `page.terms-and-conditions`, `page.privacy-policy`, `page.anpc` (RO+EN required).
