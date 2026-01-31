@@ -1564,21 +1564,83 @@ type PriceHistoryChart = {
       <section
         *ngIf="editorOpen()"
         id="product-wizard-top"
+        (input)="markEditorDirtyFromEvent($event)"
+        (change)="markEditorDirtyFromEvent($event)"
         class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900"
       >
-        <div class="flex items-center justify-between gap-3">
-          <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
-            {{ editingSlug() ? ('adminUi.products.edit' | translate) : ('adminUi.products.create' | translate) }}
-          </h2>
-          <div class="flex flex-wrap items-center justify-end gap-2">
-            <app-button
-              *ngIf="editingSlug()"
-              size="sm"
-              variant="ghost"
-              [label]="'adminUi.products.wizard.publish' | translate"
-              (action)="startPublishWizard()"
-            ></app-button>
-            <app-button size="sm" variant="ghost" [label]="'adminUi.products.actions.cancel' | translate" (action)="closeEditor()"></app-button>
+        <div
+          class="-mx-4 -mt-4 px-4 pt-4 pb-3 sticky top-24 z-30 rounded-t-2xl border-b border-slate-200 bg-white/95 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95"
+        >
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="min-w-0 grid gap-1">
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                {{ editingSlug() ? ('adminUi.products.edit' | translate) : ('adminUi.products.create' | translate) }}
+              </h2>
+              <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                <span *ngIf="editingSlug() as slug" class="font-mono truncate">{{ slug }}</span>
+                <span *ngIf="!editingSlug() && predictedSlug()" class="font-mono truncate">{{ predictedSlug() }}</span>
+
+                <span
+                  *ngIf="editorSaving()"
+                  class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                >
+                  {{ 'adminUi.common.saving' | translate }}
+                </span>
+                <ng-container *ngIf="!editorSaving()">
+                  <span
+                    *ngIf="editorDirty()"
+                    class="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-900 dark:bg-amber-950/30 dark:text-amber-100"
+                  >
+                    {{ 'adminUi.content.autosave.state.unsaved' | translate }}
+                  </span>
+                  <span
+                    *ngIf="!editorDirty() && editorLastSavedAt()"
+                    class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  >
+                    {{ 'adminUi.content.autosave.state.saved' | translate }} · {{ editorLastSavedAt() | date: 'shortTime' }}
+                  </span>
+                </ng-container>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-end justify-end gap-2">
+              <label class="grid gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.products.table.status' | translate }}
+                <select
+                  class="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="form.status"
+                  [disabled]="editorSaving()"
+                >
+                  <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
+                  <option value="published">{{ 'adminUi.status.published' | translate }}</option>
+                  <option value="archived">{{ 'adminUi.status.archived' | translate }}</option>
+                </select>
+              </label>
+
+              <app-button
+                size="sm"
+                [label]="editorSaving() ? ('adminUi.common.saving' | translate) : ('adminUi.products.form.save' | translate)"
+                (action)="save()"
+                [disabled]="editorSaving()"
+              ></app-button>
+
+              <app-button
+                *ngIf="editingSlug()"
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.products.wizard.publish' | translate"
+                (action)="startPublishWizard()"
+                [disabled]="editorSaving()"
+              ></app-button>
+
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.products.actions.cancel' | translate"
+                (action)="closeEditor()"
+                [disabled]="editorSaving()"
+              ></app-button>
+            </div>
           </div>
         </div>
 
@@ -2083,115 +2145,146 @@ type PriceHistoryChart = {
           </details>
 	        </div>
 
-	        <div class="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
-	          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-	            <div class="grid gap-1">
-	              <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
-	                {{ 'adminUi.products.form.variantsTitle' | translate }}
-	              </h3>
-	              <p class="text-xs text-slate-500 dark:text-slate-400">
-	                {{ 'adminUi.products.form.variantsHint' | translate }}
-	              </p>
-	            </div>
-	            <div class="flex flex-wrap items-center gap-2">
-	              <app-button
-	                size="sm"
-	                variant="ghost"
-	                [label]="'adminUi.products.form.variantsAdd' | translate"
-	                (action)="addVariantRow()"
-	                [disabled]="variantsBusy()"
-	              ></app-button>
-	              <app-button
-	                size="sm"
-	                [label]="'adminUi.products.form.variantsSave' | translate"
-	                (action)="saveVariants()"
-	                [disabled]="variantsBusy() || !editingSlug()"
-	              ></app-button>
-	            </div>
-	          </div>
+	        <details
+            data-ignore-dirty
+            class="group rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20"
+          >
+            <summary class="flex items-start justify-between gap-4 cursor-pointer select-none [&::-webkit-details-marker]:hidden">
+              <div class="min-w-0 grid gap-1">
+                <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.products.form.variantsTitle' | translate }}
+                </h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.products.form.variantsHint' | translate }}
+                </p>
+              </div>
+              <div class="flex items-center gap-2">
+                <span
+                  *ngIf="variants().length"
+                  class="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+                >
+                  {{ variants().length }}
+                </span>
+                <span class="text-slate-500 transition-transform group-open:rotate-90 dark:text-slate-400">▸</span>
+              </div>
+            </summary>
 
-	          <div
-	            *ngIf="variantsError()"
-	            class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
-	          >
-	            {{ variantsError() }}
-	          </div>
+            <div class="mt-3 grid gap-3">
+              <div class="flex flex-wrap items-center justify-end gap-2">
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.products.form.variantsAdd' | translate"
+                  (action)="addVariantRow()"
+                  [disabled]="variantsBusy()"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  [label]="'adminUi.products.form.variantsSave' | translate"
+                  (action)="saveVariants()"
+                  [disabled]="variantsBusy() || !editingSlug()"
+                ></app-button>
+              </div>
 
-	          <div *ngIf="variants().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
-	            {{ 'adminUi.products.form.variantsEmpty' | translate }}
-	          </div>
+              <div
+                *ngIf="variantsError()"
+                class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+              >
+                {{ variantsError() }}
+              </div>
 
-	          <div *ngIf="variants().length > 0" class="overflow-x-auto">
-	            <table class="w-full text-sm">
-	              <thead>
-	                <tr class="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-	                  <th class="py-2 pr-3">{{ 'adminUi.products.form.variantsName' | translate }}</th>
-	                  <th class="py-2 pr-3 w-40">{{ 'adminUi.products.form.variantsDelta' | translate }}</th>
-	                  <th class="py-2 pr-3 w-32">{{ 'adminUi.products.form.variantsPrice' | translate }}</th>
-	                  <th class="py-2 pr-3 w-28">{{ 'adminUi.products.form.variantsStock' | translate }}</th>
-	                  <th class="py-2 w-24">{{ 'adminUi.products.table.actions' | translate }}</th>
-	                </tr>
-	              </thead>
-	              <tbody>
-	                <tr *ngFor="let v of variants(); let idx = index" class="border-t border-slate-200 dark:border-slate-800">
-	                  <td class="py-2 pr-3">
-	                    <input
-	                      class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-	                      type="text"
-	                      [ngModel]="v.name"
-	                      (ngModelChange)="onVariantNameChange(idx, $event)"
-	                      [disabled]="variantsBusy()"
-	                    />
-	                  </td>
-	                  <td class="py-2 pr-3">
-	                    <input
-	                      class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-	                      type="number"
-	                      step="0.01"
-	                      inputmode="decimal"
-	                      [ngModel]="v.additional_price_delta"
-	                      (ngModelChange)="onVariantDeltaChange(idx, $event)"
-	                      [disabled]="variantsBusy()"
-	                    />
-	                  </td>
-	                  <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">
-	                    {{ formatMoneyInput(variantComputedPrice(v.additional_price_delta)) }} RON
-	                  </td>
-	                  <td class="py-2 pr-3">
-	                    <input
-	                      class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-	                      type="number"
-	                      step="1"
-	                      min="0"
-	                      [ngModel]="v.stock_quantity"
-	                      (ngModelChange)="onVariantStockChange(idx, $event)"
-	                      [disabled]="variantsBusy()"
-	                    />
-	                  </td>
-	                  <td class="py-2">
-	                    <app-button
-	                      size="sm"
-	                      variant="ghost"
-	                      [label]="'adminUi.products.form.variantsRemove' | translate"
-	                      (action)="removeVariantRow(v)"
-	                      [disabled]="variantsBusy()"
-	                    ></app-button>
-	                  </td>
-	                </tr>
-	              </tbody>
-		            </table>
-		          </div>
-		        </div>
+              <div *ngIf="variants().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.products.form.variantsEmpty' | translate }}
+              </div>
 
-		        <div class="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
-		          <div class="grid gap-1">
-		            <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
-		              {{ 'adminUi.products.relationships.title' | translate }}
-		            </h3>
-		            <p class="text-xs text-slate-500 dark:text-slate-400">
-		              {{ 'adminUi.products.relationships.hint' | translate }}
-		            </p>
-		          </div>
+              <div *ngIf="variants().length > 0" class="overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead>
+                    <tr class="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      <th class="py-2 pr-3">{{ 'adminUi.products.form.variantsName' | translate }}</th>
+                      <th class="py-2 pr-3 w-40">{{ 'adminUi.products.form.variantsDelta' | translate }}</th>
+                      <th class="py-2 pr-3 w-32">{{ 'adminUi.products.form.variantsPrice' | translate }}</th>
+                      <th class="py-2 pr-3 w-28">{{ 'adminUi.products.form.variantsStock' | translate }}</th>
+                      <th class="py-2 w-24">{{ 'adminUi.products.table.actions' | translate }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let v of variants(); let idx = index" class="border-t border-slate-200 dark:border-slate-800">
+                      <td class="py-2 pr-3">
+                        <input
+                          class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                          type="text"
+                          [ngModel]="v.name"
+                          (ngModelChange)="onVariantNameChange(idx, $event)"
+                          [disabled]="variantsBusy()"
+                        />
+                      </td>
+                      <td class="py-2 pr-3">
+                        <input
+                          class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                          type="number"
+                          step="0.01"
+                          inputmode="decimal"
+                          [ngModel]="v.additional_price_delta"
+                          (ngModelChange)="onVariantDeltaChange(idx, $event)"
+                          [disabled]="variantsBusy()"
+                        />
+                      </td>
+                      <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">
+                        {{ formatMoneyInput(variantComputedPrice(v.additional_price_delta)) }} RON
+                      </td>
+                      <td class="py-2 pr-3">
+                        <input
+                          class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                          type="number"
+                          step="1"
+                          min="0"
+                          [ngModel]="v.stock_quantity"
+                          (ngModelChange)="onVariantStockChange(idx, $event)"
+                          [disabled]="variantsBusy()"
+                        />
+                      </td>
+                      <td class="py-2">
+                        <app-button
+                          size="sm"
+                          variant="ghost"
+                          [label]="'adminUi.products.form.variantsRemove' | translate"
+                          (action)="removeVariantRow(v)"
+                          [disabled]="variantsBusy()"
+                        ></app-button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </details>
+
+		        <details
+              data-ignore-dirty
+              class="group rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20"
+            >
+		          <summary class="flex items-start justify-between gap-4 cursor-pointer select-none [&::-webkit-details-marker]:hidden">
+                <div class="min-w-0 grid gap-1">
+                  <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
+                    {{ 'adminUi.products.relationships.title' | translate }}
+                  </h3>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ 'adminUi.products.relationships.hint' | translate }}
+                  </p>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span
+                    *ngIf="relationshipsRelated().length + relationshipsUpsells().length"
+                    class="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+                  >
+                    {{ relationshipsRelated().length + relationshipsUpsells().length }}
+                  </span>
+                  <span class="text-slate-500 transition-transform group-open:rotate-90 dark:text-slate-400">▸</span>
+                </div>
+              </summary>
+
+              <div class="mt-3 grid gap-3">
 
               <div
                 *ngIf="!editingSlug()"
@@ -2344,18 +2437,31 @@ type PriceHistoryChart = {
                   ></app-button>
 	                </div>
 	              </div>
-			        </div>
+              </div>
+			        </details>
 
-			        <div class="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
-			          <div class="grid gap-1">
-			            <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
-			              {{ 'adminUi.products.priceHistory.title' | translate }}
-			            </h3>
-			            <p class="text-xs text-slate-500 dark:text-slate-400">
-			              {{ 'adminUi.products.priceHistory.hint' | translate }}
-			            </p>
-			          </div>
+			        <details class="group rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
+			          <summary class="flex items-start justify-between gap-4 cursor-pointer select-none [&::-webkit-details-marker]:hidden">
+                  <div class="min-w-0 grid gap-1">
+                    <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
+                      {{ 'adminUi.products.priceHistory.title' | translate }}
+                    </h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.products.priceHistory.hint' | translate }}
+                    </p>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span
+                      *ngIf="priceHistoryChanges().length"
+                      class="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+                    >
+                      {{ priceHistoryChanges().length }}
+                    </span>
+                    <span class="text-slate-500 transition-transform group-open:rotate-90 dark:text-slate-400">▸</span>
+                  </div>
+                </summary>
 
+                <div class="mt-3 grid gap-3">
 			          <div *ngIf="priceHistoryChart() as chart; else priceHistoryEmpty" class="grid gap-3">
 			            <div class="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
 			              <svg class="h-40 w-full" [attr.viewBox]="'0 0 ' + chart.width + ' ' + chart.height" preserveAspectRatio="none">
@@ -2451,11 +2557,12 @@ type PriceHistoryChart = {
 			              </tbody>
 			            </table>
 			          </div>
-			        </div>
+                </div>
+			        </details>
 
-			        <div class="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
-			          <div class="flex flex-wrap items-start justify-between gap-3">
-			            <div class="grid gap-1">
+			        <details class="group rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
+			          <summary class="flex items-start justify-between gap-4 cursor-pointer select-none [&::-webkit-details-marker]:hidden">
+			            <div class="min-w-0 grid gap-1">
 			              <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
 			                {{ 'adminUi.products.audit.title' | translate }}
 			              </h3>
@@ -2463,175 +2570,210 @@ type PriceHistoryChart = {
 			                {{ 'adminUi.products.audit.hint' | translate }}
 			              </p>
 			            </div>
-			            <app-button
-			              size="sm"
-			              variant="ghost"
-			              [label]="'adminUi.actions.refresh' | translate"
-			              (action)="refreshAudit()"
-			              [disabled]="auditBusy() || !editingSlug()"
-			            ></app-button>
-			          </div>
+			            <div class="flex items-center gap-2">
+			              <span
+			                *ngIf="auditEntries().length"
+			                class="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+			              >
+			                {{ auditEntries().length }}
+			              </span>
+			              <span class="text-slate-500 transition-transform group-open:rotate-90 dark:text-slate-400">▸</span>
+			            </div>
+			          </summary>
 
-			          <div
-			            *ngIf="auditError()"
-			            class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
-			          >
-			            {{ auditError() }}
-			          </div>
+			          <div class="mt-3 grid gap-3">
+			            <div class="flex flex-wrap items-center justify-end gap-2">
+			              <app-button
+			                size="sm"
+			                variant="ghost"
+			                [label]="'adminUi.actions.refresh' | translate"
+			                (action)="refreshAudit()"
+			                [disabled]="auditBusy() || !editingSlug()"
+			              ></app-button>
+			            </div>
 
-			          <div *ngIf="auditBusy()" class="text-sm text-slate-600 dark:text-slate-300">
-			            {{ 'adminUi.actions.loading' | translate }}
-			          </div>
+			            <div
+			              *ngIf="auditError()"
+			              class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+			            >
+			              {{ auditError() }}
+			            </div>
 
-			          <div *ngIf="!auditBusy() && auditEntries().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
-			            {{ 'adminUi.products.audit.empty' | translate }}
-			          </div>
+			            <div *ngIf="auditBusy()" class="text-sm text-slate-600 dark:text-slate-300">
+			              {{ 'adminUi.actions.loading' | translate }}
+			            </div>
 
-			          <div *ngIf="auditEntries().length > 0" class="overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-			            <table class="w-full text-sm">
-			              <thead class="bg-slate-100 text-left text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-950/20 dark:text-slate-400">
-			                <tr>
-			                  <th class="px-3 py-2">{{ 'adminUi.products.audit.when' | translate }}</th>
-			                  <th class="px-3 py-2">{{ 'adminUi.products.audit.action' | translate }}</th>
-			                  <th class="px-3 py-2">{{ 'adminUi.products.audit.user' | translate }}</th>
-			                  <th class="px-3 py-2">{{ 'adminUi.products.audit.details' | translate }}</th>
-			                </tr>
-			              </thead>
-			              <tbody>
-			                <tr *ngFor="let entry of auditEntries()" class="border-t border-slate-200 dark:border-slate-800">
-			                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ entry.created_at | date: 'short' }}</td>
-			                  <td class="px-3 py-2 font-semibold text-slate-900 dark:text-slate-50">{{ entry.action }}</td>
-			                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
-			                    {{ entry.user_email || entry.user_id || '—' }}
-			                  </td>
-			                  <td class="px-3 py-2 text-xs text-slate-600 dark:text-slate-300">
-			                    <div *ngIf="entry.payload?.changes as changes; else auditFallback" class="grid gap-1">
-			                      <div *ngFor="let item of changes | keyvalue" class="grid gap-1 sm:grid-cols-[160px_1fr] sm:gap-3">
-			                        <span class="font-semibold text-slate-700 dark:text-slate-200">{{ item.key }}</span>
-			                        <span class="truncate">
-			                          {{ formatAuditValue(item.value?.before) }} → {{ formatAuditValue(item.value?.after) }}
-			                        </span>
+			            <div *ngIf="!auditBusy() && auditEntries().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+			              {{ 'adminUi.products.audit.empty' | translate }}
+			            </div>
+
+			            <div
+			              *ngIf="auditEntries().length > 0"
+			              class="overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+			            >
+			              <table class="w-full text-sm">
+			                <thead class="bg-slate-100 text-left text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-950/20 dark:text-slate-400">
+			                  <tr>
+			                    <th class="px-3 py-2">{{ 'adminUi.products.audit.when' | translate }}</th>
+			                    <th class="px-3 py-2">{{ 'adminUi.products.audit.action' | translate }}</th>
+			                    <th class="px-3 py-2">{{ 'adminUi.products.audit.user' | translate }}</th>
+			                    <th class="px-3 py-2">{{ 'adminUi.products.audit.details' | translate }}</th>
+			                  </tr>
+			                </thead>
+			                <tbody>
+			                  <tr *ngFor="let entry of auditEntries()" class="border-t border-slate-200 dark:border-slate-800">
+			                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ entry.created_at | date: 'short' }}</td>
+			                    <td class="px-3 py-2 font-semibold text-slate-900 dark:text-slate-50">{{ entry.action }}</td>
+			                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+			                      {{ entry.user_email || entry.user_id || '—' }}
+			                    </td>
+			                    <td class="px-3 py-2 text-xs text-slate-600 dark:text-slate-300">
+			                      <div *ngIf="entry.payload?.changes as changes; else auditFallback" class="grid gap-1">
+			                        <div *ngFor="let item of changes | keyvalue" class="grid gap-1 sm:grid-cols-[160px_1fr] sm:gap-3">
+			                          <span class="font-semibold text-slate-700 dark:text-slate-200">{{ item.key }}</span>
+			                          <span class="truncate">
+			                            {{ formatAuditValue(item.value?.before) }} → {{ formatAuditValue(item.value?.after) }}
+			                          </span>
+			                        </div>
 			                      </div>
-			                    </div>
-			                    <ng-template #auditFallback>
-			                      <span *ngIf="entry.payload as payload; else auditEmpty">{{ formatAuditValue(payload) }}</span>
-			                      <ng-template #auditEmpty>—</ng-template>
-			                    </ng-template>
-			                  </td>
-			                </tr>
-			              </tbody>
-			            </table>
+			                      <ng-template #auditFallback>
+			                        <span *ngIf="entry.payload as payload; else auditEmpty">{{ formatAuditValue(payload) }}</span>
+			                        <ng-template #auditEmpty>—</ng-template>
+			                      </ng-template>
+			                    </td>
+			                  </tr>
+			                </tbody>
+			              </table>
+			            </div>
 			          </div>
-			        </div>
+			        </details>
 
-			        <div class="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
-			          <div class="grid gap-1">
-			            <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
-			              {{ 'adminUi.products.form.stockLedgerTitle' | translate }}
-		            </h3>
-	            <p class="text-xs text-slate-500 dark:text-slate-400">
-	              {{ 'adminUi.products.form.stockLedgerHint' | translate }}
-	            </p>
-	          </div>
+			        <details
+			          data-ignore-dirty
+			          class="group rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20"
+			        >
+			          <summary class="flex items-start justify-between gap-4 cursor-pointer select-none [&::-webkit-details-marker]:hidden">
+			            <div class="min-w-0 grid gap-1">
+			              <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
+			                {{ 'adminUi.products.form.stockLedgerTitle' | translate }}
+			              </h3>
+			              <p class="text-xs text-slate-500 dark:text-slate-400">
+			                {{ 'adminUi.products.form.stockLedgerHint' | translate }}
+			              </p>
+			            </div>
+			            <div class="flex items-center gap-2">
+			              <span
+			                *ngIf="stockAdjustments().length"
+			                class="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+			              >
+			                {{ stockAdjustments().length }}
+			              </span>
+			              <span class="text-slate-500 transition-transform group-open:rotate-90 dark:text-slate-400">▸</span>
+			            </div>
+			          </summary>
 
-	          <div
-	            *ngIf="stockAdjustmentsError()"
-	            class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
-	          >
-	            {{ stockAdjustmentsError() }}
-	          </div>
+			          <div class="mt-3 grid gap-3">
+			            <div
+			              *ngIf="stockAdjustmentsError()"
+			              class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+			            >
+			              {{ stockAdjustmentsError() }}
+			            </div>
 
-	          <div class="grid gap-3 md:grid-cols-5 items-end">
-	            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	              {{ 'adminUi.products.form.stockLedgerTarget' | translate }}
-	              <select
-	                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-	                [(ngModel)]="stockAdjustTarget"
-	                [disabled]="stockAdjustBusy() || !editingSlug()"
-	              >
-	                <option value="">{{ 'adminUi.products.form.stockLedgerTargetProduct' | translate }}</option>
-	                <option *ngFor="let v of variantsWithIds()" [value]="v.id">{{ v.name }}</option>
-	              </select>
-	            </label>
+			            <div class="grid gap-3 items-end md:grid-cols-5">
+			              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                {{ 'adminUi.products.form.stockLedgerTarget' | translate }}
+			                <select
+			                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                  [(ngModel)]="stockAdjustTarget"
+			                  [disabled]="stockAdjustBusy() || !editingSlug()"
+			                >
+			                  <option value="">{{ 'adminUi.products.form.stockLedgerTargetProduct' | translate }}</option>
+			                  <option *ngFor="let v of variantsWithIds()" [value]="v.id">{{ v.name }}</option>
+			                </select>
+			              </label>
 
-	            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	              {{ 'adminUi.products.form.stockLedgerReason' | translate }}
-	              <select
-	                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-	                [(ngModel)]="stockAdjustReason"
-	                [disabled]="stockAdjustBusy() || !editingSlug()"
-	              >
-	                <option value="restock">{{ 'adminUi.products.form.stockReason.restock' | translate }}</option>
-	                <option value="damage">{{ 'adminUi.products.form.stockReason.damage' | translate }}</option>
-	                <option value="manual_correction">{{ 'adminUi.products.form.stockReason.manual_correction' | translate }}</option>
-	              </select>
-	            </label>
+			              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                {{ 'adminUi.products.form.stockLedgerReason' | translate }}
+			                <select
+			                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                  [(ngModel)]="stockAdjustReason"
+			                  [disabled]="stockAdjustBusy() || !editingSlug()"
+			                >
+			                  <option value="restock">{{ 'adminUi.products.form.stockReason.restock' | translate }}</option>
+			                  <option value="damage">{{ 'adminUi.products.form.stockReason.damage' | translate }}</option>
+			                  <option value="manual_correction">{{ 'adminUi.products.form.stockReason.manual_correction' | translate }}</option>
+			                </select>
+			              </label>
 
-	            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	              {{ 'adminUi.products.form.stockLedgerDelta' | translate }}
-	              <input
-	                class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-	                type="number"
-	                step="1"
-	                [(ngModel)]="stockAdjustDelta"
-	                [disabled]="stockAdjustBusy() || !editingSlug()"
-	              />
-	            </label>
+			              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+			                {{ 'adminUi.products.form.stockLedgerDelta' | translate }}
+			                <input
+			                  class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                  type="number"
+			                  step="1"
+			                  [(ngModel)]="stockAdjustDelta"
+			                  [disabled]="stockAdjustBusy() || !editingSlug()"
+			                />
+			              </label>
 
-	            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
-	              {{ 'adminUi.products.form.stockLedgerNote' | translate }}
-	              <input
-	                class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-	                type="text"
-	                [(ngModel)]="stockAdjustNote"
-	                [disabled]="stockAdjustBusy() || !editingSlug()"
-	              />
-	            </label>
-	          </div>
+			              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
+			                {{ 'adminUi.products.form.stockLedgerNote' | translate }}
+			                <input
+			                  class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+			                  type="text"
+			                  [(ngModel)]="stockAdjustNote"
+			                  [disabled]="stockAdjustBusy() || !editingSlug()"
+			                />
+			              </label>
+			            </div>
 
-	          <div class="flex items-center gap-2">
-	            <app-button
-	              size="sm"
-	              [label]="'adminUi.products.form.stockLedgerApply' | translate"
-	              (action)="applyStockAdjustment()"
-	              [disabled]="stockAdjustBusy() || !editingSlug()"
-	            ></app-button>
-	            <span *ngIf="stockAdjustBusy()" class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.products.form.stockLedgerApplying' | translate }}</span>
-	          </div>
+			            <div class="flex items-center gap-2">
+			              <app-button
+			                size="sm"
+			                [label]="'adminUi.products.form.stockLedgerApply' | translate"
+			                (action)="applyStockAdjustment()"
+			                [disabled]="stockAdjustBusy() || !editingSlug()"
+			              ></app-button>
+			              <span *ngIf="stockAdjustBusy()" class="text-sm text-slate-600 dark:text-slate-300">
+			                {{ 'adminUi.products.form.stockLedgerApplying' | translate }}
+			              </span>
+			            </div>
 
-	          <div *ngIf="stockAdjustments().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
-	            {{ 'adminUi.products.form.stockLedgerEmpty' | translate }}
-	          </div>
+			            <div *ngIf="stockAdjustments().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+			              {{ 'adminUi.products.form.stockLedgerEmpty' | translate }}
+			            </div>
 
-	          <div *ngIf="stockAdjustments().length > 0" class="overflow-x-auto">
-	            <table class="w-full text-sm">
-	              <thead>
-	                <tr class="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-	                  <th class="py-2 pr-3">{{ 'adminUi.products.form.stockLedgerWhen' | translate }}</th>
-	                  <th class="py-2 pr-3">{{ 'adminUi.products.form.stockLedgerItem' | translate }}</th>
-	                  <th class="py-2 pr-3">{{ 'adminUi.products.form.stockLedgerReason' | translate }}</th>
-	                  <th class="py-2 pr-3">{{ 'adminUi.products.form.stockLedgerDelta' | translate }}</th>
-	                  <th class="py-2 pr-3">{{ 'adminUi.products.form.stockLedgerBefore' | translate }}</th>
-	                  <th class="py-2 pr-3">{{ 'adminUi.products.form.stockLedgerAfter' | translate }}</th>
-	                  <th class="py-2">{{ 'adminUi.products.form.stockLedgerNote' | translate }}</th>
-	                </tr>
-	              </thead>
-	              <tbody>
-	                <tr *ngFor="let row of stockAdjustments()" class="border-t border-slate-200 dark:border-slate-800">
-	                  <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">{{ formatTimestamp(row.created_at) }}</td>
-	                  <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">{{ stockAdjustmentTargetLabel(row) }}</td>
-	                  <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">{{ stockReasonLabel(row.reason) }}</td>
-	                  <td class="py-2 pr-3 font-semibold" [class.text-emerald-700]="row.delta > 0" [class.text-rose-700]="row.delta < 0">
-	                    {{ row.delta > 0 ? '+' + row.delta : row.delta }}
-	                  </td>
-	                  <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">{{ row.before_quantity }}</td>
-	                  <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">{{ row.after_quantity }}</td>
-	                  <td class="py-2 text-slate-600 dark:text-slate-300">{{ row.note || '—' }}</td>
-	                </tr>
-	              </tbody>
-	            </table>
-	          </div>
-	        </div>
+			            <div *ngIf="stockAdjustments().length > 0" class="overflow-x-auto">
+			              <table class="w-full text-sm">
+			                <thead>
+			                  <tr class="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+			                    <th class="py-2 pr-3">{{ 'adminUi.products.form.stockLedgerWhen' | translate }}</th>
+			                    <th class="py-2 pr-3">{{ 'adminUi.products.form.stockLedgerItem' | translate }}</th>
+			                    <th class="py-2 pr-3">{{ 'adminUi.products.form.stockLedgerReason' | translate }}</th>
+			                    <th class="py-2 pr-3">{{ 'adminUi.products.form.stockLedgerDelta' | translate }}</th>
+			                    <th class="py-2 pr-3">{{ 'adminUi.products.form.stockLedgerBefore' | translate }}</th>
+			                    <th class="py-2 pr-3">{{ 'adminUi.products.form.stockLedgerAfter' | translate }}</th>
+			                    <th class="py-2">{{ 'adminUi.products.form.stockLedgerNote' | translate }}</th>
+			                  </tr>
+			                </thead>
+			                <tbody>
+			                  <tr *ngFor="let row of stockAdjustments()" class="border-t border-slate-200 dark:border-slate-800">
+			                    <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">{{ formatTimestamp(row.created_at) }}</td>
+			                    <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">{{ stockAdjustmentTargetLabel(row) }}</td>
+			                    <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">{{ stockReasonLabel(row.reason) }}</td>
+			                    <td class="py-2 pr-3 font-semibold" [class.text-emerald-700]="row.delta > 0" [class.text-rose-700]="row.delta < 0">
+			                      {{ row.delta > 0 ? '+' + row.delta : row.delta }}
+			                    </td>
+			                    <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">{{ row.before_quantity }}</td>
+			                    <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">{{ row.after_quantity }}</td>
+			                    <td class="py-2 text-slate-600 dark:text-slate-300">{{ row.note || '—' }}</td>
+			                  </tr>
+			                </tbody>
+			              </table>
+			            </div>
+			          </div>
+			        </details>
 
           <div id="product-wizard-content" class="h-0 scroll-mt-24"></div>
 
@@ -2682,25 +2824,37 @@ type PriceHistoryChart = {
             </div>
           </div>
 
-	        <div class="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
-	          <div class="grid gap-1">
-	            <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
-	              {{ 'adminUi.products.translations.title' | translate }}
-	            </h3>
-	            <p class="text-xs text-slate-500 dark:text-slate-400">
-	              {{ 'adminUi.products.translations.hint' | translate }}
-	            </p>
-	          </div>
+	        <details
+	          data-ignore-dirty
+	          class="group rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20"
+	        >
+	          <summary class="flex items-start justify-between gap-4 cursor-pointer select-none [&::-webkit-details-marker]:hidden">
+	            <div class="min-w-0 grid gap-1">
+	              <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
+	                {{ 'adminUi.products.translations.title' | translate }}
+	              </h3>
+	              <p class="text-xs text-slate-500 dark:text-slate-400">
+	                {{ 'adminUi.products.translations.hint' | translate }}
+	              </p>
+	            </div>
+	            <div class="flex items-center gap-2">
+	              <span class="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
+	                {{ (translationExists.ro ? 1 : 0) + (translationExists.en ? 1 : 0) }}/2
+	              </span>
+	              <span class="text-slate-500 transition-transform group-open:rotate-90 dark:text-slate-400">▸</span>
+	            </div>
+	          </summary>
 
-	          <div
-	            *ngIf="translationError()"
-	            class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
-	          >
-	            {{ translationError() }}
-	          </div>
+	          <div class="mt-3 grid gap-3">
+	            <div
+	              *ngIf="translationError()"
+	              class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+	            >
+	              {{ translationError() }}
+	            </div>
 
-	          <div class="grid gap-4 lg:grid-cols-2">
-	            <div class="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+	            <div class="grid gap-4 lg:grid-cols-2">
+	              <div class="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
 	              <div class="flex items-center justify-between gap-3">
 	                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">RO</p>
 	                <div class="flex items-center gap-2">
@@ -2760,9 +2914,9 @@ type PriceHistoryChart = {
                     <div class="markdown text-sm text-slate-700 dark:text-slate-200" [innerHTML]="translationPreviewHtml.ro"></div>
                   </div>
                 </div>
-	            </div>
+	              </div>
 
-	            <div class="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+	              <div class="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
 	              <div class="flex items-center justify-between gap-3">
 	                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">EN</p>
 	                <div class="flex items-center gap-2">
@@ -2822,21 +2976,25 @@ type PriceHistoryChart = {
                     <div class="markdown text-sm text-slate-700 dark:text-slate-200" [innerHTML]="translationPreviewHtml.en"></div>
                   </div>
                 </div>
-		            </div>
-		          </div>
-		        </div>
+	              </div>
+	            </div>
+	          </div>
+	        </details>
 
-            <div class="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
-              <div class="grid gap-1">
-                <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
-                  {{ 'adminUi.products.seoPreview.title' | translate }}
-                </h3>
-                <p class="text-xs text-slate-500 dark:text-slate-400">
-                  {{ 'adminUi.products.seoPreview.hint' | translate }}
-                </p>
-              </div>
+            <details class="group rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
+              <summary class="flex items-start justify-between gap-4 cursor-pointer select-none [&::-webkit-details-marker]:hidden">
+                <div class="min-w-0 grid gap-1">
+                  <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
+                    {{ 'adminUi.products.seoPreview.title' | translate }}
+                  </h3>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ 'adminUi.products.seoPreview.hint' | translate }}
+                  </p>
+                </div>
+                <span class="text-slate-500 transition-transform group-open:rotate-90 dark:text-slate-400">▸</span>
+              </summary>
 
-              <div class="grid gap-4 lg:grid-cols-2">
+              <div class="mt-3 grid gap-4 lg:grid-cols-2">
                 <div class="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
                   <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">RO</p>
 
@@ -2931,23 +3089,15 @@ type PriceHistoryChart = {
                   </div>
                 </div>
               </div>
-            </div>
+            </details>
 
 		        <div id="product-wizard-save" class="grid gap-2">
               <div class="flex flex-wrap items-center gap-2">
-		            <app-button [label]="'adminUi.products.form.save' | translate" (action)="save()"></app-button>
-
-                <label class="grid gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
-                  {{ 'adminUi.products.table.status' | translate }}
-                  <select
-                    class="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    [(ngModel)]="form.status"
-                  >
-                    <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
-                    <option value="published">{{ 'adminUi.status.published' | translate }}</option>
-                    <option value="archived">{{ 'adminUi.status.archived' | translate }}</option>
-                  </select>
-                </label>
+		            <app-button
+                  [label]="editorSaving() ? ('adminUi.common.saving' | translate) : ('adminUi.products.form.save' | translate)"
+                  (action)="save()"
+                  [disabled]="editorSaving()"
+                ></app-button>
 
                 <ng-container *ngIf="editorMessage()">
                   <span
@@ -2992,7 +3142,7 @@ type PriceHistoryChart = {
               </div>
 		        </div>
 
-	        <div id="product-wizard-images" class="grid gap-3">
+	        <div id="product-wizard-images" data-ignore-dirty class="grid gap-3">
 	          <div class="flex items-center justify-between">
 	            <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{{ 'adminUi.products.form.images' | translate }}</p>
 	            <div class="flex flex-wrap items-center gap-2">
@@ -3239,6 +3389,9 @@ export class AdminProductsComponent implements OnInit {
 	  editingCurrency = signal('RON');
 	  editorError = signal<string | null>(null);
 	  editorMessage = signal<string | null>(null);
+    editorDirty = signal(false);
+    editorSaving = signal(false);
+    editorLastSavedAt = signal<string | null>(null);
     lastSavedState = signal<{ status: ProductForm['status']; isActive: boolean } | null>(null);
 	  wizardKind = signal<ProductWizardKind | null>(null);
 	  wizardStep = signal(0);
@@ -5021,6 +5174,20 @@ export class AdminProductsComponent implements OnInit {
     }, 0);
   }
 
+  markEditorDirty(): void {
+    if (!this.editorOpen()) return;
+    if (this.editorSaving()) return;
+    if (this.editorDirty()) return;
+    this.editorDirty.set(true);
+    this.editorMessage.set(null);
+  }
+
+  markEditorDirtyFromEvent(event: Event): void {
+    const target = event?.target as HTMLElement | null;
+    if (target && typeof (target as any).closest === 'function' && target.closest('[data-ignore-dirty]')) return;
+    this.markEditorDirty();
+  }
+
 		  startNew(): void {
         this.exitWizard();
 		    this.editorOpen.set(true);
@@ -5029,6 +5196,9 @@ export class AdminProductsComponent implements OnInit {
 		    this.editingCurrency.set('RON');
 		    this.editorError.set(null);
 		    this.editorMessage.set(null);
+        this.editorDirty.set(false);
+        this.editorSaving.set(false);
+        this.editorLastSavedAt.set(null);
         this.lastSavedState.set(null);
         this.loadedTagSlugs = [];
 		    this.resetDuplicateCheck();
@@ -5050,6 +5220,8 @@ export class AdminProductsComponent implements OnInit {
   }
 
 		  closeEditor(): void {
+        if (this.editorSaving()) return;
+        if (this.editorDirty() && !window.confirm(this.t('account.unsaved.confirmDiscard'))) return;
         this.exitWizard();
 		    this.editorOpen.set(false);
 		    this.editingSlug.set(null);
@@ -5057,6 +5229,9 @@ export class AdminProductsComponent implements OnInit {
 		    this.editingCurrency.set('RON');
 		    this.editorError.set(null);
 		    this.editorMessage.set(null);
+        this.editorDirty.set(false);
+        this.editorSaving.set(false);
+        this.editorLastSavedAt.set(null);
         this.lastSavedState.set(null);
         this.loadedTagSlugs = [];
 		    this.resetDuplicateCheck();
@@ -5078,6 +5253,9 @@ export class AdminProductsComponent implements OnInit {
 		    this.editorOpen.set(true);
 		    this.editorError.set(null);
 		    this.editorMessage.set(null);
+        this.editorDirty.set(false);
+        this.editorSaving.set(false);
+        this.editorLastSavedAt.set(null);
         this.lastSavedState.set(null);
 		    this.editingSlug.set(slug);
 		    this.editingProductId.set(null);
@@ -5440,6 +5618,10 @@ export class AdminProductsComponent implements OnInit {
       opts?.done?.(false);
       return;
     }
+    if (this.editorSaving()) {
+      opts?.done?.(false);
+      return;
+    }
 
     const basePrice = this.parseMoneyInput(this.form.base_price);
     if (basePrice === null) {
@@ -5581,8 +5763,12 @@ export class AdminProductsComponent implements OnInit {
 
     const slug = this.editingSlug();
     const op = slug ? this.admin.updateProduct(slug, payload) : this.admin.createProduct(payload);
+    this.editorSaving.set(true);
     op.subscribe({
       next: (prod: any) => {
+        this.editorSaving.set(false);
+        this.editorDirty.set(false);
+        this.editorLastSavedAt.set(new Date().toISOString());
         this.toast.success(this.t('adminUi.products.success.save'));
         this.editorMessage.set(this.t('adminUi.products.success.save'));
         const newSlug = (prod?.slug as string | undefined) || slug || null;
@@ -5613,6 +5799,7 @@ export class AdminProductsComponent implements OnInit {
           }
 	      },
 	      error: () => {
+          this.editorSaving.set(false);
           this.editorError.set(this.t('adminUi.products.errors.save'));
           opts?.done?.(false);
         }
