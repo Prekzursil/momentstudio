@@ -737,6 +737,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Storefront: add “Notify me when back in stock” UI on product detail (out-of-stock), wired to the back-in-stock request flow.
 - [x] Observability: add an ops “health dashboard” view in admin (surface uptime, recent errors, backpressure signals).
 - [x] Analytics: add lightweight funnel metrics (sessions → carts → checkouts → orders) with opt-in tracking.
+- [x] Admin products: improve search UX with typeahead suggestions + auto-filter while typing.
+- [ ] Admin products: simplify the product editor UX (sticky save bar + clearer section grouping + progressive disclosure).
 
 ## UX, Performance, SEO & Accessibility
 - [x] Mobile-first responsive design across pages(full mobile compatibility).

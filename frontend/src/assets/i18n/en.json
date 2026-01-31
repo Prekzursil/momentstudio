@@ -3252,6 +3252,8 @@
       "create": "Create product",
       "selectCategory": "Select category",
       "search": "Search",
+      "searchPlaceholder": "Search products\u2026",
+      "searchNoMatches": "No matches.",
       "all": "All statuses",
       "allCategories": "All categories",
       "empty": "No products match these filters.",

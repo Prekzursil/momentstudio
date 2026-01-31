@@ -237,15 +237,15 @@ type PriceHistoryChart = {
     TableLayoutModalComponent
   ],
   template: `
-    <div class="grid gap-6">
+      <div class="grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
 
-      <div class="flex items-start justify-between gap-4">
-        <div class="grid gap-1">
+      <div class="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-start">
+        <div class="grid gap-1 min-w-0">
           <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.products.title' | translate }}</h1>
           <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.products.hint' | translate }}</p>
         </div>
-        <div class="flex flex-wrap items-center justify-end gap-2">
+        <div class="flex flex-wrap items-center gap-2 lg:justify-end">
           <app-button size="sm" variant="ghost" [label]="'adminUi.products.csv.export' | translate" (action)="exportProductsCsv()"></app-button>
           <app-button size="sm" variant="ghost" [label]="'adminUi.products.csv.import' | translate" (action)="openCsvImport()"></app-button>
           <app-button size="sm" variant="ghost" [label]="densityToggleLabelKey() | translate" (action)="toggleDensity()"></app-button>
@@ -797,10 +797,98 @@ type PriceHistoryChart = {
             </div>
           </div>
 
-		        <div class="grid gap-3 lg:grid-cols-[1fr_180px_220px_240px_220px_auto] items-end">
-		          <app-input [label]="'adminUi.products.search' | translate" [(value)]="q"></app-input>
+		        <div class="flex flex-wrap items-end gap-3">
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 flex-1 min-w-[260px]">
+                {{ 'adminUi.products.search' | translate }}
+                <div class="relative">
+                  <input
+                    id="admin-products-search"
+                    role="combobox"
+                    aria-autocomplete="list"
+                    [attr.aria-expanded]="productSearchOpen() ? 'true' : 'false'"
+                    [attr.aria-controls]="'admin-products-search-listbox'"
+                    [attr.aria-activedescendant]="productSearchActiveDescendant()"
+                    class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [placeholder]="'adminUi.products.searchPlaceholder' | translate"
+                    [(ngModel)]="q"
+                    (ngModelChange)="onProductSearchChange()"
+                    (focus)="openProductSearch()"
+                    (blur)="onProductSearchBlur()"
+                    (keydown)="onProductSearchKeydown($event)"
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
 
-	          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  <div
+                    *ngIf="productSearchOpen()"
+                    class="absolute left-0 right-0 z-30 mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-900"
+                  >
+                    <div id="admin-products-search-listbox" role="listbox" class="max-h-72 overflow-auto">
+                      <div
+                        *ngIf="productSearchLoading()"
+                        role="option"
+                        aria-disabled="true"
+                        class="px-3 py-2 text-xs text-slate-600 dark:text-slate-300"
+                      >
+                        {{ 'adminUi.actions.loading' | translate }}
+                      </div>
+                      <div
+                        *ngIf="productSearchError()"
+                        role="option"
+                        aria-disabled="true"
+                        class="px-3 py-2 text-xs text-rose-700 dark:text-rose-300"
+                      >
+                        {{ productSearchError() }}
+                      </div>
+
+                      <ng-container *ngIf="!productSearchLoading() && !productSearchError()">
+                        <div
+                          *ngIf="productSearchResults().length === 0 && (q || '').trim().length >= 2"
+                          role="option"
+                          aria-disabled="true"
+                          class="px-3 py-2 text-xs text-slate-600 dark:text-slate-300"
+                        >
+                          {{ 'adminUi.products.searchNoMatches' | translate }}
+                        </div>
+
+                        <button
+                          *ngFor="let item of productSearchResults(); let i = index"
+                          type="button"
+                          role="option"
+                          tabindex="-1"
+                          [id]="'admin-products-search-option-' + i"
+                          [attr.aria-selected]="i === productSearchActiveIndex() ? 'true' : 'false'"
+                          class="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                          [class.bg-slate-50]="i === productSearchActiveIndex()"
+                          [class.dark:bg-slate-800/60]="i === productSearchActiveIndex()"
+                          (mousedown)="selectProductSearch(item, $event)"
+                        >
+                          <div class="flex items-center justify-between gap-3">
+                            <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400 truncate">
+                              {{ item.sku || item.slug }}
+                            </span>
+                            <span class="inline-flex items-center gap-2">
+                              <span
+                                class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
+                                [ngClass]="statusPillClass(item.status)"
+                              >
+                                {{ ('adminUi.status.' + item.status) | translate }}
+                              </span>
+                              <span *ngIf="item.status === 'published'" class="text-xs text-slate-500 dark:text-slate-400">
+                                {{ item.is_active ? ('adminUi.products.active' | translate) : ('adminUi.products.inactive' | translate) }}
+                              </span>
+                            </span>
+                          </div>
+                          <div class="mt-1 font-medium text-slate-900 dark:text-slate-50 truncate">{{ item.name }}</div>
+                          <div class="text-xs text-slate-600 dark:text-slate-300 truncate">{{ item.slug }}</div>
+                        </button>
+                      </ng-container>
+                    </div>
+                  </div>
+                </div>
+              </label>
+
+	          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 w-full sm:w-auto min-w-[180px]">
 	            {{ 'adminUi.products.table.view' | translate }}
 	            <select
 	              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
@@ -811,7 +899,7 @@ type PriceHistoryChart = {
 	            </select>
 	          </label>
 
-	          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 w-full sm:w-auto min-w-[200px]">
 	            {{ 'adminUi.products.table.status' | translate }}
 	            <select
 	              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
@@ -824,7 +912,7 @@ type PriceHistoryChart = {
             </select>
           </label>
 
-          <div class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+          <div class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 w-full sm:w-auto min-w-[220px]">
             <div class="flex items-center justify-between gap-2">
               <span>{{ 'adminUi.products.table.category' | translate }}</span>
               <app-button
@@ -844,7 +932,7 @@ type PriceHistoryChart = {
             </select>
           </div>
 
-          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 w-full sm:w-auto min-w-[220px]">
             {{ 'adminUi.products.table.translations' | translate }}
             <select
               class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
@@ -857,7 +945,7 @@ type PriceHistoryChart = {
             </select>
           </label>
 
-	          <div class="flex items-center gap-2">
+	          <div class="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
 	            <app-button size="sm" [label]="'adminUi.actions.refresh' | translate" (action)="applyFilters()"></app-button>
 	            <app-button size="sm" variant="ghost" [label]="'adminUi.actions.reset' | translate" (action)="resetFilters()"></app-button>
 	          </div>
@@ -3135,6 +3223,17 @@ export class AdminProductsComponent implements OnInit {
   limit = 25;
   selectedSavedViewKey = '';
 
+  productSearchOpen = signal(false);
+  productSearchLoading = signal(false);
+  productSearchResults = signal<AdminProductListItem[]>([]);
+  productSearchError = signal<string | null>(null);
+  productSearchActiveIndex = signal(-1);
+
+  private productSearchDebounceHandle: number | null = null;
+  private productSearchBlurHandle: number | null = null;
+  private productSearchRequestId = 0;
+  private productFilterDebounceHandle: number | null = null;
+
 	  editorOpen = signal(false);
 	  editingSlug = signal<string | null>(null);
 	  editingCurrency = signal('RON');
@@ -3400,6 +3499,178 @@ export class AdminProductsComponent implements OnInit {
     this.clearSelection();
     this.cancelInlineEdit();
     this.load();
+  }
+
+  openProductSearch(): void {
+    if (this.productSearchBlurHandle !== null) {
+      clearTimeout(this.productSearchBlurHandle);
+      this.productSearchBlurHandle = null;
+    }
+    this.productSearchOpen.set(true);
+    if (this.productSearchActiveIndex() === -1 && this.productSearchResults().length > 0) {
+      this.productSearchActiveIndex.set(0);
+    }
+  }
+
+  onProductSearchBlur(): void {
+    if (this.productSearchBlurHandle !== null) clearTimeout(this.productSearchBlurHandle);
+    this.productSearchBlurHandle = window.setTimeout(() => {
+      this.productSearchOpen.set(false);
+      this.productSearchActiveIndex.set(-1);
+      this.productSearchBlurHandle = null;
+    }, 150);
+  }
+
+  onProductSearchKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape') {
+      this.productSearchOpen.set(false);
+      this.productSearchActiveIndex.set(-1);
+      return;
+    }
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      this.openProductSearch();
+      this.moveProductSearchActive(1);
+      return;
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      this.openProductSearch();
+      this.moveProductSearchActive(-1);
+      return;
+    }
+    if (event.key === 'Home') {
+      event.preventDefault();
+      this.setProductSearchActive(0);
+      return;
+    }
+    if (event.key === 'End') {
+      event.preventDefault();
+      this.setProductSearchActive(this.productSearchResults().length - 1);
+      return;
+    }
+    if (event.key !== 'Enter') return;
+    const selected = this.getProductSearchActive() || this.productSearchResults()[0];
+    if (!selected) return;
+    event.preventDefault();
+    this.selectProductSearch(selected);
+  }
+
+  onProductSearchChange(): void {
+    const needle = (this.q || '').trim();
+    this.productSearchError.set(null);
+    this.productSearchActiveIndex.set(-1);
+
+    this.scheduleProductFiltersApply();
+
+    if (this.productSearchDebounceHandle !== null) {
+      clearTimeout(this.productSearchDebounceHandle);
+      this.productSearchDebounceHandle = null;
+    }
+
+    if (needle.length < 2) {
+      this.productSearchResults.set([]);
+      this.productSearchLoading.set(false);
+      this.productSearchActiveIndex.set(-1);
+      return;
+    }
+
+    this.productSearchDebounceHandle = window.setTimeout(() => {
+      this.productSearchDebounceHandle = null;
+      this.runProductSearch(needle);
+    }, 250);
+  }
+
+  private scheduleProductFiltersApply(): void {
+    if (this.productFilterDebounceHandle !== null) clearTimeout(this.productFilterDebounceHandle);
+    this.productFilterDebounceHandle = window.setTimeout(() => {
+      this.productFilterDebounceHandle = null;
+      this.applyFilters();
+    }, 250);
+  }
+
+  private runProductSearch(needle: string): void {
+    this.openProductSearch();
+    this.productSearchLoading.set(true);
+    const requestId = ++this.productSearchRequestId;
+    this.productsApi
+      .search({
+        q: needle,
+        status: this.status === 'all' ? undefined : this.status,
+        category_slug: this.categorySlug || undefined,
+        missing_translations: this.translationFilter === 'missing_any' ? true : undefined,
+        missing_translation_lang:
+          this.translationFilter === 'missing_en' ? 'en' : this.translationFilter === 'missing_ro' ? 'ro' : undefined,
+        deleted: this.view === 'deleted' ? true : undefined,
+        page: 1,
+        limit: 8
+      })
+      .subscribe({
+        next: (res) => {
+          if (requestId !== this.productSearchRequestId) return;
+          const items = Array.isArray(res?.items) ? res.items : [];
+          this.productSearchResults.set(items);
+          this.productSearchActiveIndex.set(items.length > 0 ? 0 : -1);
+          this.productSearchLoading.set(false);
+        },
+        error: () => {
+          if (requestId !== this.productSearchRequestId) return;
+          this.productSearchResults.set([]);
+          this.productSearchLoading.set(false);
+          this.productSearchActiveIndex.set(-1);
+          this.productSearchError.set(this.t('adminUi.products.errors.loadList'));
+        }
+      });
+  }
+
+  productSearchActiveDescendant(): string | null {
+    if (!this.productSearchOpen()) return null;
+    const idx = this.productSearchActiveIndex();
+    if (idx < 0 || idx >= this.productSearchResults().length) return null;
+    return `admin-products-search-option-${idx}`;
+  }
+
+  selectProductSearch(item: AdminProductListItem, event?: Event): void {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    this.productSearchOpen.set(false);
+    this.productSearchActiveIndex.set(-1);
+    this.edit(item.slug);
+  }
+
+  private getProductSearchActive(): AdminProductListItem | null {
+    const idx = this.productSearchActiveIndex();
+    const items = this.productSearchResults();
+    if (idx < 0 || idx >= items.length) return null;
+    return items[idx];
+  }
+
+  private moveProductSearchActive(delta: number): void {
+    const items = this.productSearchResults();
+    if (items.length === 0) {
+      this.productSearchActiveIndex.set(-1);
+      return;
+    }
+    const current = this.productSearchActiveIndex();
+    const next = Math.max(0, Math.min(items.length - 1, (current < 0 ? 0 : current) + delta));
+    this.setProductSearchActive(next);
+  }
+
+  private setProductSearchActive(index: number): void {
+    const items = this.productSearchResults();
+    if (items.length === 0) {
+      this.productSearchActiveIndex.set(-1);
+      return;
+    }
+    const bounded = Math.max(0, Math.min(items.length - 1, index));
+    this.productSearchActiveIndex.set(bounded);
+    const id = `admin-products-search-option-${bounded}`;
+    window.setTimeout(() => {
+      if (typeof document === 'undefined') return;
+      document.getElementById(id)?.scrollIntoView({ block: 'nearest' });
+    }, 0);
   }
 
   setStatusFilter(next: ProductStatusFilter): void {

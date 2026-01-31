@@ -3252,6 +3252,8 @@
       "create": "Creează produs",
       "selectCategory": "Selectează categoria",
       "search": "Caută",
+      "searchPlaceholder": "Caută produse\u2026",
+      "searchNoMatches": "Niciun rezultat.",
       "all": "Toate stările",
       "allCategories": "Toate categoriile",
       "empty": "Nu există produse pentru aceste filtre.",
