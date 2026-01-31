@@ -727,14 +727,16 @@ interface ShopFilterChip {
                 (click)="$event.stopPropagation()"
                 (change)="toggleBulkSelected($event, product.id)"
               />
-              <app-product-card
-                [product]="product"
-                [rememberShopReturn]="true"
-                [showQuickView]="true"
-                [showPin]="canReorderProducts()"
-                (quickView)="openQuickView($event)"
-                (pinToTop)="pinProductToTop($event)"
-              ></app-product-card>
+	              <app-product-card
+	                [product]="product"
+	                [rememberShopReturn]="true"
+	                [showQuickView]="true"
+	                [quickViewOnCardClick]="!canReorderProducts()"
+	                [showAddToCart]="true"
+	                [showPin]="canReorderProducts()"
+	                (quickView)="openQuickView($event)"
+	                (pinToTop)="pinProductToTop($event)"
+	              ></app-product-card>
             </div>
           </div>
 

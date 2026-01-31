@@ -42,14 +42,24 @@ import { ButtonComponent } from '../../shared/button.component';
           "
           (click)="vm.setPaymentMethod('netopia')"
           [attr.aria-pressed]="vm.paymentMethod === 'netopia'"
-        >
-          <span
-            class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white dark:bg-slate-100 dark:text-slate-900"
-          >
-            N
-          </span>
-          <span>{{ 'checkout.paymentNetopia' | translate }}</span>
-        </button>
+	        >
+	          <span
+	            class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white dark:bg-slate-100 dark:text-slate-900"
+	          >
+	            N
+	          </span>
+	          <span class="inline-flex items-center gap-1">
+	            <span>{{ 'checkout.paymentNetopia' | translate }}</span>
+	            <span class="text-xs text-slate-500 dark:text-slate-300">(</span>
+	            <img
+	              src="assets/payments/netopia-visa-mastercard.png"
+	              [alt]="'checkout.acceptedCardsAlt' | translate"
+	              class="h-4 w-auto"
+	              loading="lazy"
+	            />
+	            <span class="text-xs text-slate-500 dark:text-slate-300">)</span>
+	          </span>
+	        </button>
         <button
           *ngIf="vm.paypalEnabled"
           type="button"

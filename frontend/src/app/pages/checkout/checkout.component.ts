@@ -1854,7 +1854,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       const saved = this.checkoutPrefs.tryLoadPaymentMethod();
       if (saved && this.isPaymentMethodAvailable(saved)) return saved;
 
-      const candidates: CheckoutPaymentMethod[] = ['cod', 'paypal', 'stripe', 'netopia'];
+	      const candidates: CheckoutPaymentMethod[] = ['cod', 'netopia', 'paypal', 'stripe'];
       for (const candidate of candidates) {
         if (this.isPaymentMethodAvailable(candidate)) return candidate;
       }
