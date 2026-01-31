@@ -3502,6 +3502,10 @@ export class AdminProductsComponent implements OnInit {
   }
 
   openProductSearch(): void {
+    const needle = (this.q || '').trim();
+    const shouldOpen =
+      needle.length >= 2 || this.productSearchLoading() || !!this.productSearchError() || this.productSearchResults().length > 0;
+    if (!shouldOpen) return;
     if (this.productSearchBlurHandle !== null) {
       clearTimeout(this.productSearchBlurHandle);
       this.productSearchBlurHandle = null;
@@ -3572,6 +3576,7 @@ export class AdminProductsComponent implements OnInit {
       this.productSearchResults.set([]);
       this.productSearchLoading.set(false);
       this.productSearchActiveIndex.set(-1);
+      this.productSearchOpen.set(false);
       return;
     }
 
