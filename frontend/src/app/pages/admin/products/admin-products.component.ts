@@ -240,21 +240,21 @@ type PriceHistoryChart = {
       <div class="grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
 
-      <div class="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-start">
-        <div class="grid gap-1 min-w-0">
-          <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.products.title' | translate }}</h1>
-          <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.products.hint' | translate }}</p>
-        </div>
-        <div class="flex flex-wrap items-center gap-2 lg:justify-end">
-          <app-button size="sm" variant="ghost" [label]="'adminUi.products.csv.export' | translate" (action)="exportProductsCsv()"></app-button>
-          <app-button size="sm" variant="ghost" [label]="'adminUi.products.csv.import' | translate" (action)="openCsvImport()"></app-button>
-          <app-button size="sm" variant="ghost" [label]="densityToggleLabelKey() | translate" (action)="toggleDensity()"></app-button>
-          <app-button size="sm" variant="ghost" [label]="'adminUi.tableLayout.title' | translate" (action)="openLayoutModal()"></app-button>
-          <app-button size="sm" variant="ghost" [label]="'adminUi.categories.title' | translate" (action)="openCategoryManager()"></app-button>
-          <app-button size="sm" variant="ghost" [label]="'adminUi.products.wizard.start' | translate" (action)="startCreateWizard()"></app-button>
-          <app-button size="sm" [label]="'adminUi.products.new' | translate" (action)="startNew()"></app-button>
-        </div>
-      </div>
+	      <div class="flex flex-wrap items-start justify-between gap-3">
+	        <div class="grid gap-1 min-w-0">
+	          <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.products.title' | translate }}</h1>
+	          <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.products.hint' | translate }}</p>
+	        </div>
+	        <div class="flex flex-wrap items-center justify-end gap-2">
+	          <app-button size="sm" variant="ghost" [label]="'adminUi.products.csv.export' | translate" (action)="exportProductsCsv()"></app-button>
+	          <app-button size="sm" variant="ghost" [label]="'adminUi.products.csv.import' | translate" (action)="openCsvImport()"></app-button>
+	          <app-button size="sm" variant="ghost" [label]="densityToggleLabelKey() | translate" (action)="toggleDensity()"></app-button>
+	          <app-button size="sm" variant="ghost" [label]="'adminUi.tableLayout.title' | translate" (action)="openLayoutModal()"></app-button>
+	          <app-button size="sm" variant="ghost" [label]="'adminUi.categories.title' | translate" (action)="openCategoryManager()"></app-button>
+	          <app-button size="sm" variant="ghost" [label]="'adminUi.products.wizard.start' | translate" (action)="startCreateWizard()"></app-button>
+	          <app-button size="sm" [label]="'adminUi.products.new' | translate" (action)="startNew()"></app-button>
+	        </div>
+	      </div>
 
       <app-table-layout-modal
         [open]="layoutModalOpen()"

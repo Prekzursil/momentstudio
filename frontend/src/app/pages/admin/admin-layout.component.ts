@@ -28,7 +28,7 @@ type AdminNavItem = {
     <app-container classes="py-8">
       <div class="grid lg:grid-cols-[260px_1fr] gap-6">
         <aside
-          class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-1 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+          class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-1 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 lg:self-start lg:sticky lg:top-24"
         >
           <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400 pb-2">
             {{ 'adminUi.nav.title' | translate }}
