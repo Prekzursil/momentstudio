@@ -64,14 +64,24 @@ fi
 
 mkdir -p "${repo_root}/uploads" "${repo_root}/private_uploads"
 
+echo "Ensuring database container is running..."
+docker compose --env-file "${env_file}" -f "${compose_file}" up -d db
+
+echo "Waiting for database to become ready..."
+db_deadline="$((SECONDS + 60))"
+until docker compose --env-file "${env_file}" -f "${compose_file}" exec -T db pg_isready \
+  -U "${POSTGRES_USER:-postgres}" \
+  -d "${POSTGRES_DB:-adrianaart}" \
+  >/dev/null 2>&1; do
+  if (( SECONDS > db_deadline )); then
+    echo "ERROR: Database did not become ready within 60s." >&2
+    exit 1
+  fi
+  sleep 2
+done
+
 echo "Stopping app containers (keeps db running)..."
 docker compose --env-file "${env_file}" -f "${compose_file}" stop backend frontend caddy || true
-
-echo "Restoring media..."
-rm -rf "${repo_root}/uploads" "${repo_root}/private_uploads"
-mkdir -p "${repo_root}/uploads" "${repo_root}/private_uploads"
-cp -a "${tmp}/uploads/." "${repo_root}/uploads/"
-cp -a "${tmp}/private_uploads/." "${repo_root}/private_uploads/"
 
 echo "Restoring Postgres..."
 cat "${tmp}/db.dump" | docker compose --env-file "${env_file}" -f "${compose_file}" exec -T db pg_restore \
@@ -81,6 +91,12 @@ cat "${tmp}/db.dump" | docker compose --env-file "${env_file}" -f "${compose_fil
   --if-exists \
   --no-owner \
   --no-privileges
+
+echo "Restoring media..."
+rm -rf "${repo_root}/uploads" "${repo_root}/private_uploads"
+mkdir -p "${repo_root}/uploads" "${repo_root}/private_uploads"
+cp -a "${tmp}/uploads/." "${repo_root}/uploads/"
+cp -a "${tmp}/private_uploads/." "${repo_root}/private_uploads/"
 
 echo "Starting app containers..."
 docker compose --env-file "${env_file}" -f "${compose_file}" up -d --build

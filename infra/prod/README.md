@@ -75,7 +75,7 @@ docker compose --env-file infra/prod/.env -f infra/prod/docker-compose.yml logs 
 After first deploy (or after a DB reset):
 
 ```bash
-docker compose --env-file infra/prod/.env -f infra/prod/docker-compose.yml exec -T backend python -m app.cli bootstrap-owner \\
+docker compose --env-file infra/prod/.env -f infra/prod/docker-compose.yml exec -T backend python -m app.cli bootstrap-owner \
   --email owner@example.com --password 'Password123' --username owner --display-name Owner
 ```
 
@@ -100,4 +100,3 @@ Restore from a backup:
 - This stack mounts `uploads/` + `private_uploads/` from the repo directory so media persists across restarts/rebuilds.
 - `restart: unless-stopped` keeps the app running after reboots.
 - Docker log rotation is enabled (json-file `max-size`/`max-file`) to reduce the risk of filling disk.
-
