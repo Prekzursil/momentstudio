@@ -1,9 +1,11 @@
 import { EffectRef, Injectable, computed, effect, signal } from '@angular/core';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 import { ApiService } from './api.service';
 import { AuthService } from './auth.service';
 import { Product } from './catalog.service';
+import { parseMoney } from '../shared/money';
 
 export interface WishlistSnapshotEntry {
   saved_at: string;
@@ -50,8 +52,9 @@ export class WishlistService {
     this.loadingSignal.set(true);
     this.api.get<Product[]>('/wishlist').subscribe({
       next: (items) => {
-        this.itemsSignal.set(items);
-        this.ensureBaselines(items);
+        const normalized = (items ?? []).map((item: any) => this.normalizeProduct(item));
+        this.itemsSignal.set(normalized);
+        this.ensureBaselines(normalized);
         this.loadedSignal.set(true);
         this.loadingSignal.set(false);
       },
@@ -79,7 +82,7 @@ export class WishlistService {
   }
 
   add(productId: string): Observable<Product> {
-    return this.api.post<Product>(`/wishlist/${productId}`, {});
+    return this.api.post<Product>(`/wishlist/${productId}`, {}).pipe(map((item: any) => this.normalizeProduct(item)));
   }
 
   remove(productId: string): Observable<void> {
@@ -87,11 +90,12 @@ export class WishlistService {
   }
 
   addLocal(product: Product): void {
+    const normalized = this.normalizeProduct(product as any);
     this.itemsSignal.update((items) => {
-      if (items.some((p) => p.id === product.id)) return items;
-      return [...items, product];
+      if (items.some((p) => p.id === normalized.id)) return items;
+      return [...items, normalized];
     });
-    this.upsertBaseline(product);
+    this.upsertBaseline(normalized);
   }
 
   removeLocal(productId: string): void {
@@ -107,6 +111,15 @@ export class WishlistService {
     const sale = product.sale_price;
     if (typeof sale === 'number' && Number.isFinite(sale) && sale < product.base_price) return sale;
     return product.base_price;
+  }
+
+  private normalizeProduct(raw: any): Product {
+    return {
+      ...(raw ?? {}),
+      base_price: parseMoney(raw?.base_price),
+      sale_price: raw?.sale_price == null ? null : parseMoney(raw.sale_price),
+      sale_value: raw?.sale_value == null ? null : parseMoney(raw.sale_value)
+    } as Product;
   }
 
   private snapshotStorageKey(userId: string): string {

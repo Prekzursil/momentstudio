@@ -99,12 +99,12 @@ async def get_cart(session: AsyncSession, user_id: UUID | None, session_id: str 
 
 
 async def _validate_stock(product: Product, variant: ProductVariant | None, quantity: int) -> None:
+    if getattr(product, "allow_backorder", False):
+        return
     stock = variant.stock_quantity if variant else product.stock_quantity
     if quantity > stock:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Insufficient stock")
-    max_allowed = variant.stock_quantity if variant else product.stock_quantity
-    if max_allowed and quantity > max_allowed:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Quantity exceeds allowed maximum")
+    # Cart max-quantity enforcement is handled separately.
 
 
 def _enforce_max_quantity(quantity: int, limit: int | None) -> None:
@@ -424,7 +424,15 @@ async def serialize_cart(
                 product_id=item.product_id,
                 variant_id=item.variant_id,
                 quantity=item.quantity,
-                max_quantity=item.max_quantity or (item.product.stock_quantity if item.product else None),
+                max_quantity=(
+                    item.max_quantity
+                    if item.max_quantity is not None
+                    else (
+                        None
+                        if item.product and getattr(item.product, "allow_backorder", False)
+                        else (item.product.stock_quantity if item.product else None)
+                    )
+                ),
                 note=item.note,
                 unit_price_at_add=Decimal(item.unit_price_at_add),
                 name=item.product.name if item.product else None,
@@ -442,7 +450,11 @@ async def add_item(
     session: AsyncSession,
     cart: Cart,
     payload: CartItemCreate,
+    *,
+    commit: bool = True,
 ) -> CartItem:
+    cart.last_order_id = None
+    session.add(cart)
     product = await session.get(Product, payload.product_id)
     if (
         not product
@@ -459,7 +471,9 @@ async def add_item(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid variant")
 
     await _validate_stock(product, variant, payload.quantity)
-    limit = payload.max_quantity or (variant.stock_quantity if variant else product.stock_quantity)
+    limit = payload.max_quantity
+    if limit is None and not getattr(product, "allow_backorder", False):
+        limit = variant.stock_quantity if variant else product.stock_quantity
     _enforce_max_quantity(payload.quantity, limit)
 
     sale_price = product.sale_price if is_sale_active(product) else None
@@ -478,8 +492,11 @@ async def add_item(
         max_quantity=payload.max_quantity,
     )
     session.add(item)
-    await session.commit()
-    await session.refresh(item)
+    if commit:
+        await session.commit()
+        await session.refresh(item)
+    else:
+        await session.flush()
     record_cart_event(
         "add_item", {"cart_id": str(cart.id), "product_id": str(product.id), "quantity": payload.quantity}
     )
@@ -492,6 +509,8 @@ async def update_item(session: AsyncSession, cart: Cart, item_id: UUID, payload:
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cart item not found")
 
+    cart.last_order_id = None
+    session.add(cart)
     product = await session.get(Product, item.product_id)
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
@@ -515,15 +534,20 @@ async def delete_item(session: AsyncSession, cart: Cart, item_id: UUID) -> None:
     item = result.scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cart item not found")
+    cart.last_order_id = None
+    session.add(cart)
     await session.delete(item)
     await session.commit()
     record_cart_event("delete_item", {"cart_id": str(cart.id), "item_id": str(item_id)})
 
 
 async def sync_cart(session: AsyncSession, cart: Cart, items: list[CartSyncItem]) -> None:
+    cart.last_order_id = None
+    session.add(cart)
     # clear existing items
     for existing in list(cart.items):
         await session.delete(existing)
+    cart.items.clear()
     await session.flush()
     for item in items:
         await add_item(
@@ -536,7 +560,9 @@ async def sync_cart(session: AsyncSession, cart: Cart, items: list[CartSyncItem]
                 note=item.note,
                 max_quantity=item.max_quantity,
             ),
+            commit=False,
         )
+    await session.commit()
     await session.refresh(cart)
 
 
@@ -548,6 +574,8 @@ async def merge_guest_cart(session: AsyncSession, user_cart: Cart, guest_session
     if guest.id == user_cart.id:
         return user_cart
 
+    user_cart.last_order_id = None
+    session.add(user_cart)
     for guest_item in guest.items:
         # try to find matching item
         match = next(
@@ -667,6 +695,7 @@ async def reorder_from_order(session: AsyncSession, user_id: UUID, order_id: UUI
     # Replace current cart items with the order items
     for item in list(cart.items):
         await session.delete(item)
+    cart.items = []
     await session.flush()
 
     for order_item in order.items:

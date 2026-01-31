@@ -9,19 +9,26 @@ import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
 import { InputComponent } from '../../../shared/input.component';
 import { SkeletonComponent } from '../../../shared/skeleton.component';
+import { AdminPageHeaderComponent } from '../shared/admin-page-header.component';
 
 @Component({
   selector: 'app-admin-user-segments',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslateModule, BreadcrumbComponent, ButtonComponent, InputComponent, SkeletonComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    TranslateModule,
+    BreadcrumbComponent,
+    ButtonComponent,
+    InputComponent,
+    SkeletonComponent,
+    AdminPageHeaderComponent
+  ],
   template: `
     <div class="grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
 
-      <div class="grid gap-1">
-        <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.segments.title' | translate }}</h1>
-        <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.segments.hint' | translate }}</p>
-      </div>
+      <app-admin-page-header [titleKey]="'adminUi.segments.title'" [hintKey]="'adminUi.segments.hint'"></app-admin-page-header>
 
       <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
         <div class="grid gap-3 lg:grid-cols-[1fr_auto] items-end">

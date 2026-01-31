@@ -373,6 +373,20 @@ def test_admin_order_search_and_detail(test_app: Dict[str, object], monkeypatch:
     order_id = order["id"]
     ref = order["reference_code"]
 
+    async def clear_cart_idempotency() -> None:
+        async with SessionLocal() as session:
+            cart = (
+                (await session.execute(select(Cart).where(Cart.user_id == user_id)))
+                .scalars()
+                .first()
+            )
+            assert cart is not None
+            cart.last_order_id = None
+            session.add(cart)
+            await session.commit()
+
+    asyncio.run(clear_cart_idempotency())
+
     create_two = client.post(
         "/api/v1/orders",
         json={

@@ -17,20 +17,22 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         token = request_id_ctx_var.set(request_id)
         start = time.time()
         request.state.request_id = request_id
+        response: Response | None = None
         try:
             response = await call_next(request)
+            return response
         finally:
+            duration = time.time() - start
+            if response is not None:
+                response.headers["X-Request-ID"] = request_id
+                logger.info(
+                    "request",
+                    extra={
+                        "request_id": request_id,
+                        "path": request.url.path,
+                        "method": request.method,
+                        "status_code": response.status_code,
+                        "duration_ms": int(duration * 1000),
+                    },
+                )
             request_id_ctx_var.reset(token)
-        duration = time.time() - start
-        response.headers["X-Request-ID"] = request_id
-        logger.info(
-            "request",
-            extra={
-                "request_id": request_id,
-                "path": request.url.path,
-                "method": request.method,
-                "status_code": response.status_code,
-                "duration_ms": int(duration * 1000),
-            },
-        )
-        return response

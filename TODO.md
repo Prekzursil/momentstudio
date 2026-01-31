@@ -1,31 +1,5 @@
 # TODO / Roadmap
 
-## Open backlog
-
-### Docs
-- [x] Docs: add a production deployment guide (reverse proxy, env vars, migrations, backups, first-owner bootstrap).
-
-### DX
-- [x] DX: update `.pre-commit-config.yaml` to match the current toolchain (ESLint v9 flat config, remove deprecated hooks).
-
-### Infra
-- [x] Infra: add a local helper to run the CI Docker smoke flow (same steps as `compose-smoke`).
-
-### Observability
-- [x] Observability: add an ops “health dashboard” view in admin (surface uptime, recent errors, backpressure signals).
-
-### Orders
-- [x] Orders: add an export center/history for generated PDFs/labels (packing slips, invoices, shipping labels) with retention + re-download links.
-
-### Storefront
-- [x] Storefront: add product share controls (copy link / share sheet) on product pages.
-- [x] Storefront: add optional PWA install prompt + offline fallback page.
-
-### Analytics
-- [x] Analytics: add lightweight funnel metrics (sessions → carts → checkouts → orders) with opt-in tracking.
-
----
-
 Below is a structured checklist you can turn into issues.
 
 ## Project & Infra
@@ -55,6 +29,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Frontend deps: address `npm audit` vulnerabilities (upgrade/overrides as needed).
 - [x] CI hardening: pin tool versions in workflows (e.g. `pip-audit`, `ruff`, `mypy`) to reduce surprise breakage.
 - [x] CI: add a quick smoke for i18n key consistency (detect orphaned/typo keys).
+- [x] Docs: add a production deployment guide (reverse proxy, env vars, migrations, backups, first-owner bootstrap).
+- [x] DX: update `.pre-commit-config.yaml` to match the current toolchain (ESLint v9 flat config, remove deprecated hooks).
+- [x] Infra: add a local helper to run the CI Docker smoke flow (same steps as `compose-smoke`).
 
 ## Legal & Compliance (NETOPIA/ANPC/GDPR)
 - [x] Legal pages: add CMS-backed pages `page.terms` (index), `page.terms-and-conditions`, `page.privacy-policy`, `page.anpc` (RO+EN required).
@@ -173,6 +150,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Cart cleanup job for stale guest carts.
 - [x] Variant selection validation (options match product).
 - [x] Cart analytics events (add/remove/update).
+- [x] Checkout: honor `allow_backorder` in cart stock validation so backorderable products can be purchased.
+- [x] Checkout: add idempotency guard to prevent duplicate orders from the same cart (double-submit/retry).
 
 ## Backend - Orders, Payment, Addresses
 - [x] Address model + migration; CRUD /me/addresses.
@@ -222,6 +201,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Orders: add admin filters for “Pending (any)” (covers `pending_payment` + `pending_acceptance`) and optionally highlight “Awaiting payment” vs “Awaiting acceptance”.
 - [x] Payments: increment promo `times_used` on successful payment capture (and avoid counting abandoned checkouts).
 - [x] Payments: add admin tooling to invalidate Stripe coupon mappings when a promo is edited/disabled.
+- [x] Orders: add an export center/history for generated PDFs/labels (packing slips, invoices, shipping labels) with retention + re-download links.
+- [x] Payments: harden PayPal return/cancel URL building (strip trailing slash) across both checkout flows.
+- [x] Payments: add backend payment capabilities endpoint and use it to disable Netopia checkout until configured (still visible for review).
 
 ## Backend - CMS & Content
 - [x] ContentBlock model + migration.
@@ -292,6 +274,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Frontend deps: resolve `npm audit` vulnerabilities (pin/upgrade).
 - [x] Backpressure handling (429) for expensive endpoints.
 - [x] Maintenance mode toggle.
+- [x] Reliability: fix BackpressureMiddleware disable semantics + avoid asyncio internals; add regression tests.
+- [x] Reliability: standardize 429 responses (Retry-After + request_id) for rate limits and backpressure.
 
 ## Frontend - Shell & Shared
 - [x] Scaffold Angular app with routing + strict TS.
@@ -400,6 +384,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Shop: better empty states – Suggest clearing filters / show popular categories when no results.
 - [x] Shop: skeleton grid – Product card skeletons to reduce layout shift during loading.
 - [x] Shop return UX: make product breadcrumb “Shop” preserve last shop filters/scroll when available.
+- [x] Storefront: fix product detail page loading on first navigation (NgOptimizedImage sizing + change detection).
 
 ### Storefront Admin Quick Edit (No Dashboard) – Next Improvements (Backlog)
 - [x] Storefront Admin Mode: toggle – Add an “Edit mode” toggle for admins (header button) that reveals inline controls.
@@ -425,6 +410,16 @@ Below is a structured checklist you can turn into issues.
 - [x] Storefront Products: image manager – Reorder images and edit alt text/captions from product detail in edit mode.
 - [x] Storefront Admin Mode: undo window – After edits (reorder/publish/price), offer a short “Undo” toast.
 - [x] Storefront Admin Mode: audit trail – Record all storefront edits in the admin audit log with “source=storefront”.
+- [x] Storefront Products: set a product’s main image from the image manager (moves it to the first position).
+
+### Storefront – Homepage & PWA
+- [x] Storefront: add product share controls (copy link / share sheet) on product pages.
+- [x] Storefront: add offline fallback page (`/offline`) + online/offline indicator.
+- [x] Storefront: remove borders and adjust sizing on the homepage hero banner image.
+- [x] Storefront: move the homepage hero banner image into frontend assets and use it by default.
+- [x] Storefront: optimize the homepage hero banner image (WebP/AVIF + responsive sizes).
+- [x] Storefront: allow configuring the homepage hero banner image via CMS without code changes.
+- [x] Storefront: remove PWA install prompt button and related code.
 
 ## Blog & Community
 - [x] Nav: add “Blog” link between Home and Shop (header + drawer).
@@ -596,6 +591,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Testing: add Playwright e2e for coupons eligibility + guest restriction.
 - [x] Testing: add Playwright e2e for PayPal and Stripe return/cancel flows (smoke).
 - [x] Checkout: audit `phone_required_*` defaults between cart totals, CMS settings, and backend checkout enforcement (avoid UI/backend mismatch).
+- [x] Checkout: remove unused checkout shipping methods resolver call (shipping is fixed) to reduce network + confusion.
 
 ## Frontend - Auth & Account
 - [x] Login page with validation.
@@ -739,6 +735,15 @@ Below is a structured checklist you can turn into issues.
 - [x] CMS UX: add an asset library (upload/browse/reuse images) and allow selecting existing uploads for hero/page blocks.
 - [x] Admin i18n/content: expose RO/EN translation fields for products and categories (optional; fallback to available language).
 - [x] Storefront: add “Notify me when back in stock” UI on product detail (out-of-stock), wired to the back-in-stock request flow.
+- [x] Observability: add an ops “health dashboard” view in admin (surface uptime, recent errors, backpressure signals).
+- [x] Analytics: add lightweight funnel metrics (sessions → carts → checkouts → orders) with opt-in tracking.
+- [x] Admin products: improve search UX with typeahead suggestions + auto-filter while typing.
+- [x] Admin products: simplify the product editor UX (sticky save bar + clearer section grouping + progressive disclosure).
+- [x] Admin products: prevent the header title from being overlapped by action buttons (responsive wrap).
+- [x] Admin layout: prevent the sidebar from stretching to full page height (sticky + no grid-stretch).
+- [x] Admin products: collapse less-used header actions into a “More” menu on smaller screens.
+- [x] Admin UI: standardize page headers (title + hint + actions) across admin pages.
+- [x] Admin UI: add a compact “sidebar mode” (tighter spacing + optional section collapse) for long admin pages.
 
 ## UX, Performance, SEO & Accessibility
 - [x] Mobile-first responsive design across pages(full mobile compatibility).

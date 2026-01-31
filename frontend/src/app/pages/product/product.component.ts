@@ -1,5 +1,5 @@
 import { CommonModule, NgOptimizedImage, DOCUMENT } from '@angular/common';
-import { Component, OnDestroy, OnInit, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { BackInStockRequest, CatalogService, Product, ProductVariant } from '../../core/catalog.service';
@@ -80,7 +80,7 @@ import { ProductImageManagerModalComponent } from '../../shared/product-image-ma
                   height="960"
                   loading="lazy"
                   decoding="async"
-                  sizes="(min-width: 1024px) 480px, 100vw"
+                  sizes="(min-width: 1024px) 50vw, 100vw"
                   [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
                 />
               </div>
@@ -377,7 +377,7 @@ import { ProductImageManagerModalComponent } from '../../shared/product-image-ma
             height="1200"
 	            loading="lazy"
 	            decoding="async"
-	            sizes="(min-width: 1024px) 960px, 100vw"
+	            sizes="100vw"
 	            [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
 	          />
 	        </div>
@@ -456,6 +456,7 @@ export class ProductComponent implements OnInit, OnDestroy {
     private wishlist: WishlistService,
     private auth: AuthService,
     private router: Router,
+    private cdr: ChangeDetectorRef,
     private storefrontAdminMode: StorefrontAdminModeService,
     private admin: AdminService
   ) {}
@@ -649,6 +650,7 @@ export class ProductComponent implements OnInit, OnDestroy {
         this.selectedVariantId = product.variants?.[0]?.id ?? null;
         this.loading = false;
         this.loadError = false;
+        this.cdr.detectChanges();
         this.crumbs = [
           { label: 'nav.home', url: '/' },
           { label: 'nav.shop', url: this.shopReturnUrl || '/shop' },
@@ -668,6 +670,7 @@ export class ProductComponent implements OnInit, OnDestroy {
         this.loading = false;
         const status = typeof err?.status === 'number' ? err.status : 0;
         this.loadError = status !== 404;
+        this.cdr.detectChanges();
       }
     });
   }

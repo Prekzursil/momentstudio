@@ -115,6 +115,7 @@ def test_register_login_checkout_flow(full_app: Dict[str, object], monkeypatch: 
         discount_cents: int | None = None,
         promo_code: str | None = None,
     ) -> dict:
+        captured["stripe_session_calls"] = int(captured.get("stripe_session_calls") or 0) + 1
         captured["promo_code"] = promo_code
         captured["amount_cents"] = amount_cents
         captured["customer_email"] = customer_email
@@ -192,7 +193,30 @@ def test_register_login_checkout_flow(full_app: Dict[str, object], monkeypatch: 
     assert body["payment_method"] == "stripe"
     assert body["stripe_session_id"] == "cs_test_logged"
     assert body["stripe_checkout_url"].startswith("https://")
+    assert captured.get("stripe_session_calls") == 1
     assert captured.get("email_sent") is None
+
+    # Re-submitting checkout should be idempotent (no duplicate order/session creation).
+    order_res_2 = client.post(
+        "/api/v1/orders/checkout",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "shipping_method_id": str(seeded["shipping_id"]),
+            "save_address": True,
+            "line1": "123 Flow St",
+            "city": "Flowtown",
+            "region": "FT",
+            "postal_code": "12345",
+            "country": "US",
+            "promo_code": "SAVE10",
+        },
+    )
+    assert order_res_2.status_code == 200, order_res_2.text
+    body_2 = order_res_2.json()
+    assert body_2["order_id"] == body["order_id"]
+    assert body_2["stripe_session_id"] == body["stripe_session_id"]
+    assert body_2["stripe_checkout_url"] == body["stripe_checkout_url"]
+    assert captured.get("stripe_session_calls") == 1
 
     async def promo_times_used() -> int:
         async with SessionLocal() as session:

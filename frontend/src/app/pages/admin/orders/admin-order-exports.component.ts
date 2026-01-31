@@ -7,30 +7,25 @@ import { ToastService } from '../../../core/toast.service';
 import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
 import { SkeletonComponent } from '../../../shared/skeleton.component';
+import { AdminPageHeaderComponent } from '../shared/admin-page-header.component';
 
 @Component({
   selector: 'app-admin-order-exports',
   standalone: true,
-  imports: [CommonModule, TranslateModule, BreadcrumbComponent, ButtonComponent, SkeletonComponent],
+  imports: [CommonModule, TranslateModule, BreadcrumbComponent, ButtonComponent, SkeletonComponent, AdminPageHeaderComponent],
   template: `
     <div class="grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
 
-      <div class="flex items-start justify-between gap-4">
-        <div class="grid gap-1">
-          <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.exports.title' | translate }}</h1>
-          <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.orders.exports.hint' | translate }}</p>
-        </div>
-        <div class="flex items-center gap-2">
-          <app-button
-            size="sm"
-            variant="ghost"
-            [label]="'adminUi.orders.exports.back' | translate"
-            (action)="backToOrders()"
-          ></app-button>
+      <app-admin-page-header [titleKey]="'adminUi.orders.exports.title'" [hintKey]="'adminUi.orders.exports.hint'">
+        <ng-template #primaryActions>
+          <app-button size="sm" variant="ghost" [label]="'adminUi.orders.exports.back' | translate" (action)="backToOrders()"></app-button>
+        </ng-template>
+
+        <ng-template #secondaryActions>
           <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="load()"></app-button>
-        </div>
-      </div>
+        </ng-template>
+      </app-admin-page-header>
 
       <div *ngIf="loading()" class="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <app-skeleton [rows]="6"></app-skeleton>
@@ -205,4 +200,3 @@ export class AdminOrderExportsComponent implements OnInit {
     });
   }
 }
-

@@ -97,3 +97,9 @@ def test_login_rate_limiter(rate_limit_app: Dict[str, object]) -> None:
 
     blocked = client.post("/api/v1/auth/login", json={"email": payload["email"], "password": payload["password"]})
     assert blocked.status_code == 429
+    assert blocked.headers.get("Retry-After")
+    assert blocked.headers.get("X-Request-ID")
+    body = blocked.json()
+    assert body.get("code") == "too_many_requests"
+    assert body.get("request_id")
+    assert isinstance(body.get("retry_after"), int)

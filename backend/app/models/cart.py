@@ -16,6 +16,12 @@ class Cart(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     session_id: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True, index=True)
+    last_order_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("orders.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     guest_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     guest_email_verification_token: Mapped[str | None] = mapped_column(String(64), nullable=True)
     guest_email_verification_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -54,7 +54,9 @@ async def build_order_from_cart(
     payment_method: str = "stripe",
     payment_intent_id: str | None = None,
     stripe_checkout_session_id: str | None = None,
+    stripe_checkout_url: str | None = None,
     paypal_order_id: str | None = None,
+    paypal_approval_url: str | None = None,
     tax_amount: Decimal | None = None,
     fee_amount: Decimal | None = None,
     shipping_amount: Decimal | None = None,
@@ -189,9 +191,14 @@ async def build_order_from_cart(
         shipping_method_id=shipping_method.id if shipping_method else None,
         stripe_payment_intent_id=payment_intent_id,
         stripe_checkout_session_id=stripe_checkout_session_id,
+        stripe_checkout_url=(stripe_checkout_url or "").strip() or None,
         paypal_order_id=paypal_order_id,
+        paypal_approval_url=(paypal_approval_url or "").strip() or None,
     )
     session.add(order)
+    await session.flush()
+    cart.last_order_id = order.id
+    session.add(cart)
     await session.commit()
     await session.refresh(order)
     await _log_event(session, order.id, "created", f"Reference {order.reference_code}")

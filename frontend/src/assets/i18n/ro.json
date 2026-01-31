@@ -32,9 +32,6 @@
     "editMode": "Mod editare"
   },
   "pwa": {
-    "install": "Instalează aplicația",
-    "installAccepted": "Instalarea a început.",
-    "installDismissed": "Instalarea a fost anulată.",
     "offlineBadge": "Offline",
     "offlineTitle": "Ești offline",
     "offlineBody": "Unele funcții necesită conexiune la internet.",
@@ -1552,8 +1549,10 @@
           "reorderError": "Nu s-au putut reordona imaginile.",
           "empty": "Nu există imagini încă.",
           "imageLabel": "Imaginea {{index}}",
+          "primaryBadge": "Principală",
+          "makePrimary": "Setează ca principală",
           "metaHint": "Textul alternativ și descrierile sunt bilingve (RO/EN).",
-        "metaLoadError": "Nu s-a putut încărca textul imaginii."
+          "metaLoadError": "Nu s-a putut încărca textul imaginii."
         }
       },
       "undoApplied": "Modificările au fost anulate.",
@@ -1569,6 +1568,8 @@
       "title": "Administrare",
       "searchPlaceholder": "Caută în admin…",
       "searchEmpty": "Niciun rezultat.",
+      "preferences": "Preferințe",
+      "compactSidebar": "Bară laterală compactă",
       "dashboard": "Panou",
       "products": "Produse",
       "inventory": "Stocuri",
@@ -1836,6 +1837,7 @@
       "search": "Caută",
       "copy": "Copiază",
       "use": "Folosește",
+      "more": "Mai multe",
       "prev": "Anterior",
       "next": "Înainte",
       "back": "Înapoi",
@@ -3253,6 +3255,8 @@
       "create": "Creează produs",
       "selectCategory": "Selectează categoria",
       "search": "Caută",
+      "searchPlaceholder": "Caută produse\u2026",
+      "searchNoMatches": "Niciun rezultat.",
       "all": "Toate stările",
       "allCategories": "Toate categoriile",
       "empty": "Nu există produse pentru aceste filtre.",

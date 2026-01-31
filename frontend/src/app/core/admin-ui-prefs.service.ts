@@ -8,6 +8,7 @@ export type AdminUiPreset = 'custom' | 'owner_basic';
 export class AdminUiPrefsService {
   mode = signal<AdminUiMode>('simple');
   preset = signal<AdminUiPreset>('custom');
+  sidebarCompact = signal(false);
 
   constructor(private auth: AuthService) {
     this.load();
@@ -27,6 +28,15 @@ export class AdminUiPrefsService {
     }
     this.mode.set(mode);
     this.persist();
+  }
+
+  setSidebarCompact(value: boolean): void {
+    this.sidebarCompact.set(value);
+    this.persist();
+  }
+
+  toggleSidebarCompact(): void {
+    this.setSidebarCompact(!this.sidebarCompact());
   }
 
   toggleMode(): void {
@@ -52,6 +62,10 @@ export class AdminUiPrefsService {
       if (preset === 'custom' || preset === 'owner_basic') {
         this.preset.set(preset);
       }
+      const sidebarCompact = (parsed as any)?.sidebarCompact;
+      if (typeof sidebarCompact === 'boolean') {
+        this.sidebarCompact.set(sidebarCompact);
+      }
       if (this.preset() === 'owner_basic') {
         this.mode.set('simple');
       }
@@ -63,7 +77,10 @@ export class AdminUiPrefsService {
   private persist(): void {
     if (typeof localStorage === 'undefined') return;
     try {
-      localStorage.setItem(this.storageKey(), JSON.stringify({ mode: this.mode(), preset: this.preset() }));
+      localStorage.setItem(
+        this.storageKey(),
+        JSON.stringify({ mode: this.mode(), preset: this.preset(), sidebarCompact: this.sidebarCompact() })
+      );
     } catch {
       // ignore
     }

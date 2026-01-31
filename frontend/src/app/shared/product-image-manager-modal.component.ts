@@ -64,13 +64,29 @@ type ImageMetaByLang = {
                 class="h-14 w-14 rounded-lg border border-slate-200 object-cover dark:border-slate-700"
               />
               <div class="grid gap-1 flex-1 min-w-0">
-                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                  {{ 'adminUi.storefront.products.images.imageLabel' | translate : { index: idx + 1 } }}
-                </p>
+                <div class="flex flex-wrap items-center gap-2">
+                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                    {{ 'adminUi.storefront.products.images.imageLabel' | translate : { index: idx + 1 } }}
+                  </p>
+                  <span
+                    *ngIf="idx === 0"
+                    class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200"
+                  >
+                    {{ 'adminUi.storefront.products.images.primaryBadge' | translate }}
+                  </span>
+                </div>
                 <p class="text-xs text-slate-600 dark:text-slate-300 truncate">
                   {{ img.alt_text || productNameFallback }}
                 </p>
               </div>
+              <app-button
+                *ngIf="canReorder() && idx > 0"
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.storefront.products.images.makePrimary' | translate"
+                [disabled]="metaBusy || orderSaving"
+                (action)="makePrimary(img.id)"
+              ></app-button>
               <app-button
                 size="sm"
                 variant="ghost"
@@ -247,6 +263,23 @@ export class ProductImageManagerModalComponent implements OnChanges {
     }
     this.editingImageId = desired;
     this.loadMeta(desired);
+  }
+
+  makePrimary(imageId?: string): void {
+    if (!this.canReorder()) return;
+    const desired = String(imageId || '').trim();
+    if (!desired) return;
+    const currentFirst = String(this.draftImages[0]?.id || '').trim();
+    if (!currentFirst || desired === currentFirst) return;
+
+    const previous = this.draftImages.map((img) => String(img.id || ''));
+    const list = [...this.draftImages];
+    const index = list.findIndex((img) => String(img.id || '').trim() === desired);
+    if (index < 0) return;
+    const [moved] = list.splice(index, 1);
+    list.unshift(moved);
+    this.draftImages = list;
+    this.persistOrder(previous);
   }
 
   saveMeta(): void {

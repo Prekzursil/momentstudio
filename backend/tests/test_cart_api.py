@@ -79,6 +79,30 @@ def seed_product(session_factory) -> UUID:
     return asyncio.run(seed())
 
 
+def seed_backorder_product(session_factory) -> UUID:
+    async def seed():
+        async with session_factory() as session:
+            category = Category(slug="backorder", name="Backorder")
+            product = Product(
+                category=category,
+                slug="backorder-cup",
+                sku="SKU-BACKORDER",
+                name="Backorder Cup",
+                base_price=10,
+                currency="RON",
+                stock_quantity=1,
+                allow_backorder=True,
+                status=ProductStatus.published,
+                images=[ProductImage(url="/media/backorder.png", alt_text="backorder")],
+            )
+            session.add_all([category, product])
+            await session.commit()
+            await session.refresh(product)
+            return product.id
+
+    return asyncio.run(seed())
+
+
 def test_cart_crud_flow(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
@@ -117,6 +141,28 @@ def test_cart_crud_flow(test_app: Dict[str, object]) -> None:
     res = client.get("/api/v1/cart", headers=auth_headers(token))
     assert res.status_code == 200
     assert res.json()["items"] == []
+
+
+def test_cart_allows_backorder_quantity(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    token, _ = create_user_token(SessionLocal, email="backorder@example.com")
+    product_id = seed_backorder_product(SessionLocal)
+
+    res = client.post(
+        "/api/v1/cart/items",
+        json={"product_id": str(product_id), "quantity": 5},
+        headers=auth_headers(token),
+    )
+    assert res.status_code == 201, res.text
+
+    cart = client.get("/api/v1/cart", headers=auth_headers(token))
+    assert cart.status_code == 200, cart.text
+    items = cart.json().get("items") or []
+    assert len(items) == 1
+    assert items[0]["quantity"] == 5
+    assert items[0]["max_quantity"] is None
 
 
 def test_guest_cart_and_merge(test_app: Dict[str, object]) -> None:
@@ -235,3 +281,29 @@ def test_cart_sync_metadata_and_totals(test_app: Dict[str, object]) -> None:
     # subtotal 10*2=20, tax 10% =>2, shipping 20 => total 42
     assert float(totals["subtotal"]) == pytest.approx(20.0)
     assert float(totals["total"]) == pytest.approx(42.0, rel=1e-2)
+
+
+def test_cart_sync_replaces_existing_items(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    product_id = seed_product(SessionLocal)
+    session_id = "guest-meta-2"
+
+    first = client.post(
+        "/api/v1/cart/sync",
+        json={"items": [{"product_id": str(product_id), "quantity": 1}]},
+        headers={"X-Session-Id": session_id},
+    )
+    assert first.status_code == 200, first.text
+
+    second = client.post(
+        "/api/v1/cart/sync",
+        json={"items": [{"product_id": str(product_id), "quantity": 2}]},
+        headers={"X-Session-Id": session_id},
+    )
+    assert second.status_code == 200, second.text
+    payload = second.json()
+    assert len(payload["items"]) == 1
+    assert payload["items"][0]["product_id"] == str(product_id)
+    assert payload["items"][0]["quantity"] == 2

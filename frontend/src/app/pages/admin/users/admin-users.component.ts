@@ -36,6 +36,7 @@ import {
   visibleAdminTableColumnIds
 } from '../shared/admin-table-layout';
 import { AdminTableLayoutColumnDef, TableLayoutModalComponent } from '../shared/table-layout-modal.component';
+import { AdminPageHeaderComponent } from '../shared/admin-page-header.component';
 import { adminFilterFavoriteKey } from '../shared/admin-filter-favorites';
 import { CustomerTimelineComponent } from '../shared/customer-timeline.component';
 
@@ -58,44 +59,44 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
 @Component({
   selector: 'app-admin-users',
   standalone: true,
-  imports: [
-    CommonModule,
-    FormsModule,
-    RouterLink,
-    ScrollingModule,
-    TranslateModule,
-    BreadcrumbComponent,
-    ButtonComponent,
-    ErrorStateComponent,
-    InputComponent,
-    HelpPanelComponent,
-    SkeletonComponent,
-    CustomerTimelineComponent,
-    TableLayoutModalComponent
-  ],
+	  imports: [
+	    CommonModule,
+	    FormsModule,
+	    RouterLink,
+	    ScrollingModule,
+	    TranslateModule,
+	    BreadcrumbComponent,
+	    ButtonComponent,
+	    ErrorStateComponent,
+	    InputComponent,
+	    HelpPanelComponent,
+	    SkeletonComponent,
+	    CustomerTimelineComponent,
+	    TableLayoutModalComponent,
+      AdminPageHeaderComponent
+	  ],
   template: `
     <div class="grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
 
-	      <div class="flex items-start justify-between gap-3">
-	        <div class="grid gap-1">
-	          <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.users.title' | translate }}</h1>
-	          <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.users.hint' | translate }}</p>
-	        </div>
-	        <div class="flex items-center gap-2">
-	          <app-button
-	            size="sm"
-	            variant="ghost"
-	            [label]="(piiReveal() ? 'adminUi.pii.hide' : 'adminUi.pii.reveal') | translate"
-	            [disabled]="loading() || !canRevealPii()"
-	            (action)="togglePiiReveal()"
-	          ></app-button>
-	          <app-button size="sm" variant="ghost" routerLink="/admin/users/segments" [label]="'adminUi.users.segments' | translate"></app-button>
-	          <app-button size="sm" variant="ghost" routerLink="/admin/users/gdpr" [label]="'adminUi.users.gdprQueue' | translate"></app-button>
-            <app-button size="sm" variant="ghost" [label]="densityToggleLabelKey() | translate" (action)="toggleDensity()"></app-button>
-            <app-button size="sm" variant="ghost" [label]="'adminUi.tableLayout.title' | translate" (action)="openLayoutModal()"></app-button>
-	        </div>
-	      </div>
+		      <app-admin-page-header [titleKey]="'adminUi.users.title'" [hintKey]="'adminUi.users.hint'">
+		        <ng-template #primaryActions>
+		          <app-button
+		            size="sm"
+		            variant="ghost"
+		            [label]="(piiReveal() ? 'adminUi.pii.hide' : 'adminUi.pii.reveal') | translate"
+		            [disabled]="loading() || !canRevealPii()"
+		            (action)="togglePiiReveal()"
+		          ></app-button>
+		          <app-button size="sm" variant="ghost" routerLink="/admin/users/segments" [label]="'adminUi.users.segments' | translate"></app-button>
+		          <app-button size="sm" variant="ghost" routerLink="/admin/users/gdpr" [label]="'adminUi.users.gdprQueue' | translate"></app-button>
+		        </ng-template>
+
+		        <ng-template #secondaryActions>
+		          <app-button size="sm" variant="ghost" [label]="densityToggleLabelKey() | translate" (action)="toggleDensity()"></app-button>
+		          <app-button size="sm" variant="ghost" [label]="'adminUi.tableLayout.title' | translate" (action)="openLayoutModal()"></app-button>
+		        </ng-template>
+		      </app-admin-page-header>
 
       <app-table-layout-modal
         [open]="layoutModalOpen()"

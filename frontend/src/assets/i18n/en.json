@@ -32,9 +32,6 @@
     "editMode": "Edit mode"
   },
   "pwa": {
-    "install": "Install app",
-    "installAccepted": "Install started.",
-    "installDismissed": "Install dismissed.",
     "offlineBadge": "Offline",
     "offlineTitle": "You're offline",
     "offlineBody": "Some features require an internet connection.",
@@ -1552,8 +1549,10 @@
           "reorderError": "Could not reorder images.",
           "empty": "No images yet.",
           "imageLabel": "Image {{index}}",
+          "primaryBadge": "Main",
+          "makePrimary": "Set as main",
           "metaHint": "Alt text and captions are bilingual (RO/EN).",
-        "metaLoadError": "Could not load image text."
+          "metaLoadError": "Could not load image text."
         }
       },
       "undoApplied": "Undone.",
@@ -1569,6 +1568,8 @@
       "title": "Admin",
       "searchPlaceholder": "Search admin…",
       "searchEmpty": "No matches.",
+      "preferences": "Preferences",
+      "compactSidebar": "Compact sidebar",
       "dashboard": "Dashboard",
       "products": "Products",
       "inventory": "Inventory",
@@ -1836,6 +1837,7 @@
       "search": "Search",
       "copy": "Copy",
       "use": "Use",
+      "more": "More",
       "prev": "Prev",
       "next": "Next",
       "back": "Back",
@@ -3253,6 +3255,8 @@
       "create": "Create product",
       "selectCategory": "Select category",
       "search": "Search",
+      "searchPlaceholder": "Search products\u2026",
+      "searchNoMatches": "No matches.",
       "all": "All statuses",
       "allCategories": "All categories",
       "empty": "No products match these filters.",
