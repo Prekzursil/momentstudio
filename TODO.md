@@ -741,9 +741,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin products: simplify the product editor UX (sticky save bar + clearer section grouping + progressive disclosure).
 - [x] Admin products: prevent the header title from being overlapped by action buttons (responsive wrap).
 - [x] Admin layout: prevent the sidebar from stretching to full page height (sticky + no grid-stretch).
-- [ ] Admin products: collapse less-used header actions into a “More” menu on smaller screens.
-- [ ] Admin UI: standardize page headers (title + hint + actions) across admin pages.
-- [ ] Admin UI: add a compact “sidebar mode” (tighter spacing + optional section collapse) for long admin pages.
+- [x] Admin products: collapse less-used header actions into a “More” menu on smaller screens.
+- [x] Admin UI: standardize page headers (title + hint + actions) across admin pages.
+- [x] Admin UI: add a compact “sidebar mode” (tighter spacing + optional section collapse) for long admin pages.
 
 ## UX, Performance, SEO & Accessibility
 - [x] Mobile-first responsive design across pages(full mobile compatibility).

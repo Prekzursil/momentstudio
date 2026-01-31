@@ -25,11 +25,12 @@ type AdminNavItem = {
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink, RouterLinkActive, RouterOutlet, TranslateModule, ContainerComponent],
   template: `
-    <app-container classes="py-8">
-      <div class="grid lg:grid-cols-[260px_1fr] gap-6">
-        <aside
-          class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-1 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 lg:self-start lg:sticky lg:top-24"
-        >
+	    <app-container classes="py-8">
+	      <div class="grid lg:grid-cols-[260px_1fr] gap-6">
+	        <aside
+	          class="rounded-2xl border border-slate-200 bg-white grid text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 lg:self-start lg:sticky lg:top-24 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto"
+            [ngClass]="uiPrefs.sidebarCompact() ? 'p-3 gap-0.5 text-xs' : 'p-4 gap-1 text-sm'"
+	        >
           <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400 pb-2">
             {{ 'adminUi.nav.title' | translate }}
           </div>
@@ -60,96 +61,114 @@ type AdminNavItem = {
             {{ 'adminUi.nav.searchEmpty' | translate }}
           </div>
 
-          <div *ngIf="auth.role() === 'owner'" class="px-3 pb-2">
-            <div class="flex items-center justify-between gap-3 text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
-              <span>{{ 'adminUi.uiPreset.title' | translate }}</span>
-            </div>
-            <div class="mt-1 flex items-center justify-between gap-3">
-              <div class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <button
-                  type="button"
-                  class="px-3 py-1.5 text-xs font-semibold"
-                  [class.bg-slate-900]="uiPrefs.preset() === 'owner_basic'"
-                  [class.text-white]="uiPrefs.preset() === 'owner_basic'"
-                  [class.text-slate-700]="uiPrefs.preset() !== 'owner_basic'"
-                  [class.dark:text-slate-200]="uiPrefs.preset() !== 'owner_basic'"
-                  (click)="uiPrefs.setPreset('owner_basic')"
-                >
-                  {{ 'adminUi.uiPreset.ownerBasic' | translate }}
-                </button>
-                <button
-                  type="button"
-                  class="px-3 py-1.5 text-xs font-semibold"
-                  [class.bg-slate-900]="uiPrefs.preset() === 'custom'"
-                  [class.text-white]="uiPrefs.preset() === 'custom'"
-                  [class.text-slate-700]="uiPrefs.preset() !== 'custom'"
-                  [class.dark:text-slate-200]="uiPrefs.preset() !== 'custom'"
-                  (click)="uiPrefs.setPreset('custom')"
-                >
-                  {{ 'adminUi.uiPreset.custom' | translate }}
-                </button>
-              </div>
-            </div>
-            <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              {{ 'adminUi.uiPreset.hint' | translate }}
-            </div>
-          </div>
+            <details *ngIf="!navQuery.trim()" class="group pb-2">
+              <summary
+                class="flex items-center justify-between gap-3 px-3 pb-1 text-[11px] font-semibold tracking-wide uppercase text-slate-500 cursor-pointer select-none dark:text-slate-400 [&::-webkit-details-marker]:hidden"
+              >
+                <span>{{ 'adminUi.nav.preferences' | translate }}</span>
+                <span aria-hidden="true" class="text-slate-400 transition group-open:rotate-90">▸</span>
+              </summary>
 
-          <div class="px-3 pb-2">
-            <div class="flex items-center justify-between gap-3 text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
-              <span>{{ 'adminUi.uiMode.title' | translate }}</span>
-            </div>
-            <div class="mt-1 flex items-center justify-between gap-3">
-              <div class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <button
-                  type="button"
-                  class="px-3 py-1.5 text-xs font-semibold"
-                  [class.bg-slate-900]="uiPrefs.mode() === 'simple'"
-                  [class.text-white]="uiPrefs.mode() === 'simple'"
-                  [class.text-slate-700]="uiPrefs.mode() !== 'simple'"
-                  [class.dark:text-slate-200]="uiPrefs.mode() !== 'simple'"
-                  (click)="uiPrefs.setMode('simple')"
-                >
-                  {{ 'adminUi.uiMode.simple' | translate }}
-                </button>
-                <button
-                  type="button"
-                  class="px-3 py-1.5 text-xs font-semibold"
-                  [class.bg-slate-900]="uiPrefs.mode() === 'advanced'"
-                  [class.text-white]="uiPrefs.mode() === 'advanced'"
-                  [class.text-slate-700]="uiPrefs.mode() !== 'advanced'"
-                  [class.dark:text-slate-200]="uiPrefs.mode() !== 'advanced'"
-                  (click)="uiPrefs.setMode('advanced')"
-                >
-                  {{ 'adminUi.uiMode.advanced' | translate }}
-                </button>
-              </div>
-            </div>
-            <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              {{ (uiPrefs.mode() === 'simple' ? 'adminUi.uiMode.simpleHint' : 'adminUi.uiMode.advancedHint') | translate }}
-            </div>
-          </div>
+              <div class="px-3 pt-2 grid gap-3">
+                <label class="flex items-center justify-between gap-3 text-xs font-medium text-slate-600 dark:text-slate-300">
+                  <span>{{ 'adminUi.nav.compactSidebar' | translate }}</span>
+                  <input type="checkbox" [checked]="uiPrefs.sidebarCompact()" (change)="toggleSidebarCompact($event)" />
+                </label>
 
-          <div class="px-3 pb-2">
-            <div class="flex items-center justify-between gap-3 text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
-              <span>{{ 'adminUi.trainingMode.title' | translate }}</span>
-              <label class="inline-flex items-center gap-2 text-xs font-medium normal-case text-slate-600 dark:text-slate-300">
-                <input
-                  type="checkbox"
-                  [checked]="isTrainingMode()"
-                  [disabled]="trainingSaving"
-                  (change)="toggleTrainingMode($event)"
-                />
-                <span>{{ isTrainingMode() ? ('adminUi.trainingMode.on' | translate) : ('adminUi.trainingMode.off' | translate) }}</span>
-              </label>
-            </div>
-            <div *ngIf="isTrainingMode()" class="mt-1 text-xs text-amber-700 dark:text-amber-200">
-              {{ 'adminUi.trainingMode.hint' | translate }}
-            </div>
-            <div *ngIf="trainingError" class="mt-1 text-xs text-rose-700 dark:text-rose-200">
-              {{ trainingError }}
-            </div>
-          </div>
+                <div *ngIf="auth.role() === 'owner'">
+                  <div class="flex items-center justify-between gap-3 text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                    <span>{{ 'adminUi.uiPreset.title' | translate }}</span>
+                  </div>
+                  <div class="mt-1 flex items-center justify-between gap-3">
+                    <div class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                      <button
+                        type="button"
+                        class="px-3 py-1.5 text-xs font-semibold"
+                        [class.bg-slate-900]="uiPrefs.preset() === 'owner_basic'"
+                        [class.text-white]="uiPrefs.preset() === 'owner_basic'"
+                        [class.text-slate-700]="uiPrefs.preset() !== 'owner_basic'"
+                        [class.dark:text-slate-200]="uiPrefs.preset() !== 'owner_basic'"
+                        (click)="uiPrefs.setPreset('owner_basic')"
+                      >
+                        {{ 'adminUi.uiPreset.ownerBasic' | translate }}
+                      </button>
+                      <button
+                        type="button"
+                        class="px-3 py-1.5 text-xs font-semibold"
+                        [class.bg-slate-900]="uiPrefs.preset() === 'custom'"
+                        [class.text-white]="uiPrefs.preset() === 'custom'"
+                        [class.text-slate-700]="uiPrefs.preset() !== 'custom'"
+                        [class.dark:text-slate-200]="uiPrefs.preset() !== 'custom'"
+                        (click)="uiPrefs.setPreset('custom')"
+                      >
+                        {{ 'adminUi.uiPreset.custom' | translate }}
+                      </button>
+                    </div>
+                  </div>
+                  <div *ngIf="!uiPrefs.sidebarCompact()" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    {{ 'adminUi.uiPreset.hint' | translate }}
+                  </div>
+                </div>
+
+                <div>
+                  <div class="flex items-center justify-between gap-3 text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                    <span>{{ 'adminUi.uiMode.title' | translate }}</span>
+                  </div>
+                  <div class="mt-1 flex items-center justify-between gap-3">
+                    <div class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                      <button
+                        type="button"
+                        class="px-3 py-1.5 text-xs font-semibold"
+                        [class.bg-slate-900]="uiPrefs.mode() === 'simple'"
+                        [class.text-white]="uiPrefs.mode() === 'simple'"
+                        [class.text-slate-700]="uiPrefs.mode() !== 'simple'"
+                        [class.dark:text-slate-200]="uiPrefs.mode() !== 'simple'"
+                        (click)="uiPrefs.setMode('simple')"
+                      >
+                        {{ 'adminUi.uiMode.simple' | translate }}
+                      </button>
+                      <button
+                        type="button"
+                        class="px-3 py-1.5 text-xs font-semibold"
+                        [class.bg-slate-900]="uiPrefs.mode() === 'advanced'"
+                        [class.text-white]="uiPrefs.mode() === 'advanced'"
+                        [class.text-slate-700]="uiPrefs.mode() !== 'advanced'"
+                        [class.dark:text-slate-200]="uiPrefs.mode() !== 'advanced'"
+                        (click)="uiPrefs.setMode('advanced')"
+                      >
+                        {{ 'adminUi.uiMode.advanced' | translate }}
+                      </button>
+                    </div>
+                  </div>
+                  <div *ngIf="!uiPrefs.sidebarCompact()" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    {{ (uiPrefs.mode() === 'simple' ? 'adminUi.uiMode.simpleHint' : 'adminUi.uiMode.advancedHint') | translate }}
+                  </div>
+                </div>
+
+                <div>
+                  <div class="flex items-center justify-between gap-3 text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                    <span>{{ 'adminUi.trainingMode.title' | translate }}</span>
+                    <label class="inline-flex items-center gap-2 text-xs font-medium normal-case text-slate-600 dark:text-slate-300">
+                      <input
+                        type="checkbox"
+                        [checked]="isTrainingMode()"
+                        [disabled]="trainingSaving"
+                        (change)="toggleTrainingMode($event)"
+                      />
+                      <span>{{ isTrainingMode() ? ('adminUi.trainingMode.on' | translate) : ('adminUi.trainingMode.off' | translate) }}</span>
+                    </label>
+                  </div>
+                  <div *ngIf="isTrainingMode() && !uiPrefs.sidebarCompact()" class="mt-1 text-xs text-amber-700 dark:text-amber-200">
+                    {{ 'adminUi.trainingMode.hint' | translate }}
+                  </div>
+                  <div *ngIf="trainingError" class="mt-1 text-xs text-rose-700 dark:text-rose-200">
+                    {{ trainingError }}
+                  </div>
+                </div>
+              </div>
+
+              <div class="my-2 h-px bg-slate-200 dark:bg-slate-800/70"></div>
+            </details>
 
           <div *ngIf="shouldShowAlerts()" class="pb-2">
             <div class="flex items-center justify-between px-3 pb-1 text-[11px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
@@ -177,7 +196,8 @@ type AdminNavItem = {
               <button
                 *ngIf="lowStockCount > 0 && auth.canAccessAdminSection('inventory')"
                 type="button"
-                class="w-full flex items-center justify-between gap-3 rounded-lg px-3 py-2 hover:bg-slate-50 hover:text-slate-900 dark:hover:bg-slate-800/60 dark:hover:text-white"
+                class="w-full flex items-center justify-between gap-3 rounded-lg hover:bg-slate-50 hover:text-slate-900 dark:hover:bg-slate-800/60 dark:hover:text-white"
+                [ngClass]="uiPrefs.sidebarCompact() ? 'px-2.5 py-1.5' : 'px-3 py-2'"
                 (click)="goToInventory()"
               >
                 <span class="truncate">{{ 'adminUi.alerts.lowStock' | translate }}</span>
@@ -189,7 +209,8 @@ type AdminNavItem = {
               <button
                 *ngIf="failedWebhooksCount > 0 && auth.canAccessAdminSection('ops')"
                 type="button"
-                class="w-full flex items-center justify-between gap-3 rounded-lg px-3 py-2 hover:bg-slate-50 hover:text-slate-900 dark:hover:bg-slate-800/60 dark:hover:text-white"
+                class="w-full flex items-center justify-between gap-3 rounded-lg hover:bg-slate-50 hover:text-slate-900 dark:hover:bg-slate-800/60 dark:hover:text-white"
+                [ngClass]="uiPrefs.sidebarCompact() ? 'px-2.5 py-1.5' : 'px-3 py-2'"
                 (click)="goToOps('webhooks')"
               >
                 <span class="truncate">{{ 'adminUi.alerts.failedWebhooks' | translate }}</span>
@@ -201,7 +222,8 @@ type AdminNavItem = {
               <button
                 *ngIf="failedEmailsCount > 0 && auth.canAccessAdminSection('ops')"
                 type="button"
-                class="w-full flex items-center justify-between gap-3 rounded-lg px-3 py-2 hover:bg-slate-50 hover:text-slate-900 dark:hover:bg-slate-800/60 dark:hover:text-white"
+                class="w-full flex items-center justify-between gap-3 rounded-lg hover:bg-slate-50 hover:text-slate-900 dark:hover:bg-slate-800/60 dark:hover:text-white"
+                [ngClass]="uiPrefs.sidebarCompact() ? 'px-2.5 py-1.5' : 'px-3 py-2'"
                 (click)="goToOps('emails')"
               >
                 <span class="truncate">{{ 'adminUi.alerts.failedEmails' | translate }}</span>
@@ -224,7 +246,8 @@ type AdminNavItem = {
                 [routerLink]="item.path"
                 routerLinkActive="bg-slate-100 text-slate-900 dark:bg-slate-800/70 dark:text-white"
                 [routerLinkActiveOptions]="{ exact: item.exact ?? false }"
-                class="rounded-lg px-3 py-2 hover:bg-slate-50 hover:text-slate-900 dark:hover:bg-slate-800/60 dark:hover:text-white"
+                class="rounded-lg hover:bg-slate-50 hover:text-slate-900 dark:hover:bg-slate-800/60 dark:hover:text-white"
+                [ngClass]="uiPrefs.sidebarCompact() ? 'px-2.5 py-1.5' : 'px-3 py-2'"
               >
                 {{ item.labelKey | translate }}
               </a>
@@ -237,7 +260,8 @@ type AdminNavItem = {
               [routerLink]="item.path"
               routerLinkActive="bg-slate-100 text-slate-900 dark:bg-slate-800/70 dark:text-white"
               [routerLinkActiveOptions]="{ exact: item.exact ?? false }"
-              class="flex-1 min-w-0 rounded-lg px-3 py-2 hover:bg-slate-50 hover:text-slate-900 dark:hover:bg-slate-800/60 dark:hover:text-white"
+              class="flex-1 min-w-0 rounded-lg hover:bg-slate-50 hover:text-slate-900 dark:hover:bg-slate-800/60 dark:hover:text-white"
+              [ngClass]="uiPrefs.sidebarCompact() ? 'px-2.5 py-1.5' : 'px-3 py-2'"
             >
               <ng-container *ngIf="navQuery.trim(); else fullLabel">
                 <ng-container *ngIf="navLabelParts(item) as parts">
@@ -364,6 +388,11 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
         this.trainingError = this.translate.instant('adminUi.trainingMode.errors.save');
       }
     });
+  }
+
+  toggleSidebarCompact(event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    this.uiPrefs.setSidebarCompact(Boolean(target?.checked));
   }
 
   favoriteNavItems(): AdminNavItem[] {

@@ -51,6 +51,7 @@ import {
   visibleAdminTableColumnIds
 } from '../shared/admin-table-layout';
 import { AdminTableLayoutColumnDef, TableLayoutModalComponent } from '../shared/table-layout-modal.component';
+import { AdminPageHeaderComponent } from '../shared/admin-page-header.component';
 import { adminFilterFavoriteKey } from '../shared/admin-filter-favorites';
 
 type ProductStatusFilter = 'all' | 'draft' | 'published' | 'archived';
@@ -234,27 +235,27 @@ type PriceHistoryChart = {
     ModalComponent,
     SkeletonComponent,
     LocalizedCurrencyPipe,
-    TableLayoutModalComponent
+    TableLayoutModalComponent,
+    AdminPageHeaderComponent
   ],
   template: `
       <div class="grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
 
-	      <div class="flex flex-wrap items-start justify-between gap-3">
-	        <div class="grid gap-1 min-w-0">
-	          <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.products.title' | translate }}</h1>
-	          <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.products.hint' | translate }}</p>
-	        </div>
-	        <div class="flex flex-wrap items-center justify-end gap-2">
+	      <app-admin-page-header [titleKey]="'adminUi.products.title'" [hintKey]="'adminUi.products.hint'">
+	        <ng-template #primaryActions>
+	          <app-button size="sm" variant="ghost" [label]="'adminUi.products.wizard.start' | translate" (action)="startCreateWizard()"></app-button>
+	          <app-button size="sm" [label]="'adminUi.products.new' | translate" (action)="startNew()"></app-button>
+	        </ng-template>
+
+	        <ng-template #secondaryActions>
 	          <app-button size="sm" variant="ghost" [label]="'adminUi.products.csv.export' | translate" (action)="exportProductsCsv()"></app-button>
 	          <app-button size="sm" variant="ghost" [label]="'adminUi.products.csv.import' | translate" (action)="openCsvImport()"></app-button>
 	          <app-button size="sm" variant="ghost" [label]="densityToggleLabelKey() | translate" (action)="toggleDensity()"></app-button>
 	          <app-button size="sm" variant="ghost" [label]="'adminUi.tableLayout.title' | translate" (action)="openLayoutModal()"></app-button>
 	          <app-button size="sm" variant="ghost" [label]="'adminUi.categories.title' | translate" (action)="openCategoryManager()"></app-button>
-	          <app-button size="sm" variant="ghost" [label]="'adminUi.products.wizard.start' | translate" (action)="startCreateWizard()"></app-button>
-	          <app-button size="sm" [label]="'adminUi.products.new' | translate" (action)="startNew()"></app-button>
-	        </div>
-	      </div>
+	        </ng-template>
+	      </app-admin-page-header>
 
       <app-table-layout-modal
         [open]="layoutModalOpen()"
@@ -3168,19 +3169,35 @@ type PriceHistoryChart = {
             {{ 'adminUi.products.form.noImages' | translate }}
           </div>
 
-		          <div *ngIf="images().length > 0" class="grid gap-2">
-		            <div *ngFor="let img of images()" class="rounded-lg border border-slate-200 dark:border-slate-700">
-		              <div class="flex items-center gap-3 p-2">
-		                <img [src]="img.url" [alt]="img.alt_text || 'image'" class="h-12 w-12 rounded object-cover" />
-	                <div class="flex-1 min-w-0">
-	                  <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">{{ img.alt_text || ('adminUi.products.form.image' | translate) }}</p>
-	                  <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ img.url }}</p>
-	                </div>
-	                <div class="flex items-center gap-1">
-	                  <app-button
-	                    size="sm"
-	                    variant="ghost"
-	                    [label]="'adminUi.actions.edit' | translate"
+			          <div *ngIf="images().length > 0" class="grid gap-2">
+			            <div *ngFor="let img of images(); let idx = index" class="rounded-lg border border-slate-200 dark:border-slate-700">
+			              <div class="flex items-center gap-3 p-2">
+			                <img [src]="img.url" [alt]="img.alt_text || 'image'" class="h-12 w-12 rounded object-cover" />
+		                <div class="flex-1 min-w-0">
+		                  <div class="flex flex-wrap items-center gap-2">
+		                    <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">{{ img.alt_text || ('adminUi.products.form.image' | translate) }}</p>
+		                    <span
+		                      *ngIf="idx === 0"
+		                      class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200"
+		                    >
+		                      {{ 'adminUi.storefront.products.images.primaryBadge' | translate }}
+		                    </span>
+		                  </div>
+		                  <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ img.url }}</p>
+		                </div>
+		                <div class="flex items-center gap-1">
+		                  <app-button
+		                    *ngIf="idx > 0"
+		                    size="sm"
+		                    variant="ghost"
+		                    [label]="'adminUi.storefront.products.images.makePrimary' | translate"
+		                    [disabled]="imageOrderBusy() || imageMetaBusy() || deleteImageConfirmBusy()"
+		                    (action)="makeImagePrimary(img.id)"
+		                  ></app-button>
+		                  <app-button
+		                    size="sm"
+		                    variant="ghost"
+		                    [label]="'adminUi.actions.edit' | translate"
 	                    (action)="toggleImageMeta(img.id)"
 	                  ></app-button>
 	                  <app-button
@@ -3188,9 +3205,9 @@ type PriceHistoryChart = {
                       variant="ghost"
                       [label]="'adminUi.actions.delete' | translate"
                       (action)="openDeleteImageConfirm(img.id)"
-                    ></app-button>
-	                </div>
-	              </div>
+		                    ></app-button>
+		                </div>
+			              </div>
 
 	              <div *ngIf="editingImageId() === img.id" class="grid gap-4 border-t border-slate-200 p-3 dark:border-slate-700">
 	                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -3204,7 +3221,9 @@ type PriceHistoryChart = {
 	                      [disabled]="imageMetaBusy()"
 	                    ></app-button>
 	                    <app-button size="sm" variant="ghost" [label]="'adminUi.actions.save' | translate" (action)="saveImageMeta()" [disabled]="imageMetaBusy()"></app-button>
-	                  </div>
+			          </div>
+
+                <p *ngIf="imageOrderError()" class="text-sm text-rose-700 dark:text-rose-300">{{ imageOrderError() }}</p>
 	                </div>
 
 	                <p *ngIf="imageMetaError()" class="text-sm text-rose-700 dark:text-rose-300">{{ imageMetaError() }}</p>
@@ -3401,10 +3420,12 @@ export class AdminProductsComponent implements OnInit {
     statusConfirmBusy = signal(false);
     statusConfirmPrev = signal<{ status: ProductForm['status']; isActive: boolean } | null>(null);
     statusConfirmTarget = signal<{ status: ProductForm['status']; isActive: boolean } | null>(null);
-    deleteImageConfirmOpen = signal(false);
-    deleteImageConfirmBusy = signal(false);
-    deleteImageConfirmTarget = signal<{ id: string; url: string; alt: string } | null>(null);
-  images = signal<Array<{ id: string; url: string; alt_text?: string | null; caption?: string | null }>>([]);
+  deleteImageConfirmOpen = signal(false);
+  deleteImageConfirmBusy = signal(false);
+  deleteImageConfirmTarget = signal<{ id: string; url: string; alt: string } | null>(null);
+  images = signal<Array<{ id: string; url: string; alt_text?: string | null; caption?: string | null; sort_order?: number | null }>>([]);
+  imageOrderBusy = signal(false);
+  imageOrderError = signal<string | null>(null);
   deletedImagesOpen = signal(false);
   deletedImages = signal<AdminDeletedProductImage[]>([]);
   deletedImagesBusy = signal(false);
@@ -5357,11 +5378,13 @@ export class AdminProductsComponent implements OnInit {
           badges: badgesState
         };
         this.lastSavedState.set({ status: this.form.status, isActive: this.form.is_active });
-        this.images.set(Array.isArray(prod.images) ? prod.images : []);
+        const nextImages = Array.isArray(prod.images) ? [...prod.images] : [];
+        nextImages.sort((a: any, b: any) => Number(a?.sort_order ?? 0) - Number(b?.sort_order ?? 0));
+        this.images.set(nextImages);
         this.setVariantsFromProduct(prod);
-	        const productId = this.editingProductId();
-		        if (productId) this.loadStockAdjustments(productId);
-		        this.loadTranslations((prod.slug || slug).toString());
+        const productId = this.editingProductId();
+        if (productId) this.loadStockAdjustments(productId);
+        this.loadTranslations((prod.slug || slug).toString());
 		        this.loadRelationships((prod.slug || slug).toString());
 		        this.loadAudit((prod.slug || slug).toString());
 		        this.scheduleDuplicateCheck();
@@ -5778,7 +5801,11 @@ export class AdminProductsComponent implements OnInit {
           this.editingProductId.set(String(prod.id));
           this.loadStockAdjustments(String(prod.id));
         }
-        this.images.set(Array.isArray(prod?.images) ? prod.images : this.images());
+        if (Array.isArray(prod?.images)) {
+          const nextImages = [...prod.images];
+          nextImages.sort((a: any, b: any) => Number(a?.sort_order ?? 0) - Number(b?.sort_order ?? 0));
+          this.images.set(nextImages);
+        }
 	        if (prod?.status) this.form.status = prod.status;
           if (typeof prod?.is_active === 'boolean') this.form.is_active = prod.is_active;
           this.lastSavedState.set({ status: this.form.status, isActive: this.form.is_active });
@@ -6277,10 +6304,48 @@ export class AdminProductsComponent implements OnInit {
     this.admin.uploadProductImage(slug, file).subscribe({
       next: (prod: any) => {
         this.toast.success(this.t('adminUi.products.success.imageUpload'));
-        this.images.set(Array.isArray(prod.images) ? prod.images : []);
+        const nextImages = Array.isArray(prod.images) ? [...prod.images] : [];
+        nextImages.sort((a: any, b: any) => Number(a?.sort_order ?? 0) - Number(b?.sort_order ?? 0));
+        this.images.set(nextImages);
         if (target) target.value = '';
       },
       error: () => this.toast.error(this.t('adminUi.products.errors.image'))
+    });
+  }
+
+  makeImagePrimary(imageId: string): void {
+    const slug = this.editingSlug();
+    const desired = (imageId || '').trim();
+    if (!slug || !desired) return;
+    if (this.imageOrderBusy()) return;
+
+    const current = this.images();
+    const fromIndex = current.findIndex((img) => img.id === desired);
+    if (fromIndex <= 0) return;
+
+    const next = [...current];
+    const [moved] = next.splice(fromIndex, 1);
+    if (!moved) return;
+    next.unshift(moved);
+
+    const updates = next.map((img, idx) => ({ id: img.id, sort_order: idx + 1 }));
+    this.imageOrderBusy.set(true);
+    this.imageOrderError.set(null);
+
+    forkJoin(updates.map((row) => this.admin.reorderProductImage(slug, row.id, row.sort_order))).subscribe({
+      next: () => {
+        this.imageOrderBusy.set(false);
+        for (const row of updates) {
+          const match = next.find((img) => img.id === row.id);
+          if (match) match.sort_order = row.sort_order;
+        }
+        this.images.set(next);
+        this.toast.success(this.t('adminUi.storefront.products.images.reorderSuccess'));
+      },
+      error: () => {
+        this.imageOrderBusy.set(false);
+        this.imageOrderError.set(this.t('adminUi.storefront.products.images.reorderError'));
+      }
     });
   }
 
@@ -6325,7 +6390,9 @@ export class AdminProductsComponent implements OnInit {
         if (this.editingImageId() === imageId) {
           this.resetImageMeta();
         }
-        this.images.set(Array.isArray(prod.images) ? prod.images : []);
+        const nextImages = Array.isArray(prod.images) ? [...prod.images] : [];
+        nextImages.sort((a: any, b: any) => Number(a?.sort_order ?? 0) - Number(b?.sort_order ?? 0));
+        this.images.set(nextImages);
         if (this.deletedImagesOpen()) {
           this.loadDeletedImages(slug);
         }
@@ -6357,7 +6424,9 @@ export class AdminProductsComponent implements OnInit {
     this.admin.restoreProductImage(slug, imageId).subscribe({
       next: (prod: any) => {
         this.toast.success(this.t('adminUi.products.success.imageRestore'));
-        this.images.set(Array.isArray(prod.images) ? prod.images : []);
+        const nextImages = Array.isArray(prod.images) ? [...prod.images] : [];
+        nextImages.sort((a: any, b: any) => Number(a?.sort_order ?? 0) - Number(b?.sort_order ?? 0));
+        this.images.set(nextImages);
         this.restoringDeletedImage.set(null);
         this.loadDeletedImages(slug);
       },

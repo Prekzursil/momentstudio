@@ -9,6 +9,7 @@ import { ToastService } from '../../../core/toast.service';
 import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
 import { SkeletonComponent } from '../../../shared/skeleton.component';
+import { AdminPageHeaderComponent } from '../shared/admin-page-header.component';
 
 type StatusOption = { value: ReturnRequestStatus | ''; labelKey: string };
 type BoardStatus = 'requested' | 'approved' | 'received' | 'refunded';
@@ -17,15 +18,21 @@ type BoardColumn = { items: ReturnRequestListItem[]; total: number };
 @Component({
   selector: 'app-admin-returns',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, TranslateModule, BreadcrumbComponent, ButtonComponent, SkeletonComponent],
-	  template: `
-	    <div class="grid gap-6">
-	      <app-breadcrumb [crumbs]="crumbs()"></app-breadcrumb>
+  imports: [
+    CommonModule,
+    FormsModule,
+    RouterLink,
+    TranslateModule,
+    BreadcrumbComponent,
+    ButtonComponent,
+    SkeletonComponent,
+    AdminPageHeaderComponent
+  ],
+		  template: `
+		    <div class="grid gap-6">
+		      <app-breadcrumb [crumbs]="crumbs()"></app-breadcrumb>
 
-        <div class="grid gap-1">
-          <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.returns.title' | translate }}</h1>
-          <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.returns.subtitle' | translate }}</p>
-        </div>
+	        <app-admin-page-header [titleKey]="'adminUi.returns.title'" [hintKey]="'adminUi.returns.subtitle'"></app-admin-page-header>
 
 	      <div class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900">
 	        <div class="flex flex-wrap items-end gap-3">

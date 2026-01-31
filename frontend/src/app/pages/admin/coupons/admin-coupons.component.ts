@@ -20,6 +20,7 @@ import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
 import { InputComponent } from '../../../shared/input.component';
 import { SkeletonComponent } from '../../../shared/skeleton.component';
+import { AdminPageHeaderComponent } from '../shared/admin-page-header.component';
 
 type PromotionForm = {
   key: string;
@@ -71,16 +72,14 @@ type PromotionScheduleRow = {
     BreadcrumbComponent,
     ButtonComponent,
     InputComponent,
-    SkeletonComponent
+    SkeletonComponent,
+    AdminPageHeaderComponent
   ],
   template: `
     <div class="grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
 
-      <div class="grid gap-1">
-        <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.couponsV2.title' | translate }}</h1>
-        <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.couponsV2.subtitle' | translate }}</p>
-      </div>
+      <app-admin-page-header [titleKey]="'adminUi.couponsV2.title'" [hintKey]="'adminUi.couponsV2.subtitle'"></app-admin-page-header>
 
       <div class="grid gap-6 lg:grid-cols-2 items-start">
         <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">

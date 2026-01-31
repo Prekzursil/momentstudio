@@ -10,6 +10,7 @@ import { SkeletonComponent } from '../../../shared/skeleton.component';
 import { AdminService, RestockListItem, RestockListResponse, RestockNoteUpsert } from '../../../core/admin.service';
 import { ToastService } from '../../../core/toast.service';
 import { extractRequestId } from '../../../shared/http-error';
+import { AdminPageHeaderComponent } from '../shared/admin-page-header.component';
 
 type RestockRow = RestockListItem & {
   draftSupplier: string;
@@ -22,23 +23,30 @@ type RestockRow = RestockListItem & {
 @Component({
   selector: 'app-admin-inventory',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslateModule, BreadcrumbComponent, ButtonComponent, ErrorStateComponent, SkeletonComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    TranslateModule,
+    BreadcrumbComponent,
+    ButtonComponent,
+    ErrorStateComponent,
+    SkeletonComponent,
+    AdminPageHeaderComponent
+  ],
   template: `
     <div class="grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
 
-      <div class="flex items-start justify-between gap-4">
-        <div class="grid gap-1">
-          <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.inventory.title' | translate }}</h1>
-          <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.inventory.hint' | translate }}</p>
-        </div>
-        <app-button
-          size="sm"
-          [label]="'adminUi.inventory.export' | translate"
-          (action)="exportCsv()"
-          [disabled]="loading() || exporting"
-        ></app-button>
-      </div>
+      <app-admin-page-header [titleKey]="'adminUi.inventory.title'" [hintKey]="'adminUi.inventory.hint'">
+        <ng-template #primaryActions>
+          <app-button
+            size="sm"
+            [label]="'adminUi.inventory.export' | translate"
+            (action)="exportCsv()"
+            [disabled]="loading() || exporting"
+          ></app-button>
+        </ng-template>
+      </app-admin-page-header>
 
       <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
         <div class="grid gap-3 lg:grid-cols-[auto_auto_1fr] items-end">

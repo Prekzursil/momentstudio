@@ -1,6 +1,7 @@
 import { Pipe, PipeTransform, inject } from '@angular/core';
 import { TranslateService } from '@ngx-translate/core';
 import { FxRatesService } from '../core/fx-rates.service';
+import { parseMoney } from './money';
 
 @Pipe({
   name: 'localizedCurrency',
@@ -36,11 +37,12 @@ export class LocalizedCurrencyPipe implements PipeTransform {
     return formatter;
   }
 
-  transform(value: number, currency: string, locale?: string): string {
+  transform(value: unknown, currency: string, locale?: string): string {
     const normalizedCurrency = (currency ?? '').toUpperCase();
     const fromLang = this.translate?.currentLang === 'ro' ? 'ro-RO' : this.translate?.currentLang === 'en' ? 'en-US' : undefined;
     const loc = locale || fromLang || (typeof navigator !== 'undefined' ? navigator.language : 'en-US');
-    const base = normalizedCurrency === 'RON' ? this.formatRon(value) : this.getFormatter(loc, currency).format(value);
+    const amount = parseMoney(value);
+    const base = normalizedCurrency === 'RON' ? this.formatRon(amount) : this.getFormatter(loc, currency).format(amount);
 
     const shouldApproximate =
       (this.translate?.currentLang ?? '').toLowerCase() === 'en' &&
@@ -56,8 +58,8 @@ export class LocalizedCurrencyPipe implements PipeTransform {
       return base;
     }
 
-    const eurValue = value * rates.eurPerRon;
-    const usdValue = value * rates.usdPerRon;
+    const eurValue = amount * rates.eurPerRon;
+    const usdValue = amount * rates.usdPerRon;
 
     const eur = this.getFormatter(loc, 'EUR', 2, 2).format(eurValue);
 

@@ -235,7 +235,18 @@ export class ProductCardComponent implements OnChanges {
   }
 
   get primaryImage(): string {
-    return this.product.images?.[0]?.url ?? 'assets/placeholder/product-placeholder.svg';
+    const images = Array.isArray(this.product?.images) ? this.product.images : [];
+    if (!images.length) return 'assets/placeholder/product-placeholder.svg';
+    let best = images[0];
+    let bestOrder = Number((best as any)?.sort_order ?? 0);
+    for (const img of images) {
+      const order = Number((img as any)?.sort_order ?? 0);
+      if (order < bestOrder) {
+        best = img;
+        bestOrder = order;
+      }
+    }
+    return (best as any)?.url ?? 'assets/placeholder/product-placeholder.svg';
   }
 
   get stockBadge(): string | null {
