@@ -53,7 +53,8 @@ import { ButtonComponent } from '../../shared/button.component';
 	            <span class="text-xs text-slate-500 dark:text-slate-300">(</span>
 	            <img
 	              src="assets/payments/netopia-visa-mastercard.png"
-	              [alt]="'checkout.acceptedCardsAlt' | translate"
+	              alt=""
+	              aria-hidden="true"
 	              class="h-4 w-auto"
 	              loading="lazy"
 	            />
