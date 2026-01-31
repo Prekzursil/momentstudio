@@ -16,6 +16,8 @@ At a high level:
 Use Compose for `frontend` + `backend` + `db` (or external DB), and run a reverse proxy that terminates TLS and forwards
 traffic to the `frontend` container.
 
+This repo also includes a ready-to-use VPS production stack under `infra/prod/` (Docker Compose + Caddy + deploy/backup scripts). In that stack, Caddy routes `/api/*` and `/media/*` to the backend and everything else to the frontend.
+
 Why this works well:
 
 - The browser only talks to **one origin** (your domain).
@@ -149,4 +151,3 @@ If you deploy from GHCR images (see `.github/workflows/release.yml`), the typica
 3) Verify health:
    - backend: `/api/v1/health` and `/api/v1/health/ready`
    - frontend: load `/` and admin area
-
