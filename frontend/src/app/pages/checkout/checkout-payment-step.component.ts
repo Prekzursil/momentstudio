@@ -42,14 +42,25 @@ import { ButtonComponent } from '../../shared/button.component';
           "
           (click)="vm.setPaymentMethod('netopia')"
           [attr.aria-pressed]="vm.paymentMethod === 'netopia'"
-        >
-          <span
-            class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white dark:bg-slate-100 dark:text-slate-900"
-          >
-            N
-          </span>
-          <span>{{ 'checkout.paymentNetopia' | translate }}</span>
-        </button>
+	        >
+	          <span
+	            class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white dark:bg-slate-100 dark:text-slate-900"
+	          >
+	            N
+	          </span>
+	          <span class="inline-flex items-center gap-1">
+	            <span>{{ 'checkout.paymentNetopia' | translate }}</span>
+	            <span class="text-xs text-slate-500 dark:text-slate-300">(</span>
+	            <img
+	              src="assets/payments/netopia-visa-mastercard.png"
+	              alt=""
+	              aria-hidden="true"
+	              class="h-4 w-auto"
+	              loading="lazy"
+	            />
+	            <span class="text-xs text-slate-500 dark:text-slate-300">)</span>
+	          </span>
+	        </button>
         <button
           *ngIf="vm.paypalEnabled"
           type="button"
@@ -67,8 +78,10 @@ import { ButtonComponent } from '../../shared/button.component';
           <span>{{ 'checkout.paymentPayPal' | translate }}</span>
         </button>
         <button
+          *ngIf="vm.stripeEnabled"
           type="button"
-          class="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+          class="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-60"
+          [disabled]="!vm.isPaymentMethodAvailable('stripe')"
           [ngClass]="
             vm.paymentMethod === 'stripe'
               ? 'border-indigo-500 bg-indigo-50 text-indigo-900 dark:border-indigo-400 dark:bg-indigo-950/30 dark:text-indigo-100'

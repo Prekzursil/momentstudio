@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
+import { ChangeDetectorRef, Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Subscription } from 'rxjs';
@@ -172,7 +172,8 @@ export class ProductQuickViewModalComponent implements OnChanges {
     private catalog: CatalogService,
     private cart: CartStore,
     private toast: ToastService,
-    private translate: TranslateService
+    private translate: TranslateService,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -276,6 +277,7 @@ export class ProductQuickViewModalComponent implements OnChanges {
       this.loading = false;
       this.error = this.translate.instant('product.notFound');
       this.product = null;
+      this.cdr.detectChanges();
       return;
     }
 
@@ -286,20 +288,28 @@ export class ProductQuickViewModalComponent implements OnChanges {
     this.activeImageIndex = 0;
     this.selectedVariantId = null;
     this.quantity = 1;
+    this.cdr.detectChanges();
 
     this.loadSub = this.catalog.getProduct(slug).subscribe({
       next: (product) => {
         this.loading = false;
         this.error = '';
+        if (Array.isArray(product.images)) {
+          product.images = [...product.images].sort(
+            (a: any, b: any) => Number(a?.sort_order ?? 0) - Number(b?.sort_order ?? 0)
+          );
+        }
         this.product = product;
         this.activeImageIndex = 0;
         const firstVariant = product?.variants?.[0];
         this.selectedVariantId = firstVariant?.id ?? null;
+        this.cdr.detectChanges();
       },
       error: () => {
         this.loading = false;
         this.product = null;
         this.error = this.translate.instant('product.loadErrorCopy');
+        this.cdr.detectChanges();
       }
     });
   }
@@ -313,5 +323,6 @@ export class ProductQuickViewModalComponent implements OnChanges {
     this.activeImageIndex = 0;
     this.selectedVariantId = null;
     this.quantity = 1;
+    this.cdr.detectChanges();
   }
 }

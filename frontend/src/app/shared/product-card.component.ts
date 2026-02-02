@@ -12,6 +12,7 @@ import { ToastService } from '../core/toast.service';
 import { Router } from '@angular/router';
 import { StorefrontAdminModeService } from '../core/storefront-admin-mode.service';
 import { AdminService } from '../core/admin.service';
+import { CartStore } from '../core/cart.store';
 
 @Component({
   selector: 'app-product-card',
@@ -20,7 +21,7 @@ import { AdminService } from '../core/admin.service';
   template: `
     <article class="group grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm hover:-translate-y-1 hover:shadow-md transition dark:bg-slate-900 dark:border-slate-800 dark:shadow-none">
       <div class="block overflow-hidden rounded-xl bg-slate-50 relative dark:bg-slate-800">
-        <a [routerLink]="['/products', product.slug]" class="block" (click)="rememberShopReturnContext($event)">
+        <a [routerLink]="['/products', product.slug]" class="block" (click)="onPrimaryClick($event)">
           <img
             [ngSrc]="primaryImage"
             [alt]="product.name"
@@ -81,7 +82,7 @@ import { AdminService } from '../core/admin.service';
           <a
             [routerLink]="['/products', product.slug]"
             class="font-semibold text-slate-900 line-clamp-1 dark:text-slate-50"
-            (click)="rememberShopReturnContext($event)"
+            (click)="onPrimaryClick($event)"
           >
             {{ product.name }}
           </a>
@@ -160,14 +161,21 @@ import { AdminService } from '../core/admin.service';
 	      </div>
 	      <div class="flex flex-wrap items-center gap-2">
 	        <app-button
+	          *ngIf="showAddToCart"
+	          [label]="'product.addToCart' | translate"
+	          size="sm"
+	          [disabled]="isOutOfStock()"
+	          (action)="addToCart()"
+	        ></app-button>
+	        <app-button
 	          *ngIf="showQuickView"
 	          [label]="'shop.quickView' | translate"
-          size="sm"
-          variant="ghost"
-          (action)="openQuickView()"
-        ></app-button>
-        <app-button [label]="'product.viewDetails' | translate" size="sm" variant="ghost" (action)="goToDetails()"></app-button>
-      </div>
+            size="sm"
+            variant="ghost"
+            (action)="openQuickView()"
+          ></app-button>
+          <app-button [label]="'product.viewDetails' | translate" size="sm" variant="ghost" (action)="goToDetails()"></app-button>
+        </div>
     </article>
   `
 })
@@ -176,6 +184,8 @@ export class ProductCardComponent implements OnChanges {
   @Input() tag?: string | null;
   @Input() rememberShopReturn = false;
   @Input() showQuickView = false;
+  @Input() quickViewOnCardClick = false;
+  @Input() showAddToCart = false;
   @Input() showPin = false;
   @Output() quickView = new EventEmitter<string>();
   @Output() pinToTop = new EventEmitter<string>();
@@ -192,7 +202,8 @@ export class ProductCardComponent implements OnChanges {
     private toast: ToastService,
     private router: Router,
     private storefrontAdminMode: StorefrontAdminModeService,
-    private admin: AdminService
+    private admin: AdminService,
+    private cart: CartStore
   ) {
     this.wishlist.ensureLoaded();
   }
@@ -507,6 +518,61 @@ export class ProductCardComponent implements OnChanges {
   openQuickView(): void {
     if (!this.product?.slug) return;
     this.quickView.emit(this.product.slug);
+  }
+
+  private isPlainLeftClick(event: MouseEvent): boolean {
+    if (event.button !== 0) return false;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
+    return true;
+  }
+
+  onPrimaryClick(event: MouseEvent): void {
+    if (this.quickViewOnCardClick && this.isPlainLeftClick(event)) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.openQuickView();
+      return;
+    }
+    this.rememberShopReturnContext(event);
+  }
+
+  isOutOfStock(): boolean {
+    const product = this.product;
+    if (!product) return false;
+    const variant = product.variants?.[0] ?? null;
+    const stock = variant?.stock_quantity ?? product.stock_quantity ?? 0;
+    const allowBackorder = !!product.allow_backorder;
+    if (variant && variant.stock_quantity == null) return false;
+    return stock <= 0 && !allowBackorder;
+  }
+
+  addToCart(): void {
+    const product = this.product;
+    if (!product) return;
+    if (this.isOutOfStock()) return;
+
+    const variant = product.variants?.[0] ?? null;
+    const variantId = variant?.id ?? null;
+    const allowBackorder = !!product.allow_backorder;
+    const stockRaw = variant && variant.stock_quantity == null ? null : (variant?.stock_quantity ?? product.stock_quantity);
+    const stock = stockRaw == null ? (allowBackorder ? 9_999 : 99) : Number(stockRaw);
+
+    this.cart.addFromProduct({
+      product_id: product.id,
+      variant_id: variantId,
+      quantity: 1,
+      name: product.name,
+      slug: product.slug,
+      image: this.primaryImage,
+      price: this.displayPrice,
+      currency: product.currency,
+      stock: Number.isFinite(stock) ? stock : 99
+    });
+
+    this.toast.success(
+      this.translate.instant('product.addedTitle'),
+      this.translate.instant('product.addedBody', { qty: 1, name: product.name })
+    );
   }
 
   rememberShopReturnContext(event?: MouseEvent): void {

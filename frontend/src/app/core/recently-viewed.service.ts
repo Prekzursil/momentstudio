@@ -21,25 +21,55 @@ export class RecentlyViewedService {
         slug: product.slug,
         name: product.name,
         base_price: product.base_price,
-        currency: product.currency,
-        images: product.images
+        currency: product.currency || 'RON',
+        images: Array.isArray(product.images) ? product.images : []
       },
       ...filtered
     ];
-    this.write(next.slice(0, this.maxItems));
-    return next;
+    const sliced = next.slice(0, this.maxItems);
+    this.write(sliced);
+    return sliced;
   }
 
   private read(): RecentlyViewedProduct[] {
     const raw = this.readRaw();
     if (!raw) return [];
     try {
-      const parsed = JSON.parse(raw) as RecentlyViewedProduct[];
+      const parsed = JSON.parse(raw) as unknown;
       if (!Array.isArray(parsed)) return [];
-      return parsed.filter((item) => item && typeof item.slug === 'string');
+      const normalized = this.normalize(parsed).slice(0, this.maxItems);
+      const nextRaw = JSON.stringify(normalized);
+      if (nextRaw !== raw) {
+        this.writeRaw(nextRaw);
+      }
+      return normalized;
     } catch {
       return [];
     }
+  }
+
+  private normalize(items: unknown[]): RecentlyViewedProduct[] {
+    const normalized: RecentlyViewedProduct[] = [];
+    const seen = new Set<string>();
+    for (const raw of items) {
+      if (!raw || typeof raw !== 'object') continue;
+      const item: any = raw;
+      const slug = typeof item.slug === 'string' ? item.slug.trim() : '';
+      if (!slug) continue;
+      if (seen.has(slug)) continue;
+      seen.add(slug);
+
+      const id = typeof item.id === 'string' && item.id.trim() ? item.id : slug;
+      const name = typeof item.name === 'string' ? item.name : '';
+      const basePriceRaw = Number(item.base_price);
+      const base_price = Number.isFinite(basePriceRaw) ? basePriceRaw : 0;
+      const currencyRaw = typeof item.currency === 'string' ? item.currency.trim() : '';
+      const currency = currencyRaw || 'RON';
+      const images = Array.isArray(item.images) ? item.images.filter((img: any) => img && typeof img.url === 'string') : [];
+
+      normalized.push({ id, slug, name, base_price, currency, images });
+    }
+    return normalized;
   }
 
   private write(items: RecentlyViewedProduct[]): void {
