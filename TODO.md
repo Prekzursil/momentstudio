@@ -414,9 +414,10 @@ Below is a structured checklist you can turn into issues.
 - [x] Storefront Products: set a product’s main image from the image manager (moves it to the first position).
 - [x] Shop: product cards – Add “Add to cart” button (default variant) alongside quick view + view details.
 - [x] Shop: product cards – Clicking the product image/title opens quick view (keeps view details for navigation).
+- [x] Product detail: recently viewed – Harden rendering for legacy cached entries (missing currency/images).
 
 ### Storefront – Homepage & PWA
-- [x] Storefront: add product share controls (copy link / share sheet) on product pages.
+- [x] Storefront: remove product share controls from product pages (Share button + share/copy logic).
 - [x] Storefront: add offline fallback page (`/offline`) + online/offline indicator.
 - [x] Storefront: remove borders and adjust sizing on the homepage hero banner image.
 - [x] Storefront: move the homepage hero banner image into frontend assets and use it by default.
