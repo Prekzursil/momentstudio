@@ -73,7 +73,7 @@ services:
       backend:
         condition: service_healthy
     environment:
-      STRIPE_ENABLED: ${STRIPE_ENABLED:-0}
+      STRIPE_ENABLED: ${STRIPE_ENABLED:-1}
       PAYPAL_ENABLED: ${PAYPAL_ENABLED:-1}
       NETOPIA_ENABLED: ${NETOPIA_ENABLED:-0}
       CAPTCHA_SITE_KEY: ${CAPTCHA_SITE_KEY:-}
