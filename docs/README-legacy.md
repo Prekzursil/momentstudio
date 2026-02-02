@@ -99,7 +99,7 @@ You can swap pieces later, but the initial design assumes:
 - **Local-only dev (quick start)**:  
   - Use SQLite by setting `DATABASE_URL=sqlite+aiosqlite:///./local.db` in `backend/.env` (already handled by pydantic settings).  
   - Media goes to the local `uploads/` directory; no S3 keys required.  
-  - Use Stripe sandbox keys (`STRIPE_ENV=sandbox`, `STRIPE_SECRET_KEY_SANDBOX`, `STRIPE_PUBLISHABLE_KEY_SANDBOX`) and the built-in email console logger (no SMTP).  
+  - Use Stripe sandbox keys (`STRIPE_ENV=sandbox`, `STRIPE_SECRET_KEY_SANDBOX`) and set `STRIPE_ENABLED=1` in the frontend env if you want Stripe visible in checkout.  
   - Start both (recommended): `make dev` (or `./start.sh` / `start.bat`).  
   - Backend only: `cd backend && pip install -r requirements.txt && uvicorn app.main:app --reload`.  
   - Frontend only: `cd frontend && npm ci && npm start` (uses `frontend/.env` / `.env.example`; keep `API_BASE_URL=/api/v1` when using the dev proxy).
@@ -404,7 +404,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 cd frontend
 npm install
 cp .env.example .env            # or .env.local if you prefer
-# set API_BASE_URL, STRIPE_ENV/STRIPE_PUBLISHABLE_KEY_SANDBOX, etc.
+# set API_BASE_URL, STRIPE_ENABLED, etc.
 
 npm start
 ```

@@ -61,7 +61,7 @@ Operational visibility:
 - `APP_ENV=production`
 - `API_BASE_URL=/api/v1` (when using the frontend nginx reverse proxy)
 - Payments:
-  - Stripe: `STRIPE_ENV=live` + `STRIPE_PUBLISHABLE_KEY_LIVE=...`
+  - Stripe: `STRIPE_ENABLED=1`
   - Optional PayPal: `PAYPAL_ENABLED=1`
   - Optional Netopia: `NETOPIA_ENABLED=1`
 

@@ -3,7 +3,6 @@ export interface AppConfig {
   appEnv: string;
   appVersion: string;
   stripeEnabled: boolean;
-  stripePublishableKey: string;
   paypalEnabled: boolean;
   netopiaEnabled: boolean;
   addressAutocompleteEnabled: boolean;
@@ -21,8 +20,7 @@ const defaults: AppConfig = {
   apiBaseUrl: '/api/v1',
   appEnv: 'development',
   appVersion: '',
-  stripeEnabled: true,
-  stripePublishableKey: '',
+  stripeEnabled: false,
   paypalEnabled: false,
   netopiaEnabled: false,
   addressAutocompleteEnabled: false,
