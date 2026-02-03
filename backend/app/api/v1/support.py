@@ -214,7 +214,7 @@ async def admin_list_contact_submissions(
     assignee_filter: str | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
-    include_pii: bool = Query(default=False),
+    include_pii: bool = Query(default=True),
 ) -> ContactSubmissionListResponse:
     if include_pii:
         pii_service.require_pii_reveal(admin)
@@ -322,7 +322,7 @@ async def admin_delete_canned_response(
 @router.get("/admin/submissions/{submission_id}", response_model=ContactSubmissionRead)
 async def admin_get_contact_submission(
     submission_id: UUID,
-    include_pii: bool = Query(default=False),
+    include_pii: bool = Query(default=True),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("support")),
 ) -> ContactSubmissionRead:
@@ -339,7 +339,7 @@ async def admin_get_contact_submission(
 async def admin_update_contact_submission(
     submission_id: UUID,
     payload: ContactSubmissionUpdate,
-    include_pii: bool = Query(default=False),
+    include_pii: bool = Query(default=True),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("support")),
 ) -> ContactSubmissionRead:
@@ -369,7 +369,7 @@ async def admin_reply_contact_submission(
     submission_id: UUID,
     payload: TicketMessageCreate,
     background_tasks: BackgroundTasks,
-    include_pii: bool = Query(default=False),
+    include_pii: bool = Query(default=True),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("support")),
 ) -> ContactSubmissionRead:

@@ -958,7 +958,7 @@ async def admin_search_orders(
     to_dt: datetime | None = Query(default=None, alias="to"),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=20, ge=1, le=100),
-    include_pii: bool = Query(default=False),
+    include_pii: bool = Query(default=True),
     include_test: bool = Query(default=True),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("orders")),
@@ -1031,7 +1031,7 @@ async def admin_export_orders(
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("orders")),
     columns: list[str] | None = Query(default=None),
-    include_pii: bool = Query(default=False),
+    include_pii: bool = Query(default=True),
 ):
     if include_pii:
         pii_service.require_pii_reveal(admin)
@@ -1209,7 +1209,7 @@ async def _serialize_admin_order(
 @router.get("/admin/{order_id}", response_model=AdminOrderRead)
 async def admin_get_order(
     order_id: UUID,
-    include_pii: bool = Query(default=False),
+    include_pii: bool = Query(default=True),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
@@ -1609,7 +1609,7 @@ async def admin_update_order(
     background_tasks: BackgroundTasks,
     order_id: UUID,
     payload: OrderUpdate,
-    include_pii: bool = Query(default=False),
+    include_pii: bool = Query(default=True),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("orders")),
 ):
@@ -1745,7 +1745,7 @@ async def admin_update_order(
 async def admin_update_order_addresses(
     order_id: UUID,
     payload: AdminOrderAddressesUpdate = Body(...),
-    include_pii: bool = Query(default=False),
+    include_pii: bool = Query(default=True),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
@@ -1780,7 +1780,7 @@ async def admin_list_order_shipments(
 async def admin_create_order_shipment(
     order_id: UUID,
     payload: OrderShipmentCreate = Body(...),
-    include_pii: bool = Query(default=False),
+    include_pii: bool = Query(default=True),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
@@ -1803,7 +1803,7 @@ async def admin_update_order_shipment(
     order_id: UUID,
     shipment_id: UUID,
     payload: OrderShipmentUpdate = Body(...),
-    include_pii: bool = Query(default=False),
+    include_pii: bool = Query(default=True),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
@@ -1826,7 +1826,7 @@ async def admin_update_order_shipment(
 async def admin_delete_order_shipment(
     order_id: UUID,
     shipment_id: UUID,
-    include_pii: bool = Query(default=False),
+    include_pii: bool = Query(default=True),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
@@ -1848,7 +1848,7 @@ async def admin_delete_order_shipment(
 async def admin_upload_shipping_label(
     order_id: UUID,
     file: UploadFile = File(...),
-    include_pii: bool = Query(default=False),
+    include_pii: bool = Query(default=True),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
@@ -2061,7 +2061,7 @@ async def admin_create_order_refund(
 async def admin_add_order_note(
     order_id: UUID,
     payload: OrderAdminNoteCreate = Body(...),
-    include_pii: bool = Query(default=False),
+    include_pii: bool = Query(default=True),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
@@ -2078,7 +2078,7 @@ async def admin_add_order_note(
 async def admin_add_order_tag(
     order_id: UUID,
     payload: OrderTagCreate = Body(...),
-    include_pii: bool = Query(default=False),
+    include_pii: bool = Query(default=True),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
@@ -2097,7 +2097,7 @@ async def admin_add_order_tag(
 async def admin_remove_order_tag(
     order_id: UUID,
     tag: str,
-    include_pii: bool = Query(default=False),
+    include_pii: bool = Query(default=True),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
@@ -2179,7 +2179,7 @@ async def admin_fulfill_item(
     order_id: UUID,
     item_id: UUID,
     shipped_quantity: int = 0,
-    include_pii: bool = Query(default=False),
+    include_pii: bool = Query(default=True),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("orders")),
 ):
