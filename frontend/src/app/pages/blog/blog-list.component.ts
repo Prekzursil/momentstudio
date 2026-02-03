@@ -141,8 +141,8 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
         </div>
       </div>
 
-      <div *ngIf="loading()" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <app-skeleton *ngFor="let i of skeletons" height="240px"></app-skeleton>
+      <div *ngIf="loading()" class="grid gap-4">
+        <app-skeleton *ngFor="let i of skeletons" height="200px"></app-skeleton>
       </div>
 
       <div
@@ -188,8 +188,11 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
         >
           {{ 'blog.admin.edit' | translate }}
         </button>
-        <div class="grid md:grid-cols-[1.35fr_1fr]">
-          <div class="relative min-h-[220px] md:min-h-[360px] bg-slate-100 dark:bg-slate-800">
+        <div [ngClass]="heroPost.cover_image_url ? 'grid md:grid-cols-[1.35fr_1fr]' : 'grid'">
+          <div
+            *ngIf="heroPost.cover_image_url"
+            class="relative min-h-[220px] md:min-h-[360px] bg-slate-100 dark:bg-slate-800"
+          >
             <img
               *ngIf="thumbUrl(heroPost.cover_image_url) as thumb"
               [src]="thumb"
@@ -201,7 +204,6 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
               decoding="async"
             />
             <img
-              *ngIf="heroPost.cover_image_url"
               [src]="heroPost.cover_image_url"
               [alt]="heroPost.title"
               class="absolute inset-0 h-full w-full object-cover transition-opacity duration-300"
@@ -253,7 +255,7 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
         </div>
       </a>
 
-      <div *ngIf="!loading() && !hasError() && gridPosts.length" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div *ngIf="!loading() && !hasError() && gridPosts.length" class="grid gap-4">
         <a
           *ngFor="let post of gridPosts"
           class="group block"
@@ -261,83 +263,93 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
           (mouseenter)="prefetchPost(post.slug)"
           (focusin)="prefetchPost(post.slug)"
         >
-	          <div class="h-full transition-transform duration-200 ease-out group-hover:-translate-y-0.5">
-	            <app-card class="h-full">
-	              <div class="relative">
-                  <button
-                    *ngIf="canEditBlog()"
-                    type="button"
-                    class="absolute top-3 right-3 z-10 rounded-full border border-slate-200 bg-white/95 px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-200 dark:hover:border-slate-600"
-                    (click)="editBlogPost($event, post.slug)"
-                  >
-                    {{ 'blog.admin.edit' | translate }}
-                  </button>
-                  <div class="grid gap-3">
-	                <div
-	                  *ngIf="post.cover_image_url"
-	                  class="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-800"
-	                >
-                  <img
-                    *ngIf="thumbUrl(post.cover_image_url) as thumb"
-                    [src]="thumb"
-                    [alt]="post.title"
-                    class="absolute inset-0 h-full w-full object-cover blur-xl scale-110 opacity-80"
-                    [style.object-position]="focalPosition(post.cover_focal_x, post.cover_focal_y)"
-                    (error)="markThumbFailed(thumb)"
-                    loading="lazy"
-                    decoding="async"
-                  />
-                  <img
-                    [src]="post.cover_image_url"
-                    [alt]="post.title"
-                    class="relative w-full aspect-[16/9] object-cover transition-opacity duration-300"
-                    [style.object-position]="focalPosition(post.cover_focal_x, post.cover_focal_y)"
-                    [class.opacity-0]="!isImageLoaded(post.cover_image_url)"
-                    (load)="markImageLoaded(post.cover_image_url)"
-                    loading="lazy"
-                    decoding="async"
-                  />
-                </div>
-                <div class="grid gap-1">
-                  <p class="text-sm text-slate-500 dark:text-slate-400" *ngIf="post.published_at">
-                    {{ post.published_at | date: 'mediumDate' }}
-                    <ng-container *ngIf="post.reading_time_minutes">
-                      · {{ 'blog.minutesRead' | translate : { minutes: post.reading_time_minutes } }}
+          <div class="h-full transition-transform duration-200 ease-out group-hover:-translate-y-0.5">
+            <app-card class="h-full">
+              <div class="relative">
+                <button
+                  *ngIf="canEditBlog()"
+                  type="button"
+                  class="absolute top-3 right-3 z-10 rounded-full border border-slate-200 bg-white/95 px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-200 dark:hover:border-slate-600"
+                  (click)="editBlogPost($event, post.slug)"
+                >
+                  {{ 'blog.admin.edit' | translate }}
+                </button>
+
+                <div class="grid gap-4 md:grid-cols-[240px_1fr] md:items-start">
+                  <div class="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-800">
+                    <ng-container *ngIf="post.cover_image_url; else blogCoverPlaceholderTpl">
+                      <img
+                        *ngIf="thumbUrl(post.cover_image_url) as thumb"
+                        [src]="thumb"
+                        [alt]="post.title"
+                        class="absolute inset-0 h-full w-full object-cover blur-xl scale-110 opacity-80"
+                        [style.object-position]="focalPosition(post.cover_focal_x, post.cover_focal_y)"
+                        (error)="markThumbFailed(thumb)"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                      <img
+                        [src]="post.cover_image_url"
+                        [alt]="post.title"
+                        class="relative w-full aspect-[16/9] object-cover transition-opacity duration-300"
+                        [style.object-position]="focalPosition(post.cover_focal_x, post.cover_focal_y)"
+                        [class.opacity-0]="!isImageLoaded(post.cover_image_url)"
+                        (load)="markImageLoaded(post.cover_image_url)"
+                        loading="lazy"
+                        decoding="async"
+                      />
                     </ng-container>
-                    <ng-container *ngIf="post.author_name">
-                      · {{ 'blog.byAuthor' | translate : { author: post.author_name } }}
-                    </ng-container>
-                  </p>
-                  <button
-                    *ngIf="post.series"
-                    type="button"
-                    class="justify-self-start text-xs font-semibold rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-slate-700 hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-200 dark:hover:border-slate-600"
-                    (click)="filterBySeries($event, post.series!)"
-                  >
-                    {{ 'blog.seriesPill' | translate : { series: post.series } }}
-                  </button>
-                  <h2 class="text-lg font-semibold text-slate-900 group-hover:text-indigo-600 dark:text-slate-50 dark:group-hover:text-indigo-300">
-                    {{ post.title }}
-                  </h2>
-                  <p class="text-sm text-slate-600 dark:text-slate-300 line-clamp-3">
-                    {{ post.excerpt }}
-                  </p>
-                  <div class="flex flex-wrap gap-1 pt-1" *ngIf="post.tags?.length">
-                    <button
-                      *ngFor="let tag of post.tags"
-                      type="button"
-                      class="text-xs rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-slate-700 hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-200 dark:hover:border-slate-600"
-                      (click)="filterByTag($event, tag)"
-                    >
-                      #{{ tag }}
-                    </button>
-	                  </div>
-	                </div>
+                    <ng-template #blogCoverPlaceholderTpl>
+                      <div
+                        class="aspect-[16/9] w-full grid place-items-center bg-gradient-to-br from-indigo-500/15 via-sky-500/10 to-fuchsia-500/15 text-slate-600 dark:text-slate-300"
+                      >
+                        <span class="text-xs font-semibold tracking-wide uppercase px-3 py-1 rounded-full border border-slate-200 bg-white/70 dark:border-slate-700 dark:bg-slate-900/60">
+                          {{ 'blog.title' | translate }}
+                        </span>
+                      </div>
+                    </ng-template>
                   </div>
-	              </div>
-	            </app-card>
-	          </div>
-	        </a>
+
+                  <div class="grid gap-2 py-1">
+                    <p class="text-sm text-slate-500 dark:text-slate-400" *ngIf="post.published_at">
+                      {{ post.published_at | date: 'mediumDate' }}
+                      <ng-container *ngIf="post.reading_time_minutes">
+                        · {{ 'blog.minutesRead' | translate : { minutes: post.reading_time_minutes } }}
+                      </ng-container>
+                      <ng-container *ngIf="post.author_name">
+                        · {{ 'blog.byAuthor' | translate : { author: post.author_name } }}
+                      </ng-container>
+                    </p>
+                    <button
+                      *ngIf="post.series"
+                      type="button"
+                      class="justify-self-start text-xs font-semibold rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-slate-700 hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-200 dark:hover:border-slate-600"
+                      (click)="filterBySeries($event, post.series!)"
+                    >
+                      {{ 'blog.seriesPill' | translate : { series: post.series } }}
+                    </button>
+                    <h2 class="text-lg font-semibold text-slate-900 group-hover:text-indigo-600 dark:text-slate-50 dark:group-hover:text-indigo-300">
+                      {{ post.title }}
+                    </h2>
+                    <p class="text-sm text-slate-600 dark:text-slate-300 line-clamp-3">
+                      {{ post.excerpt }}
+                    </p>
+                    <div class="flex flex-wrap gap-1 pt-1" *ngIf="post.tags?.length">
+                      <button
+                        *ngFor="let tag of post.tags"
+                        type="button"
+                        class="text-xs rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-slate-700 hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-200 dark:hover:border-slate-600"
+                        (click)="filterByTag($event, tag)"
+                      >
+                        #{{ tag }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </app-card>
+          </div>
+        </a>
       </div>
 
       <div *ngIf="pageMeta" class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-300">
