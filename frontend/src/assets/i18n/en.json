@@ -1845,6 +1845,7 @@
       "down": "Down",
       "preview": "Preview",
       "hide": "Hide",
+      "unhide": "Unhide",
       "bulkActions": "Bulk actions"
     },
     "help": {
@@ -2588,6 +2589,8 @@
           "hint": "Edit the Terms, Privacy Policy, and ANPC pages (EN + RO).",
           "documentLabel": "Document",
           "open": "Open",
+          "lastUpdatedLabel": "Last updated",
+          "lastUpdatedHint": "Manual date (does not auto-update).",
           "documents": {
             "termsIndex": "Terms page (index)",
             "terms": "Terms & Conditions",
@@ -2597,6 +2600,14 @@
         },
         "success": { "save": "Page saved." },
         "errors": { "save": "Could not save the page.", "load": "Could not load the page." },
+        "visibility": {
+          "hidden": "Page hidden.",
+          "visible": "Page is now visible.",
+          "errors": {
+            "save": "Could not update page visibility.",
+            "load": "Could not load page."
+          }
+        },
         "builder": {
           "title": "Page builder blocks",
           "hint": "Optional: build richer About/Contact pages with blocks. If blocks are present, the storefront renders them instead of the Markdown body.",
@@ -2612,8 +2623,10 @@
           "status": "Status",
           "createPage": "Create page",
           "page": "Page",
+          "showHidden": "Show hidden pages",
           "globalSections": "Global sections",
           "pagesGroup": "Pages",
+          "hiddenTag": "hidden",
           "publishAtOptional": "Publish at (optional)",
           "publishAtHint": "If this is in the future and status is published, the page will go live at that time.",
           "unpublishAtOptional": "Unpublish at (optional)",

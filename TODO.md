@@ -230,9 +230,10 @@ Below is a structured checklist you can turn into issues.
 - [x] CMS seeds: populate default thumbnails for `site.social` Instagram/Facebook pages.
 - [x] CMS seeds: prefill `site.company` footer details for momentstudio.ro (name/RC/CUI/address/phone/email).
 - [x] CMS seeds: align `home.sections` defaults to current homepage layout (enable Sale section, disable Why, reorder sections).
-- [ ] CMS pages: decide whether Shipping & FAQ pages are needed; if yes, write final RO/EN copy + add links; if no, hide/remove them from admin.
-- [ ] Admin CMS: upgrade About/FAQ/Shipping/Contact editors to a rich editor with preview (reduce cramped textareas).
-- [ ] CMS: support per-document “Last updated” meta fields for legal pages (manual date, not auto-updated) and render them in the legal index automatically.
+- [x] CMS pages: hide Shipping & FAQ by default (remove from admin + block public access; allow unhide later).
+- [x] Admin CMS: upgrade About/FAQ/Shipping/Contact editors to a rich editor with preview (reduce cramped textareas).
+- [x] CMS: support per-document “Last updated” meta fields for legal pages (manual date, not auto-updated) and render them in the legal index automatically.
+- [x] Admin CMS: add hide/unhide controls for custom pages (meta flag; hidden pages excluded from sitemap/SEO and return 404 publicly).
 
 ## Backend - Email & Notifications
 - [x] Email settings (SMTP).

@@ -62,6 +62,11 @@ def _requires_auth(block: ContentBlock) -> bool:
     return bool(meta.get("requires_auth")) if isinstance(meta, dict) else False
 
 
+def _is_hidden(block: ContentBlock) -> bool:
+    meta = getattr(block, "meta", None) or {}
+    return bool(meta.get("hidden")) if isinstance(meta, dict) else False
+
+
 def _normalize_image_tags(tags: list[str]) -> list[str]:
     normalized: list[str] = []
     seen: set[str] = set()
@@ -132,6 +137,8 @@ async def get_static_page(
     block = await content_service.get_published_by_key_following_redirects(session, key, lang=lang)
     if not block:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+    if getattr(block, "key", "").startswith("page.") and _is_hidden(block):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
     if _requires_auth(block) and not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     return block
@@ -193,6 +200,8 @@ async def get_content(
 ) -> ContentBlockRead:
     block = await content_service.get_published_by_key_following_redirects(session, key, lang=lang)
     if not block:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+    if getattr(block, "key", "").startswith("page.") and _is_hidden(block):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
     if getattr(block, "key", "").startswith("page.") and _requires_auth(block) and not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
@@ -1010,12 +1019,15 @@ async def admin_list_pages(
     items: list[ContentPageListItem] = []
     for block in result.scalars().all():
         slug = block.key.split(".", 1)[1] if "." in block.key else block.key
+        meta = block.meta or {}
+        hidden = bool(meta.get("hidden")) if isinstance(meta, dict) else False
         items.append(
             ContentPageListItem(
                 key=block.key,
                 slug=slug,
                 title=block.title,
                 status=block.status,
+                hidden=hidden,
                 updated_at=block.updated_at,
                 published_at=block.published_at,
                 published_until=block.published_until,

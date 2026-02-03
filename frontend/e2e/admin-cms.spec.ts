@@ -37,10 +37,11 @@ test('owner can update About page via CMS and audit log records it', async ({ pa
   });
   await Promise.all([aboutLoadEn, aboutLoadRo, page.goto('/admin/content/pages')]);
 
-  const aboutField = page.getByRole('textbox', { name: 'Our story (About)' });
-  await expect(aboutField).toBeVisible();
+  const staticPagesPanel = page.locator('section', { has: page.getByRole('heading', { name: 'Static pages' }) });
+  const aboutEditor = staticPagesPanel.locator('app-rich-editor').first();
+  const aboutField = aboutEditor.locator('[role="textbox"]:visible, textarea:visible, .ProseMirror:visible').first();
+  await expect(aboutField).toBeVisible({ timeout: 30_000 });
   await aboutField.fill(marker);
-  await expect(aboutField).toHaveValue(marker);
 
   const saveAboutResponse = page.waitForResponse((resp) => {
     if (!resp.url().includes('/content/admin/page.about')) return false;

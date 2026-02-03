@@ -2,7 +2,8 @@ import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Meta, Title } from '@angular/platform-browser';
-import { combineLatest, Subscription } from 'rxjs';
+import { combineLatest, forkJoin, of, Subscription } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import { ApiService } from '../../core/api.service';
 import { ContainerComponent } from '../../layout/container.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
@@ -27,6 +28,12 @@ interface ContentBlock {
   body_markdown: string;
   meta?: Record<string, unknown> | null;
   images: ContentImage[];
+}
+
+interface LegalIndexDoc {
+  slug: string;
+  title: string;
+  lastUpdated: string | null;
 }
 
 @Component({
@@ -84,10 +91,10 @@ interface ContentBlock {
           </div>
         </div>
 
-        <div *ngIf="!loading() && !hasError() && block()" class="grid gap-5">
-          <ng-container *ngIf="pageBlocks().length; else markdownContent">
-            <app-cms-page-blocks [blocks]="pageBlocks()"></app-cms-page-blocks>
-          </ng-container>
+	        <div *ngIf="!loading() && !hasError() && block()" class="grid gap-5">
+	          <ng-container *ngIf="pageBlocks().length; else markdownContent">
+	            <app-cms-page-blocks [blocks]="pageBlocks()"></app-cms-page-blocks>
+	          </ng-container>
 
           <ng-template #markdownContent>
             <img
@@ -97,13 +104,29 @@ interface ContentBlock {
               class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
               [style.object-position]="focalPosition(block()!.images[0].focal_x, block()!.images[0].focal_y)"
               loading="lazy"
-            />
-            <div class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="bodyHtml()"></div>
-          </ng-template>
-        </div>
-      </app-card>
-    </app-container>
-  `
+	            />
+	            <div class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="bodyHtml()"></div>
+	          </ng-template>
+
+	          <div *ngIf="legalIndexLoading()" class="text-sm text-slate-600 dark:text-slate-300">
+	            {{ 'notifications.loading' | translate }}
+	          </div>
+	          <div *ngIf="!legalIndexLoading() && legalIndexDocs().length" class="grid gap-2">
+	            <a
+	              *ngFor="let doc of legalIndexDocs()"
+	              [routerLink]="['/pages', doc.slug]"
+	              class="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-700 hover:border-slate-300 hover:bg-white dark:border-slate-800 dark:bg-slate-900/30 dark:text-slate-200 dark:hover:border-slate-700 dark:hover:bg-slate-900"
+	            >
+	              <span class="font-medium text-slate-900 dark:text-slate-50">{{ doc.title }}</span>
+	              <span class="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
+	                {{ doc.lastUpdated ? formatLegalIndexDate(doc.lastUpdated) : '—' }}
+	              </span>
+	            </a>
+	          </div>
+	        </div>
+	      </app-card>
+	    </app-container>
+	  `
 })
 export class CmsPageComponent implements OnInit, OnDestroy {
   block = signal<ContentBlock | null>(null);
@@ -112,6 +135,8 @@ export class CmsPageComponent implements OnInit, OnDestroy {
   requiresLogin = signal<boolean>(false);
   bodyHtml = signal<string>('');
   pageBlocks = signal<PageBlock[]>([]);
+  legalIndexDocs = signal<LegalIndexDoc[]>([]);
+  legalIndexLoading = signal<boolean>(false);
   crumbs = signal<{ label: string; url?: string }[]>([
     { label: 'nav.home', url: '/' },
     { label: 'nav.page' }
@@ -119,6 +144,7 @@ export class CmsPageComponent implements OnInit, OnDestroy {
 
   private langSub?: Subscription;
   private slugSub?: Subscription;
+  private legalIndexSub?: Subscription;
   private slug = '';
   private previewToken = '';
   private suppressNextLoad = false;
@@ -160,6 +186,7 @@ export class CmsPageComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.langSub?.unsubscribe();
     this.slugSub?.unsubscribe();
+    this.legalIndexSub?.unsubscribe();
   }
 
   focalPosition(focalX?: number, focalY?: number): string {
@@ -175,6 +202,9 @@ export class CmsPageComponent implements OnInit, OnDestroy {
       this.loading.set(false);
       this.hasError.set(true);
       this.requiresLogin.set(false);
+      this.legalIndexDocs.set([]);
+      this.legalIndexLoading.set(false);
+      this.legalIndexSub?.unsubscribe();
       return;
     }
 
@@ -182,6 +212,10 @@ export class CmsPageComponent implements OnInit, OnDestroy {
     this.hasError.set(false);
     this.requiresLogin.set(false);
     this.pageBlocks.set([]);
+    this.legalIndexDocs.set([]);
+    this.legalIndexLoading.set(false);
+    this.legalIndexSub?.unsubscribe();
+    this.legalIndexSub = undefined;
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     const req = this.previewToken
       ? this.api.get<ContentBlock>(`/content/pages/${encodeURIComponent(slug)}/preview`, { token: this.previewToken, lang })
@@ -190,15 +224,17 @@ export class CmsPageComponent implements OnInit, OnDestroy {
       next: (block) => {
         const canonicalSlug = this.slugFromKey(block.key);
         this.block.set(block);
-        this.bodyHtml.set(this.markdown.render(block.body_markdown));
+        const bodyMarkdown = canonicalSlug === 'terms' ? this.stripLegalIndexTable(block.body_markdown) : block.body_markdown;
+        this.bodyHtml.set(this.markdown.render(bodyMarkdown));
         this.pageBlocks.set(parsePageBlocks(block.meta, lang, (md) => this.markdown.render(md)));
         this.loading.set(false);
         this.hasError.set(false);
+        this.loadLegalIndexDocs(canonicalSlug, lang);
         if (canonicalSlug && canonicalSlug !== slug) {
           this.suppressNextLoad = true;
           void this.router.navigate(['/pages', canonicalSlug], { replaceUrl: true, queryParamsHandling: 'preserve' });
         }
-        const metaBody = this.pageBlocks().length ? pageBlocksToPlainText(this.pageBlocks()) : block.body_markdown;
+        const metaBody = this.pageBlocks().length ? pageBlocksToPlainText(this.pageBlocks()) : bodyMarkdown;
         this.crumbs.set([
           { label: 'nav.home', url: '/' },
           { label: block.title || slug }
@@ -230,6 +266,80 @@ export class CmsPageComponent implements OnInit, OnDestroy {
           { label: slug }
         ]);
         this.setMetaTags(slug, this.translate.instant('about.metaDescription'));
+      }
+    });
+  }
+
+  formatLegalIndexDate(value: string): string {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+    const parts = raw.split('-').map((p) => Number(p));
+    if (parts.length !== 3 || parts.some((p) => !Number.isFinite(p))) return raw;
+    const [y, m, d] = parts;
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    const locale = this.translate.currentLang === 'ro' ? 'ro-RO' : 'en-US';
+    try {
+      return new Intl.DateTimeFormat(locale, { year: 'numeric', month: 'short', day: '2-digit', timeZone: 'UTC' }).format(dt);
+    } catch {
+      return raw;
+    }
+  }
+
+  private stripLegalIndexTable(body: string): string {
+    const lines = String(body || '')
+      .replace(/\r\n/g, '\n')
+      .split('\n');
+    const out: string[] = [];
+    let inTable = false;
+    for (const line of lines) {
+      const trimmed = line.trim().toLowerCase();
+      if (!inTable) {
+        if (trimmed.startsWith('|') && (trimmed.includes('last updated') || trimmed.includes('ultima actualizare'))) {
+          inTable = true;
+          continue;
+        }
+        out.push(line);
+        continue;
+      }
+      if (line.trim().startsWith('|')) continue;
+      inTable = false;
+      out.push(line);
+    }
+    return out.join('\n').trim();
+  }
+
+  private loadLegalIndexDocs(slug: string, lang: string): void {
+    if (slug !== 'terms') return;
+    const docs = [
+      { slug: 'terms-and-conditions', fallbackKey: 'nav.terms' },
+      { slug: 'privacy-policy', fallbackKey: 'footer.privacyPolicy' },
+      { slug: 'anpc', fallbackKey: 'footer.anpc' }
+    ];
+
+    this.legalIndexLoading.set(true);
+    this.legalIndexSub?.unsubscribe();
+    this.legalIndexSub = forkJoin(
+      docs.map((doc) =>
+        this.api
+          .get<ContentBlock>(`/content/pages/${encodeURIComponent(doc.slug)}`, { lang })
+          .pipe(catchError(() => of(null)))
+      )
+    ).subscribe({
+      next: (blocks) => {
+        const rows: LegalIndexDoc[] = docs.map((doc, idx) => {
+          const block = (blocks?.[idx] as ContentBlock | null) || null;
+          const meta = (block?.meta || {}) as Record<string, unknown>;
+          const lastUpdated = typeof meta['last_updated'] === 'string' ? String(meta['last_updated']) : null;
+          const title = (block?.title || '').trim() || this.translate.instant(doc.fallbackKey);
+          return { slug: doc.slug, title, lastUpdated };
+        });
+        this.legalIndexDocs.set(rows);
+        this.legalIndexLoading.set(false);
+      },
+      error: () => {
+        this.legalIndexDocs.set([]);
+        this.legalIndexLoading.set(false);
       }
     });
   }

@@ -1368,91 +1368,96 @@ class CmsDraftManager<T> {
               </div>
             </div>
             <div class="grid gap-3 text-sm">
-              <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pagesAboutSingle">
-                <app-localized-text-editor
-                  [label]="'adminUi.site.pages.aboutLabel' | translate"
-                  [multiline]="true"
-                  [rows]="10"
-                  [value]="infoForm.about"
-                ></app-localized-text-editor>
-              </ng-container>
-              <ng-template #pagesAboutSingle>
-                <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
-                  {{ 'adminUi.site.pages.aboutLabel' | translate }}
-                  <textarea
-                    rows="10"
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    [(ngModel)]="infoForm.about[infoLang]"
-                  ></textarea>
-                </label>
-              </ng-template>
-              <div class="flex gap-2">
-                <app-button size="sm" [label]="'adminUi.site.pages.saveAbout' | translate" (action)="saveInfoUi('page.about', infoForm.about)"></app-button>
+              <div class="grid gap-2">
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.pages.aboutLabel' | translate }}</p>
+                <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pagesAboutSingle">
+	                  <div class="grid gap-3 md:grid-cols-2">
+	                    <div class="grid gap-1">
+	                      <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">RO</span>
+	                      <app-rich-editor height="420px" [ariaLabel]="('adminUi.site.pages.aboutLabel' | translate) + ' (RO)'" [(value)]="infoForm.about.ro"></app-rich-editor>
+	                    </div>
+	                    <div class="grid gap-1">
+	                      <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">EN</span>
+	                      <app-rich-editor height="420px" [ariaLabel]="('adminUi.site.pages.aboutLabel' | translate) + ' (EN)'" [(value)]="infoForm.about.en"></app-rich-editor>
+	                    </div>
+	                  </div>
+	                </ng-container>
+	                <ng-template #pagesAboutSingle>
+	                  <app-rich-editor height="420px" [ariaLabel]="'adminUi.site.pages.aboutLabel' | translate" [(value)]="infoForm.about[infoLang]"></app-rich-editor>
+	                </ng-template>
+                <div class="flex gap-2">
+                  <app-button size="sm" [label]="'adminUi.site.pages.saveAbout' | translate" (action)="saveInfoUi('page.about', infoForm.about)"></app-button>
+                </div>
               </div>
-              <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pagesFaqSingle">
-                <app-localized-text-editor
-                  [label]="'adminUi.site.pages.faqLabel' | translate"
-                  [multiline]="true"
-                  [rows]="10"
-                  [value]="infoForm.faq"
-                ></app-localized-text-editor>
+
+              <ng-container *ngIf="showHiddenPages">
+                <div class="grid gap-2">
+                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.pages.faqLabel' | translate }}</p>
+                  <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pagesFaqSingle">
+	                    <div class="grid gap-3 md:grid-cols-2">
+	                      <div class="grid gap-1">
+	                        <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">RO</span>
+	                        <app-rich-editor height="320px" [ariaLabel]="('adminUi.site.pages.faqLabel' | translate) + ' (RO)'" [(value)]="infoForm.faq.ro"></app-rich-editor>
+	                      </div>
+	                      <div class="grid gap-1">
+	                        <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">EN</span>
+	                        <app-rich-editor height="320px" [ariaLabel]="('adminUi.site.pages.faqLabel' | translate) + ' (EN)'" [(value)]="infoForm.faq.en"></app-rich-editor>
+	                      </div>
+	                    </div>
+	                  </ng-container>
+	                  <ng-template #pagesFaqSingle>
+	                    <app-rich-editor height="320px" [ariaLabel]="'adminUi.site.pages.faqLabel' | translate" [(value)]="infoForm.faq[infoLang]"></app-rich-editor>
+	                  </ng-template>
+                  <div class="flex gap-2">
+                    <app-button size="sm" [label]="'adminUi.site.pages.saveFaq' | translate" (action)="saveInfoUi('page.faq', infoForm.faq)"></app-button>
+                  </div>
+                </div>
+
+                <div class="grid gap-2">
+                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.pages.shippingLabel' | translate }}</p>
+                  <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pagesShippingSingle">
+	                    <div class="grid gap-3 md:grid-cols-2">
+	                      <div class="grid gap-1">
+	                        <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">RO</span>
+	                        <app-rich-editor height="320px" [ariaLabel]="('adminUi.site.pages.shippingLabel' | translate) + ' (RO)'" [(value)]="infoForm.shipping.ro"></app-rich-editor>
+	                      </div>
+	                      <div class="grid gap-1">
+	                        <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">EN</span>
+	                        <app-rich-editor height="320px" [ariaLabel]="('adminUi.site.pages.shippingLabel' | translate) + ' (EN)'" [(value)]="infoForm.shipping.en"></app-rich-editor>
+	                      </div>
+	                    </div>
+	                  </ng-container>
+	                  <ng-template #pagesShippingSingle>
+	                    <app-rich-editor height="320px" [ariaLabel]="'adminUi.site.pages.shippingLabel' | translate" [(value)]="infoForm.shipping[infoLang]"></app-rich-editor>
+	                  </ng-template>
+                  <div class="flex gap-2">
+                    <app-button size="sm" [label]="'adminUi.site.pages.saveShipping' | translate" (action)="saveInfoUi('page.shipping', infoForm.shipping)"></app-button>
+                  </div>
+                </div>
               </ng-container>
-              <ng-template #pagesFaqSingle>
-                <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
-                  {{ 'adminUi.site.pages.faqLabel' | translate }}
-                  <textarea
-                    rows="10"
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    [(ngModel)]="infoForm.faq[infoLang]"
-                  ></textarea>
-                </label>
-              </ng-template>
-              <div class="flex gap-2">
-                <app-button size="sm" [label]="'adminUi.site.pages.saveFaq' | translate" (action)="saveInfoUi('page.faq', infoForm.faq)"></app-button>
-              </div>
-              <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pagesShippingSingle">
-                <app-localized-text-editor
-                  [label]="'adminUi.site.pages.shippingLabel' | translate"
-                  [multiline]="true"
-                  [rows]="10"
-                  [value]="infoForm.shipping"
-                ></app-localized-text-editor>
-              </ng-container>
-              <ng-template #pagesShippingSingle>
-                <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
-                  {{ 'adminUi.site.pages.shippingLabel' | translate }}
-                  <textarea
-                    rows="10"
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    [(ngModel)]="infoForm.shipping[infoLang]"
-                  ></textarea>
-                </label>
-              </ng-template>
-              <div class="flex gap-2">
-                <app-button size="sm" [label]="'adminUi.site.pages.saveShipping' | translate" (action)="saveInfoUi('page.shipping', infoForm.shipping)"></app-button>
-              </div>
-              <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pagesContactSingle">
-                <app-localized-text-editor
-                  [label]="'adminUi.site.pages.contactLabel' | translate"
-                  [multiline]="true"
-                  [rows]="10"
-                  [value]="infoForm.contact"
-                ></app-localized-text-editor>
-              </ng-container>
-              <ng-template #pagesContactSingle>
-                <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
-                  {{ 'adminUi.site.pages.contactLabel' | translate }}
-                  <textarea
-                    rows="10"
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    [(ngModel)]="infoForm.contact[infoLang]"
-                  ></textarea>
-                </label>
-              </ng-template>
-              <div class="flex gap-2">
-                <app-button size="sm" [label]="'adminUi.site.pages.saveContact' | translate" (action)="saveInfoUi('page.contact', infoForm.contact)"></app-button>
-                <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="infoMessage">{{ infoMessage }}</span>
-                <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="infoError">{{ infoError }}</span>
+
+              <div class="grid gap-2">
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.pages.contactLabel' | translate }}</p>
+                <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pagesContactSingle">
+	                  <div class="grid gap-3 md:grid-cols-2">
+	                    <div class="grid gap-1">
+	                      <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">RO</span>
+	                      <app-rich-editor height="320px" [ariaLabel]="('adminUi.site.pages.contactLabel' | translate) + ' (RO)'" [(value)]="infoForm.contact.ro"></app-rich-editor>
+	                    </div>
+	                    <div class="grid gap-1">
+	                      <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">EN</span>
+	                      <app-rich-editor height="320px" [ariaLabel]="('adminUi.site.pages.contactLabel' | translate) + ' (EN)'" [(value)]="infoForm.contact.en"></app-rich-editor>
+	                    </div>
+	                  </div>
+	                </ng-container>
+	                <ng-template #pagesContactSingle>
+	                  <app-rich-editor height="320px" [ariaLabel]="'adminUi.site.pages.contactLabel' | translate" [(value)]="infoForm.contact[infoLang]"></app-rich-editor>
+	                </ng-template>
+                <div class="flex gap-2">
+                  <app-button size="sm" [label]="'adminUi.site.pages.saveContact' | translate" (action)="saveInfoUi('page.contact', infoForm.contact)"></app-button>
+                  <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="infoMessage">{{ infoMessage }}</span>
+                  <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="infoError">{{ infoError }}</span>
+                </div>
               </div>
 
               <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
@@ -1464,10 +1469,10 @@ class CmsDraftManager<T> {
                     {{ 'adminUi.site.pages.legal.hint' | translate }}
                   </p>
 
-                  <div class="grid gap-3 md:grid-cols-[1fr_auto] items-end">
-                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                      {{ 'adminUi.site.pages.legal.documentLabel' | translate }}
-                      <select
+	                  <div class="grid gap-3 md:grid-cols-[1fr_auto] items-end">
+	                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                      {{ 'adminUi.site.pages.legal.documentLabel' | translate }}
+	                      <select
                         class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                         [(ngModel)]="legalPageKey"
                         (ngModelChange)="onLegalPageKeyChange($event)"
@@ -1487,14 +1492,26 @@ class CmsDraftManager<T> {
                       >
                         {{ 'adminUi.site.pages.legal.open' | translate }}
                       </a>
-                      <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadLegalPage(legalPageKey)"></app-button>
-                    </div>
-                  </div>
+	                      <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadLegalPage(legalPageKey)"></app-button>
+	                    </div>
+	                  </div>
 
-                  <div
-                    *ngIf="legalPageError"
-                    class="rounded-lg border border-rose-200 bg-rose-50 p-2 text-sm text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
-                  >
+	                  <div class="grid gap-3 md:grid-cols-[260px_1fr] items-end">
+	                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                      {{ 'adminUi.site.pages.legal.lastUpdatedLabel' | translate }}
+	                      <input
+	                        type="date"
+	                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                        [(ngModel)]="legalPageLastUpdated"
+	                      />
+	                      <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.site.pages.legal.lastUpdatedHint' | translate }}</span>
+	                    </label>
+	                  </div>
+
+	                  <div
+	                    *ngIf="legalPageError"
+	                    class="rounded-lg border border-rose-200 bg-rose-50 p-2 text-sm text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+	                  >
                     {{ legalPageError }}
                   </div>
                   <div *ngIf="legalPageLoading" class="text-sm text-slate-600 dark:text-slate-300">
@@ -1597,6 +1614,11 @@ class CmsDraftManager<T> {
                     {{ contentPagesError }}
                   </div>
 
+                  <label class="inline-flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
+                    <input type="checkbox" [(ngModel)]="showHiddenPages" (ngModelChange)="onShowHiddenPagesChange()" />
+                    {{ 'adminUi.site.pages.builder.showHidden' | translate }}
+                  </label>
+
                   <div class="grid gap-3 md:grid-cols-[1fr_auto] items-end">
                     <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                       {{ 'adminUi.site.pages.builder.page' | translate }}
@@ -1612,8 +1634,9 @@ class CmsDraftManager<T> {
 	                        </optgroup>
 	                        <optgroup [label]="'adminUi.site.pages.builder.pagesGroup' | translate">
 	                          <ng-container *ngIf="contentPages.length; else defaultPages">
-	                            <option *ngFor="let p of contentPages" [ngValue]="p.key">
+	                            <option *ngFor="let p of visibleContentPages()" [ngValue]="p.key">
 	                              {{ p.title || p.slug }} · {{ p.slug }}
+                                <ng-container *ngIf="p.hidden"> · {{ 'adminUi.site.pages.builder.hiddenTag' | translate }}</ng-container>
 	                              <ng-container *ngIf="p.needs_translation_en || p.needs_translation_ro">
 	                                ·
 	                                <ng-container *ngIf="p.needs_translation_en">EN</ng-container>
@@ -1637,6 +1660,14 @@ class CmsDraftManager<T> {
                         variant="ghost"
                         [label]="'adminUi.actions.changeUrl' | translate"
                         (action)="renameCustomPageUrl()"
+                      ></app-button>
+                      <app-button
+                        *ngIf="canTogglePageHidden(pageBlocksKey)"
+                        size="sm"
+                        variant="ghost"
+                        [label]="isPageHidden(pageBlocksKey) ? ('adminUi.actions.unhide' | translate) : ('adminUi.actions.hide' | translate)"
+                        [disabled]="pageVisibilitySaving[pageBlocksKey]"
+                        (action)="togglePageHidden(pageBlocksKey)"
                       ></app-button>
                       <ng-container *ngIf="cmsAdvanced()">
 	                        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -3314,10 +3345,15 @@ class CmsDraftManager<T> {
                       class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                       [(ngModel)]="pagesRevisionKey"
                     >
-                      <option [ngValue]="'page.about'">{{ 'adminUi.site.pages.aboutLabel' | translate }}</option>
-                      <option [ngValue]="'page.faq'">{{ 'adminUi.site.pages.faqLabel' | translate }}</option>
-                      <option [ngValue]="'page.shipping'">{{ 'adminUi.site.pages.shippingLabel' | translate }}</option>
-                      <option [ngValue]="'page.contact'">{{ 'adminUi.site.pages.contactLabel' | translate }}</option>
+                      <ng-container *ngIf="contentPages.length; else defaultRevisionPages">
+                        <option *ngFor="let p of visibleContentPages()" [ngValue]="p.key">
+                          {{ p.title || p.slug }} · {{ p.slug }}
+                        </option>
+                      </ng-container>
+                      <ng-template #defaultRevisionPages>
+                        <option [ngValue]="'page.about'">{{ 'adminUi.site.pages.aboutLabel' | translate }}</option>
+                        <option [ngValue]="'page.contact'">{{ 'adminUi.site.pages.contactLabel' | translate }}</option>
+                      </ng-template>
                     </select>
                   </label>
                   <app-content-revisions [contentKey]="pagesRevisionKey" [titleKey]="pagesRevisionTitleKey()"></app-content-revisions>
@@ -7292,6 +7328,9 @@ export class AdminComponent implements OnInit, OnDestroy {
   infoError: string | null = null;
   legalPageKey: LegalPageKey = 'page.terms';
   legalPageForm: LocalizedText = { en: '', ro: '' };
+  legalPageLastUpdated = '';
+  private legalPageLastUpdatedOriginal = '';
+  private legalPageMeta: Record<string, unknown> = {};
   legalPageLoading = false;
   legalPageSaving = false;
   legalPageMessage: string | null = null;
@@ -7299,6 +7338,8 @@ export class AdminComponent implements OnInit, OnDestroy {
   contentPages: ContentPageListItem[] = [];
   contentPagesLoading = false;
   contentPagesError: string | null = null;
+  showHiddenPages = false;
+  pageVisibilitySaving: Record<string, boolean> = {};
   reusableBlocks: CmsReusableBlock[] = [];
   reusableBlocksLoading = false;
   reusableBlocksError: string | null = null;
@@ -7727,18 +7768,22 @@ export class AdminComponent implements OnInit, OnDestroy {
     return true;
   }
 
-  pagesRevisionTitleKey(): string {
-    switch (this.pagesRevisionKey) {
+  pagesRevisionTitleKey(): string | undefined {
+    switch (String(this.pagesRevisionKey || '').trim()) {
       case 'page.about':
         return 'adminUi.site.pages.aboutLabel';
-      case 'page.faq':
-        return 'adminUi.site.pages.faqLabel';
-      case 'page.shipping':
-        return 'adminUi.site.pages.shippingLabel';
       case 'page.contact':
         return 'adminUi.site.pages.contactLabel';
+      case 'page.terms':
+        return 'adminUi.site.pages.legal.documents.termsIndex';
+      case 'page.terms-and-conditions':
+        return 'adminUi.site.pages.legal.documents.terms';
+      case 'page.privacy-policy':
+        return 'adminUi.site.pages.legal.documents.privacy';
+      case 'page.anpc':
+        return 'adminUi.site.pages.legal.documents.anpc';
       default:
-        return 'adminUi.content.revisions.title';
+        return undefined;
     }
   }
 
@@ -11626,6 +11671,68 @@ export class AdminComponent implements OnInit, OnDestroy {
     return `/pages/${encodeURIComponent(slug)}`;
   }
 
+  private readonly protectedHiddenPageKeys = new Set<string>([
+    'page.about',
+    'page.contact',
+    'page.terms',
+    'page.terms-and-conditions',
+    'page.privacy-policy',
+    'page.anpc',
+  ]);
+
+  isPageHidden(key: PageBuilderKey): boolean {
+    const raw = String(key || '').trim();
+    if (!raw || isCmsGlobalSectionKey(raw)) return false;
+    return Boolean(this.contentPages.find((p) => p.key === raw)?.hidden);
+  }
+
+  canTogglePageHidden(key: PageBuilderKey): boolean {
+    const raw = String(key || '').trim();
+    if (!raw || isCmsGlobalSectionKey(raw)) return false;
+    if (!raw.startsWith('page.')) return false;
+    return !this.protectedHiddenPageKeys.has(raw);
+  }
+
+  togglePageHidden(key: PageBuilderKey): void {
+    const raw = String(key || '').trim();
+    if (!raw || !this.canTogglePageHidden(key)) return;
+    const target = !this.isPageHidden(key);
+    this.setPageHidden(raw, target);
+  }
+
+  private setPageHidden(key: string, hidden: boolean): void {
+    const target = (key || '').trim();
+    if (!target) return;
+
+    this.pageVisibilitySaving[target] = true;
+    this.admin.getContent(target).subscribe({
+      next: (block) => {
+        this.rememberContentVersion(target, block);
+        const currentMeta = ((block as { meta?: Record<string, unknown> | null }).meta || {}) as Record<string, unknown>;
+        const nextMeta: Record<string, unknown> = { ...currentMeta, hidden };
+        const payload = this.withExpectedVersion(target, { meta: nextMeta });
+        this.admin.updateContentBlock(target, payload).subscribe({
+          next: (updated) => {
+            this.rememberContentVersion(target, updated);
+            this.pageVisibilitySaving[target] = false;
+            this.toast.success(hidden ? this.t('adminUi.site.pages.visibility.hidden') : this.t('adminUi.site.pages.visibility.visible'));
+            this.loadContentPages();
+            if (!this.showHiddenPages) this.ensureSelectedPageIsVisible();
+          },
+          error: (err) => {
+            this.pageVisibilitySaving[target] = false;
+            if (this.handleContentConflict(err, target, () => this.loadContentPages())) return;
+            this.toast.error(this.t('adminUi.site.pages.visibility.errors.save'));
+          }
+        });
+      },
+      error: () => {
+        this.pageVisibilitySaving[target] = false;
+        this.toast.error(this.t('adminUi.site.pages.visibility.errors.load'));
+      }
+    });
+  }
+
   onLegalPageKeyChange(next: LegalPageKey): void {
     if (!next || next === this.legalPageKey) return;
     this.legalPageKey = next;
@@ -11662,12 +11769,50 @@ export class AdminComponent implements OnInit, OnDestroy {
           en: (enBlock?.body_markdown as string) || '',
           ro: (roBlock?.body_markdown as string) || ''
         };
+        const meta = ((enBlock?.meta as Record<string, unknown> | null | undefined) ??
+          (roBlock?.meta as Record<string, unknown> | null | undefined) ??
+          {}) as Record<string, unknown>;
+        this.legalPageMeta = { ...(meta && typeof meta === 'object' ? meta : {}) };
+        const lastUpdated = typeof this.legalPageMeta['last_updated'] === 'string' ? String(this.legalPageMeta['last_updated']) : '';
+        this.legalPageLastUpdated = lastUpdated;
+        this.legalPageLastUpdatedOriginal = lastUpdated;
 
         this.legalPageLoading = false;
       },
       error: () => {
         this.legalPageLoading = false;
         this.legalPageError = this.t('adminUi.site.pages.errors.load');
+      }
+    });
+  }
+
+  private saveLegalMetaIfNeeded(key: LegalPageKey, onSuccess: () => void, onError: () => void): void {
+    const next = String(this.legalPageLastUpdated || '').trim();
+    const prev = String(this.legalPageLastUpdatedOriginal || '').trim();
+    if (next === prev) {
+      onSuccess();
+      return;
+    }
+    const meta: Record<string, unknown> = { ...(this.legalPageMeta || {}) };
+    if (next) meta['last_updated'] = next;
+    else delete meta['last_updated'];
+
+    this.admin.updateContentBlock(key, this.withExpectedVersion(key, { meta })).subscribe({
+      next: (updated) => {
+        this.rememberContentVersion(key, updated);
+        const updatedMeta = ((updated as { meta?: Record<string, unknown> | null }).meta || {}) as Record<string, unknown>;
+        this.legalPageMeta = { ...(updatedMeta && typeof updatedMeta === 'object' ? updatedMeta : {}) };
+        const lastUpdated = typeof this.legalPageMeta['last_updated'] === 'string' ? String(this.legalPageMeta['last_updated']) : '';
+        this.legalPageLastUpdated = lastUpdated;
+        this.legalPageLastUpdatedOriginal = lastUpdated;
+        onSuccess();
+      },
+      error: (err) => {
+        if (this.handleContentConflict(err, key, () => this.loadLegalPage(key))) {
+          onError();
+          return;
+        }
+        onError();
       }
     });
   }
@@ -11686,13 +11831,22 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.legalPageMessage = null;
     this.legalPageError = null;
     this.legalPageSaving = true;
-    this.savePageMarkdownInternal(
+    this.saveLegalMetaIfNeeded(
       key,
-      body,
-      lang,
       () => {
-        this.legalPageSaving = false;
-        this.legalPageMessage = this.t('adminUi.site.pages.success.save');
+        this.savePageMarkdownInternal(
+          key,
+          body,
+          lang,
+          () => {
+            this.legalPageSaving = false;
+            this.legalPageMessage = this.t('adminUi.site.pages.success.save');
+          },
+          () => {
+            this.legalPageSaving = false;
+            this.legalPageError = this.t('adminUi.site.pages.errors.save');
+          }
+        );
       },
       () => {
         this.legalPageSaving = false;
@@ -11705,18 +11859,27 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.legalPageMessage = null;
     this.legalPageError = null;
     this.legalPageSaving = true;
-    this.savePageMarkdownInternal(
+    this.saveLegalMetaIfNeeded(
       key,
-      body.en || '',
-      'en',
       () => {
         this.savePageMarkdownInternal(
           key,
-          body.ro || '',
-          'ro',
+          body.en || '',
+          'en',
           () => {
-            this.legalPageSaving = false;
-            this.legalPageMessage = this.t('adminUi.site.pages.success.save');
+            this.savePageMarkdownInternal(
+              key,
+              body.ro || '',
+              'ro',
+              () => {
+                this.legalPageSaving = false;
+                this.legalPageMessage = this.t('adminUi.site.pages.success.save');
+              },
+              () => {
+                this.legalPageSaving = false;
+                this.legalPageError = this.t('adminUi.site.pages.errors.save');
+              }
+            );
           },
           () => {
             this.legalPageSaving = false;
@@ -11846,15 +12009,8 @@ export class AdminComponent implements OnInit, OnDestroy {
           this.pageBlocksNeedsTranslationEn[page.key] = Boolean(page.needs_translation_en);
           this.pageBlocksNeedsTranslationRo[page.key] = Boolean(page.needs_translation_ro);
         }
-	        this.contentPagesLoading = false;
-	        if (!this.contentPages.length) return;
-	        if (isCmsGlobalSectionKey(this.pageBlocksKey)) return;
-	        const exists = this.contentPages.some((p) => p.key === this.pageBlocksKey);
-	        if (!exists) {
-	          const preferred = this.contentPages.find((p) => p.key === 'page.about')?.key || this.contentPages[0].key;
-	          this.pageBlocksKey = preferred as PageBuilderKey;
-	          this.ensureNewPageBlockTypeForKey(this.pageBlocksKey);
-	        }
+        this.contentPagesLoading = false;
+        this.ensureSelectedPageIsVisible();
 	      },
       error: () => {
         this.contentPagesLoading = false;
@@ -11862,6 +12018,26 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.contentPagesError = this.t('adminUi.site.pages.errors.load');
       }
     });
+  }
+
+  visibleContentPages(): ContentPageListItem[] {
+    const base = [...(this.contentPages || [])];
+    return this.showHiddenPages ? base : base.filter((p) => !p.hidden);
+  }
+
+  onShowHiddenPagesChange(): void {
+    this.ensureSelectedPageIsVisible();
+  }
+
+  private ensureSelectedPageIsVisible(): void {
+    const pages = this.visibleContentPages();
+    if (!pages.length) return;
+    if (isCmsGlobalSectionKey(this.pageBlocksKey)) return;
+    const exists = pages.some((p) => p.key === this.pageBlocksKey);
+    if (exists) return;
+    const preferred = pages.find((p) => p.key === 'page.about')?.key || pages[0].key;
+    this.pageBlocksKey = preferred as PageBuilderKey;
+    this.ensureNewPageBlockTypeForKey(this.pageBlocksKey);
   }
 
   loadReusableBlocks(): void {

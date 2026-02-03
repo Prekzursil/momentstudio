@@ -617,7 +617,8 @@ export interface ContentPageListItem {
   key: string;
   slug: string;
   title: string;
-  status: 'draft' | 'published';
+  status: 'draft' | 'review' | 'published';
+  hidden?: boolean;
   updated_at: string;
   published_at?: string | null;
   published_until?: string | null;

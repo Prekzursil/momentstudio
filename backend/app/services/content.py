@@ -69,6 +69,8 @@ _LEGAL_PAGE_KEYS = {
 
 _SUPPORTED_LANGS = {"en", "ro"}
 
+_NON_TRANSLATABLE_META_KEYS = {"hidden", "last_updated", "requires_auth", "version"}
+
 
 def _present_langs_for_bilingual(block: ContentBlock) -> set[str]:
     present: set[str] = set()
@@ -121,6 +123,16 @@ def _mark_other_needs_translation(block: ContentBlock, lang: str) -> None:
     elif lang == "ro":
         block.needs_translation_ro = False
         block.needs_translation_en = True
+
+
+def _meta_changes_require_translation(old_meta: object | None, new_meta: object | None) -> bool:
+    old_dict = old_meta if isinstance(old_meta, dict) else {}
+    new_dict = new_meta if isinstance(new_meta, dict) else {}
+    keys = set(old_dict.keys()) | set(new_dict.keys())
+    changed = {k for k in keys if old_dict.get(k) != new_dict.get(k)}
+    if not changed:
+        return False
+    return not changed.issubset(_NON_TRANSLATABLE_META_KEYS)
 
 
 def slugify_page_slug(value: str) -> str:
@@ -385,6 +397,7 @@ async def upsert_block(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Content has changed (expected version {expected_version}, found {block.version})",
         )
+    prev_meta: object | None = block.meta
     # If lang is provided and differs from the base language, upsert a translation instead of touching base content.
     # Admin UI often sends lang for base edits (e.g. en), so we treat lang==block.lang (or unset base lang) as base update.
     if lang and block.lang and lang != block.lang:
@@ -467,7 +480,10 @@ async def upsert_block(
     if "lang" in data and data["lang"] is not None:
         block.lang = data["lang"]
     effective_lang = (block.lang or lang) if isinstance(block.lang or lang, str) else None
-    if content_changed and isinstance(effective_lang, str):
+    translation_sensitive_change = any(field in data for field in ("title", "body_markdown"))
+    if not translation_sensitive_change and "meta" in data:
+        translation_sensitive_change = _meta_changes_require_translation(prev_meta, block.meta)
+    if translation_sensitive_change and isinstance(effective_lang, str):
         _mark_other_needs_translation(block, effective_lang)
     if block.status in (ContentStatus.draft, ContentStatus.review):
         block.published_at = None

@@ -1845,6 +1845,7 @@
       "down": "Jos",
       "preview": "Previzualizează",
       "hide": "Ascunde",
+      "unhide": "Afișează",
       "bulkActions": "Acțiuni în masă"
     },
     "help": {
@@ -2588,6 +2589,8 @@
           "hint": "Editează Termeni și condiții, Politica de confidențialitate și pagina ANPC (EN + RO).",
           "documentLabel": "Document",
           "open": "Deschide",
+          "lastUpdatedLabel": "Ultima actualizare",
+          "lastUpdatedHint": "Dată manuală (nu se actualizează automat).",
           "documents": {
             "termsIndex": "Pagina Termeni (index)",
             "terms": "Termeni și condiții",
@@ -2597,6 +2600,14 @@
         },
         "success": { "save": "Pagina a fost salvată." },
         "errors": { "save": "Nu am putut salva pagina.", "load": "Nu am putut încărca pagina." },
+        "visibility": {
+          "hidden": "Pagina a fost ascunsă.",
+          "visible": "Pagina este acum vizibilă.",
+          "errors": {
+            "save": "Nu am putut actualiza vizibilitatea paginii.",
+            "load": "Nu am putut încărca pagina."
+          }
+        },
         "builder": {
           "title": "Blocuri tip page builder",
           "hint": "Opțional: construiește pagini mai bogate (Povestea noastră/Contact) din blocuri. Dacă există blocuri, magazinul le afișează în locul conținutului Markdown.",
@@ -2612,8 +2623,10 @@
           "status": "Stare",
           "createPage": "Creează pagină",
           "page": "Pagină",
+          "showHidden": "Afișează paginile ascunse",
           "globalSections": "Secțiuni globale",
           "pagesGroup": "Pagini",
+          "hiddenTag": "ascunsă",
           "publishAtOptional": "Publică la (opțional)",
           "publishAtHint": "Dacă este în viitor și starea este Publicat, pagina va deveni vizibilă la acel moment.",
           "unpublishAtOptional": "Ascunde la (opțional)",
