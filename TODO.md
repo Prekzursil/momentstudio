@@ -49,6 +49,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Consent UX: checkbox click opens a “read before accept” modal; require scrolling to bottom before enabling Accept.
 - [x] Re-consent policy: force re-acceptance when legal docs change (by version) for both registration and checkout.
 - [x] Tests: unit tests for publish enforcement + API validation; Playwright tests for modal gating and register/checkout blocking.
+- [x] Legal pages: remove the “template” disclaimer from the legal index page (EN/RO).
+- [x] Admin CMS: make legal pages editable (Terms index, Terms & Conditions, Privacy Policy, ANPC).
 
 ## Backend - Core & Auth
 - [x] Scaffold FastAPI app with versioned `/api/v1` router.
@@ -225,6 +227,10 @@ Below is a structured checklist you can turn into issues.
 - [x] CMS: allow changing page URLs with redirects (advanced).
 - [x] CMS: redirects – add admin UI to list/manage redirects (view/delete stale entries).
 - [x] CMS: pages – enforce reserved slug validation server-side on page creation (not just frontend).
+- [x] CMS seeds: populate default thumbnails for `site.social` Instagram/Facebook pages.
+- [ ] CMS content: replace placeholder Shipping & FAQ copy with final RO/EN policies before launch.
+- [ ] Admin CMS: upgrade About/FAQ/Shipping/Contact editors to a rich editor with preview (reduce cramped textareas).
+- [ ] CMS: support per-document “Last updated” meta fields for legal pages (manual date, not auto-updated) and render them in the legal index automatically.
 
 ## Backend - Email & Notifications
 - [x] Email settings (SMTP).

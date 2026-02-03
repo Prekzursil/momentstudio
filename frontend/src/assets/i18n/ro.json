@@ -2583,6 +2583,20 @@
         "saveShipping": "Salvează livrarea",
         "contactLabel": "Contact",
         "saveContact": "Salvează contactul",
+        "legal": {
+          "title": "Pagini legale",
+          "hint": "Editează Termeni și condiții, Politica de confidențialitate și pagina ANPC (EN + RO).",
+          "documentLabel": "Document",
+          "open": "Deschide",
+          "documents": {
+            "termsIndex": "Pagina Termeni (index)",
+            "terms": "Termeni și condiții",
+            "privacy": "Politica de confidențialitate",
+            "anpc": "ANPC / Informații pentru consumatori"
+          }
+        },
+        "success": { "save": "Pagina a fost salvată." },
+        "errors": { "save": "Nu am putut salva pagina.", "load": "Nu am putut încărca pagina." },
         "builder": {
           "title": "Blocuri tip page builder",
           "hint": "Opțional: construiește pagini mai bogate (Povestea noastră/Contact) din blocuri. Dacă există blocuri, magazinul le afișează în locul conținutului Markdown.",

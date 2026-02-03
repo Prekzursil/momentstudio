@@ -2583,6 +2583,20 @@
         "saveShipping": "Save shipping",
         "contactLabel": "Contact",
         "saveContact": "Save contact",
+        "legal": {
+          "title": "Legal pages",
+          "hint": "Edit the Terms, Privacy Policy, and ANPC pages (EN + RO).",
+          "documentLabel": "Document",
+          "open": "Open",
+          "documents": {
+            "termsIndex": "Terms page (index)",
+            "terms": "Terms & Conditions",
+            "privacy": "Privacy Policy",
+            "anpc": "ANPC / Consumer information"
+          }
+        },
+        "success": { "save": "Page saved." },
+        "errors": { "save": "Could not save the page.", "load": "Could not load the page." },
         "builder": {
           "title": "Page builder blocks",
           "hint": "Optional: build richer About/Contact pages with blocks. If blocks are present, the storefront renders them instead of the Markdown body.",

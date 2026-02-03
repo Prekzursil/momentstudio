@@ -69,6 +69,7 @@ import {
 type AdminContentSection = 'home' | 'pages' | 'blog' | 'settings';
 type UiLang = 'en' | 'ro';
 type ContentStatusUi = 'draft' | 'review' | 'published';
+type LegalPageKey = 'page.terms' | 'page.terms-and-conditions' | 'page.privacy-policy' | 'page.anpc';
 
 type HomeSectionId =
   | 'featured_products'
@@ -1371,7 +1372,7 @@ class CmsDraftManager<T> {
                 <app-localized-text-editor
                   [label]="'adminUi.site.pages.aboutLabel' | translate"
                   [multiline]="true"
-                  [rows]="5"
+                  [rows]="10"
                   [value]="infoForm.about"
                 ></app-localized-text-editor>
               </ng-container>
@@ -1379,7 +1380,7 @@ class CmsDraftManager<T> {
                 <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
                   {{ 'adminUi.site.pages.aboutLabel' | translate }}
                   <textarea
-                    rows="3"
+                    rows="10"
                     class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     [(ngModel)]="infoForm.about[infoLang]"
                   ></textarea>
@@ -1392,7 +1393,7 @@ class CmsDraftManager<T> {
                 <app-localized-text-editor
                   [label]="'adminUi.site.pages.faqLabel' | translate"
                   [multiline]="true"
-                  [rows]="5"
+                  [rows]="10"
                   [value]="infoForm.faq"
                 ></app-localized-text-editor>
               </ng-container>
@@ -1400,7 +1401,7 @@ class CmsDraftManager<T> {
                 <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
                   {{ 'adminUi.site.pages.faqLabel' | translate }}
                   <textarea
-                    rows="3"
+                    rows="10"
                     class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     [(ngModel)]="infoForm.faq[infoLang]"
                   ></textarea>
@@ -1413,7 +1414,7 @@ class CmsDraftManager<T> {
                 <app-localized-text-editor
                   [label]="'adminUi.site.pages.shippingLabel' | translate"
                   [multiline]="true"
-                  [rows]="5"
+                  [rows]="10"
                   [value]="infoForm.shipping"
                 ></app-localized-text-editor>
               </ng-container>
@@ -1421,7 +1422,7 @@ class CmsDraftManager<T> {
                 <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
                   {{ 'adminUi.site.pages.shippingLabel' | translate }}
                   <textarea
-                    rows="3"
+                    rows="10"
                     class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     [(ngModel)]="infoForm.shipping[infoLang]"
                   ></textarea>
@@ -1434,7 +1435,7 @@ class CmsDraftManager<T> {
                 <app-localized-text-editor
                   [label]="'adminUi.site.pages.contactLabel' | translate"
                   [multiline]="true"
-                  [rows]="5"
+                  [rows]="10"
                   [value]="infoForm.contact"
                 ></app-localized-text-editor>
               </ng-container>
@@ -1442,7 +1443,7 @@ class CmsDraftManager<T> {
                 <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
                   {{ 'adminUi.site.pages.contactLabel' | translate }}
                   <textarea
-                    rows="3"
+                    rows="10"
                     class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     [(ngModel)]="infoForm.contact[infoLang]"
                   ></textarea>
@@ -1453,6 +1454,76 @@ class CmsDraftManager<T> {
                 <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="infoMessage">{{ infoMessage }}</span>
                 <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="infoError">{{ infoError }}</span>
               </div>
+
+              <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
+                <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.site.pages.legal.title' | translate }}
+                </summary>
+                <div class="mt-3 grid gap-3">
+                  <p class="text-sm text-slate-600 dark:text-slate-300">
+                    {{ 'adminUi.site.pages.legal.hint' | translate }}
+                  </p>
+
+                  <div class="grid gap-3 md:grid-cols-[1fr_auto] items-end">
+                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                      {{ 'adminUi.site.pages.legal.documentLabel' | translate }}
+                      <select
+                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        [(ngModel)]="legalPageKey"
+                        (ngModelChange)="onLegalPageKeyChange($event)"
+                      >
+                        <option [ngValue]="'page.terms'">{{ 'adminUi.site.pages.legal.documents.termsIndex' | translate }}</option>
+                        <option [ngValue]="'page.terms-and-conditions'">{{ 'adminUi.site.pages.legal.documents.terms' | translate }}</option>
+                        <option [ngValue]="'page.privacy-policy'">{{ 'adminUi.site.pages.legal.documents.privacy' | translate }}</option>
+                        <option [ngValue]="'page.anpc'">{{ 'adminUi.site.pages.legal.documents.anpc' | translate }}</option>
+                      </select>
+                    </label>
+                    <div class="flex flex-wrap items-center justify-end gap-2">
+                      <a
+                        class="inline-flex h-10 items-center justify-center rounded-full px-3 text-sm font-medium bg-white text-slate-900 border border-slate-200 hover:border-slate-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:bg-slate-800 dark:text-slate-50 dark:border-slate-700 dark:hover:border-slate-600"
+                        [attr.href]="pagePublicUrlForKey(legalPageKey)"
+                        target="_blank"
+                        rel="noopener"
+                      >
+                        {{ 'adminUi.site.pages.legal.open' | translate }}
+                      </a>
+                      <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadLegalPage(legalPageKey)"></app-button>
+                    </div>
+                  </div>
+
+                  <div
+                    *ngIf="legalPageError"
+                    class="rounded-lg border border-rose-200 bg-rose-50 p-2 text-sm text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+                  >
+                    {{ legalPageError }}
+                  </div>
+                  <div *ngIf="legalPageLoading" class="text-sm text-slate-600 dark:text-slate-300">
+                    {{ 'notifications.loading' | translate }}
+                  </div>
+
+                  <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else legalPagesSingle">
+                    <div class="grid gap-3 md:grid-cols-2">
+                      <div class="grid gap-1">
+                        <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">RO</span>
+                        <app-rich-editor height="520px" [(value)]="legalPageForm.ro"></app-rich-editor>
+                      </div>
+                      <div class="grid gap-1">
+                        <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">EN</span>
+                        <app-rich-editor height="520px" [(value)]="legalPageForm.en"></app-rich-editor>
+                      </div>
+                    </div>
+                  </ng-container>
+                  <ng-template #legalPagesSingle>
+                    <app-rich-editor height="520px" [(value)]="legalPageForm[infoLang]"></app-rich-editor>
+                  </ng-template>
+
+                  <div class="flex flex-wrap items-center gap-2">
+                    <app-button size="sm" [label]="'adminUi.actions.save' | translate" [disabled]="legalPageSaving" (action)="saveLegalPageUi()"></app-button>
+                    <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="legalPageMessage">{{ legalPageMessage }}</span>
+                    <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="legalPageError">{{ legalPageError }}</span>
+                  </div>
+                </div>
+              </details>
 
               <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
                 <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
@@ -7219,6 +7290,12 @@ export class AdminComponent implements OnInit, OnDestroy {
   };
   infoMessage: string | null = null;
   infoError: string | null = null;
+  legalPageKey: LegalPageKey = 'page.terms';
+  legalPageForm: LocalizedText = { en: '', ro: '' };
+  legalPageLoading = false;
+  legalPageSaving = false;
+  legalPageMessage: string | null = null;
+  legalPageError: string | null = null;
   contentPages: ContentPageListItem[] = [];
   contentPagesLoading = false;
   contentPagesError: string | null = null;
@@ -7848,6 +7925,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 
     if (section === 'pages') {
       this.loadInfo();
+      this.loadLegalPage(this.legalPageKey);
       this.loadCategories();
       this.loadCollections();
       this.loadContentPages();
@@ -11528,6 +11606,153 @@ export class AdminComponent implements OnInit, OnDestroy {
       next: (block) => onSuccessWithBlock(block),
       error: (err) => {
         if (this.handleContentConflict(err, key, () => this.loadInfo())) {
+          onError();
+          return;
+        }
+        this.admin.createContent(key, createPayload).subscribe({
+          next: (created) => onSuccessWithBlock(created),
+          error: () => onError()
+        });
+      }
+    });
+  }
+
+  pagePublicUrlForKey(key: string): string {
+    const raw = String(key || '');
+    const slug = raw.startsWith('page.') ? raw.slice('page.'.length) : raw;
+    if (slug === 'about') return '/about';
+    if (slug === 'contact') return '/contact';
+    if (!slug) return '/pages';
+    return `/pages/${encodeURIComponent(slug)}`;
+  }
+
+  onLegalPageKeyChange(next: LegalPageKey): void {
+    if (!next || next === this.legalPageKey) return;
+    this.legalPageKey = next;
+    this.loadLegalPage(next);
+  }
+
+  loadLegalPage(key: LegalPageKey): void {
+    this.legalPageLoading = true;
+    this.legalPageMessage = null;
+    this.legalPageError = null;
+    const target = (key || '').trim();
+    if (!target) {
+      this.legalPageLoading = false;
+      this.legalPageError = 'Missing page key.';
+      return;
+    }
+
+    forkJoin([
+      this.admin.getContent(target, 'en').pipe(catchError((err) => (err?.status === 404 ? of(null) : of(err)))),
+      this.admin.getContent(target, 'ro').pipe(catchError((err) => (err?.status === 404 ? of(null) : of(err))))
+    ]).subscribe({
+      next: ([enRes, roRes]) => {
+        const enBlock = (enRes && typeof enRes === 'object' && 'body_markdown' in enRes) ? (enRes as any) : null;
+        const roBlock = (roRes && typeof roRes === 'object' && 'body_markdown' in roRes) ? (roRes as any) : null;
+
+        if (!enBlock && enRes && (enRes as any)?.status && (enRes as any)?.status !== 404) {
+          this.legalPageError = this.t('adminUi.site.pages.errors.load');
+        }
+
+        if (enBlock) this.rememberContentVersion(target, enBlock);
+        if (!enBlock && roBlock) this.rememberContentVersion(target, roBlock);
+
+        this.legalPageForm = {
+          en: (enBlock?.body_markdown as string) || '',
+          ro: (roBlock?.body_markdown as string) || ''
+        };
+
+        this.legalPageLoading = false;
+      },
+      error: () => {
+        this.legalPageLoading = false;
+        this.legalPageError = this.t('adminUi.site.pages.errors.load');
+      }
+    });
+  }
+
+  saveLegalPageUi(): void {
+    const key = this.legalPageKey;
+    if (!key) return;
+    if (this.cmsPrefs.translationLayout() === 'sideBySide') {
+      this.saveLegalPageBoth(key, this.legalPageForm);
+      return;
+    }
+    this.saveLegalPage(key, this.legalPageForm[this.infoLang] || '', this.infoLang);
+  }
+
+  private saveLegalPage(key: LegalPageKey, body: string, lang: UiLang): void {
+    this.legalPageMessage = null;
+    this.legalPageError = null;
+    this.legalPageSaving = true;
+    this.savePageMarkdownInternal(
+      key,
+      body,
+      lang,
+      () => {
+        this.legalPageSaving = false;
+        this.legalPageMessage = this.t('adminUi.site.pages.success.save');
+      },
+      () => {
+        this.legalPageSaving = false;
+        this.legalPageError = this.t('adminUi.site.pages.errors.save');
+      }
+    );
+  }
+
+  private saveLegalPageBoth(key: LegalPageKey, body: LocalizedText): void {
+    this.legalPageMessage = null;
+    this.legalPageError = null;
+    this.legalPageSaving = true;
+    this.savePageMarkdownInternal(
+      key,
+      body.en || '',
+      'en',
+      () => {
+        this.savePageMarkdownInternal(
+          key,
+          body.ro || '',
+          'ro',
+          () => {
+            this.legalPageSaving = false;
+            this.legalPageMessage = this.t('adminUi.site.pages.success.save');
+          },
+          () => {
+            this.legalPageSaving = false;
+            this.legalPageError = this.t('adminUi.site.pages.errors.save');
+          }
+        );
+      },
+      () => {
+        this.legalPageSaving = false;
+        this.legalPageError = this.t('adminUi.site.pages.errors.save');
+      }
+    );
+  }
+
+  private savePageMarkdownInternal(
+    key: string,
+    body: string,
+    lang: UiLang,
+    onSuccess: () => void,
+    onError: () => void
+  ): void {
+    const payload = { body_markdown: body, status: 'published', lang };
+    const createPayload = { title: key, ...payload };
+
+    const onSuccessWithBlock = (block?: any | null) => {
+      this.rememberContentVersion(key, block);
+      this.pageBlocksNeedsTranslationEn[key] = Boolean(block?.needs_translation_en);
+      this.pageBlocksNeedsTranslationRo[key] = Boolean(block?.needs_translation_ro);
+      this.loadContentPages();
+      onSuccess();
+    };
+
+    this.admin.updateContentBlock(key, this.withExpectedVersion(key, payload)).subscribe({
+      next: (block) => onSuccessWithBlock(block),
+      error: (err) => {
+        if (this.handleContentConflict(err, key, () => this.loadLegalPage(key as LegalPageKey))) {
           onError();
           return;
         }
