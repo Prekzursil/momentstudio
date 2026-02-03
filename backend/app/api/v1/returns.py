@@ -88,7 +88,7 @@ async def admin_list_returns(
     order_id: UUID | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
-    include_pii: bool = Query(default=True),
+    include_pii: bool = Query(default=False),
 ) -> ReturnRequestListResponse:
     if include_pii:
         pii_service.require_pii_reveal(admin)
@@ -129,7 +129,7 @@ async def admin_list_returns(
 @router.get("/admin/{return_id}", response_model=ReturnRequestRead)
 async def admin_get_return(
     return_id: UUID,
-    include_pii: bool = Query(default=True),
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("returns")),
 ) -> ReturnRequestRead:
@@ -144,7 +144,7 @@ async def admin_get_return(
 @router.get("/admin/by-order/{order_id}", response_model=list[ReturnRequestRead])
 async def admin_list_returns_for_order(
     order_id: UUID,
-    include_pii: bool = Query(default=True),
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("returns")),
 ) -> list[ReturnRequestRead]:
@@ -211,7 +211,7 @@ async def admin_update_return(
 async def admin_upload_return_label(
     return_id: UUID,
     file: UploadFile = File(...),
-    include_pii: bool = Query(default=True),
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("returns")),
 ) -> ReturnRequestRead:

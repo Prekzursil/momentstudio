@@ -825,8 +825,7 @@ export class AdminService {
   }
 
   globalSearch(q: string, opts?: { include_pii?: boolean }): Observable<AdminDashboardSearchResponse> {
-    const params: any = { q };
-    if (opts?.include_pii) params.include_pii = true;
+    const params: any = { q, include_pii: opts?.include_pii ?? true };
     return this.api.get<AdminDashboardSearchResponse>('/admin/dashboard/search', params);
   }
 
@@ -843,15 +842,18 @@ export class AdminService {
   }
 
   orders(opts?: { include_pii?: boolean }): Observable<AdminOrder[]> {
-    return this.api.get<AdminOrder[]>('/admin/dashboard/orders', opts as any);
+    const params = { include_pii: opts?.include_pii ?? true };
+    return this.api.get<AdminOrder[]>('/admin/dashboard/orders', params as any);
   }
 
   users(opts?: { include_pii?: boolean }): Observable<AdminUser[]> {
-    return this.api.get<AdminUser[]>('/admin/dashboard/users', opts as any);
+    const params = { include_pii: opts?.include_pii ?? true };
+    return this.api.get<AdminUser[]>('/admin/dashboard/users', params as any);
   }
 
   userAliases(userId: string, opts?: { include_pii?: boolean }): Observable<AdminUserAliasesResponse> {
-    return this.api.get<AdminUserAliasesResponse>(`/admin/dashboard/users/${userId}/aliases`, opts as any);
+    const params = { include_pii: opts?.include_pii ?? true };
+    return this.api.get<AdminUserAliasesResponse>(`/admin/dashboard/users/${userId}/aliases`, params as any);
   }
 
   content(): Observable<AdminContent[]> {

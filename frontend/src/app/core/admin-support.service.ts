@@ -91,27 +91,33 @@ export class AdminSupportService {
     assignee_filter?: string;
     page?: number;
     limit?: number;
+    include_pii?: boolean;
   }): Observable<AdminContactSubmissionListResponse> {
-    return this.api.get<AdminContactSubmissionListResponse>('/support/admin/submissions', params);
+    const finalParams = { ...params, include_pii: params.include_pii ?? true };
+    return this.api.get<AdminContactSubmissionListResponse>('/support/admin/submissions', finalParams);
   }
 
   listAssignees(): Observable<SupportAgentRef[]> {
     return this.api.get<SupportAgentRef[]>('/support/admin/assignees');
   }
 
-  getOne(id: string): Observable<AdminContactSubmissionRead> {
-    return this.api.get<AdminContactSubmissionRead>(`/support/admin/submissions/${id}`);
+  getOne(id: string, opts?: { include_pii?: boolean }): Observable<AdminContactSubmissionRead> {
+    const params = { include_pii: opts?.include_pii ?? true };
+    return this.api.get<AdminContactSubmissionRead>(`/support/admin/submissions/${id}`, params);
   }
 
   update(
     id: string,
-    payload: { status?: SupportStatus | null; admin_note?: string | null; assignee_id?: string | null }
+    payload: { status?: SupportStatus | null; admin_note?: string | null; assignee_id?: string | null },
+    opts?: { include_pii?: boolean }
   ): Observable<AdminContactSubmissionRead> {
-    return this.api.patch<AdminContactSubmissionRead>(`/support/admin/submissions/${id}`, payload);
+    const params = { include_pii: opts?.include_pii ?? true };
+    return this.api.patch<AdminContactSubmissionRead>(`/support/admin/submissions/${id}`, payload, undefined, params);
   }
 
-  addMessage(id: string, message: string): Observable<AdminContactSubmissionRead> {
-    return this.api.post<AdminContactSubmissionRead>(`/support/admin/submissions/${id}/messages`, { message });
+  addMessage(id: string, message: string, opts?: { include_pii?: boolean }): Observable<AdminContactSubmissionRead> {
+    const params = { include_pii: opts?.include_pii ?? true };
+    return this.api.post<AdminContactSubmissionRead>(`/support/admin/submissions/${id}/messages`, { message }, undefined, params);
   }
 
   listCannedResponses(params?: { include_inactive?: boolean }): Observable<SupportCannedResponseRead[]> {

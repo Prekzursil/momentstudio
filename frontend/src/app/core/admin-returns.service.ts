@@ -65,22 +65,26 @@ export class AdminReturnsService {
     order_id?: string;
     page?: number;
     limit?: number;
+    include_pii?: boolean;
   }): Observable<ReturnRequestListResponse> {
-    return this.api.get<ReturnRequestListResponse>('/returns/admin', params as any);
+    const finalParams = { ...params, include_pii: params.include_pii ?? true };
+    return this.api.get<ReturnRequestListResponse>('/returns/admin', finalParams as any);
   }
 
-  get(returnId: string): Observable<ReturnRequestRead> {
-    return this.api.get<ReturnRequestRead>(`/returns/admin/${returnId}`);
+  get(returnId: string, opts?: { include_pii?: boolean }): Observable<ReturnRequestRead> {
+    const params = { include_pii: opts?.include_pii ?? true };
+    return this.api.get<ReturnRequestRead>(`/returns/admin/${returnId}`, params);
   }
 
   update(returnId: string, payload: ReturnRequestUpdatePayload): Observable<ReturnRequestRead> {
     return this.api.patch<ReturnRequestRead>(`/returns/admin/${returnId}`, payload);
   }
 
-  uploadReturnLabel(returnId: string, file: File): Observable<ReturnRequestRead> {
+  uploadReturnLabel(returnId: string, file: File, opts?: { include_pii?: boolean }): Observable<ReturnRequestRead> {
     const data = new FormData();
     data.append('file', file);
-    return this.api.post<ReturnRequestRead>(`/returns/admin/${returnId}/label`, data);
+    const params = { include_pii: opts?.include_pii ?? true };
+    return this.api.post<ReturnRequestRead>(`/returns/admin/${returnId}/label`, data, undefined, params);
   }
 
   downloadReturnLabel(returnId: string): Observable<Blob> {
@@ -91,8 +95,9 @@ export class AdminReturnsService {
     return this.api.delete<void>(`/returns/admin/${returnId}/label`);
   }
 
-  listByOrder(orderId: string): Observable<ReturnRequestRead[]> {
-    return this.api.get<ReturnRequestRead[]>(`/returns/admin/by-order/${orderId}`);
+  listByOrder(orderId: string, opts?: { include_pii?: boolean }): Observable<ReturnRequestRead[]> {
+    const params = { include_pii: opts?.include_pii ?? true };
+    return this.api.get<ReturnRequestRead[]>(`/returns/admin/by-order/${orderId}`, params);
   }
 
   create(payload: {

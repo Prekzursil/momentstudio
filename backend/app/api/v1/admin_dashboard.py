@@ -1243,7 +1243,7 @@ async def search_users(
     role: UserRole | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
-    include_pii: bool = Query(default=True),
+    include_pii: bool = Query(default=False),
 ) -> AdminUserListResponse:
     if include_pii:
         pii_service.require_pii_reveal(current_user)
@@ -1324,7 +1324,7 @@ async def admin_user_segment_repeat_buyers(
     min_orders: int = Query(default=2, ge=1, le=100),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
-    include_pii: bool = Query(default=True),
+    include_pii: bool = Query(default=False),
 ) -> AdminUserSegmentResponse:
     if include_pii:
         pii_service.require_pii_reveal(current_user)
@@ -1484,7 +1484,7 @@ async def admin_user_aliases(
     user_id: UUID,
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(require_admin_section("users")),
-    include_pii: bool = Query(default=True),
+    include_pii: bool = Query(default=False),
 ) -> dict:
     if include_pii:
         pii_service.require_pii_reveal(current_user)
@@ -1520,7 +1520,7 @@ async def admin_user_profile(
     user_id: UUID,
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(require_admin_section("users")),
-    include_pii: bool = Query(default=True),
+    include_pii: bool = Query(default=False),
 ) -> AdminUserProfileResponse:
     if include_pii:
         pii_service.require_pii_reveal(current_user)
@@ -2513,7 +2513,7 @@ async def admin_gdpr_export_jobs(
     status_filter: UserDataExportStatus | None = Query(default=None, alias="status"),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
-    include_pii: bool = Query(default=True),
+    include_pii: bool = Query(default=False),
 ) -> AdminGdprExportJobsResponse:
     if include_pii:
         pii_service.require_pii_reveal(current_user)
@@ -2716,7 +2716,7 @@ async def admin_gdpr_deletion_requests(
     q: str | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
-    include_pii: bool = Query(default=True),
+    include_pii: bool = Query(default=False),
 ) -> AdminGdprDeletionRequestsResponse:
     if include_pii:
         pii_service.require_pii_reveal(current_user)

@@ -131,7 +131,8 @@ export class AdminOrdersService {
     include_pii?: boolean;
     include_test?: boolean;
   }): Observable<AdminOrderListResponse> {
-    return this.api.get<AdminOrderListResponse>('/orders/admin/search', params as any).pipe(
+    const finalParams = { ...params, include_pii: params.include_pii ?? true };
+    return this.api.get<AdminOrderListResponse>('/orders/admin/search', finalParams as any).pipe(
       map((res: any) => ({
         ...(res ?? {}),
         items: (res?.items ?? []).map((o: any) => ({
@@ -144,7 +145,8 @@ export class AdminOrdersService {
   }
 
   get(orderId: string, opts?: { include_pii?: boolean }): Observable<AdminOrderDetail> {
-    return this.api.get<AdminOrderDetail>(`/orders/admin/${orderId}`, opts as any).pipe(
+    const params = { include_pii: opts?.include_pii ?? true };
+    return this.api.get<AdminOrderDetail>(`/orders/admin/${orderId}`, params as any).pipe(
       map((o: any) => ({
         ...o,
         total_amount: parseMoney(o?.total_amount),
@@ -178,7 +180,8 @@ export class AdminOrdersService {
     },
     opts?: { include_pii?: boolean }
   ): Observable<AdminOrderDetail> {
-    return this.api.patch<AdminOrderDetail>(`/orders/admin/${orderId}`, payload, undefined, opts as any).pipe(
+    const params = { include_pii: opts?.include_pii ?? true };
+    return this.api.patch<AdminOrderDetail>(`/orders/admin/${orderId}`, payload, undefined, params as any).pipe(
       map((o: any) => ({
         ...o,
         total_amount: parseMoney(o?.total_amount),
@@ -211,7 +214,8 @@ export class AdminOrdersService {
     },
     opts?: { include_pii?: boolean }
   ): Observable<AdminOrderDetail> {
-    return this.api.patch<AdminOrderDetail>(`/orders/admin/${orderId}/addresses`, payload, undefined, opts as any).pipe(
+    const params = { include_pii: opts?.include_pii ?? true };
+    return this.api.patch<AdminOrderDetail>(`/orders/admin/${orderId}/addresses`, payload, undefined, params as any).pipe(
       map((o: any) => ({
         ...o,
         total_amount: parseMoney(o?.total_amount),
@@ -239,7 +243,8 @@ export class AdminOrdersService {
     payload: { courier?: string | null; tracking_number: string; tracking_url?: string | null },
     opts?: { include_pii?: boolean }
   ): Observable<AdminOrderDetail> {
-    return this.api.post<AdminOrderDetail>(`/orders/admin/${orderId}/shipments`, payload, undefined, opts as any).pipe(
+    const params = { include_pii: opts?.include_pii ?? true };
+    return this.api.post<AdminOrderDetail>(`/orders/admin/${orderId}/shipments`, payload, undefined, params as any).pipe(
       map((o: any) => ({
         ...o,
         total_amount: parseMoney(o?.total_amount),
@@ -268,7 +273,8 @@ export class AdminOrdersService {
     payload: { courier?: string | null; tracking_number?: string | null; tracking_url?: string | null },
     opts?: { include_pii?: boolean }
   ): Observable<AdminOrderDetail> {
-    return this.api.patch<AdminOrderDetail>(`/orders/admin/${orderId}/shipments/${shipmentId}`, payload, undefined, opts as any).pipe(
+    const params = { include_pii: opts?.include_pii ?? true };
+    return this.api.patch<AdminOrderDetail>(`/orders/admin/${orderId}/shipments/${shipmentId}`, payload, undefined, params as any).pipe(
       map((o: any) => ({
         ...o,
         total_amount: parseMoney(o?.total_amount),
@@ -292,7 +298,8 @@ export class AdminOrdersService {
   }
 
   deleteShipment(orderId: string, shipmentId: string, opts?: { include_pii?: boolean }): Observable<AdminOrderDetail> {
-    return this.api.delete<AdminOrderDetail>(`/orders/admin/${orderId}/shipments/${shipmentId}`, undefined, opts as any).pipe(
+    const params = { include_pii: opts?.include_pii ?? true };
+    return this.api.delete<AdminOrderDetail>(`/orders/admin/${orderId}/shipments/${shipmentId}`, undefined, params as any).pipe(
       map((o: any) => ({
         ...o,
         total_amount: parseMoney(o?.total_amount),
@@ -321,8 +328,7 @@ export class AdminOrdersService {
     shippedQuantity: number,
     opts?: { include_pii?: boolean }
   ): Observable<AdminOrderDetail> {
-    const params: any = { shipped_quantity: shippedQuantity };
-    if (opts?.include_pii) params.include_pii = true;
+    const params: any = { shipped_quantity: shippedQuantity, include_pii: opts?.include_pii ?? true };
     return this.api
       .post<AdminOrderDetail>(`/orders/admin/${orderId}/items/${itemId}/fulfill`, {}, undefined, params)
       .pipe(
@@ -351,7 +357,8 @@ export class AdminOrdersService {
   uploadShippingLabel(orderId: string, file: File, opts?: { include_pii?: boolean }): Observable<AdminOrderDetail> {
     const data = new FormData();
     data.append('file', file);
-    return this.api.post<AdminOrderDetail>(`/orders/admin/${orderId}/shipping-label`, data, undefined, opts as any);
+    const params = { include_pii: opts?.include_pii ?? true };
+    return this.api.post<AdminOrderDetail>(`/orders/admin/${orderId}/shipping-label`, data, undefined, params as any);
   }
 
   downloadShippingLabel(orderId: string, opts?: { action?: 'download' | 'print' }): Observable<Blob> {
@@ -414,7 +421,8 @@ export class AdminOrdersService {
   }
 
   addAdminNote(orderId: string, note: string, opts?: { include_pii?: boolean }): Observable<AdminOrderDetail> {
-    return this.api.post<AdminOrderDetail>(`/orders/admin/${orderId}/notes`, { note }, undefined, opts as any).pipe(
+    const params = { include_pii: opts?.include_pii ?? true };
+    return this.api.post<AdminOrderDetail>(`/orders/admin/${orderId}/notes`, { note }, undefined, params as any).pipe(
       map((o: any) => ({
         ...o,
         total_amount: parseMoney(o?.total_amount),
@@ -443,7 +451,8 @@ export class AdminOrdersService {
   }
 
   addOrderTag(orderId: string, tag: string, opts?: { include_pii?: boolean }): Observable<AdminOrderDetail> {
-    return this.api.post<AdminOrderDetail>(`/orders/admin/${orderId}/tags`, { tag }, undefined, opts as any).pipe(
+    const params = { include_pii: opts?.include_pii ?? true };
+    return this.api.post<AdminOrderDetail>(`/orders/admin/${orderId}/tags`, { tag }, undefined, params as any).pipe(
       map((o: any) => ({
         ...o,
         total_amount: parseMoney(o?.total_amount),
@@ -467,8 +476,9 @@ export class AdminOrdersService {
   }
 
   removeOrderTag(orderId: string, tag: string, opts?: { include_pii?: boolean }): Observable<AdminOrderDetail> {
+    const params = { include_pii: opts?.include_pii ?? true };
     return this.api
-      .delete<AdminOrderDetail>(`/orders/admin/${orderId}/tags/${encodeURIComponent(tag)}`, undefined, opts as any)
+      .delete<AdminOrderDetail>(`/orders/admin/${orderId}/tags/${encodeURIComponent(tag)}`, undefined, params as any)
       .pipe(
       map((o: any) => ({
         ...o,
@@ -519,7 +529,7 @@ export class AdminOrdersService {
   downloadExport(columns?: string[], opts?: { include_pii?: boolean }): Observable<Blob> {
     const cols = (columns ?? []).filter((c) => (c ?? '').trim());
     const params: any = cols.length ? { columns: cols } : {};
-    if (opts?.include_pii) params.include_pii = true;
+    params.include_pii = opts?.include_pii ?? true;
     return this.api.getBlob('/orders/admin/export', params);
   }
 

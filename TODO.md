@@ -1083,3 +1083,10 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Dashboard analytics: exclude cancelled/refunded/pending orders from sales totals and “sold” KPIs.
 - [x] Data hygiene: replace any “oz” units in seeded/sample products with metric variants (e.g., ml) and avoid reintroducing.
 - [x] i18n: move category name required message from `adminUi.products.errors.required` to `adminUi.categories.errors.required` and update call sites.
+- [x] Admin: show unmasked customer name/email in Orders/Support/Returns (frontend defaults `include_pii=true`; backend remains masked-by-default).
+- [x] Admin Blog: add post delete action (with confirmation) in the blog list.
+- [x] Admin Blog: allow multiple pinned posts with drag-and-drop ordering.
+- [x] Storefront Blog: refresh list layout (left cover image cards; avoid huge empty featured image area).
+- [x] Admin Blog: fix bulk action layout overlap/clutter on `/admin/content/blog`.
+- [x] CI: reduce noise in compose-smoke npm installs (suppress deprecation warnings).
+- [ ] Frontend tests: migrate off Karma to eliminate deprecated `glob@7`/`rimraf@3`/`inflight` dependency chain (vs log suppression).
