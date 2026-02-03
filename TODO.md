@@ -1089,4 +1089,3 @@ Below is a structured checklist you can turn into issues.
 - [x] Storefront Blog: refresh list layout (left cover image cards; avoid huge empty featured image area).
 - [x] Admin Blog: fix bulk action layout overlap/clutter on `/admin/content/blog`.
 - [x] CI: reduce noise in compose-smoke npm installs (suppress deprecation warnings).
-- [ ] Frontend tests: migrate off Karma to eliminate deprecated `glob@7`/`rimraf@3`/`inflight` dependency chain (vs log suppression).
