@@ -5545,7 +5545,7 @@ class CmsDraftManager<T> {
                 </div>
               </div>
 
-              <div class="grid gap-3 md:grid-cols-4">
+              <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
                 <label class="grid gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
                   {{ 'adminUi.blog.bulk.actionLabel' | translate }}
                   <select
@@ -5652,6 +5652,13 @@ class CmsDraftManager<T> {
                   >
                     {{ 'adminUi.blog.actions.view' | translate }}
                   </a>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.actions.delete' | translate"
+                    [disabled]="blogDeleteBusy.has(post.key)"
+                    (action)="deleteBlogPost(post)"
+                  ></app-button>
                   <app-button size="sm" variant="ghost" [label]="'adminUi.actions.edit' | translate" (action)="selectBlogPost(post)"></app-button>
                 </div>
               </div>
@@ -7165,6 +7172,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   blogMeta: Record<string, any> = {};
   blogImages: { id: string; url: string; alt_text?: string | null; sort_order: number; focal_x: number; focal_y: number }[] = [];
   blogBulkSelection = new Set<string>();
+  blogDeleteBusy = new Set<string>();
   blogBulkAction: 'publish' | 'unpublish' | 'schedule' | 'tags_add' | 'tags_remove' = 'publish';
   blogBulkPublishAt = '';
   blogBulkUnpublishAt = '';
@@ -9358,6 +9366,31 @@ export class AdminComponent implements OnInit, OnDestroy {
   selectBlogPost(post: AdminContent): void {
     this.showBlogCreate = false;
     this.loadBlogEditor(post.key);
+  }
+
+  deleteBlogPost(post: AdminContent): void {
+    const key = (post?.key || '').trim();
+    if (!key) return;
+    const label = (post?.title || '').trim() || key;
+    const ok = window.confirm(this.t('adminUi.blog.confirms.deletePost', { title: label }));
+    if (!ok) return;
+
+    this.blogDeleteBusy.add(key);
+    this.admin.deleteContent(key).subscribe({
+      next: () => {
+        this.blogDeleteBusy.delete(key);
+        this.blogBulkSelection.delete(key);
+        if (this.selectedBlogKey === key) {
+          this.closeBlogEditor();
+        }
+        this.toast.success(this.t('adminUi.blog.success.deleted'));
+        this.reloadContentBlocks();
+      },
+      error: () => {
+        this.blogDeleteBusy.delete(key);
+        this.toast.error(this.t('adminUi.blog.errors.delete'));
+      }
+    });
   }
 
   setBlogEditLang(lang: 'en' | 'ro'): void {

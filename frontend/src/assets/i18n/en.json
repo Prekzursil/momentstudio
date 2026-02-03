@@ -3090,8 +3090,12 @@
         "success": "Updated {{count}} posts.",
         "errors": "{{count}} posts failed to update."
       },
+      "confirms": {
+        "deletePost": "Delete \"{{title}}\"? This cannot be undone."
+      },
       "success": {
         "created": "Blog post created",
+        "deleted": "Blog post deleted",
         "saved": "Saved",
         "translationSaved": "Saved translation"
       },
@@ -3104,7 +3108,8 @@
         "save": "Could not save blog post",
         "translationSave": "Could not save translation",
         "translationMetaSave": "Saved translation, but could not save metadata",
-        "loadPost": "Could not load blog post"
+        "loadPost": "Could not load blog post",
+        "delete": "Could not delete blog post"
       }
     },
     "fx": {

@@ -654,6 +654,22 @@ async def admin_update_content(
     return block
 
 
+@router.delete("/admin/{key}", status_code=status.HTTP_204_NO_CONTENT)
+async def admin_delete_content(
+    key: str,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> Response:
+    if not (key or "").startswith("blog."):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only blog posts can be deleted")
+    block = await content_service.get_block_by_key(session, key)
+    if not block:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+    await session.delete(block)
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.post("/admin/{key}", response_model=ContentBlockRead, status_code=status.HTTP_201_CREATED)
 async def admin_create_content(
     key: str,

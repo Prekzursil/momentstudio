@@ -1205,6 +1205,10 @@ export class AdminService {
     return this.api.post<ContentBlock>(`/content/admin/${key}`, payload);
   }
 
+  deleteContent(key: string): Observable<void> {
+    return this.api.delete<void>(`/content/admin/${encodeURIComponent(key)}`);
+  }
+
   uploadContentImage(key: string, file: File, lang?: string): Observable<ContentBlock> {
     const form = new FormData();
     form.append('file', file);
