@@ -5600,13 +5600,33 @@ class CmsDraftManager<T> {
             </div>
 
             <div
-              *ngIf="blogPinnedConflicts().length"
-              class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
+              *ngIf="blogPinnedPosts().length"
+              class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/40"
             >
-              <p class="font-semibold">{{ 'adminUi.blog.pins.conflictsTitle' | translate }}</p>
-              <div class="mt-1 grid gap-1 text-xs">
-                <div *ngFor="let conflict of blogPinnedConflicts()">
-                  {{ 'adminUi.blog.pins.conflictLine' | translate: { slot: conflict.slot, posts: conflict.posts } }}
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <p class="font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.blog.pins.title' | translate }}</p>
+                <span *ngIf="blogPinsSaving" class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.common.saving' | translate }}</span>
+              </div>
+              <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.blog.pins.hint' | translate }}</p>
+              <div class="mt-2 grid gap-2">
+                <div
+                  *ngFor="let post of blogPinnedPosts()"
+                  class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900"
+                  [class.opacity-60]="blogPinsSaving"
+                  [attr.draggable]="blogPinsSaving ? null : 'true'"
+                  (dragstart)="onBlogPinDragStart(post.key)"
+                  (dragover)="onBlogPinDragOver($event)"
+                  (drop)="onBlogPinDrop(post.key)"
+                >
+                  <div class="min-w-0">
+                    <p class="font-medium text-slate-900 dark:text-slate-50 truncate">{{ post.title || post.key }}</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ post.key }}</p>
+                  </div>
+                  <span
+                    class="shrink-0 inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 dark:border-indigo-900/50 dark:bg-indigo-950/40 dark:text-indigo-200"
+                  >
+                    #{{ blogPinnedSlot(post) || 1 }}
+                  </span>
                 </div>
               </div>
             </div>
@@ -5629,12 +5649,6 @@ class CmsDraftManager<T> {
                     <ng-container *ngIf="blogPinnedSlot(post) as slot">
                       <span class="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 dark:border-indigo-900/50 dark:bg-indigo-950/40 dark:text-indigo-200">
                         {{ 'adminUi.blog.pins.badge' | translate: { slot } }}
-                      </span>
-                      <span
-                        *ngIf="blogPinnedSlotHasConflict(slot, post.key)"
-                        class="ml-1 inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100"
-                      >
-                        {{ 'adminUi.blog.pins.conflictBadge' | translate }}
                       </span>
                       ·
                     </ng-container>
@@ -5763,15 +5777,14 @@ class CmsDraftManager<T> {
                 </label>
                 <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                   {{ 'adminUi.blog.fields.pinOrder' | translate }}
-                  <select
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
                     class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     [(ngModel)]="blogCreate.pin_order"
                     [disabled]="!blogCreate.pinned"
-                  >
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                  </select>
+                  />
                   <span class="text-xs text-slate-500 dark:text-slate-400">
                     {{ 'adminUi.blog.fields.pinOrderHint' | translate }}
                   </span>
@@ -6019,15 +6032,14 @@ class CmsDraftManager<T> {
                 </label>
                 <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                   {{ 'adminUi.blog.fields.pinOrder' | translate }}
-                  <select
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
                     class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     [(ngModel)]="blogForm.pin_order"
                     [disabled]="blogEditLang !== blogBaseLang || !blogForm.pinned"
-                  >
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                  </select>
+                  />
                   <span class="text-xs text-slate-500 dark:text-slate-400">
                     {{ 'adminUi.blog.fields.pinOrderHint' | translate }}
                   </span>
@@ -7179,6 +7191,8 @@ export class AdminComponent implements OnInit, OnDestroy {
   blogBulkTags = '';
   blogBulkSaving = false;
   blogBulkError = '';
+  blogPinsSaving = false;
+  draggingBlogPinKey: string | null = null;
   showBlogCoverLibrary = false;
   showBlogPreview = false;
   blogA11yOpen = false;
@@ -9043,32 +9057,91 @@ export class AdminComponent implements OnInit, OnDestroy {
     else if (typeof pinned === 'number') pinnedFlag = pinned === 1;
     else if (typeof pinned === 'string') pinnedFlag = ['1', 'true', 'yes', 'on'].includes(pinned.trim().toLowerCase());
     if (!pinnedFlag) return null;
-    const raw = Number(meta['pin_order']);
-    if (!Number.isFinite(raw)) return null;
-    const normalized = Math.min(3, Math.max(1, Math.trunc(raw)));
-    return normalized;
+    const raw = meta['pin_order'];
+    const parsed = Number(typeof raw === 'number' ? raw : typeof raw === 'string' ? raw.trim() : 1);
+    const normalized = Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : 1;
+    return Math.max(1, normalized);
   }
 
   blogPinnedSlot(post: AdminContent): number | null {
     return this.pinnedSlotFromMeta(post.meta || null);
   }
 
-  blogPinnedSlotHasConflict(slot: number, key: string): boolean {
-    const normalized = Math.min(3, Math.max(1, Math.trunc(Number(slot))));
-    const matches = this.blogPosts().filter((p) => p.key !== key && this.blogPinnedSlot(p) === normalized);
-    return matches.length > 0;
+  blogPinnedPosts(): AdminContent[] {
+    const pinned = this.blogPosts().filter((p) => Boolean(this.blogPinnedSlot(p)));
+    return pinned.sort((a, b) => {
+      const ao = this.blogPinnedSlot(a) ?? 999;
+      const bo = this.blogPinnedSlot(b) ?? 999;
+      if (ao !== bo) return ao - bo;
+      const ap = a.published_at ? Date.parse(a.published_at) : 0;
+      const bp = b.published_at ? Date.parse(b.published_at) : 0;
+      if (ap !== bp) return bp - ap;
+      return String(b.updated_at || '').localeCompare(String(a.updated_at || ''));
+    });
   }
 
-  blogPinnedConflicts(): Array<{ slot: number; posts: string }> {
-    const out: Array<{ slot: number; posts: string }> = [];
-    for (const slot of [1, 2, 3]) {
-      const posts = this.blogPosts().filter((p) => this.blogPinnedSlot(p) === slot);
-      if (posts.length <= 1) continue;
-      const labels = posts.map((p) => p.title || p.key).slice(0, 4);
-      const more = posts.length > labels.length ? ` (+${posts.length - labels.length})` : '';
-      out.push({ slot, posts: labels.join(', ') + more });
+  private nextBlogPinOrder(): number {
+    const orders = this.blogPosts()
+      .map((p) => this.blogPinnedSlot(p))
+      .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+    const max = orders.length ? Math.max(...orders) : 0;
+    return max + 1;
+  }
+
+  onBlogPinDragStart(key: string): void {
+    this.draggingBlogPinKey = (key || '').trim() || null;
+  }
+
+  onBlogPinDragOver(event: DragEvent): void {
+    event.preventDefault();
+  }
+
+  async onBlogPinDrop(targetKey: string): Promise<void> {
+    const fromKey = (this.draggingBlogPinKey || '').trim();
+    const toKey = (targetKey || '').trim();
+    this.draggingBlogPinKey = null;
+    if (!fromKey || !toKey || fromKey === toKey || this.blogPinsSaving) return;
+
+    const pinned = this.blogPinnedPosts();
+    const pinnedKeys = pinned.map((p) => p.key);
+    const fromIdx = pinnedKeys.indexOf(fromKey);
+    const toIdx = pinnedKeys.indexOf(toKey);
+    if (fromIdx === -1 || toIdx === -1) return;
+
+    const nextKeys = [...pinnedKeys];
+    nextKeys.splice(fromIdx, 1);
+    const insertIdx = fromIdx < toIdx ? toIdx - 1 : toIdx;
+    nextKeys.splice(insertIdx, 0, fromKey);
+
+    const updates: Array<{ key: string; meta: Record<string, any> }> = [];
+    nextKeys.forEach((key, idx) => {
+      const post = pinned.find((p) => p.key === key);
+      if (!post) return;
+      const nextOrder = idx + 1;
+      if ((this.blogPinnedSlot(post) ?? 1) === nextOrder) return;
+      const meta = { ...(post.meta || {}) };
+      meta['pinned'] = true;
+      meta['pin_order'] = nextOrder;
+      updates.push({ key, meta });
+    });
+    if (!updates.length) return;
+
+    this.blogPinsSaving = true;
+    try {
+      for (const update of updates) {
+        const updated = await firstValueFrom(
+          this.admin.updateContentBlock(update.key, this.withExpectedVersion(update.key, { meta: update.meta }))
+        );
+        this.rememberContentVersion(update.key, updated);
+      }
+      this.toast.success(this.t('adminUi.blog.pins.success.reordered'));
+      this.reloadContentBlocks();
+    } catch {
+      this.toast.error(this.t('adminUi.blog.pins.errors.reorder'));
+      this.reloadContentBlocks();
+    } finally {
+      this.blogPinsSaving = false;
     }
-    return out;
   }
 
   isBlogSelected(key: string): boolean {
@@ -9235,7 +9308,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 	      cover_image_url: '',
 	      reading_time_minutes: '',
 	      pinned: false,
-      pin_order: '1',
+      pin_order: String(this.nextBlogPinOrder()),
       includeTranslation: false,
       translationTitle: '',
       translationBody: ''
@@ -9295,14 +9368,9 @@ export class AdminComponent implements OnInit, OnDestroy {
 	    }
 	    if (this.blogCreate.pinned) {
         const rawOrder = Number(String(this.blogCreate.pin_order || '').trim());
-        const normalized = Number.isFinite(rawOrder) ? Math.min(3, Math.max(1, Math.trunc(rawOrder))) : 1;
-        const conflict = this.blogPosts().find((post) => this.blogPinnedSlot(post) === normalized);
-        if (conflict) {
-          this.toast.error(this.t('adminUi.blog.pins.saveConflict', { slot: normalized, title: conflict.title || conflict.key }));
-          return;
-        }
-	      meta['pinned'] = true;
-	      meta['pin_order'] = normalized;
+        const normalized = Number.isFinite(rawOrder) && rawOrder > 0 ? Math.trunc(rawOrder) : this.nextBlogPinOrder();
+        meta['pinned'] = true;
+        meta['pin_order'] = Math.max(1, normalized);
 	    }
 	    const published_at = this.blogCreate.published_at ? new Date(this.blogCreate.published_at).toISOString() : undefined;
 	    const published_until = this.blogCreate.published_until ? new Date(this.blogCreate.published_until).toISOString() : undefined;
@@ -9428,17 +9496,6 @@ export class AdminComponent implements OnInit, OnDestroy {
     const nextMeta = this.buildBlogMeta(this.blogEditLang);
     const metaChanged = JSON.stringify(nextMeta) !== JSON.stringify(this.blogMeta || {});
     const isBase = this.blogEditLang === this.blogBaseLang;
-    if (isBase && nextMeta['pinned']) {
-      const slot = Number(nextMeta['pin_order']);
-      if (Number.isFinite(slot)) {
-        const normalized = Math.min(3, Math.max(1, Math.trunc(slot)));
-        const conflict = this.blogPosts().find((post) => post.key !== key && this.blogPinnedSlot(post) === normalized);
-        if (conflict) {
-          this.toast.error(this.t('adminUi.blog.pins.saveConflict', { slot: normalized, title: conflict.title || conflict.key }));
-          return;
-        }
-      }
-    }
     if (isBase && this.blogForm.status === 'published') {
       const issues = this.blogA11yIssues();
       if (issues.length) {
@@ -10601,17 +10658,21 @@ export class AdminComponent implements OnInit, OnDestroy {
 
 	    const cover = meta['cover_image_url'] || meta['cover_image'] || '';
 	    this.blogForm.cover_image_url = typeof cover === 'string' ? cover : '';
-	    const rt = meta['reading_time_minutes'] ?? meta['reading_time'] ?? '';
-	    this.blogForm.reading_time_minutes = rt ? String(rt) : '';
+    const rt = meta['reading_time_minutes'] ?? meta['reading_time'] ?? '';
+    this.blogForm.reading_time_minutes = rt ? String(rt) : '';
 
     const pinned = meta['pinned'];
-    this.blogForm.pinned = pinned === true || pinned === 'true';
+    let pinnedFlag = false;
+    if (typeof pinned === 'boolean') pinnedFlag = pinned;
+    else if (typeof pinned === 'number') pinnedFlag = pinned === 1;
+    else if (typeof pinned === 'string') pinnedFlag = ['1', 'true', 'yes', 'on'].includes(pinned.trim().toLowerCase());
+    this.blogForm.pinned = pinnedFlag;
     const rawPinOrder = meta['pin_order'];
     const parsedPinOrder = Number(
       typeof rawPinOrder === 'number' ? rawPinOrder : typeof rawPinOrder === 'string' ? rawPinOrder.trim() : '1'
     );
-    const normalized = Number.isFinite(parsedPinOrder) ? Math.min(3, Math.max(1, Math.trunc(parsedPinOrder))) : 1;
-    this.blogForm.pin_order = String(normalized);
+    const normalized = Number.isFinite(parsedPinOrder) && parsedPinOrder > 0 ? Math.trunc(parsedPinOrder) : 1;
+    this.blogForm.pin_order = String(Math.max(1, normalized));
   }
 
   private buildBlogMeta(lang: 'en' | 'ro'): Record<string, any> {
@@ -10649,8 +10710,8 @@ export class AdminComponent implements OnInit, OnDestroy {
     if (this.blogForm.pinned) {
       meta['pinned'] = true;
       const rawOrder = Number(String(this.blogForm.pin_order || '').trim());
-      const normalized = Number.isFinite(rawOrder) ? Math.min(3, Math.max(1, Math.trunc(rawOrder))) : 1;
-      meta['pin_order'] = normalized;
+      const normalized = Number.isFinite(rawOrder) && rawOrder > 0 ? Math.trunc(rawOrder) : 1;
+      meta['pin_order'] = Math.max(1, normalized);
     } else {
       delete meta['pinned'];
       delete meta['pin_order'];

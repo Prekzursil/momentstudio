@@ -2867,8 +2867,8 @@
         "coverImagePlaceholder": "https://…",
         "readingTimeOptional": "Timp de citire (minute) (opțional)",
         "pinned": "Fixează sus în blog",
-        "pinOrder": "Ordine fixare (1–3)",
-        "pinOrderHint": "Articolele fixate apar primele în /blog.",
+        "pinOrder": "Ordine fixare",
+        "pinOrderHint": "Articolele fixate apar primele în /blog. Numerele mai mici apar primele.",
         "body": "Conținut"
       },
       "cover": {
@@ -2980,10 +2980,18 @@
       },
       "pins": {
         "badge": "Fixat #{{slot}}",
+        "title": "Articole fixate",
+        "hint": "Trage pentru a reordona articolele fixate. Numerele mai mici apar primele în /blog.",
         "conflictBadge": "Conflict",
         "conflictsTitle": "Conflicte de fixare",
         "conflictLine": "Slot #{{slot}}: {{posts}}",
-        "saveConflict": "Slotul #{{slot}} este deja folosit de „{{title}}”. Debifează-l sau alege alt slot."
+        "saveConflict": "Slotul #{{slot}} este deja folosit de „{{title}}”. Debifează-l sau alege alt slot.",
+        "success": {
+          "reordered": "Ordinea articolelor fixate a fost salvată."
+        },
+        "errors": {
+          "reorder": "Nu s-a putut reordona lista de articole fixate."
+        }
       },
       "preview": {
         "title": "Link previzualizare",
