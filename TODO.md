@@ -228,7 +228,9 @@ Below is a structured checklist you can turn into issues.
 - [x] CMS: redirects – add admin UI to list/manage redirects (view/delete stale entries).
 - [x] CMS: pages – enforce reserved slug validation server-side on page creation (not just frontend).
 - [x] CMS seeds: populate default thumbnails for `site.social` Instagram/Facebook pages.
-- [ ] CMS content: replace placeholder Shipping & FAQ copy with final RO/EN policies before launch.
+- [x] CMS seeds: prefill `site.company` footer details for momentstudio.ro (name/RC/CUI/address/phone/email).
+- [x] CMS seeds: align `home.sections` defaults to current homepage layout (enable Sale section, disable Why, reorder sections).
+- [ ] CMS pages: decide whether Shipping & FAQ pages are needed; if yes, write final RO/EN copy + add links; if no, hide/remove them from admin.
 - [ ] Admin CMS: upgrade About/FAQ/Shipping/Contact editors to a rich editor with preview (reduce cramped textareas).
 - [ ] CMS: support per-document “Last updated” meta fields for legal pages (manual date, not auto-updated) and render them in the legal index automatically.
 
