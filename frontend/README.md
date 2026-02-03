@@ -41,7 +41,7 @@ E2E_BASE_URL=http://localhost:4201 npm run e2e
 ```
 
 Stripe:
-- Set `STRIPE_ENV` and `STRIPE_PUBLISHABLE_KEY_SANDBOX` / `STRIPE_PUBLISHABLE_KEY_LIVE` in `frontend/.env` (or legacy `STRIPE_PUBLISHABLE_KEY` / `*_TEST`).
+- Set `STRIPE_ENABLED=1` in `frontend/.env` to show Stripe as a payment option.
 - Backend must have `STRIPE_ENV` and `STRIPE_SECRET_KEY_SANDBOX` / `STRIPE_SECRET_KEY_LIVE` (and webhook secret if used) configured.
 
 Performance & bundle budget:
