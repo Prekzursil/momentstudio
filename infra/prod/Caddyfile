@@ -3,8 +3,13 @@
 	email {$CADDY_EMAIL}
 }
 
+# Redirect www -> apex to keep a single canonical origin (payments + localStorage).
+www.{$PUBLIC_DOMAIN} {
+	redir https://{$PUBLIC_DOMAIN}{uri} permanent
+}
+
 # momentstudio.ro (production)
-{$PUBLIC_DOMAIN}, www.{$PUBLIC_DOMAIN} {
+{$PUBLIC_DOMAIN} {
 	encode zstd gzip
 
 	@api path /api/*
@@ -22,4 +27,3 @@
 		reverse_proxy frontend:80
 	}
 }
-

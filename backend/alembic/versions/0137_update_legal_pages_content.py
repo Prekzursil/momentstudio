@@ -37,6 +37,8 @@ PRIVACY_EN_BODY = _load_seed_md("privacy.en.md")
 PRIVACY_RO_BODY = _load_seed_md("privacy.ro.md")
 ANPC_EN_BODY = _load_seed_md("anpc.en.md")
 ANPC_RO_BODY = _load_seed_md("anpc.ro.md")
+LEGAL_INDEX_EN_BODY = _load_seed_md("legal-index.en.md")
+LEGAL_INDEX_RO_BODY = _load_seed_md("legal-index.ro.md")
 
 
 def upgrade() -> None:
@@ -225,9 +227,9 @@ def upgrade() -> None:
     upsert_page(
         key="page.terms",
         en_title="Terms & Conditions",
-        en_body=TERMS_EN_BODY,
+        en_body=LEGAL_INDEX_EN_BODY,
         ro_title="Termeni și condiții",
-        ro_body=TERMS_RO_BODY,
+        ro_body=LEGAL_INDEX_RO_BODY,
         template_sentinels=[
             "This content is a template",
             "Acest conținut este un șablon",
