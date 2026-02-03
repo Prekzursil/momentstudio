@@ -1243,7 +1243,7 @@ async def search_users(
     role: UserRole | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
-    include_pii: bool = Query(default=False),
+    include_pii: bool = Query(default=True),
 ) -> AdminUserListResponse:
     if include_pii:
         pii_service.require_pii_reveal(current_user)
@@ -1324,7 +1324,7 @@ async def admin_user_segment_repeat_buyers(
     min_orders: int = Query(default=2, ge=1, le=100),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
-    include_pii: bool = Query(default=False),
+    include_pii: bool = Query(default=True),
 ) -> AdminUserSegmentResponse:
     if include_pii:
         pii_service.require_pii_reveal(current_user)
@@ -1405,7 +1405,7 @@ async def admin_user_segment_high_aov(
     min_aov: float = Query(default=0, ge=0),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
-    include_pii: bool = Query(default=False),
+    include_pii: bool = Query(default=True),
 ) -> AdminUserSegmentResponse:
     if include_pii:
         pii_service.require_pii_reveal(current_user)
@@ -1484,7 +1484,7 @@ async def admin_user_aliases(
     user_id: UUID,
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(require_admin_section("users")),
-    include_pii: bool = Query(default=False),
+    include_pii: bool = Query(default=True),
 ) -> dict:
     if include_pii:
         pii_service.require_pii_reveal(current_user)
@@ -1520,7 +1520,7 @@ async def admin_user_profile(
     user_id: UUID,
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(require_admin_section("users")),
-    include_pii: bool = Query(default=False),
+    include_pii: bool = Query(default=True),
 ) -> AdminUserProfileResponse:
     if include_pii:
         pii_service.require_pii_reveal(current_user)
@@ -2513,7 +2513,7 @@ async def admin_gdpr_export_jobs(
     status_filter: UserDataExportStatus | None = Query(default=None, alias="status"),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
-    include_pii: bool = Query(default=False),
+    include_pii: bool = Query(default=True),
 ) -> AdminGdprExportJobsResponse:
     if include_pii:
         pii_service.require_pii_reveal(current_user)
@@ -2647,7 +2647,7 @@ async def admin_gdpr_retry_export_job(
         id=job.id,
         user=AdminGdprUserRef(
             id=user.id,
-            email=pii_service.mask_email(user.email) or user.email,
+            email=user.email,
             username=user.username,
             role=user.role,
         ),
@@ -2716,7 +2716,7 @@ async def admin_gdpr_deletion_requests(
     q: str | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
-    include_pii: bool = Query(default=False),
+    include_pii: bool = Query(default=True),
 ) -> AdminGdprDeletionRequestsResponse:
     if include_pii:
         pii_service.require_pii_reveal(current_user)
@@ -2921,9 +2921,9 @@ async def update_user_role(
     await session.commit()
     return {
         "id": str(user.id),
-        "email": pii_service.mask_email(user.email) or user.email,
+        "email": user.email,
         "username": user.username,
-        "name": pii_service.mask_text(user.name, keep=1),
+        "name": user.name,
         "name_tag": user.name_tag,
         "role": user.role,
         "created_at": user.created_at,
@@ -2978,9 +2978,9 @@ async def update_user_internal(
 
     return AdminUserProfileUser(
         id=user.id,
-        email=pii_service.mask_email(user.email) or user.email,
+        email=user.email,
         username=user.username,
-        name=pii_service.mask_text(user.name, keep=1),
+        name=user.name,
         name_tag=user.name_tag,
         role=user.role,
         email_verified=bool(user.email_verified),
@@ -3071,9 +3071,9 @@ async def update_user_security(
 
     return AdminUserProfileUser(
         id=user.id,
-        email=pii_service.mask_email(user.email) or user.email,
+        email=user.email,
         username=user.username,
-        name=pii_service.mask_text(user.name, keep=1),
+        name=user.name,
         name_tag=user.name_tag,
         role=user.role,
         email_verified=bool(user.email_verified),
@@ -3198,9 +3198,9 @@ async def override_email_verification(
 
     return AdminUserProfileUser(
         id=user.id,
-        email=pii_service.mask_email(user.email) or user.email,
+        email=user.email,
         username=user.username,
-        name=pii_service.mask_text(user.name, keep=1),
+        name=user.name,
         name_tag=user.name_tag,
         role=user.role,
         email_verified=bool(user.email_verified),

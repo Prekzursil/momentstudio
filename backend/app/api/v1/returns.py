@@ -88,7 +88,7 @@ async def admin_list_returns(
     order_id: UUID | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
-    include_pii: bool = Query(default=False),
+    include_pii: bool = Query(default=True),
 ) -> ReturnRequestListResponse:
     if include_pii:
         pii_service.require_pii_reveal(admin)
@@ -129,7 +129,7 @@ async def admin_list_returns(
 @router.get("/admin/{return_id}", response_model=ReturnRequestRead)
 async def admin_get_return(
     return_id: UUID,
-    include_pii: bool = Query(default=False),
+    include_pii: bool = Query(default=True),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("returns")),
 ) -> ReturnRequestRead:
@@ -144,7 +144,7 @@ async def admin_get_return(
 @router.get("/admin/by-order/{order_id}", response_model=list[ReturnRequestRead])
 async def admin_list_returns_for_order(
     order_id: UUID,
-    include_pii: bool = Query(default=False),
+    include_pii: bool = Query(default=True),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("returns")),
 ) -> list[ReturnRequestRead]:
@@ -174,7 +174,7 @@ async def admin_create_return(
         lang = created.user.preferred_language if getattr(created, "user", None) else None
         background_tasks.add_task(email_service.send_return_request_created, to_email, created, lang=lang)
 
-    return await admin_get_return(created.id, session=session, admin=admin, include_pii=False)
+    return await admin_get_return(created.id, session=session, admin=admin, include_pii=True)
 
 
 @router.patch("/admin/{return_id}", response_model=ReturnRequestRead)
@@ -204,14 +204,14 @@ async def admin_update_return(
             lang=lang,
         )
 
-    return await admin_get_return(updated.id, session=session, admin=admin, include_pii=False)
+    return await admin_get_return(updated.id, session=session, admin=admin, include_pii=True)
 
 
 @router.post("/admin/{return_id}/label", response_model=ReturnRequestRead)
 async def admin_upload_return_label(
     return_id: UUID,
     file: UploadFile = File(...),
-    include_pii: bool = Query(default=False),
+    include_pii: bool = Query(default=True),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("returns")),
 ) -> ReturnRequestRead:
