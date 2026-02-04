@@ -53,7 +53,7 @@ Use `backend/.env.example` and `frontend/.env.example` as the authoritative list
     - `NETOPIA_ENV=live` (or `sandbox`)
     - `NETOPIA_API_KEY=...` (from the Netopia admin panel)
     - `NETOPIA_POS_SIGNATURE=...`
-    - `NETOPIA_PUBLIC_KEY_PEM=...` (or `NETOPIA_PUBLIC_KEY_PATH=...`)
+    - `NETOPIA_PUBLIC_KEY_PEM=...` (or `NETOPIA_PUBLIC_KEY_PATH=...`; supports `.cer` DER/PEM)
 
 Recommended hardening:
 

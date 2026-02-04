@@ -6,6 +6,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from cryptography import x509
+from cryptography.hazmat.primitives import serialization
 from fastapi import HTTPException, status
 import httpx
 from jose import jwt
@@ -28,12 +30,90 @@ def _public_key_pem() -> str:
     path = (settings.netopia_public_key_path or "").strip()
     if path:
         try:
-            return Path(path).read_text(encoding="utf-8").strip()
+            key_bytes = Path(path).read_bytes()
         except OSError as exc:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Netopia public key could not be read",
             ) from exc
+
+        if not key_bytes:
+            return ""
+
+        # Common case: PEM certificate/public key.
+        if key_bytes.lstrip().startswith(b"-----BEGIN "):
+            header = key_bytes.lstrip().splitlines()[0]
+            if b"PRIVATE KEY" in header:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Netopia public key path points to a private key; provide the public certificate/key instead",
+                )
+
+            if b"BEGIN CERTIFICATE" in header:
+                try:
+                    cert = x509.load_pem_x509_certificate(key_bytes)
+                    public_key = cert.public_key()
+                    return (
+                        public_key.public_bytes(
+                            encoding=serialization.Encoding.PEM,
+                            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+                        )
+                        .decode("utf-8")
+                        .strip()
+                    )
+                except Exception as exc:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="Netopia public certificate could not be parsed",
+                    ) from exc
+
+            if b"BEGIN PUBLIC KEY" in header:
+                try:
+                    public_key = serialization.load_pem_public_key(key_bytes)
+                    return (
+                        public_key.public_bytes(
+                            encoding=serialization.Encoding.PEM,
+                            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+                        )
+                        .decode("utf-8")
+                        .strip()
+                    )
+                except Exception as exc:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="Netopia public key could not be parsed",
+                    ) from exc
+
+            # Fall back to returning the PEM text verbatim.
+            try:
+                return key_bytes.decode("utf-8").strip()
+            except UnicodeDecodeError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Netopia public key could not be decoded",
+                ) from exc
+
+        # DER certificate/public key (some .cer downloads are DER).
+        try:
+            cert = x509.load_der_x509_certificate(key_bytes)
+            public_key = cert.public_key()
+        except Exception:
+            try:
+                public_key = serialization.load_der_public_key(key_bytes)
+            except Exception as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Netopia public key could not be parsed",
+                ) from exc
+
+        return (
+            public_key.public_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo,
+            )
+            .decode("utf-8")
+            .strip()
+        )
     return ""
 
 
