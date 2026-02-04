@@ -143,6 +143,16 @@ export const routes: Routes = [
     title: 'Set new password | momentstudio'
   },
   {
+    path: 'newsletter/confirm',
+    loadComponent: () => import('./pages/newsletter/newsletter-confirm.component').then((m) => m.NewsletterConfirmComponent),
+    title: 'Newsletter | momentstudio'
+  },
+  {
+    path: 'newsletter/unsubscribe',
+    loadComponent: () => import('./pages/newsletter/newsletter-unsubscribe.component').then((m) => m.NewsletterUnsubscribeComponent),
+    title: 'Unsubscribe | momentstudio'
+  },
+  {
     path: 'account',
     canActivate: [authGuard],
     loadComponent: () => import('./pages/account/account.component').then((m) => m.AccountComponent),

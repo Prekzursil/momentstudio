@@ -256,6 +256,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Emails: send welcome email when a guest checkout creates an account.
 - [x] Emails: send coupon assignment/revocation notifications (bilingual) with an account link.
 - [x] Receipt UX: add a shareable HTML receipt view (`/receipt/:token`) with clickable product links + a real PDF renderer with embedded hyperlinks (token PDF endpoint).
+- [x] Newsletter: add double opt-in confirmation + unsubscribe URLs (List-Unsubscribe) and enforce marketing opt-in for promotional sends.
+- [ ] Newsletter: add admin export of confirmed subscribers (CSV) for marketing ops.
 
 ## Backend - Security, Observability, Testing
 - [x] CORS config for dev/prod.

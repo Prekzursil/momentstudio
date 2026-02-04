@@ -964,8 +964,8 @@
       "emailLabel": "Email",
       "emailPlaceholder": "tu@exemplu.com",
       "subscribe": "Abonează-te",
-      "successCopy": "Mulțumim — vei primi noutăți pe email.",
-      "alreadyCopy": "Ești deja abonat(ă).",
+      "successCopy": "Mulțumim — verifică inboxul pentru a confirma abonarea.",
+      "alreadyCopy": "Ești deja abonat(ă). Dacă nu ai confirmat încă, verifică inboxul.",
       "errorTitle": "Nu am putut face abonarea",
       "errorCopy": "Încearcă din nou."
     },
@@ -978,6 +978,28 @@
       "savedCopy": "Modificările au fost aplicate.",
       "saveErrorTitle": "Nu am putut salva",
       "saveErrorCopy": "Încearcă din nou."
+    }
+  },
+  "newsletter": {
+    "confirm": {
+      "title": "Confirmare newsletter",
+      "loading": "Se confirmă abonarea…",
+      "successTitle": "Confirmat",
+      "successCopy": "Mulțumim — abonarea ta a fost confirmată.",
+      "missingToken": "Lipsește token-ul de confirmare.",
+      "errorCopy": "Nu am putut confirma abonarea. Încearcă din nou."
+    },
+    "unsubscribe": {
+      "title": "Dezabonare",
+      "loading": "Se actualizează preferințele…",
+      "prompt": "Vrei să te dezabonezi de la emailurile de marketing de la momentstudio?",
+      "cta": "Dezabonează-mă",
+      "keep": "Păstrează abonarea",
+      "manage": "Setări email",
+      "successTitle": "Dezabonat",
+      "successCopy": "Nu vei mai primi emailuri de marketing de la noi.",
+      "missingToken": "Lipsește token-ul de dezabonare.",
+      "errorCopy": "Nu am putut face dezabonarea. Încearcă din nou."
     }
   },
   "home": {

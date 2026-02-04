@@ -7,6 +7,14 @@ export interface NewsletterSubscribeResponse {
   already_subscribed: boolean;
 }
 
+export interface NewsletterConfirmResponse {
+  confirmed: boolean;
+}
+
+export interface NewsletterUnsubscribeResponse {
+  unsubscribed: boolean;
+}
+
 @Injectable({ providedIn: 'root' })
 export class NewsletterService {
   constructor(private api: ApiService) {}
@@ -22,5 +30,12 @@ export class NewsletterService {
       { 'X-Silent': '1' }
     );
   }
-}
 
+  confirm(token: string): Observable<NewsletterConfirmResponse> {
+    return this.api.post<NewsletterConfirmResponse>('/newsletter/confirm', { token }, { 'X-Silent': '1' });
+  }
+
+  unsubscribe(token: string): Observable<NewsletterUnsubscribeResponse> {
+    return this.api.post<NewsletterUnsubscribeResponse>('/newsletter/unsubscribe', { token }, { 'X-Silent': '1' });
+  }
+}
