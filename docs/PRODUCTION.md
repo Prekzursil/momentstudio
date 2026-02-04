@@ -48,7 +48,12 @@ Use `backend/.env.example` and `frontend/.env.example` as the authoritative list
 - Payments:
   - Stripe: `STRIPE_ENV=live` + `STRIPE_SECRET_KEY_LIVE=...` (+ webhook secret if you accept webhooks)
   - Optional PayPal: `PAYPAL_ENV=live` + `PAYPAL_CLIENT_ID_LIVE` / `PAYPAL_CLIENT_SECRET_LIVE` (+ webhook id)
-  - Optional Netopia: `NETOPIA_ENABLED=1` + signature/public key config
+  - Optional Netopia:
+    - `NETOPIA_ENABLED=1`
+    - `NETOPIA_ENV=live` (or `sandbox`)
+    - `NETOPIA_API_KEY=...` (from the Netopia admin panel)
+    - `NETOPIA_POS_SIGNATURE=...`
+    - `NETOPIA_PUBLIC_KEY_PEM=...` (or `NETOPIA_PUBLIC_KEY_PATH=...`)
 
 Recommended hardening:
 

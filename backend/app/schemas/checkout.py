@@ -77,6 +77,8 @@ class GuestCheckoutResponse(BaseModel):
     reference_code: str | None = None
     paypal_order_id: str | None = None
     paypal_approval_url: str | None = None
+    netopia_ntp_id: str | None = None
+    netopia_payment_url: str | None = None
     stripe_session_id: str | None = None
     stripe_checkout_url: str | None = None
     payment_method: str = "stripe"
@@ -102,6 +104,17 @@ class StripeConfirmRequest(BaseModel):
 
 
 class StripeConfirmResponse(BaseModel):
+    order_id: UUID
+    reference_code: str | None = None
+    status: OrderStatus
+
+
+class NetopiaConfirmRequest(BaseModel):
+    order_id: UUID
+    ntp_id: str | None = Field(default=None, max_length=255)
+
+
+class NetopiaConfirmResponse(BaseModel):
     order_id: UUID
     reference_code: str | None = None
     status: OrderStatus

@@ -87,6 +87,11 @@ export const routes: Routes = [
     title: 'Stripe | momentstudio'
   },
   {
+    path: 'checkout/netopia/return',
+    loadComponent: () => import('./pages/checkout/netopia-return.component').then((m) => m.NetopiaReturnComponent),
+    title: 'Netopia | momentstudio'
+  },
+  {
     path: 'checkout/paypal/cancel',
     loadComponent: () => import('./pages/checkout/paypal-cancel.component').then((m) => m.PayPalCancelComponent),
     title: 'Checkout | momentstudio'
@@ -94,6 +99,11 @@ export const routes: Routes = [
   {
     path: 'checkout/stripe/cancel',
     loadComponent: () => import('./pages/checkout/stripe-cancel.component').then((m) => m.StripeCancelComponent),
+    title: 'Checkout | momentstudio'
+  },
+  {
+    path: 'checkout/netopia/cancel',
+    loadComponent: () => import('./pages/checkout/netopia-cancel.component').then((m) => m.NetopiaCancelComponent),
     title: 'Checkout | momentstudio'
   },
   {
