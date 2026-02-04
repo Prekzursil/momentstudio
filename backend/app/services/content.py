@@ -323,7 +323,6 @@ async def upsert_block(
     if "body_markdown" in data and data["body_markdown"] is not None:
         _sanitize_markdown(data["body_markdown"])
     lang = data.get("lang")
-    content_changed = any(field in data for field in ("title", "body_markdown", "meta"))
     published_at = _ensure_utc(data.get("published_at"))
     published_until = _ensure_utc(data.get("published_until"))
     if not block:
