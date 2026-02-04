@@ -1118,6 +1118,10 @@ async def confirm_netopia_payment(
     if not ntp_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing Netopia transaction id")
 
+    already_captured = any(getattr(evt, "event", None) == "payment_captured" for evt in (order.events or []))
+    if already_captured:
+        return NetopiaConfirmResponse(order_id=order.id, reference_code=order.reference_code, status=order.status)
+
     status_data = await netopia_service.get_status(ntp_id=ntp_id, order_id=str(order.id))
     payment = status_data.get("payment") if isinstance(status_data, dict) else None
     payment_status_raw = payment.get("status") if isinstance(payment, dict) else None
@@ -1130,13 +1134,20 @@ async def confirm_netopia_payment(
     if payment_status not in paid_statuses:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment not completed")
 
-    already_captured = any(getattr(evt, "event", None) == "payment_captured" for evt in (order.events or []))
-    captured_added = False
-    if not already_captured:
-        note = f"Netopia {ntp_id}".strip()
-        session.add(OrderEvent(order_id=order.id, event="payment_captured", note=note))
-        captured_added = True
-        await promo_usage.record_promo_usage(session, order=order, note=note)
+    error = status_data.get("error") if isinstance(status_data, dict) else None
+    error_code = str(error.get("code") or "").strip() if isinstance(error, dict) else ""
+    error_message = str(error.get("message") or "").strip() if isinstance(error, dict) else ""
+    success_codes = {"00", "0", "approved"}
+    if error_code and error_code.strip().lower() not in success_codes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_message or f"Payment not completed (Netopia {error_code})",
+        )
+
+    note = f"Netopia {ntp_id}".strip()
+    session.add(OrderEvent(order_id=order.id, event="payment_captured", note=note))
+    captured_added = True
+    await promo_usage.record_promo_usage(session, order=order, note=note)
 
     if order.status == OrderStatus.pending_payment:
         order.status = OrderStatus.pending_acceptance

@@ -14,7 +14,7 @@ from jose.exceptions import JWTError
 from app.core.config import settings
 
 NETOPIA_BASE_URL_LIVE = "https://secure.mobilpay.ro/pay"
-NETOPIA_BASE_URL_SANDBOX = "https://secure-sandbox.netopia-payments.com"
+NETOPIA_BASE_URL_SANDBOX = "https://secure.sandbox.netopia-payments.com"
 
 
 def _payload_hash_b64(payload: bytes) -> str:
