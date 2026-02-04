@@ -964,8 +964,8 @@
       "emailLabel": "Email",
       "emailPlaceholder": "you@example.com",
       "subscribe": "Subscribe",
-      "successCopy": "Thanks — please check your inbox for updates.",
-      "alreadyCopy": "You’re already subscribed.",
+      "successCopy": "Thanks — check your inbox to confirm your subscription.",
+      "alreadyCopy": "You’re already subscribed. If you haven’t confirmed yet, check your inbox.",
       "errorTitle": "Could not subscribe",
       "errorCopy": "Please try again."
     },
@@ -978,6 +978,28 @@
       "savedCopy": "Changes applied.",
       "saveErrorTitle": "Could not save",
       "saveErrorCopy": "Please try again."
+    }
+  },
+  "newsletter": {
+    "confirm": {
+      "title": "Newsletter confirmation",
+      "loading": "Confirming your subscription…",
+      "successTitle": "Confirmed",
+      "successCopy": "Thanks — your subscription is confirmed.",
+      "missingToken": "Missing confirmation token.",
+      "errorCopy": "We couldn’t confirm your subscription. Please try again."
+    },
+    "unsubscribe": {
+      "title": "Unsubscribe",
+      "loading": "Updating your preferences…",
+      "prompt": "Unsubscribe from marketing emails from momentstudio?",
+      "cta": "Unsubscribe",
+      "keep": "Keep me subscribed",
+      "manage": "Manage email settings",
+      "successTitle": "Unsubscribed",
+      "successCopy": "You won’t receive marketing emails from us anymore.",
+      "missingToken": "Missing unsubscribe token.",
+      "errorCopy": "We couldn’t unsubscribe you. Please try again."
     }
   },
   "home": {

@@ -20,6 +20,7 @@ from app.db.session import SessionLocal
 from app.models.email_failure import EmailDeliveryFailure
 from app.models.email_event import EmailDeliveryEvent
 from app.services import receipts as receipt_service
+from app.services import newsletter_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -45,11 +46,21 @@ def _build_message(
     html_body: str | None = None,
     *,
     attachments: Sequence[EmailAttachment] | None = None,
+    headers: dict[str, str] | None = None,
 ) -> EmailMessage:
     msg = EmailMessage()
     msg["Subject"] = subject
     msg["From"] = settings.smtp_from_email or "no-reply@momentstudio.local"
     msg["To"] = to_email
+    if headers:
+        for key, value in headers.items():
+            k = str(key or "").strip()
+            v = str(value or "").strip()
+            if not k or not v:
+                continue
+            if k.lower() in {"subject", "from", "to"}:
+                continue
+            msg[k] = v
     msg.set_content(text_body)
     if html_body:
         msg.add_alternative(html_body, subtype="html")
@@ -93,6 +104,7 @@ async def send_email(
     html_body: str | None = None,
     *,
     attachments: Sequence[EmailAttachment] | None = None,
+    headers: dict[str, str] | None = None,
 ) -> bool:
     if not settings.smtp_enabled:
         return False
@@ -101,7 +113,7 @@ async def send_email(
     if not _allow_send(now, to_email):
         logger.warning("Email rate limit reached for %s", to_email)
         return False
-    msg = _build_message(to_email, subject, text_body, html_body, attachments=attachments)
+    msg = _build_message(to_email, subject, text_body, html_body, attachments=attachments, headers=headers)
     try:
         with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=10) as smtp:
             if settings.smtp_use_tls:
@@ -117,6 +129,17 @@ async def send_email(
         await _record_email_event(to_email=to_email, subject=subject, status="failed", error_message=str(exc))
         await _record_email_failure(to_email=to_email, subject=subject, error_message=str(exc))
         return False
+
+
+def _marketing_unsubscribe_context(*, to_email: str) -> tuple[str, dict[str, str]]:
+    token = newsletter_tokens.create_newsletter_token(
+        email=str(to_email or "").strip().lower(),
+        purpose=newsletter_tokens.NEWSLETTER_PURPOSE_UNSUBSCRIBE,
+    )
+    unsubscribe_url = newsletter_tokens.build_frontend_unsubscribe_url(token=token)
+    api_unsubscribe_url = newsletter_tokens.build_api_unsubscribe_url(token=token)
+    headers = {"List-Unsubscribe": f"<{api_unsubscribe_url}>"}
+    return unsubscribe_url, headers
 
 
 async def _record_email_event(*, to_email: str, subject: str, status: str, error_message: str | None) -> None:
@@ -221,7 +244,13 @@ def render_bilingual_template(template_name: str, context: dict, *, preferred_la
 
     base_text = env.get_template("base.txt.j2")
     base_html = env.get_template("base.html.j2")
-    return base_text.render(body=text_body), base_html.render(body=html_body or "")
+    unsubscribe_url = context.get("unsubscribe_url")
+    if not isinstance(unsubscribe_url, str) or not unsubscribe_url.strip():
+        unsubscribe_url = None
+    return (
+        base_text.render(body=text_body, unsubscribe_url=unsubscribe_url),
+        base_html.render(body=html_body or "", unsubscribe_url=unsubscribe_url),
+    )
 
 
 def _courier_label(courier: str | None, *, lang: str) -> str | None:
@@ -929,12 +958,13 @@ async def send_refund_requested_notification(
 
 async def send_cart_abandonment(to_email: str, *, lang: str | None = None) -> bool:
     subject = _bilingual_subject("Te mai gândești?", "Still thinking it over?", preferred_language=lang)
+    unsubscribe_url, headers = _marketing_unsubscribe_context(to_email=to_email)
     text_body, html_body = render_bilingual_template(
         "cart_abandonment.txt.j2",
-        {"cart_url": f"{settings.frontend_origin.rstrip('/')}/cart"},
+        {"cart_url": f"{settings.frontend_origin.rstrip('/')}/cart", "unsubscribe_url": unsubscribe_url},
         preferred_language=lang,
     )
-    return await send_email(to_email, subject, text_body, html_body)
+    return await send_email(to_email, subject, text_body, html_body, headers=headers)
 
 
 async def send_back_in_stock(to_email: str, product_name: str, *, lang: str | None = None) -> bool:
@@ -973,6 +1003,7 @@ async def send_coupon_assigned(
     subject = _bilingual_subject("Cupon nou", "New coupon", preferred_language=lang)
     ends_str = ends_at.strftime("%Y-%m-%d") if ends_at else None
     account_url = f"{settings.frontend_origin.rstrip('/')}/account/coupons"
+    unsubscribe_url, headers = _marketing_unsubscribe_context(to_email=to_email)
     text_body, html_body = render_bilingual_template(
         "coupon_assigned.txt.j2",
         {
@@ -981,10 +1012,11 @@ async def send_coupon_assigned(
             "promotion_description": promotion_description,
             "ends_at": ends_str,
             "account_url": account_url,
+            "unsubscribe_url": unsubscribe_url,
         },
         preferred_language=lang,
     )
-    return await send_email(to_email, subject, text_body, html_body)
+    return await send_email(to_email, subject, text_body, html_body, headers=headers)
 
 
 async def send_coupon_revoked(
@@ -996,14 +1028,42 @@ async def send_coupon_revoked(
     lang: str | None = None,
 ) -> bool:
     subject = _bilingual_subject("Cupon revocat", "Coupon revoked", preferred_language=lang)
+    unsubscribe_url, headers = _marketing_unsubscribe_context(to_email=to_email)
     text_body, html_body = render_bilingual_template(
         "coupon_revoked.txt.j2",
         {
             "coupon_code": str(coupon_code or "").strip().upper(),
             "promotion_name": promotion_name,
             "reason": (reason or "").strip() or None,
+            "unsubscribe_url": unsubscribe_url,
         },
         preferred_language=lang,
+    )
+    return await send_email(to_email, subject, text_body, html_body, headers=headers)
+
+
+async def send_newsletter_confirmation(
+    to_email: str,
+    *,
+    confirm_url: str,
+) -> bool:
+    subject = _bilingual_subject("Confirmă newsletter-ul", "Confirm your newsletter subscription", preferred_language=None)
+    text_ro = (
+        "Îți mulțumim! Confirmă abonarea la newsletter folosind acest link:\n\n"
+        f"{confirm_url}\n\n"
+        "Dacă nu ai cerut această abonare, poți ignora acest email."
+    )
+    text_en = (
+        "Thanks! Please confirm your newsletter subscription using this link:\n\n"
+        f"{confirm_url}\n\n"
+        "If you didn’t request this subscription, you can ignore this email."
+    )
+    text_body, html_body = _bilingual_sections(
+        text_ro=text_ro,
+        text_en=text_en,
+        html_ro=_html_pre(text_ro),
+        html_en=_html_pre(text_en),
+        preferred_language=None,
     )
     return await send_email(to_email, subject, text_body, html_body)
 

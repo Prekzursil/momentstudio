@@ -3,5 +3,12 @@
     <div style="font-family: Arial, sans-serif; color: #111;">
       {{ body|safe }}
     </div>
+    {% if unsubscribe_url -%}
+    <div style="font-family: Arial, sans-serif; color: #6b7280; font-size: 12px; margin-top: 20px;">
+      <p style="margin: 0;">
+        <a href="{{ unsubscribe_url }}" style="color: #6b7280; text-decoration: underline;">Unsubscribe / Dezabonare</a>
+      </p>
+    </div>
+    {%- endif %}
   </body>
 </html>

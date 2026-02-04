@@ -669,7 +669,7 @@ async def run_abandoned_cart_job(session: AsyncSession, max_age_hours: int = 24)
         if cart.items and cart.user_id:
             user_result = await session.execute(select(User).where(User.id == cart.user_id))
             user = user_result.scalar_one_or_none()
-            if user and user.email:
+            if user and user.email and bool(getattr(user, "notify_marketing", False)):
                 await email_service.send_cart_abandonment(user.email)
                 sent += 1
     await cleanup_stale_guest_carts(session, max_age_hours)
