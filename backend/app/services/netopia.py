@@ -5,6 +5,7 @@ import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from typing import cast
 
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
@@ -22,6 +23,17 @@ NETOPIA_BASE_URL_SANDBOX = "https://secure.sandbox.netopia-payments.com"
 
 def _payload_hash_b64(payload: bytes) -> str:
     return base64.b64encode(hashlib.sha512(payload).digest()).decode("ascii")
+
+
+def _to_subject_public_key_pem(public_key: asymmetric_types.PublicKeyTypes) -> str:
+    return (
+        public_key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        .decode("utf-8")
+        .strip()
+    )
 
 
 def _public_key_pem() -> str:
@@ -53,15 +65,7 @@ def _public_key_pem() -> str:
             if b"BEGIN CERTIFICATE" in header:
                 try:
                     cert = x509.load_pem_x509_certificate(key_bytes)
-                    public_key: asymmetric_types.PublicKeyTypes = cert.public_key()
-                    return (
-                        public_key.public_bytes(
-                            encoding=serialization.Encoding.PEM,
-                            format=serialization.PublicFormat.SubjectPublicKeyInfo,
-                        )
-                        .decode("utf-8")
-                        .strip()
-                    )
+                    return _to_subject_public_key_pem(cert.public_key())
                 except Exception as exc:
                     raise HTTPException(
                         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -70,15 +74,8 @@ def _public_key_pem() -> str:
 
             if b"BEGIN PUBLIC KEY" in header:
                 try:
-                    public_key: asymmetric_types.PublicKeyTypes = serialization.load_pem_public_key(key_bytes)
-                    return (
-                        public_key.public_bytes(
-                            encoding=serialization.Encoding.PEM,
-                            format=serialization.PublicFormat.SubjectPublicKeyInfo,
-                        )
-                        .decode("utf-8")
-                        .strip()
-                    )
+                    loaded_key = serialization.load_pem_public_key(key_bytes)
+                    return _to_subject_public_key_pem(cast(asymmetric_types.PublicKeyTypes, loaded_key))
                 except Exception as exc:
                     raise HTTPException(
                         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -97,24 +94,17 @@ def _public_key_pem() -> str:
         # DER certificate/public key (some .cer downloads are DER).
         try:
             cert = x509.load_der_x509_certificate(key_bytes)
-            public_key: asymmetric_types.PublicKeyTypes = cert.public_key()
         except Exception:
             try:
-                public_key = serialization.load_der_public_key(key_bytes)
+                loaded_key = serialization.load_der_public_key(key_bytes)
             except Exception as exc:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="Netopia public key could not be parsed",
                 ) from exc
-
-        return (
-            public_key.public_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PublicFormat.SubjectPublicKeyInfo,
-            )
-            .decode("utf-8")
-            .strip()
-        )
+            return _to_subject_public_key_pem(cast(asymmetric_types.PublicKeyTypes, loaded_key))
+        else:
+            return _to_subject_public_key_pem(cert.public_key())
     return ""
 
 
