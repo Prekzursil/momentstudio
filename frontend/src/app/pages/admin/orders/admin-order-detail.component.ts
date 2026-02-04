@@ -243,6 +243,7 @@ type OrderAction =
                 <select
                   class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                   [(ngModel)]="statusValue"
+                  (ngModelChange)="onStatusValueChange($event)"
                 >
                   <option value="pending_payment">{{ 'adminUi.orders.pending_payment' | translate }}</option>
                   <option value="pending_acceptance">{{ 'adminUi.orders.pending_acceptance' | translate }}</option>
@@ -257,10 +258,7 @@ type OrderAction =
               <app-input [label]="'adminUi.orders.trackingNumber' | translate" [(value)]="trackingNumber"></app-input>
             </div>
 
-            <label
-              *ngIf="statusValue === 'cancelled' || order()!.status === 'cancelled'"
-              class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200"
-            >
+            <label *ngIf="statusValue === 'cancelled'" class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
               {{ 'adminUi.orders.cancelReason' | translate }}
               <textarea
                 class="min-h-[92px] w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
@@ -2297,11 +2295,18 @@ export class AdminOrderDetailComponent implements OnInit {
           this.action.set(null);
           this.toast.success(this.translate.instant('adminUi.orders.success.status'));
         },
-        error: () => {
+        error: (err) => {
           this.action.set(null);
-          this.toast.error(this.translate.instant('adminUi.orders.errors.status'));
+          const message = err?.error?.detail || this.translate.instant('adminUi.orders.errors.status');
+          this.toast.error(message);
         }
-      });
+    });
+  }
+
+  onStatusValueChange(next: OrderStatus): void {
+    if (next !== 'cancelled') {
+      this.cancelReason = '';
+    }
   }
 
   shippingLabelFileName(): string {

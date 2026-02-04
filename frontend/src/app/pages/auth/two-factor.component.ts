@@ -3,6 +3,7 @@ import { Component, OnInit } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
 import { Router } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { finalize } from 'rxjs';
 
 import { AuthService } from '../../core/auth.service';
 import { ToastService } from '../../core/toast.service';
@@ -109,24 +110,28 @@ export class TwoFactorComponent implements OnInit {
     }
     this.error = null;
     this.loading = true;
-    this.auth.completeTwoFactorLogin(this.token, this.code, this.remember).subscribe({
-      next: (res) => {
-        if (typeof sessionStorage !== 'undefined') {
-          sessionStorage.removeItem('two_factor_token');
-          sessionStorage.removeItem('two_factor_user');
-          sessionStorage.removeItem('two_factor_remember');
+    this.auth
+      .completeTwoFactorLogin(this.token, this.code, this.remember)
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        })
+      )
+      .subscribe({
+        next: (res) => {
+          if (typeof sessionStorage !== 'undefined') {
+            sessionStorage.removeItem('two_factor_token');
+            sessionStorage.removeItem('two_factor_user');
+            sessionStorage.removeItem('two_factor_remember');
+          }
+          this.toast.success(this.translate.instant('auth.successLogin'), res.user.email);
+          void this.router.navigateByUrl('/account');
+        },
+        error: (err) => {
+          const message = err?.error?.detail || this.translate.instant('auth.twoFactorInvalid');
+          this.error = message;
+          this.toast.error(message);
         }
-        this.toast.success(this.translate.instant('auth.successLogin'), res.user.email);
-        void this.router.navigateByUrl('/account');
-      },
-      error: (err) => {
-        const message = err?.error?.detail || this.translate.instant('auth.twoFactorInvalid');
-        this.error = message;
-        this.toast.error(message);
-      },
-      complete: () => {
-        this.loading = false;
-      }
-    });
+      });
   }
 }

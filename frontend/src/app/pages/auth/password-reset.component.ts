@@ -9,6 +9,7 @@ import { PasswordStrengthComponent } from '../../shared/password-strength.compon
 import { ToastService } from '../../core/toast.service';
 import { AuthService } from '../../core/auth.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { finalize } from 'rxjs';
 
 @Component({
   selector: 'app-password-reset',
@@ -109,17 +110,21 @@ export class PasswordResetComponent {
     }
     this.error = '';
     this.loading = true;
-    this.auth.confirmPasswordReset(this.token, this.password).subscribe({
-      next: () => {
-        this.toast.success(this.translate.instant('auth.successReset'), this.translate.instant('auth.backToLogin'));
-      },
-      error: (err) => {
-        const message = err?.error?.detail || this.translate.instant('auth.errorReset');
-        this.toast.error(message);
-      },
-      complete: () => {
-        this.loading = false;
-      }
-    });
+    this.auth
+      .confirmPasswordReset(this.token, this.password)
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        })
+      )
+      .subscribe({
+        next: () => {
+          this.toast.success(this.translate.instant('auth.successReset'), this.translate.instant('auth.backToLogin'));
+        },
+        error: (err) => {
+          const message = err?.error?.detail || this.translate.instant('auth.errorReset');
+          this.toast.error(message);
+        }
+      });
   }
 }

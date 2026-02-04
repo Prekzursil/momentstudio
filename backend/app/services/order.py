@@ -707,7 +707,10 @@ async def update_order(
         }:
             if cancel_reason_clean is None or not cancel_reason_clean:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cancel reason is required")
-        allowed = ALLOWED_TRANSITIONS.get(current_status, set())
+        allowed = set(ALLOWED_TRANSITIONS.get(current_status, set()))
+        # COD orders start in "pending_acceptance" and should be shippable without a payment capture step.
+        if payment_method == "cod" and current_status == OrderStatus.pending_acceptance:
+            allowed.update({OrderStatus.shipped, OrderStatus.delivered})
         if next_status not in allowed:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status transition")
         order.status = next_status

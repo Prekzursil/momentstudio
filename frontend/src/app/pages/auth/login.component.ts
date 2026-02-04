@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
+import { Component, ViewChild } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ContainerComponent } from '../../layout/container.component';
@@ -11,6 +11,7 @@ import { AuthService } from '../../core/auth.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { appConfig } from '../../core/app-config';
 import { isWebAuthnSupported, serializePublicKeyCredential, toPublicKeyCredentialRequestOptions } from '../../shared/webauthn';
+import { finalize } from 'rxjs';
 
 @Component({
   selector: 'app-login',
@@ -151,6 +152,8 @@ export class LoginComponent {
   twoFactorCode = '';
   nextUrl: string | null = null;
 
+  @ViewChild(CaptchaTurnstileComponent) captcha: CaptchaTurnstileComponent | undefined;
+
   constructor(
     private toast: ToastService,
     private auth: AuthService,
@@ -171,6 +174,11 @@ export class LoginComponent {
 
   private navigateAfterLogin(): void {
     void this.router.navigateByUrl(this.nextUrl || '/account');
+  }
+
+  private resetCaptcha(): void {
+    this.captchaToken = null;
+    this.captcha?.reset();
   }
 
   cancelTwoFactor(): void {
@@ -260,31 +268,35 @@ export class LoginComponent {
         return;
       }
       this.loading = true;
-      this.auth.completeTwoFactorLogin(token, code, this.keepSignedIn).subscribe({
-        next: (authRes) => {
-          if (typeof sessionStorage !== 'undefined') {
-            sessionStorage.removeItem('two_factor_token');
-            sessionStorage.removeItem('two_factor_user');
-            sessionStorage.removeItem('two_factor_remember');
+      this.auth
+        .completeTwoFactorLogin(token, code, this.keepSignedIn)
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          })
+        )
+        .subscribe({
+          next: (authRes) => {
+            if (typeof sessionStorage !== 'undefined') {
+              sessionStorage.removeItem('two_factor_token');
+              sessionStorage.removeItem('two_factor_user');
+              sessionStorage.removeItem('two_factor_remember');
+            }
+            this.twoFactorToken = null;
+            this.twoFactorUserEmail = null;
+            this.twoFactorCode = '';
+            this.toast.success(this.translate.instant('auth.successLogin'), authRes?.user?.email);
+            this.navigateAfterLogin();
+          },
+          error: (err) => {
+            if (err?.status === 401) {
+              this.toast.error(this.translate.instant('auth.twoFactorInvalid'));
+              return;
+            }
+            const message = err?.error?.detail || this.translate.instant('auth.twoFactorInvalid');
+            this.toast.error(message);
           }
-          this.twoFactorToken = null;
-          this.twoFactorUserEmail = null;
-          this.twoFactorCode = '';
-          this.toast.success(this.translate.instant('auth.successLogin'), authRes?.user?.email);
-          this.navigateAfterLogin();
-        },
-        error: (err) => {
-          if (err?.status === 401) {
-            this.toast.error(this.translate.instant('auth.twoFactorInvalid'));
-            return;
-          }
-          const message = err?.error?.detail || this.translate.instant('auth.twoFactorInvalid');
-          this.toast.error(message);
-        },
-        complete: () => {
-          this.loading = false;
-        }
-      });
+        });
       return;
     }
     if (!form.valid) {
@@ -298,35 +310,38 @@ export class LoginComponent {
     this.loading = true;
     this.auth
       .login(this.identifier, this.password, this.captchaToken ?? undefined, { remember: this.keepSignedIn })
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        })
+      )
       .subscribe({
-      next: (res) => {
-        const anyRes = res as any;
-        if (anyRes?.requires_two_factor && anyRes?.two_factor_token) {
-          this.twoFactorToken = anyRes.two_factor_token;
-          this.twoFactorUserEmail = anyRes?.user?.email || null;
-          this.twoFactorCode = '';
-          if (typeof sessionStorage !== 'undefined') {
-            sessionStorage.setItem('two_factor_token', anyRes.two_factor_token);
-            sessionStorage.setItem('two_factor_user', JSON.stringify(anyRes.user ?? null));
-            sessionStorage.setItem('two_factor_remember', JSON.stringify(this.keepSignedIn));
+        next: (res) => {
+          const anyRes = res as any;
+          if (anyRes?.requires_two_factor && anyRes?.two_factor_token) {
+            this.twoFactorToken = anyRes.two_factor_token;
+            this.twoFactorUserEmail = anyRes?.user?.email || null;
+            this.twoFactorCode = '';
+            if (typeof sessionStorage !== 'undefined') {
+              sessionStorage.setItem('two_factor_token', anyRes.two_factor_token);
+              sessionStorage.setItem('two_factor_user', JSON.stringify(anyRes.user ?? null));
+              sessionStorage.setItem('two_factor_remember', JSON.stringify(this.keepSignedIn));
+            }
+            this.toast.info(this.translate.instant('auth.twoFactorRequired'));
+            return;
           }
-          this.toast.info(this.translate.instant('auth.twoFactorRequired'));
-          return;
+          this.toast.success(this.translate.instant('auth.successLogin'), anyRes?.user?.email);
+          this.navigateAfterLogin();
+        },
+        error: (err) => {
+          this.resetCaptcha();
+          if (err?.status === 401) {
+            this.toast.error(this.translate.instant('auth.invalidCredentials'));
+            return;
+          }
+          const message = err?.error?.detail || this.translate.instant('auth.errorLogin');
+          this.toast.error(message);
         }
-        this.toast.success(this.translate.instant('auth.successLogin'), anyRes?.user?.email);
-        this.navigateAfterLogin();
-      },
-      error: (err) => {
-        if (err?.status === 401) {
-          this.toast.error(this.translate.instant('auth.invalidCredentials'));
-          return;
-        }
-        const message = err?.error?.detail || this.translate.instant('auth.errorLogin');
-        this.toast.error(message);
-      },
-      complete: () => {
-        this.loading = false;
-      }
-    });
+      });
   }
 }

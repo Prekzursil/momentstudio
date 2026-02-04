@@ -690,10 +690,38 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     assert fulfill.status_code == 200
     assert fulfill.json()["items"][0]["shipped_quantity"] == 1
 
-    # invalid transition pending -> shipped
+    async def seed_cod_pending_acceptance_order() -> str:
+        async with SessionLocal() as session:
+            order = Order(
+                user_id=user_id,
+                status=OrderStatus.pending_acceptance,
+                reference_code="CODPEND1",
+                customer_email="buyer@example.com",
+                customer_name="Buyer",
+                total_amount=Decimal("10.00"),
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                currency="RON",
+                payment_method="cod",
+            )
+            session.add(order)
+            await session.commit()
+            await session.refresh(order)
+            return str(order.id)
+
+    cod_pending_id = asyncio.run(seed_cod_pending_acceptance_order())
+    cod_ship = client.patch(
+        f"/api/v1/orders/admin/{cod_pending_id}",
+        json={"status": "shipped"},
+        headers=auth_headers(admin_token),
+    )
+    assert cod_ship.status_code == 200, cod_ship.text
+    assert cod_ship.json()["status"] == "shipped"
+
+    # invalid transition pending -> refunded
     bad = client.patch(
         f"/api/v1/orders/admin/{order_id}",
-        json={"status": "shipped"},
+        json={"status": "refunded"},
         headers=auth_headers(admin_token),
     )
     assert bad.status_code == 400
@@ -806,7 +834,7 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     assert packing.headers.get("content-type", "").startswith("application/pdf")
     assert packing.headers.get("content-disposition", "").startswith("attachment;")
     assert packing.content.startswith(b"%PDF")
-    assert sent["shipped"] == 1
+    assert sent["shipped"] == 2
 
     batch_packing = client.post(
         "/api/v1/orders/admin/batch/packing-slips",
