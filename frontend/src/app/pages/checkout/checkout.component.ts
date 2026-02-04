@@ -110,6 +110,7 @@ type LegalConsentStatusResponse = {
 const CHECKOUT_SUCCESS_KEY = 'checkout_last_order';
 const CHECKOUT_PAYPAL_PENDING_KEY = 'checkout_paypal_pending';
 const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
+const CHECKOUT_NETOPIA_PENDING_KEY = 'checkout_netopia_pending';
 const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
 
 const parseBool = (value: unknown, fallback: boolean): boolean => {
@@ -1214,6 +1215,11 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     localStorage.setItem(CHECKOUT_STRIPE_PENDING_KEY, JSON.stringify(summary));
   }
 
+  private persistNetopiaPendingSummary(summary: CheckoutSuccessSummary): void {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(CHECKOUT_NETOPIA_PENDING_KEY, JSON.stringify(summary));
+  }
+
   private hydrateCartAndQuote(res: CartResponse): void {
     this.cart.hydrateFromBackend(res);
     this.setQuote(res);
@@ -2052,6 +2058,8 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
 	        reference_code?: string;
         paypal_order_id?: string | null;
         paypal_approval_url?: string | null;
+        netopia_ntp_id?: string | null;
+        netopia_payment_url?: string | null;
         stripe_session_id?: string | null;
         stripe_checkout_url?: string | null;
         payment_method?: string;
@@ -2090,9 +2098,14 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
             return;
           }
           if (this.paymentMethod === 'netopia') {
-            this.persistStripePendingSummary(this.buildSuccessSummary(res.order_id, res.reference_code ?? null, method));
+            this.persistNetopiaPendingSummary(this.buildSuccessSummary(res.order_id, res.reference_code ?? null, method));
             if (this.saveAddress) this.persistAddress();
             this.placing = false;
+            if (res.netopia_payment_url) {
+              this.checkoutFlowCompleted = true;
+              window.location.assign(res.netopia_payment_url);
+              return;
+            }
             this.errorMessage = this.translate.instant('checkout.paymentNotReady');
             return;
           }
@@ -2370,6 +2383,8 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
         reference_code?: string;
         paypal_order_id?: string | null;
         paypal_approval_url?: string | null;
+        netopia_ntp_id?: string | null;
+        netopia_payment_url?: string | null;
         stripe_session_id?: string | null;
         stripe_checkout_url?: string | null;
         payment_method?: string;
@@ -2408,9 +2423,14 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
             return;
           }
           if (this.paymentMethod === 'netopia') {
-            this.persistStripePendingSummary(this.buildSuccessSummary(res.order_id, res.reference_code ?? null, method));
+            this.persistNetopiaPendingSummary(this.buildSuccessSummary(res.order_id, res.reference_code ?? null, method));
             if (this.saveAddress) this.persistAddress();
             this.placing = false;
+            if (res.netopia_payment_url) {
+              this.checkoutFlowCompleted = true;
+              window.location.assign(res.netopia_payment_url);
+              return;
+            }
             this.errorMessage = this.translate.instant('checkout.paymentNotReady');
             return;
           }

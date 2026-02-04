@@ -53,10 +53,12 @@ Edit:
 - `backend/.env`
   - set `ENVIRONMENT=production`
   - set a strong `SECRET_KEY`
+  - optional CAPTCHA (Cloudflare Turnstile): set `CAPTCHA_ENABLED=1` and `TURNSTILE_SECRET_KEY=...`
   - configure Stripe/PayPal/Netopia + SMTP as needed
 - `frontend/.env`
   - set `APP_ENV=production`
   - keep `API_BASE_URL=/api/v1`
+  - optional CAPTCHA (Cloudflare Turnstile): set `CAPTCHA_SITE_KEY=...`
 
 ## 3) Deploy / update
 
@@ -64,7 +66,20 @@ Edit:
 ./infra/prod/deploy.sh
 ```
 
-View logs:
+Notes:
+
+- `deploy.sh` runs `docker compose up -d --build`. It **does not wipe** your database or uploads (volumes are preserved).
+- After a VPS reboot, the stack starts automatically (`restart: unless-stopped`). You usually **do not** need to run `deploy.sh` again.
+
+Useful helpers:
+
+- Start (no rebuild): `./infra/prod/start.sh`
+- Stop (keeps volumes/data): `./infra/prod/stop.sh`
+- Apply `.env` changes without rebuilding images: `./infra/prod/reload-env.sh` (defaults to `backend frontend caddy`)
+- View logs: `./infra/prod/logs.sh` (optionally pass service names)
+- List services: `./infra/prod/ps.sh`
+
+View logs manually:
 
 ```bash
 docker compose --env-file infra/prod/.env -f infra/prod/docker-compose.yml logs -f --tail=200
@@ -75,8 +90,7 @@ docker compose --env-file infra/prod/.env -f infra/prod/docker-compose.yml logs 
 After first deploy (or after a DB reset):
 
 ```bash
-docker compose --env-file infra/prod/.env -f infra/prod/docker-compose.yml exec -T backend python -m app.cli bootstrap-owner \
-  --email owner@example.com --password 'Password123' --username owner --display-name Owner
+./infra/prod/bootstrap-owner.sh --email owner@example.com --password 'Password123' --username owner --display-name Owner
 ```
 
 ## 5) Backups + restores
@@ -89,11 +103,53 @@ Create a backup (DB + uploads):
 
 Backups are saved to `infra/prod/backups/`. Copy them off-host (recommended).
 
+Retention is controlled via `infra/prod/.env`:
+
+- `BACKUP_RETENTION_COUNT` (keep last N) takes precedence over
+- `BACKUP_RETENTION_DAYS` (delete older than N days).
+
+### Automatic daily backup (systemd timer)
+
+On Ubuntu, run:
+
+```bash
+sudo ./infra/prod/install-backup-timer.sh
+```
+
+Check schedules:
+
+```bash
+systemctl list-timers momentstudio-backup.timer
+```
+
+View logs:
+
+```bash
+journalctl -u momentstudio-backup.service -n 200 --no-pager
+```
+
 Restore from a backup:
 
 ```bash
 ./infra/prod/restore.sh infra/prod/backups/backup-<timestamp>.tar.gz
 ```
+
+### One-time migration: local dev → VPS
+
+To move your current local dev DB + uploads to the VPS:
+
+1. On your dev machine, create a backup archive:
+
+   ```bash
+   ./scripts/dev-backup.sh
+   ```
+
+2. Copy the resulting `infra/prod/backups/dev-backup-*.tar.gz` to the VPS (e.g. `scp`).
+3. On the VPS, restore using `restore.sh`:
+
+   ```bash
+   ./infra/prod/restore.sh infra/prod/backups/dev-backup-<timestamp>.tar.gz
+   ```
 
 ## 6) Notes
 

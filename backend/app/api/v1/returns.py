@@ -174,7 +174,7 @@ async def admin_create_return(
         lang = created.user.preferred_language if getattr(created, "user", None) else None
         background_tasks.add_task(email_service.send_return_request_created, to_email, created, lang=lang)
 
-    return await admin_get_return(created.id, session=session, admin=admin, include_pii=False)
+    return await admin_get_return(created.id, session=session, admin=admin, include_pii=True)
 
 
 @router.patch("/admin/{return_id}", response_model=ReturnRequestRead)
@@ -204,7 +204,7 @@ async def admin_update_return(
             lang=lang,
         )
 
-    return await admin_get_return(updated.id, session=session, admin=admin, include_pii=False)
+    return await admin_get_return(updated.id, session=session, admin=admin, include_pii=True)
 
 
 @router.post("/admin/{return_id}/label", response_model=ReturnRequestRead)

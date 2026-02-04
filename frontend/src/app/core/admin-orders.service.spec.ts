@@ -39,8 +39,9 @@ describe('AdminOrdersService', () => {
       expect(res.id).toBe('o1');
     });
 
-    const req = httpMock.expectOne('/api/v1/orders/admin/o1');
+    const req = httpMock.expectOne((r) => r.url === '/api/v1/orders/admin/o1');
     expect(req.request.method).toBe('GET');
+    expect(req.request.params.get('include_pii')).toBe('true');
     req.flush({
       id: 'o1',
       status: 'pending',
@@ -57,8 +58,9 @@ describe('AdminOrdersService', () => {
       expect(res.status).toBe('paid');
     });
 
-    const req = httpMock.expectOne('/api/v1/orders/admin/o1');
+    const req = httpMock.expectOne((r) => r.url === '/api/v1/orders/admin/o1');
     expect(req.request.method).toBe('PATCH');
+    expect(req.request.params.get('include_pii')).toBe('true');
     expect(req.request.body).toEqual({ status: 'paid', tracking_number: 'T123' });
     req.flush({
       id: 'o1',
@@ -76,10 +78,10 @@ describe('AdminOrdersService', () => {
       expect(blob.size).toBe(3);
     });
 
-    const req = httpMock.expectOne('/api/v1/orders/admin/export');
+    const req = httpMock.expectOne((r) => r.url === '/api/v1/orders/admin/export');
     expect(req.request.method).toBe('GET');
+    expect(req.request.params.get('include_pii')).toBe('true');
     expect(req.request.responseType).toBe('blob');
     req.flush(new Blob(['csv'], { type: 'text/csv' }));
   });
 });
-

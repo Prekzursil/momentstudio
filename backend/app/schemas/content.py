@@ -75,6 +75,7 @@ class ContentPageListItem(BaseModel):
     slug: str
     title: str
     status: ContentStatus
+    hidden: bool = False
     updated_at: datetime
     published_at: datetime | None = None
     published_until: datetime | None = None

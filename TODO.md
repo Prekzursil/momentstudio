@@ -49,6 +49,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Consent UX: checkbox click opens a “read before accept” modal; require scrolling to bottom before enabling Accept.
 - [x] Re-consent policy: force re-acceptance when legal docs change (by version) for both registration and checkout.
 - [x] Tests: unit tests for publish enforcement + API validation; Playwright tests for modal gating and register/checkout blocking.
+- [x] Legal pages: remove the “template” disclaimer from the legal index page (EN/RO).
+- [x] Admin CMS: make legal pages editable (Terms index, Terms & Conditions, Privacy Policy, ANPC).
 
 ## Backend - Core & Auth
 - [x] Scaffold FastAPI app with versioned `/api/v1` router.
@@ -225,6 +227,13 @@ Below is a structured checklist you can turn into issues.
 - [x] CMS: allow changing page URLs with redirects (advanced).
 - [x] CMS: redirects – add admin UI to list/manage redirects (view/delete stale entries).
 - [x] CMS: pages – enforce reserved slug validation server-side on page creation (not just frontend).
+- [x] CMS seeds: populate default thumbnails for `site.social` Instagram/Facebook pages.
+- [x] CMS seeds: prefill `site.company` footer details for momentstudio.ro (name/RC/CUI/address/phone/email).
+- [x] CMS seeds: align `home.sections` defaults to current homepage layout (enable Sale section, disable Why, reorder sections).
+- [x] CMS pages: hide Shipping & FAQ by default (remove from admin + block public access; allow unhide later).
+- [x] Admin CMS: upgrade About/FAQ/Shipping/Contact editors to a rich editor with preview (reduce cramped textareas).
+- [x] CMS: support per-document “Last updated” meta fields for legal pages (manual date, not auto-updated) and render them in the legal index automatically.
+- [x] Admin CMS: add hide/unhide controls for custom pages (meta flag; hidden pages excluded from sitemap/SEO and return 404 publicly).
 
 ## Backend - Email & Notifications
 - [x] Email settings (SMTP).
@@ -1074,3 +1083,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Dashboard analytics: exclude cancelled/refunded/pending orders from sales totals and “sold” KPIs.
 - [x] Data hygiene: replace any “oz” units in seeded/sample products with metric variants (e.g., ml) and avoid reintroducing.
 - [x] i18n: move category name required message from `adminUi.products.errors.required` to `adminUi.categories.errors.required` and update call sites.
+- [x] Admin: show unmasked customer name/email in Orders/Support/Returns (frontend defaults `include_pii=true`; backend remains masked-by-default).
+- [x] Admin Blog: add post delete action (with confirmation) in the blog list.
+- [x] Admin Blog: allow multiple pinned posts with drag-and-drop ordering.
+- [x] Storefront Blog: refresh list layout (left cover image cards; avoid huge empty featured image area).
+- [x] Admin Blog: fix bulk action layout overlap/clutter on `/admin/content/blog`.
+- [x] CI: reduce noise in compose-smoke npm installs (suppress deprecation warnings).

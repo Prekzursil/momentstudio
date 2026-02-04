@@ -910,7 +910,7 @@ export class AdminUsersComponent implements OnInit {
   errorRequestId = signal<string | null>(null);
   users = signal<AdminUserListItem[]>([]);
   meta = signal<AdminUserListResponse['meta'] | null>(null);
-  piiReveal = signal(false);
+  piiReveal = signal(true);
 
   q = '';
   role: RoleFilter = 'all';

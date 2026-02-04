@@ -103,9 +103,12 @@ async def validate_structured_data(session: AsyncSession) -> dict[str, object]:
         if not slug:
             add("page", key or "<missing>", "error", "Invalid page key (expected page.<slug>)")
             continue
+        meta = page.meta or {}
+        if isinstance(meta, dict) and meta.get("hidden"):
+            continue
         if not (page.title or "").strip():
             add("page", key, "error", "Missing page title")
-        has_blocks = bool((page.meta or {}).get("blocks")) if isinstance(page.meta, dict) else False
+        has_blocks = bool(meta.get("blocks")) if isinstance(meta, dict) else False
         if not has_blocks and not (page.body_markdown or "").strip():
             add("page", key, "warning", "Empty page content (no blocks and empty body)")
         url_path = "/about" if slug == "about" else "/contact" if slug == "contact" else f"/pages/{slug}"
@@ -122,4 +125,3 @@ async def validate_structured_data(session: AsyncSession) -> dict[str, object]:
         "warnings": warnings,
         "issues": issues,
     }
-

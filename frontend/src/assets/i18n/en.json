@@ -1227,6 +1227,15 @@
     "lockers": {
       "useMyLocation": "Use my location",
       "searchArea": "Search this area",
+      "searchLabel": "Search location",
+      "searchPlaceholder": "Search city or address…",
+      "searchButton": "Find",
+      "clearSearch": "Clear search",
+      "searching": "Searching…",
+      "searchingAround": "Searching around:",
+      "searchNoResults": "No locations found for that search.",
+      "searchError": "Could not search locations. Please try again.",
+      "clearSelectedLocation": "Clear selected location",
       "loading": "Loading lockers…",
       "none": "No lockers found nearby. Try moving the map or increasing the area.",
       "results": "Lockers",
@@ -1274,6 +1283,12 @@
     "stripeConfirmFailed": "Could not confirm Stripe payment. Please try again.",
     "stripeCancelled": "Stripe checkout cancelled",
     "stripeCancelledCopy": "No payment was made. You can return to checkout and try another method.",
+    "netopiaReturnTitle": "Netopia",
+    "netopiaConfirming": "Confirming your Netopia payment…",
+    "netopiaMissingOrder": "Missing Netopia order id.",
+    "netopiaConfirmFailed": "Could not confirm Netopia payment. Please try again.",
+    "netopiaCancelled": "Netopia checkout cancelled",
+    "netopiaCancelledCopy": "No payment was made. You can return to checkout and try another method.",
     "backToCheckout": "Back to checkout",
     "placeOrder": "Place order",
     "placingOrder": "Placing order…",
@@ -1845,6 +1860,7 @@
       "down": "Down",
       "preview": "Preview",
       "hide": "Hide",
+      "unhide": "Unhide",
       "bulkActions": "Bulk actions"
     },
     "help": {
@@ -2583,6 +2599,30 @@
         "saveShipping": "Save shipping",
         "contactLabel": "Contact",
         "saveContact": "Save contact",
+        "legal": {
+          "title": "Legal pages",
+          "hint": "Edit the Terms, Privacy Policy, and ANPC pages (EN + RO).",
+          "documentLabel": "Document",
+          "open": "Open",
+          "lastUpdatedLabel": "Last updated",
+          "lastUpdatedHint": "Manual date (does not auto-update).",
+          "documents": {
+            "termsIndex": "Terms page (index)",
+            "terms": "Terms & Conditions",
+            "privacy": "Privacy Policy",
+            "anpc": "ANPC / Consumer information"
+          }
+        },
+        "success": { "save": "Page saved." },
+        "errors": { "save": "Could not save the page.", "load": "Could not load the page." },
+        "visibility": {
+          "hidden": "Page hidden.",
+          "visible": "Page is now visible.",
+          "errors": {
+            "save": "Could not update page visibility.",
+            "load": "Could not load page."
+          }
+        },
         "builder": {
           "title": "Page builder blocks",
           "hint": "Optional: build richer About/Contact pages with blocks. If blocks are present, the storefront renders them instead of the Markdown body.",
@@ -2598,8 +2638,10 @@
           "status": "Status",
           "createPage": "Create page",
           "page": "Page",
+          "showHidden": "Show hidden pages",
           "globalSections": "Global sections",
           "pagesGroup": "Pages",
+          "hiddenTag": "hidden",
           "publishAtOptional": "Publish at (optional)",
           "publishAtHint": "If this is in the future and status is published, the page will go live at that time.",
           "unpublishAtOptional": "Unpublish at (optional)",
@@ -2840,8 +2882,8 @@
         "coverImagePlaceholder": "https://…",
         "readingTimeOptional": "Reading time minutes (optional)",
         "pinned": "Pin to top of blog",
-        "pinOrder": "Pin order (1–3)",
-        "pinOrderHint": "Pinned posts appear first on /blog.",
+        "pinOrder": "Pin order",
+        "pinOrderHint": "Pinned posts appear first on /blog. Lower numbers appear first.",
         "body": "Body"
       },
       "cover": {
@@ -2953,10 +2995,18 @@
       },
       "pins": {
         "badge": "Pinned #{{slot}}",
+        "title": "Pinned posts",
+        "hint": "Drag to reorder pinned posts. Lower numbers appear first on /blog.",
         "conflictBadge": "Conflict",
         "conflictsTitle": "Pinned slot conflicts",
         "conflictLine": "Slot #{{slot}}: {{posts}}",
-        "saveConflict": "Pinned slot #{{slot}} is already used by \"{{title}}\". Unpin it or choose another slot."
+        "saveConflict": "Pinned slot #{{slot}} is already used by \"{{title}}\". Unpin it or choose another slot.",
+        "success": {
+          "reordered": "Pinned order saved."
+        },
+        "errors": {
+          "reorder": "Could not reorder pinned posts."
+        }
       },
       "preview": {
         "title": "Preview link",
@@ -3063,8 +3113,12 @@
         "success": "Updated {{count}} posts.",
         "errors": "{{count}} posts failed to update."
       },
+      "confirms": {
+        "deletePost": "Delete \"{{title}}\"? This cannot be undone."
+      },
       "success": {
         "created": "Blog post created",
+        "deleted": "Blog post deleted",
         "saved": "Saved",
         "translationSaved": "Saved translation"
       },
@@ -3077,7 +3131,8 @@
         "save": "Could not save blog post",
         "translationSave": "Could not save translation",
         "translationMetaSave": "Saved translation, but could not save metadata",
-        "loadPost": "Could not load blog post"
+        "loadPost": "Could not load blog post",
+        "delete": "Could not delete blog post"
       }
     },
     "fx": {

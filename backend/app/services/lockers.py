@@ -193,6 +193,19 @@ def _parse_sameday_expire_at(value: object) -> datetime:
     return datetime.now(timezone.utc) + timedelta(minutes=10)
 
 
+def _parse_fan_expires_at(value: object, *, now: datetime) -> datetime:
+    raw = str(value or "").strip()
+    if not raw:
+        return now + timedelta(hours=23)
+    for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S"):
+        try:
+            dt = datetime.strptime(raw, fmt)
+            return dt.replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+    return now + timedelta(hours=1)
+
+
 async def _sameday_get_token() -> str:
     global _sameday_auth
     now = datetime.now(timezone.utc)
@@ -278,11 +291,15 @@ async def _fan_get_token() -> str:
     async with httpx.AsyncClient(base_url=_fan_base_url(), timeout=timeout, headers=headers) as client:
         resp = await client.post("/login", params={"username": settings.fan_api_username, "password": settings.fan_api_password})
         resp.raise_for_status()
-        data = resp.json() or {}
-    token = str(data.get("token") or "").strip()
+        payload = resp.json() or {}
+
+    data = payload.get("data") if isinstance(payload, dict) else None
+    data_obj = data if isinstance(data, dict) else (payload if isinstance(payload, dict) else {})
+    token = str(data_obj.get("token") or "").strip()
     if not token:
         raise RuntimeError("FAN Courier authentication returned an empty token")
-    _fan_auth = _AuthToken(token=token, expires_at=now + timedelta(hours=23))
+    expires_at = _parse_fan_expires_at(data_obj.get("expiresAt") or data_obj.get("expires_at"), now=now)
+    _fan_auth = _AuthToken(token=token, expires_at=expires_at)
     return token
 
 

@@ -62,6 +62,8 @@ from app.schemas.checkout import (
     GuestEmailVerificationRequest,
     GuestEmailVerificationRequestResponse,
     GuestEmailVerificationStatus,
+    NetopiaConfirmRequest,
+    NetopiaConfirmResponse,
     PayPalCaptureRequest,
     PayPalCaptureResponse,
     StripeConfirmRequest,
@@ -70,6 +72,7 @@ from app.schemas.checkout import (
 from app.schemas.user import UserCreate
 from app.schemas.address import AddressCreate
 from app.services import payments
+from app.services import netopia as netopia_service
 from app.services import paypal as paypal_service
 from app.services import address as address_service
 from app.api.v1 import cart as cart_api
@@ -230,6 +233,83 @@ def _build_paypal_items(cart: Cart, *, lang: str | None) -> list[dict[str, objec
     return items
 
 
+def _split_customer_name(value: str) -> tuple[str, str]:
+    cleaned = (value or "").strip()
+    if not cleaned:
+        return "Customer", "Customer"
+    parts = cleaned.split()
+    if len(parts) == 1:
+        return parts[0], parts[0]
+    return parts[0], " ".join(parts[1:]).strip() or parts[0]
+
+
+def _netopia_address_payload(*, email: str, phone: str | None, first_name: str, last_name: str, addr: Address) -> dict[str, Any]:
+    country = (getattr(addr, "country", None) or "").strip().upper() or "RO"
+    country_num = 642 if country == "RO" else 0
+    country_name = "Romania" if country == "RO" else country
+    details = (getattr(addr, "line1", None) or "").strip()
+    line2 = (getattr(addr, "line2", None) or "").strip()
+    if line2:
+        details = f"{details}, {line2}" if details else line2
+    return {
+        "email": (email or "").strip(),
+        "phone": (phone or "").strip() or "",
+        "firstName": (first_name or "").strip() or "Customer",
+        "lastName": (last_name or "").strip() or "Customer",
+        "city": (getattr(addr, "city", None) or "").strip(),
+        "country": int(country_num),
+        "countryName": country_name,
+        "state": (getattr(addr, "region", None) or "").strip() or "",
+        "postalCode": (getattr(addr, "postal_code", None) or "").strip(),
+        "details": details,
+    }
+
+
+def _build_netopia_products(order: Order, *, lang: str | None) -> list[dict[str, Any]]:
+    lines: list[dict[str, Any]] = []
+    for item in order.items or []:
+        product = getattr(item, "product", None)
+        name = (getattr(product, "name", None) or "").strip() or "Item"
+        code = (getattr(product, "sku", None) or "").strip() or str(getattr(product, "id", "") or "")
+        category = (getattr(getattr(product, "category", None), "name", None) or "").strip() or "Product"
+        subtotal = pricing.quantize_money(_as_decimal(getattr(item, "subtotal", 0)))
+        if subtotal <= 0:
+            continue
+        lines.append({"name": name, "code": code, "category": category, "price": subtotal, "vat": 0})
+
+    shipping = pricing.quantize_money(_as_decimal(getattr(order, "shipping_amount", 0)))
+    if shipping > 0:
+        lines.append({"name": _charge_label("shipping", lang), "code": "shipping", "category": "Shipping", "price": shipping, "vat": 0})
+
+    fee = pricing.quantize_money(_as_decimal(getattr(order, "fee_amount", 0)))
+    if fee > 0:
+        lines.append({"name": _charge_label("fee", lang), "code": "fee", "category": "Fee", "price": fee, "vat": 0})
+
+    tax = pricing.quantize_money(_as_decimal(getattr(order, "tax_amount", 0)))
+    if tax > 0:
+        lines.append({"name": _charge_label("vat", lang), "code": "vat", "category": "VAT", "price": tax, "vat": 0})
+
+    target = pricing.quantize_money(_as_decimal(getattr(order, "total_amount", 0)))
+    current = sum((row["price"] for row in lines), Decimal("0.00"))
+    diff = current - target
+    if diff > Decimal("0.00"):
+        idx = max(range(len(lines)), key=lambda i: lines[i]["price"])
+        lines[idx]["price"] = pricing.quantize_money(max(Decimal("0.00"), lines[idx]["price"] - diff))
+
+    out: list[dict[str, Any]] = []
+    for row in lines:
+        out.append(
+            {
+                "name": row["name"],
+                "code": row["code"],
+                "category": row["category"],
+                "price": float(row["price"]),
+                "vat": float(row["vat"]),
+            }
+        )
+    return out
+
+
 def _delivery_from_payload(
     *,
     courier: str,
@@ -381,12 +461,63 @@ async def checkout(
     if last_order_id:
         existing_order = await order_service.get_order_by_id(session, last_order_id)
         if existing_order:
+            existing_method = (existing_order.payment_method or "").strip().lower()
+            existing_netopia_url = (getattr(existing_order, "netopia_payment_url", None) or "").strip()
+            if (
+                existing_method == "netopia"
+                and not existing_netopia_url
+                and settings.netopia_enabled
+                and netopia_service.is_netopia_configured()
+            ):
+                first_name, last_name = _split_customer_name(getattr(existing_order, "customer_name", None) or "")
+                shipping_addr_obj = existing_order.shipping_address
+                billing_addr_obj = existing_order.billing_address or shipping_addr_obj
+                if shipping_addr_obj and billing_addr_obj:
+                    billing_payload = _netopia_address_payload(
+                        email=getattr(existing_order, "customer_email", None) or current_user.email,
+                        phone=getattr(shipping_addr_obj, "phone", None) or getattr(current_user, "phone", None),
+                        first_name=first_name,
+                        last_name=last_name,
+                        addr=billing_addr_obj,
+                    )
+                    shipping_payload = _netopia_address_payload(
+                        email=getattr(existing_order, "customer_email", None) or current_user.email,
+                        phone=getattr(shipping_addr_obj, "phone", None) or getattr(current_user, "phone", None),
+                        first_name=first_name,
+                        last_name=last_name,
+                        addr=shipping_addr_obj,
+                    )
+                    base = settings.frontend_origin.rstrip("/")
+                    cancel_url = f"{base}/checkout/netopia/cancel?order_id={existing_order.id}"
+                    redirect_url = f"{base}/checkout/netopia/return?order_id={existing_order.id}"
+                    notify_url = f"{base}/api/v1/payments/netopia/webhook"
+                    netopia_ntp_id, netopia_payment_url = await netopia_service.start_payment(
+                        order_id=str(existing_order.id),
+                        amount_ron=float(pricing.quantize_money(existing_order.total_amount)),
+                        description=f"Order {existing_order.reference_code}"
+                        if existing_order.reference_code
+                        else f"Order {existing_order.id}",
+                        billing=billing_payload,
+                        shipping=shipping_payload,
+                        products=_build_netopia_products(existing_order, lang=current_user.preferred_language),
+                        language=(current_user.preferred_language or "ro"),
+                        cancel_url=cancel_url,
+                        notify_url=notify_url,
+                        redirect_url=redirect_url,
+                    )
+                    existing_order.netopia_ntp_id = netopia_ntp_id
+                    existing_order.netopia_payment_url = netopia_payment_url
+                    session.add(existing_order)
+                    await session.commit()
+                    await session.refresh(existing_order)
             response.status_code = status.HTTP_200_OK
             return GuestCheckoutResponse(
                 order_id=existing_order.id,
                 reference_code=existing_order.reference_code,
                 paypal_order_id=existing_order.paypal_order_id,
                 paypal_approval_url=getattr(existing_order, "paypal_approval_url", None),
+                netopia_ntp_id=getattr(existing_order, "netopia_ntp_id", None),
+                netopia_payment_url=getattr(existing_order, "netopia_payment_url", None),
                 stripe_session_id=existing_order.stripe_checkout_session_id,
                 stripe_checkout_url=getattr(existing_order, "stripe_checkout_url", None),
                 payment_method=existing_order.payment_method,
@@ -527,6 +658,8 @@ async def checkout(
     payment_intent_id = None
     paypal_order_id = None
     paypal_approval_url = None
+    netopia_ntp_id = None
+    netopia_payment_url = None
     if payment_method == "stripe":
         stripe_line_items = _build_stripe_line_items(user_cart, totals, lang=current_user.preferred_language)
         discount_cents = _money_to_cents(discount_val) if discount_val and discount_val > 0 else None
@@ -558,8 +691,6 @@ async def checkout(
             discount_ron=discount_val,
             items=paypal_items,
         )
-    elif payment_method == "netopia":
-        raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Netopia is not configured yet")
     order = await order_service.build_order_from_cart(
         session,
         current_user.id,
@@ -591,6 +722,49 @@ async def checkout(
         shipping_amount=totals.shipping,
         total_amount=totals.total,
     )
+    if payment_method == "netopia":
+        if not settings.netopia_enabled:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Netopia is disabled")
+        if not netopia_service.is_netopia_configured():
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Netopia is not configured")
+        first_name, last_name = _split_customer_name(getattr(order, "customer_name", None) or "")
+        shipping_addr_obj = order.shipping_address or shipping_addr
+        billing_addr_obj = order.billing_address or billing_addr or shipping_addr_obj
+        billing_payload = _netopia_address_payload(
+            email=getattr(order, "customer_email", None) or current_user.email,
+            phone=getattr(shipping_addr_obj, "phone", None) or getattr(current_user, "phone", None),
+            first_name=first_name,
+            last_name=last_name,
+            addr=billing_addr_obj,
+        )
+        shipping_payload = _netopia_address_payload(
+            email=getattr(order, "customer_email", None) or current_user.email,
+            phone=getattr(shipping_addr_obj, "phone", None) or getattr(current_user, "phone", None),
+            first_name=first_name,
+            last_name=last_name,
+            addr=shipping_addr_obj,
+        )
+        base = settings.frontend_origin.rstrip("/")
+        cancel_url = f"{base}/checkout/netopia/cancel?order_id={order.id}"
+        redirect_url = f"{base}/checkout/netopia/return?order_id={order.id}"
+        notify_url = f"{base}/api/v1/payments/netopia/webhook"
+        netopia_ntp_id, netopia_payment_url = await netopia_service.start_payment(
+            order_id=str(order.id),
+            amount_ron=float(pricing.quantize_money(order.total_amount)),
+            description=f"Order {order.reference_code}" if order.reference_code else f"Order {order.id}",
+            billing=billing_payload,
+            shipping=shipping_payload,
+            products=_build_netopia_products(order, lang=current_user.preferred_language),
+            language=(current_user.preferred_language or "ro"),
+            cancel_url=cancel_url,
+            notify_url=notify_url,
+            redirect_url=redirect_url,
+        )
+        order.netopia_ntp_id = netopia_ntp_id
+        order.netopia_payment_url = netopia_payment_url
+        session.add(order)
+        await session.commit()
+        await session.refresh(order)
     if needs_consent:
         legal_consents_service.add_consent_records(
             session,
@@ -644,6 +818,8 @@ async def checkout(
         reference_code=order.reference_code,
         paypal_order_id=paypal_order_id,
         paypal_approval_url=paypal_approval_url,
+        netopia_ntp_id=netopia_ntp_id,
+        netopia_payment_url=netopia_payment_url,
         stripe_session_id=stripe_session_id,
         stripe_checkout_url=stripe_checkout_url,
         payment_method=payment_method,
@@ -894,6 +1070,130 @@ async def confirm_stripe_checkout(
             )
 
     return StripeConfirmResponse(order_id=order.id, reference_code=order.reference_code, status=order.status)
+
+
+@router.post("/netopia/confirm", response_model=NetopiaConfirmResponse)
+async def confirm_netopia_payment(
+    payload: NetopiaConfirmRequest,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+    current_user=Depends(get_current_user_optional),
+) -> NetopiaConfirmResponse:
+    order = (
+        (
+            await session.execute(
+                select(Order)
+                .options(
+                    selectinload(Order.user),
+                    selectinload(Order.items).selectinload(OrderItem.product),
+                    selectinload(Order.events),
+                    selectinload(Order.shipping_address),
+                    selectinload(Order.billing_address),
+                )
+                .where(Order.id == payload.order_id)
+            )
+        )
+        .scalars()
+        .first()
+    )
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    if (order.payment_method or "").strip().lower() != "netopia":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order is not a Netopia order")
+
+    # Keep confirmation bound to the same user for signed-in checkouts.
+    if order.user_id:
+        if current_user and order.user_id == getattr(current_user, "id", None):
+            pass
+        elif payload.order_id and order.id == payload.order_id:
+            # Allow guest checkout return flows (including "create account" during guest checkout).
+            pass
+        else:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
+
+    if payload.ntp_id and order.netopia_ntp_id and payload.ntp_id != order.netopia_ntp_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Transaction mismatch")
+
+    ntp_id = (order.netopia_ntp_id or "").strip()
+    if not ntp_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing Netopia transaction id")
+
+    already_captured = any(getattr(evt, "event", None) == "payment_captured" for evt in (order.events or []))
+    if already_captured:
+        return NetopiaConfirmResponse(order_id=order.id, reference_code=order.reference_code, status=order.status)
+
+    status_data = await netopia_service.get_status(ntp_id=ntp_id, order_id=str(order.id))
+    payment = status_data.get("payment") if isinstance(status_data, dict) else None
+    payment_status_raw = payment.get("status") if isinstance(payment, dict) else None
+    try:
+        payment_status = int(payment_status_raw) if payment_status_raw is not None else None
+    except Exception:
+        payment_status = None
+
+    paid_statuses = {3, 5}  # STATUS_PAID / STATUS_CONFIRMED
+    if payment_status not in paid_statuses:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment not completed")
+
+    error = status_data.get("error") if isinstance(status_data, dict) else None
+    error_code = str(error.get("code") or "").strip() if isinstance(error, dict) else ""
+    error_message = str(error.get("message") or "").strip() if isinstance(error, dict) else ""
+    success_codes = {"00", "0", "approved"}
+    if error_code and error_code.strip().lower() not in success_codes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_message or f"Payment not completed (Netopia {error_code})",
+        )
+
+    note = f"Netopia {ntp_id}".strip()
+    session.add(OrderEvent(order_id=order.id, event="payment_captured", note=note))
+    captured_added = True
+    await promo_usage.record_promo_usage(session, order=order, note=note)
+
+    if order.status == OrderStatus.pending_payment:
+        order.status = OrderStatus.pending_acceptance
+        session.add(OrderEvent(order_id=order.id, event="status_change", note="pending_payment -> pending_acceptance"))
+
+    session.add(order)
+    await session.commit()
+    await session.refresh(order)
+    await coupons_service.redeem_coupon_for_order(session, order=order, note=f"Netopia {ntp_id}".strip())
+
+    if captured_added:
+        checkout_settings = await checkout_settings_service.get_checkout_settings(session)
+        customer_to = (order.user.email if order.user and order.user.email else None) or getattr(order, "customer_email", None)
+        customer_lang = order.user.preferred_language if order.user else None
+        if customer_to:
+            background_tasks.add_task(
+                email_service.send_order_confirmation,
+                customer_to,
+                order,
+                order.items,
+                customer_lang,
+                receipt_share_days=checkout_settings.receipt_share_days,
+            )
+        owner = await auth_service.get_owner_user(session)
+        admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+        if admin_to:
+            background_tasks.add_task(
+                email_service.send_new_order_notification,
+                admin_to,
+                order,
+                customer_to,
+                owner.preferred_language if owner else None,
+            )
+        if order.user and order.user.id:
+            await notification_service.create_notification(
+                session,
+                user_id=order.user.id,
+                type="order",
+                title="Payment received"
+                if (order.user.preferred_language or "en") != "ro"
+                else "Plată confirmată",
+                body=f"Reference {order.reference_code}" if order.reference_code else None,
+                url=_account_orders_url(order),
+            )
+
+    return NetopiaConfirmResponse(order_id=order.id, reference_code=order.reference_code, status=order.status)
 
 
 @router.get("", response_model=list[OrderRead])
@@ -1336,12 +1636,63 @@ async def guest_checkout(
     if last_order_id:
         existing_order = await order_service.get_order_by_id(session, last_order_id)
         if existing_order:
+            existing_method = (existing_order.payment_method or "").strip().lower()
+            existing_netopia_url = (getattr(existing_order, "netopia_payment_url", None) or "").strip()
+            if (
+                existing_method == "netopia"
+                and not existing_netopia_url
+                and settings.netopia_enabled
+                and netopia_service.is_netopia_configured()
+            ):
+                first_name, last_name = _split_customer_name(getattr(existing_order, "customer_name", None) or "")
+                shipping_addr_obj = existing_order.shipping_address
+                billing_addr_obj = existing_order.billing_address or shipping_addr_obj
+                if shipping_addr_obj and billing_addr_obj:
+                    billing_payload = _netopia_address_payload(
+                        email=getattr(existing_order, "customer_email", None) or email,
+                        phone=getattr(shipping_addr_obj, "phone", None),
+                        first_name=first_name,
+                        last_name=last_name,
+                        addr=billing_addr_obj,
+                    )
+                    shipping_payload = _netopia_address_payload(
+                        email=getattr(existing_order, "customer_email", None) or email,
+                        phone=getattr(shipping_addr_obj, "phone", None),
+                        first_name=first_name,
+                        last_name=last_name,
+                        addr=shipping_addr_obj,
+                    )
+                    base = settings.frontend_origin.rstrip("/")
+                    cancel_url = f"{base}/checkout/netopia/cancel?order_id={existing_order.id}"
+                    redirect_url = f"{base}/checkout/netopia/return?order_id={existing_order.id}"
+                    notify_url = f"{base}/api/v1/payments/netopia/webhook"
+                    netopia_ntp_id, netopia_payment_url = await netopia_service.start_payment(
+                        order_id=str(existing_order.id),
+                        amount_ron=float(pricing.quantize_money(existing_order.total_amount)),
+                        description=f"Order {existing_order.reference_code}"
+                        if existing_order.reference_code
+                        else f"Order {existing_order.id}",
+                        billing=billing_payload,
+                        shipping=shipping_payload,
+                        products=_build_netopia_products(existing_order, lang=payload.preferred_language),
+                        language=(payload.preferred_language or "ro"),
+                        cancel_url=cancel_url,
+                        notify_url=notify_url,
+                        redirect_url=redirect_url,
+                    )
+                    existing_order.netopia_ntp_id = netopia_ntp_id
+                    existing_order.netopia_payment_url = netopia_payment_url
+                    session.add(existing_order)
+                    await session.commit()
+                    await session.refresh(existing_order)
             response.status_code = status.HTTP_200_OK
             return GuestCheckoutResponse(
                 order_id=existing_order.id,
                 reference_code=existing_order.reference_code,
                 paypal_order_id=existing_order.paypal_order_id,
                 paypal_approval_url=getattr(existing_order, "paypal_approval_url", None),
+                netopia_ntp_id=getattr(existing_order, "netopia_ntp_id", None),
+                netopia_payment_url=getattr(existing_order, "netopia_payment_url", None),
                 stripe_session_id=existing_order.stripe_checkout_session_id,
                 stripe_checkout_url=getattr(existing_order, "stripe_checkout_url", None),
                 payment_method=existing_order.payment_method,
@@ -1499,6 +1850,8 @@ async def guest_checkout(
     payment_intent_id = None
     paypal_order_id = None
     paypal_approval_url = None
+    netopia_ntp_id = None
+    netopia_payment_url = None
     if payment_method == "stripe":
         stripe_line_items = _build_stripe_line_items(cart, totals, lang=payload.preferred_language)
         discount_cents = _money_to_cents(discount_val) if discount_val and discount_val > 0 else None
@@ -1530,8 +1883,6 @@ async def guest_checkout(
             discount_ron=discount_val,
             items=paypal_items,
         )
-    elif payment_method == "netopia":
-        raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Netopia is not configured yet")
     order = await order_service.build_order_from_cart(
         session,
         user_id,
@@ -1563,6 +1914,47 @@ async def guest_checkout(
         shipping_amount=totals.shipping,
         total_amount=totals.total,
     )
+    if payment_method == "netopia":
+        if not settings.netopia_enabled:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Netopia is disabled")
+        if not netopia_service.is_netopia_configured():
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Netopia is not configured")
+        first_name, last_name = _split_customer_name(getattr(order, "customer_name", None) or "")
+        shipping_addr_obj = order.shipping_address or shipping_addr
+        billing_addr_obj = order.billing_address or billing_addr or shipping_addr_obj
+        billing_payload = _netopia_address_payload(
+            email=getattr(order, "customer_email", None) or email,
+            phone=getattr(shipping_addr_obj, "phone", None),
+            first_name=first_name,
+            last_name=last_name,
+            addr=billing_addr_obj,
+        )
+        shipping_payload = _netopia_address_payload(
+            email=getattr(order, "customer_email", None) or email,
+            phone=getattr(shipping_addr_obj, "phone", None),
+            first_name=first_name,
+            last_name=last_name,
+            addr=shipping_addr_obj,
+        )
+        base = settings.frontend_origin.rstrip("/")
+        cancel_url = f"{base}/checkout/netopia/cancel?order_id={order.id}"
+        redirect_url = f"{base}/checkout/netopia/return?order_id={order.id}"
+        notify_url = f"{base}/api/v1/payments/netopia/webhook"
+        netopia_ntp_id, netopia_payment_url = await netopia_service.start_payment(
+            order_id=str(order.id),
+            amount_ron=float(pricing.quantize_money(order.total_amount)),
+            description=f"Order {order.reference_code}" if order.reference_code else f"Order {order.id}",
+            billing=billing_payload,
+            shipping=shipping_payload,
+            products=_build_netopia_products(order, lang=payload.preferred_language),
+            language=(payload.preferred_language or "ro"),
+            cancel_url=cancel_url,
+            notify_url=notify_url,
+            redirect_url=redirect_url,
+        )
+        order.netopia_ntp_id = netopia_ntp_id
+        order.netopia_payment_url = netopia_payment_url
+        session.add(order)
     legal_consents_service.add_consent_records(
         session,
         context=LegalConsentContext.checkout,
@@ -1598,6 +1990,8 @@ async def guest_checkout(
         reference_code=order.reference_code,
         paypal_order_id=paypal_order_id,
         paypal_approval_url=paypal_approval_url,
+        netopia_ntp_id=netopia_ntp_id,
+        netopia_payment_url=netopia_payment_url,
         stripe_session_id=stripe_session_id,
         stripe_checkout_url=stripe_checkout_url,
         payment_method=payment_method,

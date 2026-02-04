@@ -64,6 +64,8 @@ class Order(Base):
     paypal_order_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     paypal_approval_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
     paypal_capture_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    netopia_ntp_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    netopia_payment_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
     receipt_token_version: Mapped[int] = mapped_column(nullable=False, default=0)
     shipping_address_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("addresses.id"), nullable=True

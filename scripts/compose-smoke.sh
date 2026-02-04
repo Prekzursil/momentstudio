@@ -33,7 +33,7 @@ cd "${ROOT_DIR}"
 echo "[compose-smoke] Installing frontend deps (Playwright)..."
 (
   cd frontend
-  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm ci
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm ci --loglevel=error
   if [[ "$(id -u)" -eq 0 ]]; then
     npx playwright install --with-deps chromium
   elif command -v sudo >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1; then

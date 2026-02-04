@@ -1227,6 +1227,15 @@
     "lockers": {
       "useMyLocation": "Folosește locația mea",
       "searchArea": "Caută în această zonă",
+      "searchLabel": "Caută locația",
+      "searchPlaceholder": "Caută orașul sau adresa…",
+      "searchButton": "Caută",
+      "clearSearch": "Șterge căutarea",
+      "searching": "Se caută…",
+      "searchingAround": "Cauți în jurul:",
+      "searchNoResults": "Nu am găsit locații pentru această căutare.",
+      "searchError": "Nu am putut căuta locații. Încearcă din nou.",
+      "clearSelectedLocation": "Șterge locația selectată",
       "loading": "Se încarcă lockerele…",
       "none": "Nu am găsit lockere în apropiere. Mută harta sau mărește zona.",
       "results": "Lockere",
@@ -1274,6 +1283,12 @@
     "stripeConfirmFailed": "Nu am putut confirma plata Stripe. Încearcă din nou.",
     "stripeCancelled": "Plata Stripe a fost anulată",
     "stripeCancelledCopy": "Nu a fost efectuată nicio plată. Poți reveni la checkout și alege o altă metodă.",
+    "netopiaReturnTitle": "Netopia",
+    "netopiaConfirming": "Confirmăm plata Netopia…",
+    "netopiaMissingOrder": "Lipsește id-ul comenzii Netopia.",
+    "netopiaConfirmFailed": "Nu am putut confirma plata Netopia. Încearcă din nou.",
+    "netopiaCancelled": "Plata Netopia a fost anulată",
+    "netopiaCancelledCopy": "Nu a fost efectuată nicio plată. Poți reveni la checkout și alege o altă metodă.",
     "backToCheckout": "Înapoi la checkout",
     "placeOrder": "Plasează comanda",
     "placingOrder": "Se plasează comanda…",
@@ -1845,6 +1860,7 @@
       "down": "Jos",
       "preview": "Previzualizează",
       "hide": "Ascunde",
+      "unhide": "Afișează",
       "bulkActions": "Acțiuni în masă"
     },
     "help": {
@@ -2583,6 +2599,30 @@
         "saveShipping": "Salvează livrarea",
         "contactLabel": "Contact",
         "saveContact": "Salvează contactul",
+        "legal": {
+          "title": "Pagini legale",
+          "hint": "Editează Termeni și condiții, Politica de confidențialitate și pagina ANPC (EN + RO).",
+          "documentLabel": "Document",
+          "open": "Deschide",
+          "lastUpdatedLabel": "Ultima actualizare",
+          "lastUpdatedHint": "Dată manuală (nu se actualizează automat).",
+          "documents": {
+            "termsIndex": "Pagina Termeni (index)",
+            "terms": "Termeni și condiții",
+            "privacy": "Politica de confidențialitate",
+            "anpc": "ANPC / Informații pentru consumatori"
+          }
+        },
+        "success": { "save": "Pagina a fost salvată." },
+        "errors": { "save": "Nu am putut salva pagina.", "load": "Nu am putut încărca pagina." },
+        "visibility": {
+          "hidden": "Pagina a fost ascunsă.",
+          "visible": "Pagina este acum vizibilă.",
+          "errors": {
+            "save": "Nu am putut actualiza vizibilitatea paginii.",
+            "load": "Nu am putut încărca pagina."
+          }
+        },
         "builder": {
           "title": "Blocuri tip page builder",
           "hint": "Opțional: construiește pagini mai bogate (Povestea noastră/Contact) din blocuri. Dacă există blocuri, magazinul le afișează în locul conținutului Markdown.",
@@ -2598,8 +2638,10 @@
           "status": "Stare",
           "createPage": "Creează pagină",
           "page": "Pagină",
+          "showHidden": "Afișează paginile ascunse",
           "globalSections": "Secțiuni globale",
           "pagesGroup": "Pagini",
+          "hiddenTag": "ascunsă",
           "publishAtOptional": "Publică la (opțional)",
           "publishAtHint": "Dacă este în viitor și starea este Publicat, pagina va deveni vizibilă la acel moment.",
           "unpublishAtOptional": "Ascunde la (opțional)",
@@ -2840,8 +2882,8 @@
         "coverImagePlaceholder": "https://…",
         "readingTimeOptional": "Timp de citire (minute) (opțional)",
         "pinned": "Fixează sus în blog",
-        "pinOrder": "Ordine fixare (1–3)",
-        "pinOrderHint": "Articolele fixate apar primele în /blog.",
+        "pinOrder": "Ordine fixare",
+        "pinOrderHint": "Articolele fixate apar primele în /blog. Numerele mai mici apar primele.",
         "body": "Conținut"
       },
       "cover": {
@@ -2953,10 +2995,18 @@
       },
       "pins": {
         "badge": "Fixat #{{slot}}",
+        "title": "Articole fixate",
+        "hint": "Trage pentru a reordona articolele fixate. Numerele mai mici apar primele în /blog.",
         "conflictBadge": "Conflict",
         "conflictsTitle": "Conflicte de fixare",
         "conflictLine": "Slot #{{slot}}: {{posts}}",
-        "saveConflict": "Slotul #{{slot}} este deja folosit de „{{title}}”. Debifează-l sau alege alt slot."
+        "saveConflict": "Slotul #{{slot}} este deja folosit de „{{title}}”. Debifează-l sau alege alt slot.",
+        "success": {
+          "reordered": "Ordinea articolelor fixate a fost salvată."
+        },
+        "errors": {
+          "reorder": "Nu s-a putut reordona lista de articole fixate."
+        }
       },
       "preview": {
         "title": "Link previzualizare",
@@ -3063,8 +3113,12 @@
         "success": "Actualizate {{count}} articole.",
         "errors": "{{count}} articole nu au putut fi actualizate."
       },
+      "confirms": {
+        "deletePost": "Ștergi \"{{title}}\"? Această acțiune nu poate fi anulată."
+      },
       "success": {
         "created": "Articol creat",
+        "deleted": "Articol șters",
         "saved": "Salvat",
         "translationSaved": "Traducere salvată"
       },
@@ -3077,7 +3131,8 @@
         "save": "Nu am putut salva articolul",
         "translationSave": "Nu am putut salva traducerea",
         "translationMetaSave": "Traducerea a fost salvată, dar nu am putut salva metadatele",
-        "loadPost": "Nu am putut încărca articolul"
+        "loadPost": "Nu am putut încărca articolul",
+        "delete": "Nu am putut șterge articolul"
       }
     },
     "fx": {

@@ -69,6 +69,7 @@ import {
 type AdminContentSection = 'home' | 'pages' | 'blog' | 'settings';
 type UiLang = 'en' | 'ro';
 type ContentStatusUi = 'draft' | 'review' | 'published';
+type LegalPageKey = 'page.terms' | 'page.terms-and-conditions' | 'page.privacy-policy' | 'page.anpc';
 
 type HomeSectionId =
   | 'featured_products'
@@ -1367,92 +1368,179 @@ class CmsDraftManager<T> {
               </div>
             </div>
             <div class="grid gap-3 text-sm">
-              <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pagesAboutSingle">
-                <app-localized-text-editor
-                  [label]="'adminUi.site.pages.aboutLabel' | translate"
-                  [multiline]="true"
-                  [rows]="5"
-                  [value]="infoForm.about"
-                ></app-localized-text-editor>
-              </ng-container>
-              <ng-template #pagesAboutSingle>
-                <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
-                  {{ 'adminUi.site.pages.aboutLabel' | translate }}
-                  <textarea
-                    rows="3"
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    [(ngModel)]="infoForm.about[infoLang]"
-                  ></textarea>
-                </label>
-              </ng-template>
-              <div class="flex gap-2">
-                <app-button size="sm" [label]="'adminUi.site.pages.saveAbout' | translate" (action)="saveInfoUi('page.about', infoForm.about)"></app-button>
+              <div class="grid gap-2">
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.pages.aboutLabel' | translate }}</p>
+                <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pagesAboutSingle">
+	                  <div class="grid gap-3 md:grid-cols-2">
+	                    <div class="grid gap-1">
+	                      <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">RO</span>
+	                      <app-rich-editor height="420px" [ariaLabel]="('adminUi.site.pages.aboutLabel' | translate) + ' (RO)'" [(value)]="infoForm.about.ro"></app-rich-editor>
+	                    </div>
+	                    <div class="grid gap-1">
+	                      <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">EN</span>
+	                      <app-rich-editor height="420px" [ariaLabel]="('adminUi.site.pages.aboutLabel' | translate) + ' (EN)'" [(value)]="infoForm.about.en"></app-rich-editor>
+	                    </div>
+	                  </div>
+	                </ng-container>
+	                <ng-template #pagesAboutSingle>
+	                  <app-rich-editor height="420px" [ariaLabel]="'adminUi.site.pages.aboutLabel' | translate" [(value)]="infoForm.about[infoLang]"></app-rich-editor>
+	                </ng-template>
+                <div class="flex gap-2">
+                  <app-button size="sm" [label]="'adminUi.site.pages.saveAbout' | translate" (action)="saveInfoUi('page.about', infoForm.about)"></app-button>
+                </div>
               </div>
-              <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pagesFaqSingle">
-                <app-localized-text-editor
-                  [label]="'adminUi.site.pages.faqLabel' | translate"
-                  [multiline]="true"
-                  [rows]="5"
-                  [value]="infoForm.faq"
-                ></app-localized-text-editor>
+
+              <ng-container *ngIf="showHiddenPages">
+                <div class="grid gap-2">
+                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.pages.faqLabel' | translate }}</p>
+                  <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pagesFaqSingle">
+	                    <div class="grid gap-3 md:grid-cols-2">
+	                      <div class="grid gap-1">
+	                        <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">RO</span>
+	                        <app-rich-editor height="320px" [ariaLabel]="('adminUi.site.pages.faqLabel' | translate) + ' (RO)'" [(value)]="infoForm.faq.ro"></app-rich-editor>
+	                      </div>
+	                      <div class="grid gap-1">
+	                        <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">EN</span>
+	                        <app-rich-editor height="320px" [ariaLabel]="('adminUi.site.pages.faqLabel' | translate) + ' (EN)'" [(value)]="infoForm.faq.en"></app-rich-editor>
+	                      </div>
+	                    </div>
+	                  </ng-container>
+	                  <ng-template #pagesFaqSingle>
+	                    <app-rich-editor height="320px" [ariaLabel]="'adminUi.site.pages.faqLabel' | translate" [(value)]="infoForm.faq[infoLang]"></app-rich-editor>
+	                  </ng-template>
+                  <div class="flex gap-2">
+                    <app-button size="sm" [label]="'adminUi.site.pages.saveFaq' | translate" (action)="saveInfoUi('page.faq', infoForm.faq)"></app-button>
+                  </div>
+                </div>
+
+                <div class="grid gap-2">
+                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.pages.shippingLabel' | translate }}</p>
+                  <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pagesShippingSingle">
+	                    <div class="grid gap-3 md:grid-cols-2">
+	                      <div class="grid gap-1">
+	                        <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">RO</span>
+	                        <app-rich-editor height="320px" [ariaLabel]="('adminUi.site.pages.shippingLabel' | translate) + ' (RO)'" [(value)]="infoForm.shipping.ro"></app-rich-editor>
+	                      </div>
+	                      <div class="grid gap-1">
+	                        <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">EN</span>
+	                        <app-rich-editor height="320px" [ariaLabel]="('adminUi.site.pages.shippingLabel' | translate) + ' (EN)'" [(value)]="infoForm.shipping.en"></app-rich-editor>
+	                      </div>
+	                    </div>
+	                  </ng-container>
+	                  <ng-template #pagesShippingSingle>
+	                    <app-rich-editor height="320px" [ariaLabel]="'adminUi.site.pages.shippingLabel' | translate" [(value)]="infoForm.shipping[infoLang]"></app-rich-editor>
+	                  </ng-template>
+                  <div class="flex gap-2">
+                    <app-button size="sm" [label]="'adminUi.site.pages.saveShipping' | translate" (action)="saveInfoUi('page.shipping', infoForm.shipping)"></app-button>
+                  </div>
+                </div>
               </ng-container>
-              <ng-template #pagesFaqSingle>
-                <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
-                  {{ 'adminUi.site.pages.faqLabel' | translate }}
-                  <textarea
-                    rows="3"
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    [(ngModel)]="infoForm.faq[infoLang]"
-                  ></textarea>
-                </label>
-              </ng-template>
-              <div class="flex gap-2">
-                <app-button size="sm" [label]="'adminUi.site.pages.saveFaq' | translate" (action)="saveInfoUi('page.faq', infoForm.faq)"></app-button>
+
+              <div class="grid gap-2">
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.pages.contactLabel' | translate }}</p>
+                <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pagesContactSingle">
+	                  <div class="grid gap-3 md:grid-cols-2">
+	                    <div class="grid gap-1">
+	                      <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">RO</span>
+	                      <app-rich-editor height="320px" [ariaLabel]="('adminUi.site.pages.contactLabel' | translate) + ' (RO)'" [(value)]="infoForm.contact.ro"></app-rich-editor>
+	                    </div>
+	                    <div class="grid gap-1">
+	                      <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">EN</span>
+	                      <app-rich-editor height="320px" [ariaLabel]="('adminUi.site.pages.contactLabel' | translate) + ' (EN)'" [(value)]="infoForm.contact.en"></app-rich-editor>
+	                    </div>
+	                  </div>
+	                </ng-container>
+	                <ng-template #pagesContactSingle>
+	                  <app-rich-editor height="320px" [ariaLabel]="'adminUi.site.pages.contactLabel' | translate" [(value)]="infoForm.contact[infoLang]"></app-rich-editor>
+	                </ng-template>
+                <div class="flex gap-2">
+                  <app-button size="sm" [label]="'adminUi.site.pages.saveContact' | translate" (action)="saveInfoUi('page.contact', infoForm.contact)"></app-button>
+                  <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="infoMessage">{{ infoMessage }}</span>
+                  <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="infoError">{{ infoError }}</span>
+                </div>
               </div>
-              <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pagesShippingSingle">
-                <app-localized-text-editor
-                  [label]="'adminUi.site.pages.shippingLabel' | translate"
-                  [multiline]="true"
-                  [rows]="5"
-                  [value]="infoForm.shipping"
-                ></app-localized-text-editor>
-              </ng-container>
-              <ng-template #pagesShippingSingle>
-                <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
-                  {{ 'adminUi.site.pages.shippingLabel' | translate }}
-                  <textarea
-                    rows="3"
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    [(ngModel)]="infoForm.shipping[infoLang]"
-                  ></textarea>
-                </label>
-              </ng-template>
-              <div class="flex gap-2">
-                <app-button size="sm" [label]="'adminUi.site.pages.saveShipping' | translate" (action)="saveInfoUi('page.shipping', infoForm.shipping)"></app-button>
-              </div>
-              <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else pagesContactSingle">
-                <app-localized-text-editor
-                  [label]="'adminUi.site.pages.contactLabel' | translate"
-                  [multiline]="true"
-                  [rows]="5"
-                  [value]="infoForm.contact"
-                ></app-localized-text-editor>
-              </ng-container>
-              <ng-template #pagesContactSingle>
-                <label class="grid gap-1 font-medium text-slate-700 dark:text-slate-200">
-                  {{ 'adminUi.site.pages.contactLabel' | translate }}
-                  <textarea
-                    rows="3"
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    [(ngModel)]="infoForm.contact[infoLang]"
-                  ></textarea>
-                </label>
-              </ng-template>
-              <div class="flex gap-2">
-                <app-button size="sm" [label]="'adminUi.site.pages.saveContact' | translate" (action)="saveInfoUi('page.contact', infoForm.contact)"></app-button>
-                <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="infoMessage">{{ infoMessage }}</span>
-                <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="infoError">{{ infoError }}</span>
-              </div>
+
+              <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
+                <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.site.pages.legal.title' | translate }}
+                </summary>
+                <div class="mt-3 grid gap-3">
+                  <p class="text-sm text-slate-600 dark:text-slate-300">
+                    {{ 'adminUi.site.pages.legal.hint' | translate }}
+                  </p>
+
+	                  <div class="grid gap-3 md:grid-cols-[1fr_auto] items-end">
+	                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                      {{ 'adminUi.site.pages.legal.documentLabel' | translate }}
+	                      <select
+                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        [(ngModel)]="legalPageKey"
+                        (ngModelChange)="onLegalPageKeyChange($event)"
+                      >
+                        <option [ngValue]="'page.terms'">{{ 'adminUi.site.pages.legal.documents.termsIndex' | translate }}</option>
+                        <option [ngValue]="'page.terms-and-conditions'">{{ 'adminUi.site.pages.legal.documents.terms' | translate }}</option>
+                        <option [ngValue]="'page.privacy-policy'">{{ 'adminUi.site.pages.legal.documents.privacy' | translate }}</option>
+                        <option [ngValue]="'page.anpc'">{{ 'adminUi.site.pages.legal.documents.anpc' | translate }}</option>
+                      </select>
+                    </label>
+                    <div class="flex flex-wrap items-center justify-end gap-2">
+                      <a
+                        class="inline-flex h-10 items-center justify-center rounded-full px-3 text-sm font-medium bg-white text-slate-900 border border-slate-200 hover:border-slate-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:bg-slate-800 dark:text-slate-50 dark:border-slate-700 dark:hover:border-slate-600"
+                        [attr.href]="pagePublicUrlForKey(legalPageKey)"
+                        target="_blank"
+                        rel="noopener"
+                      >
+                        {{ 'adminUi.site.pages.legal.open' | translate }}
+                      </a>
+	                      <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadLegalPage(legalPageKey)"></app-button>
+	                    </div>
+	                  </div>
+
+	                  <div class="grid gap-3 md:grid-cols-[260px_1fr] items-end">
+	                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                      {{ 'adminUi.site.pages.legal.lastUpdatedLabel' | translate }}
+	                      <input
+	                        type="date"
+	                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                        [(ngModel)]="legalPageLastUpdated"
+	                      />
+	                      <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.site.pages.legal.lastUpdatedHint' | translate }}</span>
+	                    </label>
+	                  </div>
+
+	                  <div
+	                    *ngIf="legalPageError"
+	                    class="rounded-lg border border-rose-200 bg-rose-50 p-2 text-sm text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+	                  >
+                    {{ legalPageError }}
+                  </div>
+                  <div *ngIf="legalPageLoading" class="text-sm text-slate-600 dark:text-slate-300">
+                    {{ 'notifications.loading' | translate }}
+                  </div>
+
+                  <ng-container *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else legalPagesSingle">
+                    <div class="grid gap-3 md:grid-cols-2">
+                      <div class="grid gap-1">
+                        <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">RO</span>
+                        <app-rich-editor height="520px" [(value)]="legalPageForm.ro"></app-rich-editor>
+                      </div>
+                      <div class="grid gap-1">
+                        <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">EN</span>
+                        <app-rich-editor height="520px" [(value)]="legalPageForm.en"></app-rich-editor>
+                      </div>
+                    </div>
+                  </ng-container>
+                  <ng-template #legalPagesSingle>
+                    <app-rich-editor height="520px" [(value)]="legalPageForm[infoLang]"></app-rich-editor>
+                  </ng-template>
+
+                  <div class="flex flex-wrap items-center gap-2">
+                    <app-button size="sm" [label]="'adminUi.actions.save' | translate" [disabled]="legalPageSaving" (action)="saveLegalPageUi()"></app-button>
+                    <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="legalPageMessage">{{ legalPageMessage }}</span>
+                    <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="legalPageError">{{ legalPageError }}</span>
+                  </div>
+                </div>
+              </details>
 
               <details class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
                 <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
@@ -1526,6 +1614,11 @@ class CmsDraftManager<T> {
                     {{ contentPagesError }}
                   </div>
 
+                  <label class="inline-flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
+                    <input type="checkbox" [(ngModel)]="showHiddenPages" (ngModelChange)="onShowHiddenPagesChange()" />
+                    {{ 'adminUi.site.pages.builder.showHidden' | translate }}
+                  </label>
+
                   <div class="grid gap-3 md:grid-cols-[1fr_auto] items-end">
                     <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                       {{ 'adminUi.site.pages.builder.page' | translate }}
@@ -1541,8 +1634,9 @@ class CmsDraftManager<T> {
 	                        </optgroup>
 	                        <optgroup [label]="'adminUi.site.pages.builder.pagesGroup' | translate">
 	                          <ng-container *ngIf="contentPages.length; else defaultPages">
-	                            <option *ngFor="let p of contentPages" [ngValue]="p.key">
+	                            <option *ngFor="let p of visibleContentPages()" [ngValue]="p.key">
 	                              {{ p.title || p.slug }} · {{ p.slug }}
+                                <ng-container *ngIf="p.hidden"> · {{ 'adminUi.site.pages.builder.hiddenTag' | translate }}</ng-container>
 	                              <ng-container *ngIf="p.needs_translation_en || p.needs_translation_ro">
 	                                ·
 	                                <ng-container *ngIf="p.needs_translation_en">EN</ng-container>
@@ -1566,6 +1660,14 @@ class CmsDraftManager<T> {
                         variant="ghost"
                         [label]="'adminUi.actions.changeUrl' | translate"
                         (action)="renameCustomPageUrl()"
+                      ></app-button>
+                      <app-button
+                        *ngIf="canTogglePageHidden(pageBlocksKey)"
+                        size="sm"
+                        variant="ghost"
+                        [label]="isPageHidden(pageBlocksKey) ? ('adminUi.actions.unhide' | translate) : ('adminUi.actions.hide' | translate)"
+                        [disabled]="pageVisibilitySaving[pageBlocksKey]"
+                        (action)="togglePageHidden(pageBlocksKey)"
                       ></app-button>
                       <ng-container *ngIf="cmsAdvanced()">
 	                        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -3243,10 +3345,15 @@ class CmsDraftManager<T> {
                       class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                       [(ngModel)]="pagesRevisionKey"
                     >
-                      <option [ngValue]="'page.about'">{{ 'adminUi.site.pages.aboutLabel' | translate }}</option>
-                      <option [ngValue]="'page.faq'">{{ 'adminUi.site.pages.faqLabel' | translate }}</option>
-                      <option [ngValue]="'page.shipping'">{{ 'adminUi.site.pages.shippingLabel' | translate }}</option>
-                      <option [ngValue]="'page.contact'">{{ 'adminUi.site.pages.contactLabel' | translate }}</option>
+                      <ng-container *ngIf="contentPages.length; else defaultRevisionPages">
+                        <option *ngFor="let p of visibleContentPages()" [ngValue]="p.key">
+                          {{ p.title || p.slug }} · {{ p.slug }}
+                        </option>
+                      </ng-container>
+                      <ng-template #defaultRevisionPages>
+                        <option [ngValue]="'page.about'">{{ 'adminUi.site.pages.aboutLabel' | translate }}</option>
+                        <option [ngValue]="'page.contact'">{{ 'adminUi.site.pages.contactLabel' | translate }}</option>
+                      </ng-template>
                     </select>
                   </label>
                   <app-content-revisions [contentKey]="pagesRevisionKey" [titleKey]="pagesRevisionTitleKey()"></app-content-revisions>
@@ -5438,7 +5545,7 @@ class CmsDraftManager<T> {
                 </div>
               </div>
 
-              <div class="grid gap-3 md:grid-cols-4">
+              <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
                 <label class="grid gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
                   {{ 'adminUi.blog.bulk.actionLabel' | translate }}
                   <select
@@ -5493,13 +5600,33 @@ class CmsDraftManager<T> {
             </div>
 
             <div
-              *ngIf="blogPinnedConflicts().length"
-              class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
+              *ngIf="blogPinnedPosts().length"
+              class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/40"
             >
-              <p class="font-semibold">{{ 'adminUi.blog.pins.conflictsTitle' | translate }}</p>
-              <div class="mt-1 grid gap-1 text-xs">
-                <div *ngFor="let conflict of blogPinnedConflicts()">
-                  {{ 'adminUi.blog.pins.conflictLine' | translate: { slot: conflict.slot, posts: conflict.posts } }}
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <p class="font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.blog.pins.title' | translate }}</p>
+                <span *ngIf="blogPinsSaving" class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.common.saving' | translate }}</span>
+              </div>
+              <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.blog.pins.hint' | translate }}</p>
+              <div class="mt-2 grid gap-2">
+                <div
+                  *ngFor="let post of blogPinnedPosts()"
+                  class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900"
+                  [class.opacity-60]="blogPinsSaving"
+                  [attr.draggable]="blogPinsSaving ? null : 'true'"
+                  (dragstart)="onBlogPinDragStart(post.key)"
+                  (dragover)="onBlogPinDragOver($event)"
+                  (drop)="onBlogPinDrop(post.key)"
+                >
+                  <div class="min-w-0">
+                    <p class="font-medium text-slate-900 dark:text-slate-50 truncate">{{ post.title || post.key }}</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ post.key }}</p>
+                  </div>
+                  <span
+                    class="shrink-0 inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 dark:border-indigo-900/50 dark:bg-indigo-950/40 dark:text-indigo-200"
+                  >
+                    #{{ blogPinnedSlot(post) || 1 }}
+                  </span>
                 </div>
               </div>
             </div>
@@ -5523,12 +5650,6 @@ class CmsDraftManager<T> {
                       <span class="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 dark:border-indigo-900/50 dark:bg-indigo-950/40 dark:text-indigo-200">
                         {{ 'adminUi.blog.pins.badge' | translate: { slot } }}
                       </span>
-                      <span
-                        *ngIf="blogPinnedSlotHasConflict(slot, post.key)"
-                        class="ml-1 inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100"
-                      >
-                        {{ 'adminUi.blog.pins.conflictBadge' | translate }}
-                      </span>
                       ·
                     </ng-container>
                     {{ post.key }} · {{ ('adminUi.status.' + (post.status || 'draft')) | translate }} ·
@@ -5545,6 +5666,13 @@ class CmsDraftManager<T> {
                   >
                     {{ 'adminUi.blog.actions.view' | translate }}
                   </a>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.actions.delete' | translate"
+                    [disabled]="blogDeleteBusy.has(post.key)"
+                    (action)="deleteBlogPost(post)"
+                  ></app-button>
                   <app-button size="sm" variant="ghost" [label]="'adminUi.actions.edit' | translate" (action)="selectBlogPost(post)"></app-button>
                 </div>
               </div>
@@ -5649,15 +5777,14 @@ class CmsDraftManager<T> {
                 </label>
                 <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                   {{ 'adminUi.blog.fields.pinOrder' | translate }}
-                  <select
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
                     class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     [(ngModel)]="blogCreate.pin_order"
                     [disabled]="!blogCreate.pinned"
-                  >
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                  </select>
+                  />
                   <span class="text-xs text-slate-500 dark:text-slate-400">
                     {{ 'adminUi.blog.fields.pinOrderHint' | translate }}
                   </span>
@@ -5905,15 +6032,14 @@ class CmsDraftManager<T> {
                 </label>
                 <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                   {{ 'adminUi.blog.fields.pinOrder' | translate }}
-                  <select
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
                     class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     [(ngModel)]="blogForm.pin_order"
                     [disabled]="blogEditLang !== blogBaseLang || !blogForm.pinned"
-                  >
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                  </select>
+                  />
                   <span class="text-xs text-slate-500 dark:text-slate-400">
                     {{ 'adminUi.blog.fields.pinOrderHint' | translate }}
                   </span>
@@ -7058,12 +7184,15 @@ export class AdminComponent implements OnInit, OnDestroy {
   blogMeta: Record<string, any> = {};
   blogImages: { id: string; url: string; alt_text?: string | null; sort_order: number; focal_x: number; focal_y: number }[] = [];
   blogBulkSelection = new Set<string>();
+  blogDeleteBusy = new Set<string>();
   blogBulkAction: 'publish' | 'unpublish' | 'schedule' | 'tags_add' | 'tags_remove' = 'publish';
   blogBulkPublishAt = '';
   blogBulkUnpublishAt = '';
   blogBulkTags = '';
   blogBulkSaving = false;
   blogBulkError = '';
+  blogPinsSaving = false;
+  draggingBlogPinKey: string | null = null;
   showBlogCoverLibrary = false;
   showBlogPreview = false;
   blogA11yOpen = false;
@@ -7219,9 +7348,20 @@ export class AdminComponent implements OnInit, OnDestroy {
   };
   infoMessage: string | null = null;
   infoError: string | null = null;
+  legalPageKey: LegalPageKey = 'page.terms';
+  legalPageForm: LocalizedText = { en: '', ro: '' };
+  legalPageLastUpdated = '';
+  private legalPageLastUpdatedOriginal = '';
+  private legalPageMeta: Record<string, unknown> = {};
+  legalPageLoading = false;
+  legalPageSaving = false;
+  legalPageMessage: string | null = null;
+  legalPageError: string | null = null;
   contentPages: ContentPageListItem[] = [];
   contentPagesLoading = false;
   contentPagesError: string | null = null;
+  showHiddenPages = false;
+  pageVisibilitySaving: Record<string, boolean> = {};
   reusableBlocks: CmsReusableBlock[] = [];
   reusableBlocksLoading = false;
   reusableBlocksError: string | null = null;
@@ -7650,18 +7790,22 @@ export class AdminComponent implements OnInit, OnDestroy {
     return true;
   }
 
-  pagesRevisionTitleKey(): string {
-    switch (this.pagesRevisionKey) {
+  pagesRevisionTitleKey(): string | undefined {
+    switch (String(this.pagesRevisionKey || '').trim()) {
       case 'page.about':
         return 'adminUi.site.pages.aboutLabel';
-      case 'page.faq':
-        return 'adminUi.site.pages.faqLabel';
-      case 'page.shipping':
-        return 'adminUi.site.pages.shippingLabel';
       case 'page.contact':
         return 'adminUi.site.pages.contactLabel';
+      case 'page.terms':
+        return 'adminUi.site.pages.legal.documents.termsIndex';
+      case 'page.terms-and-conditions':
+        return 'adminUi.site.pages.legal.documents.terms';
+      case 'page.privacy-policy':
+        return 'adminUi.site.pages.legal.documents.privacy';
+      case 'page.anpc':
+        return 'adminUi.site.pages.legal.documents.anpc';
       default:
-        return 'adminUi.content.revisions.title';
+        return undefined;
     }
   }
 
@@ -7848,6 +7992,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 
     if (section === 'pages') {
       this.loadInfo();
+      this.loadLegalPage(this.legalPageKey);
       this.loadCategories();
       this.loadCollections();
       this.loadContentPages();
@@ -8912,32 +9057,91 @@ export class AdminComponent implements OnInit, OnDestroy {
     else if (typeof pinned === 'number') pinnedFlag = pinned === 1;
     else if (typeof pinned === 'string') pinnedFlag = ['1', 'true', 'yes', 'on'].includes(pinned.trim().toLowerCase());
     if (!pinnedFlag) return null;
-    const raw = Number(meta['pin_order']);
-    if (!Number.isFinite(raw)) return null;
-    const normalized = Math.min(3, Math.max(1, Math.trunc(raw)));
-    return normalized;
+    const raw = meta['pin_order'];
+    const parsed = Number(typeof raw === 'number' ? raw : typeof raw === 'string' ? raw.trim() : 1);
+    const normalized = Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : 1;
+    return Math.max(1, normalized);
   }
 
   blogPinnedSlot(post: AdminContent): number | null {
     return this.pinnedSlotFromMeta(post.meta || null);
   }
 
-  blogPinnedSlotHasConflict(slot: number, key: string): boolean {
-    const normalized = Math.min(3, Math.max(1, Math.trunc(Number(slot))));
-    const matches = this.blogPosts().filter((p) => p.key !== key && this.blogPinnedSlot(p) === normalized);
-    return matches.length > 0;
+  blogPinnedPosts(): AdminContent[] {
+    const pinned = this.blogPosts().filter((p) => Boolean(this.blogPinnedSlot(p)));
+    return pinned.sort((a, b) => {
+      const ao = this.blogPinnedSlot(a) ?? 999;
+      const bo = this.blogPinnedSlot(b) ?? 999;
+      if (ao !== bo) return ao - bo;
+      const ap = a.published_at ? Date.parse(a.published_at) : 0;
+      const bp = b.published_at ? Date.parse(b.published_at) : 0;
+      if (ap !== bp) return bp - ap;
+      return String(b.updated_at || '').localeCompare(String(a.updated_at || ''));
+    });
   }
 
-  blogPinnedConflicts(): Array<{ slot: number; posts: string }> {
-    const out: Array<{ slot: number; posts: string }> = [];
-    for (const slot of [1, 2, 3]) {
-      const posts = this.blogPosts().filter((p) => this.blogPinnedSlot(p) === slot);
-      if (posts.length <= 1) continue;
-      const labels = posts.map((p) => p.title || p.key).slice(0, 4);
-      const more = posts.length > labels.length ? ` (+${posts.length - labels.length})` : '';
-      out.push({ slot, posts: labels.join(', ') + more });
+  private nextBlogPinOrder(): number {
+    const orders = this.blogPosts()
+      .map((p) => this.blogPinnedSlot(p))
+      .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+    const max = orders.length ? Math.max(...orders) : 0;
+    return max + 1;
+  }
+
+  onBlogPinDragStart(key: string): void {
+    this.draggingBlogPinKey = (key || '').trim() || null;
+  }
+
+  onBlogPinDragOver(event: DragEvent): void {
+    event.preventDefault();
+  }
+
+  async onBlogPinDrop(targetKey: string): Promise<void> {
+    const fromKey = (this.draggingBlogPinKey || '').trim();
+    const toKey = (targetKey || '').trim();
+    this.draggingBlogPinKey = null;
+    if (!fromKey || !toKey || fromKey === toKey || this.blogPinsSaving) return;
+
+    const pinned = this.blogPinnedPosts();
+    const pinnedKeys = pinned.map((p) => p.key);
+    const fromIdx = pinnedKeys.indexOf(fromKey);
+    const toIdx = pinnedKeys.indexOf(toKey);
+    if (fromIdx === -1 || toIdx === -1) return;
+
+    const nextKeys = [...pinnedKeys];
+    nextKeys.splice(fromIdx, 1);
+    const insertIdx = fromIdx < toIdx ? toIdx - 1 : toIdx;
+    nextKeys.splice(insertIdx, 0, fromKey);
+
+    const updates: Array<{ key: string; meta: Record<string, any> }> = [];
+    nextKeys.forEach((key, idx) => {
+      const post = pinned.find((p) => p.key === key);
+      if (!post) return;
+      const nextOrder = idx + 1;
+      if ((this.blogPinnedSlot(post) ?? 1) === nextOrder) return;
+      const meta = { ...(post.meta || {}) };
+      meta['pinned'] = true;
+      meta['pin_order'] = nextOrder;
+      updates.push({ key, meta });
+    });
+    if (!updates.length) return;
+
+    this.blogPinsSaving = true;
+    try {
+      for (const update of updates) {
+        const updated = await firstValueFrom(
+          this.admin.updateContentBlock(update.key, this.withExpectedVersion(update.key, { meta: update.meta }))
+        );
+        this.rememberContentVersion(update.key, updated);
+      }
+      this.toast.success(this.t('adminUi.blog.pins.success.reordered'));
+      this.reloadContentBlocks();
+    } catch {
+      this.toast.error(this.t('adminUi.blog.pins.errors.reorder'));
+      this.reloadContentBlocks();
+    } finally {
+      this.blogPinsSaving = false;
     }
-    return out;
   }
 
   isBlogSelected(key: string): boolean {
@@ -9104,7 +9308,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 	      cover_image_url: '',
 	      reading_time_minutes: '',
 	      pinned: false,
-      pin_order: '1',
+      pin_order: String(this.nextBlogPinOrder()),
       includeTranslation: false,
       translationTitle: '',
       translationBody: ''
@@ -9164,14 +9368,9 @@ export class AdminComponent implements OnInit, OnDestroy {
 	    }
 	    if (this.blogCreate.pinned) {
         const rawOrder = Number(String(this.blogCreate.pin_order || '').trim());
-        const normalized = Number.isFinite(rawOrder) ? Math.min(3, Math.max(1, Math.trunc(rawOrder))) : 1;
-        const conflict = this.blogPosts().find((post) => this.blogPinnedSlot(post) === normalized);
-        if (conflict) {
-          this.toast.error(this.t('adminUi.blog.pins.saveConflict', { slot: normalized, title: conflict.title || conflict.key }));
-          return;
-        }
-	      meta['pinned'] = true;
-	      meta['pin_order'] = normalized;
+        const normalized = Number.isFinite(rawOrder) && rawOrder > 0 ? Math.trunc(rawOrder) : this.nextBlogPinOrder();
+        meta['pinned'] = true;
+        meta['pin_order'] = Math.max(1, normalized);
 	    }
 	    const published_at = this.blogCreate.published_at ? new Date(this.blogCreate.published_at).toISOString() : undefined;
 	    const published_until = this.blogCreate.published_until ? new Date(this.blogCreate.published_until).toISOString() : undefined;
@@ -9237,6 +9436,31 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.loadBlogEditor(post.key);
   }
 
+  deleteBlogPost(post: AdminContent): void {
+    const key = (post?.key || '').trim();
+    if (!key) return;
+    const label = (post?.title || '').trim() || key;
+    const ok = window.confirm(this.t('adminUi.blog.confirms.deletePost', { title: label }));
+    if (!ok) return;
+
+    this.blogDeleteBusy.add(key);
+    this.admin.deleteContent(key).subscribe({
+      next: () => {
+        this.blogDeleteBusy.delete(key);
+        this.blogBulkSelection.delete(key);
+        if (this.selectedBlogKey === key) {
+          this.closeBlogEditor();
+        }
+        this.toast.success(this.t('adminUi.blog.success.deleted'));
+        this.reloadContentBlocks();
+      },
+      error: () => {
+        this.blogDeleteBusy.delete(key);
+        this.toast.error(this.t('adminUi.blog.errors.delete'));
+      }
+    });
+  }
+
   setBlogEditLang(lang: 'en' | 'ro'): void {
     if (!this.selectedBlogKey) return;
     this.blogEditLang = lang;
@@ -9272,17 +9496,6 @@ export class AdminComponent implements OnInit, OnDestroy {
     const nextMeta = this.buildBlogMeta(this.blogEditLang);
     const metaChanged = JSON.stringify(nextMeta) !== JSON.stringify(this.blogMeta || {});
     const isBase = this.blogEditLang === this.blogBaseLang;
-    if (isBase && nextMeta['pinned']) {
-      const slot = Number(nextMeta['pin_order']);
-      if (Number.isFinite(slot)) {
-        const normalized = Math.min(3, Math.max(1, Math.trunc(slot)));
-        const conflict = this.blogPosts().find((post) => post.key !== key && this.blogPinnedSlot(post) === normalized);
-        if (conflict) {
-          this.toast.error(this.t('adminUi.blog.pins.saveConflict', { slot: normalized, title: conflict.title || conflict.key }));
-          return;
-        }
-      }
-    }
     if (isBase && this.blogForm.status === 'published') {
       const issues = this.blogA11yIssues();
       if (issues.length) {
@@ -10445,17 +10658,21 @@ export class AdminComponent implements OnInit, OnDestroy {
 
 	    const cover = meta['cover_image_url'] || meta['cover_image'] || '';
 	    this.blogForm.cover_image_url = typeof cover === 'string' ? cover : '';
-	    const rt = meta['reading_time_minutes'] ?? meta['reading_time'] ?? '';
-	    this.blogForm.reading_time_minutes = rt ? String(rt) : '';
+    const rt = meta['reading_time_minutes'] ?? meta['reading_time'] ?? '';
+    this.blogForm.reading_time_minutes = rt ? String(rt) : '';
 
     const pinned = meta['pinned'];
-    this.blogForm.pinned = pinned === true || pinned === 'true';
+    let pinnedFlag = false;
+    if (typeof pinned === 'boolean') pinnedFlag = pinned;
+    else if (typeof pinned === 'number') pinnedFlag = pinned === 1;
+    else if (typeof pinned === 'string') pinnedFlag = ['1', 'true', 'yes', 'on'].includes(pinned.trim().toLowerCase());
+    this.blogForm.pinned = pinnedFlag;
     const rawPinOrder = meta['pin_order'];
     const parsedPinOrder = Number(
       typeof rawPinOrder === 'number' ? rawPinOrder : typeof rawPinOrder === 'string' ? rawPinOrder.trim() : '1'
     );
-    const normalized = Number.isFinite(parsedPinOrder) ? Math.min(3, Math.max(1, Math.trunc(parsedPinOrder))) : 1;
-    this.blogForm.pin_order = String(normalized);
+    const normalized = Number.isFinite(parsedPinOrder) && parsedPinOrder > 0 ? Math.trunc(parsedPinOrder) : 1;
+    this.blogForm.pin_order = String(Math.max(1, normalized));
   }
 
   private buildBlogMeta(lang: 'en' | 'ro'): Record<string, any> {
@@ -10493,8 +10710,8 @@ export class AdminComponent implements OnInit, OnDestroy {
     if (this.blogForm.pinned) {
       meta['pinned'] = true;
       const rawOrder = Number(String(this.blogForm.pin_order || '').trim());
-      const normalized = Number.isFinite(rawOrder) ? Math.min(3, Math.max(1, Math.trunc(rawOrder))) : 1;
-      meta['pin_order'] = normalized;
+      const normalized = Number.isFinite(rawOrder) && rawOrder > 0 ? Math.trunc(rawOrder) : 1;
+      meta['pin_order'] = Math.max(1, normalized);
     } else {
       delete meta['pinned'];
       delete meta['pin_order'];
@@ -11539,6 +11756,271 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
+  pagePublicUrlForKey(key: string): string {
+    const raw = String(key || '');
+    const slug = raw.startsWith('page.') ? raw.slice('page.'.length) : raw;
+    if (slug === 'about') return '/about';
+    if (slug === 'contact') return '/contact';
+    if (!slug) return '/pages';
+    return `/pages/${encodeURIComponent(slug)}`;
+  }
+
+  private readonly protectedHiddenPageKeys = new Set<string>([
+    'page.about',
+    'page.contact',
+    'page.terms',
+    'page.terms-and-conditions',
+    'page.privacy-policy',
+    'page.anpc',
+  ]);
+
+  isPageHidden(key: PageBuilderKey): boolean {
+    const raw = String(key || '').trim();
+    if (!raw || isCmsGlobalSectionKey(raw)) return false;
+    return Boolean(this.contentPages.find((p) => p.key === raw)?.hidden);
+  }
+
+  canTogglePageHidden(key: PageBuilderKey): boolean {
+    const raw = String(key || '').trim();
+    if (!raw || isCmsGlobalSectionKey(raw)) return false;
+    if (!raw.startsWith('page.')) return false;
+    return !this.protectedHiddenPageKeys.has(raw);
+  }
+
+  togglePageHidden(key: PageBuilderKey): void {
+    const raw = String(key || '').trim();
+    if (!raw || !this.canTogglePageHidden(key)) return;
+    const target = !this.isPageHidden(key);
+    this.setPageHidden(raw, target);
+  }
+
+  private setPageHidden(key: string, hidden: boolean): void {
+    const target = (key || '').trim();
+    if (!target) return;
+
+    this.pageVisibilitySaving[target] = true;
+    this.admin.getContent(target).subscribe({
+      next: (block) => {
+        this.rememberContentVersion(target, block);
+        const currentMeta = ((block as { meta?: Record<string, unknown> | null }).meta || {}) as Record<string, unknown>;
+        const nextMeta: Record<string, unknown> = { ...currentMeta, hidden };
+        const payload = this.withExpectedVersion(target, { meta: nextMeta });
+        this.admin.updateContentBlock(target, payload).subscribe({
+          next: (updated) => {
+            this.rememberContentVersion(target, updated);
+            this.pageVisibilitySaving[target] = false;
+            this.toast.success(hidden ? this.t('adminUi.site.pages.visibility.hidden') : this.t('adminUi.site.pages.visibility.visible'));
+            this.loadContentPages();
+            if (!this.showHiddenPages) this.ensureSelectedPageIsVisible();
+          },
+          error: (err) => {
+            this.pageVisibilitySaving[target] = false;
+            if (this.handleContentConflict(err, target, () => this.loadContentPages())) return;
+            this.toast.error(this.t('adminUi.site.pages.visibility.errors.save'));
+          }
+        });
+      },
+      error: () => {
+        this.pageVisibilitySaving[target] = false;
+        this.toast.error(this.t('adminUi.site.pages.visibility.errors.load'));
+      }
+    });
+  }
+
+  onLegalPageKeyChange(next: LegalPageKey): void {
+    if (!next || next === this.legalPageKey) return;
+    this.legalPageKey = next;
+    this.loadLegalPage(next);
+  }
+
+  loadLegalPage(key: LegalPageKey): void {
+    this.legalPageLoading = true;
+    this.legalPageMessage = null;
+    this.legalPageError = null;
+    const target = (key || '').trim();
+    if (!target) {
+      this.legalPageLoading = false;
+      this.legalPageError = 'Missing page key.';
+      return;
+    }
+
+    forkJoin([
+      this.admin.getContent(target, 'en').pipe(catchError((err) => (err?.status === 404 ? of(null) : of(err)))),
+      this.admin.getContent(target, 'ro').pipe(catchError((err) => (err?.status === 404 ? of(null) : of(err))))
+    ]).subscribe({
+      next: ([enRes, roRes]) => {
+        const enBlock = (enRes && typeof enRes === 'object' && 'body_markdown' in enRes) ? (enRes as any) : null;
+        const roBlock = (roRes && typeof roRes === 'object' && 'body_markdown' in roRes) ? (roRes as any) : null;
+
+        if (!enBlock && enRes && (enRes as any)?.status && (enRes as any)?.status !== 404) {
+          this.legalPageError = this.t('adminUi.site.pages.errors.load');
+        }
+
+        if (enBlock) this.rememberContentVersion(target, enBlock);
+        if (!enBlock && roBlock) this.rememberContentVersion(target, roBlock);
+
+        this.legalPageForm = {
+          en: (enBlock?.body_markdown as string) || '',
+          ro: (roBlock?.body_markdown as string) || ''
+        };
+        const meta = ((enBlock?.meta as Record<string, unknown> | null | undefined) ??
+          (roBlock?.meta as Record<string, unknown> | null | undefined) ??
+          {}) as Record<string, unknown>;
+        this.legalPageMeta = { ...(meta && typeof meta === 'object' ? meta : {}) };
+        const lastUpdated = typeof this.legalPageMeta['last_updated'] === 'string' ? String(this.legalPageMeta['last_updated']) : '';
+        this.legalPageLastUpdated = lastUpdated;
+        this.legalPageLastUpdatedOriginal = lastUpdated;
+
+        this.legalPageLoading = false;
+      },
+      error: () => {
+        this.legalPageLoading = false;
+        this.legalPageError = this.t('adminUi.site.pages.errors.load');
+      }
+    });
+  }
+
+  private saveLegalMetaIfNeeded(key: LegalPageKey, onSuccess: () => void, onError: () => void): void {
+    const next = String(this.legalPageLastUpdated || '').trim();
+    const prev = String(this.legalPageLastUpdatedOriginal || '').trim();
+    if (next === prev) {
+      onSuccess();
+      return;
+    }
+    const meta: Record<string, unknown> = { ...(this.legalPageMeta || {}) };
+    if (next) meta['last_updated'] = next;
+    else delete meta['last_updated'];
+
+    this.admin.updateContentBlock(key, this.withExpectedVersion(key, { meta })).subscribe({
+      next: (updated) => {
+        this.rememberContentVersion(key, updated);
+        const updatedMeta = ((updated as { meta?: Record<string, unknown> | null }).meta || {}) as Record<string, unknown>;
+        this.legalPageMeta = { ...(updatedMeta && typeof updatedMeta === 'object' ? updatedMeta : {}) };
+        const lastUpdated = typeof this.legalPageMeta['last_updated'] === 'string' ? String(this.legalPageMeta['last_updated']) : '';
+        this.legalPageLastUpdated = lastUpdated;
+        this.legalPageLastUpdatedOriginal = lastUpdated;
+        onSuccess();
+      },
+      error: (err) => {
+        if (this.handleContentConflict(err, key, () => this.loadLegalPage(key))) {
+          onError();
+          return;
+        }
+        onError();
+      }
+    });
+  }
+
+  saveLegalPageUi(): void {
+    const key = this.legalPageKey;
+    if (!key) return;
+    if (this.cmsPrefs.translationLayout() === 'sideBySide') {
+      this.saveLegalPageBoth(key, this.legalPageForm);
+      return;
+    }
+    this.saveLegalPage(key, this.legalPageForm[this.infoLang] || '', this.infoLang);
+  }
+
+  private saveLegalPage(key: LegalPageKey, body: string, lang: UiLang): void {
+    this.legalPageMessage = null;
+    this.legalPageError = null;
+    this.legalPageSaving = true;
+    this.saveLegalMetaIfNeeded(
+      key,
+      () => {
+        this.savePageMarkdownInternal(
+          key,
+          body,
+          lang,
+          () => {
+            this.legalPageSaving = false;
+            this.legalPageMessage = this.t('adminUi.site.pages.success.save');
+          },
+          () => {
+            this.legalPageSaving = false;
+            this.legalPageError = this.t('adminUi.site.pages.errors.save');
+          }
+        );
+      },
+      () => {
+        this.legalPageSaving = false;
+        this.legalPageError = this.t('adminUi.site.pages.errors.save');
+      }
+    );
+  }
+
+  private saveLegalPageBoth(key: LegalPageKey, body: LocalizedText): void {
+    this.legalPageMessage = null;
+    this.legalPageError = null;
+    this.legalPageSaving = true;
+    this.saveLegalMetaIfNeeded(
+      key,
+      () => {
+        this.savePageMarkdownInternal(
+          key,
+          body.en || '',
+          'en',
+          () => {
+            this.savePageMarkdownInternal(
+              key,
+              body.ro || '',
+              'ro',
+              () => {
+                this.legalPageSaving = false;
+                this.legalPageMessage = this.t('adminUi.site.pages.success.save');
+              },
+              () => {
+                this.legalPageSaving = false;
+                this.legalPageError = this.t('adminUi.site.pages.errors.save');
+              }
+            );
+          },
+          () => {
+            this.legalPageSaving = false;
+            this.legalPageError = this.t('adminUi.site.pages.errors.save');
+          }
+        );
+      },
+      () => {
+        this.legalPageSaving = false;
+        this.legalPageError = this.t('adminUi.site.pages.errors.save');
+      }
+    );
+  }
+
+  private savePageMarkdownInternal(
+    key: string,
+    body: string,
+    lang: UiLang,
+    onSuccess: () => void,
+    onError: () => void
+  ): void {
+    const payload = { body_markdown: body, status: 'published', lang };
+    const createPayload = { title: key, ...payload };
+
+    const onSuccessWithBlock = (block?: any | null) => {
+      this.rememberContentVersion(key, block);
+      this.pageBlocksNeedsTranslationEn[key] = Boolean(block?.needs_translation_en);
+      this.pageBlocksNeedsTranslationRo[key] = Boolean(block?.needs_translation_ro);
+      this.loadContentPages();
+      onSuccess();
+    };
+
+    this.admin.updateContentBlock(key, this.withExpectedVersion(key, payload)).subscribe({
+      next: (block) => onSuccessWithBlock(block),
+      error: (err) => {
+        if (this.handleContentConflict(err, key, () => this.loadLegalPage(key as LegalPageKey))) {
+          onError();
+          return;
+        }
+        this.admin.createContent(key, createPayload).subscribe({
+          next: (created) => onSuccessWithBlock(created),
+          error: () => onError()
+        });
+      }
+    });
+  }
+
   saveInfo(key: 'page.about' | 'page.faq' | 'page.shipping' | 'page.contact', body: string, lang: UiLang = this.infoLang): void {
     this.infoMessage = null;
     this.infoError = null;
@@ -11621,15 +12103,8 @@ export class AdminComponent implements OnInit, OnDestroy {
           this.pageBlocksNeedsTranslationEn[page.key] = Boolean(page.needs_translation_en);
           this.pageBlocksNeedsTranslationRo[page.key] = Boolean(page.needs_translation_ro);
         }
-	        this.contentPagesLoading = false;
-	        if (!this.contentPages.length) return;
-	        if (isCmsGlobalSectionKey(this.pageBlocksKey)) return;
-	        const exists = this.contentPages.some((p) => p.key === this.pageBlocksKey);
-	        if (!exists) {
-	          const preferred = this.contentPages.find((p) => p.key === 'page.about')?.key || this.contentPages[0].key;
-	          this.pageBlocksKey = preferred as PageBuilderKey;
-	          this.ensureNewPageBlockTypeForKey(this.pageBlocksKey);
-	        }
+        this.contentPagesLoading = false;
+        this.ensureSelectedPageIsVisible();
 	      },
       error: () => {
         this.contentPagesLoading = false;
@@ -11637,6 +12112,26 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.contentPagesError = this.t('adminUi.site.pages.errors.load');
       }
     });
+  }
+
+  visibleContentPages(): ContentPageListItem[] {
+    const base = [...(this.contentPages || [])];
+    return this.showHiddenPages ? base : base.filter((p) => !p.hidden);
+  }
+
+  onShowHiddenPagesChange(): void {
+    this.ensureSelectedPageIsVisible();
+  }
+
+  private ensureSelectedPageIsVisible(): void {
+    const pages = this.visibleContentPages();
+    if (!pages.length) return;
+    if (isCmsGlobalSectionKey(this.pageBlocksKey)) return;
+    const exists = pages.some((p) => p.key === this.pageBlocksKey);
+    if (exists) return;
+    const preferred = pages.find((p) => p.key === 'page.about')?.key || pages[0].key;
+    this.pageBlocksKey = preferred as PageBuilderKey;
+    this.ensureNewPageBlockTypeForKey(this.pageBlocksKey);
   }
 
   loadReusableBlocks(): void {

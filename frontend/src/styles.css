@@ -91,6 +91,27 @@
     @apply my-4 border-l-4 border-slate-200 pl-4 italic text-slate-700 dark:border-slate-700 dark:text-slate-200;
   }
 
+  .markdown table {
+    @apply my-4 w-full border-separate border-spacing-0 text-left;
+  }
+
+  .markdown thead th {
+    @apply border-b border-slate-200 pb-2 text-sm font-semibold text-slate-900 dark:border-slate-800 dark:text-slate-50;
+  }
+
+  .markdown tbody td {
+    @apply border-b border-slate-100 py-2 text-base text-slate-700 dark:border-slate-800 dark:text-slate-200;
+  }
+
+  .markdown tbody tr:last-child td {
+    @apply border-b-0;
+  }
+
+  .markdown th:last-child,
+  .markdown td:last-child {
+    @apply whitespace-nowrap text-right text-slate-600 dark:text-slate-300;
+  }
+
   .blog-markdown {
     @apply text-[1.05rem] leading-8 tracking-[-0.01em];
   }

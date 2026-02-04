@@ -65,6 +65,8 @@ async def build_sitemap_urls(session: AsyncSession, *, langs: list[str] | None =
         for key, meta in page_rows:
             if isinstance(meta, dict) and meta.get("requires_auth"):
                 continue
+            if isinstance(meta, dict) and meta.get("hidden"):
+                continue
             slug = key.split(".", 1)[1] if key.startswith("page.") else key
             if not slug:
                 continue

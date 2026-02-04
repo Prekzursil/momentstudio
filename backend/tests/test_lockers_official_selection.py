@@ -79,3 +79,39 @@ async def test_list_lockers_fan_uses_official_when_configured(monkeypatch) -> No
     assert items
     assert items[0].id == "fan:FAN0001"
     assert items[0].provider == LockerProvider.fan_courier
+
+
+@pytest.mark.anyio("asyncio")
+async def test_fan_auth_token_parses_nested_response(monkeypatch) -> None:
+    lockers_service._reset_cache_for_tests()
+
+    monkeypatch.setattr(lockers_service.settings, "fan_api_base_url", "https://example.invalid")
+    monkeypatch.setattr(lockers_service.settings, "fan_api_username", "u")
+    monkeypatch.setattr(lockers_service.settings, "fan_api_password", "p")
+
+    class DummyResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {"status": "success", "data": {"token": "tok", "expiresAt": "2099-01-01 00:00:00"}}
+
+    class DummyClient:
+        def __init__(self, *args, **kwargs) -> None:
+            self.kwargs = kwargs
+
+        async def __aenter__(self) -> "DummyClient":
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb) -> bool:
+            return False
+
+        async def post(self, path: str, params: dict | None = None) -> DummyResponse:
+            assert path == "/login"
+            assert params == {"username": "u", "password": "p"}
+            return DummyResponse()
+
+    monkeypatch.setattr(lockers_service.httpx, "AsyncClient", DummyClient)
+
+    token = await lockers_service._fan_get_token()
+    assert token == "tok"

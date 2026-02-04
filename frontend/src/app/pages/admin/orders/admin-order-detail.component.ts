@@ -1365,7 +1365,7 @@ export class AdminOrderDetailComponent implements OnInit {
   error = signal<string | null>(null);
   errorRequestId = signal<string | null>(null);
   order = signal<AdminOrderDetail | null>(null);
-  piiReveal = signal(false);
+  piiReveal = signal(true);
   action = signal<OrderAction | null>(null);
   returnsLoading = signal(false);
   returnsError = signal<string | null>(null);

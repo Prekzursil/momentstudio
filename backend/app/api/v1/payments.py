@@ -57,7 +57,8 @@ async def payment_capabilities() -> PaymentsCapabilitiesResponse:
     elif not netopia_configured:
         netopia_reason = "Netopia is not configured"
     else:
-        netopia_reason = "Netopia checkout is not implemented yet"
+        netopia_enabled = True
+        netopia_reason = None
 
     return PaymentsCapabilitiesResponse(
         payments_provider=str(getattr(settings, "payments_provider", "") or "real"),

@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     paypal_client_secret_live: str | None = None
     paypal_webhook_id_live: str | None = None
     netopia_enabled: bool = False
+    # One of: sandbox | live
+    netopia_env: str = "sandbox"
+    # API key generated in NETOPIA Payments admin panel (required to start payments / check status).
+    netopia_api_key: str | None = None
     netopia_pos_signature: str | None = None
     netopia_public_key_pem: str | None = None
     netopia_public_key_path: str | None = None

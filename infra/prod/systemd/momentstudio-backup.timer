@@ -1,0 +1,11 @@
+[Unit]
+Description=Run momentstudio backups daily
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+RandomizedDelaySec=15m
+
+[Install]
+WantedBy=timers.target
+
