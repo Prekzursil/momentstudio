@@ -1227,6 +1227,12 @@
     "lockers": {
       "useMyLocation": "Folosește locația mea",
       "searchArea": "Caută în această zonă",
+      "searchLabel": "Caută locația",
+      "searchPlaceholder": "Caută orașul sau adresa…",
+      "searchButton": "Caută",
+      "searching": "Se caută…",
+      "searchNoResults": "Nu am găsit locații pentru această căutare.",
+      "searchError": "Nu am putut căuta locații. Încearcă din nou.",
       "loading": "Se încarcă lockerele…",
       "none": "Nu am găsit lockere în apropiere. Mută harta sau mărește zona.",
       "results": "Lockere",

@@ -1227,6 +1227,12 @@
     "lockers": {
       "useMyLocation": "Use my location",
       "searchArea": "Search this area",
+      "searchLabel": "Search location",
+      "searchPlaceholder": "Search city or address…",
+      "searchButton": "Find",
+      "searching": "Searching…",
+      "searchNoResults": "No locations found for that search.",
+      "searchError": "Could not search locations. Please try again.",
       "loading": "Loading lockers…",
       "none": "No lockers found nearby. Try moving the map or increasing the area.",
       "results": "Lockers",
