@@ -51,15 +51,26 @@ type LocationResult = { display_name: string; lat: number; lng: number };
         </div>
         <div class="relative">
           <div class="flex gap-2">
-            <input
-              class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400"
-              name="lockerSearch"
-              autocomplete="off"
-              [placeholder]="'checkout.lockers.searchPlaceholder' | translate"
-              [(ngModel)]="searchQuery"
-              (ngModelChange)="onSearchQueryChange($event)"
-              (keydown.enter)="searchFirstResult()"
-            />
+            <div class="relative flex-1">
+              <input
+                class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 pr-10 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400"
+                name="lockerSearch"
+                autocomplete="off"
+                [placeholder]="'checkout.lockers.searchPlaceholder' | translate"
+                [(ngModel)]="searchQuery"
+                (ngModelChange)="onSearchQueryChange($event)"
+                (keydown.enter)="searchFirstResult()"
+              />
+              <button
+                *ngIf="searchQuery.trim().length"
+                type="button"
+                class="absolute right-1 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:text-slate-300 dark:hover:bg-slate-800"
+                [attr.aria-label]="'checkout.lockers.clearSearch' | translate"
+                (click)="clearSearchQuery()"
+              >
+                <span aria-hidden="true">&times;</span>
+              </button>
+            </div>
             <button
               type="button"
               class="shrink-0 rounded-xl border px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-50"
@@ -92,6 +103,19 @@ type LocationResult = { display_name: string; lat: number; lng: number };
           </div>
         </div>
         <p *ngIf="searchError" class="text-xs text-amber-700 dark:text-amber-300">{{ searchError }}</p>
+        <div *ngIf="selectedLocation" class="flex flex-wrap items-center gap-2">
+          <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'checkout.lockers.searchingAround' | translate }}</span>
+          <button
+            type="button"
+            class="inline-flex max-w-full items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            [attr.aria-label]="'checkout.lockers.clearSelectedLocation' | translate"
+            (click)="clearSelectedLocation()"
+            [title]="selectedLocation.display_name"
+          >
+            <span class="truncate max-w-[18rem]">{{ selectedLocation.display_name }}</span>
+            <span class="text-slate-500 dark:text-slate-300" aria-hidden="true">&times;</span>
+          </button>
+        </div>
       </div>
 
       <div #mapHost class="h-72 w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950"></div>
@@ -144,6 +168,7 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
   searchResults: LocationResult[] = [];
   searchLoading = false;
   searchError = '';
+  selectedLocation: LocationResult | null = null;
 
   private leaflet: Leaflet | null = null;
   private map: import('leaflet').Map | null = null;
@@ -211,6 +236,14 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
       const center = map.getCenter();
       this.lastCenter = { lat: center.lat, lng: center.lng };
     });
+    map.on('dragend', () => {
+      if (!this.selectedLocation) return;
+      const center = map.getCenter();
+      const distanceKm = this.haversineKm(this.selectedLocation.lat, this.selectedLocation.lng, center.lat, center.lng);
+      if (distanceKm > 1) {
+        this.selectedLocation = null;
+      }
+    });
 
     this.map = map;
     this.markers = markers;
@@ -228,6 +261,7 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
       (pos) => {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
+        this.selectedLocation = null;
         this.lastCenter = { lat, lng };
         this.map?.setView([lat, lng], 13);
         this.searchThisArea();
@@ -241,6 +275,18 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
 
   searchThisArea(): void {
     void this.loadLockers(this.lastCenter.lat, this.lastCenter.lng);
+  }
+
+  clearSearchQuery(): void {
+    this.searchQuery = '';
+    this.searchResults = [];
+    this.searchError = '';
+    this.searchLoading = false;
+    this.searchAbort?.abort();
+  }
+
+  clearSelectedLocation(): void {
+    this.selectedLocation = null;
   }
 
   onSearchQueryChange(next: string): void {
@@ -270,7 +316,8 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
   applyLocation(item: LocationResult): void {
     this.searchResults = [];
     this.searchError = '';
-    this.searchQuery = item.display_name;
+    this.searchQuery = '';
+    this.selectedLocation = item;
     this.lastCenter = { lat: item.lat, lng: item.lng };
     this.map?.setView([item.lat, item.lng], 13);
     this.searchThisArea();
@@ -325,6 +372,16 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
       marker.on('click', () => this.selectLocker(locker));
       marker.addTo(this.markers);
     }
+  }
+
+  private haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const r = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLng = ((lng2 - lng1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+    return 2 * r * Math.asin(Math.min(1, Math.sqrt(a)));
   }
 
   private async fetchLocations(query: string, opts?: { applyFirst?: boolean }): Promise<void> {
