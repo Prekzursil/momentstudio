@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+compose_file="${repo_root}/infra/prod/docker-compose.yml"
+env_file="${repo_root}/infra/prod/.env"
+
+cd "${repo_root}"
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo "ERROR: docker is not installed." >&2
+  exit 1
+fi
+
+if ! docker compose version >/dev/null 2>&1; then
+  echo "ERROR: docker compose is not available." >&2
+  exit 1
+fi
+
+if [[ ! -f "${env_file}" ]]; then
+  echo "ERROR: Missing ${env_file}. Copy infra/prod/.env.example to infra/prod/.env" >&2
+  exit 1
+fi
+
+services=("$@")
+if [[ "${#services[@]}" -eq 0 ]]; then
+  services=(backend frontend caddy)
+fi
+
+echo "Recreating containers to apply updated env files:"
+printf -- "- %s\n" "${services[@]}"
+
+docker compose --env-file "${env_file}" -f "${compose_file}" up -d --no-build --force-recreate "${services[@]}"
+
+echo
+docker compose --env-file "${env_file}" -f "${compose_file}" ps
+

@@ -27,6 +27,9 @@ backend/uploads/
 private_uploads/
 backend/private_uploads/
 
+# Production backups
+infra/prod/backups/
+
 # Windows download metadata
 *:Zone.Identifier
 

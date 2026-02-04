@@ -57,3 +57,17 @@ tar -C "${repo_root}" -czf "${out}" \
   -C "${tmp}" db.dump manifest.txt
 
 echo "Backup created: ${out}"
+
+retention_count="${BACKUP_RETENTION_COUNT:-0}"
+retention_days="${BACKUP_RETENTION_DAYS:-30}"
+
+if [[ "${retention_count}" =~ ^[0-9]+$ ]] && (( retention_count > 0 )); then
+  echo "Pruning old backups (keeping last ${retention_count})..."
+  mapfile -t backups < <(ls -1 "${backup_dir}"/backup-*.tar.gz 2>/dev/null | sort -r || true)
+  if (( ${#backups[@]} > retention_count )); then
+    rm -f "${backups[@]:retention_count}"
+  fi
+elif [[ "${retention_days}" =~ ^[0-9]+$ ]] && (( retention_days > 0 )); then
+  echo "Pruning old backups (older than ${retention_days} days)..."
+  find "${backup_dir}" -maxdepth 1 -type f -name "backup-*.tar.gz" -mtime +"${retention_days}" -print -delete || true
+fi

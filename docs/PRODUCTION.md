@@ -136,6 +136,11 @@ docker compose -f infra/docker-compose.yml exec -T backend python -m app.cli boo
 
 The repo includes backup helpers in `infra/backup/`.
 
+If you deploy using the VPS stack in `infra/prod/`, you can also use:
+
+- `./infra/prod/backup.sh` and `./infra/prod/restore.sh` (DB + uploads in a single archive)
+- `sudo ./infra/prod/install-backup-timer.sh` to run backups automatically every 24h (systemd timer)
+
 ### Backups
 
 The simplest “all-in-one” backup is:
