@@ -360,14 +360,17 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
     if (!this.leaflet || !this.map || !this.markers) return;
     const L = this.leaflet;
     this.markers.clearLayers();
+    const stroke = '#0f172a';
+    const fill = '#38bdf8';
+    const selectedFill = '#4f46e5';
     for (const locker of this.lockers) {
       const isSelected = this.selected?.id === locker.id;
       const marker = L.circleMarker([locker.lat, locker.lng], {
-        radius: isSelected ? 8 : 6,
-        color: isSelected ? '#4f46e5' : '#94a3b8',
-        fillColor: isSelected ? '#4f46e5' : '#94a3b8',
-        fillOpacity: 1,
-        weight: 2
+        radius: isSelected ? 9 : 7,
+        color: stroke,
+        fillColor: isSelected ? selectedFill : fill,
+        fillOpacity: isSelected ? 1 : 0.9,
+        weight: isSelected ? 3 : 2
       });
       marker.on('click', () => this.selectLocker(locker));
       marker.addTo(this.markers);
