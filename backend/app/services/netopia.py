@@ -8,6 +8,7 @@ from typing import Any
 
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import types as asymmetric_types
 from fastapi import HTTPException, status
 import httpx
 from jose import jwt
@@ -52,7 +53,7 @@ def _public_key_pem() -> str:
             if b"BEGIN CERTIFICATE" in header:
                 try:
                     cert = x509.load_pem_x509_certificate(key_bytes)
-                    public_key = cert.public_key()
+                    public_key: asymmetric_types.PublicKeyTypes = cert.public_key()
                     return (
                         public_key.public_bytes(
                             encoding=serialization.Encoding.PEM,
@@ -69,7 +70,7 @@ def _public_key_pem() -> str:
 
             if b"BEGIN PUBLIC KEY" in header:
                 try:
-                    public_key = serialization.load_pem_public_key(key_bytes)
+                    public_key: asymmetric_types.PublicKeyTypes = serialization.load_pem_public_key(key_bytes)
                     return (
                         public_key.public_bytes(
                             encoding=serialization.Encoding.PEM,
@@ -96,7 +97,7 @@ def _public_key_pem() -> str:
         # DER certificate/public key (some .cer downloads are DER).
         try:
             cert = x509.load_der_x509_certificate(key_bytes)
-            public_key = cert.public_key()
+            public_key: asymmetric_types.PublicKeyTypes = cert.public_key()
         except Exception:
             try:
                 public_key = serialization.load_der_public_key(key_bytes)
