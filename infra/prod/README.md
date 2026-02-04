@@ -53,10 +53,12 @@ Edit:
 - `backend/.env`
   - set `ENVIRONMENT=production`
   - set a strong `SECRET_KEY`
+  - optional CAPTCHA (Cloudflare Turnstile): set `CAPTCHA_ENABLED=1` and `TURNSTILE_SECRET_KEY=...`
   - configure Stripe/PayPal/Netopia + SMTP as needed
 - `frontend/.env`
   - set `APP_ENV=production`
   - keep `API_BASE_URL=/api/v1`
+  - optional CAPTCHA (Cloudflare Turnstile): set `CAPTCHA_SITE_KEY=...`
 
 ## 3) Deploy / update
 

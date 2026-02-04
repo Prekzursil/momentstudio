@@ -42,6 +42,9 @@ Use `backend/.env.example` and `frontend/.env.example` as the authoritative list
 - `SECRET_KEY=<long-random-secret>`
 - `FRONTEND_ORIGIN=https://<your-domain>`
 - `SMTP_ENABLED=1` + `SMTP_*` + `SMTP_FROM_EMAIL=...` (for real emails)
+- Optional CAPTCHA (Cloudflare Turnstile):
+  - `CAPTCHA_ENABLED=1`
+  - `TURNSTILE_SECRET_KEY=...` (from Cloudflare Turnstile)
 - Payments:
   - Stripe: `STRIPE_ENV=live` + `STRIPE_SECRET_KEY_LIVE=...` (+ webhook secret if you accept webhooks)
   - Optional PayPal: `PAYPAL_ENV=live` + `PAYPAL_CLIENT_ID_LIVE` / `PAYPAL_CLIENT_SECRET_LIVE` (+ webhook id)
@@ -60,10 +63,24 @@ Operational visibility:
 
 - `APP_ENV=production`
 - `API_BASE_URL=/api/v1` (when using the frontend nginx reverse proxy)
+- Optional CAPTCHA (Cloudflare Turnstile):
+  - `CAPTCHA_SITE_KEY=...` (public site key from Cloudflare Turnstile)
 - Payments:
   - Stripe: `STRIPE_ENABLED=1`
   - Optional PayPal: `PAYPAL_ENABLED=1`
   - Optional Netopia: `NETOPIA_ENABLED=1`
+
+### Cloudflare Turnstile (setup)
+
+1. Cloudflare Dashboard → **Turnstile** → **Add widget**.
+2. Hostnames: add `momentstudio.ro` and `www.momentstudio.ro` (add `localhost` only if you want it in local dev).
+3. Choose a mode:
+   - **Managed** (recommended): mostly invisible; shows a checkbox only when needed.
+   - **Non-interactive** / **Invisible**: less friction, but can be more strict; use only if you prefer it.
+4. Copy keys:
+   - **Site key** → `frontend/.env` as `CAPTCHA_SITE_KEY`.
+   - **Secret key** → `backend/.env` as `TURNSTILE_SECRET_KEY`.
+5. Enable backend verification by setting `CAPTCHA_ENABLED=1` in `backend/.env`, then redeploy/restart.
 
 ## 3) Reverse proxy (TLS termination)
 
