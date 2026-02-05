@@ -4,6 +4,23 @@ Below is a structured checklist you can turn into issues.
 
 ## High priority (next)
 - [x] Admin Orders: prevent 400s on status/tracking updates (guide allowed transitions + clearer errors).
+- [ ] Backend Email: prevent SMTP blocking the event loop (wrap `smtplib` send in `anyio.to_thread.run_sync` or switch to async SMTP).
+- [ ] Backend Jobs: avoid duplicate scheduled loops when running multiple workers/replicas (move schedulers to worker service or add Postgres advisory-lock leader election).
+- [ ] Observability: JSON logs should emit `extra` fields (audit/slow_query) with strict redaction; avoid logging request bodies in production.
+- [ ] Security: expand audit payload redaction/allowlist for commerce PII (name/phone/address) and add config to disable payload logging entirely.
+- [ ] SEO/feeds: filter `/api/v1/feeds/products.json` + sitemap categories to only published/visible content (avoid leaking drafts/hidden categories).
+- [ ] Auth: password reset request should not leak user enumeration and should work for verified secondary emails (always return 202; send email only when match exists).
+- [ ] SEO: expose `/robots.txt` and `/sitemap.xml` at site root via Nginx/Caddy proxy and ensure robots references the canonical sitemap URL.
+- [ ] Uploads: remove SVG from allowed image types (or sanitize/rasterize) to avoid broken uploads and stored-XSS.
+- [ ] Analytics: rate limit `/api/v1/analytics/events` (IP-based) and add optional signed token to prevent DB bloat/DoS.
+- [ ] Netopia: use `Decimal` for amounts and add basic IPN replay protection; validate token timestamps/expiry when present.
+- [ ] Prod safety: refuse to start with default secrets/bypass tokens or insecure cookie settings when `ENVIRONMENT=production`.
+- [ ] Frontend security: prep for strict CSP (move inline theme bootstrap script to external file or nonce/hash it) and set CSP headers at edge.
+- [ ] Infra: set `client_max_body_size` in `frontend/nginx/default.conf` (align with backend upload limit).
+- [ ] Frontend: stop relying on backend error `detail` strings in guards; use error `code` and translate to UX.
+- [ ] Auth UX: include a reset link in password reset emails and auto-fill the token from URL query param.
+- [ ] Ops: restrict `/api/v1/metrics` to admin/internal network (or disable in prod).
+- [ ] Frontend: guard/remove `/checkout/mock/*` routes in production builds.
 - [ ] Admin Orders: fix cancel-reason UI so it only appears for cancelled status and doesn’t block other updates.
 - [x] Auth: login/register should not get stuck after errors; improve error visibility and re-attempt flow (incl. CAPTCHA).
 - [x] Frontend: stop showing duplicate generic “Request failed” toasts when pages already handle errors.
