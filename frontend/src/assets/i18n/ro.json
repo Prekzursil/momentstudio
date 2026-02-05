@@ -1936,6 +1936,46 @@
           "delta": "Δ"
         }
       },
+      "shippingPerformance": {
+        "title": "Performanță livrare",
+        "window": "Ultimele {{days}} zile vs perioada anterioară",
+        "timeToShip": "Timp până la expediere",
+        "deliveryTime": "Timp de livrare",
+        "empty": "Nu există date în această perioadă.",
+        "error": "Nu am putut încărca performanța livrării.",
+        "table": {
+          "courier": "Curier",
+          "avgHours": "Ore medii",
+          "delta": "Δ",
+          "count": "Comenzi"
+        }
+      },
+      "stockoutImpact": {
+        "title": "Impact stoc epuizat",
+        "window": "Semnale cerere ({{days}}z)",
+        "backorder": "Precomandă",
+        "empty": "Nu există produse fără stoc acum.",
+        "error": "Nu am putut încărca impactul stocurilor epuizate.",
+        "table": {
+          "product": "Produs",
+          "available": "Disponibil",
+          "carts": "În coșuri",
+          "sales": "Vânzări",
+          "missed": "Est. pierdut"
+        }
+      },
+      "channelAttribution": {
+        "title": "Atribuire canal",
+        "coverage": "Urmărite {{tracked}} / {{total}} comenzi",
+        "note": "Atribuirea se bazează pe analytics opt-in (UTM la session_start).",
+        "empty": "Nu există comenzi atribuite în acest interval.",
+        "error": "Nu am putut încărca atribuirea canalelor.",
+        "table": {
+          "channel": "Canal",
+          "orders": "Comenzi",
+          "sales": "Vânzări"
+        }
+      },
       "scheduledTitle": "Sarcini programate",
       "scheduledLoading": "Se încarcă sarcinile programate…",
       "scheduledError": "Nu am putut încărca sarcinile programate.",
@@ -1997,6 +2037,7 @@
         "edit": "Editează",
         "changeUrl": "Schimbă URL-ul",
         "refresh": "Reîncarcă",
+        "openInventory": "Deschide inventarul",
       "search": "Caută",
       "copy": "Copiază",
       "use": "Folosește",

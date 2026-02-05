@@ -20,6 +20,7 @@ export class AnalyticsService {
   private readonly sessionStartedKey = 'analytics.session_started.v1';
   private readonly tokenStorageKey = 'analytics.token.v1';
   private readonly tokenExpiresAtKey = 'analytics.token_expires_at.v1';
+  private readonly attributionStorageKey = 'analytics.attribution.v1';
 
   private enabledState = signal(this.readEnabled());
   private sessionStarted = this.readSessionStarted();
@@ -44,7 +45,7 @@ export class AnalyticsService {
     if (this.sessionStarted) return;
     this.sessionStarted = true;
     this.persistSessionStarted(true);
-    this.send('session_start');
+    this.send('session_start', this.getAttributionPayload());
   }
 
   track(event: string, payload?: Record<string, unknown>): void {
@@ -92,6 +93,53 @@ export class AnalyticsService {
 
   private send(event: string, payload?: Record<string, unknown>): void {
     this.track(event, payload);
+  }
+
+  private getAttributionPayload(): Record<string, unknown> | undefined {
+    const cached = this.readAttribution();
+    if (cached) return cached;
+    if (typeof window === 'undefined') return undefined;
+    if (typeof sessionStorage === 'undefined') return undefined;
+
+    const params = new URLSearchParams(window.location.search);
+    const keys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'];
+    const attribution: Record<string, unknown> = {};
+    for (const key of keys) {
+      const raw = (params.get(key) || '').trim();
+      if (raw) attribution[key] = raw.slice(0, 200);
+    }
+    try {
+      const referrer = (document.referrer || '').trim();
+      if (referrer) attribution['referrer_host'] = new URL(referrer).hostname;
+    } catch {
+      // ignore
+    }
+
+    if (Object.keys(attribution).length === 0) return undefined;
+    this.persistAttribution(attribution);
+    return attribution;
+  }
+
+  private readAttribution(): Record<string, unknown> | undefined {
+    if (typeof sessionStorage === 'undefined') return undefined;
+    try {
+      const raw = sessionStorage.getItem(this.attributionStorageKey);
+      if (!raw) return undefined;
+      const parsed = JSON.parse(raw) as unknown;
+      if (!parsed || typeof parsed !== 'object') return undefined;
+      return parsed as Record<string, unknown>;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private persistAttribution(value: Record<string, unknown>): void {
+    if (typeof sessionStorage === 'undefined') return;
+    try {
+      sessionStorage.setItem(this.attributionStorageKey, JSON.stringify(value));
+    } catch {
+      // ignore
+    }
   }
 
   private readEnabled(): boolean {

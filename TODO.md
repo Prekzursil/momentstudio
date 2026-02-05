@@ -44,9 +44,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Dashboard: KPI drill-down links – Clicking a KPI navigates to the relevant list with filters pre-applied.
 - [x] Admin Dashboard: payments health widget – Show success rate/failures + recent webhook errors per provider using existing DB logs.
 - [x] Admin Dashboard: refunds breakdown widget – Show refunds by reason/provider/timeframe with deltas.
-- [ ] Admin Dashboard: shipping performance widget – Track avg time-to-ship and delivery time by courier with trend deltas.
-- [ ] Admin Dashboard: stockout impact widget – Highlight out-of-stock products and estimate missed revenue from recent demand signals.
-- [ ] Admin Dashboard: channel attribution panel – Summarize GMV/orders by UTM/source based on stored analytics events.
+- [x] Admin Dashboard: shipping performance widget – Track avg time-to-ship and delivery time by courier with trend deltas.
+- [x] Admin Dashboard: stockout impact widget – Highlight out-of-stock products and estimate missed revenue from recent demand signals.
+- [x] Admin Dashboard: channel attribution panel – Summarize GMV/orders by UTM/source based on stored analytics events.
 - [ ] Admin Dashboard: configurable alert thresholds – Owner can tune anomaly thresholds (failed payments spike, refund rate, stockouts).
 - [ ] Admin Dashboard: audit quick filters – Add presets like security/content/payments to pre-filter the audit log.
 - [ ] Admin Dashboard: background jobs monitor – List running/completed jobs with retry/cancel and dead-letter views (DB-backed).

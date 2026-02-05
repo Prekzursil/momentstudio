@@ -57,7 +57,7 @@ from app.services import exporter as exporter_service
 from app.services import inventory as inventory_service
 from app.services import catalog as catalog_service
 from app.models.address import Address
-from app.models.order import Order, OrderRefund, OrderStatus, OrderTag
+from app.models.order import Order, OrderRefund, OrderStatus, OrderTag, OrderEvent, OrderItem
 from app.models.returns import ReturnRequest, ReturnRequestStatus
 from app.models.support import ContactSubmission
 from app.models.user import AdminAuditLog, EmailVerificationToken, User, RefreshSession, UserRole, UserSecurityEvent
@@ -1023,6 +1023,447 @@ async def admin_refunds_breakdown(
             },
         },
         "reasons": reasons,
+    }
+
+
+@router.get("/shipping-performance")
+async def admin_shipping_performance(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("orders")),
+    window_days: int = Query(default=30, ge=1, le=365),
+) -> dict:
+    now = datetime.now(timezone.utc)
+    window = timedelta(days=int(window_days))
+    start = now - window
+    prev_start = start - window
+
+    test_order_ids = select(OrderTag.order_id).where(OrderTag.tag == "test")
+    exclude_test_orders = Order.id.notin_(test_order_ids)
+
+    shipped_subq = (
+        select(
+            OrderEvent.order_id.label("order_id"),
+            func.min(OrderEvent.created_at).label("shipped_at"),
+        )
+        .where(
+            OrderEvent.event.in_(("status_change", "status_auto_ship")),
+            OrderEvent.note.is_not(None),
+            OrderEvent.note.like("% -> shipped"),
+        )
+        .group_by(OrderEvent.order_id)
+        .subquery()
+    )
+    delivered_subq = (
+        select(
+            OrderEvent.order_id.label("order_id"),
+            func.min(OrderEvent.created_at).label("delivered_at"),
+        )
+        .where(
+            OrderEvent.event == "status_change",
+            OrderEvent.note.is_not(None),
+            OrderEvent.note.like("% -> delivered"),
+        )
+        .group_by(OrderEvent.order_id)
+        .subquery()
+    )
+
+    courier_col = func.lower(func.coalesce(Order.courier, literal("unknown"))).label("courier")
+
+    def _delta_pct(current: float | None, previous: float | None) -> float | None:
+        if current is None or previous is None or previous == 0:
+            return None
+        return (current - previous) / previous * 100.0
+
+    async def _collect_ship_durations(window_start: datetime, window_end: datetime) -> dict[str, list[float]]:
+        rows = await session.execute(
+            select(Order.created_at, courier_col, shipped_subq.c.shipped_at)
+            .select_from(Order)
+            .join(shipped_subq, shipped_subq.c.order_id == Order.id)
+            .where(
+                shipped_subq.c.shipped_at >= window_start,
+                shipped_subq.c.shipped_at < window_end,
+                exclude_test_orders,
+            )
+        )
+        durations: dict[str, list[float]] = {}
+        for created_at, courier, shipped_at in rows.all():
+            if not created_at or not shipped_at:
+                continue
+            hours = (shipped_at - created_at).total_seconds() / 3600.0
+            if hours < 0 or hours > 24 * 365:
+                continue
+            key = str(courier or "unknown")
+            durations.setdefault(key, []).append(float(hours))
+        return durations
+
+    async def _collect_delivery_durations(window_start: datetime, window_end: datetime) -> dict[str, list[float]]:
+        rows = await session.execute(
+            select(courier_col, shipped_subq.c.shipped_at, delivered_subq.c.delivered_at)
+            .select_from(Order)
+            .join(delivered_subq, delivered_subq.c.order_id == Order.id)
+            .join(shipped_subq, shipped_subq.c.order_id == Order.id)
+            .where(
+                delivered_subq.c.delivered_at >= window_start,
+                delivered_subq.c.delivered_at < window_end,
+                exclude_test_orders,
+            )
+        )
+        durations: dict[str, list[float]] = {}
+        for courier, shipped_at, delivered_at in rows.all():
+            if not shipped_at or not delivered_at:
+                continue
+            hours = (delivered_at - shipped_at).total_seconds() / 3600.0
+            if hours < 0 or hours > 24 * 365:
+                continue
+            key = str(courier or "unknown")
+            durations.setdefault(key, []).append(float(hours))
+        return durations
+
+    def _avg(values: list[float]) -> float | None:
+        if not values:
+            return None
+        return sum(values) / len(values)
+
+    current_ship = await _collect_ship_durations(start, now)
+    previous_ship = await _collect_ship_durations(prev_start, start)
+
+    ship_rows: list[dict] = []
+    for courier in sorted(set(current_ship) | set(previous_ship)):
+        cur_avg = _avg(current_ship.get(courier, []))
+        prev_avg = _avg(previous_ship.get(courier, []))
+        ship_rows.append(
+            {
+                "courier": courier,
+                "current": {"count": len(current_ship.get(courier, [])), "avg_hours": cur_avg},
+                "previous": {"count": len(previous_ship.get(courier, [])), "avg_hours": prev_avg},
+                "delta_pct": {
+                    "avg_hours": _delta_pct(cur_avg, prev_avg),
+                    "count": _delta_pct(float(len(current_ship.get(courier, []))), float(len(previous_ship.get(courier, [])))),
+                },
+            }
+        )
+    ship_rows.sort(key=lambda row: (row.get("current", {}).get("count", 0), row.get("courier", "")), reverse=True)
+
+    current_delivery = await _collect_delivery_durations(start, now)
+    previous_delivery = await _collect_delivery_durations(prev_start, start)
+
+    delivery_rows: list[dict] = []
+    for courier in sorted(set(current_delivery) | set(previous_delivery)):
+        cur_avg = _avg(current_delivery.get(courier, []))
+        prev_avg = _avg(previous_delivery.get(courier, []))
+        delivery_rows.append(
+            {
+                "courier": courier,
+                "current": {"count": len(current_delivery.get(courier, [])), "avg_hours": cur_avg},
+                "previous": {"count": len(previous_delivery.get(courier, [])), "avg_hours": prev_avg},
+                "delta_pct": {
+                    "avg_hours": _delta_pct(cur_avg, prev_avg),
+                    "count": _delta_pct(float(len(current_delivery.get(courier, []))), float(len(previous_delivery.get(courier, [])))),
+                },
+            }
+        )
+    delivery_rows.sort(key=lambda row: (row.get("current", {}).get("count", 0), row.get("courier", "")), reverse=True)
+
+    return {
+        "window_days": int(window_days),
+        "window_start": start,
+        "window_end": now,
+        "time_to_ship": ship_rows,
+        "delivery_time": delivery_rows,
+    }
+
+
+@router.get("/stockout-impact")
+async def admin_stockout_impact(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("inventory")),
+    window_days: int = Query(default=30, ge=1, le=365),
+    limit: int = Query(default=8, ge=1, le=30),
+) -> dict:
+    now = datetime.now(timezone.utc)
+    since = now - timedelta(days=int(window_days))
+    successful_statuses = (OrderStatus.paid, OrderStatus.shipped, OrderStatus.delivered)
+
+    test_order_ids = select(OrderTag.order_id).where(OrderTag.tag == "test")
+    exclude_test_orders = Order.id.notin_(test_order_ids)
+
+    restock_rows = await inventory_service.list_restock_list(
+        session,
+        include_variants=False,
+        default_threshold=DEFAULT_LOW_STOCK_DASHBOARD_THRESHOLD,
+    )
+    stockouts = [row for row in restock_rows if int(getattr(row, "available_quantity", 0) or 0) <= 0]
+    if not stockouts:
+        return {"window_days": int(window_days), "window_start": since, "window_end": now, "items": []}
+
+    product_ids = [row.product_id for row in stockouts]
+
+    demand_rows = await session.execute(
+        select(
+            OrderItem.product_id,
+            func.coalesce(func.sum(OrderItem.quantity), 0).label("units"),
+            func.coalesce(func.sum(OrderItem.subtotal), 0).label("revenue"),
+        )
+        .select_from(OrderItem)
+        .join(Order, Order.id == OrderItem.order_id)
+        .where(
+            Order.created_at >= since,
+            Order.created_at < now,
+            Order.status.in_(successful_statuses),
+            OrderItem.product_id.in_(product_ids),
+            exclude_test_orders,
+        )
+        .group_by(OrderItem.product_id)
+    )
+    demand_map = {
+        row[0]: (int(row[1] or 0), float(row[2] or 0))
+        for row in demand_rows.all()
+    }
+
+    product_rows = await session.execute(
+        select(
+            Product.id,
+            Product.base_price,
+            Product.sale_price,
+            Product.currency,
+            Product.allow_backorder,
+        ).where(Product.id.in_(product_ids))
+    )
+    product_map = {
+        row[0]: {
+            "base_price": float(row[1] or 0),
+            "sale_price": float(row[2] or 0) if row[2] is not None else None,
+            "currency": str(row[3] or "RON"),
+            "allow_backorder": bool(row[4]),
+        }
+        for row in product_rows.all()
+    }
+
+    items: list[dict] = []
+    for row in stockouts:
+        meta = product_map.get(row.product_id, {})
+        allow_backorder = bool(meta.get("allow_backorder", False))
+        base_price = float(meta.get("base_price", 0) or 0)
+        sale_price = meta.get("sale_price")
+        current_price = float(sale_price if sale_price is not None else base_price)
+
+        demand_units, demand_revenue = demand_map.get(row.product_id, (0, 0.0))
+        avg_price = float(demand_revenue / demand_units) if demand_units > 0 else current_price
+        reserved_carts = int(getattr(row, "reserved_in_carts", 0) or 0)
+        reserved_orders = int(getattr(row, "reserved_in_orders", 0) or 0)
+        estimated_missed = 0.0 if allow_backorder else float(reserved_carts) * avg_price
+
+        items.append(
+            {
+                "product_id": str(row.product_id),
+                "product_slug": row.product_slug,
+                "product_name": row.product_name,
+                "available_quantity": int(getattr(row, "available_quantity", 0) or 0),
+                "reserved_in_carts": reserved_carts,
+                "reserved_in_orders": reserved_orders,
+                "stock_quantity": int(getattr(row, "stock_quantity", 0) or 0),
+                "demand_units": int(demand_units),
+                "demand_revenue": float(demand_revenue),
+                "estimated_missed_revenue": float(estimated_missed),
+                "currency": str(meta.get("currency") or "RON"),
+                "allow_backorder": allow_backorder,
+            }
+        )
+
+    items.sort(
+        key=lambda item: (
+            float(item.get("estimated_missed_revenue", 0)),
+            float(item.get("demand_revenue", 0)),
+            int(item.get("reserved_in_carts", 0)),
+        ),
+        reverse=True,
+    )
+
+    return {
+        "window_days": int(window_days),
+        "window_start": since,
+        "window_end": now,
+        "items": items[: int(limit)],
+    }
+
+
+@router.get("/channel-attribution")
+async def admin_channel_attribution(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("dashboard")),
+    range_days: int = Query(default=30, ge=1, le=365),
+    range_from: date | None = Query(default=None),
+    range_to: date | None = Query(default=None),
+    limit: int = Query(default=12, ge=1, le=50),
+) -> dict:
+    now = datetime.now(timezone.utc)
+    successful_statuses = (OrderStatus.paid, OrderStatus.shipped, OrderStatus.delivered)
+    sales_statuses = (*successful_statuses, OrderStatus.refunded)
+
+    if (range_from is None) != (range_to is None):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="range_from and range_to must be provided together",
+        )
+
+    if range_from is not None and range_to is not None:
+        if range_to < range_from:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="range_to must be on/after range_from",
+            )
+        start = datetime.combine(range_from, datetime.min.time(), tzinfo=timezone.utc)
+        end = datetime.combine(range_to + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc)
+        effective_range_days = (range_to - range_from).days + 1
+    else:
+        start = now - timedelta(days=range_days)
+        end = now
+        effective_range_days = range_days
+
+    test_order_ids = select(OrderTag.order_id).where(OrderTag.tag == "test")
+    exclude_test_orders = Order.id.notin_(test_order_ids)
+
+    total_orders = await session.scalar(
+        select(func.count())
+        .select_from(Order)
+        .where(
+            Order.created_at >= start,
+            Order.created_at < end,
+            Order.status.in_(sales_statuses),
+            exclude_test_orders,
+        )
+    )
+    total_gross_sales = await session.scalar(
+        select(func.coalesce(func.sum(Order.total_amount), 0))
+        .select_from(Order)
+        .where(
+            Order.created_at >= start,
+            Order.created_at < end,
+            Order.status.in_(sales_statuses),
+            exclude_test_orders,
+        )
+    )
+
+    checkout_rows = await session.execute(
+        select(AnalyticsEvent.session_id, AnalyticsEvent.order_id)
+        .select_from(AnalyticsEvent)
+        .where(
+            AnalyticsEvent.event == "checkout_success",
+            AnalyticsEvent.created_at >= start,
+            AnalyticsEvent.created_at < end,
+            AnalyticsEvent.order_id.is_not(None),
+        )
+        .order_by(AnalyticsEvent.created_at.asc())
+    )
+    order_to_session: dict[UUID, str] = {}
+    session_ids: set[str] = set()
+    for session_id, order_id in checkout_rows.all():
+        if not session_id or not order_id:
+            continue
+        if order_id in order_to_session:
+            continue
+        order_to_session[order_id] = str(session_id)
+        session_ids.add(str(session_id))
+
+    if not order_to_session:
+        return {
+            "range_days": int(effective_range_days),
+            "range_from": start.date().isoformat(),
+            "range_to": (end - timedelta(microseconds=1)).date().isoformat(),
+            "total_orders": int(total_orders or 0),
+            "total_gross_sales": float(total_gross_sales or 0),
+            "tracked_orders": 0,
+            "tracked_gross_sales": 0.0,
+            "coverage_pct": None if not total_orders else 0.0,
+            "channels": [],
+        }
+
+    order_ids = list(order_to_session.keys())
+    order_rows = await session.execute(
+        select(Order.id, Order.total_amount)
+        .select_from(Order)
+        .where(
+            Order.id.in_(order_ids),
+            Order.created_at >= start,
+            Order.created_at < end,
+            Order.status.in_(sales_statuses),
+            exclude_test_orders,
+        )
+    )
+    order_amounts = {row[0]: float(row[1] or 0) for row in order_rows.all()}
+
+    session_start_rows = await session.execute(
+        select(AnalyticsEvent.session_id, AnalyticsEvent.payload, AnalyticsEvent.created_at)
+        .select_from(AnalyticsEvent)
+        .where(
+            AnalyticsEvent.event == "session_start",
+            AnalyticsEvent.session_id.in_(session_ids),
+        )
+        .order_by(AnalyticsEvent.created_at.asc())
+    )
+    session_payload: dict[str, dict | None] = {}
+    for session_id, payload, _created_at in session_start_rows.all():
+        key = str(session_id)
+        if key in session_payload:
+            continue
+        session_payload[key] = payload if isinstance(payload, dict) else None
+
+    def _normalize(value: object) -> str:
+        if not isinstance(value, str):
+            return ""
+        return value.strip()
+
+    def _extract_channel(payload: dict | None) -> tuple[str, str | None, str | None]:
+        src = _normalize((payload or {}).get("utm_source")).lower()
+        med = _normalize((payload or {}).get("utm_medium")).lower() or None
+        camp = _normalize((payload or {}).get("utm_campaign")) or None
+        if not src:
+            return ("direct", None, None)
+        return (src, med, camp)
+
+    channels: dict[tuple[str, str | None, str | None], dict[str, float]] = {}
+    tracked_orders = 0
+    tracked_sales = 0.0
+    for order_id, session_id in order_to_session.items():
+        amount = order_amounts.get(order_id)
+        if amount is None:
+            continue
+        tracked_orders += 1
+        tracked_sales += float(amount)
+        payload = session_payload.get(session_id)
+        src, med, camp = _extract_channel(payload)
+        key = (src, med, camp)
+        entry = channels.setdefault(key, {"orders": 0.0, "gross_sales": 0.0})
+        entry["orders"] += 1.0
+        entry["gross_sales"] += float(amount)
+
+    channel_rows: list[dict] = []
+    for (src, med, camp), entry in channels.items():
+        channel_rows.append(
+            {
+                "source": src,
+                "medium": med,
+                "campaign": camp,
+                "orders": int(entry.get("orders", 0) or 0),
+                "gross_sales": float(entry.get("gross_sales", 0) or 0),
+            }
+        )
+    channel_rows.sort(key=lambda row: (row.get("gross_sales", 0), row.get("orders", 0)), reverse=True)
+
+    coverage_pct = None
+    if total_orders:
+        coverage_pct = tracked_orders / int(total_orders or 1)
+
+    return {
+        "range_days": int(effective_range_days),
+        "range_from": start.date().isoformat(),
+        "range_to": (end - timedelta(microseconds=1)).date().isoformat(),
+        "total_orders": int(total_orders or 0),
+        "total_gross_sales": float(total_gross_sales or 0),
+        "tracked_orders": int(tracked_orders),
+        "tracked_gross_sales": float(tracked_sales),
+        "coverage_pct": coverage_pct,
+        "channels": channel_rows[: int(limit)],
     }
 
 

@@ -120,6 +120,68 @@ export interface AdminRefundsBreakdownResponse {
   reasons: AdminRefundsBreakdownReasonRow[];
 }
 
+export interface AdminShippingPerformanceMetric {
+  count: number;
+  avg_hours: number | null;
+}
+
+export interface AdminShippingPerformanceRow {
+  courier: string;
+  current: AdminShippingPerformanceMetric;
+  previous: AdminShippingPerformanceMetric;
+  delta_pct: { avg_hours: number | null; count: number | null };
+}
+
+export interface AdminShippingPerformanceResponse {
+  window_days: number;
+  window_start: string;
+  window_end: string;
+  time_to_ship: AdminShippingPerformanceRow[];
+  delivery_time: AdminShippingPerformanceRow[];
+}
+
+export interface AdminStockoutImpactItem {
+  product_id: string;
+  product_slug: string;
+  product_name: string;
+  available_quantity: number;
+  reserved_in_carts: number;
+  reserved_in_orders: number;
+  stock_quantity: number;
+  demand_units: number;
+  demand_revenue: number;
+  estimated_missed_revenue: number;
+  currency: string;
+  allow_backorder: boolean;
+}
+
+export interface AdminStockoutImpactResponse {
+  window_days: number;
+  window_start: string;
+  window_end: string;
+  items: AdminStockoutImpactItem[];
+}
+
+export interface AdminChannelAttributionRow {
+  source: string;
+  medium: string | null;
+  campaign: string | null;
+  orders: number;
+  gross_sales: number;
+}
+
+export interface AdminChannelAttributionResponse {
+  range_days: number;
+  range_from: string;
+  range_to: string;
+  total_orders: number;
+  total_gross_sales: number;
+  tracked_orders: number;
+  tracked_gross_sales: number;
+  coverage_pct: number | null;
+  channels: AdminChannelAttributionRow[];
+}
+
 export interface AdminChannelBreakdownRow {
   key: string;
   orders: number;
@@ -880,6 +942,20 @@ export class AdminService {
 
   refundsBreakdown(params?: { window_days?: number }): Observable<AdminRefundsBreakdownResponse> {
     return this.api.get<AdminRefundsBreakdownResponse>('/admin/dashboard/refunds-breakdown', params as any);
+  }
+
+  shippingPerformance(params?: { window_days?: number }): Observable<AdminShippingPerformanceResponse> {
+    return this.api.get<AdminShippingPerformanceResponse>('/admin/dashboard/shipping-performance', params as any);
+  }
+
+  stockoutImpact(params?: { window_days?: number; limit?: number }): Observable<AdminStockoutImpactResponse> {
+    return this.api.get<AdminStockoutImpactResponse>('/admin/dashboard/stockout-impact', params as any);
+  }
+
+  channelAttribution(
+    params?: { range_days?: number; range_from?: string; range_to?: string; limit?: number }
+  ): Observable<AdminChannelAttributionResponse> {
+    return this.api.get<AdminChannelAttributionResponse>('/admin/dashboard/channel-attribution', params as any);
   }
 
   funnel(params?: { range_days?: number; range_from?: string; range_to?: string }): Observable<AdminFunnelMetricsResponse> {

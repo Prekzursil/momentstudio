@@ -1936,6 +1936,46 @@
           "delta": "Δ"
         }
       },
+      "shippingPerformance": {
+        "title": "Shipping performance",
+        "window": "Last {{days}}d vs previous",
+        "timeToShip": "Time to ship",
+        "deliveryTime": "Delivery time",
+        "empty": "No data in this window.",
+        "error": "Could not load shipping performance.",
+        "table": {
+          "courier": "Courier",
+          "avgHours": "Avg hours",
+          "delta": "Δ",
+          "count": "Orders"
+        }
+      },
+      "stockoutImpact": {
+        "title": "Stockout impact",
+        "window": "Demand signals ({{days}}d)",
+        "backorder": "Backorder",
+        "empty": "No stockouts right now.",
+        "error": "Could not load stockout impact.",
+        "table": {
+          "product": "Product",
+          "available": "Available",
+          "carts": "In carts",
+          "sales": "Sales",
+          "missed": "Est. missed"
+        }
+      },
+      "channelAttribution": {
+        "title": "Channel attribution",
+        "coverage": "Tracked {{tracked}} / {{total}} orders",
+        "note": "Attribution is derived from opt-in analytics (session_start UTM tags).",
+        "empty": "No attributed orders in this range.",
+        "error": "Could not load channel attribution.",
+        "table": {
+          "channel": "Channel",
+          "orders": "Orders",
+          "sales": "Sales"
+        }
+      },
       "scheduledTitle": "Scheduled tasks",
       "scheduledLoading": "Loading scheduled tasks…",
       "scheduledError": "Could not load scheduled tasks.",
@@ -1996,7 +2036,8 @@
         "loading": "Loading…",
         "edit": "Edit",
         "changeUrl": "Change URL",
-        "refresh": "Refresh",
+      "refresh": "Refresh",
+      "openInventory": "Open inventory",
       "search": "Search",
       "copy": "Copy",
       "use": "Use",

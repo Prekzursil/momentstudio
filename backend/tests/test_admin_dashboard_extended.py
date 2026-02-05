@@ -16,8 +16,9 @@ from app.db.session import get_session
 from app.main import app
 from app.models.catalog import Category, Product, ProductImage, ProductStatus, ProductAuditLog, ProductTranslation
 from app.models.content import ContentBlock, ContentStatus, ContentAuditLog
-from app.models.order import Order, OrderRefund, OrderStatus, OrderTag
+from app.models.order import Order, OrderEvent, OrderItem, OrderRefund, OrderStatus, OrderTag
 from app.models.address import Address
+from app.models.cart import Cart, CartItem
 from app.models.promo import PromoCode, StripeCouponMapping
 from app.models.returns import ReturnRequest, ReturnRequestStatus
 from app.models.support import ContactSubmission, ContactSubmissionTopic, ContactSubmissionStatus
@@ -25,6 +26,7 @@ from app.models.passkeys import UserPasskey
 from app.models.user import User, UserRole
 from app.models.user import UserSecurityEvent
 from app.models.webhook import PayPalWebhookEvent, StripeWebhookEvent
+from app.models.analytics_event import AnalyticsEvent
 
 
 @pytest.fixture(scope="module")
@@ -757,6 +759,240 @@ def test_admin_refunds_breakdown_widget(test_app: Dict[str, object]) -> None:
     reasons = {row["category"]: row for row in data["reasons"]}
     assert reasons["damaged"]["current"] == 1
     assert reasons["wrong_item"]["previous"] == 1
+
+
+def test_admin_shipping_performance_widget(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    engine = test_app["engine"]
+    session_factory = test_app["session_factory"]
+    asyncio.run(reset_db(engine))
+    asyncio.run(seed(session_factory))
+    headers = auth_headers(client)
+
+    async def add_data() -> None:
+        async with session_factory() as session:
+            customer = (await session.execute(select(User).where(User.email == "customer@example.com"))).scalar_one()
+            now = datetime.now(timezone.utc)
+            email = customer.email
+            name = customer.name or customer.email
+
+            current_order = Order(
+                user_id=customer.id,
+                status=OrderStatus.delivered,
+                total_amount=Decimal("10.00"),
+                currency="RON",
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                customer_email=email,
+                customer_name=name,
+                payment_method="stripe",
+                courier="fan_courier",
+                created_at=now - timedelta(hours=10),
+                updated_at=now - timedelta(hours=10),
+            )
+            prev_order = Order(
+                user_id=customer.id,
+                status=OrderStatus.delivered,
+                total_amount=Decimal("20.00"),
+                currency="RON",
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                customer_email=email,
+                customer_name=name,
+                payment_method="stripe",
+                courier="fan_courier",
+                created_at=now - timedelta(hours=40),
+                updated_at=now - timedelta(hours=40),
+            )
+            session.add_all([current_order, prev_order])
+            await session.flush()
+
+            session.add_all(
+                [
+                    OrderEvent(
+                        order_id=current_order.id,
+                        event="status_change",
+                        note="paid -> shipped",
+                        created_at=now - timedelta(hours=2),
+                    ),
+                    OrderEvent(
+                        order_id=current_order.id,
+                        event="status_change",
+                        note="shipped -> delivered",
+                        created_at=now - timedelta(hours=1),
+                    ),
+                    OrderEvent(
+                        order_id=prev_order.id,
+                        event="status_change",
+                        note="paid -> shipped",
+                        created_at=now - timedelta(hours=30),
+                    ),
+                    OrderEvent(
+                        order_id=prev_order.id,
+                        event="status_change",
+                        note="shipped -> delivered",
+                        created_at=now - timedelta(hours=28),
+                    ),
+                ]
+            )
+            await session.commit()
+
+    asyncio.run(add_data())
+
+    resp = client.get("/api/v1/admin/dashboard/shipping-performance", params={"window_days": 1}, headers=headers)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+
+    time_to_ship = {row["courier"]: row for row in data["time_to_ship"]}
+    assert time_to_ship["fan_courier"]["current"]["count"] == 1
+    assert time_to_ship["fan_courier"]["current"]["avg_hours"] == pytest.approx(8.0)
+
+    delivery = {row["courier"]: row for row in data["delivery_time"]}
+    assert delivery["fan_courier"]["current"]["count"] == 1
+    assert delivery["fan_courier"]["current"]["avg_hours"] == pytest.approx(1.0)
+
+
+def test_admin_stockout_impact_widget(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    engine = test_app["engine"]
+    session_factory = test_app["session_factory"]
+    asyncio.run(reset_db(engine))
+    asyncio.run(seed(session_factory))
+    headers = auth_headers(client)
+
+    async def add_data() -> None:
+        async with session_factory() as session:
+            customer = (await session.execute(select(User).where(User.email == "customer@example.com"))).scalar_one()
+            category = (await session.execute(select(Category).where(Category.slug == "art"))).scalar_one()
+            now = datetime.now(timezone.utc)
+
+            product = Product(
+                slug="stockout-item",
+                name="Stockout Item",
+                base_price=Decimal("20.00"),
+                currency="RON",
+                category_id=category.id,
+                stock_quantity=0,
+                status=ProductStatus.published,
+            )
+            session.add(product)
+            await session.flush()
+
+            cart = Cart(session_id="sess-stockout", updated_at=now, created_at=now)
+            session.add(cart)
+            await session.flush()
+            session.add(
+                CartItem(
+                    cart_id=cart.id,
+                    product_id=product.id,
+                    quantity=2,
+                    unit_price_at_add=Decimal("20.00"),
+                )
+            )
+
+            order = Order(
+                user_id=customer.id,
+                status=OrderStatus.delivered,
+                total_amount=Decimal("40.00"),
+                currency="RON",
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                customer_email=customer.email,
+                customer_name=customer.name or customer.email,
+                payment_method="stripe",
+                created_at=now - timedelta(days=2),
+                updated_at=now - timedelta(days=2),
+            )
+            session.add(order)
+            await session.flush()
+            session.add(
+                OrderItem(
+                    order_id=order.id,
+                    product_id=product.id,
+                    quantity=2,
+                    shipped_quantity=2,
+                    unit_price=Decimal("20.00"),
+                    subtotal=Decimal("40.00"),
+                    created_at=order.created_at,
+                )
+            )
+            await session.commit()
+
+    asyncio.run(add_data())
+
+    resp = client.get("/api/v1/admin/dashboard/stockout-impact", params={"window_days": 30, "limit": 5}, headers=headers)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["items"], "Expected stockout items"
+    item = data["items"][0]
+    assert item["product_slug"] == "stockout-item"
+    assert item["reserved_in_carts"] == 2
+    assert item["demand_units"] == 2
+    assert item["demand_revenue"] == pytest.approx(40.0)
+    assert item["estimated_missed_revenue"] == pytest.approx(40.0)
+
+
+def test_admin_channel_attribution_widget(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    engine = test_app["engine"]
+    session_factory = test_app["session_factory"]
+    asyncio.run(reset_db(engine))
+    asyncio.run(seed(session_factory))
+    headers = auth_headers(client)
+
+    async def add_data() -> None:
+        async with session_factory() as session:
+            customer = (await session.execute(select(User).where(User.email == "customer@example.com"))).scalar_one()
+            now = datetime.now(timezone.utc)
+
+            order = Order(
+                user_id=customer.id,
+                status=OrderStatus.delivered,
+                total_amount=Decimal("100.00"),
+                currency="RON",
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                customer_email=customer.email,
+                customer_name=customer.name or customer.email,
+                payment_method="stripe",
+                created_at=now - timedelta(days=1),
+                updated_at=now - timedelta(days=1),
+            )
+            session.add(order)
+            await session.flush()
+
+            session_id = "sess-utm"
+            session.add(
+                AnalyticsEvent(
+                    session_id=session_id,
+                    event="session_start",
+                    path="/",
+                    payload={"utm_source": "google", "utm_medium": "cpc", "utm_campaign": "spring"},
+                    created_at=now - timedelta(days=2),
+                )
+            )
+            session.add(
+                AnalyticsEvent(
+                    session_id=session_id,
+                    event="checkout_success",
+                    path="/checkout/success",
+                    payload={"order_id": str(order.id)},
+                    order_id=order.id,
+                    created_at=now - timedelta(days=1),
+                )
+            )
+            await session.commit()
+
+    asyncio.run(add_data())
+
+    resp = client.get("/api/v1/admin/dashboard/channel-attribution", params={"range_days": 30}, headers=headers)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["tracked_orders"] == 1
+    channels = {(row["source"], row["medium"]): row for row in data["channels"]}
+    assert ("google", "cpc") in channels
+    assert channels[("google", "cpc")]["orders"] == 1
+    assert channels[("google", "cpc")]["gross_sales"] == pytest.approx(100.0)
 
 
 def test_coupon_lifecycle_and_audit(test_app: Dict[str, object]) -> None:

@@ -19,6 +19,9 @@ import {
   AdminAuditRetentionResponse,
   AdminDashboardPaymentsHealthResponse,
   AdminRefundsBreakdownResponse,
+  AdminShippingPerformanceResponse,
+  AdminStockoutImpactResponse,
+  AdminChannelAttributionResponse,
   AdminDashboardScheduledTasksResponse,
   AdminDashboardSearchResult,
   AdminDashboardSearchResultType,
@@ -1181,6 +1184,261 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
 		          </ng-container>
 		        </section>
 
+            <section
+              *ngIf="canShowShippingPerformance()"
+              class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+            >
+              <div class="flex items-center justify-between gap-3 flex-wrap">
+                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.dashboard.shippingPerformance.title' | translate }}
+                </h2>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.actions.refresh' | translate"
+                  [disabled]="shippingPerformanceLoading()"
+                  (action)="loadShippingPerformance()"
+                ></app-button>
+              </div>
+
+              <app-error-state
+                *ngIf="shippingPerformanceError()"
+                [message]="shippingPerformanceError()!"
+                [requestId]="shippingPerformanceRequestId()"
+                [showRetry]="true"
+                (retry)="loadShippingPerformance()"
+              ></app-error-state>
+
+              <div *ngIf="shippingPerformanceLoading()" class="grid gap-2">
+                <app-skeleton height="3rem"></app-skeleton>
+                <app-skeleton height="3rem"></app-skeleton>
+              </div>
+
+              <ng-container
+                *ngIf="!shippingPerformanceLoading() && !shippingPerformanceError() && shippingPerformance() as perf"
+              >
+                <div class="text-xs text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.dashboard.shippingPerformance.window' | translate: { days: perf.window_days || 30 } }}
+                </div>
+
+                <div class="grid gap-4 lg:grid-cols-2">
+                  <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.dashboard.shippingPerformance.timeToShip' | translate }}
+                    </p>
+                    <div *ngIf="(perf.time_to_ship || []).length === 0" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.dashboard.shippingPerformance.empty' | translate }}
+                    </div>
+                    <div *ngIf="(perf.time_to_ship || []).length" class="mt-3 overflow-x-auto">
+                      <table class="min-w-[520px] w-full text-xs">
+                        <thead>
+                          <tr class="text-left text-slate-500 dark:text-slate-400">
+                            <th class="py-2 pr-3">{{ 'adminUi.dashboard.shippingPerformance.table.courier' | translate }}</th>
+                            <th class="py-2 pr-3 text-right">{{ 'adminUi.dashboard.shippingPerformance.table.avgHours' | translate }}</th>
+                            <th class="py-2 pr-3 text-right">{{ 'adminUi.dashboard.shippingPerformance.table.delta' | translate }}</th>
+                            <th class="py-2 text-right">{{ 'adminUi.dashboard.shippingPerformance.table.count' | translate }}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr *ngFor="let row of perf.time_to_ship" class="border-t border-slate-100 dark:border-slate-800">
+                            <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">{{ formatChannelKey(row.courier) }}</td>
+                            <td class="py-2 pr-3 text-right text-slate-700 dark:text-slate-200">
+                              {{ row.current.avg_hours === null ? '—' : (row.current.avg_hours | number: '1.0-1') }}
+                            </td>
+                            <td class="py-2 pr-3 text-right text-slate-500 dark:text-slate-400">{{ deltaLabel(row.delta_pct.avg_hours) }}</td>
+                            <td class="py-2 text-right text-slate-700 dark:text-slate-200">{{ row.current.count }}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.dashboard.shippingPerformance.deliveryTime' | translate }}
+                    </p>
+                    <div *ngIf="(perf.delivery_time || []).length === 0" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.dashboard.shippingPerformance.empty' | translate }}
+                    </div>
+                    <div *ngIf="(perf.delivery_time || []).length" class="mt-3 overflow-x-auto">
+                      <table class="min-w-[520px] w-full text-xs">
+                        <thead>
+                          <tr class="text-left text-slate-500 dark:text-slate-400">
+                            <th class="py-2 pr-3">{{ 'adminUi.dashboard.shippingPerformance.table.courier' | translate }}</th>
+                            <th class="py-2 pr-3 text-right">{{ 'adminUi.dashboard.shippingPerformance.table.avgHours' | translate }}</th>
+                            <th class="py-2 pr-3 text-right">{{ 'adminUi.dashboard.shippingPerformance.table.delta' | translate }}</th>
+                            <th class="py-2 text-right">{{ 'adminUi.dashboard.shippingPerformance.table.count' | translate }}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr *ngFor="let row of perf.delivery_time" class="border-t border-slate-100 dark:border-slate-800">
+                            <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">{{ formatChannelKey(row.courier) }}</td>
+                            <td class="py-2 pr-3 text-right text-slate-700 dark:text-slate-200">
+                              {{ row.current.avg_hours === null ? '—' : (row.current.avg_hours | number: '1.0-1') }}
+                            </td>
+                            <td class="py-2 pr-3 text-right text-slate-500 dark:text-slate-400">{{ deltaLabel(row.delta_pct.avg_hours) }}</td>
+                            <td class="py-2 text-right text-slate-700 dark:text-slate-200">{{ row.current.count }}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </ng-container>
+            </section>
+
+            <section
+              *ngIf="canShowStockoutImpact()"
+              class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+            >
+              <div class="flex items-center justify-between gap-3 flex-wrap">
+                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.dashboard.stockoutImpact.title' | translate }}
+                </h2>
+                <div class="flex items-center gap-2">
+                  <app-button size="sm" variant="ghost" [label]="'adminUi.actions.openInventory' | translate" (action)="openInventory()"></app-button>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.actions.refresh' | translate"
+                    [disabled]="stockoutImpactLoading()"
+                    (action)="loadStockoutImpact()"
+                  ></app-button>
+                </div>
+              </div>
+
+              <app-error-state
+                *ngIf="stockoutImpactError()"
+                [message]="stockoutImpactError()!"
+                [requestId]="stockoutImpactRequestId()"
+                [showRetry]="true"
+                (retry)="loadStockoutImpact()"
+              ></app-error-state>
+
+              <div *ngIf="stockoutImpactLoading()" class="grid gap-2">
+                <app-skeleton height="3rem"></app-skeleton>
+                <app-skeleton height="3rem"></app-skeleton>
+              </div>
+
+              <ng-container *ngIf="!stockoutImpactLoading() && !stockoutImpactError() && stockoutImpact() as impact">
+                <div class="text-xs text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.dashboard.stockoutImpact.window' | translate: { days: impact.window_days || 30 } }}
+                </div>
+
+                <div *ngIf="(impact.items || []).length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.dashboard.stockoutImpact.empty' | translate }}
+                </div>
+
+                <div *ngIf="(impact.items || []).length" class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+                  <table class="min-w-[760px] w-full text-xs">
+                    <thead>
+                      <tr class="text-left text-slate-500 dark:text-slate-400">
+                        <th class="py-2 px-3">{{ 'adminUi.dashboard.stockoutImpact.table.product' | translate }}</th>
+                        <th class="py-2 px-3 text-right">{{ 'adminUi.dashboard.stockoutImpact.table.available' | translate }}</th>
+                        <th class="py-2 px-3 text-right">{{ 'adminUi.dashboard.stockoutImpact.table.carts' | translate }}</th>
+                        <th class="py-2 px-3 text-right">{{ 'adminUi.dashboard.stockoutImpact.table.sales' | translate }}</th>
+                        <th class="py-2 px-3 text-right">{{ 'adminUi.dashboard.stockoutImpact.table.missed' | translate }}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let item of impact.items" class="border-t border-slate-100 dark:border-slate-800">
+                        <td class="py-2 px-3 text-slate-700 dark:text-slate-200">
+                          <div class="flex items-center gap-2">
+                            <span class="font-semibold">{{ item.product_name }}</span>
+                            <span *ngIf="item.allow_backorder" class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
+                              {{ 'adminUi.dashboard.stockoutImpact.backorder' | translate }}
+                            </span>
+                          </div>
+                          <div class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{{ item.product_slug }}</div>
+                        </td>
+                        <td class="py-2 px-3 text-right font-semibold" [ngClass]="item.available_quantity <= 0 ? 'text-rose-700 dark:text-rose-200' : 'text-slate-700 dark:text-slate-200'">
+                          {{ item.available_quantity }}
+                        </td>
+                        <td class="py-2 px-3 text-right text-slate-700 dark:text-slate-200">{{ item.reserved_in_carts }}</td>
+                        <td class="py-2 px-3 text-right text-slate-700 dark:text-slate-200">
+                          {{ item.demand_revenue | localizedCurrency : item.currency }}
+                        </td>
+                        <td class="py-2 px-3 text-right font-semibold text-slate-900 dark:text-slate-50">
+                          {{ item.estimated_missed_revenue | localizedCurrency : item.currency }}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </ng-container>
+            </section>
+
+            <section
+              *ngIf="canShowChannelAttribution()"
+              class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+            >
+              <div class="flex items-center justify-between gap-3 flex-wrap">
+                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.dashboard.channelAttribution.title' | translate }}
+                </h2>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.actions.refresh' | translate"
+                  [disabled]="channelAttributionLoading()"
+                  (action)="loadChannelAttribution()"
+                ></app-button>
+              </div>
+
+              <app-error-state
+                *ngIf="channelAttributionError()"
+                [message]="channelAttributionError()!"
+                [requestId]="channelAttributionRequestId()"
+                [showRetry]="true"
+                (retry)="loadChannelAttribution()"
+              ></app-error-state>
+
+              <div *ngIf="channelAttributionLoading()" class="grid gap-2">
+                <app-skeleton height="3rem"></app-skeleton>
+                <app-skeleton height="3rem"></app-skeleton>
+              </div>
+
+              <ng-container
+                *ngIf="!channelAttributionLoading() && !channelAttributionError() && channelAttribution() as attribution"
+              >
+                <div class="grid gap-1 text-xs text-slate-500 dark:text-slate-400">
+                  <div>
+                    {{ 'adminUi.dashboard.channelAttribution.coverage' | translate: { tracked: attribution.tracked_orders, total: attribution.total_orders } }}
+                    · {{ attribution.coverage_pct === null ? '—' : (attribution.coverage_pct | percent: '1.0-0') }}
+                  </div>
+                  <div>{{ 'adminUi.dashboard.channelAttribution.note' | translate }}</div>
+                </div>
+
+                <div *ngIf="(attribution.channels || []).length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.dashboard.channelAttribution.empty' | translate }}
+                </div>
+
+                <div *ngIf="(attribution.channels || []).length" class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+                  <table class="min-w-[760px] w-full text-xs">
+                    <thead>
+                      <tr class="text-left text-slate-500 dark:text-slate-400">
+                        <th class="py-2 px-3">{{ 'adminUi.dashboard.channelAttribution.table.channel' | translate }}</th>
+                        <th class="py-2 px-3 text-right">{{ 'adminUi.dashboard.channelAttribution.table.orders' | translate }}</th>
+                        <th class="py-2 px-3 text-right">{{ 'adminUi.dashboard.channelAttribution.table.sales' | translate }}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let row of attribution.channels" class="border-t border-slate-100 dark:border-slate-800">
+                        <td class="py-2 px-3 text-slate-700 dark:text-slate-200">
+                          <div class="font-semibold">{{ row.source }}<ng-container *ngIf="row.medium"> / {{ row.medium }}</ng-container></div>
+                          <div *ngIf="row.campaign" class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{{ row.campaign }}</div>
+                        </td>
+                        <td class="py-2 px-3 text-right text-slate-700 dark:text-slate-200">{{ row.orders }}</td>
+                        <td class="py-2 px-3 text-right text-slate-700 dark:text-slate-200">
+                          {{ row.gross_sales | localizedCurrency : 'RON' }}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </ng-container>
+            </section>
+
 		        <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
 		          <div class="flex items-center justify-between gap-3 flex-wrap">
 		            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.dashboard.scheduledTitle' | translate }}</h2>
@@ -1655,6 +1913,18 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
 	  refundsBreakdownLoading = signal(false);
 	  refundsBreakdownError = signal<string | null>(null);
 	  refundsBreakdownRequestId = signal<string | null>(null);
+    shippingPerformance = signal<AdminShippingPerformanceResponse | null>(null);
+    shippingPerformanceLoading = signal(false);
+    shippingPerformanceError = signal<string | null>(null);
+    shippingPerformanceRequestId = signal<string | null>(null);
+    stockoutImpact = signal<AdminStockoutImpactResponse | null>(null);
+    stockoutImpactLoading = signal(false);
+    stockoutImpactError = signal<string | null>(null);
+    stockoutImpactRequestId = signal<string | null>(null);
+    channelAttribution = signal<AdminChannelAttributionResponse | null>(null);
+    channelAttributionLoading = signal(false);
+    channelAttributionError = signal<string | null>(null);
+    channelAttributionRequestId = signal<string | null>(null);
 	  channelBreakdown = signal<AdminChannelBreakdownResponse | null>(null);
 	  channelBreakdownLoading = signal(false);
 	  channelBreakdownError = signal<string | null>(null);
@@ -1762,6 +2032,9 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
 		    this.loadChannelBreakdown();
         if (this.canShowPaymentsHealth()) this.loadPaymentsHealth();
         if (this.canShowRefundsBreakdown()) this.loadRefundsBreakdown();
+        if (this.canShowShippingPerformance()) this.loadShippingPerformance();
+        if (this.canShowStockoutImpact()) this.loadStockoutImpact();
+        if (this.canShowChannelAttribution()) this.loadChannelAttribution();
 		    this.loadScheduledTasks();
 		    this.loadBackgroundJobs();
 		    this.loadAudit(1);
@@ -1878,6 +2151,9 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     this.refreshFunnelSilent();
     if (this.canShowPaymentsHealth()) this.loadPaymentsHealth();
     if (this.canShowRefundsBreakdown()) this.loadRefundsBreakdown();
+    if (this.canShowShippingPerformance()) this.loadShippingPerformance();
+    if (this.canShowStockoutImpact()) this.loadStockoutImpact();
+    if (this.canShowChannelAttribution()) this.loadChannelAttribution();
     this.loadScheduledTasks();
     this.loadBackgroundJobs();
   }
@@ -1949,6 +2225,18 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
 
   canShowRefundsBreakdown(): boolean {
     return this.auth.canAccessAdminSection('orders') || this.auth.canAccessAdminSection('returns');
+  }
+
+  canShowShippingPerformance(): boolean {
+    return this.auth.canAccessAdminSection('orders');
+  }
+
+  canShowStockoutImpact(): boolean {
+    return this.auth.canAccessAdminSection('inventory');
+  }
+
+  canShowChannelAttribution(): boolean {
+    return this.auth.canAccessAdminSection('dashboard');
   }
 
   paymentsProviderLabelKey(provider: string): string {
@@ -2264,6 +2552,79 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     });
   }
 
+  private resolveWindowDays(fallback = 30): number {
+    const params = this.buildSummaryParams();
+    if (params?.range_days) return params.range_days;
+    const from = (params?.range_from || '').trim();
+    const to = (params?.range_to || '').trim();
+    if (!from || !to) return fallback;
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+    if (!Number.isFinite(fromDate.getTime()) || !Number.isFinite(toDate.getTime())) return fallback;
+    const diffMs = toDate.getTime() - fromDate.getTime();
+    if (diffMs < 0) return fallback;
+    const days = Math.floor(diffMs / (24 * 60 * 60 * 1000)) + 1;
+    return days > 0 ? days : fallback;
+  }
+
+  loadShippingPerformance(): void {
+    if (this.shippingPerformanceLoading()) return;
+    this.shippingPerformanceLoading.set(true);
+    this.shippingPerformanceError.set(null);
+    this.shippingPerformanceRequestId.set(null);
+    this.admin.shippingPerformance({ window_days: this.resolveWindowDays(30) }).subscribe({
+      next: (data) => {
+        this.shippingPerformance.set(data);
+        this.shippingPerformanceLoading.set(false);
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.translate.instant('adminUi.dashboard.shippingPerformance.error');
+        this.shippingPerformanceError.set(msg);
+        this.shippingPerformanceRequestId.set(extractRequestId(err));
+        this.shippingPerformanceLoading.set(false);
+      }
+    });
+  }
+
+  loadStockoutImpact(): void {
+    if (this.stockoutImpactLoading()) return;
+    this.stockoutImpactLoading.set(true);
+    this.stockoutImpactError.set(null);
+    this.stockoutImpactRequestId.set(null);
+    this.admin.stockoutImpact({ window_days: this.resolveWindowDays(30), limit: 8 }).subscribe({
+      next: (data) => {
+        this.stockoutImpact.set(data);
+        this.stockoutImpactLoading.set(false);
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.translate.instant('adminUi.dashboard.stockoutImpact.error');
+        this.stockoutImpactError.set(msg);
+        this.stockoutImpactRequestId.set(extractRequestId(err));
+        this.stockoutImpactLoading.set(false);
+      }
+    });
+  }
+
+  loadChannelAttribution(): void {
+    if (this.channelAttributionLoading()) return;
+    this.channelAttributionLoading.set(true);
+    this.channelAttributionError.set(null);
+    this.channelAttributionRequestId.set(null);
+    const params = this.buildSummaryParams() ?? { range_days: 30 };
+    this.admin.channelAttribution({ ...params, limit: 12 }).subscribe({
+      next: (data) => {
+        this.channelAttribution.set(data);
+        this.channelAttributionLoading.set(false);
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.translate.instant('adminUi.dashboard.channelAttribution.error');
+        this.channelAttributionError.set(msg);
+        this.channelAttributionRequestId.set(extractRequestId(err));
+        this.channelAttributionLoading.set(false);
+      }
+    });
+  }
+
   private loadFunnelMetrics(): void {
     this.funnelLoading.set(true);
     this.funnelError.set(null);
@@ -2451,6 +2812,9 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     this.loadSummary();
     this.loadFunnelMetrics();
     this.loadChannelBreakdown();
+    if (this.canShowChannelAttribution()) this.loadChannelAttribution();
+    if (this.canShowShippingPerformance()) this.loadShippingPerformance();
+    if (this.canShowStockoutImpact()) this.loadStockoutImpact();
   }
 
   private buildSummaryParams(): { range_days?: number; range_from?: string; range_to?: string } | undefined {
