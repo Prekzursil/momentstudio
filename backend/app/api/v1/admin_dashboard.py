@@ -1,6 +1,7 @@
 import csv
 import io
 import re
+import unicodedata
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID
@@ -64,6 +65,7 @@ from app.models.promo import PromoCode, StripeCouponMapping
 from app.models.coupons_v2 import Promotion
 from app.models.user_export import UserDataExportJob, UserDataExportStatus
 from app.models.analytics_event import AnalyticsEvent
+from app.models.webhook import PayPalWebhookEvent, StripeWebhookEvent
 from app.services import auth as auth_service
 from app.services import audit_chain as audit_chain_service
 from app.services import email as email_service
@@ -703,6 +705,324 @@ async def admin_channel_breakdown(
         "payment_methods": await _build(Order.payment_method),
         "couriers": await _build(Order.courier),
         "delivery_types": await _build(Order.delivery_type),
+    }
+
+
+@router.get("/payments-health")
+async def admin_payments_health(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("ops")),
+    since_hours: int = Query(default=24, ge=1, le=168),
+) -> dict:
+    now = datetime.now(timezone.utc)
+    since = now - timedelta(hours=int(since_hours))
+    successful_statuses = (OrderStatus.paid, OrderStatus.shipped, OrderStatus.delivered)
+
+    test_order_ids = select(OrderTag.order_id).where(OrderTag.tag == "test")
+    exclude_test_orders = Order.id.notin_(test_order_ids)
+
+    method_col = func.lower(func.coalesce(Order.payment_method, literal("unknown")))
+    success_rows = await session.execute(
+        select(method_col, func.count().label("count"))
+        .select_from(Order)
+        .where(
+            Order.created_at >= since,
+            Order.created_at < now,
+            Order.status.in_(successful_statuses),
+            exclude_test_orders,
+        )
+        .group_by(method_col)
+    )
+    pending_rows = await session.execute(
+        select(method_col, func.count().label("count"))
+        .select_from(Order)
+        .where(
+            Order.created_at >= since,
+            Order.created_at < now,
+            Order.status == OrderStatus.pending_payment,
+            exclude_test_orders,
+        )
+        .group_by(method_col)
+    )
+    success_map = {str(row[0] or "unknown"): int(row[1] or 0) for row in success_rows.all()}
+    pending_map = {str(row[0] or "unknown"): int(row[1] or 0) for row in pending_rows.all()}
+
+    def _safe_int(value: int | None) -> int:
+        return int(value or 0)
+
+    def _success_rate(success: int, pending: int) -> float | None:
+        denom = success + pending
+        if denom <= 0:
+            return None
+        return success / denom
+
+    def _error_filter(model) -> Any:
+        return (
+            model.last_attempt_at >= since,
+            model.last_error.is_not(None),
+            model.last_error != "",
+        )
+
+    def _backlog_filter(model) -> Any:
+        return (
+            model.last_attempt_at >= since,
+            model.processed_at.is_(None),
+            or_(model.last_error.is_(None), model.last_error == ""),
+        )
+
+    stripe_errors = await session.scalar(select(func.count()).select_from(StripeWebhookEvent).where(*_error_filter(StripeWebhookEvent)))
+    stripe_backlog = await session.scalar(select(func.count()).select_from(StripeWebhookEvent).where(*_backlog_filter(StripeWebhookEvent)))
+    paypal_errors = await session.scalar(select(func.count()).select_from(PayPalWebhookEvent).where(*_error_filter(PayPalWebhookEvent)))
+    paypal_backlog = await session.scalar(select(func.count()).select_from(PayPalWebhookEvent).where(*_backlog_filter(PayPalWebhookEvent)))
+
+    stripe_recent_rows = (
+        (
+            await session.execute(
+                select(StripeWebhookEvent)
+                .where(*_error_filter(StripeWebhookEvent))
+                .order_by(StripeWebhookEvent.last_attempt_at.desc())
+                .limit(8)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    paypal_recent_rows = (
+        (
+            await session.execute(
+                select(PayPalWebhookEvent)
+                .where(*_error_filter(PayPalWebhookEvent))
+                .order_by(PayPalWebhookEvent.last_attempt_at.desc())
+                .limit(8)
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    recent_errors: list[dict] = []
+    for row in stripe_recent_rows:
+        recent_errors.append(
+            {
+                "provider": "stripe",
+                "event_id": row.stripe_event_id,
+                "event_type": row.event_type,
+                "attempts": int(row.attempts or 0),
+                "last_attempt_at": row.last_attempt_at,
+                "last_error": row.last_error,
+            }
+        )
+    for row in paypal_recent_rows:
+        recent_errors.append(
+            {
+                "provider": "paypal",
+                "event_id": row.paypal_event_id,
+                "event_type": row.event_type,
+                "attempts": int(row.attempts or 0),
+                "last_attempt_at": row.last_attempt_at,
+                "last_error": row.last_error,
+            }
+        )
+    recent_errors.sort(key=lambda item: item.get("last_attempt_at") or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+    recent_errors = recent_errors[:12]
+
+    preferred_order = ["stripe", "paypal", "netopia", "cod", "unknown"]
+    methods = list({*success_map.keys(), *pending_map.keys(), *preferred_order})
+    methods.sort(key=lambda key: (preferred_order.index(key) if key in preferred_order else len(preferred_order), key))
+
+    providers: list[dict] = []
+    for method in methods:
+        success = _safe_int(success_map.get(method))
+        pending = _safe_int(pending_map.get(method))
+        if method == "stripe":
+            webhook_error_count = _safe_int(int(stripe_errors or 0))
+            webhook_backlog_count = _safe_int(int(stripe_backlog or 0))
+        elif method == "paypal":
+            webhook_error_count = _safe_int(int(paypal_errors or 0))
+            webhook_backlog_count = _safe_int(int(paypal_backlog or 0))
+        else:
+            webhook_error_count = 0
+            webhook_backlog_count = 0
+
+        providers.append(
+            {
+                "provider": method,
+                "successful_orders": success,
+                "pending_payment_orders": pending,
+                "success_rate": _success_rate(success, pending),
+                "webhook_errors": webhook_error_count,
+                "webhook_backlog": webhook_backlog_count,
+            }
+        )
+
+    return {
+        "window_hours": int(since_hours),
+        "window_start": since,
+        "window_end": now,
+        "providers": providers,
+        "recent_webhook_errors": recent_errors,
+    }
+
+
+@router.get("/refunds-breakdown")
+async def admin_refunds_breakdown(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("dashboard")),
+    window_days: int = Query(default=30, ge=1, le=365),
+) -> dict:
+    now = datetime.now(timezone.utc)
+    window = timedelta(days=int(window_days))
+    start = now - window
+    prev_start = start - window
+
+    test_order_ids = select(OrderTag.order_id).where(OrderTag.tag == "test")
+    exclude_test_orders = Order.id.notin_(test_order_ids)
+
+    provider_col = func.lower(func.coalesce(OrderRefund.provider, literal("unknown")))
+
+    async def _provider_rows(window_start: datetime, window_end: datetime) -> list[tuple[str, int, float]]:
+        rows = await session.execute(
+            select(
+                provider_col,
+                func.count().label("count"),
+                func.coalesce(func.sum(OrderRefund.amount), 0).label("amount"),
+            )
+            .select_from(OrderRefund)
+            .join(Order, OrderRefund.order_id == Order.id)
+            .where(
+                OrderRefund.created_at >= window_start,
+                OrderRefund.created_at < window_end,
+                exclude_test_orders,
+            )
+            .group_by(provider_col)
+        )
+        items: list[tuple[str, int, float]] = []
+        for provider, count, amount in rows.all():
+            items.append((str(provider or "unknown"), int(count or 0), float(amount or 0)))
+        return items
+
+    current_provider = await _provider_rows(start, now)
+    previous_provider = await _provider_rows(prev_start, start)
+    prev_provider_map = {row[0]: row for row in previous_provider}
+
+    def _delta_pct(current: float, previous: float) -> float | None:
+        if previous == 0:
+            return None
+        return (current - previous) / previous * 100.0
+
+    providers: list[dict] = []
+    for provider, count, amount in current_provider:
+        _, prev_count, prev_amount = prev_provider_map.get(provider, (provider, 0, 0.0))
+        providers.append(
+            {
+                "provider": provider,
+                "current": {"count": int(count), "amount": float(amount)},
+                "previous": {"count": int(prev_count), "amount": float(prev_amount)},
+                "delta_pct": {
+                    "count": _delta_pct(float(count), float(prev_count)),
+                    "amount": _delta_pct(float(amount), float(prev_amount)),
+                },
+            }
+        )
+    providers.sort(key=lambda row: (row.get("current", {}).get("amount", 0), row.get("current", {}).get("count", 0)), reverse=True)
+
+    async def _missing_refunds(window_start: datetime, window_end: datetime) -> tuple[int, float]:
+        row = await session.execute(
+            select(
+                func.count().label("count"),
+                func.coalesce(func.sum(Order.total_amount), 0).label("amount"),
+            )
+            .select_from(Order)
+            .outerjoin(OrderRefund, OrderRefund.order_id == Order.id)
+            .where(
+                Order.status == OrderStatus.refunded,
+                Order.updated_at >= window_start,
+                Order.updated_at < window_end,
+                OrderRefund.id.is_(None),
+                exclude_test_orders,
+            )
+        )
+        count, amount = row.one()
+        return int(count or 0), float(amount or 0)
+
+    missing_current_count, missing_current_amount = await _missing_refunds(start, now)
+    missing_prev_count, missing_prev_amount = await _missing_refunds(prev_start, start)
+
+    def _normalize_text(value: str) -> str:
+        raw = (value or "").strip()
+        if not raw:
+            return ""
+        normalized = unicodedata.normalize("NFKD", raw)
+        return normalized.encode("ascii", "ignore").decode("ascii").lower()
+
+    def _reason_category(reason: str) -> str:
+        t = _normalize_text(reason)
+        if not t:
+            return "other"
+        if any(key in t for key in ("damaged", "broken", "defect", "defective", "crack", "spart", "stricat", "zgariat", "deterior")):
+            return "damaged"
+        if any(key in t for key in ("wrong", "different", "gresit", "incorect", "alt produs", "other item", "not the one")):
+            return "wrong_item"
+        if any(key in t for key in ("not as described", "different than expected", "nu corespunde", "nu este ca", "description", "poza", "picture")):
+            return "not_as_described"
+        if any(key in t for key in ("size", "fit", "too big", "too small", "marime", "potriv")):
+            return "size_fit"
+        if any(key in t for key in ("delivery", "shipping", "ship", "courier", "curier", "livrare", "intarzi", "intarzier")):
+            return "delivery_issue"
+        if any(key in t for key in ("changed my mind", "dont want", "do not want", "no longer", "nu mai", "razgand", "renunt")):
+            return "changed_mind"
+        return "other"
+
+    async def _reason_counts(window_start: datetime, window_end: datetime) -> dict[str, int]:
+        rows = await session.execute(
+            select(ReturnRequest.reason)
+            .select_from(ReturnRequest)
+            .join(Order, ReturnRequest.order_id == Order.id)
+            .where(
+                ReturnRequest.status == ReturnRequestStatus.refunded,
+                ReturnRequest.updated_at >= window_start,
+                ReturnRequest.updated_at < window_end,
+                exclude_test_orders,
+            )
+        )
+        counts: dict[str, int] = {}
+        for reason in rows.scalars().all():
+            category = _reason_category(str(reason or ""))
+            counts[category] = counts.get(category, 0) + 1
+        return counts
+
+    current_reasons = await _reason_counts(start, now)
+    previous_reasons = await _reason_counts(prev_start, start)
+
+    categories = ["damaged", "wrong_item", "not_as_described", "size_fit", "delivery_issue", "changed_mind", "other"]
+    reasons: list[dict] = []
+    for category in categories:
+        cur = int(current_reasons.get(category, 0))
+        prev = int(previous_reasons.get(category, 0))
+        reasons.append(
+            {
+                "category": category,
+                "current": cur,
+                "previous": prev,
+                "delta_pct": _delta_pct(float(cur), float(prev)),
+            }
+        )
+    reasons.sort(key=lambda row: row.get("current", 0), reverse=True)
+
+    return {
+        "window_days": int(window_days),
+        "window_start": start,
+        "window_end": now,
+        "providers": providers,
+        "missing_refunds": {
+            "current": {"count": missing_current_count, "amount": float(missing_current_amount)},
+            "previous": {"count": missing_prev_count, "amount": float(missing_prev_amount)},
+            "delta_pct": {
+                "count": _delta_pct(float(missing_current_count), float(missing_prev_count)),
+                "amount": _delta_pct(float(missing_current_amount), float(missing_prev_amount)),
+            },
+        },
+        "reasons": reasons,
     }
 
 

@@ -1883,6 +1883,59 @@
         "unavailable": "Indisponibil",
         "backupNotConfigured": "Nu este configurat"
       },
+      "paymentsHealth": {
+        "title": "Stare plăți",
+        "window": "Ultimele {{hours}}h",
+        "successful": "Reușite",
+        "pending": "În așteptare plată",
+        "webhookErrors": "Erori webhook",
+        "webhookBacklog": "Coada webhook",
+        "recentErrorsTitle": "Erori webhook recente",
+        "error": "Nu am putut încărca starea plăților.",
+        "providers": {
+          "stripe": "Stripe",
+          "paypal": "PayPal",
+          "netopia": "Netopia",
+          "cod": "Ramburs",
+          "unknown": "Altele"
+        },
+        "table": {
+          "provider": "Furnizor",
+          "event": "Eveniment",
+          "attempted": "Ultima încercare",
+          "error": "Eroare"
+        }
+      },
+      "refundsBreakdown": {
+        "title": "Defalcare rambursări",
+        "window": "Ultimele {{days}} zile",
+        "byProviderTitle": "Pe furnizor",
+        "byReasonTitle": "Retururi rambursate după motiv (dedus)",
+        "missingTitle": "Rambursări neînregistrate",
+        "missingHint": "Comenzi marcate rambursate fără înregistrare de rambursare.",
+        "error": "Nu am putut încărca defalcarea rambursărilor.",
+        "providers": {
+          "stripe": "Stripe",
+          "paypal": "PayPal",
+          "manual": "Manual",
+          "unknown": "Altele"
+        },
+        "reasons": {
+          "damaged": "Deteriorat / defect",
+          "wrong_item": "Produs greșit",
+          "not_as_described": "Nu corespunde descrierii",
+          "size_fit": "Mărime / potrivire",
+          "delivery_issue": "Probleme livrare",
+          "changed_mind": "Răzgândire",
+          "other": "Altele"
+        },
+        "table": {
+          "provider": "Furnizor",
+          "amount": "Sumă",
+          "count": "Număr",
+          "delta": "Δ"
+        }
+      },
       "scheduledTitle": "Sarcini programate",
       "scheduledLoading": "Se încarcă sarcinile programate…",
       "scheduledError": "Nu am putut încărca sarcinile programate.",

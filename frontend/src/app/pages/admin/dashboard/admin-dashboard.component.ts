@@ -17,6 +17,8 @@ import {
   AdminAuditEntity,
   AdminAuditEntryUnified,
   AdminAuditRetentionResponse,
+  AdminDashboardPaymentsHealthResponse,
+  AdminRefundsBreakdownResponse,
   AdminDashboardScheduledTasksResponse,
   AdminDashboardSearchResult,
   AdminDashboardSearchResultType,
@@ -843,53 +845,59 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
 	          </div>
 
 	          <div *ngIf="hasAnomalyAlerts()" class="grid gap-4 md:grid-cols-3">
-	            <div
-	              *ngIf="failedPaymentsAlert() as failed"
-	              class="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-slate-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
-	            >
-	              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-rose-700 dark:text-rose-200">
-	                {{ 'adminUi.dashboard.alerts.failedPayments' | translate }}
-	              </p>
-	              <div class="mt-2 text-2xl font-semibold text-rose-900 dark:text-rose-50">{{ failed.current }}</div>
-	              <p class="mt-1 text-xs text-rose-700 dark:text-rose-200">
-	                {{ 'adminUi.dashboard.alerts.windowHours' | translate: { hours: failed.window_hours || 24 } }} ·
-	                {{ 'adminUi.dashboard.alerts.vsPrevious' | translate }}: {{ failed.previous }} · {{ deltaLabel(failed.delta_pct) }}
-	              </p>
-	            </div>
+                <button
+                  *ngIf="failedPaymentsAlert() as failed"
+                  type="button"
+                  class="w-full text-left rounded-2xl border border-rose-200 bg-rose-50 p-4 text-slate-800 transition hover:bg-rose-100/70 focus:outline-none focus:ring-2 focus:ring-rose-400/40 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100 dark:hover:bg-rose-950/40"
+                  (click)="openFailedPayments()"
+                >
+                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-rose-700 dark:text-rose-200">
+                    {{ 'adminUi.dashboard.alerts.failedPayments' | translate }}
+                  </p>
+                  <div class="mt-2 text-2xl font-semibold text-rose-900 dark:text-rose-50">{{ failed.current }}</div>
+                  <p class="mt-1 text-xs text-rose-700 dark:text-rose-200">
+                    {{ 'adminUi.dashboard.alerts.windowHours' | translate: { hours: failed.window_hours || 24 } }} ·
+                    {{ 'adminUi.dashboard.alerts.vsPrevious' | translate }}: {{ failed.previous }} · {{ deltaLabel(failed.delta_pct) }}
+                  </p>
+                </button>
 
-	            <div
-	              *ngIf="refundRequestsAlert() as refunds"
-	              class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-slate-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
-	            >
-	              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-200">
-	                {{ 'adminUi.dashboard.alerts.refundRequests' | translate }}
-	              </p>
-	              <div class="mt-2 text-2xl font-semibold text-amber-900 dark:text-amber-50">{{ refunds.current }}</div>
-	              <p class="mt-1 text-xs text-amber-700 dark:text-amber-200">
-	                {{ 'adminUi.dashboard.alerts.windowDays' | translate: { days: refunds.window_days || 7 } }} ·
-	                {{ 'adminUi.dashboard.alerts.vsPrevious' | translate }}: {{ refunds.previous }} · {{ deltaLabel(refunds.delta_pct) }}
-	              </p>
-	            </div>
+                <button
+                  *ngIf="refundRequestsAlert() as refunds"
+                  type="button"
+                  class="w-full text-left rounded-2xl border border-amber-200 bg-amber-50 p-4 text-slate-800 transition hover:bg-amber-100/70 focus:outline-none focus:ring-2 focus:ring-amber-400/40 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100 dark:hover:bg-amber-950/40"
+                  (click)="openRefundRequests()"
+                >
+                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-200">
+                    {{ 'adminUi.dashboard.alerts.refundRequests' | translate }}
+                  </p>
+                  <div class="mt-2 text-2xl font-semibold text-amber-900 dark:text-amber-50">{{ refunds.current }}</div>
+                  <p class="mt-1 text-xs text-amber-700 dark:text-amber-200">
+                    {{ 'adminUi.dashboard.alerts.windowDays' | translate: { days: refunds.window_days || 7 } }} ·
+                    {{ 'adminUi.dashboard.alerts.vsPrevious' | translate }}: {{ refunds.previous }} · {{ deltaLabel(refunds.delta_pct) }}
+                  </p>
+                </button>
 
-	            <div
-	              *ngIf="stockoutsAlertCount() as stockouts"
-	              class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-slate-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
-	            >
-	              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-200">
-	                {{ 'adminUi.dashboard.alerts.stockouts' | translate }}
-	              </p>
-	              <div class="mt-2 text-2xl font-semibold text-amber-900 dark:text-amber-50">{{ stockouts }}</div>
-	              <p class="mt-1 text-xs text-amber-700 dark:text-amber-200">
-	                {{ 'adminUi.dashboard.alerts.stockoutsHint' | translate }}
-	              </p>
-	            </div>
-	          </div>
-	        </section>
+                <button
+                  *ngIf="stockoutsAlertCount() as stockouts"
+                  type="button"
+                  class="w-full text-left rounded-2xl border border-amber-200 bg-amber-50 p-4 text-slate-800 transition hover:bg-amber-100/70 focus:outline-none focus:ring-2 focus:ring-amber-400/40 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100 dark:hover:bg-amber-950/40"
+                  (click)="openStockouts()"
+                >
+                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-200">
+                    {{ 'adminUi.dashboard.alerts.stockouts' | translate }}
+                  </p>
+                  <div class="mt-2 text-2xl font-semibold text-amber-900 dark:text-amber-50">{{ stockouts }}</div>
+                  <p class="mt-1 text-xs text-amber-700 dark:text-amber-200">
+                    {{ 'adminUi.dashboard.alerts.stockoutsHint' | translate }}
+                  </p>
+                </button>
+              </div>
+            </section>
 
-	        <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-	          <div class="flex items-center justify-between gap-3 flex-wrap">
-	            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
-	              {{ 'adminUi.dashboard.systemHealthTitle' | translate }}
+		        <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+		          <div class="flex items-center justify-between gap-3 flex-wrap">
+		            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+		              {{ 'adminUi.dashboard.systemHealthTitle' | translate }}
 	            </h2>
 	          </div>
 
@@ -920,14 +928,264 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
 	                </p>
 	              </ng-template>
 	            </div>
-	          </div>
-	        </section>
+		          </div>
+		        </section>
 
-	        <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-	          <div class="flex items-center justify-between gap-3 flex-wrap">
-	            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.dashboard.scheduledTitle' | translate }}</h2>
-              <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadScheduledTasks()"></app-button>
-	          </div>
+		        <section
+		          *ngIf="canShowPaymentsHealth()"
+		          class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+		        >
+		          <div class="flex items-center justify-between gap-3 flex-wrap">
+		            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+		              {{ 'adminUi.dashboard.paymentsHealth.title' | translate }}
+		            </h2>
+		            <app-button
+		              size="sm"
+		              variant="ghost"
+		              [label]="'adminUi.actions.refresh' | translate"
+		              [disabled]="paymentsHealthLoading()"
+		              (action)="loadPaymentsHealth()"
+		            ></app-button>
+		          </div>
+
+		          <app-error-state
+		            *ngIf="paymentsHealthError()"
+		            [message]="paymentsHealthError()!"
+		            [requestId]="paymentsHealthRequestId()"
+		            [showRetry]="true"
+		            (retry)="loadPaymentsHealth()"
+		          ></app-error-state>
+
+		          <div *ngIf="paymentsHealthLoading()" class="grid gap-2">
+		            <app-skeleton height="3rem"></app-skeleton>
+		            <app-skeleton height="3rem"></app-skeleton>
+		          </div>
+
+		          <ng-container *ngIf="!paymentsHealthLoading() && !paymentsHealthError() && paymentsHealth() as health">
+		            <div class="text-xs text-slate-500 dark:text-slate-400">
+		              {{ 'adminUi.dashboard.paymentsHealth.window' | translate: { hours: health.window_hours || 24 } }}
+		            </div>
+
+		            <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+		              <div
+		                *ngFor="let row of health.providers"
+		                class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+		              >
+		                <div class="flex items-center justify-between gap-2">
+		                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+		                    {{ paymentsProviderLabelKey(row.provider) | translate }}
+		                  </p>
+		                  <span class="text-xs font-semibold text-slate-700 dark:text-slate-200">
+		                    {{ row.success_rate === null ? '—' : (row.success_rate | percent: '1.0-0') }}
+		                  </span>
+		                </div>
+
+		                <div class="mt-2 grid gap-1 text-sm text-slate-700 dark:text-slate-200">
+		                  <div class="flex items-center justify-between">
+		                    <span class="text-xs text-slate-500 dark:text-slate-400">
+		                      {{ 'adminUi.dashboard.paymentsHealth.successful' | translate }}
+		                    </span>
+		                    <span class="font-semibold text-slate-900 dark:text-slate-50">{{ row.successful_orders }}</span>
+		                  </div>
+		                  <div class="flex items-center justify-between">
+		                    <span class="text-xs text-slate-500 dark:text-slate-400">
+		                      {{ 'adminUi.dashboard.paymentsHealth.pending' | translate }}
+		                    </span>
+		                    <span class="font-semibold text-slate-900 dark:text-slate-50">{{ row.pending_payment_orders }}</span>
+		                  </div>
+
+		                  <ng-container *ngIf="supportsWebhookMetrics(row.provider)">
+		                    <div class="flex items-center justify-between">
+		                      <span class="text-xs text-slate-500 dark:text-slate-400">
+		                        {{ 'adminUi.dashboard.paymentsHealth.webhookErrors' | translate }}
+		                      </span>
+		                      <span
+		                        class="font-semibold"
+		                        [ngClass]="row.webhook_errors ? 'text-rose-700 dark:text-rose-200' : 'text-slate-900 dark:text-slate-50'"
+		                      >
+		                        {{ row.webhook_errors }}
+		                      </span>
+		                    </div>
+		                    <div class="flex items-center justify-between">
+		                      <span class="text-xs text-slate-500 dark:text-slate-400">
+		                        {{ 'adminUi.dashboard.paymentsHealth.webhookBacklog' | translate }}
+		                      </span>
+		                      <span
+		                        class="font-semibold"
+		                        [ngClass]="row.webhook_backlog ? 'text-amber-700 dark:text-amber-200' : 'text-slate-900 dark:text-slate-50'"
+		                      >
+		                        {{ row.webhook_backlog }}
+		                      </span>
+		                    </div>
+		                  </ng-container>
+		                </div>
+		              </div>
+		            </div>
+
+		            <div *ngIf="(health.recent_webhook_errors || []).length" class="grid gap-2">
+		              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+		                {{ 'adminUi.dashboard.paymentsHealth.recentErrorsTitle' | translate }}
+		              </p>
+		              <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+		                <table class="w-full text-xs">
+		                  <thead>
+		                    <tr class="text-left text-slate-500 dark:text-slate-400">
+		                      <th class="py-2 px-3">{{ 'adminUi.dashboard.paymentsHealth.table.provider' | translate }}</th>
+		                      <th class="py-2 px-3">{{ 'adminUi.dashboard.paymentsHealth.table.event' | translate }}</th>
+		                      <th class="py-2 px-3">{{ 'adminUi.dashboard.paymentsHealth.table.attempted' | translate }}</th>
+		                      <th class="py-2 px-3">{{ 'adminUi.dashboard.paymentsHealth.table.error' | translate }}</th>
+		                    </tr>
+		                  </thead>
+		                  <tbody>
+		                    <tr
+		                      *ngFor="let evt of health.recent_webhook_errors"
+		                      class="border-t border-slate-100 dark:border-slate-800"
+		                    >
+		                      <td class="py-2 px-3 text-slate-700 dark:text-slate-200">
+		                        {{ paymentsProviderLabelKey(evt.provider) | translate }}
+		                      </td>
+		                      <td class="py-2 px-3 text-slate-700 dark:text-slate-200 font-mono">
+		                        {{ evt.event_type || evt.event_id }}
+		                      </td>
+		                      <td class="py-2 px-3 text-slate-500 dark:text-slate-400">{{ evt.last_attempt_at | date: 'short' }}</td>
+		                      <td class="py-2 px-3 text-rose-700 dark:text-rose-200">
+		                        <span class="block max-w-[520px] truncate">{{ evt.last_error }}</span>
+		                      </td>
+		                    </tr>
+		                  </tbody>
+		                </table>
+		              </div>
+		            </div>
+		          </ng-container>
+		        </section>
+
+		        <section
+		          *ngIf="canShowRefundsBreakdown()"
+		          class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+		        >
+		          <div class="flex items-center justify-between gap-3 flex-wrap">
+		            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+		              {{ 'adminUi.dashboard.refundsBreakdown.title' | translate }}
+		            </h2>
+		            <app-button
+		              size="sm"
+		              variant="ghost"
+		              [label]="'adminUi.actions.refresh' | translate"
+		              [disabled]="refundsBreakdownLoading()"
+		              (action)="loadRefundsBreakdown()"
+		            ></app-button>
+		          </div>
+
+		          <app-error-state
+		            *ngIf="refundsBreakdownError()"
+		            [message]="refundsBreakdownError()!"
+		            [requestId]="refundsBreakdownRequestId()"
+		            [showRetry]="true"
+		            (retry)="loadRefundsBreakdown()"
+		          ></app-error-state>
+
+		          <div *ngIf="refundsBreakdownLoading()" class="grid gap-2">
+		            <app-skeleton height="3rem"></app-skeleton>
+		            <app-skeleton height="3rem"></app-skeleton>
+		          </div>
+
+		          <ng-container *ngIf="!refundsBreakdownLoading() && !refundsBreakdownError() && refundsBreakdown() as breakdown">
+		            <div class="text-xs text-slate-500 dark:text-slate-400">
+		              {{ 'adminUi.dashboard.refundsBreakdown.window' | translate: { days: breakdown.window_days || 30 } }}
+		            </div>
+
+		            <div class="grid gap-4 lg:grid-cols-3">
+		              <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
+		                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+		                  {{ 'adminUi.dashboard.refundsBreakdown.missingTitle' | translate }}
+		                </p>
+		                <div class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">
+		                  {{ (breakdown.missing_refunds.current.amount || 0) | localizedCurrency : 'RON' }}
+		                </div>
+		                <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+		                  {{ 'adminUi.dashboard.refundsBreakdown.missingHint' | translate }}
+		                </p>
+		                <div class="mt-3 grid gap-1 text-sm text-slate-700 dark:text-slate-200">
+		                  <div class="flex items-center justify-between">
+		                    <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.dashboard.refundsBreakdown.table.count' | translate }}</span>
+		                    <span class="font-semibold text-slate-900 dark:text-slate-50">
+		                      {{ breakdown.missing_refunds.current.count }} · {{ deltaLabel(breakdown.missing_refunds.delta_pct.count) }}
+		                    </span>
+		                  </div>
+		                  <div class="flex items-center justify-between">
+		                    <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.dashboard.refundsBreakdown.table.amount' | translate }}</span>
+		                    <span class="font-semibold text-slate-900 dark:text-slate-50">
+		                      {{ deltaLabel(breakdown.missing_refunds.delta_pct.amount) }}
+		                    </span>
+		                  </div>
+		                </div>
+		              </div>
+
+		              <div class="lg:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
+		                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+		                  {{ 'adminUi.dashboard.refundsBreakdown.byProviderTitle' | translate }}
+		                </p>
+		                <div class="mt-3 overflow-x-auto">
+		                  <table class="min-w-[640px] w-full text-xs">
+		                    <thead>
+		                      <tr class="text-left text-slate-500 dark:text-slate-400">
+		                        <th class="py-2 pr-3">{{ 'adminUi.dashboard.refundsBreakdown.table.provider' | translate }}</th>
+		                        <th class="py-2 pr-3 text-right">{{ 'adminUi.dashboard.refundsBreakdown.table.amount' | translate }}</th>
+		                        <th class="py-2 pr-3 text-right">{{ 'adminUi.dashboard.refundsBreakdown.table.delta' | translate }}</th>
+		                        <th class="py-2 pr-3 text-right">{{ 'adminUi.dashboard.refundsBreakdown.table.count' | translate }}</th>
+		                        <th class="py-2 text-right">{{ 'adminUi.dashboard.refundsBreakdown.table.delta' | translate }}</th>
+		                      </tr>
+		                    </thead>
+		                    <tbody>
+		                      <tr
+		                        *ngFor="let row of breakdown.providers"
+		                        class="border-t border-slate-100 dark:border-slate-800"
+		                      >
+		                        <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">
+		                          {{ refundProviderLabelKey(row.provider) | translate }}
+		                        </td>
+		                        <td class="py-2 pr-3 text-right text-slate-700 dark:text-slate-200">
+		                          {{ (row.current.amount || 0) | localizedCurrency : 'RON' }}
+		                        </td>
+		                        <td class="py-2 pr-3 text-right text-slate-500 dark:text-slate-400">
+		                          {{ deltaLabel(row.delta_pct.amount) }}
+		                        </td>
+		                        <td class="py-2 pr-3 text-right text-slate-700 dark:text-slate-200">{{ row.current.count }}</td>
+		                        <td class="py-2 text-right text-slate-500 dark:text-slate-400">{{ deltaLabel(row.delta_pct.count) }}</td>
+		                      </tr>
+		                    </tbody>
+		                  </table>
+		                </div>
+		              </div>
+		            </div>
+
+		            <div class="grid gap-2">
+		              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+		                {{ 'adminUi.dashboard.refundsBreakdown.byReasonTitle' | translate }}
+		              </p>
+		              <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+		                <div
+		                  *ngFor="let row of breakdown.reasons"
+		                  class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+		                >
+		                  <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+		                    {{ refundReasonLabelKey(row.category) | translate }}
+		                  </p>
+		                  <div class="mt-2 flex items-baseline justify-between gap-2">
+		                    <span class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ row.current }}</span>
+		                    <span class="text-xs text-slate-500 dark:text-slate-400">{{ deltaLabel(row.delta_pct) }}</span>
+		                  </div>
+		                </div>
+		              </div>
+		            </div>
+		          </ng-container>
+		        </section>
+
+		        <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+		          <div class="flex items-center justify-between gap-3 flex-wrap">
+		            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.dashboard.scheduledTitle' | translate }}</h2>
+	              <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadScheduledTasks()"></app-button>
+		          </div>
 
             <div *ngIf="scheduledError()" class="text-sm text-rose-700 dark:text-rose-300">
               {{ scheduledError() }}
@@ -1385,14 +1643,22 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
   loading = signal(true);
   error = signal<string | null>(null);
   errorRequestId = signal<string | null>(null);
-  whatsNewLoading = signal(false);
-  whatsNewError = signal<string | null>(null);
-  whatsNewHtml = signal('');
-  summary = signal<AdminSummary | null>(null);
-  channelBreakdown = signal<AdminChannelBreakdownResponse | null>(null);
-  channelBreakdownLoading = signal(false);
-  channelBreakdownError = signal<string | null>(null);
-  funnelMetrics = signal<AdminFunnelMetricsResponse | null>(null);
+	  whatsNewLoading = signal(false);
+	  whatsNewError = signal<string | null>(null);
+	  whatsNewHtml = signal('');
+	  summary = signal<AdminSummary | null>(null);
+	  paymentsHealth = signal<AdminDashboardPaymentsHealthResponse | null>(null);
+	  paymentsHealthLoading = signal(false);
+	  paymentsHealthError = signal<string | null>(null);
+	  paymentsHealthRequestId = signal<string | null>(null);
+	  refundsBreakdown = signal<AdminRefundsBreakdownResponse | null>(null);
+	  refundsBreakdownLoading = signal(false);
+	  refundsBreakdownError = signal<string | null>(null);
+	  refundsBreakdownRequestId = signal<string | null>(null);
+	  channelBreakdown = signal<AdminChannelBreakdownResponse | null>(null);
+	  channelBreakdownLoading = signal(false);
+	  channelBreakdownError = signal<string | null>(null);
+	  funnelMetrics = signal<AdminFunnelMetricsResponse | null>(null);
   funnelLoading = signal(false);
   funnelError = signal<string | null>(null);
   lastUpdatedAt = signal<string | null>(null);
@@ -1492,13 +1758,15 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
 	    this.loadSalesMetricPreference();
 	    this.loadSummary();
       this.loadWhatsNew();
-	    this.loadFunnelMetrics();
-	    this.loadChannelBreakdown();
-	    this.loadScheduledTasks();
-	    this.loadBackgroundJobs();
-	    this.loadAudit(1);
-	    this.loadAuditRetention();
-	    this.maybeShowOnboarding();
+		    this.loadFunnelMetrics();
+		    this.loadChannelBreakdown();
+        if (this.canShowPaymentsHealth()) this.loadPaymentsHealth();
+        if (this.canShowRefundsBreakdown()) this.loadRefundsBreakdown();
+		    this.loadScheduledTasks();
+		    this.loadBackgroundJobs();
+		    this.loadAudit(1);
+		    this.loadAuditRetention();
+		    this.maybeShowOnboarding();
 	  }
 
   clearRecent(): void {
@@ -1563,6 +1831,24 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     this.openOrdersWithFilters({ q: '', status: 'refunded', tag: '', fromDate: '', toDate: '', includeTestOrders: false, limit: 20 });
   }
 
+  openFailedPayments(): void {
+    const metric = this.failedPaymentsAlert();
+    const windowHours = typeof metric?.window_hours === 'number' && metric.window_hours > 0 ? metric.window_hours : 24;
+    const now = new Date();
+    const from = new Date(now.getTime() - windowHours * 60 * 60 * 1000);
+    const fromDate = from.toISOString().slice(0, 10);
+    const toDate = now.toISOString().slice(0, 10);
+    this.openOrdersWithFilters({ q: '', status: 'pending_payment', tag: '', fromDate, toDate, includeTestOrders: false, limit: 20 });
+  }
+
+  openRefundRequests(): void {
+    void this.router.navigate(['/admin/returns'], { queryParams: { status: 'requested' } });
+  }
+
+  openStockouts(): void {
+    this.openInventory();
+  }
+
   openOrdersRange(): void {
     const sum = this.summary();
     const fromDate = sum?.range_from || '';
@@ -1590,6 +1876,8 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     this.refreshSummarySilent();
     this.refreshChannelBreakdownSilent();
     this.refreshFunnelSilent();
+    if (this.canShowPaymentsHealth()) this.loadPaymentsHealth();
+    if (this.canShowRefundsBreakdown()) this.loadRefundsBreakdown();
     this.loadScheduledTasks();
     this.loadBackgroundJobs();
   }
@@ -1653,6 +1941,50 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
 
   shouldShowJobsPanel(): boolean {
     return this.auth.canAccessAdminSection('users') || this.auth.canAccessAdminSection('coupons');
+  }
+
+  canShowPaymentsHealth(): boolean {
+    return this.auth.canAccessAdminSection('ops');
+  }
+
+  canShowRefundsBreakdown(): boolean {
+    return this.auth.canAccessAdminSection('orders') || this.auth.canAccessAdminSection('returns');
+  }
+
+  paymentsProviderLabelKey(provider: string): string {
+    const key = (provider || '').trim().toLowerCase();
+    if (key === 'stripe' || key === 'paypal' || key === 'netopia' || key === 'cod') {
+      return `adminUi.dashboard.paymentsHealth.providers.${key}`;
+    }
+    return 'adminUi.dashboard.paymentsHealth.providers.unknown';
+  }
+
+  supportsWebhookMetrics(provider: string): boolean {
+    const key = (provider || '').trim().toLowerCase();
+    return key === 'stripe' || key === 'paypal';
+  }
+
+  refundProviderLabelKey(provider: string): string {
+    const key = (provider || '').trim().toLowerCase();
+    if (key === 'stripe' || key === 'paypal' || key === 'manual') {
+      return `adminUi.dashboard.refundsBreakdown.providers.${key}`;
+    }
+    return 'adminUi.dashboard.refundsBreakdown.providers.unknown';
+  }
+
+  refundReasonLabelKey(category: string): string {
+    const key = (category || '').trim().toLowerCase();
+    const allowed = new Set([
+      'damaged',
+      'wrong_item',
+      'not_as_described',
+      'size_fit',
+      'delivery_issue',
+      'changed_mind',
+      'other'
+    ]);
+    if (allowed.has(key)) return `adminUi.dashboard.refundsBreakdown.reasons.${key}`;
+    return 'adminUi.dashboard.refundsBreakdown.reasons.other';
   }
 
   canManageGdprJobs(): boolean {
@@ -1890,6 +2222,44 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
       },
       error: () => {
         // ignore background refresh failures
+      }
+    });
+  }
+
+  loadPaymentsHealth(): void {
+    if (this.paymentsHealthLoading()) return;
+    this.paymentsHealthLoading.set(true);
+    this.paymentsHealthError.set(null);
+    this.paymentsHealthRequestId.set(null);
+    this.admin.paymentsHealth({ since_hours: 24 }).subscribe({
+      next: (data) => {
+        this.paymentsHealth.set(data);
+        this.paymentsHealthLoading.set(false);
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.translate.instant('adminUi.dashboard.paymentsHealth.error');
+        this.paymentsHealthError.set(msg);
+        this.paymentsHealthRequestId.set(extractRequestId(err));
+        this.paymentsHealthLoading.set(false);
+      }
+    });
+  }
+
+  loadRefundsBreakdown(): void {
+    if (this.refundsBreakdownLoading()) return;
+    this.refundsBreakdownLoading.set(true);
+    this.refundsBreakdownError.set(null);
+    this.refundsBreakdownRequestId.set(null);
+    this.admin.refundsBreakdown({ window_days: 30 }).subscribe({
+      next: (data) => {
+        this.refundsBreakdown.set(data);
+        this.refundsBreakdownLoading.set(false);
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.translate.instant('adminUi.dashboard.refundsBreakdown.error');
+        this.refundsBreakdownError.set(msg);
+        this.refundsBreakdownRequestId.set(extractRequestId(err));
+        this.refundsBreakdownLoading.set(false);
       }
     });
   }

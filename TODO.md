@@ -41,9 +41,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin UI: copy buttons for IDs/emails – Add one-click copy for order/product/user IDs and key strings with a visible confirmation.
 - [x] Admin UI: in-app feedback widget – Add an admin-only “Feedback” form stored in DB and visible in Support (no external services).
 - [x] Admin UI: “What’s new” panel – Show deploy notes from a local markdown file in the repo (no third-party tooling).
-- [ ] Admin Dashboard: KPI drill-down links – Clicking a KPI navigates to the relevant list with filters pre-applied.
-- [ ] Admin Dashboard: payments health widget – Show success rate/failures + recent webhook errors per provider using existing DB logs.
-- [ ] Admin Dashboard: refunds breakdown widget – Show refunds by reason/provider/timeframe with deltas.
+- [x] Admin Dashboard: KPI drill-down links – Clicking a KPI navigates to the relevant list with filters pre-applied.
+- [x] Admin Dashboard: payments health widget – Show success rate/failures + recent webhook errors per provider using existing DB logs.
+- [x] Admin Dashboard: refunds breakdown widget – Show refunds by reason/provider/timeframe with deltas.
 - [ ] Admin Dashboard: shipping performance widget – Track avg time-to-ship and delivery time by courier with trend deltas.
 - [ ] Admin Dashboard: stockout impact widget – Highlight out-of-stock products and estimate missed revenue from recent demand signals.
 - [ ] Admin Dashboard: channel attribution panel – Summarize GMV/orders by UTM/source based on stored analytics events.

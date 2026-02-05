@@ -438,6 +438,12 @@ export class AdminReturnsComponent implements OnInit, OnDestroy {
     this.routeSub = route.queryParamMap.subscribe((params) => {
       const orderId = params.get('order_id');
       this.orderIdFilter = orderId;
+      const statusParam = (params.get('status') || params.get('status_filter') || '').trim().toLowerCase();
+      const allowedStatuses = new Set(['requested', 'approved', 'rejected', 'received', 'refunded', 'closed']);
+      if (statusParam && allowedStatuses.has(statusParam)) {
+        this.statusFilter = statusParam as ReturnRequestStatus;
+        this.viewMode.set('list');
+      }
       this.page = 1;
       if (this.viewMode() === 'board') {
         this.loadBoard();

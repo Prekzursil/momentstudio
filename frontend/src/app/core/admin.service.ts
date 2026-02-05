@@ -62,6 +62,64 @@ export interface AdminDashboardSystemHealth {
   backup_last_at: string | null;
 }
 
+export interface AdminDashboardPaymentsHealthProvider {
+  provider: string;
+  successful_orders: number;
+  pending_payment_orders: number;
+  success_rate: number | null;
+  webhook_errors: number;
+  webhook_backlog: number;
+}
+
+export interface AdminDashboardPaymentsHealthWebhookError {
+  provider: string;
+  event_id: string;
+  event_type: string | null;
+  attempts: number;
+  last_attempt_at: string;
+  last_error: string | null;
+}
+
+export interface AdminDashboardPaymentsHealthResponse {
+  window_hours: number;
+  window_start: string;
+  window_end: string;
+  providers: AdminDashboardPaymentsHealthProvider[];
+  recent_webhook_errors: AdminDashboardPaymentsHealthWebhookError[];
+}
+
+export interface AdminRefundsBreakdownMetric {
+  count: number;
+  amount: number;
+}
+
+export interface AdminRefundsBreakdownProviderRow {
+  provider: string;
+  current: AdminRefundsBreakdownMetric;
+  previous: AdminRefundsBreakdownMetric;
+  delta_pct: { count: number | null; amount: number | null };
+}
+
+export interface AdminRefundsBreakdownReasonRow {
+  category: string;
+  current: number;
+  previous: number;
+  delta_pct: number | null;
+}
+
+export interface AdminRefundsBreakdownResponse {
+  window_days: number;
+  window_start: string;
+  window_end: string;
+  providers: AdminRefundsBreakdownProviderRow[];
+  missing_refunds: {
+    current: AdminRefundsBreakdownMetric;
+    previous: AdminRefundsBreakdownMetric;
+    delta_pct: { count: number | null; amount: number | null };
+  };
+  reasons: AdminRefundsBreakdownReasonRow[];
+}
+
 export interface AdminChannelBreakdownRow {
   key: string;
   orders: number;
@@ -814,6 +872,14 @@ export class AdminService {
 
   summary(params?: { range_days?: number; range_from?: string; range_to?: string }): Observable<AdminSummary> {
     return this.api.get<AdminSummary>('/admin/dashboard/summary', params);
+  }
+
+  paymentsHealth(params?: { since_hours?: number }): Observable<AdminDashboardPaymentsHealthResponse> {
+    return this.api.get<AdminDashboardPaymentsHealthResponse>('/admin/dashboard/payments-health', params as any);
+  }
+
+  refundsBreakdown(params?: { window_days?: number }): Observable<AdminRefundsBreakdownResponse> {
+    return this.api.get<AdminRefundsBreakdownResponse>('/admin/dashboard/refunds-breakdown', params as any);
   }
 
   funnel(params?: { range_days?: number; range_from?: string; range_to?: string }): Observable<AdminFunnelMetricsResponse> {

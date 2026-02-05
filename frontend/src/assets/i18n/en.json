@@ -1883,6 +1883,59 @@
         "unavailable": "Unavailable",
         "backupNotConfigured": "Not configured"
       },
+      "paymentsHealth": {
+        "title": "Payments health",
+        "window": "Last {{hours}}h",
+        "successful": "Successful",
+        "pending": "Pending payment",
+        "webhookErrors": "Webhook errors",
+        "webhookBacklog": "Webhook backlog",
+        "recentErrorsTitle": "Recent webhook errors",
+        "error": "Could not load payments health.",
+        "providers": {
+          "stripe": "Stripe",
+          "paypal": "PayPal",
+          "netopia": "Netopia",
+          "cod": "Cash on delivery",
+          "unknown": "Other"
+        },
+        "table": {
+          "provider": "Provider",
+          "event": "Event",
+          "attempted": "Last attempt",
+          "error": "Error"
+        }
+      },
+      "refundsBreakdown": {
+        "title": "Refunds breakdown",
+        "window": "Last {{days}}d",
+        "byProviderTitle": "By provider",
+        "byReasonTitle": "Refunded returns by reason (inferred)",
+        "missingTitle": "Unreconciled refunds",
+        "missingHint": "Orders marked refunded without a refund record.",
+        "error": "Could not load refunds breakdown.",
+        "providers": {
+          "stripe": "Stripe",
+          "paypal": "PayPal",
+          "manual": "Manual",
+          "unknown": "Other"
+        },
+        "reasons": {
+          "damaged": "Damaged / defective",
+          "wrong_item": "Wrong item",
+          "not_as_described": "Not as described",
+          "size_fit": "Size / fit",
+          "delivery_issue": "Delivery issue",
+          "changed_mind": "Changed mind",
+          "other": "Other"
+        },
+        "table": {
+          "provider": "Provider",
+          "amount": "Amount",
+          "count": "Count",
+          "delta": "Δ"
+        }
+      },
       "scheduledTitle": "Scheduled tasks",
       "scheduledLoading": "Loading scheduled tasks…",
       "scheduledError": "Could not load scheduled tasks.",

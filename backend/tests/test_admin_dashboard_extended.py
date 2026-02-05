@@ -19,10 +19,12 @@ from app.models.content import ContentBlock, ContentStatus, ContentAuditLog
 from app.models.order import Order, OrderRefund, OrderStatus, OrderTag
 from app.models.address import Address
 from app.models.promo import PromoCode, StripeCouponMapping
+from app.models.returns import ReturnRequest, ReturnRequestStatus
 from app.models.support import ContactSubmission, ContactSubmissionTopic, ContactSubmissionStatus
 from app.models.passkeys import UserPasskey
 from app.models.user import User, UserRole
 from app.models.user import UserSecurityEvent
+from app.models.webhook import PayPalWebhookEvent, StripeWebhookEvent
 
 
 @pytest.fixture(scope="module")
@@ -510,6 +512,251 @@ def test_admin_channel_breakdown_groups_and_excludes_test_orders(test_app: Dict[
     assert delivery["home"]["gross_sales"] == pytest.approx(130.0)
     assert delivery["home"]["net_sales"] == pytest.approx(80.0)
     assert delivery["locker"]["gross_sales"] == pytest.approx(50.0)
+
+
+def test_admin_payments_health_widget(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    engine = test_app["engine"]
+    session_factory = test_app["session_factory"]
+    asyncio.run(reset_db(engine))
+    asyncio.run(seed(session_factory))
+    headers = auth_headers(client)
+
+    async def add_data() -> None:
+        async with session_factory() as session:
+            customer = (await session.execute(select(User).where(User.email == "customer@example.com"))).scalar_one()
+            now = datetime.now(timezone.utc)
+            email = customer.email
+            name = customer.name or customer.email
+
+            session.add_all(
+                [
+                    Order(
+                        user_id=customer.id,
+                        status=OrderStatus.paid,
+                        total_amount=Decimal("100.00"),
+                        currency="RON",
+                        tax_amount=Decimal("0.00"),
+                        shipping_amount=Decimal("0.00"),
+                        customer_email=email,
+                        customer_name=name,
+                        payment_method="stripe",
+                        created_at=now,
+                        updated_at=now,
+                    ),
+                    Order(
+                        user_id=customer.id,
+                        status=OrderStatus.pending_payment,
+                        total_amount=Decimal("80.00"),
+                        currency="RON",
+                        tax_amount=Decimal("0.00"),
+                        shipping_amount=Decimal("0.00"),
+                        customer_email=email,
+                        customer_name=name,
+                        payment_method="stripe",
+                        created_at=now,
+                        updated_at=now,
+                    ),
+                    Order(
+                        user_id=customer.id,
+                        status=OrderStatus.delivered,
+                        total_amount=Decimal("50.00"),
+                        currency="RON",
+                        tax_amount=Decimal("0.00"),
+                        shipping_amount=Decimal("0.00"),
+                        customer_email=email,
+                        customer_name=name,
+                        payment_method="paypal",
+                        created_at=now,
+                        updated_at=now,
+                    ),
+                ]
+            )
+
+            session.add(
+                StripeWebhookEvent(
+                    stripe_event_id="evt_test_error",
+                    event_type="payment_intent.succeeded",
+                    attempts=2,
+                    last_attempt_at=now,
+                    last_error="boom",
+                )
+            )
+            session.add(
+                StripeWebhookEvent(
+                    stripe_event_id="evt_test_backlog",
+                    event_type="checkout.session.completed",
+                    attempts=1,
+                    last_attempt_at=now,
+                )
+            )
+            session.add(
+                PayPalWebhookEvent(
+                    paypal_event_id="wh_test_error",
+                    event_type="PAYMENT.CAPTURE.COMPLETED",
+                    attempts=1,
+                    last_attempt_at=now,
+                    last_error="oops",
+                )
+            )
+            await session.commit()
+
+    asyncio.run(add_data())
+
+    resp = client.get("/api/v1/admin/dashboard/payments-health", headers=headers)
+    assert resp.status_code == 200, resp.text
+    payload = resp.json()
+    assert payload["window_hours"] == 24
+    providers = {row["provider"]: row for row in payload["providers"]}
+    assert providers["stripe"]["successful_orders"] >= 1
+    assert providers["stripe"]["pending_payment_orders"] >= 1
+    assert providers["stripe"]["webhook_errors"] == 1
+    assert providers["stripe"]["webhook_backlog"] == 1
+    assert providers["paypal"]["successful_orders"] >= 1
+    assert providers["paypal"]["webhook_errors"] == 1
+    assert any(evt["provider"] == "stripe" for evt in payload["recent_webhook_errors"])
+
+
+def test_admin_refunds_breakdown_widget(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    engine = test_app["engine"]
+    session_factory = test_app["session_factory"]
+    asyncio.run(reset_db(engine))
+    asyncio.run(seed(session_factory))
+    headers = auth_headers(client)
+
+    async def add_data() -> None:
+        async with session_factory() as session:
+            customer = (await session.execute(select(User).where(User.email == "customer@example.com"))).scalar_one()
+            now = datetime.now(timezone.utc)
+            current_time = now - timedelta(hours=2)
+            previous_time = now - timedelta(hours=36)
+            email = customer.email
+            name = customer.name or customer.email
+
+            missing_order = Order(
+                user_id=customer.id,
+                status=OrderStatus.refunded,
+                total_amount=Decimal("100.00"),
+                currency="RON",
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                customer_email=email,
+                customer_name=name,
+                payment_method="stripe",
+                created_at=previous_time,
+                updated_at=current_time,
+            )
+            refund_order = Order(
+                user_id=customer.id,
+                status=OrderStatus.delivered,
+                total_amount=Decimal("50.00"),
+                currency="RON",
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                customer_email=email,
+                customer_name=name,
+                payment_method="stripe",
+                created_at=current_time,
+                updated_at=current_time,
+            )
+            manual_order = Order(
+                user_id=customer.id,
+                status=OrderStatus.shipped,
+                total_amount=Decimal("70.00"),
+                currency="RON",
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                customer_email=email,
+                customer_name=name,
+                payment_method="stripe",
+                created_at=current_time,
+                updated_at=current_time,
+            )
+            previous_refund_order = Order(
+                user_id=customer.id,
+                status=OrderStatus.paid,
+                total_amount=Decimal("30.00"),
+                currency="RON",
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                customer_email=email,
+                customer_name=name,
+                payment_method="stripe",
+                created_at=previous_time,
+                updated_at=previous_time,
+            )
+
+            session.add_all([missing_order, refund_order, manual_order, previous_refund_order])
+            await session.flush()
+
+            session.add(
+                OrderRefund(
+                    order_id=refund_order.id,
+                    amount=Decimal("10.00"),
+                    currency="RON",
+                    provider="stripe",
+                    created_at=current_time,
+                )
+            )
+            session.add(
+                OrderRefund(
+                    order_id=manual_order.id,
+                    amount=Decimal("5.00"),
+                    currency="RON",
+                    provider="manual",
+                    created_at=current_time,
+                )
+            )
+            session.add(
+                OrderRefund(
+                    order_id=previous_refund_order.id,
+                    amount=Decimal("3.00"),
+                    currency="RON",
+                    provider="stripe",
+                    created_at=previous_time,
+                )
+            )
+
+            session.add(
+                ReturnRequest(
+                    order_id=refund_order.id,
+                    user_id=customer.id,
+                    status=ReturnRequestStatus.refunded,
+                    reason="Produs spart la livrare",
+                    created_at=current_time,
+                    updated_at=current_time,
+                )
+            )
+            session.add(
+                ReturnRequest(
+                    order_id=previous_refund_order.id,
+                    user_id=customer.id,
+                    status=ReturnRequestStatus.refunded,
+                    reason="wrong item sent",
+                    created_at=previous_time,
+                    updated_at=previous_time,
+                )
+            )
+            await session.commit()
+
+    asyncio.run(add_data())
+
+    resp = client.get("/api/v1/admin/dashboard/refunds-breakdown", params={"window_days": 1}, headers=headers)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["window_days"] == 1
+    assert data["missing_refunds"]["current"]["count"] == 1
+    assert data["missing_refunds"]["current"]["amount"] == 100.0
+
+    providers = {row["provider"]: row for row in data["providers"]}
+    assert providers["stripe"]["current"]["count"] == 1
+    assert providers["stripe"]["current"]["amount"] == 10.0
+    assert providers["manual"]["current"]["count"] == 1
+
+    reasons = {row["category"]: row for row in data["reasons"]}
+    assert reasons["damaged"]["current"] == 1
+    assert reasons["wrong_item"]["previous"] == 1
 
 
 def test_coupon_lifecycle_and_audit(test_app: Dict[str, object]) -> None:
