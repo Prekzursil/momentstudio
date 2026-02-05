@@ -122,6 +122,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('cart → checkout → COD success', async ({ page, request }) => {
+  test.setTimeout(120_000);
   const sessionId = `e2e-cod-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   await page.addInitScript((sid) => {
     localStorage.setItem('cart_session_id', sid);

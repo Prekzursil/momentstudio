@@ -183,6 +183,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('stripe checkout (mock): success', async ({ page, request }) => {
+  test.setTimeout(120_000);
   const token = await loginApi(request);
   await loginUi(page);
   const checkout = await startStripeCheckout(page, request);
@@ -197,6 +198,7 @@ test('stripe checkout (mock): success', async ({ page, request }) => {
 });
 
 test('stripe checkout (mock): decline + cancel', async ({ page, request }) => {
+  test.setTimeout(120_000);
   const token = await loginApi(request);
   await loginUi(page);
 

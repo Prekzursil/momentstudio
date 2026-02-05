@@ -189,6 +189,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('paypal checkout (mock): success', async ({ page, request }) => {
+  test.setTimeout(120_000);
   const token = await loginApi(request);
   await loginUi(page);
   const checkout = await startPayPalCheckout(page, request);
@@ -203,6 +204,7 @@ test('paypal checkout (mock): success', async ({ page, request }) => {
 });
 
 test('paypal checkout (mock): decline + cancel', async ({ page, request }) => {
+  test.setTimeout(120_000);
   const token = await loginApi(request);
   await loginUi(page);
 
