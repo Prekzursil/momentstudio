@@ -28,6 +28,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Checkout: investigate Easybox/FANbox checkout regressions when frontend runs on alternate dev port (4201).
 - [x] Coupons v2: validate marketing opt-in before committing coupon changes when `send_email=true` (avoid partial success).
 - [x] Email: add RFC 8058 one-click unsubscribe headers (`List-Unsubscribe-Post`).
+- [x] Newsletter: auto-unsubscribe landing page on load and return HTML on API GET (fallback UX when clients open the unsubscribe URL).
 - [ ] Email: manually verify one-click unsubscribe behavior across Gmail/Outlook (and adjust headers if needed).
 - [x] Docs: add Google OAuth setup guide (origins, redirect URIs, backend env, dev/prod examples).
 - [x] Docs: document when/why dev uses `4201` (port bump + Docker stack) and related CORS/proxy expectations.
