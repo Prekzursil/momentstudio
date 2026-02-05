@@ -4,29 +4,31 @@ Below is a structured checklist you can turn into issues.
 
 ## High priority (next)
 - [x] Admin Orders: prevent 400s on status/tracking updates (guide allowed transitions + clearer errors).
-- [ ] Backend Email: prevent SMTP blocking the event loop (wrap `smtplib` send in `anyio.to_thread.run_sync` or switch to async SMTP).
-- [ ] Backend Jobs: avoid duplicate scheduled loops when running multiple workers/replicas (move schedulers to worker service or add Postgres advisory-lock leader election).
-- [ ] Observability: JSON logs should emit `extra` fields (audit/slow_query) with strict redaction; avoid logging request bodies in production.
-- [ ] Security: expand audit payload redaction/allowlist for commerce PII (name/phone/address) and add config to disable payload logging entirely.
-- [ ] SEO/feeds: filter `/api/v1/feeds/products.json` + sitemap categories to only published/visible content (avoid leaking drafts/hidden categories).
-- [ ] Auth: password reset request should not leak user enumeration and should work for verified secondary emails (always return 202; send email only when match exists).
-- [ ] SEO: expose `/robots.txt` and `/sitemap.xml` at site root via Nginx/Caddy proxy and ensure robots references the canonical sitemap URL.
-- [ ] Uploads: remove SVG from allowed image types (or sanitize/rasterize) to avoid broken uploads and stored-XSS.
-- [ ] Analytics: rate limit `/api/v1/analytics/events` (IP-based) and add optional signed token to prevent DB bloat/DoS.
-- [ ] Netopia: use `Decimal` for amounts and add basic IPN replay protection; validate token timestamps/expiry when present.
-- [ ] Prod safety: refuse to start with default secrets/bypass tokens or insecure cookie settings when `ENVIRONMENT=production`.
-- [ ] Frontend security: prep for strict CSP (move inline theme bootstrap script to external file or nonce/hash it) and set CSP headers at edge.
-- [ ] Infra: set `client_max_body_size` in `frontend/nginx/default.conf` (align with backend upload limit).
-- [ ] Frontend: stop relying on backend error `detail` strings in guards; use error `code` and translate to UX.
-- [ ] Auth UX: include a reset link in password reset emails and auto-fill the token from URL query param.
-- [ ] Ops: restrict `/api/v1/metrics` to admin/internal network (or disable in prod).
-- [ ] Frontend: guard/remove `/checkout/mock/*` routes in production builds.
+- [x] Backend Email: prevent SMTP blocking the event loop (wrap `smtplib` send in `anyio.to_thread.run_sync` or switch to async SMTP).
+- [x] Backend Jobs: avoid duplicate scheduled loops when running multiple workers/replicas (move schedulers to worker service or add Postgres advisory-lock leader election).
+- [x] Observability: JSON logs should emit `extra` fields (audit/slow_query) with strict redaction; keep request body logging configurable.
+- [x] Security: expand audit payload redaction for commerce PII (name/phone/address) and add config to disable payload logging entirely.
+- [x] SEO/feeds: filter `/api/v1/feeds/products.json` + sitemap categories to only published/visible content (avoid leaking drafts/hidden categories).
+- [x] Auth: password reset request should not leak user enumeration and should work for verified secondary emails (always return 202; send email only when match exists).
+- [x] SEO: expose `/robots.txt` and `/sitemap.xml` at site root via Nginx/Caddy proxy and ensure robots references the canonical sitemap URL.
+- [x] Uploads: support SVG uploads safely (sanitize and store; skip thumbnails for SVGs).
+- [x] Analytics: rate limit `/api/v1/analytics/events` (IP-based) to prevent DB bloat/DoS.
+- [ ] Analytics: add optional signed token to further harden ingestion (for multi-replica deployments).
+- [x] Netopia: use `Decimal` for amounts and add basic IPN time/max-age validation to reduce replay risk.
+- [x] Prod safety: refuse to start with default secrets/bypass tokens or insecure cookie settings when `ENVIRONMENT=production`.
+- [x] Frontend security: prep for strict CSP (move inline theme bootstrap script to external file) and set CSP headers at edge.
+- [x] Infra: set `client_max_body_size` in `frontend/nginx/default.conf` (align with backend upload limit).
+- [x] Frontend: stop relying on backend error `detail` strings in guards; use error `code` and translate to UX.
+- [x] Auth UX: include a reset link in password reset emails and auto-fill the token from URL query param.
+- [x] Ops: restrict `/api/v1/metrics` to admin/internal network (or disable in prod).
+- [x] Frontend: guard/remove `/checkout/mock/*` routes in production builds.
 - [ ] Admin Orders: fix cancel-reason UI so it only appears for cancelled status and doesn’t block other updates.
 - [x] Auth: login/register should not get stuck after errors; improve error visibility and re-attempt flow (incl. CAPTCHA).
 - [x] Frontend: stop showing duplicate generic “Request failed” toasts when pages already handle errors.
 - [ ] Checkout: investigate Easybox/FANbox checkout regressions when frontend runs on alternate dev port (4201).
 - [x] Coupons v2: validate marketing opt-in before committing coupon changes when `send_email=true` (avoid partial success).
-- [ ] Email: add RFC 8058 one-click unsubscribe headers (`List-Unsubscribe-Post`) and verify client compatibility.
+- [x] Email: add RFC 8058 one-click unsubscribe headers (`List-Unsubscribe-Post`).
+- [ ] Email: manually verify one-click unsubscribe behavior across Gmail/Outlook (and adjust headers if needed).
 - [ ] Docs: add Google OAuth setup guide (origins, redirect URIs, backend env, dev/prod examples).
 - [ ] Docs: document when/why dev uses `4201` (port bump + Docker stack) and related CORS/proxy expectations.
 - [ ] Scale: replace in-memory rate limits/caches with Redis-backed equivalents for multi-replica deployments (auth limits, analytics ingestion, etc.).
