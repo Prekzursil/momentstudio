@@ -25,6 +25,7 @@ from app.schemas.error import ErrorResponse
 from app.services import fx_refresh
 from app.services import admin_report_scheduler
 from app.core.startup_checks import validate_production_settings
+from app.core import redis_client
 
 
 def get_application() -> FastAPI:
@@ -47,6 +48,7 @@ def get_application() -> FastAPI:
         yield
         await fx_refresh.stop(app)
         await admin_report_scheduler.stop(app)
+        await redis_client.close_redis()
 
     app = FastAPI(
         title=settings.app_name,

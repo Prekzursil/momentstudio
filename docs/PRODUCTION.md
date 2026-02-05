@@ -39,6 +39,7 @@ Use `backend/.env.example` and `frontend/.env.example` as the authoritative list
 
 - `ENVIRONMENT=production`
 - `DATABASE_URL=postgresql+asyncpg://...`
+- Optional (recommended for multi-replica): `REDIS_URL=redis://...` (shared rate limiting/caches)
 - `SECRET_KEY=<long-random-secret>`
 - `FRONTEND_ORIGIN=https://<your-domain>`
 - `SMTP_ENABLED=1` + `SMTP_*` + `SMTP_FROM_EMAIL=...` (for real emails)

@@ -82,7 +82,10 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 logger = logging.getLogger(__name__)
 
 register_rate_limit = per_identifier_limiter(
-    lambda r: r.client.host if r.client else "anon", settings.auth_rate_limit_register, 60
+    lambda r: r.client.host if r.client else "anon",
+    settings.auth_rate_limit_register,
+    60,
+    key="auth:register",
 )
 login_rate_limit = limiter("auth:login", settings.auth_rate_limit_login, 60)
 two_factor_rate_limit = limiter("auth:2fa", settings.auth_rate_limit_login, 60)
@@ -93,6 +96,7 @@ google_rate_limit = per_identifier_limiter(
     lambda r: r.client.host if r.client else "anon",
     settings.auth_rate_limit_google,
     60,
+    key="auth:google",
 )
 
 _REQUIRED_REGISTRATION_CONSENT_KEYS = ("page.terms-and-conditions", "page.privacy-policy")

@@ -1,10 +1,14 @@
+import csv
 from datetime import datetime, timedelta, timezone
+from io import StringIO
 
 import sqlalchemy as sa
-from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.dependencies import require_admin_section
 from app.db.session import get_session
 from app.models.user import User
 from app.models.newsletter import NewsletterSubscriber
@@ -149,11 +153,22 @@ async def unsubscribe_newsletter_get(
 
 @router.post("/unsubscribe", response_model=NewsletterUnsubscribeResponse)
 async def unsubscribe_newsletter_post(
+    request: Request,
     token: str = Query(default="", max_length=5000),
-    payload: NewsletterTokenRequest | None = Body(default=None),
     session: AsyncSession = Depends(get_session),
 ) -> NewsletterUnsubscribeResponse:
-    resolved = token or (payload.token if payload else "")
+    resolved = token
+    if not resolved:
+        # RFC 8058 clients can POST form bodies (e.g. List-Unsubscribe=One-Click). We don't require any body.
+        # Allow JSON bodies too for backward compatibility with our frontend.
+        try:
+            data = await request.json()
+        except Exception:
+            data = None
+        if isinstance(data, dict):
+            candidate = data.get("token")
+            if isinstance(candidate, str):
+                resolved = candidate
     return await _unsubscribe_newsletter(token=resolved, session=session)
 
 
@@ -185,3 +200,31 @@ async def _unsubscribe_newsletter(*, token: str, session: AsyncSession) -> Newsl
 
     await session.commit()
     return NewsletterUnsubscribeResponse(unsubscribed=True)
+
+
+@router.get("/admin/export", response_class=StreamingResponse)
+async def export_confirmed_subscribers_csv(
+    session: AsyncSession = Depends(get_session),
+    _: object = Depends(require_admin_section("ops")),
+) -> StreamingResponse:
+    result = await session.execute(
+        sa.select(
+            NewsletterSubscriber.email,
+            NewsletterSubscriber.confirmed_at,
+            NewsletterSubscriber.source,
+        )
+        .where(NewsletterSubscriber.confirmed_at.is_not(None))
+        .where(NewsletterSubscriber.unsubscribed_at.is_(None))
+        .order_by(NewsletterSubscriber.confirmed_at.desc())
+    )
+
+    buf = StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["email", "confirmed_at", "source"])
+    for email, confirmed_at, source in result.all():
+        confirmed_value = confirmed_at.isoformat() if confirmed_at else ""
+        writer.writerow([email or "", confirmed_value, source or ""])
+
+    content = buf.getvalue()
+    headers = {"Content-Disposition": 'attachment; filename="newsletter_confirmed_subscribers.csv"'}
+    return StreamingResponse(iter([content]), media_type="text/csv", headers=headers)

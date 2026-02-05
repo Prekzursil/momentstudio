@@ -100,10 +100,16 @@ class Settings(BaseSettings):
 
     media_root: str = "uploads"
     private_media_root: str = "private_uploads"
+    upload_image_max_width: int = 8192
+    upload_image_max_height: int = 8192
+    upload_image_max_pixels: int = 40_000_000
     cors_origins: list[str] = ["http://localhost:4200", "http://localhost:4201"]
     cors_allow_credentials: bool = True
     cors_allow_methods: list[str] = ["*"]
     cors_allow_headers: list[str] = ["*"]
+
+    # Optional Redis (recommended for multi-replica deployments; used for shared rate limiting/caches)
+    redis_url: str | None = None
 
     smtp_host: str = "localhost"
     smtp_port: int = 1025

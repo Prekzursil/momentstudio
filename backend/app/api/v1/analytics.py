@@ -24,7 +24,10 @@ from app.schemas.analytics import (
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
 analytics_rate_limit = per_identifier_limiter(
-    lambda r: r.client.host if r.client else "anon", settings.analytics_rate_limit_events, 60
+    lambda r: r.client.host if r.client else "anon",
+    settings.analytics_rate_limit_events,
+    60,
+    key="analytics:events",
 )
 
 _EVENT_RE = re.compile(r"^[a-z0-9_]{1,80}$")

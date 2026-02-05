@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
+from app.services import newsletter_tokens
 
 
 @pytest.fixture
@@ -45,3 +46,17 @@ def test_newsletter_subscribe_idempotent(test_app: Dict[str, object]) -> None:
     assert again.json()["subscribed"] is True
     assert again.json()["already_subscribed"] is True
 
+
+def test_newsletter_unsubscribe_accepts_one_click_post(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    token = newsletter_tokens.create_newsletter_token(
+        email="test@example.com", purpose=newsletter_tokens.NEWSLETTER_PURPOSE_UNSUBSCRIBE
+    )
+
+    resp = client.post(
+        "/api/v1/newsletter/unsubscribe",
+        params={"token": token},
+        data={"List-Unsubscribe": "One-Click"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["unsubscribed"] is True

@@ -53,10 +53,13 @@ def save_upload(
     if is_svg:
         content = _sanitize_svg(content)
 
+    canonical_suffix = _suffix_for_mime(sniff_mime) if sniff_mime else None
     original_suffix = Path(file.filename or "").suffix.lower()
     safe_name = Path(filename or "").name if filename else ""
     if not safe_name:
-        safe_name = f"{uuid.uuid4().hex}{original_suffix or '.bin'}"
+        safe_name = f"{uuid.uuid4().hex}{canonical_suffix or original_suffix or '.bin'}"
+    elif canonical_suffix:
+        safe_name = f"{Path(safe_name).stem}{canonical_suffix}"
     destination = dest_root / safe_name
     destination.write_bytes(content)
 
@@ -158,8 +161,14 @@ def _detect_image_mime(content: bytes) -> str | None:
         return svg
     try:
         with Image.open(BytesIO(content)) as img:
+            width, height = img.size
+            _validate_raster_dimensions(width=int(width), height=int(height))
             image_format = img.format
             img.verify()
+    except HTTPException:
+        raise
+    except Image.DecompressionBombError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image too large")
     except (UnidentifiedImageError, OSError, ValueError):
         return None
 
@@ -185,6 +194,35 @@ def _detect_svg_mime(content: bytes) -> str | None:
     # Common SVGs start with "<svg" or with an xml declaration before the <svg> element.
     if head.startswith(b"<svg") or b"<svg" in head:
         return "image/svg+xml"
+    return None
+
+
+def _validate_raster_dimensions(*, width: int, height: int) -> None:
+    max_width = int(getattr(settings, "upload_image_max_width", 0) or 0)
+    max_height = int(getattr(settings, "upload_image_max_height", 0) or 0)
+    max_pixels = int(getattr(settings, "upload_image_max_pixels", 0) or 0)
+
+    if max_width and width > max_width:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image too large")
+    if max_height and height > max_height:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image too large")
+    if max_pixels and (width * height) > max_pixels:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image too large")
+
+
+def _suffix_for_mime(mime: str | None) -> str | None:
+    if not mime:
+        return None
+    if mime == "image/jpeg":
+        return ".jpg"
+    if mime == "image/png":
+        return ".png"
+    if mime == "image/webp":
+        return ".webp"
+    if mime == "image/gif":
+        return ".gif"
+    if mime == "image/svg+xml":
+        return ".svg"
     return None
 
 
