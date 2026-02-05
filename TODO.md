@@ -29,6 +29,11 @@ Below is a structured checklist you can turn into issues.
 - [ ] Email: add RFC 8058 one-click unsubscribe headers (`List-Unsubscribe-Post`) and verify client compatibility.
 - [ ] Docs: add Google OAuth setup guide (origins, redirect URIs, backend env, dev/prod examples).
 - [ ] Docs: document when/why dev uses `4201` (port bump + Docker stack) and related CORS/proxy expectations.
+- [ ] Scale: replace in-memory rate limits/caches with Redis-backed equivalents for multi-replica deployments (auth limits, analytics ingestion, etc.).
+- [ ] Frontend SEO/i18n: set `<html lang>` dynamically and use translation keys for route titles/meta.
+- [ ] Frontend deps: remove `postinstall` node_modules patch by upgrading/replacing `http-proxy` (make installs deterministic).
+- [ ] Docs: align `ARCHITECTURE.md`/`README.md` with current Angular/backend versions and deployment topology.
+- [ ] Uploads: add additional upload hardening (max dimensions, image-bomb protection, safe serving headers, storage outside web root).
 
 ## Project & Infra
 - [x] Initialize monorepo with `backend/`, `frontend/`, `infra/`.
