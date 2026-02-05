@@ -238,24 +238,28 @@ export const routes: Routes = [
             path: 'home',
             loadComponent: () => import('./pages/admin/admin.component').then((m) => m.AdminComponent),
             data: { section: 'home' },
+            canDeactivate: [unsavedChangesGuard],
             title: 'meta.titles.admin_content_home'
           },
           {
             path: 'pages',
             loadComponent: () => import('./pages/admin/admin.component').then((m) => m.AdminComponent),
             data: { section: 'pages' },
+            canDeactivate: [unsavedChangesGuard],
             title: 'meta.titles.admin_content_pages'
           },
           {
             path: 'blog',
             loadComponent: () => import('./pages/admin/admin.component').then((m) => m.AdminComponent),
             data: { section: 'blog' },
+            canDeactivate: [unsavedChangesGuard],
             title: 'meta.titles.admin_content_blog'
           },
           {
             path: 'settings',
             loadComponent: () => import('./pages/admin/admin.component').then((m) => m.AdminComponent),
             data: { section: 'settings' },
+            canDeactivate: [unsavedChangesGuard],
             title: 'meta.titles.admin_content_settings'
           },
           {
@@ -302,6 +306,7 @@ export const routes: Routes = [
         path: 'products',
         loadComponent: () => import('./pages/admin/products/admin-products.component').then((m) => m.AdminProductsComponent),
         canActivate: [adminSectionGuard('products')],
+        canDeactivate: [unsavedChangesGuard],
         title: 'meta.titles.admin_products'
       },
       {

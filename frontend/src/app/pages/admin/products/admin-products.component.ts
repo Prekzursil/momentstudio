@@ -5307,6 +5307,14 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
     this.resetStockLedger();
   }
 
+  hasUnsavedChanges(): boolean {
+    return this.editorOpen() && this.editorDirty();
+  }
+
+  discardUnsavedChanges(): void {
+    this.editorDirty.set(false);
+  }
+
 		  edit(slug: string): void {
         this.exitWizard();
 		    this.editorOpen.set(true);

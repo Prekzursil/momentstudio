@@ -7935,6 +7935,26 @@ export class AdminComponent implements OnInit, OnDestroy {
     }
   }
 
+  hasUnsavedChanges(): boolean {
+    if (this.cmsHomeDraft.isReady() && this.cmsHomeDraft.dirty) return true;
+
+    for (const manager of this.cmsPageDrafts.values()) {
+      if (manager.isReady() && manager.dirty) return true;
+    }
+
+    for (const manager of this.cmsBlogDrafts.values()) {
+      if (manager.isReady() && manager.dirty) return true;
+    }
+
+    return false;
+  }
+
+  discardUnsavedChanges(): void {
+    if (this.cmsHomeDraft.isReady()) this.cmsHomeDraft.discardAutosave();
+    for (const manager of this.cmsPageDrafts.values()) manager.discardAutosave();
+    for (const manager of this.cmsBlogDrafts.values()) manager.discardAutosave();
+  }
+
   loadAll(): void {
     this.loadForSection(this.section());
   }

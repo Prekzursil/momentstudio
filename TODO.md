@@ -34,8 +34,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Tables: translate selection a11y labels – Replace hard-coded admin `aria-label`s (select all/row/base price/stock qty) with RO/EN i18n keys.
 - [x] Admin UI: include requestId in error states – Surface backend request IDs on failures and add a one-click “copy requestId” action for support.
 - [x] Admin UI: standardized error + retry component – Use a shared error state across admin pages (message + requestId + retry CTA).
-- [ ] Admin UI: consistent loading skeletons – Add a shared table skeleton/placeholder so lists don’t flash empty content while loading.
-- [ ] Admin UI: unsaved-changes guard for editors – Prevent navigating away from product/CMS editors when there are unsaved changes.
+- [x] Admin UI: consistent loading skeletons – Add a shared table skeleton/placeholder so lists don’t flash empty content while loading.
+- [x] Admin UI: unsaved-changes guard for editors – Prevent navigating away from product/CMS editors when there are unsaved changes.
 - [ ] Admin UI: focus management for modals – Trap focus, restore focus to trigger, and close on Escape consistently across admin modals.
 - [ ] Admin UI: optimistic toggles with rollback – For simple flags (active/featured/visible), update immediately and rollback on failure with clear toast.
 - [ ] Admin UI: copy buttons for IDs/emails – Add one-click copy for order/product/user IDs and key strings with a visible confirmation.
