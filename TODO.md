@@ -32,8 +32,8 @@ Below is a structured checklist you can turn into issues.
 ### Admin Dashboard & Subpages — Curated Improvements (50)
 - [x] Admin Products: cleanup pending timers on destroy – Clear debounce/poll timeouts and cancel in-flight searches to prevent stale UI updates.
 - [x] Admin Tables: translate selection a11y labels – Replace hard-coded admin `aria-label`s (select all/row/base price/stock qty) with RO/EN i18n keys.
-- [ ] Admin UI: include requestId in error states – Surface backend request IDs on failures and add a one-click “copy requestId” action for support.
-- [ ] Admin UI: standardized error + retry component – Use a shared error state across admin pages (message + requestId + retry CTA).
+- [x] Admin UI: include requestId in error states – Surface backend request IDs on failures and add a one-click “copy requestId” action for support.
+- [x] Admin UI: standardized error + retry component – Use a shared error state across admin pages (message + requestId + retry CTA).
 - [ ] Admin UI: consistent loading skeletons – Add a shared table skeleton/placeholder so lists don’t flash empty content while loading.
 - [ ] Admin UI: unsaved-changes guard for editors – Prevent navigating away from product/CMS editors when there are unsaved changes.
 - [ ] Admin UI: focus management for modals – Trap focus, restore focus to trigger, and close on Escape consistently across admin modals.

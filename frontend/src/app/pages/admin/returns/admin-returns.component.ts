@@ -8,6 +8,8 @@ import { AdminReturnsService, ReturnRequestListItem, ReturnRequestRead, ReturnRe
 import { ToastService } from '../../../core/toast.service';
 import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
+import { ErrorStateComponent } from '../../../shared/error-state.component';
+import { extractRequestId } from '../../../shared/http-error';
 import { SkeletonComponent } from '../../../shared/skeleton.component';
 import { AdminPageHeaderComponent } from '../shared/admin-page-header.component';
 
@@ -25,6 +27,7 @@ type BoardColumn = { items: ReturnRequestListItem[]; total: number };
     TranslateModule,
     BreadcrumbComponent,
     ButtonComponent,
+    ErrorStateComponent,
     SkeletonComponent,
     AdminPageHeaderComponent
   ],
@@ -98,12 +101,13 @@ type BoardColumn = { items: ReturnRequestListItem[]; total: number };
 	                <app-skeleton [rows]="6"></app-skeleton>
 	              </div>
 
-	              <div
-	                *ngIf="!loading() && error()"
-	                class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
-	              >
-	                {{ error() }}
-	              </div>
+	              <app-error-state
+                  *ngIf="!loading() && error()"
+                  [message]="error()!"
+                  [requestId]="errorRequestId()"
+                  [showRetry]="true"
+                  (retry)="retryLoad()"
+                ></app-error-state>
 
 	              <div *ngIf="!loading() && !items().length" class="text-sm text-slate-600 dark:text-slate-300">
 	                {{ 'adminUi.returns.empty' | translate }}
@@ -165,12 +169,13 @@ type BoardColumn = { items: ReturnRequestListItem[]; total: number };
 	                <app-skeleton [rows]="6"></app-skeleton>
 	              </div>
 
-	              <div
-	                *ngIf="!boardLoading() && boardError()"
-	                class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
-	              >
-	                {{ boardError() }}
-	              </div>
+	              <app-error-state
+                  *ngIf="!boardLoading() && boardError()"
+                  [message]="boardError()!"
+                  [requestId]="boardErrorRequestId()"
+                  [showRetry]="true"
+                  (retry)="retryLoad()"
+                ></app-error-state>
 
 	              <div *ngIf="!boardLoading() && !boardError()" class="grid gap-3 xl:grid-cols-4">
 	                <div
@@ -380,11 +385,13 @@ export class AdminReturnsComponent implements OnInit, OnDestroy {
 
   loading = signal(true);
   error = signal<string | null>(null);
+  errorRequestId = signal<string | null>(null);
   items = signal<ReturnRequestListItem[]>([]);
   meta = signal<{ total_items?: number; total_pages?: number; page?: number; limit?: number }>({});
 
   boardLoading = signal(false);
   boardError = signal<string | null>(null);
+  boardErrorRequestId = signal<string | null>(null);
   board = signal<Record<BoardStatus, BoardColumn>>({
     requested: { items: [], total: 0 },
     approved: { items: [], total: 0 },
@@ -456,6 +463,14 @@ export class AdminReturnsComponent implements OnInit, OnDestroy {
 
   applyFilters(): void {
     this.page = 1;
+    if (this.viewMode() === 'board') {
+      this.loadBoard();
+    } else {
+      this.load();
+    }
+  }
+
+  retryLoad(): void {
     if (this.viewMode() === 'board') {
       this.loadBoard();
     } else {
@@ -632,6 +647,7 @@ export class AdminReturnsComponent implements OnInit, OnDestroy {
   private load(clearSelection = true): void {
     this.loading.set(true);
     this.error.set(null);
+    this.errorRequestId.set(null);
     const params: any = { page: this.page, limit: 25 };
     const q = this.query.trim();
     if (q) params.q = q;
@@ -647,8 +663,9 @@ export class AdminReturnsComponent implements OnInit, OnDestroy {
           this.selected.set(null);
         }
       },
-      error: () => {
+      error: (err) => {
         this.error.set(this.translate.instant('adminUi.returns.errors.load'));
+        this.errorRequestId.set(extractRequestId(err));
         this.loading.set(false);
       }
     });
@@ -657,6 +674,7 @@ export class AdminReturnsComponent implements OnInit, OnDestroy {
   private loadBoard(): void {
     this.boardLoading.set(true);
     this.boardError.set(null);
+    this.boardErrorRequestId.set(null);
     const params: any = { page: 1, limit: 25 };
     const q = this.query.trim();
     if (q) params.q = q;
@@ -677,8 +695,9 @@ export class AdminReturnsComponent implements OnInit, OnDestroy {
         });
         this.boardLoading.set(false);
       },
-      error: () => {
+      error: (err) => {
         this.boardError.set(this.translate.instant('adminUi.returns.errors.load'));
+        this.boardErrorRequestId.set(extractRequestId(err));
         this.boardLoading.set(false);
       }
     });
