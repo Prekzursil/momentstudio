@@ -42,7 +42,9 @@ Expected result:
 
 ## Debug tips
 
-- If the client opens a browser tab instead of silently one-clicking, it may be falling back to the frontend `/newsletter/unsubscribe` page (still acceptable).
+- If the client opens a browser tab instead of silently one-clicking, it may:
+  - open the API URL (GET), which returns a simple HTML “Unsubscribed” page when the browser sends `Accept: text/html`, or
+  - fall back to the frontend `/newsletter/unsubscribe` page (which auto-unsubscribes on load when a token is present).
 - If POST unsubscribes fail, check the backend logs for a `400 Invalid unsubscribe token.` response.
 - Ensure `FRONTEND_ORIGIN` matches your public site origin (the List-Unsubscribe URL uses this).
 
@@ -51,4 +53,3 @@ Expected result:
 If Outlook (or another client) refuses the HTTP URL method, consider adding an additional mailto value to `List-Unsubscribe` (RFC 2369 allows a comma-separated list), e.g.:
 
 `List-Unsubscribe: <https://…>, <mailto:unsubscribe@your-domain>`
-

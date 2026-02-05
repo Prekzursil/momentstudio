@@ -78,10 +78,14 @@ export class NewsletterUnsubscribeComponent implements OnInit {
 
   ngOnInit(): void {
     this.token = this.route.snapshot.queryParamMap.get('token') || '';
-    this.loading = false;
     if (!this.token) {
+      this.loading = false;
       this.errorMessage = this.translate.instant('newsletter.unsubscribe.missingToken');
+      return;
     }
+    // Auto-unsubscribe when arriving via link with a valid token (one-click UX fallback).
+    this.loading = false;
+    this.unsubscribe();
   }
 
   unsubscribe(): void {
@@ -102,4 +106,3 @@ export class NewsletterUnsubscribeComponent implements OnInit {
     });
   }
 }
-

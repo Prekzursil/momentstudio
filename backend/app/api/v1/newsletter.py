@@ -4,7 +4,7 @@ from io import StringIO
 
 import sqlalchemy as sa
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -145,10 +145,30 @@ async def confirm_newsletter(
 
 @router.api_route("/unsubscribe", methods=["GET"], response_model=NewsletterUnsubscribeResponse)
 async def unsubscribe_newsletter_get(
+    request: Request,
     token: str = Query(default="", max_length=5000),
     session: AsyncSession = Depends(get_session),
-) -> NewsletterUnsubscribeResponse:
-    return await _unsubscribe_newsletter(token=token, session=session)
+) -> NewsletterUnsubscribeResponse | HTMLResponse:
+    result = await _unsubscribe_newsletter(token=token, session=session)
+    accept = (request.headers.get("accept") or "").lower()
+    if "text/html" in accept:
+        frontend_origin = settings.frontend_origin.rstrip("/")
+        html = f"""<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Unsubscribed</title>
+  </head>
+  <body>
+    <h1>Unsubscribed</h1>
+    <p>You will no longer receive marketing emails from us.</p>
+    <p><a href="{frontend_origin}/">Return to the website</a></p>
+  </body>
+</html>
+"""
+        return HTMLResponse(content=html, status_code=200)
+    return result
 
 
 @router.post("/unsubscribe", response_model=NewsletterUnsubscribeResponse)
