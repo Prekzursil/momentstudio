@@ -1,5 +1,5 @@
 import { APP_INITIALIZER, ApplicationConfig, importProvidersFrom, inject, isDevMode } from '@angular/core';
-import { provideRouter, withComponentInputBinding } from '@angular/router';
+import { provideRouter, TitleStrategy, withComponentInputBinding } from '@angular/router';
 import { provideAnimations } from '@angular/platform-browser/animations';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { routes } from './app.routes';
@@ -10,6 +10,7 @@ import { HttpClient } from '@angular/common/http';
 import { AdminClientErrorLoggerService } from './core/admin-client-error-logger.service';
 import { provideServiceWorker } from '@angular/service-worker';
 import { appConfig as runtimeConfig } from './core/app-config';
+import { TranslatedTitleStrategy } from './core/translated-title.strategy';
 
 export function httpLoaderFactory(http: HttpClient) {
   return new TranslateHttpLoader(http, 'assets/i18n/', '.json');
@@ -20,6 +21,7 @@ export const appConfig: ApplicationConfig = {
     provideRouter(routes, withComponentInputBinding()),
     provideAnimations(),
     provideHttpClient(withInterceptors([authAndErrorInterceptor])),
+    { provide: TitleStrategy, useClass: TranslatedTitleStrategy },
     provideServiceWorker('ngsw-worker.js', {
       enabled: !isDevMode() && runtimeConfig.appEnv === 'production',
       registrationStrategy: 'registerWhenStable:30000'

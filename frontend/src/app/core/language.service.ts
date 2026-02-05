@@ -37,6 +37,7 @@ export class LanguageService {
 
     this.languageSignal.set(lang);
     this.translate.use(lang);
+    this.applyDocumentLanguage(lang);
 
     if (persist && typeof localStorage !== 'undefined') {
       localStorage.setItem('lang', lang);
@@ -52,5 +53,13 @@ export class LanguageService {
       });
     }
   }
-}
 
+  private applyDocumentLanguage(lang: AppLanguage): void {
+    if (typeof document === 'undefined') return;
+    try {
+      document.documentElement.lang = lang;
+    } catch {
+      // ignore
+    }
+  }
+}

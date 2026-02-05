@@ -103,6 +103,22 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
         </div>
 
         <div class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.ops.newsletter.title' | translate }}</div>
+              <div class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.ops.newsletter.hint' | translate }}</div>
+            </div>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.ops.newsletter.download' | translate"
+              [disabled]="newsletterExporting()"
+              (action)="downloadNewsletterExport()"
+            ></app-button>
+          </div>
+        </div>
+
+        <div class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
           <div class="flex items-center justify-between gap-3">
             <div>
               <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.ops.banner.title' | translate }}</div>
@@ -625,6 +641,7 @@ export class AdminOpsComponent implements OnInit {
   webhookBacklog24h = signal(0);
   emailFailures24h = signal(0);
   healthCheckedAt = signal<Date | null>(null);
+  newsletterExporting = signal(false);
 
   bannersLoading = signal(true);
   bannersError = signal<string | null>(null);
@@ -739,6 +756,29 @@ export class AdminOpsComponent implements OnInit {
       { label: 'nav.admin', url: '/admin/dashboard' },
       { label: 'adminUi.nav.ops' }
     ];
+  }
+
+  downloadNewsletterExport(): void {
+    this.newsletterExporting.set(true);
+    this.ops.downloadNewsletterConfirmedSubscribersExport().subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const stamp = new Date().toISOString().slice(0, 10);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `newsletter-confirmed-subscribers-${stamp}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        this.toast.success(this.translate.instant('adminUi.ops.newsletter.success'));
+        this.newsletterExporting.set(false);
+      },
+      error: () => {
+        this.toast.error(this.translate.instant('adminUi.ops.newsletter.error'));
+        this.newsletterExporting.set(false);
+      }
+    });
   }
 
   bannerStatus(b: MaintenanceBannerRead): string {

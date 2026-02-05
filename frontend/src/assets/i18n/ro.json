@@ -4,6 +4,59 @@
     "tagline": "artă. meșteșug",
     "brandMarkAlt": "logo cu floare momentstudio"
   },
+  "meta": {
+    "titles": {
+      "home": "momentstudio",
+      "shop": "Magazin | momentstudio",
+      "about": "Povestea noastră | momentstudio",
+      "contact": "Contact | momentstudio",
+      "blog": "Blog | momentstudio",
+      "page": "Pagină | momentstudio",
+      "product": "Produs | momentstudio",
+      "cart": "Coș | momentstudio",
+      "checkout": "Checkout | momentstudio",
+      "checkout_paypal": "PayPal | momentstudio",
+      "checkout_stripe": "Stripe | momentstudio",
+      "checkout_netopia": "Netopia | momentstudio",
+      "checkout_success": "Comandă confirmată | momentstudio",
+      "checkout_paypal_mock": "PayPal (Mock) | momentstudio",
+      "checkout_stripe_mock": "Stripe (Mock) | momentstudio",
+      "receipt": "Chitanță | momentstudio",
+      "login": "Autentificare | momentstudio",
+      "two_factor": "Verificare în doi pași | momentstudio",
+      "register": "Înregistrare | momentstudio",
+      "google_signin": "Autentificare cu Google | momentstudio",
+      "password_reset": "Resetare parolă | momentstudio",
+      "password_reset_confirm": "Setează parolă nouă | momentstudio",
+      "newsletter": "Newsletter | momentstudio",
+      "unsubscribe": "Dezabonare | momentstudio",
+      "account": "Cont | momentstudio",
+      "change_password": "Schimbă parola | momentstudio",
+      "help_center": "Ajutor | momentstudio",
+      "admin_access": "Acces admin | momentstudio",
+      "admin": "Admin | momentstudio",
+      "admin_content_home": "Conținut · Acasă | Admin | momentstudio",
+      "admin_content_pages": "Conținut · Pagini | Admin | momentstudio",
+      "admin_content_blog": "Conținut · Blog | Admin | momentstudio",
+      "admin_content_settings": "Conținut · Setări | Admin | momentstudio",
+      "admin_content_scheduling": "Conținut · Programare | Admin | momentstudio",
+      "admin_orders": "Comenzi | Admin | momentstudio",
+      "admin_order_exports": "Documente comenzi | Admin | momentstudio",
+      "admin_order": "Comandă | Admin | momentstudio",
+      "admin_returns": "Retururi | Admin | momentstudio",
+      "admin_coupons": "Cupoane | Admin | momentstudio",
+      "admin_products": "Produse | Admin | momentstudio",
+      "admin_inventory": "Inventar | Admin | momentstudio",
+      "admin_users": "Utilizatori | Admin | momentstudio",
+      "admin_gdpr": "GDPR | Admin | momentstudio",
+      "admin_segments": "Segmente | Admin | momentstudio",
+      "admin_support": "Suport | Admin | momentstudio",
+      "admin_ops": "Operațiuni | Admin | momentstudio",
+      "offline": "Offline | momentstudio",
+      "error": "A apărut o eroare",
+      "not_found": "Pagina nu a fost găsită"
+    }
+  },
   "nav": {
     "home": "Acasă",
     "blog": "Blog",
@@ -2136,6 +2189,13 @@
         "errors": {
           "load": "Nu am putut încărca semnalele de sănătate."
         }
+      },
+      "newsletter": {
+        "title": "Abonați newsletter",
+        "hint": "Descarcă abonații confirmați (CSV) pentru operațiuni de marketing.",
+        "download": "Descarcă CSV",
+        "success": "Export newsletter descărcat.",
+        "error": "Nu am putut descărca exportul newsletter."
       },
       "banner": {
         "title": "Bannere mentenanță",

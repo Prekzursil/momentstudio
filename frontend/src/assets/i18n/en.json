@@ -4,6 +4,59 @@
     "tagline": "art. handcrafted",
     "brandMarkAlt": "momentstudio flower logo"
   },
+  "meta": {
+    "titles": {
+      "home": "momentstudio",
+      "shop": "Shop | momentstudio",
+      "about": "About | momentstudio",
+      "contact": "Contact | momentstudio",
+      "blog": "Blog | momentstudio",
+      "page": "Page | momentstudio",
+      "product": "Product | momentstudio",
+      "cart": "Cart | momentstudio",
+      "checkout": "Checkout | momentstudio",
+      "checkout_paypal": "PayPal | momentstudio",
+      "checkout_stripe": "Stripe | momentstudio",
+      "checkout_netopia": "Netopia | momentstudio",
+      "checkout_success": "Order placed | momentstudio",
+      "checkout_paypal_mock": "PayPal (Mock) | momentstudio",
+      "checkout_stripe_mock": "Stripe (Mock) | momentstudio",
+      "receipt": "Receipt | momentstudio",
+      "login": "Login | momentstudio",
+      "two_factor": "Two-factor | momentstudio",
+      "register": "Register | momentstudio",
+      "google_signin": "Google sign-in | momentstudio",
+      "password_reset": "Password reset | momentstudio",
+      "password_reset_confirm": "Set new password | momentstudio",
+      "newsletter": "Newsletter | momentstudio",
+      "unsubscribe": "Unsubscribe | momentstudio",
+      "account": "Account | momentstudio",
+      "change_password": "Change password | momentstudio",
+      "help_center": "Help center | momentstudio",
+      "admin_access": "Admin access | momentstudio",
+      "admin": "Admin | momentstudio",
+      "admin_content_home": "Content · Home | Admin | momentstudio",
+      "admin_content_pages": "Content · Pages | Admin | momentstudio",
+      "admin_content_blog": "Content · Blog | Admin | momentstudio",
+      "admin_content_settings": "Content · Settings | Admin | momentstudio",
+      "admin_content_scheduling": "Content · Scheduling | Admin | momentstudio",
+      "admin_orders": "Orders | Admin | momentstudio",
+      "admin_order_exports": "Order exports | Admin | momentstudio",
+      "admin_order": "Order | Admin | momentstudio",
+      "admin_returns": "Returns | Admin | momentstudio",
+      "admin_coupons": "Coupons | Admin | momentstudio",
+      "admin_products": "Products | Admin | momentstudio",
+      "admin_inventory": "Inventory | Admin | momentstudio",
+      "admin_users": "Users | Admin | momentstudio",
+      "admin_gdpr": "GDPR | Admin | momentstudio",
+      "admin_segments": "Segments | Admin | momentstudio",
+      "admin_support": "Support | Admin | momentstudio",
+      "admin_ops": "Ops | Admin | momentstudio",
+      "offline": "Offline | momentstudio",
+      "error": "Something went wrong",
+      "not_found": "Not Found"
+    }
+  },
   "nav": {
     "home": "Home",
     "blog": "Blog",
@@ -2136,6 +2189,13 @@
         "errors": {
           "load": "Could not load health signals."
         }
+      },
+      "newsletter": {
+        "title": "Newsletter subscribers",
+        "hint": "Download confirmed subscribers (CSV) for marketing operations.",
+        "download": "Download CSV",
+        "success": "Newsletter export downloaded.",
+        "error": "Could not download newsletter export."
       },
       "banner": {
         "title": "Maintenance banners",

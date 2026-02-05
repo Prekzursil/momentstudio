@@ -18,67 +18,67 @@ const mockCheckoutRoutes: Routes =
         {
           path: 'checkout/mock/paypal',
           loadComponent: () => import('./pages/checkout/paypal-mock.component').then((m) => m.PayPalMockComponent),
-          title: 'PayPal (Mock) | momentstudio'
+          title: 'meta.titles.checkout_paypal_mock'
         },
         {
           path: 'checkout/mock/stripe',
           loadComponent: () => import('./pages/checkout/stripe-mock.component').then((m) => m.StripeMockComponent),
-          title: 'Stripe (Mock) | momentstudio'
+          title: 'meta.titles.checkout_stripe_mock'
         }
       ];
 
 export const routes: Routes = [
-  { path: '', component: HomeComponent, title: 'momentstudio' },
+  { path: '', component: HomeComponent, title: 'meta.titles.home' },
   {
     path: 'shop',
     component: ShopComponent,
-    title: 'Shop | momentstudio',
+    title: 'meta.titles.shop',
     resolve: { categories: shopCategoriesResolver },
     pathMatch: 'full'
   },
   {
     path: 'shop/:category',
     component: ShopComponent,
-    title: 'Shop | momentstudio',
+    title: 'meta.titles.shop',
     resolve: { categories: shopCategoriesResolver }
   },
-  { path: 'about', component: AboutComponent, title: 'About | momentstudio' },
-  { path: 'contact', component: ContactComponent, title: 'Contact | momentstudio' },
+  { path: 'about', component: AboutComponent, title: 'meta.titles.about' },
+  { path: 'contact', component: ContactComponent, title: 'meta.titles.contact' },
   {
     path: 'blog',
     loadComponent: () => import('./pages/blog/blog-list.component').then((m) => m.BlogListComponent),
-    title: 'Blog | momentstudio'
+    title: 'meta.titles.blog'
   },
   {
     path: 'blog/tag/:tag',
     loadComponent: () => import('./pages/blog/blog-list.component').then((m) => m.BlogListComponent),
-    title: 'Blog | momentstudio'
+    title: 'meta.titles.blog'
   },
   {
     path: 'blog/series/:series',
     loadComponent: () => import('./pages/blog/blog-list.component').then((m) => m.BlogListComponent),
-    title: 'Blog | momentstudio'
+    title: 'meta.titles.blog'
   },
   {
     path: 'blog/:slug',
     loadComponent: () => import('./pages/blog/blog-post.component').then((m) => m.BlogPostComponent),
-    title: 'Blog | momentstudio'
+    title: 'meta.titles.blog'
   },
   {
     path: 'pages/:slug',
     loadComponent: () => import('./pages/page/page.component').then((m) => m.CmsPageComponent),
-    title: 'Page | momentstudio'
+    title: 'meta.titles.page'
   },
   {
     path: 'products/:slug',
     loadComponent: () => import('./pages/product/product.component').then((m) => m.ProductComponent),
-    title: 'Product | momentstudio'
+    title: 'meta.titles.product'
   },
-  { path: 'cart', loadComponent: () => import('./pages/cart/cart.component').then((m) => m.CartComponent), title: 'Cart | momentstudio' },
+  { path: 'cart', loadComponent: () => import('./pages/cart/cart.component').then((m) => m.CartComponent), title: 'meta.titles.cart' },
   {
     path: 'checkout',
     loadComponent: () => import('./pages/checkout/checkout.component').then((m) => m.CheckoutComponent),
-    title: 'Checkout | momentstudio',
+    title: 'meta.titles.checkout',
     resolve: {
       checkoutPricingSettings: checkoutPricingSettingsResolver
     }
@@ -87,78 +87,78 @@ export const routes: Routes = [
   {
     path: 'checkout/paypal/return',
     loadComponent: () => import('./pages/checkout/paypal-return.component').then((m) => m.PayPalReturnComponent),
-    title: 'PayPal | momentstudio'
+    title: 'meta.titles.checkout_paypal'
   },
   {
     path: 'checkout/stripe/return',
     loadComponent: () => import('./pages/checkout/stripe-return.component').then((m) => m.StripeReturnComponent),
-    title: 'Stripe | momentstudio'
+    title: 'meta.titles.checkout_stripe'
   },
   {
     path: 'checkout/netopia/return',
     loadComponent: () => import('./pages/checkout/netopia-return.component').then((m) => m.NetopiaReturnComponent),
-    title: 'Netopia | momentstudio'
+    title: 'meta.titles.checkout_netopia'
   },
   {
     path: 'checkout/paypal/cancel',
     loadComponent: () => import('./pages/checkout/paypal-cancel.component').then((m) => m.PayPalCancelComponent),
-    title: 'Checkout | momentstudio'
+    title: 'meta.titles.checkout'
   },
   {
     path: 'checkout/stripe/cancel',
     loadComponent: () => import('./pages/checkout/stripe-cancel.component').then((m) => m.StripeCancelComponent),
-    title: 'Checkout | momentstudio'
+    title: 'meta.titles.checkout'
   },
   {
     path: 'checkout/netopia/cancel',
     loadComponent: () => import('./pages/checkout/netopia-cancel.component').then((m) => m.NetopiaCancelComponent),
-    title: 'Checkout | momentstudio'
+    title: 'meta.titles.checkout'
   },
   {
     path: 'checkout/success',
     loadComponent: () => import('./pages/checkout/success.component').then((m) => m.SuccessComponent),
-    title: 'Order placed | momentstudio'
+    title: 'meta.titles.checkout_success'
   },
   {
     path: 'receipt/:token',
     loadComponent: () => import('./pages/receipt/receipt.component').then((m) => m.ReceiptComponent),
-    title: 'Receipt | momentstudio'
+    title: 'meta.titles.receipt'
   },
-  { path: 'login', loadComponent: () => import('./pages/auth/login.component').then((m) => m.LoginComponent), title: 'Login | momentstudio' },
+  { path: 'login', loadComponent: () => import('./pages/auth/login.component').then((m) => m.LoginComponent), title: 'meta.titles.login' },
   {
     path: 'login/2fa',
     loadComponent: () => import('./pages/auth/two-factor.component').then((m) => m.TwoFactorComponent),
-    title: 'Two-factor | momentstudio'
+    title: 'meta.titles.two_factor'
   },
   {
     path: 'register',
     loadComponent: () => import('./pages/auth/register.component').then((m) => m.RegisterComponent),
-    title: 'Register | momentstudio'
+    title: 'meta.titles.register'
   },
   {
     path: 'auth/google/callback',
     loadComponent: () => import('./pages/auth/google-callback.component').then((m) => m.GoogleCallbackComponent),
-    title: 'Google sign-in | momentstudio'
+    title: 'meta.titles.google_signin'
   },
   {
     path: 'password-reset',
     loadComponent: () => import('./pages/auth/password-reset-request.component').then((m) => m.PasswordResetRequestComponent),
-    title: 'Password reset | momentstudio'
+    title: 'meta.titles.password_reset'
   },
   {
     path: 'password-reset/confirm',
     loadComponent: () => import('./pages/auth/password-reset.component').then((m) => m.PasswordResetComponent),
-    title: 'Set new password | momentstudio'
+    title: 'meta.titles.password_reset_confirm'
   },
   {
     path: 'newsletter/confirm',
     loadComponent: () => import('./pages/newsletter/newsletter-confirm.component').then((m) => m.NewsletterConfirmComponent),
-    title: 'Newsletter | momentstudio'
+    title: 'meta.titles.newsletter'
   },
   {
     path: 'newsletter/unsubscribe',
     loadComponent: () => import('./pages/newsletter/newsletter-unsubscribe.component').then((m) => m.NewsletterUnsubscribeComponent),
-    title: 'Unsubscribe | momentstudio'
+    title: 'meta.titles.unsubscribe'
   },
   {
     path: 'account',
@@ -199,16 +199,16 @@ export const routes: Routes = [
       {
         path: 'password',
         loadComponent: () => import('./pages/account/change-password.component').then((m) => m.ChangePasswordComponent),
-        title: 'Change password | momentstudio'
+        title: 'meta.titles.change_password'
       }
     ],
-    title: 'Account | momentstudio'
+    title: 'meta.titles.account'
   },
   {
     path: 'tickets',
     canActivate: [authGuard],
     loadComponent: () => import('./pages/tickets/tickets.component').then((m) => m.TicketsComponent),
-    title: 'Help center | momentstudio'
+    title: 'meta.titles.help_center'
   },
   {
     path: 'admin',
@@ -219,13 +219,13 @@ export const routes: Routes = [
       {
         path: 'ip-bypass',
         loadComponent: () => import('./pages/admin/ip-bypass/admin-ip-bypass.component').then((m) => m.AdminIpBypassComponent),
-        title: 'Admin access | momentstudio'
+        title: 'meta.titles.admin_access'
       },
       {
         path: 'dashboard',
         loadComponent: () => import('./pages/admin/dashboard/admin-dashboard.component').then((m) => m.AdminDashboardComponent),
         canActivate: [adminSectionGuard('dashboard')],
-        title: 'Admin | momentstudio'
+        title: 'meta.titles.admin'
       },
       {
         path: 'content',
@@ -238,31 +238,31 @@ export const routes: Routes = [
             path: 'home',
             loadComponent: () => import('./pages/admin/admin.component').then((m) => m.AdminComponent),
             data: { section: 'home' },
-            title: 'Content · Home | Admin | momentstudio'
+            title: 'meta.titles.admin_content_home'
           },
           {
             path: 'pages',
             loadComponent: () => import('./pages/admin/admin.component').then((m) => m.AdminComponent),
             data: { section: 'pages' },
-            title: 'Content · Pages | Admin | momentstudio'
+            title: 'meta.titles.admin_content_pages'
           },
           {
             path: 'blog',
             loadComponent: () => import('./pages/admin/admin.component').then((m) => m.AdminComponent),
             data: { section: 'blog' },
-            title: 'Content · Blog | Admin | momentstudio'
+            title: 'meta.titles.admin_content_blog'
           },
           {
             path: 'settings',
             loadComponent: () => import('./pages/admin/admin.component').then((m) => m.AdminComponent),
             data: { section: 'settings' },
-            title: 'Content · Settings | Admin | momentstudio'
+            title: 'meta.titles.admin_content_settings'
           },
           {
             path: 'scheduling',
             loadComponent: () =>
               import('./pages/admin/content/admin-content-scheduling.component').then((m) => m.AdminContentSchedulingComponent),
-            title: 'Content · Scheduling | Admin | momentstudio'
+            title: 'meta.titles.admin_content_scheduling'
           }
         ]
       },
@@ -270,45 +270,45 @@ export const routes: Routes = [
         path: 'orders',
         loadComponent: () => import('./pages/admin/orders/admin-orders.component').then((m) => m.AdminOrdersComponent),
         canActivate: [adminSectionGuard('orders')],
-        title: 'Orders | Admin | momentstudio'
+        title: 'meta.titles.admin_orders'
       },
       {
         path: 'orders/exports',
         loadComponent: () =>
           import('./pages/admin/orders/admin-order-exports.component').then((m) => m.AdminOrderExportsComponent),
         canActivate: [adminSectionGuard('orders')],
-        title: 'Order exports | Admin | momentstudio'
+        title: 'meta.titles.admin_order_exports'
       },
       {
         path: 'orders/:orderId',
         loadComponent: () =>
           import('./pages/admin/orders/admin-order-detail.component').then((m) => m.AdminOrderDetailComponent),
         canActivate: [adminSectionGuard('orders')],
-        title: 'Order | Admin | momentstudio'
+        title: 'meta.titles.admin_order'
       },
       {
         path: 'returns',
         loadComponent: () => import('./pages/admin/returns/admin-returns.component').then((m) => m.AdminReturnsComponent),
         canActivate: [adminSectionGuard('returns')],
-        title: 'Returns | Admin | momentstudio'
+        title: 'meta.titles.admin_returns'
       },
       {
         path: 'coupons',
         loadComponent: () => import('./pages/admin/coupons/admin-coupons.component').then((m) => m.AdminCouponsComponent),
         canActivate: [adminSectionGuard('coupons')],
-        title: 'Coupons | Admin | momentstudio'
+        title: 'meta.titles.admin_coupons'
       },
       {
         path: 'products',
         loadComponent: () => import('./pages/admin/products/admin-products.component').then((m) => m.AdminProductsComponent),
         canActivate: [adminSectionGuard('products')],
-        title: 'Products | Admin | momentstudio'
+        title: 'meta.titles.admin_products'
       },
       {
         path: 'inventory',
         loadComponent: () => import('./pages/admin/inventory/admin-inventory.component').then((m) => m.AdminInventoryComponent),
         canActivate: [adminSectionGuard('inventory')],
-        title: 'Inventory | Admin | momentstudio'
+        title: 'meta.titles.admin_inventory'
       },
       {
         path: 'users',
@@ -317,17 +317,17 @@ export const routes: Routes = [
           {
             path: '',
             loadComponent: () => import('./pages/admin/users/admin-users.component').then((m) => m.AdminUsersComponent),
-            title: 'Users | Admin | momentstudio'
+            title: 'meta.titles.admin_users'
           },
           {
             path: 'gdpr',
             loadComponent: () => import('./pages/admin/users/admin-gdpr.component').then((m) => m.AdminGdprComponent),
-            title: 'GDPR | Admin | momentstudio'
+            title: 'meta.titles.admin_gdpr'
           },
           {
             path: 'segments',
             loadComponent: () => import('./pages/admin/users/admin-segments.component').then((m) => m.AdminSegmentsComponent),
-            title: 'Segments | Admin | momentstudio'
+            title: 'meta.titles.admin_segments'
           }
         ]
       },
@@ -335,21 +335,21 @@ export const routes: Routes = [
         path: 'support',
         loadComponent: () => import('./pages/admin/support/admin-support.component').then((m) => m.AdminSupportComponent),
         canActivate: [adminSectionGuard('support')],
-        title: 'Support | Admin | momentstudio'
+        title: 'meta.titles.admin_support'
       },
       {
         path: 'ops',
         loadComponent: () => import('./pages/admin/ops/admin-ops.component').then((m) => m.AdminOpsComponent),
         canActivate: [adminSectionGuard('ops')],
-        title: 'Ops | Admin | momentstudio'
+        title: 'meta.titles.admin_ops'
       }
     ]
   },
   {
     path: 'offline',
     loadComponent: () => import('./pages/offline/offline.component').then((m) => m.OfflineComponent),
-    title: 'Offline | momentstudio'
+    title: 'meta.titles.offline'
   },
-  { path: 'error', component: ErrorComponent, title: 'Something went wrong' },
-  { path: '**', component: NotFoundComponent, title: 'Not Found' }
+  { path: 'error', component: ErrorComponent, title: 'meta.titles.error' },
+  { path: '**', component: NotFoundComponent, title: 'meta.titles.not_found' }
 ];

@@ -208,4 +208,8 @@ export class OpsService {
   }): Observable<EmailEventRead[]> {
     return this.api.get<EmailEventRead[]>('/ops/admin/email-events', params as any);
   }
+
+  downloadNewsletterConfirmedSubscribersExport(): Observable<Blob> {
+    return this.api.getBlob('/newsletter/admin/export');
+  }
 }
