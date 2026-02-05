@@ -13,7 +13,7 @@ Below is a structured checklist you can turn into issues.
 - [x] SEO: expose `/robots.txt` and `/sitemap.xml` at site root via Nginx/Caddy proxy and ensure robots references the canonical sitemap URL.
 - [x] Uploads: support SVG uploads safely (sanitize and store; skip thumbnails for SVGs).
 - [x] Analytics: rate limit `/api/v1/analytics/events` (IP-based) to prevent DB bloat/DoS.
-- [ ] Analytics: add optional signed token to further harden ingestion (for multi-replica deployments).
+- [x] Analytics: add optional signed token to further harden ingestion (for multi-replica deployments).
 - [x] Netopia: use `Decimal` for amounts and add basic IPN time/max-age validation to reduce replay risk.
 - [x] Prod safety: refuse to start with default secrets/bypass tokens or insecure cookie settings when `ENVIRONMENT=production`.
 - [x] Frontend security: prep for strict CSP (move inline theme bootstrap script to external file) and set CSP headers at edge.
@@ -22,15 +22,15 @@ Below is a structured checklist you can turn into issues.
 - [x] Auth UX: include a reset link in password reset emails and auto-fill the token from URL query param.
 - [x] Ops: restrict `/api/v1/metrics` to admin/internal network (or disable in prod).
 - [x] Frontend: guard/remove `/checkout/mock/*` routes in production builds.
-- [ ] Admin Orders: fix cancel-reason UI so it only appears for cancelled status and doesn’t block other updates.
+- [x] Admin Orders: fix cancel-reason UI so it only appears for cancelled status and doesn’t block other updates.
 - [x] Auth: login/register should not get stuck after errors; improve error visibility and re-attempt flow (incl. CAPTCHA).
 - [x] Frontend: stop showing duplicate generic “Request failed” toasts when pages already handle errors.
-- [ ] Checkout: investigate Easybox/FANbox checkout regressions when frontend runs on alternate dev port (4201).
+- [x] Checkout: investigate Easybox/FANbox checkout regressions when frontend runs on alternate dev port (4201).
 - [x] Coupons v2: validate marketing opt-in before committing coupon changes when `send_email=true` (avoid partial success).
 - [x] Email: add RFC 8058 one-click unsubscribe headers (`List-Unsubscribe-Post`).
 - [ ] Email: manually verify one-click unsubscribe behavior across Gmail/Outlook (and adjust headers if needed).
-- [ ] Docs: add Google OAuth setup guide (origins, redirect URIs, backend env, dev/prod examples).
-- [ ] Docs: document when/why dev uses `4201` (port bump + Docker stack) and related CORS/proxy expectations.
+- [x] Docs: add Google OAuth setup guide (origins, redirect URIs, backend env, dev/prod examples).
+- [x] Docs: document when/why dev uses `4201` (port bump + Docker stack) and related CORS/proxy expectations.
 - [ ] Scale: replace in-memory rate limits/caches with Redis-backed equivalents for multi-replica deployments (auth limits, analytics ingestion, etc.).
 - [ ] Frontend SEO/i18n: set `<html lang>` dynamically and use translation keys for route titles/meta.
 - [ ] Frontend deps: remove `postinstall` node_modules patch by upgrading/replacing `http-proxy` (make installs deterministic).

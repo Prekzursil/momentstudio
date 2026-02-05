@@ -134,4 +134,6 @@ The `Release` GitHub Actions workflow builds/pushes images when you push a tag l
 - `ARCHITECTURE.md` — high-level design notes
 - `CONTRIBUTING.md` — conventions and workflows
 - `docs/PRODUCTION.md` — production deployment guide
+- `docs/GOOGLE_OAUTH.md` — Google OAuth setup (origins + redirect URIs)
+- `docs/DEV_PORTS.md` — dev ports + proxy/CORS expectations
 - `backend/README.md`, `frontend/README.md`, `infra/README.md`
