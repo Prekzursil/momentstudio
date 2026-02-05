@@ -15,6 +15,7 @@ class ContactSubmissionTopic(str, enum.Enum):
     support = "support"
     refund = "refund"
     dispute = "dispute"
+    feedback = "feedback"
 
 
 class ContactSubmissionStatus(str, enum.Enum):

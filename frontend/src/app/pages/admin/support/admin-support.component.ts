@@ -73,6 +73,9 @@ import {
               <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="dispute">
                 {{ 'adminUi.support.topics.dispute' | translate }}
               </option>
+              <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="feedback">
+                {{ 'adminUi.support.topics.feedback' | translate }}
+              </option>
 	            </select>
 	          </label>
 	

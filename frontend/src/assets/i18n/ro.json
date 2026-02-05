@@ -1555,6 +1555,22 @@
       "undo": "Anulează",
       "close": "Închide"
     },
+    "feedback": {
+      "open": "Feedback",
+      "title": "Trimite feedback",
+      "subtitle": "Creează un tichet intern pentru echipă.",
+      "hint": "Folosește asta pentru bug-uri, probleme de UX sau idei de îmbunătățire. Mesajul va apărea în inboxul de suport la „Feedback”.",
+      "messageLabel": "Mesaj",
+      "messagePlaceholder": "Ce s-a întâmplat? Ce te așteptai să se întâmple? Pașii de reproducere…",
+      "contextLabel": "Context (opțional)",
+      "contextPlaceholder": "Detalii extra (ID comandă, pagină afectată, referință screenshot)…",
+      "includePage": "Include URL-ul paginii curente",
+      "submit": "Trimite",
+      "success": "Feedback trimis.",
+      "errors": {
+        "send": "Nu am putut trimite feedback."
+      }
+    },
     "storefront": {
       "categories": {
         "dragHint": "Trage pentru a reordona categoriile. Apasă Editează pentru a redenumi (RO/EN).",
@@ -1797,6 +1813,13 @@
         "createProduct": "Creează produs",
         "createCoupon": "Creează cupon",
         "exportOrders": "Exportă comenzi"
+      },
+      "whatsNew": {
+        "title": "Ce e nou",
+        "subtitle": "Note de release din ultimul deploy.",
+        "errors": {
+          "load": "Nu am putut încărca notele de release."
+        }
       },
       "customizeWidgets": "Personalizează widgeturile",
       "liveRefresh": {
@@ -2071,7 +2094,8 @@
         "contact": "General",
         "support": "Suport",
         "refund": "Rambursare",
-        "dispute": "Dispută"
+        "dispute": "Dispută",
+        "feedback": "Feedback"
       },
       "status": {
         "new": "Nou",

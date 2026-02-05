@@ -105,6 +105,48 @@ def test_support_contact_submission_creates_notification(test_app: Dict[str, obj
     assert any(n.type == "support" and n.url == "/admin/support" for n in notifications)
 
 
+def test_support_admin_feedback_creates_submission(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    staff_token, _ = create_user_token(SessionLocal, email="staff@example.com", role=UserRole.content, username="staff")
+    admin_token, _ = create_user_token(SessionLocal, email="admin3@example.com", role=UserRole.admin, username="admin3")
+
+    res = client.post(
+        "/api/v1/support/admin/feedback",
+        headers=auth_headers(staff_token),
+        json={"message": "Found a UX issue on the orders page", "context": "/admin/orders/123"},
+    )
+    assert res.status_code == 201, res.text
+    created = res.json()
+    assert created["topic"] == "feedback"
+    assert created["admin_note"] == "/admin/orders/123"
+
+    listed = client.get(
+        "/api/v1/support/admin/submissions",
+        headers=auth_headers(admin_token),
+        params={"topic_filter": "feedback"},
+    )
+    assert listed.status_code == 200, listed.text
+    ids = {row["id"] for row in listed.json()["items"]}
+    assert created["id"] in ids
+
+
+def test_support_public_feedback_topic_rejected(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+
+    res = client.post(
+        "/api/v1/support/contact",
+        json={
+            "topic": "feedback",
+            "name": "Customer",
+            "email": "customer@example.com",
+            "message": "Feedback",
+        },
+    )
+    assert res.status_code == 400, res.text
+
+
 def test_support_admin_update_requires_admin(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]

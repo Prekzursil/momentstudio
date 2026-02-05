@@ -19,6 +19,7 @@ from app.models.user import User
 from app.schemas.admin_common import AdminPaginationMeta
 from app.schemas.content import ContentBlockUpdate
 from app.schemas.support import (
+    AdminFeedbackCreate,
     ContactSubmissionCreate,
     ContactSubmissionListItem,
     ContactSubmissionListResponse,
@@ -109,6 +110,8 @@ async def submit_contact(
     session: AsyncSession = Depends(get_session),
     current_user: User | None = Depends(get_current_user_optional),
 ) -> ContactSubmissionRead:
+    if payload.topic == ContactSubmissionTopic.feedback:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported topic")
     await captcha_service.verify(payload.captcha_token, remote_ip=request.client.host if request.client else None)
     record = await support_service.create_contact_submission(
         session,
@@ -154,6 +157,8 @@ async def create_my_ticket(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> TicketRead:
+    if payload.topic == ContactSubmissionTopic.feedback:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported topic")
     display_name = (getattr(user, "name", None) or "").strip() or (getattr(user, "username", None) or "").strip() or "Customer"
     record = await support_service.create_contact_submission(
         session,
@@ -255,6 +260,29 @@ async def admin_list_support_assignees(
 ) -> list[SupportAgentRef]:
     rows = await support_service.list_support_agents(session)
     return [SupportAgentRef.model_validate(r) for r in rows]
+
+
+@router.post("/admin/feedback", response_model=ContactSubmissionRead, status_code=status.HTTP_201_CREATED)
+async def admin_submit_feedback(
+    payload: AdminFeedbackCreate,
+    session: AsyncSession = Depends(get_session),
+    staff: User = Depends(require_admin_section("dashboard")),
+) -> ContactSubmissionRead:
+    display_name = (getattr(staff, "name", None) or "").strip() or (getattr(staff, "username", None) or "").strip() or "Staff"
+    context = (payload.context or "").strip() or None
+    record = await support_service.create_contact_submission(
+        session,
+        topic=ContactSubmissionTopic.feedback,
+        name=display_name,
+        email=str(staff.email),
+        message=payload.message,
+        admin_note=context,
+        user=staff,
+    )
+    hydrated = await support_service.get_contact_submission_with_messages(session, record.id)
+    if not hydrated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
+    return ContactSubmissionRead.model_validate(hydrated)
 
 
 @router.get("/admin/canned-responses", response_model=list[SupportCannedResponseRead])

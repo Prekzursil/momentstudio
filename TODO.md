@@ -39,8 +39,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin UI: focus management for modals – Trap focus, restore focus to trigger, and close on Escape consistently across admin modals.
 - [x] Admin UI: optimistic toggles with rollback – For simple flags (active/featured/visible), update immediately and rollback on failure with clear toast.
 - [x] Admin UI: copy buttons for IDs/emails – Add one-click copy for order/product/user IDs and key strings with a visible confirmation.
-- [ ] Admin UI: in-app feedback widget – Add an admin-only “Feedback” form stored in DB and visible in Support (no external services).
-- [ ] Admin UI: “What’s new” panel – Show deploy notes from a local markdown file in the repo (no third-party tooling).
+- [x] Admin UI: in-app feedback widget – Add an admin-only “Feedback” form stored in DB and visible in Support (no external services).
+- [x] Admin UI: “What’s new” panel – Show deploy notes from a local markdown file in the repo (no third-party tooling).
 - [ ] Admin Dashboard: KPI drill-down links – Clicking a KPI navigates to the relevant list with filters pre-applied.
 - [ ] Admin Dashboard: payments health widget – Show success rate/failures + recent webhook errors per provider using existing DB logs.
 - [ ] Admin Dashboard: refunds breakdown widget – Show refunds by reason/provider/timeframe with deltas.

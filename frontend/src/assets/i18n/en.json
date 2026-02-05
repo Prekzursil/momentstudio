@@ -1555,6 +1555,22 @@
       "undo": "Undo",
       "close": "Close"
     },
+    "feedback": {
+      "open": "Feedback",
+      "title": "Send feedback",
+      "subtitle": "Creates an internal support ticket for the team.",
+      "hint": "Use this to report bugs, UX issues, or improvement ideas. The message will appear in the Support inbox under “Feedback”.",
+      "messageLabel": "Message",
+      "messagePlaceholder": "What happened? What did you expect? Steps to reproduce…",
+      "contextLabel": "Context (optional)",
+      "contextPlaceholder": "Extra details (order ID, affected page, screenshots reference)…",
+      "includePage": "Include current page URL",
+      "submit": "Send",
+      "success": "Feedback sent.",
+      "errors": {
+        "send": "Could not send feedback."
+      }
+    },
     "storefront": {
       "categories": {
         "dragHint": "Drag to reorder categories. Click Edit to rename (RO/EN).",
@@ -1797,6 +1813,13 @@
         "createProduct": "Create product",
         "createCoupon": "Create coupon",
         "exportOrders": "Export orders"
+      },
+      "whatsNew": {
+        "title": "What’s new",
+        "subtitle": "Release notes from the latest deploy.",
+        "errors": {
+          "load": "Could not load release notes."
+        }
       },
       "customizeWidgets": "Customize widgets",
       "liveRefresh": {
@@ -2071,7 +2094,8 @@
         "contact": "General",
         "support": "Support",
         "refund": "Refund",
-        "dispute": "Dispute"
+        "dispute": "Dispute",
+        "feedback": "Feedback"
       },
       "status": {
         "new": "New",

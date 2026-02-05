@@ -1,4 +1,5 @@
 import { CommonModule } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
 import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -35,6 +36,7 @@ import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 import { extractRequestId } from '../../../shared/http-error';
 import { AdminRecentItem, AdminRecentService } from '../../../core/admin-recent.service';
 import { AdminFavoriteItem, AdminFavoritesService } from '../../../core/admin-favorites.service';
+import { MarkdownService } from '../../../core/markdown.service';
 
 type MetricWidgetId = 'kpis' | 'counts' | 'range';
 type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: string | null };
@@ -136,13 +138,36 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
 	                [label]="'adminUi.dashboard.customizeWidgets' | translate"
 	                (action)="toggleCustomizeWidgets()"
 	              ></app-button>
-              </div>
-	          </div>
+	              </div>
+		          </div>
 
-	          <div class="grid gap-3">
-	            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-	              {{ 'adminUi.dashboard.quickActionsTitle' | translate }}
-	            </p>
+              <app-card
+                [title]="'adminUi.dashboard.whatsNew.title' | translate"
+                [subtitle]="'adminUi.dashboard.whatsNew.subtitle' | translate"
+              >
+                <div class="flex justify-end">
+                  <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadWhatsNew(true)"></app-button>
+                </div>
+
+                <div *ngIf="whatsNewLoading()" class="mt-3">
+                  <app-skeleton [rows]="3"></app-skeleton>
+                </div>
+
+                <div *ngIf="whatsNewError()" class="mt-3 text-sm text-rose-700 dark:text-rose-200">
+                  {{ whatsNewError() }}
+                </div>
+
+                <div
+                  *ngIf="!whatsNewLoading() && !whatsNewError() && whatsNewHtml()"
+                  class="mt-3 grid gap-2 text-sm text-slate-700 dark:text-slate-200"
+                  [innerHTML]="whatsNewHtml()"
+                ></div>
+              </app-card>
+
+		          <div class="grid gap-3">
+		            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+		              {{ 'adminUi.dashboard.quickActionsTitle' | translate }}
+		            </p>
 
 	            <div class="grid gap-3 md:grid-cols-[1fr_auto] items-end">
 	              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -1360,6 +1385,9 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
   loading = signal(true);
   error = signal<string | null>(null);
   errorRequestId = signal<string | null>(null);
+  whatsNewLoading = signal(false);
+  whatsNewError = signal<string | null>(null);
+  whatsNewHtml = signal('');
   summary = signal<AdminSummary | null>(null);
   channelBreakdown = signal<AdminChannelBreakdownResponse | null>(null);
   channelBreakdownLoading = signal(false);
@@ -1435,7 +1463,9 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     public recent: AdminRecentService,
     private router: Router,
     private toast: ToastService,
-    private translate: TranslateService
+    private translate: TranslateService,
+    private http: HttpClient,
+    private markdown: MarkdownService
   ) {}
 
   ngAfterViewInit(): void {
@@ -1456,19 +1486,20 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     }, 0);
   }
 
-  ngOnInit(): void {
-    this.loadWidgetPrefs();
-    this.loadLiveRefreshPreference();
-    this.loadSalesMetricPreference();
-    this.loadSummary();
-    this.loadFunnelMetrics();
-    this.loadChannelBreakdown();
-    this.loadScheduledTasks();
-    this.loadBackgroundJobs();
-    this.loadAudit(1);
-    this.loadAuditRetention();
-    this.maybeShowOnboarding();
-  }
+	  ngOnInit(): void {
+	    this.loadWidgetPrefs();
+	    this.loadLiveRefreshPreference();
+	    this.loadSalesMetricPreference();
+	    this.loadSummary();
+      this.loadWhatsNew();
+	    this.loadFunnelMetrics();
+	    this.loadChannelBreakdown();
+	    this.loadScheduledTasks();
+	    this.loadBackgroundJobs();
+	    this.loadAudit(1);
+	    this.loadAuditRetention();
+	    this.maybeShowOnboarding();
+	  }
 
   clearRecent(): void {
     this.recent.clear();
@@ -1783,13 +1814,32 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     });
   }
 
-  onboardingOpen = signal(false);
-  private readonly onboardingStorageKey = 'admin.onboarding.v1';
+	  onboardingOpen = signal(false);
+	  private readonly onboardingStorageKey = 'admin.onboarding.v1';
 
-  private loadSummary(): void {
-    this.loading.set(true);
-    this.error.set(null);
-    this.errorRequestId.set(null);
+    loadWhatsNew(force = false): void {
+      if (this.whatsNewLoading()) return;
+      if (!force && this.whatsNewHtml()) return;
+      this.whatsNewLoading.set(true);
+      this.whatsNewError.set(null);
+      this.http.get('assets/whats-new.md', { responseType: 'text' }).subscribe({
+        next: (md) => {
+          const raw = (md || '').trim();
+          this.whatsNewHtml.set(raw ? this.markdown.render(md) : '');
+          this.whatsNewLoading.set(false);
+        },
+        error: () => {
+          this.whatsNewHtml.set('');
+          this.whatsNewError.set(this.translate.instant('adminUi.dashboard.whatsNew.errors.load'));
+          this.whatsNewLoading.set(false);
+        }
+      });
+    }
+
+	  private loadSummary(): void {
+	    this.loading.set(true);
+	    this.error.set(null);
+	    this.errorRequestId.set(null);
     this.rangeError = '';
     this.admin.summary(this.buildSummaryParams()).subscribe({
       next: (data) => {

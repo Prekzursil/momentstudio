@@ -51,6 +51,7 @@ async def create_contact_submission(
     email: str,
     message: str,
     order_reference: str | None = None,
+    admin_note: str | None = None,
     user: User | None = None,
 ) -> ContactSubmission:
     record = ContactSubmission(
@@ -60,6 +61,7 @@ async def create_contact_submission(
         email=(email or "").strip()[:255],
         message=(message or "").strip(),
         order_reference=(order_reference or "").strip()[:50] or None,
+        admin_note=(admin_note or "").strip() or None,
         user_id=user.id if user else None,
     )
     session.add(record)
@@ -67,7 +69,10 @@ async def create_contact_submission(
     await session.refresh(record)
 
     for recipient in await _support_recipients(session):
-        title = "New contact message" if (recipient.preferred_language or "en") != "ro" else "Mesaj nou de contact"
+        if topic == ContactSubmissionTopic.feedback:
+            title = "New admin feedback" if (recipient.preferred_language or "en") != "ro" else "Feedback nou"
+        else:
+            title = "New contact message" if (recipient.preferred_language or "en") != "ro" else "Mesaj nou de contact"
         body = f"From: {record.email}"
         await notification_service.create_notification(
             session,

@@ -29,6 +29,11 @@ class ContactSubmissionCreate(BaseModel):
     captcha_token: str | None = Field(default=None, max_length=5000)
 
 
+class AdminFeedbackCreate(BaseModel):
+    message: str = Field(min_length=1, max_length=10_000)
+    context: str | None = Field(default=None, max_length=10_000)
+
+
 class ContactSubmissionUpdate(BaseModel):
     status: ContactSubmissionStatus | None = None
     admin_note: str | None = Field(default=None, max_length=10_000)
