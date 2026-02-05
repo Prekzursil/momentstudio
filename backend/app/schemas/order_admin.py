@@ -22,6 +22,7 @@ class AdminOrderListItem(BaseModel):
     status: OrderStatus
     total_amount: Decimal
     currency: str
+    payment_method: str | None = None
     created_at: datetime
     customer_email: str | None = None
     customer_username: str | None = None

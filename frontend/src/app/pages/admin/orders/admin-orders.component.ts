@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, signal } from '@angular/core';
+import { CdkDragDrop, DragDropModule, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
 import { ScrollingModule } from '@angular/cdk/scrolling';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -44,6 +45,9 @@ type OrderStatusFilter =
   | 'cancelled'
   | 'refunded';
 
+type AdminOrdersViewMode = 'table' | 'kanban';
+type KanbanStatus = Exclude<OrderStatusFilter, 'all' | 'sales' | 'pending'>;
+
 type AdminOrdersFilterPreset = {
   id: string;
   name: string;
@@ -66,6 +70,22 @@ type AdminOrdersExportTemplate = {
   columns: string[];
 };
 
+type ShippingLabelsUploadStatus = 'pending' | 'uploading' | 'success' | 'error';
+
+type ShippingLabelsUploadItem = {
+  file: File;
+  assignedOrderId: string | null;
+  status: ShippingLabelsUploadStatus;
+  error?: string | null;
+};
+
+type ShippingLabelsOrderOption = {
+  id: string;
+  ref: string;
+  shortId: string;
+  label: string;
+};
+
 const ORDERS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
   { id: 'select', labelKey: 'adminUi.orders.table.select', required: true },
   { id: 'reference', labelKey: 'adminUi.orders.table.reference', required: true },
@@ -82,17 +102,18 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
   hidden: ['tags']
 });
 
-@Component({
-  selector: 'app-admin-orders',
-  standalone: true,
-	  imports: [
-	    CommonModule,
-	    FormsModule,
-	    ScrollingModule,
-	    TranslateModule,
-	    BreadcrumbComponent,
-	    ButtonComponent,
-	    ErrorStateComponent,
+  @Component({
+    selector: 'app-admin-orders',
+    standalone: true,
+		  imports: [
+		    CommonModule,
+		    FormsModule,
+        DragDropModule,
+		    ScrollingModule,
+		    TranslateModule,
+		    BreadcrumbComponent,
+		    ButtonComponent,
+		    ErrorStateComponent,
 	    InputComponent,
 	    HelpPanelComponent,
 	    SkeletonComponent,
@@ -110,10 +131,11 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
 	          <app-button size="sm" variant="ghost" [label]="'adminUi.orders.exports.nav' | translate" (action)="openExports()"></app-button>
 	        </ng-template>
 
-	        <ng-template #secondaryActions>
-	          <app-button size="sm" variant="ghost" [label]="densityToggleLabelKey() | translate" (action)="toggleDensity()"></app-button>
-	          <app-button size="sm" variant="ghost" [label]="'adminUi.tableLayout.title' | translate" (action)="openLayoutModal()"></app-button>
-	        </ng-template>
+		        <ng-template #secondaryActions>
+		          <app-button size="sm" variant="ghost" [label]="viewToggleLabelKey() | translate" (action)="toggleViewMode()"></app-button>
+		          <app-button size="sm" variant="ghost" [label]="densityToggleLabelKey() | translate" (action)="toggleDensity()"></app-button>
+		          <app-button size="sm" variant="ghost" [label]="'adminUi.tableLayout.title' | translate" (action)="openLayoutModal()"></app-button>
+		        </ng-template>
 	      </app-admin-page-header>
 
       <app-table-layout-modal
@@ -274,13 +296,105 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
             (retry)="retryLoad()"
           ></app-error-state>
 
-        <div *ngIf="loading(); else tableTpl">
-          <app-skeleton [rows]="8"></app-skeleton>
-        </div>
-	        <ng-template #tableTpl>
-	          <div *ngIf="orders().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
-	            {{ 'adminUi.orders.empty' | translate }}
-	          </div>
+	        <div *ngIf="loading(); else tableTpl">
+	          <app-skeleton [rows]="8"></app-skeleton>
+	        </div>
+		        <ng-template #tableTpl>
+              <ng-container *ngIf="viewMode() === 'kanban'; else listTpl">
+                <div class="grid gap-3">
+                  <div class="text-xs text-slate-600 dark:text-slate-300">
+                    {{ 'adminUi.orders.kanban.hint' | translate }}
+                  </div>
+
+                  <div *ngIf="kanbanTotalCards() === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                    {{ 'adminUi.orders.empty' | translate }}
+                  </div>
+
+                  <div *ngIf="kanbanTotalCards() > 0" class="overflow-x-auto pb-2">
+                    <div class="flex gap-4 min-w-[900px]" cdkDropListGroup>
+                      <ng-container *ngFor="let colStatus of kanbanColumnStatuses(); trackBy: trackKanbanStatus">
+                        <div
+                          class="w-[320px] shrink-0 rounded-2xl border border-slate-200 bg-slate-50 shadow-sm dark:border-slate-800 dark:bg-slate-950/30"
+                        >
+                          <div class="flex items-center justify-between gap-2 border-b border-slate-200 px-3 py-2 dark:border-slate-800">
+                            <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                              {{ ('adminUi.orders.' + colStatus) | translate }}
+                            </div>
+                            <div class="text-xs text-slate-500 dark:text-slate-300">
+                              {{ kanbanTotalsByStatus()[colStatus] ?? (kanbanItemsByStatus()[colStatus]?.length || 0) }}
+                            </div>
+                          </div>
+
+                          <div
+                            cdkDropList
+                            [cdkDropListData]="kanbanItemsByStatus()[colStatus] || []"
+                            (cdkDropListDropped)="onKanbanDrop($event, colStatus)"
+                            class="min-h-[160px] p-3 grid gap-2"
+                          >
+                            <ng-container
+                              *ngFor="let order of kanbanItemsByStatus()[colStatus] || []; trackBy: trackOrderId"
+                            >
+                              <div
+                                cdkDrag
+                                [cdkDragData]="order"
+                                [cdkDragDisabled]="kanbanBusy()"
+                                class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm cursor-grab active:cursor-grabbing dark:border-slate-800 dark:bg-slate-900"
+                              >
+                                <div class="flex items-start justify-between gap-2">
+                                  <div class="min-w-0">
+                                    <div class="font-semibold text-slate-900 dark:text-slate-50 truncate">
+                                      {{ order.reference_code || (order.id | slice: 0:8) }}
+                                    </div>
+                                    <div class="text-xs text-slate-600 dark:text-slate-300 truncate">
+                                      {{ customerLabel(order) }}
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    class="shrink-0 rounded-md px-2 py-1 text-xs text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-50"
+                                    (click)="$event.stopPropagation(); open(order.id)"
+                                    [attr.aria-label]="'adminUi.orders.view' | translate"
+                                  >
+                                    {{ 'adminUi.orders.view' | translate }}
+                                  </button>
+                                </div>
+
+                                <div class="mt-2 flex items-center justify-between gap-2 text-xs text-slate-600 dark:text-slate-300">
+                                  <span class="font-medium text-slate-700 dark:text-slate-200">
+                                    {{ order.total_amount | localizedCurrency : order.currency }}
+                                  </span>
+                                  <span>{{ order.created_at | date: 'short' }}</span>
+                                </div>
+
+                                <div class="mt-2 flex flex-wrap gap-1">
+                                  <span
+                                    *ngIf="order.payment_method"
+                                    class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] border border-slate-200 text-slate-700 dark:border-slate-700 dark:text-slate-200"
+                                  >
+                                    {{ order.payment_method }}
+                                  </span>
+                                  <ng-container *ngFor="let tagValue of order.tags || []">
+                                    <span
+                                      class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] border border-slate-200 text-slate-700 dark:border-slate-700 dark:text-slate-200"
+                                    >
+                                      {{ tagLabel(tagValue) }}
+                                    </span>
+                                  </ng-container>
+                                </div>
+                              </div>
+                            </ng-container>
+                          </div>
+                        </div>
+                      </ng-container>
+                    </div>
+                  </div>
+                </div>
+              </ng-container>
+
+              <ng-template #listTpl>
+		          <div *ngIf="orders().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+		            {{ 'adminUi.orders.empty' | translate }}
+		          </div>
 
             <div
               *ngIf="selectedIds.size"
@@ -350,18 +464,39 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
                   (action)="resendBulkEmails()"
                 ></app-button>
 
-                <app-button
-                  size="sm"
-                  variant="ghost"
-                  [label]="'adminUi.orders.bulk.packingSlips' | translate"
-                  [disabled]="bulkBusy"
-                  (action)="downloadBatchPackingSlips()"
-                ></app-button>
-                <app-button
-                  size="sm"
-                  variant="ghost"
-                  [label]="'adminUi.orders.bulk.clearSelection' | translate"
-                  [disabled]="bulkBusy"
+	                <app-button
+	                  size="sm"
+	                  variant="ghost"
+	                  [label]="'adminUi.orders.bulk.packingSlips' | translate"
+	                  [disabled]="bulkBusy"
+	                  (action)="downloadBatchPackingSlips()"
+	                ></app-button>
+	                <app-button
+	                  size="sm"
+	                  variant="ghost"
+	                  [label]="'adminUi.orders.bulk.pickListCsv' | translate"
+	                  [disabled]="bulkBusy"
+	                  (action)="downloadPickListCsv()"
+	                ></app-button>
+	                <app-button
+	                  size="sm"
+	                  variant="ghost"
+	                  [label]="'adminUi.orders.bulk.pickListPdf' | translate"
+	                  [disabled]="bulkBusy"
+	                  (action)="downloadPickListPdf()"
+	                ></app-button>
+	                <app-button
+	                  size="sm"
+	                  variant="ghost"
+	                  [label]="'adminUi.orders.bulk.shippingLabels' | translate"
+	                  [disabled]="bulkBusy"
+	                  (action)="openShippingLabelsModal()"
+	                ></app-button>
+	                <app-button
+	                  size="sm"
+	                  variant="ghost"
+	                  [label]="'adminUi.orders.bulk.clearSelection' | translate"
+	                  [disabled]="bulkBusy"
                   (action)="clearSelection()"
                 ></app-button>
               </div>
@@ -495,10 +630,10 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
             </ng-template>
           </div>
 
-	          <div *ngIf="meta()" class="flex items-center justify-between gap-3 pt-2 text-sm text-slate-700 dark:text-slate-200">
-            <div>
-              {{ 'adminUi.orders.pagination' | translate: { page: meta()!.page, total_pages: meta()!.total_pages, total_items: meta()!.total_items } }}
-            </div>
+		          <div *ngIf="meta()" class="flex items-center justify-between gap-3 pt-2 text-sm text-slate-700 dark:text-slate-200">
+	            <div>
+	              {{ 'adminUi.orders.pagination' | translate: { page: meta()!.page, total_pages: meta()!.total_pages, total_items: meta()!.total_items } }}
+	            </div>
             <div class="flex items-center gap-2">
               <app-button
                 size="sm"
@@ -515,14 +650,144 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
                 (action)="goToPage(meta()!.page + 1)"
               ></app-button>
             </div>
-	          </div>
-	        </ng-template>
-	      </section>
+		          </div>
+		        </ng-template>
+	          </ng-template>
+			      </section>
 
-      <ng-container *ngIf="exportModalOpen()">
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closeExportModal()">
-          <div
-            class="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
+        <ng-container *ngIf="shippingLabelsModalOpen()">
+          <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closeShippingLabelsModal()">
+            <div
+              class="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
+              (click)="$event.stopPropagation()"
+            >
+              <div class="flex items-center justify-between gap-3">
+                <div class="grid gap-1">
+                  <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">
+                    {{ 'adminUi.orders.shippingLabelsModal.title' | translate }}
+                  </h3>
+                  <div class="text-xs text-slate-600 dark:text-slate-300">
+                    {{ 'adminUi.orders.shippingLabelsModal.hint' | translate: { count: selectedIds.size } }}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  class="rounded-md px-2 py-1 text-slate-500 hover:text-slate-900 disabled:opacity-50 dark:text-slate-400 dark:hover:text-slate-50"
+                  (click)="closeShippingLabelsModal()"
+                  [disabled]="shippingLabelsBusy"
+                  [attr.aria-label]="'adminUi.actions.cancel' | translate"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div class="mt-4 grid gap-4">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                  <label class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                    <input type="file" class="hidden" multiple (change)="onShippingLabelsSelected($event)" />
+                    <span class="font-medium text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.shippingLabelsModal.chooseFiles' | translate }}</span>
+                    <span class="text-xs text-slate-500 dark:text-slate-300">{{ 'adminUi.orders.shippingLabelsModal.chooseFilesHint' | translate }}</span>
+                  </label>
+
+                  <div class="flex items-center gap-2">
+                    <app-button
+                      size="sm"
+                      [label]="'adminUi.orders.shippingLabelsModal.uploadAll' | translate"
+                      [disabled]="shippingLabelsBusy || shippingLabelsUploads.length === 0"
+                      (action)="uploadAllShippingLabels()"
+                    ></app-button>
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.orders.shippingLabelsModal.downloadZip' | translate"
+                      [disabled]="shippingLabelsBusy"
+                      (action)="downloadSelectedShippingLabelsZip()"
+                    ></app-button>
+                  </div>
+                </div>
+
+                <div *ngIf="shippingLabelsUploads.length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.orders.shippingLabelsModal.empty' | translate }}
+                </div>
+
+                <div
+                  *ngIf="shippingLabelsUploads.length > 0"
+                  class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800"
+                >
+                  <table class="min-w-[900px] w-full text-sm">
+                    <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+                      <tr>
+                        <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.shippingLabelsModal.table.file' | translate }}</th>
+                        <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.shippingLabelsModal.table.order' | translate }}</th>
+                        <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.shippingLabelsModal.table.status' | translate }}</th>
+                        <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.orders.shippingLabelsModal.table.actions' | translate }}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr
+                        *ngFor="let row of shippingLabelsUploads; let idx = index"
+                        class="border-t border-slate-200 dark:border-slate-800"
+                      >
+                        <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                          <div class="font-medium truncate max-w-[420px]">{{ row.file.name }}</div>
+                          <div
+                            *ngIf="row.error"
+                            class="mt-1 text-xs text-rose-700 dark:text-rose-300"
+                          >
+                            {{ row.error }}
+                          </div>
+                        </td>
+                        <td class="px-3 py-2">
+                          <select
+                            class="h-9 w-full rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                            [(ngModel)]="shippingLabelsUploads[idx].assignedOrderId"
+                            [disabled]="shippingLabelsBusy"
+                          >
+                            <option [ngValue]="null">{{ 'adminUi.orders.shippingLabelsModal.unassigned' | translate }}</option>
+                            <option *ngFor="let opt of shippingLabelsOrderOptions" [value]="opt.id">{{ opt.label }}</option>
+                          </select>
+                        </td>
+                        <td class="px-3 py-2">
+                          <span
+                            class="inline-flex items-center rounded-full px-2 py-0.5 text-xs border"
+                            [ngClass]="shippingLabelStatusPillClass(row.status)"
+                          >
+                            {{ shippingLabelStatusLabelKey(row.status) | translate }}
+                          </span>
+                        </td>
+                        <td class="px-3 py-2 text-right">
+                          <app-button
+                            *ngIf="row.status === 'error'"
+                            size="sm"
+                            variant="ghost"
+                            [label]="'adminUi.actions.retry' | translate"
+                            [disabled]="shippingLabelsBusy"
+                            (action)="retryShippingLabelUpload(idx)"
+                          ></app-button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div class="flex justify-end">
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.common.close' | translate"
+                    [disabled]="shippingLabelsBusy"
+                    (action)="closeShippingLabelsModal()"
+                  ></app-button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </ng-container>
+
+	      <ng-container *ngIf="exportModalOpen()">
+	        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closeExportModal()">
+	          <div
+	            class="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
             (click)="$event.stopPropagation()"
           >
             <div class="flex items-center justify-between gap-3">
@@ -661,6 +926,11 @@ export class AdminOrdersComponent implements OnInit {
   orders = signal<AdminOrderListItem[]>([]);
   meta = signal<AdminOrderListResponse['meta'] | null>(null);
 
+  viewMode = signal<AdminOrdersViewMode>('table');
+  kanbanBusy = signal(false);
+  kanbanItemsByStatus = signal<Record<string, AdminOrderListItem[]>>({});
+  kanbanTotalsByStatus = signal<Record<string, number>>({});
+
   q = '';
   status: OrderStatusFilter = 'all';
   tag = '';
@@ -712,6 +982,11 @@ export class AdminOrdersComponent implements OnInit {
   bulkEmailKind: '' | 'confirmation' | 'delivery' = '';
   bulkBusy = false;
 
+  shippingLabelsModalOpen = signal(false);
+  shippingLabelsOrderOptions: ShippingLabelsOrderOption[] = [];
+  shippingLabelsUploads: ShippingLabelsUploadItem[] = [];
+  shippingLabelsBusy = false;
+
   constructor(
     private ordersApi: AdminOrdersService,
     private router: Router,
@@ -724,6 +999,7 @@ export class AdminOrdersComponent implements OnInit {
   ngOnInit(): void {
     this.favorites.init();
     this.tableLayout.set(loadAdminTableLayout(this.tableLayoutStorageKey(), this.tableColumns, this.tableDefaults));
+    this.viewMode.set(this.loadViewMode());
     this.presets = this.loadPresets();
     this.loadExportState();
     this.maybeApplyFiltersFromState();
@@ -766,6 +1042,127 @@ export class AdminOrdersComponent implements OnInit {
     return this.tableLayout().density === 'compact'
       ? 'adminUi.tableLayout.densityToggle.toComfortable'
       : 'adminUi.tableLayout.densityToggle.toCompact';
+  }
+
+  viewToggleLabelKey(): string {
+    return this.viewMode() === 'kanban' ? 'adminUi.orders.viewMode.table' : 'adminUi.orders.viewMode.kanban';
+  }
+
+  toggleViewMode(): void {
+    const next: AdminOrdersViewMode = this.viewMode() === 'kanban' ? 'table' : 'kanban';
+    this.viewMode.set(next);
+    this.persistViewMode();
+    this.clearSelection();
+    this.load();
+  }
+
+  kanbanColumnStatuses(): KanbanStatus[] {
+    if (this.status === 'pending') return ['pending_payment', 'pending_acceptance'];
+    if (this.status === 'sales') return ['paid', 'shipped', 'delivered', 'refunded'];
+    if (this.status === 'all')
+      return ['pending_payment', 'pending_acceptance', 'paid', 'shipped', 'delivered', 'cancelled', 'refunded'];
+    return [this.status as KanbanStatus];
+  }
+
+  trackKanbanStatus(_: number, status: KanbanStatus): string {
+    return status;
+  }
+
+  kanbanTotalCards(): number {
+    const items = this.kanbanItemsByStatus();
+    return this.kanbanColumnStatuses().reduce((sum, status) => sum + (items[status]?.length ?? 0), 0);
+  }
+
+  onKanbanDrop(event: CdkDragDrop<AdminOrderListItem[]>, targetStatus: KanbanStatus): void {
+    if (this.kanbanBusy()) return;
+    const order = event.item.data as AdminOrderListItem;
+    const sourceStatus = (order?.status ?? '').toString() as KanbanStatus;
+    if (!order?.id || !sourceStatus) return;
+
+    if (sourceStatus === targetStatus) {
+      const itemsByStatus = this.kanbanItemsByStatus();
+      const columnItems = [...(itemsByStatus[sourceStatus] ?? [])];
+      moveItemInArray(columnItems, event.previousIndex, event.currentIndex);
+      this.kanbanItemsByStatus.set({ ...itemsByStatus, [sourceStatus]: columnItems });
+      return;
+    }
+
+    const allowed = this.allowedKanbanTransitions(order);
+    if (!allowed.includes(targetStatus)) {
+      this.toast.error(this.translate.instant('adminUi.orders.kanban.errors.invalidTransition'));
+      return;
+    }
+
+    let cancelReason: string | null | undefined = undefined;
+    if (targetStatus === 'cancelled') {
+      cancelReason = (window.prompt(this.translate.instant('adminUi.orders.kanban.cancelPrompt')) ?? '').trim();
+      if (!cancelReason) {
+        this.toast.error(this.translate.instant('adminUi.orders.kanban.errors.cancelReasonRequired'));
+        return;
+      }
+    }
+
+    if (targetStatus === 'refunded') {
+      const ok = window.confirm(this.translate.instant('adminUi.orders.kanban.refundConfirm'));
+      if (!ok) return;
+    }
+
+    const prevItemsByStatus = this.kanbanItemsByStatus();
+    const prevTotalsByStatus = this.kanbanTotalsByStatus();
+    const sourceItems = [...(prevItemsByStatus[sourceStatus] ?? [])];
+    const targetItems = [...(prevItemsByStatus[targetStatus] ?? [])];
+    transferArrayItem(sourceItems, targetItems, event.previousIndex, event.currentIndex);
+    order.status = targetStatus;
+    this.kanbanItemsByStatus.set({
+      ...prevItemsByStatus,
+      [sourceStatus]: sourceItems,
+      [targetStatus]: targetItems,
+    });
+    this.kanbanTotalsByStatus.set({
+      ...prevTotalsByStatus,
+      [sourceStatus]: Math.max(0, (prevTotalsByStatus[sourceStatus] ?? sourceItems.length + 1) - 1),
+      [targetStatus]: (prevTotalsByStatus[targetStatus] ?? Math.max(0, targetItems.length - 1)) + 1,
+    });
+
+    this.kanbanBusy.set(true);
+    this.ordersApi
+      .update(order.id, { status: targetStatus, cancel_reason: cancelReason ?? undefined })
+      .pipe(
+        finalize(() => {
+          this.kanbanBusy.set(false);
+        })
+      )
+      .subscribe({
+        next: (updated) => {
+          order.status = (updated?.status ?? targetStatus) as any;
+          this.toast.success(this.translate.instant('adminUi.orders.kanban.success.updated'));
+        },
+        error: () => {
+          order.status = sourceStatus;
+          this.kanbanItemsByStatus.set(prevItemsByStatus);
+          this.kanbanTotalsByStatus.set(prevTotalsByStatus);
+          this.toast.error(this.translate.instant('adminUi.orders.kanban.errors.updateFailed'));
+        }
+      });
+  }
+
+  private allowedKanbanTransitions(order: AdminOrderListItem): KanbanStatus[] {
+    const current = (order?.status ?? '').toString() as KanbanStatus;
+    const base: Record<string, KanbanStatus[]> = {
+      pending_payment: ['pending_acceptance', 'cancelled'],
+      pending_acceptance: ['paid', 'cancelled'],
+      paid: ['shipped', 'refunded', 'cancelled'],
+      shipped: ['delivered', 'refunded'],
+      delivered: ['refunded'],
+      cancelled: [],
+      refunded: []
+    };
+    const allowed = [...(base[current] ?? [])];
+    const method = order.payment_method ? String(order.payment_method).trim().toLowerCase() : '';
+    if (method === 'cod' && current === 'pending_acceptance') {
+      allowed.push('shipped', 'delivered');
+    }
+    return Array.from(new Set(allowed));
   }
 
   scrollToBulkActions(): void {
@@ -1110,12 +1507,7 @@ export class AdminOrdersComponent implements OnInit {
     this.bulkBusy = true;
     this.ordersApi.downloadBatchPackingSlips(ids).subscribe({
       next: (blob) => {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'packing-slips.pdf';
-        a.click();
-        URL.revokeObjectURL(url);
+        this.downloadBlob(blob, 'packing-slips.pdf');
         this.toast.success(this.translate.instant('adminUi.orders.bulk.packingSlipsReady'));
         this.bulkBusy = false;
       },
@@ -1124,6 +1516,251 @@ export class AdminOrdersComponent implements OnInit {
         this.bulkBusy = false;
       }
     });
+  }
+
+  downloadPickListCsv(): void {
+    if (!this.selectedIds.size) return;
+    const ids = Array.from(this.selectedIds);
+    this.bulkBusy = true;
+    this.ordersApi.downloadPickListCsv(ids).subscribe({
+      next: (blob) => {
+        this.downloadBlob(blob, 'pick-list.csv');
+        this.toast.success(this.translate.instant('adminUi.orders.bulk.pickListReady'));
+        this.bulkBusy = false;
+      },
+      error: () => {
+        this.toast.error(this.translate.instant('adminUi.orders.bulk.errors.pickList'));
+        this.bulkBusy = false;
+      }
+    });
+  }
+
+  downloadPickListPdf(): void {
+    if (!this.selectedIds.size) return;
+    const ids = Array.from(this.selectedIds);
+    this.bulkBusy = true;
+    this.ordersApi.downloadPickListPdf(ids).subscribe({
+      next: (blob) => {
+        this.downloadBlob(blob, 'pick-list.pdf');
+        this.toast.success(this.translate.instant('adminUi.orders.bulk.pickListReady'));
+        this.bulkBusy = false;
+      },
+      error: () => {
+        this.toast.error(this.translate.instant('adminUi.orders.bulk.errors.pickList'));
+        this.bulkBusy = false;
+      }
+    });
+  }
+
+  openShippingLabelsModal(): void {
+    if (!this.selectedIds.size) return;
+    this.shippingLabelsOrderOptions = this.buildShippingLabelsOrderOptions();
+    this.shippingLabelsUploads = [];
+    this.shippingLabelsModalOpen.set(true);
+  }
+
+  closeShippingLabelsModal(): void {
+    if (this.shippingLabelsBusy) return;
+    this.shippingLabelsModalOpen.set(false);
+    this.shippingLabelsUploads = [];
+    this.shippingLabelsOrderOptions = [];
+  }
+
+  onShippingLabelsSelected(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    const files = input?.files ? Array.from(input.files) : [];
+    if (!files.length) return;
+    const nextUploads: ShippingLabelsUploadItem[] = files.map((file) => ({
+      file,
+      assignedOrderId: this.autoAssignShippingLabel(file),
+      status: 'pending',
+      error: null
+    }));
+    this.shippingLabelsUploads = [...this.shippingLabelsUploads, ...nextUploads].slice(0, 50);
+    if (input) input.value = '';
+  }
+
+  uploadAllShippingLabels(): void {
+    if (this.shippingLabelsBusy) return;
+    if (!this.shippingLabelsUploads.length) return;
+
+    const uploadTargets = this.shippingLabelsUploads
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => item.status !== 'success');
+    if (!uploadTargets.length) return;
+
+    this.shippingLabelsBusy = true;
+    from(uploadTargets)
+      .pipe(
+        mergeMap(
+          ({ item, index }) => {
+            const orderId = (item.assignedOrderId ?? '').trim();
+            if (!orderId) {
+              this.updateShippingLabelUpload(index, {
+                status: 'error',
+                error: this.translate.instant('adminUi.orders.shippingLabelsModal.errors.missingOrder')
+              });
+              return of({ index, ok: false as const });
+            }
+            this.updateShippingLabelUpload(index, { status: 'uploading', error: null });
+            return this.ordersApi.uploadShippingLabel(orderId, item.file).pipe(
+              map(() => ({ index, ok: true as const })),
+              catchError((err) => of({ index, ok: false as const, err }))
+            );
+          },
+          2
+        ),
+        toArray(),
+        finalize(() => {
+          this.shippingLabelsBusy = false;
+        })
+      )
+      .subscribe((results) => {
+        const failed = results.filter((r) => !r.ok);
+        for (const result of results) {
+          if (result.ok) {
+            this.updateShippingLabelUpload(result.index, { status: 'success', error: null });
+            continue;
+          }
+          const requestId = extractRequestId((result as any).err);
+          const suffix = requestId ? ` (${requestId})` : '';
+          this.updateShippingLabelUpload(result.index, {
+            status: 'error',
+            error: `${this.translate.instant('adminUi.orders.shippingLabelsModal.errors.uploadFailed')}${suffix}`
+          });
+        }
+        if (failed.length) {
+          this.toast.error(
+            this.translate.instant('adminUi.orders.shippingLabelsModal.errors.partial', {
+              success: results.length - failed.length,
+              total: results.length
+            })
+          );
+          return;
+        }
+        this.toast.success(this.translate.instant('adminUi.orders.shippingLabelsModal.success.uploaded'));
+      });
+  }
+
+  retryShippingLabelUpload(index: number): void {
+    const item = this.shippingLabelsUploads[index];
+    if (!item || this.shippingLabelsBusy) return;
+    const orderId = (item.assignedOrderId ?? '').trim();
+    if (!orderId) {
+      this.updateShippingLabelUpload(index, {
+        status: 'error',
+        error: this.translate.instant('adminUi.orders.shippingLabelsModal.errors.missingOrder')
+      });
+      return;
+    }
+    this.shippingLabelsBusy = true;
+    this.updateShippingLabelUpload(index, { status: 'uploading', error: null });
+    this.ordersApi
+      .uploadShippingLabel(orderId, item.file)
+      .pipe(
+        finalize(() => {
+          this.shippingLabelsBusy = false;
+        })
+      )
+      .subscribe({
+        next: () => {
+          this.updateShippingLabelUpload(index, { status: 'success', error: null });
+          this.toast.success(this.translate.instant('adminUi.orders.shippingLabelsModal.success.uploaded'));
+        },
+        error: (err) => {
+          const requestId = extractRequestId(err);
+          const suffix = requestId ? ` (${requestId})` : '';
+          this.updateShippingLabelUpload(index, {
+            status: 'error',
+            error: `${this.translate.instant('adminUi.orders.shippingLabelsModal.errors.uploadFailed')}${suffix}`
+          });
+          this.toast.error(this.translate.instant('adminUi.orders.shippingLabelsModal.errors.uploadFailed'));
+        }
+      });
+  }
+
+  downloadSelectedShippingLabelsZip(): void {
+    if (!this.selectedIds.size || this.shippingLabelsBusy) return;
+    const ids = Array.from(this.selectedIds);
+    this.shippingLabelsBusy = true;
+    this.ordersApi.downloadBatchShippingLabelsZip(ids).subscribe({
+      next: (blob) => {
+        this.downloadBlob(blob, 'shipping-labels.zip');
+        this.toast.success(this.translate.instant('adminUi.orders.shippingLabelsModal.success.zipReady'));
+        this.shippingLabelsBusy = false;
+      },
+      error: (err) => {
+        const detail = (err?.error?.detail ?? null) as any;
+        const missing: string[] = Array.isArray(detail?.missing_shipping_label_order_ids)
+          ? detail.missing_shipping_label_order_ids
+          : [];
+        if (missing.length) {
+          this.toast.error(
+            this.translate.instant('adminUi.orders.shippingLabelsModal.errors.missingLabels', { count: missing.length })
+          );
+        } else {
+          this.toast.error(this.translate.instant('adminUi.orders.shippingLabelsModal.errors.zipFailed'));
+        }
+        this.shippingLabelsBusy = false;
+      }
+    });
+  }
+
+  shippingLabelStatusLabelKey(status: ShippingLabelsUploadStatus): string {
+    return `adminUi.orders.shippingLabelsModal.status.${status}`;
+  }
+
+  shippingLabelStatusPillClass(status: ShippingLabelsUploadStatus): string {
+    switch (status) {
+      case 'success':
+        return 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200';
+      case 'uploading':
+        return 'border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-900/40 dark:bg-indigo-950/30 dark:text-indigo-200';
+      case 'error':
+        return 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200';
+      default:
+        return 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-200';
+    }
+  }
+
+  private updateShippingLabelUpload(index: number, patch: Partial<ShippingLabelsUploadItem>): void {
+    const next = this.shippingLabelsUploads.slice();
+    if (!next[index]) return;
+    next[index] = { ...next[index], ...patch };
+    this.shippingLabelsUploads = next;
+  }
+
+  private autoAssignShippingLabel(file: File): string | null {
+    const name = (file?.name ?? '').toLowerCase();
+    for (const opt of this.shippingLabelsOrderOptions) {
+      if (opt.ref && name.includes(opt.ref.toLowerCase())) return opt.id;
+    }
+    for (const opt of this.shippingLabelsOrderOptions) {
+      if (opt.shortId && name.includes(opt.shortId.toLowerCase())) return opt.id;
+    }
+    return null;
+  }
+
+  private buildShippingLabelsOrderOptions(): ShippingLabelsOrderOption[] {
+    const orders = this.orders();
+    const byId = new Map<string, AdminOrderListItem>();
+    for (const order of orders) byId.set(order.id, order);
+    return Array.from(this.selectedIds).map((id) => {
+      const order = byId.get(id);
+      const ref = (order?.reference_code ?? '').toString().trim();
+      const shortId = id.slice(0, 8);
+      const label = ref ? `${ref} (${shortId})` : shortId;
+      return { id, ref, shortId, label };
+    });
+  }
+
+  private downloadBlob(blob: Blob, filename: string): void {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   goToPage(page: number): void {
@@ -1255,6 +1892,11 @@ export class AdminOrdersComponent implements OnInit {
   }
 
   private load(): void {
+    if (this.viewMode() === 'kanban') {
+      this.loadKanban();
+      return;
+    }
+
     this.loading.set(true);
     this.error.set(null);
     this.errorRequestId.set(null);
@@ -1286,6 +1928,71 @@ export class AdminOrdersComponent implements OnInit {
     });
   }
 
+  private loadKanban(): void {
+    this.loading.set(true);
+    this.error.set(null);
+    this.errorRequestId.set(null);
+    this.orders.set([]);
+    this.meta.set(null);
+
+    const statuses = this.kanbanColumnStatuses();
+    const baseParams: Parameters<AdminOrdersService['search']>[0] = {
+      page: 1,
+      limit: this.limit
+    };
+    const q = this.q.trim();
+    if (q) baseParams.q = q;
+    const tag = this.tag.trim();
+    if (tag) baseParams.tag = tag;
+    if (!this.includeTestOrders) baseParams.include_test = false;
+    if (this.fromDate) baseParams.from = `${this.fromDate}T00:00:00Z`;
+    if (this.toDate) baseParams.to = `${this.toDate}T23:59:59Z`;
+
+    from(statuses)
+      .pipe(
+        mergeMap(
+          (statusValue) =>
+            this.ordersApi.search({ ...baseParams, status: statusValue }).pipe(
+              map((res) => ({ status: statusValue, res })),
+              catchError((err) => of({ status: statusValue, err, res: null as any }))
+            ),
+          4
+        ),
+        toArray()
+      )
+      .subscribe({
+        next: (results) => {
+          const itemsByStatus: Record<string, AdminOrderListItem[]> = {};
+          const totalsByStatus: Record<string, number> = {};
+          let firstError: any = null;
+
+          for (const result of results) {
+            if (result?.res) {
+              itemsByStatus[result.status] = result.res.items ?? [];
+              totalsByStatus[result.status] = result.res.meta?.total_items ?? (result.res.items ?? []).length;
+              continue;
+            }
+            itemsByStatus[result.status] = [];
+            totalsByStatus[result.status] = 0;
+            if (!firstError) firstError = (result as any).err;
+          }
+
+          this.kanbanItemsByStatus.set(itemsByStatus);
+          this.kanbanTotalsByStatus.set(totalsByStatus);
+          if (firstError) {
+            this.error.set(this.translate.instant('adminUi.orders.errors.load'));
+            this.errorRequestId.set(extractRequestId(firstError));
+          }
+          this.loading.set(false);
+        },
+        error: (err) => {
+          this.error.set(this.translate.instant('adminUi.orders.errors.load'));
+          this.errorRequestId.set(extractRequestId(err));
+          this.loading.set(false);
+        }
+      });
+  }
+
   retryLoad(): void {
     this.load();
   }
@@ -1302,6 +2009,28 @@ export class AdminOrdersComponent implements OnInit {
   private exportStorageKey(): string {
     const userId = (this.auth.user()?.id ?? '').trim();
     return `admin.orders.export.v1:${userId || 'anonymous'}`;
+  }
+
+  private viewModeStorageKey(): string {
+    const userId = (this.auth.user()?.id ?? '').trim();
+    return `admin.orders.view.v1:${userId || 'anonymous'}`;
+  }
+
+  private loadViewMode(): AdminOrdersViewMode {
+    try {
+      const raw = localStorage.getItem(this.viewModeStorageKey());
+      return raw === 'kanban' || raw === 'table' ? raw : 'table';
+    } catch {
+      return 'table';
+    }
+  }
+
+  private persistViewMode(): void {
+    try {
+      localStorage.setItem(this.viewModeStorageKey(), this.viewMode());
+    } catch {
+      // ignore
+    }
   }
 
   private loadExportState(): void {

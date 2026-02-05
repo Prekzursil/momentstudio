@@ -2,6 +2,7 @@ import csv
 import io
 import mimetypes
 import secrets
+import zipfile
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
@@ -53,6 +54,7 @@ from app.services import auth as auth_service
 from app.services import private_storage
 from app.services import receipts as receipt_service
 from app.services import packing_slips as packing_slips_service
+from app.services import pick_lists as pick_lists_service
 from app.services import order_document_exports as order_exports_service
 from app.schemas.checkout import (
     CheckoutRequest,
@@ -1316,6 +1318,7 @@ async def admin_search_orders(
             status=order.status,
             total_amount=order.total_amount,
             currency=order.currency,
+            payment_method=getattr(order, "payment_method", None),
             created_at=order.created_at,
             customer_email=email if include_pii else pii_service.mask_email(email),
             customer_username=username,
@@ -2676,6 +2679,159 @@ async def admin_batch_packing_slips(
     )
     headers = {"Content-Disposition": "attachment; filename=packing-slips.pdf"}
     return Response(content=pdf, media_type="application/pdf", headers=headers)
+
+
+@router.post("/admin/batch/pick-list.csv")
+async def admin_batch_pick_list_csv(
+    payload: AdminOrderIdsRequest,
+    session: AsyncSession = Depends(get_session),
+    _: object = Depends(require_admin_section("orders")),
+):
+    ids = list(dict.fromkeys(payload.order_ids))
+    if not ids:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No orders selected")
+    if len(ids) > 100:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Too many orders selected")
+
+    result = await session.execute(
+        select(Order)
+        .execution_options(populate_existing=True)
+        .options(
+            selectinload(Order.items).selectinload(OrderItem.product),
+            selectinload(Order.items).selectinload(OrderItem.variant),
+        )
+        .where(Order.id.in_(ids))
+    )
+    orders = list(result.scalars().unique())
+    found = {o.id for o in orders}
+    missing = [str(order_id) for order_id in ids if order_id not in found]
+    if missing:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"missing_order_ids": missing})
+
+    order_by_id = {o.id: o for o in orders}
+    ordered = [order_by_id[order_id] for order_id in ids if order_id in order_by_id]
+    rows = pick_lists_service.build_pick_list_rows(ordered)
+    csv_bytes = pick_lists_service.render_pick_list_csv(rows)
+    headers = {
+        "Content-Disposition": 'attachment; filename="pick-list.csv"',
+        "Cache-Control": "no-store",
+    }
+    return Response(content=csv_bytes, media_type="text/csv; charset=utf-8", headers=headers)
+
+
+@router.post("/admin/batch/pick-list.pdf")
+async def admin_batch_pick_list_pdf(
+    payload: AdminOrderIdsRequest,
+    session: AsyncSession = Depends(get_session),
+    _: object = Depends(require_admin_section("orders")),
+):
+    ids = list(dict.fromkeys(payload.order_ids))
+    if not ids:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No orders selected")
+    if len(ids) > 100:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Too many orders selected")
+
+    result = await session.execute(
+        select(Order)
+        .execution_options(populate_existing=True)
+        .options(
+            selectinload(Order.items).selectinload(OrderItem.product),
+            selectinload(Order.items).selectinload(OrderItem.variant),
+        )
+        .where(Order.id.in_(ids))
+    )
+    orders = list(result.scalars().unique())
+    found = {o.id for o in orders}
+    missing = [str(order_id) for order_id in ids if order_id not in found]
+    if missing:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"missing_order_ids": missing})
+
+    order_by_id = {o.id: o for o in orders}
+    ordered = [order_by_id[order_id] for order_id in ids if order_id in order_by_id]
+    rows = pick_lists_service.build_pick_list_rows(ordered)
+    pdf = pick_lists_service.render_pick_list_pdf(rows, orders=ordered)
+    headers = {
+        "Content-Disposition": 'attachment; filename="pick-list.pdf"',
+        "Cache-Control": "no-store",
+    }
+    return Response(content=pdf, media_type="application/pdf", headers=headers)
+
+
+@router.post("/admin/batch/shipping-labels.zip")
+async def admin_batch_shipping_labels_zip(
+    payload: AdminOrderIdsRequest,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("orders")),
+):
+    ids = list(dict.fromkeys(payload.order_ids))
+    if not ids:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No orders selected")
+    if len(ids) > 50:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Too many orders selected")
+
+    result = await session.execute(select(Order).execution_options(populate_existing=True).where(Order.id.in_(ids)))
+    orders = list(result.scalars().unique())
+    found = {o.id for o in orders}
+    missing = [str(order_id) for order_id in ids if order_id not in found]
+    if missing:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"missing_order_ids": missing})
+
+    order_by_id = {o.id: o for o in orders}
+    ordered = [order_by_id[order_id] for order_id in ids if order_id in order_by_id]
+
+    files: list[tuple[Order, Path, str]] = []
+    missing_labels: list[str] = []
+    total_bytes = 0
+    for order in ordered:
+        rel = getattr(order, "shipping_label_path", None)
+        if not rel:
+            missing_labels.append(str(order.id))
+            continue
+        path = private_storage.resolve_private_path(rel)
+        if not path.exists():
+            missing_labels.append(str(order.id))
+            continue
+
+        size = path.stat().st_size
+        total_bytes += size
+        if total_bytes > 200 * 1024 * 1024:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Shipping labels archive too large")
+
+        base_name = _sanitize_filename(getattr(order, "shipping_label_filename", None) or path.name)
+        ref = getattr(order, "reference_code", None) or str(order.id)[:8]
+        zip_name = _sanitize_filename(f"{ref}-{base_name}" if base_name else str(ref))
+        files.append((order, path, zip_name))
+
+    if missing_labels:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"missing_shipping_label_order_ids": missing_labels},
+        )
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for _, path, zip_name in files:
+            zf.write(path, arcname=zip_name)
+    buf.seek(0)
+
+    actor = (getattr(admin, "email", None) or getattr(admin, "username", None) or "admin").strip()
+    note = f"{actor}: batch" if actor else "batch"
+    for order, _, _ in files:
+        session.add(OrderEvent(order_id=order.id, event="shipping_label_downloaded", note=note))
+    await session.commit()
+
+    def _iter_zip(file_obj: io.BytesIO, chunk_size: int = 1024 * 1024):
+        while True:
+            chunk = file_obj.read(chunk_size)
+            if not chunk:
+                break
+            yield chunk
+
+    headers = {
+        "Content-Disposition": 'attachment; filename="shipping-labels.zip"',
+        "Cache-Control": "no-store",
+    }
+    return StreamingResponse(_iter_zip(buf), media_type="application/zip", headers=headers)
 
 
 @router.get("/admin/{order_id}/receipt")

@@ -17,6 +17,7 @@ export interface AdminOrderListItem {
   status: string;
   total_amount: number;
   currency: string;
+  payment_method?: string | null;
   created_at: string;
   customer_email?: string | null;
   customer_username?: string | null;
@@ -512,6 +513,18 @@ export class AdminOrdersService {
 
   downloadBatchPackingSlips(orderIds: string[]): Observable<Blob> {
     return this.api.postBlob('/orders/admin/batch/packing-slips', { order_ids: orderIds });
+  }
+
+  downloadPickListCsv(orderIds: string[]): Observable<Blob> {
+    return this.api.postBlob('/orders/admin/batch/pick-list.csv', { order_ids: orderIds });
+  }
+
+  downloadPickListPdf(orderIds: string[]): Observable<Blob> {
+    return this.api.postBlob('/orders/admin/batch/pick-list.pdf', { order_ids: orderIds });
+  }
+
+  downloadBatchShippingLabelsZip(orderIds: string[]): Observable<Blob> {
+    return this.api.postBlob('/orders/admin/batch/shipping-labels.zip', { order_ids: orderIds });
   }
 
   downloadReceiptPdf(orderId: string): Observable<Blob> {

@@ -4014,6 +4014,23 @@
     "orders": {
       "title": "Comenzi",
       "hint": "Caută după referință, ID, email sau utilizator.",
+      "viewMode": {
+        "kanban": "Vizualizare Kanban",
+        "table": "Vizualizare tabel"
+      },
+      "kanban": {
+        "hint": "Trage cardurile între coloane pentru a actualiza statusul. Revino la tabel pentru acțiuni bulk.",
+        "cancelPrompt": "Motiv anulare (obligatoriu)",
+        "refundConfirm": "Marchezi această comandă ca rambursată?",
+        "success": {
+          "updated": "Comanda a fost actualizată."
+        },
+        "errors": {
+          "invalidTransition": "Această schimbare de status nu este permisă.",
+          "cancelReasonRequired": "Motivul anulării este obligatoriu.",
+          "updateFailed": "Nu s-a putut actualiza comanda."
+        }
+      },
       "a11y": {
         "selectAllOnPage": "Selectează toate comenzile de pe pagină",
         "selectOrder": "Selectează comanda {{ref}}"
@@ -4144,13 +4161,18 @@
         "emailsPartial": "Am trimis la coadă emailuri pentru {{success}} din {{total}} comenzi.",
         "packingSlips": "Avize (PDF)",
         "packingSlipsReady": "Avizele sunt gata",
+        "pickListCsv": "Listă colectare (CSV)",
+        "pickListPdf": "Listă colectare (PDF)",
+        "shippingLabels": "Etichete livrare",
+        "pickListReady": "Lista de colectare este gata",
         "clearSelection": "Golește selecția",
         "success": "Am actualizat {{count}} comenzi.",
         "partial": "Am actualizat {{success}} din {{total}} comenzi.",
         "errors": {
           "chooseAction": "Alege un status sau un curier de aplicat.",
           "chooseEmail": "Alege emailul de retrimis.",
-          "packingSlips": "Nu am putut descărca avizele."
+          "packingSlips": "Nu am putut descărca avizele.",
+          "pickList": "Nu am putut descărca lista de colectare."
         }
       },
       "empty": "Nu există comenzi pentru aceste filtre.",
@@ -4177,6 +4199,39 @@
         "downloaded": "Etichetă descărcată",
         "printed": "Etichetă tipărită",
         "deleted": "Etichetă ștearsă"
+      },
+      "shippingLabelsModal": {
+        "title": "Etichete de livrare",
+        "hint": "{{count}} comenzi selectate. Încarcă o etichetă per comandă (PDF/PNG/JPG/WebP).",
+        "chooseFiles": "Alege fișiere",
+        "chooseFilesHint": "Sfat: include referința comenzii în numele fișierului pentru potrivire automată.",
+        "uploadAll": "Încarcă toate",
+        "downloadZip": "Descarcă ZIP",
+        "empty": "Niciun fișier selectat încă.",
+        "unassigned": "Neatribuit",
+        "table": {
+          "file": "Fișier",
+          "order": "Comandă",
+          "status": "Status",
+          "actions": "Acțiuni"
+        },
+        "status": {
+          "pending": "În așteptare",
+          "uploading": "Se încarcă…",
+          "success": "Încărcat",
+          "error": "Eșuat"
+        },
+        "success": {
+          "uploaded": "Etichetele au fost încărcate.",
+          "zipReady": "Arhiva ZIP cu etichete este gata."
+        },
+        "errors": {
+          "missingOrder": "Selectează o comandă pentru acest fișier.",
+          "uploadFailed": "Încărcarea a eșuat",
+          "partial": "Am încărcat {{success}} din {{total}} etichete.",
+          "missingLabels": "Lipsesc etichete pentru {{count}} comenzi.",
+          "zipFailed": "Nu am putut descărca arhiva ZIP cu etichete."
+        }
       },
       "confirmDeleteLabel": "Ștergi eticheta de livrare pentru această comandă?",
       "save": "Salvează modificările",

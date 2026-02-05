@@ -411,6 +411,9 @@ def test_admin_order_search_and_detail(test_app: Dict[str, object], monkeypatch:
     payload = search.json()
     assert payload["meta"]["total_items"] >= 1
     assert any(item["id"] == order_id for item in payload["items"])
+    matching = next((item for item in payload["items"] if item["id"] == order_id), None)
+    assert matching is not None
+    assert matching.get("payment_method") in {"stripe", "paypal", "netopia", "cod"}
 
     by_user = client.get(
         "/api/v1/orders/admin/search",
@@ -845,6 +848,25 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     assert batch_packing.headers.get("content-type", "").startswith("application/pdf")
     assert batch_packing.headers.get("content-disposition", "").startswith("attachment;")
     assert batch_packing.content.startswith(b"%PDF")
+
+    pick_list_csv = client.post(
+        "/api/v1/orders/admin/batch/pick-list.csv",
+        headers=auth_headers(admin_token),
+        json={"order_ids": [order_id, stripe_order_id]},
+    )
+    assert pick_list_csv.status_code == 200, pick_list_csv.text
+    assert pick_list_csv.headers.get("content-type", "").startswith("text/csv")
+    assert b"sku,product_name,variant,quantity,orders" in pick_list_csv.content
+
+    pick_list_pdf = client.post(
+        "/api/v1/orders/admin/batch/pick-list.pdf",
+        headers=auth_headers(admin_token),
+        json={"order_ids": [order_id, stripe_order_id]},
+    )
+    assert pick_list_pdf.status_code == 200, pick_list_pdf.text
+    assert pick_list_pdf.headers.get("content-type", "").startswith("application/pdf")
+    assert pick_list_pdf.headers.get("content-disposition", "").startswith("attachment;")
+    assert pick_list_pdf.content.startswith(b"%PDF")
 
     receipt = client.get(f"/api/v1/orders/{order_id}/receipt", headers=auth_headers(token))
     assert receipt.status_code == 200
@@ -1508,3 +1530,93 @@ def test_admin_shipping_label_upload_download_and_delete(
         headers=auth_headers(admin_token),
     )
     assert missing.status_code == 404
+
+
+def test_admin_batch_shipping_labels_zip(test_app: Dict[str, object], tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    monkeypatch.setattr(settings, "private_media_root", str(tmp_path / "private_uploads"))
+
+    admin_token, _ = create_user_token(SessionLocal, email="admin-batch-labels@example.com", admin=True)
+
+    async def seed_orders() -> tuple[UUID, UUID]:
+        async with SessionLocal() as session:
+            first = Order(
+                user_id=None,
+                status=OrderStatus.pending_acceptance,
+                reference_code="BATCHLABEL1",
+                customer_email="batch1@example.com",
+                customer_name="Batch One",
+                total_amount=Decimal("10.00"),
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                currency="RON",
+            )
+            second = Order(
+                user_id=None,
+                status=OrderStatus.pending_acceptance,
+                reference_code="BATCHLABEL2",
+                customer_email="batch2@example.com",
+                customer_name="Batch Two",
+                total_amount=Decimal("10.00"),
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                currency="RON",
+            )
+            session.add_all([first, second])
+            await session.commit()
+            await session.refresh(first)
+            await session.refresh(second)
+            return first.id, second.id
+
+    first_id, second_id = asyncio.run(seed_orders())
+
+    missing_all = client.post(
+        "/api/v1/orders/admin/batch/shipping-labels.zip",
+        headers=auth_headers(admin_token),
+        json={"order_ids": [str(first_id), str(second_id)]},
+    )
+    assert missing_all.status_code == 404
+    assert str(first_id) in (missing_all.json().get("detail") or {}).get("missing_shipping_label_order_ids", [])
+
+    upload_first = client.post(
+        f"/api/v1/orders/admin/{first_id}/shipping-label",
+        headers=auth_headers(admin_token),
+        files={"file": ("label.pdf", b"%PDF-1.4 first", "application/pdf")},
+    )
+    assert upload_first.status_code == 200, upload_first.text
+
+    missing_one = client.post(
+        "/api/v1/orders/admin/batch/shipping-labels.zip",
+        headers=auth_headers(admin_token),
+        json={"order_ids": [str(first_id), str(second_id)]},
+    )
+    assert missing_one.status_code == 404
+    assert str(second_id) in (missing_one.json().get("detail") or {}).get("missing_shipping_label_order_ids", [])
+
+    upload_second = client.post(
+        f"/api/v1/orders/admin/{second_id}/shipping-label",
+        headers=auth_headers(admin_token),
+        files={"file": ("label2.pdf", b"%PDF-1.4 second", "application/pdf")},
+    )
+    assert upload_second.status_code == 200, upload_second.text
+
+    download = client.post(
+        "/api/v1/orders/admin/batch/shipping-labels.zip",
+        headers=auth_headers(admin_token),
+        json={"order_ids": [str(first_id), str(second_id)]},
+    )
+    assert download.status_code == 200, download.text
+    assert download.headers.get("content-type", "").startswith("application/zip")
+    assert download.content[:2] == b"PK"
+
+    import io
+    import zipfile
+
+    with zipfile.ZipFile(io.BytesIO(download.content)) as zf:
+        names = zf.namelist()
+        assert any("BATCHLABEL1" in name for name in names)
+        assert any("BATCHLABEL2" in name for name in names)
+        first_file = zf.read(names[0])
+        assert first_file.startswith(b"%PDF")

@@ -51,9 +51,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Dashboard: audit quick filters – Add presets like security/content/payments to pre-filter the audit log.
 - [x] Admin Dashboard: background jobs monitor – List running/completed jobs with retry/cancel and dead-letter views (DB-backed).
 - [x] Admin Dashboard: scheduled tasks “Run now” – Allow manual run of safe scheduled tasks with audit logging.
-- [ ] Admin Orders: kanban board view – Add optional kanban mode for order statuses with drag/drop and guardrails.
-- [ ] Admin Orders: batch picking list export – Generate pick lists grouped by SKU/qty for selected orders (CSV/PDF).
-- [ ] Admin Orders: batch shipping labels center – Batch upload/generate labels and provide merged download with retry.
+- [x] Admin Orders: kanban board view – Add optional kanban mode for order statuses with drag/drop and guardrails.
+- [x] Admin Orders: batch picking list export – Generate pick lists grouped by SKU/qty for selected orders (CSV/PDF).
+- [x] Admin Orders: batch shipping labels center – Batch upload/generate labels and provide merged download with retry.
 - [ ] Admin Orders: SLA timers & escalation – Track “time to accept/ship” with warning badges and filters.
 - [ ] Admin Orders: fraud review queue – Queue orders flagged by fraud signals with approve/deny actions and audit notes.
 - [ ] Admin Orders: quick next/prev navigation – Navigate to next/previous order in the current filtered list from the detail page.

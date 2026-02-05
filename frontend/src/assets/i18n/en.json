@@ -4014,6 +4014,23 @@
     "orders": {
       "title": "Orders",
       "hint": "Search by reference, id, email, or username.",
+      "viewMode": {
+        "kanban": "Kanban view",
+        "table": "Table view"
+      },
+      "kanban": {
+        "hint": "Drag cards between columns to update status. Switch back to the table for bulk actions.",
+        "cancelPrompt": "Cancel reason (required)",
+        "refundConfirm": "Mark this order as refunded?",
+        "success": {
+          "updated": "Order updated."
+        },
+        "errors": {
+          "invalidTransition": "That status change isn't allowed.",
+          "cancelReasonRequired": "Cancel reason is required.",
+          "updateFailed": "Could not update order."
+        }
+      },
       "a11y": {
         "selectAllOnPage": "Select all orders on page",
         "selectOrder": "Select order {{ref}}"
@@ -4144,13 +4161,18 @@
         "emailsPartial": "Queued emails for {{success}} of {{total}} orders.",
         "packingSlips": "Packing slips PDF",
         "packingSlipsReady": "Packing slips ready",
+        "pickListCsv": "Pick list CSV",
+        "pickListPdf": "Pick list PDF",
+        "shippingLabels": "Shipping labels",
+        "pickListReady": "Pick list ready",
         "clearSelection": "Clear selection",
         "success": "Updated {{count}} orders.",
         "partial": "Updated {{success}} of {{total}} orders.",
         "errors": {
           "chooseAction": "Choose a status or courier to apply.",
           "chooseEmail": "Choose an email to resend.",
-          "packingSlips": "Could not download packing slips."
+          "packingSlips": "Could not download packing slips.",
+          "pickList": "Could not download pick list."
         }
       },
       "empty": "No orders match these filters.",
@@ -4177,6 +4199,39 @@
         "downloaded": "Label downloaded",
         "printed": "Label printed",
         "deleted": "Label deleted"
+      },
+      "shippingLabelsModal": {
+        "title": "Shipping labels",
+        "hint": "{{count}} selected order(s). Upload one label per order (PDF/PNG/JPG/WebP).",
+        "chooseFiles": "Choose files",
+        "chooseFilesHint": "Tip: include the order reference in the filename for auto-match.",
+        "uploadAll": "Upload all",
+        "downloadZip": "Download ZIP",
+        "empty": "No files selected yet.",
+        "unassigned": "Unassigned",
+        "table": {
+          "file": "File",
+          "order": "Order",
+          "status": "Status",
+          "actions": "Actions"
+        },
+        "status": {
+          "pending": "Pending",
+          "uploading": "Uploading…",
+          "success": "Uploaded",
+          "error": "Failed"
+        },
+        "success": {
+          "uploaded": "Shipping labels uploaded.",
+          "zipReady": "Shipping labels ZIP ready."
+        },
+        "errors": {
+          "missingOrder": "Select an order for this file.",
+          "uploadFailed": "Upload failed",
+          "partial": "Uploaded {{success}} of {{total}} labels.",
+          "missingLabels": "Missing labels for {{count}} orders.",
+          "zipFailed": "Could not download shipping labels ZIP."
+        }
       },
       "confirmDeleteLabel": "Delete the shipping label for this order?",
       "save": "Save changes",
