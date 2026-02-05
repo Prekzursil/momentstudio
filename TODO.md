@@ -31,11 +31,11 @@ Below is a structured checklist you can turn into issues.
 - [ ] Email: manually verify one-click unsubscribe behavior across Gmail/Outlook (and adjust headers if needed).
 - [x] Docs: add Google OAuth setup guide (origins, redirect URIs, backend env, dev/prod examples).
 - [x] Docs: document when/why dev uses `4201` (port bump + Docker stack) and related CORS/proxy expectations.
-- [ ] Scale: replace in-memory rate limits/caches with Redis-backed equivalents for multi-replica deployments (auth limits, analytics ingestion, etc.).
-- [ ] Frontend SEO/i18n: set `<html lang>` dynamically and use translation keys for route titles/meta.
-- [ ] Frontend deps: remove `postinstall` node_modules patch by upgrading/replacing `http-proxy` (make installs deterministic).
-- [ ] Docs: align `ARCHITECTURE.md`/`README.md` with current Angular/backend versions and deployment topology.
-- [ ] Uploads: add additional upload hardening (max dimensions, image-bomb protection, safe serving headers, storage outside web root).
+- [x] Scale: use Redis-backed rate limiting for multi-replica deployments (auth limits, analytics ingestion; optional via `REDIS_URL`).
+- [x] Frontend SEO/i18n: set `<html lang>` dynamically and use translation keys for route titles/meta.
+- [x] Frontend deps: remove `postinstall` node_modules patch; suppress Node DEP0060 warnings via `node --disable-warning=DEP0060` in `ng` scripts.
+- [x] Docs: align `ARCHITECTURE.md`/`README.md` with current Angular/backend versions and deployment topology.
+- [x] Uploads: add additional upload hardening (max dimensions, image-bomb protection, safe serving headers, storage outside web root).
 
 ## Project & Infra
 - [x] Initialize monorepo with `backend/`, `frontend/`, `infra/`.
@@ -292,7 +292,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Emails: send coupon assignment/revocation notifications (bilingual) with an account link.
 - [x] Receipt UX: add a shareable HTML receipt view (`/receipt/:token`) with clickable product links + a real PDF renderer with embedded hyperlinks (token PDF endpoint).
 - [x] Newsletter: add double opt-in confirmation + unsubscribe URLs (List-Unsubscribe) and enforce marketing opt-in for promotional sends.
-- [ ] Newsletter: add admin export of confirmed subscribers (CSV) for marketing ops.
+- [x] Newsletter: add admin export of confirmed subscribers (CSV) for marketing ops.
 
 ## Backend - Security, Observability, Testing
 - [x] CORS config for dev/prod.

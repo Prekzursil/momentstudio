@@ -51,6 +51,7 @@ cd infra && docker compose up --build
 - Backend health: `http://localhost:8001/api/v1/health`
 - Backend docs: `http://localhost:8001/docs`
 - Postgres: `localhost:5433` (named volume; use `docker compose down -v` to reset)
+- Redis: `localhost:6379` (shared rate limiting/caches; optional in non-Compose dev)
 
 After first boot / after a DB reset, seed data and bootstrap the owner:
 

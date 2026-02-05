@@ -5,8 +5,8 @@ momentstudio is a monorepo with a FastAPI backend, Angular frontend, and lightwe
 ## Monorepo layout
 
 - `backend/`: FastAPI app, domain models, services, migrations, tests.
-- `frontend/`: Angular 18 storefront and admin UI with shared design tokens and components.
-- `infra/`: Docker Compose for local stack (Postgres, backend, frontend) and future deployment tooling.
+- `frontend/`: Angular 21 storefront and admin UI with shared design tokens and components.
+- `infra/`: Docker Compose stacks for local/prod-like and production deployments.
 
 ## Backend (FastAPI + PostgreSQL)
 
@@ -24,7 +24,7 @@ momentstudio is a monorepo with a FastAPI backend, Angular frontend, and lightwe
   - Content: editable content blocks for hero/about/faq/shipping/care.
   - Email: SMTP-backed service for transactional emails (order confirmation, password reset).
 - Cross-cutting: structured logging with request IDs, CORS config, rate limiting on auth endpoints, upload validation for file type and size.
-- Testing: pytest suite with factory helpers and integration tests against a temporary Postgres (for example, via testcontainers).
+- Testing: pytest suite (SQLite in-memory by default) plus opt-in integration tests against Postgres.
 
 ### Backend request and data flow (checkout example)
 
@@ -34,7 +34,7 @@ momentstudio is a monorepo with a FastAPI backend, Angular frontend, and lightwe
 4. Stripe webhook hits `/api/v1/webhooks/stripe`, signature verified, order status updated.
 5. Background task (or immediate call) triggers order confirmation email.
 
-## Frontend (Angular 18 + Tailwind)
+## Frontend (Angular 21 + Tailwind)
 
 - Shell: app component provides layout, header/footer, and responsive navigation.
 - Routing: lazy-loaded feature routes for catalog, product detail, cart/checkout, auth/account, and admin.
@@ -57,7 +57,9 @@ momentstudio is a monorepo with a FastAPI backend, Angular frontend, and lightwe
 
 ## Infra and CI/CD
 
-- Local dev: `docker compose up --build` runs Postgres, backend, and frontend with hot reload once Dockerfiles exist.
+- Local dev: `make dev` runs the backend + frontend with an Angular dev proxy (single-origin, no CORS).
+- Prod-like local stack: `infra/docker-compose.yml` runs Postgres + Redis + backend + frontend behind an nginx container (closer to production).
+- Production stack: `infra/prod/docker-compose.yml` runs Caddy (TLS + routing) + Postgres + Redis + backend + frontend.
 - Environment parity: `.env.example` files document required settings for each service.
 - CI (present): GitHub Actions run backend lint/tests/type-check and frontend lint/tests/build.
 - CI (planned): deployment and release workflow to build and push containers once runtime code lands.
