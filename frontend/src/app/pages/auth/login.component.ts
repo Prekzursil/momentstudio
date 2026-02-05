@@ -78,16 +78,17 @@ import { finalize } from 'rxjs';
             />
             {{ 'auth.keepSignedIn' | translate }}
           </label>
-          <app-captcha-turnstile
-            *ngIf="captchaEnabled"
-            [siteKey]="captchaSiteKey"
-            (tokenChange)="captchaToken = $event"
-          ></app-captcha-turnstile>
-          <div class="flex items-center justify-between text-sm">
-            <a routerLink="/password-reset" class="text-indigo-600 dark:text-indigo-300 font-medium">{{ 'auth.forgot' | translate }}</a>
-            <a routerLink="/register" class="text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-50">{{
-              'auth.createAccount' | translate
-            }}</a>
+	          <app-captcha-turnstile
+	            *ngIf="captchaEnabled"
+	            [siteKey]="captchaSiteKey"
+	            (tokenChange)="captchaToken = $event"
+	          ></app-captcha-turnstile>
+	          <p *ngIf="error" class="text-sm text-amber-700 dark:text-amber-300">{{ error }}</p>
+	          <div class="flex items-center justify-between text-sm">
+	            <a routerLink="/password-reset" class="text-indigo-600 dark:text-indigo-300 font-medium">{{ 'auth.forgot' | translate }}</a>
+	            <a routerLink="/register" class="text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-50">{{
+	              'auth.createAccount' | translate
+	            }}</a>
           </div>
           <app-button [label]="'auth.login' | translate" type="submit" [disabled]="loading"></app-button>
           <div class="border-t border-slate-200 pt-4 grid gap-2 dark:border-slate-800">
@@ -141,12 +142,13 @@ export class LoginComponent {
   password = '';
   keepSignedIn = false;
   showPassword = false;
-  captchaToken: string | null = null;
-  loading = false;
-  passkeyBusy = false;
-  captchaSiteKey = appConfig.captchaSiteKey || '';
-  captchaEnabled = Boolean(this.captchaSiteKey);
-  passkeySupported = isWebAuthnSupported();
+	  captchaToken: string | null = null;
+	  loading = false;
+	  passkeyBusy = false;
+	  error = '';
+	  captchaSiteKey = appConfig.captchaSiteKey || '';
+	  captchaEnabled = Boolean(this.captchaSiteKey);
+	  passkeySupported = isWebAuthnSupported();
   twoFactorToken: string | null = null;
   twoFactorUserEmail: string | null = null;
   twoFactorCode = '';
@@ -255,70 +257,86 @@ export class LoginComponent {
     });
   }
 
-  onSubmit(form: NgForm): void {
-    if (this.twoFactorToken) {
-      if (!form.valid) {
-        this.toast.error(this.translate.instant('auth.completeForm'));
-        return;
-      }
-      const token = this.twoFactorToken;
-      const code = this.twoFactorCode.trim();
-      if (!code) {
-        this.toast.error(this.translate.instant('auth.completeForm'));
-        return;
-      }
-      this.loading = true;
-      this.auth
+	onSubmit(form: NgForm): void {
+		this.error = '';
+	    if (this.twoFactorToken) {
+	      if (!form.valid) {
+	        const msg = this.translate.instant('auth.completeForm');
+	        this.error = msg;
+	        this.toast.error(msg);
+	        return;
+	      }
+	      const token = this.twoFactorToken;
+	      const code = this.twoFactorCode.trim();
+	      if (!code) {
+	        const msg = this.translate.instant('auth.completeForm');
+	        this.error = msg;
+	        this.toast.error(msg);
+	        return;
+	      }
+	      this.loading = true;
+	      this.auth
         .completeTwoFactorLogin(token, code, this.keepSignedIn)
         .pipe(
           finalize(() => {
             this.loading = false;
           })
         )
-        .subscribe({
-          next: (authRes) => {
+	        .subscribe({
+	          next: (authRes) => {
             if (typeof sessionStorage !== 'undefined') {
               sessionStorage.removeItem('two_factor_token');
               sessionStorage.removeItem('two_factor_user');
               sessionStorage.removeItem('two_factor_remember');
             }
             this.twoFactorToken = null;
-            this.twoFactorUserEmail = null;
-            this.twoFactorCode = '';
-            this.toast.success(this.translate.instant('auth.successLogin'), authRes?.user?.email);
-            this.navigateAfterLogin();
-          },
-          error: (err) => {
-            if (err?.status === 401) {
-              this.toast.error(this.translate.instant('auth.twoFactorInvalid'));
-              return;
-            }
-            const message = err?.error?.detail || this.translate.instant('auth.twoFactorInvalid');
-            this.toast.error(message);
-          }
-        });
-      return;
-    }
-    if (!form.valid) {
-      this.toast.error(this.translate.instant('auth.completeForm'));
-      return;
-    }
-    if (this.captchaEnabled && !this.captchaToken) {
-      this.toast.error(this.translate.instant('auth.captchaRequired'));
-      return;
-    }
-    this.loading = true;
-    this.auth
+	            this.twoFactorUserEmail = null;
+	            this.twoFactorCode = '';
+	            this.error = '';
+	            this.toast.success(this.translate.instant('auth.successLogin'), authRes?.user?.email);
+	            this.navigateAfterLogin();
+	          },
+	          error: (err) => {
+	            if (err?.status === 401) {
+	              const msg = this.translate.instant('auth.twoFactorInvalid');
+	              this.error = msg;
+	              this.toast.error(msg);
+	              return;
+	            }
+	            const detail = err?.error?.detail;
+	            const message = typeof detail === 'string' && detail.trim()
+	              ? detail
+	              : this.translate.instant('auth.twoFactorInvalid');
+	            this.error = message;
+	            this.toast.error(message);
+	          }
+	        });
+	      return;
+	    }
+	    if (!form.valid) {
+	      const msg = this.translate.instant('auth.completeForm');
+	      this.error = msg;
+	      this.toast.error(msg);
+	      return;
+	    }
+	    if (this.captchaEnabled && !this.captchaToken) {
+	      const msg = this.translate.instant('auth.captchaRequired');
+	      this.error = msg;
+	      this.toast.error(msg);
+	      return;
+	    }
+	    this.loading = true;
+	    this.auth
       .login(this.identifier, this.password, this.captchaToken ?? undefined, { remember: this.keepSignedIn })
       .pipe(
         finalize(() => {
           this.loading = false;
         })
       )
-      .subscribe({
-        next: (res) => {
-          const anyRes = res as any;
-          if (anyRes?.requires_two_factor && anyRes?.two_factor_token) {
+	      .subscribe({
+	        next: (res) => {
+	          const anyRes = res as any;
+	          if (anyRes?.requires_two_factor && anyRes?.two_factor_token) {
             this.twoFactorToken = anyRes.two_factor_token;
             this.twoFactorUserEmail = anyRes?.user?.email || null;
             this.twoFactorCode = '';
@@ -327,21 +345,28 @@ export class LoginComponent {
               sessionStorage.setItem('two_factor_user', JSON.stringify(anyRes.user ?? null));
               sessionStorage.setItem('two_factor_remember', JSON.stringify(this.keepSignedIn));
             }
-            this.toast.info(this.translate.instant('auth.twoFactorRequired'));
-            return;
-          }
-          this.toast.success(this.translate.instant('auth.successLogin'), anyRes?.user?.email);
-          this.navigateAfterLogin();
-        },
-        error: (err) => {
-          this.resetCaptcha();
-          if (err?.status === 401) {
-            this.toast.error(this.translate.instant('auth.invalidCredentials'));
-            return;
-          }
-          const message = err?.error?.detail || this.translate.instant('auth.errorLogin');
-          this.toast.error(message);
-        }
-      });
-  }
+	            this.toast.info(this.translate.instant('auth.twoFactorRequired'));
+	            return;
+	          }
+	          this.error = '';
+	          this.toast.success(this.translate.instant('auth.successLogin'), anyRes?.user?.email);
+	          this.navigateAfterLogin();
+	        },
+	        error: (err) => {
+	          this.resetCaptcha();
+	          if (err?.status === 401) {
+	            const msg = this.translate.instant('auth.invalidCredentials');
+	            this.error = msg;
+	            this.toast.error(msg);
+	            return;
+	          }
+	          const detail = err?.error?.detail;
+	          const message = typeof detail === 'string' && detail.trim()
+	            ? detail
+	            : this.translate.instant('auth.errorLogin');
+	          this.error = message;
+	          this.toast.error(message);
+	        }
+	      });
+	  }
 }

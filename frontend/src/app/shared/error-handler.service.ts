@@ -9,6 +9,10 @@ export class ErrorHandlerService {
 
   handle(error: unknown): void {
     if (error instanceof HttpErrorResponse) {
+      if (error.status === 0) {
+        this.toast.error('Network error', 'Please check your connection and try again.');
+        return;
+      }
       if (error.status === 401 || error.status === 403) {
         this.toast.error('Unauthorized', 'Please sign in to continue.');
         return;
@@ -21,7 +25,9 @@ export class ErrorHandlerService {
         this.toast.error('Server error', 'Something went wrong. Please try again.');
         return;
       }
-      this.toast.error('Request failed', error.message);
+      // 4xx errors are typically handled by the calling page (form validation, etc.).
+      // Avoid noisy duplicate global toasts that obscure the real, contextual error message.
+      return;
     } else {
       captureException(error);
       this.toast.error('Unexpected error', 'Please try again.');

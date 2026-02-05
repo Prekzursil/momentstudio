@@ -237,23 +237,25 @@ type OrderAction =
               </div>
             </div>
 
-            <div class="grid gap-3 md:grid-cols-2">
-              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.orders.updateStatus' | translate }}
-                <select
-                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="statusValue"
-                  (ngModelChange)="onStatusValueChange($event)"
-                >
-                  <option value="pending_payment">{{ 'adminUi.orders.pending_payment' | translate }}</option>
-                  <option value="pending_acceptance">{{ 'adminUi.orders.pending_acceptance' | translate }}</option>
-                  <option value="paid">{{ 'adminUi.orders.paid' | translate }}</option>
-                  <option value="shipped">{{ 'adminUi.orders.shipped' | translate }}</option>
-                  <option value="delivered">{{ 'adminUi.orders.delivered' | translate }}</option>
-                  <option value="cancelled">{{ 'adminUi.orders.cancelled' | translate }}</option>
-                  <option value="refunded">{{ 'adminUi.orders.refunded' | translate }}</option>
-                </select>
-              </label>
+	            <div class="grid gap-3 md:grid-cols-2">
+	              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                {{ 'adminUi.orders.updateStatus' | translate }}
+	                <select
+	                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	                  [(ngModel)]="statusValue"
+	                  (ngModelChange)="onStatusValueChange($event)"
+	                >
+	                  <option *ngFor="let opt of statusOptions()" [value]="opt.value" [disabled]="opt.disabled">
+	                    {{ ('adminUi.orders.' + opt.value) | translate }}
+	                  </option>
+	                </select>
+	                <span
+	                  *ngIf="paymentCaptureBlocked()"
+	                  class="text-xs font-normal text-amber-700 dark:text-amber-300"
+	                >
+	                  {{ 'adminUi.orders.paymentNotCapturedHint' | translate }}
+	                </span>
+	              </label>
 
               <app-input [label]="'adminUi.orders.trackingNumber' | translate" [(value)]="trackingNumber"></app-input>
             </div>
@@ -1429,8 +1431,79 @@ export class AdminOrderDetailComponent implements OnInit {
     private recent: AdminRecentService
   ) {}
 
+  private readonly statusOrder: OrderStatus[] = [
+    'pending_payment',
+    'pending_acceptance',
+    'paid',
+    'shipped',
+    'delivered',
+    'cancelled',
+    'refunded'
+  ];
+
   statusChipClass(status: string): string {
     return orderStatusChipClass(status);
+  }
+
+  private hasPaymentCaptured(order: AdminOrderDetail | null): boolean {
+    const method = (order?.payment_method || '').toString().trim().toLowerCase();
+    if (method === 'paypal') {
+      return Boolean((order?.paypal_capture_id || '').toString().trim());
+    }
+    if (method === 'stripe') {
+      return (order?.events || []).some((evt) => (evt?.event || '').toString().trim() === 'payment_captured');
+    }
+    return false;
+  }
+
+  paymentCaptureBlocked(): boolean {
+    const o = this.order();
+    if (!o) return false;
+    const method = (o.payment_method || '').toString().trim().toLowerCase();
+    const status = (o.status as OrderStatus) || this.statusValue;
+    if (status !== 'pending_acceptance') return false;
+    if (method !== 'stripe' && method !== 'paypal') return false;
+    return !this.hasPaymentCaptured(o);
+  }
+
+  private allowedNextStatuses(current: OrderStatus, method: string, order: AdminOrderDetail | null): Set<OrderStatus> {
+    const transitions: Record<OrderStatus, OrderStatus[]> = {
+      pending_payment: ['pending_acceptance', 'cancelled'],
+      pending_acceptance: ['paid', 'cancelled'],
+      paid: ['shipped', 'refunded', 'cancelled'],
+      shipped: ['delivered', 'refunded'],
+      delivered: ['refunded'],
+      cancelled: [],
+      refunded: []
+    };
+
+    const allowed = new Set<OrderStatus>([current, ...(transitions[current] ?? [])]);
+
+    // COD orders start in pending_acceptance and can ship/complete without payment capture.
+    if (method === 'cod' && current === 'pending_acceptance') {
+      allowed.add('shipped');
+      allowed.add('delivered');
+    }
+
+    // Mirror backend guard: Stripe/PayPal orders can only be accepted once payment is captured.
+    if (
+      current === 'pending_acceptance' &&
+      allowed.has('paid') &&
+      (method === 'stripe' || method === 'paypal') &&
+      !this.hasPaymentCaptured(order)
+    ) {
+      allowed.delete('paid');
+    }
+
+    return allowed;
+  }
+
+  statusOptions(): Array<{ value: OrderStatus; disabled: boolean }> {
+    const o = this.order();
+    const current = ((o?.status as OrderStatus) || this.statusValue) as OrderStatus;
+    const method = (o?.payment_method || '').toString().trim().toLowerCase();
+    const allowed = this.allowedNextStatuses(current, method, o);
+    return this.statusOrder.map((value) => ({ value, disabled: !allowed.has(value) }));
   }
 
   ngOnInit(): void {
@@ -2295,13 +2368,16 @@ export class AdminOrderDetailComponent implements OnInit {
           this.action.set(null);
           this.toast.success(this.translate.instant('adminUi.orders.success.status'));
         },
-        error: (err) => {
-          this.action.set(null);
-          const message = err?.error?.detail || this.translate.instant('adminUi.orders.errors.status');
-          this.toast.error(message);
-        }
-    });
-  }
+	        error: (err) => {
+	          this.action.set(null);
+	          const detail = err?.error?.detail;
+	          const message = typeof detail === 'string' && detail.trim()
+	            ? detail
+	            : this.translate.instant('adminUi.orders.errors.status');
+	          this.toast.error(message);
+	        }
+	    });
+	  }
 
   onStatusValueChange(next: OrderStatus): void {
     if (next !== 'cancelled') {

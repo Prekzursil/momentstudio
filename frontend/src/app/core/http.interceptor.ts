@@ -30,9 +30,11 @@ export const authAndErrorInterceptor: HttpInterceptorFn = (req, next) => {
       const isApiRequest = req.url.startsWith(apiBase);
       const isRefresh = req.url === `${apiBase}/auth/refresh`;
       const isLogin = req.url === `${apiBase}/auth/login`;
+      const isTwoFactor = req.url === `${apiBase}/auth/login/2fa`;
       const isRegister = req.url === `${apiBase}/auth/register`;
       const isLogout = req.url === `${apiBase}/auth/logout`;
       const isGoogleFlow = req.url.startsWith(`${apiBase}/auth/google/`);
+      const isPasswordReset = req.url.startsWith(`${apiBase}/auth/password-reset`);
 
       if (
         err instanceof HttpErrorResponse &&
@@ -66,7 +68,8 @@ export const authAndErrorInterceptor: HttpInterceptorFn = (req, next) => {
         );
       }
 
-      if (!silent) {
+      const suppressGlobalToast = silent || isLogin || isTwoFactor || isRegister || isRefresh || isLogout || isGoogleFlow || isPasswordReset;
+      if (!suppressGlobalToast) {
         handler.handle(err);
       }
       return throwError(() => err);

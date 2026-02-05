@@ -4175,6 +4175,7 @@
       "delivered": "Complete",
       "cancelled": "Cancelled",
       "refunded": "Refunded",
+      "paymentNotCapturedHint": "Payment is not captured yet. Wait for payment confirmation before accepting the order.",
       "success": {
         "status": "Order updated",
         "retry": "Payment retry started",
