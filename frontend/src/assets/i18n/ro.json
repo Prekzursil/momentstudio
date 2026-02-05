@@ -4382,10 +4382,35 @@
           "update": "Nu am putut actualiza adresa."
         }
       },
+      "addressValidate": {
+        "badge": "Necesită atenție",
+        "phoneMissing": "Numărul de telefon lipsește (curierii pot avea nevoie de el).",
+        "phoneNonE164": "Folosește format internațional pentru numerele de telefon (ex: +40740123456).",
+        "phoneInvalid": "Numărul de telefon pare invalid.",
+        "postalInvalidRo": "Codul poștal din România trebuie să aibă 6 cifre.",
+        "postalNonStandardRo": "Codul poștal conține caractere extra; folosește doar cifre.",
+        "postalInvalid": "Codul poștal pare invalid.",
+        "suggestPhone": "Telefon sugerat: {{value}}",
+        "suggestPostal": "Cod poștal sugerat: {{value}}",
+        "applySuggestion": "Aplică"
+      },
       "invoiceTitle": "Factură",
       "invoiceCompany": "Nume firmă",
       "invoiceVatId": "CUI / TVA",
       "noAddress": "Nu există adresă disponibilă.",
+      "comms": {
+        "title": "Emailuri client",
+        "hint": "Evenimente de livrare email legate de această comandă (ultimele 7 zile).",
+        "refresh": "Reîncarcă",
+        "empty": "Nu există evenimente email pentru această comandă.",
+        "status": {
+          "sent": "Trimis",
+          "failed": "Eșuat"
+        },
+        "errors": {
+          "load": "Nu s-au putut încărca evenimentele email."
+        }
+      },
       "timelineTitle": "Istoric",
       "timelineEmpty": "Nu există evenimente înregistrate încă.",
       "notesTitle": "Note interne",

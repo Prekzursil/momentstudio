@@ -17,6 +17,7 @@ from app.models.address import Address
 from app.models.catalog import Category, Product, ProductStatus
 from app.models.cart import Cart, CartItem
 from app.models.coupons_v2 import Coupon, CouponRedemption, CouponReservation, CouponVisibility, Promotion, PromotionDiscountType
+from app.models.email_event import EmailDeliveryEvent
 from app.models.order import Order, OrderEvent, OrderStatus, OrderItem
 from app.models.passkeys import UserPasskey
 from app.models.user import User, UserRole
@@ -903,6 +904,63 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     )
     assert confirm.status_code == 200
     assert sent["count"] == 2
+
+
+def test_admin_order_email_events_endpoint(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    admin_token, _ = create_user_token(SessionLocal, email="admin-email-events@example.com", admin=True)
+    _, user_id = create_user_token(SessionLocal, email="buyer-email-events@example.com")
+
+    async def seed() -> tuple[str, str]:
+        async with SessionLocal() as session:
+            order = Order(
+                user_id=user_id,
+                status=OrderStatus.pending_acceptance,
+                reference_code="EMAIL1",
+                customer_email="buyer-email-events@example.com",
+                customer_name="Buyer",
+                total_amount=Decimal("10.00"),
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                currency="RON",
+                payment_method="cod",
+            )
+            session.add(order)
+            await session.commit()
+            await session.refresh(order)
+
+            event = EmailDeliveryEvent(
+                to_email="buyer-email-events@example.com",
+                subject="Comanda EMAIL1 a fost expediată",
+                status="sent",
+                error_message=None,
+            )
+            session.add(event)
+            await session.commit()
+            await session.refresh(event)
+            return str(order.id), str(event.id)
+
+    order_id, event_id = asyncio.run(seed())
+
+    masked = client.get(f"/api/v1/orders/admin/{order_id}/email-events", headers=auth_headers(admin_token))
+    assert masked.status_code == 200, masked.text
+    rows = masked.json()
+    assert len(rows) == 1
+    assert rows[0]["id"] == event_id
+    assert rows[0]["to_email"] != "buyer-email-events@example.com"
+    assert rows[0]["subject"] == "Comanda EMAIL1 a fost expediată"
+    assert rows[0]["status"] == "sent"
+
+    unmasked = client.get(
+        f"/api/v1/orders/admin/{order_id}/email-events",
+        headers=auth_headers(admin_token),
+        params={"include_pii": True},
+    )
+    assert unmasked.status_code == 200, unmasked.text
+    rows_pii = unmasked.json()
+    assert rows_pii[0]["to_email"] == "buyer-email-events@example.com"
 
 
 def test_admin_partial_refunds(test_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch) -> None:

@@ -58,8 +58,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Orders: fraud review queue – Queue orders flagged by fraud signals with approve/deny actions and audit notes.
 - [x] Admin Orders: quick next/prev navigation – Navigate to next/previous order in the current filtered list from the detail page.
 - [x] Admin Orders: courier/tracking validation – Validate tracking URL/number formats per courier before saving.
-- [ ] Admin Orders: address validation assistant – Flag likely invalid phone/postcode and suggest corrections (offline rules, no paid APIs).
-- [ ] Admin Orders: customer comms timeline – Show transactional email delivery status/history for the order.
+- [x] Admin Orders: address validation assistant – Flag likely invalid phone/postcode and suggest corrections (offline rules, no paid APIs).
+- [x] Admin Orders: customer comms timeline – Show transactional email delivery status/history for the order.
 - [ ] Admin Orders: internal tag management – Improve tag CRUD (colors/rename) and bulk apply workflows.
 - [ ] Admin Products: refactor into subcomponents – Extract editor/bulk bar/image manager/relationships into dedicated components for maintainability.
 - [ ] Admin Products: SKU/slug uniqueness feedback – Inline validate uniqueness with non-blocking warnings and guidance.

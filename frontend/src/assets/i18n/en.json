@@ -4382,10 +4382,35 @@
           "update": "Could not update address."
         }
       },
+      "addressValidate": {
+        "badge": "Needs attention",
+        "phoneMissing": "Phone number is missing (couriers may require it).",
+        "phoneNonE164": "Use international format for phone numbers (e.g., +40740123456).",
+        "phoneInvalid": "Phone number looks invalid.",
+        "postalInvalidRo": "Romanian postal codes should be 6 digits.",
+        "postalNonStandardRo": "Postal code contains extra characters; consider using digits only.",
+        "postalInvalid": "Postal code looks invalid.",
+        "suggestPhone": "Suggested phone: {{value}}",
+        "suggestPostal": "Suggested postal code: {{value}}",
+        "applySuggestion": "Apply"
+      },
       "invoiceTitle": "Invoice",
       "invoiceCompany": "Company",
       "invoiceVatId": "VAT ID",
       "noAddress": "No address on file.",
+      "comms": {
+        "title": "Customer emails",
+        "hint": "Email delivery events related to this order (last 7 days).",
+        "refresh": "Refresh",
+        "empty": "No email events found for this order.",
+        "status": {
+          "sent": "Sent",
+          "failed": "Failed"
+        },
+        "errors": {
+          "load": "Could not load email events."
+        }
+      },
       "timelineTitle": "Timeline",
       "timelineEmpty": "No events recorded yet.",
       "notesTitle": "Internal notes",

@@ -12,6 +12,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks, UploadFile, File, Body, Response, Request
 from fastapi.responses import StreamingResponse, FileResponse
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -29,6 +30,7 @@ from app.core.security import create_receipt_token, decode_receipt_token
 from app.db.session import get_session
 from app.models.address import Address
 from app.models.cart import Cart
+from app.models.email_event import EmailDeliveryEvent
 from app.models.order import Order, OrderItem, OrderStatus, OrderEvent
 from app.models.order_document_export import OrderDocumentExportKind
 from app.models.user import User
@@ -81,6 +83,7 @@ from app.api.v1 import cart as cart_api
 from app.schemas.order_admin import (
     AdminOrderListItem,
     AdminOrderListResponse,
+    AdminOrderEmailEventRead,
     AdminOrderRead,
     AdminPaginationMeta,
     AdminOrderEmailResendRequest,
@@ -1589,6 +1592,60 @@ async def admin_get_order(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
 
     return await _serialize_admin_order(session, order, include_pii=include_pii, current_user=admin)
+
+
+@router.get("/admin/{order_id}/email-events", response_model=list[AdminOrderEmailEventRead])
+async def admin_list_order_email_events(
+    order_id: UUID,
+    include_pii: bool = Query(default=False),
+    limit: int = Query(default=50, ge=1, le=200),
+    since_hours: int = Query(default=168, ge=1, le=2160),
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("orders")),
+) -> list[AdminOrderEmailEventRead]:
+    order = await order_service.get_order_by_id_admin(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+
+    if include_pii:
+        pii_service.require_pii_reveal(admin)
+
+    customer_email = getattr(order, "customer_email", None) or (
+        getattr(order.user, "email", None) if getattr(order, "user", None) else None
+    )
+    cleaned_email = (customer_email or "").strip().lower()
+    if not cleaned_email:
+        return []
+
+    ref = (getattr(order, "reference_code", None) or str(getattr(order, "id", "")) or "").strip()
+    ref_lower = ref.lower()
+
+    now = datetime.now(timezone.utc)
+    since = now - timedelta(hours=max(1, int(since_hours or 0)))
+
+    stmt = (
+        select(EmailDeliveryEvent)
+        .where(EmailDeliveryEvent.created_at >= since)
+        .where(func.lower(EmailDeliveryEvent.to_email) == cleaned_email)
+        .order_by(EmailDeliveryEvent.created_at.desc())
+        .limit(max(1, min(int(limit or 0), 200)))
+    )
+    if ref_lower:
+        stmt = stmt.where(func.lower(EmailDeliveryEvent.subject).like(f"%{ref_lower}%"))
+
+    rows = (await session.execute(stmt)).scalars().all()
+    to_email_value = cleaned_email if include_pii else pii_service.mask_email(cleaned_email)
+    return [
+        AdminOrderEmailEventRead(
+            id=row.id,
+            to_email=to_email_value,
+            subject=row.subject,
+            status=row.status,
+            error_message=row.error_message,
+            created_at=row.created_at,
+        )
+        for row in rows
+    ]
 
 
 @router.post("/guest-checkout/email/request", response_model=GuestEmailVerificationRequestResponse)

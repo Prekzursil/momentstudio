@@ -62,6 +62,15 @@ export interface AdminOrderEvent {
   created_at: string;
 }
 
+export interface AdminOrderEmailEvent {
+  id: string;
+  to_email: string;
+  subject: string;
+  status: 'sent' | 'failed' | string;
+  error_message?: string | null;
+  created_at: string;
+}
+
 export interface AdminOrderRefund {
   id: string;
   amount: number;
@@ -175,6 +184,16 @@ export class AdminOrdersService {
           subtotal: parseMoney(it?.subtotal)
         }))
       }))
+    );
+  }
+
+  listEmailEvents(
+    orderId: string,
+    params?: { limit?: number; since_hours?: number; include_pii?: boolean }
+  ): Observable<AdminOrderEmailEvent[]> {
+    const finalParams = { ...params, include_pii: params?.include_pii ?? true };
+    return this.api.get<AdminOrderEmailEvent[]>(`/orders/admin/${orderId}/email-events`, finalParams as any).pipe(
+      map((rows: any) => (Array.isArray(rows) ? rows : []))
     );
   }
 

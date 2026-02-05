@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.order import OrderStatus
 from app.schemas.admin_common import AdminPaginationMeta
@@ -54,6 +54,17 @@ class AdminOrderRead(OrderRead):
     tags: list[str] = Field(default_factory=list)
     fraud_signals: list[AdminOrderFraudSignal] = Field(default_factory=list)
     shipments: list[OrderShipmentRead] = Field(default_factory=list)
+
+
+class AdminOrderEmailEventRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    to_email: str
+    subject: str
+    status: str
+    error_message: str | None = None
+    created_at: datetime
 
 
 class AdminOrderEmailResendRequest(BaseModel):

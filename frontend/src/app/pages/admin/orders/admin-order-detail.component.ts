@@ -12,8 +12,15 @@ import { InputComponent } from '../../../shared/input.component';
 import { SkeletonComponent } from '../../../shared/skeleton.component';
 import { ToastService } from '../../../core/toast.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
-import { ReceiptShareToken } from '../../../core/account.service';
-import { AdminOrderDetail, AdminOrderEvent, AdminOrderFraudSignal, AdminOrderShipment, AdminOrdersService } from '../../../core/admin-orders.service';
+import { Address, ReceiptShareToken } from '../../../core/account.service';
+import {
+  AdminOrderDetail,
+  AdminOrderEmailEvent,
+  AdminOrderEvent,
+  AdminOrderFraudSignal,
+  AdminOrderShipment,
+  AdminOrdersService
+} from '../../../core/admin-orders.service';
 import { AdminReturnsService, ReturnRequestRead } from '../../../core/admin-returns.service';
 import { AdminRecentService } from '../../../core/admin-recent.service';
 import { orderStatusChipClass } from '../../../shared/order-status';
@@ -520,7 +527,15 @@ type OrderAction =
             <div class="grid gap-3 md:grid-cols-2">
               <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
                 <div class="flex items-center justify-between gap-3">
-                  <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.shippingAddress' | translate }}</div>
+                  <div class="flex items-center gap-2 text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                    <span>{{ 'adminUi.orders.shippingAddress' | translate }}</span>
+                    <span
+                      *ngIf="addressNeedsAttention(order()!.shipping_address, 'shipping')"
+                      class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
+                    >
+                      {{ 'adminUi.orders.addressValidate.badge' | translate }}
+                    </span>
+                  </div>
                   <button
                     type="button"
                     class="text-xs font-semibold text-indigo-600 hover:underline disabled:opacity-40 dark:text-indigo-300"
@@ -542,6 +557,11 @@ type OrderAction =
 	                    {{ order()!.shipping_address!.postal_code }}
 	                  </div>
 	                  <div>{{ order()!.shipping_address!.country }}</div>
+                    <ng-container *ngIf="addressIssueKeys(order()!.shipping_address, 'shipping') as issues">
+                      <div *ngIf="issues.length" class="mt-2 grid gap-1 text-xs text-amber-700 dark:text-amber-200">
+                        <div *ngFor="let key of issues">{{ key | translate }}</div>
+                      </div>
+                    </ng-container>
 	                </div>
 	                <ng-template #noShipping>
 	                  <div class="mt-2 text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.orders.noAddress' | translate }}</div>
@@ -550,7 +570,15 @@ type OrderAction =
 
 	              <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
 	                <div class="flex items-center justify-between gap-3">
-	                  <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.billingAddress' | translate }}</div>
+	                  <div class="flex items-center gap-2 text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                      <span>{{ 'adminUi.orders.billingAddress' | translate }}</span>
+                      <span
+                        *ngIf="addressNeedsAttention(order()!.billing_address, 'billing')"
+                        class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
+                      >
+                        {{ 'adminUi.orders.addressValidate.badge' | translate }}
+                      </span>
+                    </div>
 	                  <button
 	                    type="button"
 	                    class="text-xs font-semibold text-indigo-600 hover:underline disabled:opacity-40 dark:text-indigo-300"
@@ -572,6 +600,11 @@ type OrderAction =
 	                    {{ order()!.billing_address!.postal_code }}
 	                  </div>
 	                  <div>{{ order()!.billing_address!.country }}</div>
+                    <ng-container *ngIf="addressIssueKeys(order()!.billing_address, 'billing') as issues">
+                      <div *ngIf="issues.length" class="mt-2 grid gap-1 text-xs text-amber-700 dark:text-amber-200">
+                        <div *ngFor="let key of issues">{{ key | translate }}</div>
+                      </div>
+                    </ng-container>
 	                </div>
 	                <ng-template #noBilling>
 	                  <div class="mt-2 text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.orders.noAddress' | translate }}</div>
@@ -875,6 +908,61 @@ type OrderAction =
           </section>
 
           <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div class="grid gap-1">
+                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.comms.title' | translate }}</h2>
+                <div class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.comms.hint' | translate }}</div>
+              </div>
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.orders.comms.refresh' | translate"
+                [disabled]="commsLoading()"
+                (action)="reloadComms()"
+              ></app-button>
+            </div>
+
+            <div *ngIf="commsLoading()" class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+              <app-skeleton [rows]="3"></app-skeleton>
+            </div>
+
+            <div
+              *ngIf="!commsLoading() && commsError()"
+              class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+            >
+              {{ commsError() }}
+            </div>
+
+            <div *ngIf="!commsLoading() && !commsError() && commsEvents().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+              {{ 'adminUi.orders.comms.empty' | translate }}
+            </div>
+
+            <div *ngIf="!commsLoading() && !commsError() && commsEvents().length" class="grid gap-2">
+              <div
+                *ngFor="let row of commsEvents()"
+                class="rounded-xl border border-slate-200 p-3 text-sm text-slate-700 dark:border-slate-800 dark:text-slate-200"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0 grid gap-1">
+                    <div class="font-semibold text-slate-900 dark:text-slate-50 break-words">{{ row.subject }}</div>
+                    <div class="flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                      <span
+                        class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                        [ngClass]="emailStatusChipClass(row.status)"
+                      >
+                        {{ emailStatusLabel(row.status) }}
+                      </span>
+                      <span class="truncate">{{ row.to_email }}</span>
+                    </div>
+                    <div *ngIf="row.error_message" class="text-xs text-rose-700 dark:text-rose-300 break-words">{{ row.error_message }}</div>
+                  </div>
+                  <div class="shrink-0 text-xs text-slate-500 dark:text-slate-400">{{ row.created_at | date: 'short' }}</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900">
             <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.timelineTitle' | translate }}</h2>
             <div *ngIf="(order()!.events || []).length === 0" class="text-sm text-slate-600 dark:text-slate-300">
               {{ 'adminUi.orders.timelineEmpty' | translate }}
@@ -992,14 +1080,34 @@ type OrderAction =
             </button>
           </div>
 
-          <div class="mt-4 grid gap-3">
+            <div class="mt-4 grid gap-3">
             <div class="grid gap-3 md:grid-cols-2">
               <app-input
                 [label]="'addressForm.label' | translate"
                 [placeholder]="'addressForm.customLabelPlaceholder' | translate"
                 [(value)]="addressLabel"
               ></app-input>
-              <app-input [label]="'auth.phone' | translate" [placeholder]="'+40740123456'" [(value)]="addressPhone"></app-input>
+              <div class="grid gap-1">
+                <app-input
+                  [label]="'auth.phone' | translate"
+                  [placeholder]="'+40740123456'"
+                  [hint]="addressPhoneHint()"
+                  [(value)]="addressPhone"
+                ></app-input>
+                <div
+                  *ngIf="addressPhoneSuggestion() as suggestion"
+                  class="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200"
+                >
+                  <span class="break-words">{{ 'adminUi.orders.addressValidate.suggestPhone' | translate: { value: suggestion } }}</span>
+                  <button
+                    type="button"
+                    class="shrink-0 text-xs font-semibold text-indigo-600 hover:underline dark:text-indigo-300"
+                    (click)="applyAddressPhoneSuggestion(suggestion)"
+                  >
+                    {{ 'adminUi.orders.addressValidate.applySuggestion' | translate }}
+                  </button>
+                </div>
+              </div>
             </div>
             <app-input [label]="'addressForm.line1' | translate" [(value)]="addressLine1"></app-input>
             <app-input [label]="'addressForm.line2' | translate" [(value)]="addressLine2"></app-input>
@@ -1008,7 +1116,22 @@ type OrderAction =
               <app-input [label]="'checkout.region' | translate" [(value)]="addressRegion"></app-input>
             </div>
             <div class="grid gap-3 md:grid-cols-2">
-              <app-input [label]="'checkout.postal' | translate" [(value)]="addressPostalCode"></app-input>
+              <div class="grid gap-1">
+                <app-input [label]="'checkout.postal' | translate" [hint]="addressPostalHint()" [(value)]="addressPostalCode"></app-input>
+                <div
+                  *ngIf="addressPostalSuggestion() as suggestion"
+                  class="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200"
+                >
+                  <span class="break-words">{{ 'adminUi.orders.addressValidate.suggestPostal' | translate: { value: suggestion } }}</span>
+                  <button
+                    type="button"
+                    class="shrink-0 text-xs font-semibold text-indigo-600 hover:underline dark:text-indigo-300"
+                    (click)="applyAddressPostalSuggestion(suggestion)"
+                  >
+                    {{ 'adminUi.orders.addressValidate.applySuggestion' | translate }}
+                  </button>
+                </div>
+              </div>
               <app-input [label]="'checkout.country' | translate" [placeholder]="'RO'" [(value)]="addressCountry"></app-input>
             </div>
 
@@ -1425,6 +1548,9 @@ export class AdminOrderDetailComponent implements OnInit {
   creatingReturn = signal(false);
   returnCreateError = signal<string | null>(null);
   receiptShare = signal<ReceiptShareToken | null>(null);
+  commsLoading = signal(false);
+  commsError = signal<string | null>(null);
+  commsEvents = signal<AdminOrderEmailEvent[]>([]);
   refundWizardOpen = signal(false);
   refundWizardError = signal<string | null>(null);
   partialRefundWizardOpen = signal(false);
@@ -1486,6 +1612,7 @@ export class AdminOrderDetailComponent implements OnInit {
         include_test?: boolean;
       }
     | null = null;
+  private readonly e164PhoneRe = /^\+[1-9]\d{7,14}$/;
 
   constructor(
     private route: ActivatedRoute,
@@ -1790,6 +1917,136 @@ export class AdminOrderDetailComponent implements OnInit {
     return email || username || this.translate.instant('adminUi.orders.guest');
   }
 
+  private normalizeCountry(country: string | null | undefined): string {
+    return (country || '').trim().toUpperCase();
+  }
+
+  private cleanPhoneValue(phone: string | null | undefined): string {
+    const raw = (phone || '').toString().trim();
+    if (!raw) return '';
+    let cleaned = raw.replace(/\s+/g, '').replace(/[().-]/g, '');
+    if (cleaned.startsWith('00')) cleaned = `+${cleaned.slice(2)}`;
+    const hasPlus = cleaned.startsWith('+');
+    const digits = cleaned.replace(/\D/g, '');
+    return hasPlus ? `+${digits}` : digits;
+  }
+
+  private phoneState(
+    country: string,
+    phone: string | null | undefined,
+    kind: 'shipping' | 'billing'
+  ): { state: 'ok' | 'warn' | 'missing' | 'invalid'; suggestion?: string } {
+    const raw = (phone || '').toString().trim();
+    if (!raw) return { state: kind === 'shipping' ? 'missing' : 'ok' };
+
+    const cleaned = this.cleanPhoneValue(raw);
+    if (!cleaned) return { state: kind === 'shipping' ? 'missing' : 'invalid' };
+
+    if (cleaned.startsWith('+')) {
+      return this.e164PhoneRe.test(cleaned) ? { state: 'ok' } : { state: 'invalid' };
+    }
+
+    const digits = cleaned;
+    if (country === 'RO') {
+      if (digits.length === 10 && digits.startsWith('0')) {
+        const suggestion = `+40${digits.slice(1)}`;
+        return this.e164PhoneRe.test(suggestion) ? { state: 'warn', suggestion } : { state: 'invalid' };
+      }
+      if (digits.length === 9) {
+        const suggestion = `+40${digits}`;
+        return this.e164PhoneRe.test(suggestion) ? { state: 'warn', suggestion } : { state: 'invalid' };
+      }
+      if (digits.length === 11 && digits.startsWith('40')) {
+        const suggestion = `+${digits}`;
+        return this.e164PhoneRe.test(suggestion) ? { state: 'warn', suggestion } : { state: 'invalid' };
+      }
+    }
+
+    return { state: 'invalid' };
+  }
+
+  private postalState(country: string, postal: string | null | undefined): { state: 'ok' | 'warn' | 'invalid'; suggestion?: string } {
+    const raw = (postal || '').toString().trim();
+    if (!raw) return { state: 'invalid' };
+
+    if (country === 'RO') {
+      const digits = raw.replace(/\D/g, '');
+      if (digits.length !== 6) return { state: 'invalid' };
+      if (digits === raw) return { state: 'ok' };
+      return { state: 'warn', suggestion: digits };
+    }
+
+    return { state: 'ok' };
+  }
+
+  addressIssueKeys(addr: Address | null | undefined, kind: 'shipping' | 'billing'): string[] {
+    if (!addr) return [];
+    const country = this.normalizeCountry(addr.country);
+    const phone = this.phoneState(country, addr.phone, kind);
+    const postal = this.postalState(country, addr.postal_code);
+    const issues: string[] = [];
+
+    if (phone.state === 'missing') issues.push('adminUi.orders.addressValidate.phoneMissing');
+    else if (phone.state === 'warn') issues.push('adminUi.orders.addressValidate.phoneNonE164');
+    else if (phone.state === 'invalid') issues.push('adminUi.orders.addressValidate.phoneInvalid');
+
+    if (country === 'RO') {
+      if (postal.state === 'invalid') issues.push('adminUi.orders.addressValidate.postalInvalidRo');
+      else if (postal.state === 'warn') issues.push('adminUi.orders.addressValidate.postalNonStandardRo');
+    } else if (postal.state === 'invalid') {
+      issues.push('adminUi.orders.addressValidate.postalInvalid');
+    }
+
+    return issues;
+  }
+
+  addressNeedsAttention(addr: Address | null | undefined, kind: 'shipping' | 'billing'): boolean {
+    return this.addressIssueKeys(addr, kind).length > 0;
+  }
+
+  addressPhoneHint(): string {
+    const kind = this.addressEditorKind();
+    const country = this.normalizeCountry(this.addressCountry);
+    const state = this.phoneState(country, this.addressPhone, kind);
+    if (state.state === 'missing') return this.translate.instant('adminUi.orders.addressValidate.phoneMissing');
+    if (state.state === 'warn') return this.translate.instant('adminUi.orders.addressValidate.phoneNonE164');
+    if (state.state === 'invalid') return this.translate.instant('adminUi.orders.addressValidate.phoneInvalid');
+    return '';
+  }
+
+  addressPhoneSuggestion(): string | null {
+    const kind = this.addressEditorKind();
+    const country = this.normalizeCountry(this.addressCountry);
+    const state = this.phoneState(country, this.addressPhone, kind);
+    return state.suggestion || null;
+  }
+
+  applyAddressPhoneSuggestion(value: string): void {
+    this.addressPhone = (value || '').trim();
+  }
+
+  addressPostalHint(): string {
+    const country = this.normalizeCountry(this.addressCountry);
+    const state = this.postalState(country, this.addressPostalCode);
+    if (country === 'RO') {
+      if (state.state === 'invalid') return this.translate.instant('adminUi.orders.addressValidate.postalInvalidRo');
+      if (state.state === 'warn') return this.translate.instant('adminUi.orders.addressValidate.postalNonStandardRo');
+      return '';
+    }
+    if (state.state === 'invalid') return this.translate.instant('adminUi.orders.addressValidate.postalInvalid');
+    return '';
+  }
+
+  addressPostalSuggestion(): string | null {
+    const country = this.normalizeCountry(this.addressCountry);
+    const state = this.postalState(country, this.addressPostalCode);
+    return state.suggestion || null;
+  }
+
+  applyAddressPostalSuggestion(value: string): void {
+    this.addressPostalCode = (value || '').trim();
+  }
+
   togglePiiReveal(): void {
     const orderId = this.orderId;
     if (!orderId) return;
@@ -1801,6 +2058,19 @@ export class AdminOrderDetailComponent implements OnInit {
     const key = `adminUi.orders.tags.${tag}`;
     const translated = this.translate.instant(key);
     return translated === key ? tag : translated;
+  }
+
+  emailStatusLabel(status: string): string {
+    const key = `adminUi.orders.comms.status.${(status || '').toLowerCase()}`;
+    const translated = this.translate.instant(key);
+    return translated === key ? status : translated;
+  }
+
+  emailStatusChipClass(status: string): string {
+    const normalized = (status || '').toLowerCase();
+    if (normalized === 'sent') return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100';
+    if (normalized === 'failed') return 'bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-100';
+    return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200';
   }
 
   fraudSignalTitle(signal: AdminOrderFraudSignal): string {
@@ -2971,6 +3241,9 @@ export class AdminOrderDetailComponent implements OnInit {
     this.errorRequestId.set(null);
     this.receiptShare.set(null);
     this.adminNoteError.set(null);
+    this.commsLoading.set(true);
+    this.commsError.set(null);
+    this.commsEvents.set([]);
     this.api.get(orderId, { include_pii: this.piiReveal() }).subscribe({
       next: (o) => {
         this.order.set(o);
@@ -2993,11 +3266,13 @@ export class AdminOrderDetailComponent implements OnInit {
         (o.items || []).forEach((it) => (this.returnQty[it.id] = 0));
         (o.items || []).forEach((it) => (this.fulfillmentQty[it.id] = Number(it.shipped_quantity ?? 0)));
         this.loadReturns(o.id);
+        this.loadComms(o.id);
         this.loading.set(false);
       },
       error: (err) => {
         this.error.set(this.translate.instant('adminUi.orders.errors.load'));
         this.errorRequestId.set(extractRequestId(err));
+        this.commsLoading.set(false);
         this.loading.set(false);
       }
     });
@@ -3087,6 +3362,28 @@ export class AdminOrderDetailComponent implements OnInit {
       next: (rows) => this.returnRequests.set(rows || []),
       error: () => this.returnsError.set(this.translate.instant('adminUi.returns.errors.load')),
       complete: () => this.returnsLoading.set(false)
+    });
+  }
+
+  reloadComms(): void {
+    const orderId = this.orderId;
+    if (!orderId) return;
+    this.loadComms(orderId);
+  }
+
+  private loadComms(orderId: string): void {
+    this.commsLoading.set(true);
+    this.commsError.set(null);
+    this.api.listEmailEvents(orderId, { include_pii: this.piiReveal(), limit: 100 }).subscribe({
+      next: (rows) => {
+        this.commsEvents.set(rows || []);
+        this.commsLoading.set(false);
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.translate.instant('adminUi.orders.comms.errors.load');
+        this.commsError.set(msg);
+        this.commsLoading.set(false);
+      }
     });
   }
 }
