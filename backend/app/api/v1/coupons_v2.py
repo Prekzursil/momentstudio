@@ -668,11 +668,13 @@ async def admin_issue_coupon_to_user(
             "code": coupon.code,
         },
     )
+
+    should_email = bool(payload.send_email and user.email)
+    if should_email and not bool(getattr(user, "notify_marketing", False)):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User has not opted in to marketing emails.")
     await session.commit()
 
-    if payload.send_email and user.email:
-        if not bool(getattr(user, "notify_marketing", False)):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User has not opted in to marketing emails.")
+    if should_email:
         background_tasks.add_task(
             email_service.send_coupon_assigned,
             user.email,
@@ -1392,11 +1394,13 @@ async def admin_assign_coupon(
         session.add(assignment)
     else:
         session.add(CouponAssignment(coupon_id=coupon.id, user_id=user.id))
+
+    should_email = bool(payload.send_email and user.email)
+    if should_email and not bool(getattr(user, "notify_marketing", False)):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User has not opted in to marketing emails.")
     await session.commit()
 
-    if payload.send_email and user.email:
-        if not bool(getattr(user, "notify_marketing", False)):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User has not opted in to marketing emails.")
+    if should_email:
         ends_at = getattr(coupon, "ends_at", None)
         background_tasks.add_task(
             email_service.send_coupon_assigned,
@@ -1538,11 +1542,13 @@ async def admin_revoke_coupon(
     assignment.revoked_at = datetime.now(timezone.utc)
     assignment.revoked_reason = (payload.reason or "").strip()[:255] or None
     session.add(assignment)
+
+    should_email = bool(payload.send_email and user.email)
+    if should_email and not bool(getattr(user, "notify_marketing", False)):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User has not opted in to marketing emails.")
     await session.commit()
 
-    if payload.send_email and user.email:
-        if not bool(getattr(user, "notify_marketing", False)):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User has not opted in to marketing emails.")
+    if should_email:
         background_tasks.add_task(
             email_service.send_coupon_revoked,
             user.email,
