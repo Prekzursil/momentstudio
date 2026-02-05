@@ -22,6 +22,12 @@ export interface AdminOrderListItem {
   customer_email?: string | null;
   customer_username?: string | null;
   tags?: string[];
+  sla_kind?: 'accept' | 'ship' | string | null;
+  sla_started_at?: string | null;
+  sla_due_at?: string | null;
+  sla_overdue?: boolean;
+  fraud_flagged?: boolean;
+  fraud_severity?: 'low' | 'medium' | 'high' | string | null;
 }
 
 export interface AdminOrderListResponse {
@@ -125,6 +131,8 @@ export class AdminOrdersService {
     user_id?: string;
     status?: string;
     tag?: string;
+    sla?: string;
+    fraud?: string;
     from?: string;
     to?: string;
     page?: number;
@@ -183,6 +191,35 @@ export class AdminOrdersService {
   ): Observable<AdminOrderDetail> {
     const params = { include_pii: opts?.include_pii ?? true };
     return this.api.patch<AdminOrderDetail>(`/orders/admin/${orderId}`, payload, undefined, params as any).pipe(
+      map((o: any) => ({
+        ...o,
+        total_amount: parseMoney(o?.total_amount),
+        tax_amount: parseMoney(o?.tax_amount),
+        fee_amount: parseMoney(o?.fee_amount),
+        shipping_amount: parseMoney(o?.shipping_amount),
+        refunds: (o?.refunds ?? []).map((r: any) => ({
+          ...r,
+          amount: parseMoney(r?.amount)
+        })),
+        admin_notes: o?.admin_notes ?? [],
+        fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
+        shipments: Array.isArray(o?.shipments) ? o.shipments : [],
+        items: (o?.items ?? []).map((it: any) => ({
+          ...it,
+          unit_price: parseMoney(it?.unit_price),
+          subtotal: parseMoney(it?.subtotal)
+        }))
+      }))
+    );
+  }
+
+  reviewFraud(
+    orderId: string,
+    payload: { decision: 'approve' | 'deny'; note?: string | null },
+    opts?: { include_pii?: boolean }
+  ): Observable<AdminOrderDetail> {
+    const params = { include_pii: opts?.include_pii ?? true };
+    return this.api.post<AdminOrderDetail>(`/orders/admin/${orderId}/fraud-review`, payload, undefined, params as any).pipe(
       map((o: any) => ({
         ...o,
         total_amount: parseMoney(o?.total_amount),

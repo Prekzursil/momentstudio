@@ -4121,6 +4121,34 @@
       },
       "search": "Search",
       "statusFilter": "Status",
+      "sla": {
+        "filter": "SLA",
+        "options": {
+          "all": "All",
+          "any_overdue": "Any overdue",
+          "accept_overdue": "Overdue acceptance",
+          "ship_overdue": "Overdue shipping"
+        },
+        "badges": {
+          "accept": "Accept",
+          "ship": "Ship",
+          "overdue": "{{kind}} overdue ({{time}})",
+          "dueSoon": "{{kind}} due in {{time}}"
+        }
+      },
+      "fraud": {
+        "filter": "Fraud",
+        "options": {
+          "all": "All",
+          "queue": "Review queue",
+          "flagged": "Flagged",
+          "approved": "Approved",
+          "denied": "Denied"
+        },
+        "badges": {
+          "label": "Fraud: {{severity}}"
+        }
+      },
       "sales": "Sales",
       "tagFilter": "Tag",
       "testOrdersFilter": "Test orders",
@@ -4368,6 +4396,8 @@
         "all": "All tags",
         "vip": "VIP",
         "fraud_risk": "Fraud risk",
+        "fraud_approved": "Fraud approved",
+        "fraud_denied": "Fraud denied",
         "gift": "Gift",
         "test": "Test order",
         "none": "No tags yet.",
@@ -4412,6 +4442,22 @@
             "title": "Payment retries",
             "description": "Payment was retried {{count}} times."
           }
+        }
+      },
+      "fraudReview": {
+        "approve": "Approve",
+        "deny": "Deny",
+        "notePrompt": "Audit note (optional)",
+        "status": {
+          "approved": "Reviewed: approved",
+          "denied": "Reviewed: denied"
+        },
+        "success": {
+          "approved": "Fraud review approved.",
+          "denied": "Fraud review denied."
+        },
+        "errors": {
+          "failed": "Could not update fraud review."
         }
       },
       "diff": {
@@ -4470,6 +4516,9 @@
         "load": "Could not load orders.",
         "export": "Could not export orders.",
         "status": "Failed to update order",
+        "invalidTrackingNumber": "Invalid tracking number.",
+        "invalidTrackingNumberForCourier": "Invalid tracking number for {{courier}}.",
+        "invalidTrackingUrl": "Invalid tracking URL.",
         "cancelReasonRequired": "Cancel reason is required to cancel an order.",
         "retry": "Could not retry payment.",
         "capture": "Could not capture payment.",

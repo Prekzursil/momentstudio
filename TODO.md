@@ -54,10 +54,10 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Orders: kanban board view – Add optional kanban mode for order statuses with drag/drop and guardrails.
 - [x] Admin Orders: batch picking list export – Generate pick lists grouped by SKU/qty for selected orders (CSV/PDF).
 - [x] Admin Orders: batch shipping labels center – Batch upload/generate labels and provide merged download with retry.
-- [ ] Admin Orders: SLA timers & escalation – Track “time to accept/ship” with warning badges and filters.
-- [ ] Admin Orders: fraud review queue – Queue orders flagged by fraud signals with approve/deny actions and audit notes.
-- [ ] Admin Orders: quick next/prev navigation – Navigate to next/previous order in the current filtered list from the detail page.
-- [ ] Admin Orders: courier/tracking validation – Validate tracking URL/number formats per courier before saving.
+- [x] Admin Orders: SLA timers & escalation – Track “time to accept/ship” with warning badges and filters.
+- [x] Admin Orders: fraud review queue – Queue orders flagged by fraud signals with approve/deny actions and audit notes.
+- [x] Admin Orders: quick next/prev navigation – Navigate to next/previous order in the current filtered list from the detail page.
+- [x] Admin Orders: courier/tracking validation – Validate tracking URL/number formats per courier before saving.
 - [ ] Admin Orders: address validation assistant – Flag likely invalid phone/postcode and suggest corrections (offline rules, no paid APIs).
 - [ ] Admin Orders: customer comms timeline – Show transactional email delivery status/history for the order.
 - [ ] Admin Orders: internal tag management – Improve tag CRUD (colors/rename) and bulk apply workflows.

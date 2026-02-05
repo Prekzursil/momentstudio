@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, HostListener, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
@@ -37,6 +37,7 @@ type OrderAction =
   | 'void'
   | 'partialRefund'
   | 'refund'
+  | 'fraudReview'
   | 'addNote'
   | 'tagAdd'
   | 'tagRemove'
@@ -107,6 +108,22 @@ type OrderAction =
                 </div>
               </div>
               <div class="flex items-center gap-2">
+                <ng-container *ngIf="navEnabled()">
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.orders.prev' | translate"
+                    [disabled]="action() !== null || navPrev() === null"
+                    (action)="goPrev()"
+                  ></app-button>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.orders.next' | translate"
+                    [disabled]="action() !== null || navNext() === null"
+                    (action)="goNext()"
+                  ></app-button>
+                </ng-container>
                 <app-button
                   size="sm"
                   variant="ghost"
@@ -182,6 +199,26 @@ type OrderAction =
                         </div>
                       </div>
                     </div>
+                  </div>
+                </div>
+                <div *ngIf="(order()!.fraud_signals || []).length" class="flex flex-col items-end gap-2">
+                  <div *ngIf="fraudReviewStatus() as status" class="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    {{ ('adminUi.orders.fraudReview.status.' + status) | translate }}
+                  </div>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <app-button
+                      size="sm"
+                      [label]="'adminUi.orders.fraudReview.approve' | translate"
+                      [disabled]="action() !== null || fraudReviewStatus() === 'approved'"
+                      (action)="reviewFraud('approve')"
+                    ></app-button>
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.orders.fraudReview.deny' | translate"
+                      [disabled]="action() !== null || fraudReviewStatus() === 'denied'"
+                      (action)="reviewFraud('deny')"
+                    ></app-button>
                   </div>
                 </div>
               </div>
@@ -1378,6 +1415,9 @@ export class AdminOrderDetailComponent implements OnInit {
   order = signal<AdminOrderDetail | null>(null);
   piiReveal = signal(true);
   action = signal<OrderAction | null>(null);
+  navEnabled = signal(false);
+  navPrev = signal<{ id: string; page: number } | null>(null);
+  navNext = signal<{ id: string; page: number } | null>(null);
   returnsLoading = signal(false);
   returnsError = signal<string | null>(null);
   returnRequests = signal<ReturnRequestRead[]>([]);
@@ -1432,9 +1472,24 @@ export class AdminOrderDetailComponent implements OnInit {
   shippingLabelError = signal<string | null>(null);
 
   private orderId: string | null = null;
+  private navContext:
+    | {
+        page: number;
+        limit: number;
+        q?: string;
+        status?: string;
+        sla?: string;
+        fraud?: string;
+        tag?: string;
+        from?: string;
+        to?: string;
+        include_test?: boolean;
+      }
+    | null = null;
 
   constructor(
     private route: ActivatedRoute,
+    private router: Router,
     private api: AdminOrdersService,
     private returnsApi: AdminReturnsService,
     private toast: ToastService,
@@ -1519,14 +1574,160 @@ export class AdminOrderDetailComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    const id = this.route.snapshot.paramMap.get('orderId');
-    if (!id) {
-      this.error.set(this.translate.instant('adminUi.orders.notFound'));
-      this.loading.set(false);
+    this.route.queryParamMap.subscribe((params) => {
+      this.applyNavContext(params as any);
+    });
+
+    this.route.paramMap.subscribe((params) => {
+      const id = params.get('orderId');
+      if (!id) {
+        this.error.set(this.translate.instant('adminUi.orders.notFound'));
+        this.loading.set(false);
+        return;
+      }
+      this.orderId = id;
+      this.load(id);
+      this.refreshNav(id);
+    });
+  }
+
+  private applyNavContext(params: any): void {
+    const enabled = Boolean(params?.get?.('nav'));
+    if (!enabled) {
+      this.navEnabled.set(false);
+      this.navContext = null;
+      this.navPrev.set(null);
+      this.navNext.set(null);
       return;
     }
-    this.orderId = id;
-    this.load(id);
+
+    const pageRaw = Number.parseInt(String(params.get('nav_page') ?? '1'), 10);
+    const limitRaw = Number.parseInt(String(params.get('nav_limit') ?? '20'), 10);
+    const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(100, limitRaw) : 20;
+
+    const q = String(params.get('nav_q') ?? '').trim();
+    const status = String(params.get('nav_status') ?? '').trim();
+    const sla = String(params.get('nav_sla') ?? '').trim();
+    const fraud = String(params.get('nav_fraud') ?? '').trim();
+    const tag = String(params.get('nav_tag') ?? '').trim();
+    const from = String(params.get('nav_from') ?? '').trim();
+    const to = String(params.get('nav_to') ?? '').trim();
+    const includeTest = String(params.get('nav_include_test') ?? '').trim();
+
+    const next: NonNullable<AdminOrderDetailComponent['navContext']> = { page, limit };
+    if (q) next.q = q;
+    if (status) next.status = status;
+    if (sla) next.sla = sla;
+    if (fraud) next.fraud = fraud;
+    if (tag) next.tag = tag;
+    if (from) next.from = from;
+    if (to) next.to = to;
+    if (includeTest === '0') next.include_test = false;
+
+    this.navContext = next;
+    this.navEnabled.set(true);
+    const orderId = this.orderId;
+    if (orderId) this.refreshNav(orderId);
+  }
+
+  private refreshNav(orderId: string): void {
+    const ctx = this.navContext;
+    if (!ctx || !this.navEnabled()) {
+      this.navPrev.set(null);
+      this.navNext.set(null);
+      return;
+    }
+
+    const params: Parameters<AdminOrdersService['search']>[0] = {
+      page: ctx.page,
+      limit: ctx.limit,
+      include_pii: false
+    };
+    if (ctx.q) params.q = ctx.q;
+    if (ctx.status) params.status = ctx.status;
+    if (ctx.sla) params.sla = ctx.sla;
+    if (ctx.fraud) params.fraud = ctx.fraud;
+    if (ctx.tag) params.tag = ctx.tag;
+    if (ctx.from) params.from = ctx.from;
+    if (ctx.to) params.to = ctx.to;
+    if (ctx.include_test === false) params.include_test = false;
+
+    this.api.search(params).subscribe({
+      next: (res) => {
+        const ids = (res.items ?? []).map((row) => row.id);
+        const idx = ids.indexOf(orderId);
+        const page = ctx.page;
+        const totalPages = Math.max(1, Number(res.meta?.total_pages ?? page));
+
+        this.navPrev.set(idx > 0 ? { id: ids[idx - 1], page } : null);
+        this.navNext.set(idx >= 0 && idx < ids.length - 1 ? { id: ids[idx + 1], page } : null);
+
+        if (idx === 0 && page > 1) {
+          this.api.search({ ...params, page: page - 1 }).subscribe({
+            next: (prevPage) => {
+              const last = (prevPage.items ?? []).slice(-1)[0];
+              if (last?.id) this.navPrev.set({ id: last.id, page: page - 1 });
+            },
+            error: () => {
+              // ignore
+            }
+          });
+        }
+
+        if (idx === ids.length - 1 && page < totalPages) {
+          this.api.search({ ...params, page: page + 1 }).subscribe({
+            next: (nextPage) => {
+              const first = (nextPage.items ?? [])[0];
+              if (first?.id) this.navNext.set({ id: first.id, page: page + 1 });
+            },
+            error: () => {
+              // ignore
+            }
+          });
+        }
+      },
+      error: () => {
+        this.navPrev.set(null);
+        this.navNext.set(null);
+      }
+    });
+  }
+
+  goPrev(): void {
+    const target = this.navPrev();
+    if (!target) return;
+    this.navigateWithNav(target.id, target.page);
+  }
+
+  goNext(): void {
+    const target = this.navNext();
+    if (!target) return;
+    this.navigateWithNav(target.id, target.page);
+  }
+
+  private navigateWithNav(orderId: string, page: number): void {
+    const ctx = this.navContext;
+    if (!ctx) {
+      void this.router.navigate(['/admin/orders', orderId]);
+      return;
+    }
+
+    const queryParams: Record<string, string | number | boolean> = {
+      nav: 1,
+      nav_page: page,
+      nav_limit: ctx.limit
+    };
+    if (ctx.q) queryParams['nav_q'] = ctx.q;
+    if (ctx.status) queryParams['nav_status'] = ctx.status;
+    if (ctx.sla) queryParams['nav_sla'] = ctx.sla;
+    if (ctx.fraud) queryParams['nav_fraud'] = ctx.fraud;
+    if (ctx.tag) queryParams['nav_tag'] = ctx.tag;
+    if (ctx.from) queryParams['nav_from'] = ctx.from;
+    if (ctx.to) queryParams['nav_to'] = ctx.to;
+    if (ctx.include_test === false) queryParams['nav_include_test'] = 0;
+
+    void this.router.navigate(['/admin/orders', orderId], { queryParams });
   }
 
   @HostListener('document:keydown', ['$event'])
@@ -1713,6 +1914,45 @@ export class AdminOrderDetailComponent implements OnInit {
     return (courier ?? '').trim() || '—';
   }
 
+  private validateTrackingFields(
+    courier: string | null | undefined,
+    trackingNumber: string,
+    trackingUrl: string
+  ): string | null {
+    const number = (trackingNumber ?? '').trim();
+    const url = (trackingUrl ?? '').trim();
+    if (!number && !url) return null;
+
+    const courierClean = (courier ?? '').trim().toLowerCase();
+    const courierPattern = /^[A-Za-z0-9]{5,30}$/;
+    const genericPattern = /^[A-Za-z0-9][A-Za-z0-9._-]{4,49}$/;
+
+    if (number) {
+      if (courierClean === 'sameday' || courierClean === 'fan_courier') {
+        if (!courierPattern.test(number)) {
+          return this.translate.instant('adminUi.orders.errors.invalidTrackingNumberForCourier', {
+            courier: this.courierName(courierClean)
+          });
+        }
+      } else if (number.includes(' ') || !genericPattern.test(number)) {
+        return this.translate.instant('adminUi.orders.errors.invalidTrackingNumber');
+      }
+    }
+
+    if (url) {
+      try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          return this.translate.instant('adminUi.orders.errors.invalidTrackingUrl');
+        }
+      } catch {
+        return this.translate.instant('adminUi.orders.errors.invalidTrackingUrl');
+      }
+    }
+
+    return null;
+  }
+
   openShipmentEditor(shipment?: AdminOrderShipment): void {
     this.shipmentEditorError.set(null);
     if (shipment) {
@@ -1748,6 +1988,13 @@ export class AdminOrderDetailComponent implements OnInit {
       const msg = this.translate.instant('adminUi.orders.shipments.errors.trackingRequired');
       this.shipmentEditorError.set(msg);
       this.toast.error(msg);
+      return;
+    }
+
+    const validationError = this.validateTrackingFields(this.shipmentCourier, trackingNumber, this.shipmentTrackingUrl);
+    if (validationError) {
+      this.shipmentEditorError.set(validationError);
+      this.toast.error(validationError);
       return;
     }
 
@@ -2144,6 +2391,39 @@ export class AdminOrderDetailComponent implements OnInit {
     });
   }
 
+  fraudReviewStatus(): 'approved' | 'denied' | null {
+    const tags = (this.order()?.tags ?? []).map((t) => String(t ?? '').trim().toLowerCase());
+    if (tags.includes('fraud_approved')) return 'approved';
+    if (tags.includes('fraud_denied')) return 'denied';
+    return null;
+  }
+
+  reviewFraud(decision: 'approve' | 'deny'): void {
+    const orderId = this.orderId;
+    if (!orderId) return;
+    if (!this.order()) return;
+    if (this.action() !== null) return;
+
+    const note = (window.prompt(this.translate.instant('adminUi.orders.fraudReview.notePrompt')) ?? '').trim();
+    this.action.set('fraudReview');
+    this.api.reviewFraud(orderId, { decision, note: note || null }, { include_pii: this.piiReveal() }).subscribe({
+      next: (updated) => {
+        this.order.set(updated);
+        this.toast.success(
+          this.translate.instant(
+            decision === 'approve' ? 'adminUi.orders.fraudReview.success.approved' : 'adminUi.orders.fraudReview.success.denied'
+          )
+        );
+        this.action.set(null);
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.translate.instant('adminUi.orders.fraudReview.errors.failed');
+        this.toast.error(msg);
+        this.action.set(null);
+      }
+    });
+  }
+
   refundsTotal(): number {
     const refunds = this.order()?.refunds ?? [];
     return refunds.reduce((sum, refund) => sum + Number(refund?.amount ?? 0), 0);
@@ -2365,13 +2645,28 @@ export class AdminOrderDetailComponent implements OnInit {
       this.toast.error(this.translate.instant('adminUi.orders.errors.cancelReasonRequired'));
       return;
     }
+
+    const currentTrackingNumber = (this.order()?.tracking_number ?? '').toString().trim();
+    const currentTrackingUrl = (this.order()?.tracking_url ?? '').toString().trim();
+    const nextTrackingNumber = this.trackingNumber.trim();
+    const nextTrackingUrl = this.trackingUrl.trim();
+    const trackingNumberChanged = nextTrackingNumber !== currentTrackingNumber;
+    const trackingUrlChanged = nextTrackingUrl !== currentTrackingUrl;
+    if (trackingNumberChanged || trackingUrlChanged) {
+      const validationError = this.validateTrackingFields(this.order()?.courier ?? null, nextTrackingNumber, nextTrackingUrl);
+      if (validationError) {
+        this.toast.error(validationError);
+        return;
+      }
+    }
+
     this.action.set('save');
     this.api
       .update(orderId, {
         status: statusChanged ? this.statusValue : undefined,
         cancel_reason: this.statusValue === 'cancelled' && cancelReasonValue ? cancelReasonValue : undefined,
-        tracking_number: this.trackingNumber.trim() || null,
-        tracking_url: this.trackingUrl.trim() || null
+        tracking_number: trackingNumberChanged ? (nextTrackingNumber || null) : undefined,
+        tracking_url: trackingUrlChanged ? (nextTrackingUrl || null) : undefined
       }, { include_pii: this.piiReveal() })
       .subscribe({
         next: (o) => {

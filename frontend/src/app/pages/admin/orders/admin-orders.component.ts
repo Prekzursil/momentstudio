@@ -45,6 +45,9 @@ type OrderStatusFilter =
   | 'cancelled'
   | 'refunded';
 
+type SlaFilter = 'all' | 'any_overdue' | 'accept_overdue' | 'ship_overdue';
+type FraudFilter = 'all' | 'queue' | 'flagged' | 'approved' | 'denied';
+
 type AdminOrdersViewMode = 'table' | 'kanban';
 type KanbanStatus = Exclude<OrderStatusFilter, 'all' | 'sales' | 'pending'>;
 
@@ -55,6 +58,8 @@ type AdminOrdersFilterPreset = {
   filters: {
     q: string;
     status: OrderStatusFilter;
+    sla: SlaFilter;
+    fraud: FraudFilter;
     tag: string;
     fromDate: string;
     toDate: string;
@@ -180,6 +185,33 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
 	              <option value="delivered">{{ 'adminUi.orders.delivered' | translate }}</option>
               <option value="cancelled">{{ 'adminUi.orders.cancelled' | translate }}</option>
               <option value="refunded">{{ 'adminUi.orders.refunded' | translate }}</option>
+            </select>
+          </label>
+
+          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            {{ 'adminUi.orders.sla.filter' | translate }}
+            <select
+              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              [(ngModel)]="sla"
+            >
+              <option value="all">{{ 'adminUi.orders.sla.options.all' | translate }}</option>
+              <option value="any_overdue">{{ 'adminUi.orders.sla.options.any_overdue' | translate }}</option>
+              <option value="accept_overdue">{{ 'adminUi.orders.sla.options.accept_overdue' | translate }}</option>
+              <option value="ship_overdue">{{ 'adminUi.orders.sla.options.ship_overdue' | translate }}</option>
+            </select>
+          </label>
+
+          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            {{ 'adminUi.orders.fraud.filter' | translate }}
+            <select
+              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              [(ngModel)]="fraud"
+            >
+              <option value="all">{{ 'adminUi.orders.fraud.options.all' | translate }}</option>
+              <option value="queue">{{ 'adminUi.orders.fraud.options.queue' | translate }}</option>
+              <option value="flagged">{{ 'adminUi.orders.fraud.options.flagged' | translate }}</option>
+              <option value="approved">{{ 'adminUi.orders.fraud.options.approved' | translate }}</option>
+              <option value="denied">{{ 'adminUi.orders.fraud.options.denied' | translate }}</option>
             </select>
           </label>
 
@@ -342,8 +374,28 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
                               >
                                 <div class="flex items-start justify-between gap-2">
                                   <div class="min-w-0">
-                                    <div class="font-semibold text-slate-900 dark:text-slate-50 truncate">
-                                      {{ order.reference_code || (order.id | slice: 0:8) }}
+                                    <div class="flex flex-wrap items-center gap-2 min-w-0">
+                                      <div class="font-semibold text-slate-900 dark:text-slate-50 truncate">
+                                        {{ order.reference_code || (order.id | slice: 0:8) }}
+                                      </div>
+                                      <ng-container *ngIf="slaBadge(order) as badge">
+                                        <span
+                                          class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+                                          [ngClass]="badge.className"
+                                          [attr.title]="badge.title"
+                                        >
+                                          {{ badge.label }}
+                                        </span>
+                                      </ng-container>
+                                      <ng-container *ngIf="fraudBadge(order) as fraud">
+                                        <span
+                                          class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+                                          [ngClass]="fraud.className"
+                                          [attr.title]="fraud.title"
+                                        >
+                                          {{ fraud.label }}
+                                        </span>
+                                      </ng-container>
                                     </div>
                                     <div class="text-xs text-slate-600 dark:text-slate-300 truncate">
                                       {{ customerLabel(order) }}
@@ -564,9 +616,32 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
                     {{ customerLabel(order) }}
                   </td>
                   <td *ngSwitchCase="'status'" [ngClass]="cellPaddingClass()">
-                    <span [ngClass]="statusPillClass(order.status)" class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold">
-                      {{ ('adminUi.orders.' + order.status) | translate }}
-                    </span>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span
+                        [ngClass]="statusPillClass(order.status)"
+                        class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
+                      >
+                        {{ ('adminUi.orders.' + order.status) | translate }}
+                      </span>
+                      <ng-container *ngIf="slaBadge(order) as badge">
+                        <span
+                          class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+                          [ngClass]="badge.className"
+                          [attr.title]="badge.title"
+                        >
+                          {{ badge.label }}
+                        </span>
+                      </ng-container>
+                      <ng-container *ngIf="fraudBadge(order) as fraud">
+                        <span
+                          class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+                          [ngClass]="fraud.className"
+                          [attr.title]="fraud.title"
+                        >
+                          {{ fraud.label }}
+                        </span>
+                      </ng-container>
+                    </div>
                   </td>
                   <td *ngSwitchCase="'tags'" [ngClass]="cellPaddingClass()">
                     <div class="flex flex-wrap gap-1">
@@ -933,6 +1008,8 @@ export class AdminOrdersComponent implements OnInit {
 
   q = '';
   status: OrderStatusFilter = 'all';
+  sla: SlaFilter = 'all';
+  fraud: FraudFilter = 'all';
   tag = '';
   fromDate = '';
   toDate = '';
@@ -943,7 +1020,7 @@ export class AdminOrdersComponent implements OnInit {
   presets: AdminOrdersFilterPreset[] = [];
   selectedPresetId = '';
   selectedSavedViewKey = '';
-  tagOptions = signal<string[]>(['vip', 'fraud_risk', 'gift']);
+  tagOptions = signal<string[]>(['vip', 'fraud_risk', 'fraud_approved', 'fraud_denied', 'gift']);
 
   exportModalOpen = signal(false);
   exportTemplates: AdminOrdersExportTemplate[] = [];
@@ -1005,7 +1082,7 @@ export class AdminOrdersComponent implements OnInit {
     this.maybeApplyFiltersFromState();
     this.ordersApi.listOrderTags().subscribe({
       next: (tags) => {
-        const merged = new Set<string>(['vip', 'fraud_risk', 'gift', 'test']);
+        const merged = new Set<string>(['vip', 'fraud_risk', 'fraud_approved', 'fraud_denied', 'gift', 'test']);
         for (const t of tags) merged.add(t);
         this.tagOptions.set(Array.from(merged).sort());
       },
@@ -1198,6 +1275,8 @@ export class AdminOrdersComponent implements OnInit {
   resetFilters(): void {
     this.q = '';
     this.status = 'all';
+    this.sla = 'all';
+    this.fraud = 'all';
     this.tag = '';
     this.fromDate = '';
     this.toDate = '';
@@ -1217,6 +1296,8 @@ export class AdminOrdersComponent implements OnInit {
 
     this.q = preset.filters.q;
     this.status = preset.filters.status;
+    this.sla = preset.filters.sla ?? 'all';
+    this.fraud = preset.filters.fraud ?? 'all';
     this.tag = preset.filters.tag;
     this.fromDate = preset.filters.fromDate;
     this.toDate = preset.filters.toDate;
@@ -1243,6 +1324,8 @@ export class AdminOrdersComponent implements OnInit {
 
     this.q = String(filters.q ?? '');
     this.status = (filters.status ?? 'all') as OrderStatusFilter;
+    this.sla = (filters.sla ?? 'all') as SlaFilter;
+    this.fraud = (filters.fraud ?? 'all') as FraudFilter;
     this.tag = String(filters.tag ?? '');
     this.fromDate = String(filters.fromDate ?? '');
     this.toDate = String(filters.toDate ?? '');
@@ -1294,6 +1377,8 @@ export class AdminOrdersComponent implements OnInit {
 
     this.q = String(filters.q ?? '');
     this.status = (filters.status ?? 'all') as OrderStatusFilter;
+    this.sla = (filters.sla ?? 'all') as SlaFilter;
+    this.fraud = (filters.fraud ?? 'all') as FraudFilter;
     this.tag = String(filters.tag ?? '');
     this.fromDate = String(filters.fromDate ?? '');
     this.toDate = String(filters.toDate ?? '');
@@ -1309,6 +1394,8 @@ export class AdminOrdersComponent implements OnInit {
     return {
       q: this.q,
       status: this.status,
+      sla: this.sla,
+      fraud: this.fraud,
       tag: this.tag,
       fromDate: this.fromDate,
       toDate: this.toDate,
@@ -1337,6 +1424,8 @@ export class AdminOrdersComponent implements OnInit {
       filters: {
         q: this.q,
         status: this.status,
+        sla: this.sla,
+        fraud: this.fraud,
         tag: this.tag,
         fromDate: this.fromDate,
         toDate: this.toDate,
@@ -1773,7 +1862,23 @@ export class AdminOrdersComponent implements OnInit {
   }
 
   open(orderId: string): void {
-    void this.router.navigate(['/admin/orders', orderId]);
+    const queryParams: Record<string, string | number | boolean> = {
+      nav: 1,
+      nav_page: this.page,
+      nav_limit: this.limit
+    };
+    const q = this.q.trim();
+    if (q) queryParams['nav_q'] = q;
+    if (this.status !== 'all') queryParams['nav_status'] = this.status;
+    if (this.sla !== 'all') queryParams['nav_sla'] = this.sla;
+    if (this.fraud !== 'all') queryParams['nav_fraud'] = this.fraud;
+    const tag = this.tag.trim();
+    if (tag) queryParams['nav_tag'] = tag;
+    if (!this.includeTestOrders) queryParams['nav_include_test'] = 0;
+    if (this.fromDate) queryParams['nav_from'] = `${this.fromDate}T00:00:00Z`;
+    if (this.toDate) queryParams['nav_to'] = `${this.toDate}T23:59:59Z`;
+
+    void this.router.navigate(['/admin/orders', orderId], { queryParams });
   }
 
   openExports(): void {
@@ -1891,6 +1996,84 @@ export class AdminOrdersComponent implements OnInit {
     return orderStatusChipClass(status);
   }
 
+  slaBadge(
+    order: AdminOrderListItem
+  ): { label: string; title: string; className: string } | null {
+    const kind = (order?.sla_kind ?? '').toString().trim().toLowerCase();
+    const dueRaw = (order?.sla_due_at ?? '').toString().trim();
+    if (!kind || !dueRaw) return null;
+    const dueTs = Date.parse(dueRaw);
+    if (!Number.isFinite(dueTs)) return null;
+
+    const kindKey =
+      kind === 'accept'
+        ? 'adminUi.orders.sla.badges.accept'
+        : kind === 'ship'
+          ? 'adminUi.orders.sla.badges.ship'
+          : null;
+    if (!kindKey) return null;
+
+    const kindLabel = this.translate.instant(kindKey);
+    const now = Date.now();
+    const diffMs = dueTs - now;
+    const time = this.formatDurationShort(Math.abs(diffMs));
+    const dueSoonMs = 4 * 60 * 60 * 1000;
+
+    if (diffMs <= 0) {
+      const label = this.translate.instant('adminUi.orders.sla.badges.overdue', { kind: kindLabel, time });
+      return {
+        label,
+        title: label,
+        className:
+          'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-950/40 dark:text-rose-100'
+      };
+    }
+
+    if (diffMs <= dueSoonMs) {
+      const label = this.translate.instant('adminUi.orders.sla.badges.dueSoon', { kind: kindLabel, time });
+      return {
+        label,
+        title: label,
+        className:
+          'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-100'
+      };
+    }
+
+    return null;
+  }
+
+  fraudBadge(
+    order: AdminOrderListItem
+  ): { label: string; title: string; className: string } | null {
+    const severity = (order?.fraud_severity ?? '').toString().trim().toLowerCase();
+    if (!severity) return null;
+
+    const severityKey = `adminUi.orders.fraudSignals.severity.${severity}`;
+    const translatedSeverity = this.translate.instant(severityKey);
+    const severityLabel = translatedSeverity === severityKey ? severity : translatedSeverity;
+    const label = this.translate.instant('adminUi.orders.fraud.badges.label', { severity: severityLabel });
+
+    const className =
+      severity === 'high'
+        ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-950/40 dark:text-rose-100'
+        : severity === 'medium'
+          ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-100'
+          : severity === 'low'
+            ? 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-500/40 dark:bg-sky-950/30 dark:text-sky-100'
+            : 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-100';
+
+    return { label, title: label, className };
+  }
+
+  private formatDurationShort(ms: number): string {
+    const minutes = Math.max(0, Math.round(ms / 60_000));
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.round(minutes / 60);
+    if (hours < 48) return `${hours}h`;
+    const days = Math.round(hours / 24);
+    return `${days}d`;
+  }
+
   private load(): void {
     if (this.viewMode() === 'kanban') {
       this.loadKanban();
@@ -1908,6 +2091,8 @@ export class AdminOrdersComponent implements OnInit {
     const q = this.q.trim();
     if (q) params.q = q;
     if (this.status !== 'all') params.status = this.status;
+    if (this.sla !== 'all') params.sla = this.sla;
+    if (this.fraud !== 'all') params.fraud = this.fraud;
     const tag = this.tag.trim();
     if (tag) params.tag = tag;
     if (!this.includeTestOrders) params.include_test = false;
@@ -1944,6 +2129,8 @@ export class AdminOrdersComponent implements OnInit {
     if (q) baseParams.q = q;
     const tag = this.tag.trim();
     if (tag) baseParams.tag = tag;
+    if (this.sla !== 'all') baseParams.sla = this.sla;
+    if (this.fraud !== 'all') baseParams.fraud = this.fraud;
     if (!this.includeTestOrders) baseParams.include_test = false;
     if (this.fromDate) baseParams.from = `${this.fromDate}T00:00:00Z`;
     if (this.toDate) baseParams.to = `${this.toDate}T23:59:59Z`;
@@ -2095,6 +2282,14 @@ export class AdminOrdersComponent implements OnInit {
           filters: {
             q: String(candidate?.filters?.q ?? ''),
             status: (candidate?.filters?.status ?? 'all') as OrderStatusFilter,
+            sla: ((): SlaFilter => {
+              const raw = String(candidate?.filters?.sla ?? 'all');
+              return raw === 'any_overdue' || raw === 'accept_overdue' || raw === 'ship_overdue' ? raw : 'all';
+            })(),
+            fraud: ((): FraudFilter => {
+              const raw = String(candidate?.filters?.fraud ?? 'all');
+              return raw === 'queue' || raw === 'flagged' || raw === 'approved' || raw === 'denied' ? raw : 'all';
+            })(),
             tag: String(candidate?.filters?.tag ?? ''),
             fromDate: String(candidate?.filters?.fromDate ?? ''),
             toDate: String(candidate?.filters?.toDate ?? ''),

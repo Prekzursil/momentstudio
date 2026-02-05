@@ -27,6 +27,12 @@ class AdminOrderListItem(BaseModel):
     customer_email: str | None = None
     customer_username: str | None = None
     tags: list[str] = Field(default_factory=list)
+    sla_kind: str | None = None
+    sla_started_at: datetime | None = None
+    sla_due_at: datetime | None = None
+    sla_overdue: bool = False
+    fraud_flagged: bool = False
+    fraud_severity: str | None = None
 
 
 class AdminOrderListResponse(BaseModel):

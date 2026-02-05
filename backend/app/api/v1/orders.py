@@ -91,6 +91,7 @@ from app.schemas.order_admin_address import AdminOrderAddressesUpdate
 from app.schemas.order_shipment import OrderShipmentCreate, OrderShipmentUpdate, OrderShipmentRead
 from app.schemas.order_tag import OrderTagCreate, OrderTagsResponse
 from app.schemas.order_refund import AdminOrderRefundCreate, AdminOrderRefundRequest
+from app.schemas.order_fraud_review import OrderFraudReviewRequest
 from app.schemas.order_exports_admin import AdminOrderDocumentExportListResponse, AdminOrderDocumentExportRead
 from app.schemas.receipt import ReceiptRead, ReceiptShareTokenRead
 from app.services import notifications as notification_service
@@ -1267,6 +1268,8 @@ async def admin_search_orders(
     user_id: UUID | None = Query(default=None),
     status: str | None = Query(default=None),
     tag: str | None = Query(default=None, max_length=50),
+    sla: str | None = Query(default=None, max_length=30),
+    fraud: str | None = Query(default=None, max_length=30),
     from_dt: datetime | None = Query(default=None, alias="from"),
     to_dt: datetime | None = Query(default=None, alias="to"),
     page: int = Query(default=1, ge=1),
@@ -1297,6 +1300,30 @@ async def admin_search_orders(
                 parsed_status = OrderStatus(status_clean)
             except ValueError:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid order status")
+    sla_clean = (sla or "").strip().lower() if sla else None
+    parsed_sla: str | None = None
+    if sla_clean:
+        if sla_clean in {"accept_overdue", "acceptance_overdue", "overdue_acceptance", "overdue_accept"}:
+            parsed_sla = "accept_overdue"
+        elif sla_clean in {"ship_overdue", "shipping_overdue", "overdue_shipping", "overdue_ship"}:
+            parsed_sla = "ship_overdue"
+        elif sla_clean in {"any_overdue", "overdue", "any"}:
+            parsed_sla = "any_overdue"
+        else:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid SLA filter")
+    fraud_clean = (fraud or "").strip().lower() if fraud else None
+    parsed_fraud: str | None = None
+    if fraud_clean:
+        if fraud_clean in {"queue", "review", "needs_review", "needs-review"}:
+            parsed_fraud = "queue"
+        elif fraud_clean in {"flagged", "risk"}:
+            parsed_fraud = "flagged"
+        elif fraud_clean in {"approved"}:
+            parsed_fraud = "approved"
+        elif fraud_clean in {"denied"}:
+            parsed_fraud = "denied"
+        else:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid fraud filter")
     rows, total_items = await order_service.admin_search_orders(
         session,
         q=q,
@@ -1305,27 +1332,57 @@ async def admin_search_orders(
         statuses=parsed_statuses,
         pending_any=pending_any,
         tag=tag,
+        sla=parsed_sla,
+        fraud=parsed_fraud,
         from_dt=from_dt,
         to_dt=to_dt,
         page=page,
         limit=limit,
         include_test=include_test,
     )
-    items = [
-        AdminOrderListItem(
-            id=order.id,
-            reference_code=order.reference_code,
-            status=order.status,
-            total_amount=order.total_amount,
-            currency=order.currency,
-            payment_method=getattr(order, "payment_method", None),
-            created_at=order.created_at,
-            customer_email=email if include_pii else pii_service.mask_email(email),
-            customer_username=username,
-            tags=[t.tag for t in (getattr(order, "tags", None) or [])],
+    now = datetime.now(timezone.utc)
+    accept_hours = max(1, int(getattr(settings, "order_sla_accept_hours", 24) or 24))
+    ship_hours = max(1, int(getattr(settings, "order_sla_ship_hours", 48) or 48))
+
+    def _ensure_utc(dt: datetime | None) -> datetime | None:
+        if not dt:
+            return None
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+
+    items: list[AdminOrderListItem] = []
+    for (order, email, username, sla_kind, sla_started_at, fraud_flagged, fraud_severity) in rows:
+        sla_started_at = _ensure_utc(sla_started_at)
+        sla_due_at: datetime | None = None
+        sla_overdue = False
+        if sla_kind == "accept" and sla_started_at:
+            sla_due_at = sla_started_at + timedelta(hours=accept_hours)
+            sla_overdue = sla_due_at <= now
+        elif sla_kind == "ship" and sla_started_at:
+            sla_due_at = sla_started_at + timedelta(hours=ship_hours)
+            sla_overdue = sla_due_at <= now
+
+        items.append(
+            AdminOrderListItem(
+                id=order.id,
+                reference_code=order.reference_code,
+                status=order.status,
+                total_amount=order.total_amount,
+                currency=order.currency,
+                payment_method=getattr(order, "payment_method", None),
+                created_at=order.created_at,
+                customer_email=email if include_pii else pii_service.mask_email(email),
+                customer_username=username,
+                tags=[t.tag for t in (getattr(order, "tags", None) or [])],
+                sla_kind=sla_kind,
+                sla_started_at=sla_started_at,
+                sla_due_at=sla_due_at,
+                sla_overdue=sla_overdue,
+                fraud_flagged=bool(fraud_flagged),
+                fraud_severity=fraud_severity,
+            )
         )
-        for (order, email, username) in rows
-    ]
     total_pages = max(1, (int(total_items) + limit - 1) // limit)
     meta = AdminPaginationMeta(total_items=int(total_items), total_pages=total_pages, page=page, limit=limit)
     return AdminOrderListResponse(items=items, meta=meta)
@@ -2518,6 +2575,28 @@ async def admin_remove_order_tag(
         session, order, tag=tag, actor_user_id=getattr(admin, "id", None)
     )
 
+    return await _serialize_admin_order(session, updated, include_pii=include_pii, current_user=admin)
+
+
+@router.post("/admin/{order_id}/fraud-review", response_model=AdminOrderRead)
+async def admin_review_order_fraud(
+    order_id: UUID,
+    payload: OrderFraudReviewRequest = Body(...),
+    include_pii: bool = Query(default=False),
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("orders")),
+) -> AdminOrderRead:
+    order = await order_service.get_order_by_id(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+
+    updated = await order_service.review_order_fraud(
+        session,
+        order,
+        decision=payload.decision,
+        note=payload.note,
+        actor_user_id=getattr(admin, "id", None),
+    )
     return await _serialize_admin_order(session, updated, include_pii=include_pii, current_user=admin)
 
 

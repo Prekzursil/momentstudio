@@ -182,6 +182,9 @@ class Settings(BaseSettings):
     fraud_velocity_window_minutes: int = 60 * 24
     fraud_velocity_threshold: int = 3
     fraud_payment_retry_threshold: int = 2
+    # Admin order SLAs (used for warning badges/filters in the admin orders UI)
+    order_sla_accept_hours: int = 24
+    order_sla_ship_hours: int = 48
 
 
 @lru_cache

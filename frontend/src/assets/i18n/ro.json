@@ -4121,6 +4121,34 @@
       },
       "search": "Caută",
       "statusFilter": "Status",
+      "sla": {
+        "filter": "SLA",
+        "options": {
+          "all": "Toate",
+          "any_overdue": "Orice întârziere",
+          "accept_overdue": "Întârziere acceptare",
+          "ship_overdue": "Întârziere expediere"
+        },
+        "badges": {
+          "accept": "Acceptare",
+          "ship": "Expediere",
+          "overdue": "{{kind}} întârziată ({{time}})",
+          "dueSoon": "{{kind}} în {{time}}"
+        }
+      },
+      "fraud": {
+        "filter": "Fraud",
+        "options": {
+          "all": "Toate",
+          "queue": "Coadă de verificare",
+          "flagged": "Semnalate",
+          "approved": "Aprobate",
+          "denied": "Respinse"
+        },
+        "badges": {
+          "label": "Fraud: {{severity}}"
+        }
+      },
       "sales": "Vânzări",
       "tagFilter": "Etichetă",
       "testOrdersFilter": "Comenzi test",
@@ -4368,6 +4396,8 @@
         "all": "Toate etichetele",
         "vip": "VIP",
         "fraud_risk": "Risc fraudă",
+        "fraud_approved": "Fraudă aprobată",
+        "fraud_denied": "Fraudă respinsă",
         "gift": "Cadou",
         "test": "Comandă test",
         "none": "Nicio etichetă încă.",
@@ -4412,6 +4442,22 @@
             "title": "Reîncercări plată",
             "description": "Plata a fost reîncercată de {{count}} ori."
           }
+        }
+      },
+      "fraudReview": {
+        "approve": "Aprobă",
+        "deny": "Respinge",
+        "notePrompt": "Notă audit (opțională)",
+        "status": {
+          "approved": "Verificat: aprobat",
+          "denied": "Verificat: respins"
+        },
+        "success": {
+          "approved": "Verificare fraudă aprobată.",
+          "denied": "Verificare fraudă respinsă."
+        },
+        "errors": {
+          "failed": "Nu am putut actualiza verificarea de fraudă."
         }
       },
       "diff": {
@@ -4470,6 +4516,9 @@
         "load": "Nu am putut încărca comenzile.",
         "export": "Nu am putut exporta comenzile.",
         "status": "Nu am putut actualiza comanda",
+        "invalidTrackingNumber": "Număr tracking invalid.",
+        "invalidTrackingNumberForCourier": "Număr tracking invalid pentru {{courier}}.",
+        "invalidTrackingUrl": "Link tracking invalid.",
         "cancelReasonRequired": "Motivul anulării este obligatoriu.",
         "retry": "Nu am putut reîncerca plata.",
         "capture": "Nu am putut captura plata.",
