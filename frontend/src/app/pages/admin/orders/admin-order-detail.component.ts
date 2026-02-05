@@ -5,6 +5,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
+import { CopyButtonComponent } from '../../../shared/copy-button.component';
 import { ErrorStateComponent } from '../../../shared/error-state.component';
 import { extractRequestId } from '../../../shared/http-error';
 import { InputComponent } from '../../../shared/input.component';
@@ -61,6 +62,7 @@ type OrderAction =
     TranslateModule,
     BreadcrumbComponent,
     ButtonComponent,
+    CopyButtonComponent,
     ErrorStateComponent,
     InputComponent,
     SkeletonComponent,
@@ -93,6 +95,15 @@ type OrderAction =
                 </h1>
                 <div class="text-sm text-slate-600 dark:text-slate-300">
                   {{ customerLabel() }} · {{ order()!.created_at | date: 'medium' }}
+                </div>
+                <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                  <span class="font-mono break-all">{{ order()!.id }}</span>
+                  <app-copy-button [value]="order()!.id"></app-copy-button>
+                  <ng-container *ngIf="piiReveal() && order()!.customer_email">
+                    <span class="text-slate-300 dark:text-slate-700">·</span>
+                    <span class="truncate max-w-[240px]">{{ order()!.customer_email }}</span>
+                    <app-copy-button [value]="order()!.customer_email"></app-copy-button>
+                  </ng-container>
                 </div>
               </div>
               <div class="flex items-center gap-2">

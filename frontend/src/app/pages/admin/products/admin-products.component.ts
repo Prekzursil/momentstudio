@@ -6,6 +6,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { forkJoin, Subscription } from 'rxjs';
 import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
+import { CopyButtonComponent } from '../../../shared/copy-button.component';
 import { ErrorStateComponent } from '../../../shared/error-state.component';
 import { extractRequestId } from '../../../shared/http-error';
 import { InputComponent } from '../../../shared/input.component';
@@ -227,13 +228,14 @@ type PriceHistoryChart = {
     FormsModule,
     ScrollingModule,
     TranslateModule,
-    BreadcrumbComponent,
-    ButtonComponent,
-    ErrorStateComponent,
-    InputComponent,
-    HelpPanelComponent,
-    ModalComponent,
-    SkeletonComponent,
+	    BreadcrumbComponent,
+	    ButtonComponent,
+      CopyButtonComponent,
+	    ErrorStateComponent,
+	    InputComponent,
+	    HelpPanelComponent,
+	    ModalComponent,
+	    SkeletonComponent,
     LocalizedCurrencyPipe,
     TableLayoutModalComponent,
     AdminPageHeaderComponent
@@ -1578,8 +1580,16 @@ type PriceHistoryChart = {
                 {{ editingSlug() ? ('adminUi.products.edit' | translate) : ('adminUi.products.create' | translate) }}
               </h2>
               <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                <span *ngIf="editingSlug() as slug" class="font-mono truncate">{{ slug }}</span>
+                <ng-container *ngIf="editingSlug() as slug">
+                  <span class="font-mono truncate">{{ slug }}</span>
+                  <app-copy-button [value]="slug"></app-copy-button>
+                </ng-container>
                 <span *ngIf="!editingSlug() && predictedSlug()" class="font-mono truncate">{{ predictedSlug() }}</span>
+                <ng-container *ngIf="editingProductId() as pid">
+                  <span class="text-slate-300 dark:text-slate-700">·</span>
+                  <span class="font-mono truncate">{{ pid }}</span>
+                  <app-copy-button [value]="pid"></app-copy-button>
+                </ng-container>
 
                 <span
                   *ngIf="editorSaving()"

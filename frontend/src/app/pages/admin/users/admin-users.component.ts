@@ -20,6 +20,7 @@ import { AdminFavoriteItem, AdminFavoritesService } from '../../../core/admin-fa
 import { ToastService } from '../../../core/toast.service';
 import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
+import { CopyButtonComponent } from '../../../shared/copy-button.component';
 import { ErrorStateComponent } from '../../../shared/error-state.component';
 import { extractRequestId } from '../../../shared/http-error';
 import { InputComponent } from '../../../shared/input.component';
@@ -67,6 +68,7 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
 	    TranslateModule,
 	    BreadcrumbComponent,
 	    ButtonComponent,
+      CopyButtonComponent,
 	    ErrorStateComponent,
 	    InputComponent,
 	    HelpPanelComponent,
@@ -314,7 +316,14 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
           <div *ngIf="selectedUser()" class="grid gap-3">
             <div class="rounded-xl border border-slate-200 p-3 grid gap-1 dark:border-slate-800">
               <div class="font-semibold text-slate-900 dark:text-slate-50">{{ identityLabel(selectedUser()!) }}</div>
-              <div class="text-sm text-slate-600 dark:text-slate-300">{{ selectedUser()!.email }}</div>
+              <div class="flex flex-wrap items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                <span class="truncate max-w-[320px]">{{ selectedUser()!.email }}</span>
+                <app-copy-button [value]="selectedUser()!.email"></app-copy-button>
+              </div>
+              <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                <span class="font-mono break-all">{{ selectedUser()!.id }}</span>
+                <app-copy-button [value]="selectedUser()!.id"></app-copy-button>
+              </div>
               <div *ngIf="vip" class="mt-2">
                 <span class="inline-flex items-center rounded-full bg-indigo-100 px-2 py-1 text-xs font-semibold text-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-100">
                   {{ 'adminUi.users.vip' | translate }}

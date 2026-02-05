@@ -36,9 +36,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin UI: standardized error + retry component – Use a shared error state across admin pages (message + requestId + retry CTA).
 - [x] Admin UI: consistent loading skeletons – Add a shared table skeleton/placeholder so lists don’t flash empty content while loading.
 - [x] Admin UI: unsaved-changes guard for editors – Prevent navigating away from product/CMS editors when there are unsaved changes.
-- [ ] Admin UI: focus management for modals – Trap focus, restore focus to trigger, and close on Escape consistently across admin modals.
-- [ ] Admin UI: optimistic toggles with rollback – For simple flags (active/featured/visible), update immediately and rollback on failure with clear toast.
-- [ ] Admin UI: copy buttons for IDs/emails – Add one-click copy for order/product/user IDs and key strings with a visible confirmation.
+- [x] Admin UI: focus management for modals – Trap focus, restore focus to trigger, and close on Escape consistently across admin modals.
+- [x] Admin UI: optimistic toggles with rollback – For simple flags (active/featured/visible), update immediately and rollback on failure with clear toast.
+- [x] Admin UI: copy buttons for IDs/emails – Add one-click copy for order/product/user IDs and key strings with a visible confirmation.
 - [ ] Admin UI: in-app feedback widget – Add an admin-only “Feedback” form stored in DB and visible in Support (no external services).
 - [ ] Admin UI: “What’s new” panel – Show deploy notes from a local markdown file in the repo (no third-party tooling).
 - [ ] Admin Dashboard: KPI drill-down links – Clicking a KPI navigates to the relevant list with filters pre-applied.

@@ -6647,8 +6647,20 @@ class CmsDraftManager<T> {
 	                      {{ 'adminUi.blog.actions.view' | translate }}
 	                    </a>
 	                    <app-button size="sm" variant="ghost" [label]="'adminUi.blog.moderation.actions.resolve' | translate" (action)="resolveFlags(c)"></app-button>
-	                    <app-button size="sm" variant="ghost" [label]="c.is_hidden ? ('adminUi.blog.moderation.actions.unhide' | translate) : ('adminUi.blog.moderation.actions.hide' | translate)" (action)="toggleHide(c)"></app-button>
-	                    <app-button size="sm" variant="ghost" [label]="'adminUi.actions.delete' | translate" (action)="adminDeleteComment(c)"></app-button>
+	                    <app-button
+	                      size="sm"
+	                      variant="ghost"
+	                      [label]="c.is_hidden ? ('adminUi.blog.moderation.actions.unhide' | translate) : ('adminUi.blog.moderation.actions.hide' | translate)"
+	                      [disabled]="blogCommentModerationBusy.has(c.id)"
+	                      (action)="toggleHide(c)"
+	                    ></app-button>
+	                    <app-button
+	                      size="sm"
+	                      variant="ghost"
+	                      [label]="'adminUi.actions.delete' | translate"
+	                      [disabled]="blogCommentModerationBusy.has(c.id)"
+	                      (action)="adminDeleteComment(c)"
+	                    ></app-button>
 	                  </div>
 	                </div>
 	                <p class="mt-2 text-sm whitespace-pre-line text-slate-700 dark:text-slate-200">
@@ -7208,6 +7220,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   blogVersions: ContentBlockVersionListItem[] = [];
   blogVersionDetail: ContentBlockVersionRead | null = null;
   blogDiffParts: { value: string; added?: boolean; removed?: boolean }[] = [];
+  blogCommentModerationBusy = new Set<string>();
   flaggedComments = signal<AdminBlogComment[]>([]);
   flaggedCommentsLoading = signal<boolean>(false);
   flaggedCommentsError: string | null = null;
@@ -9936,27 +9949,50 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   toggleHide(comment: AdminBlogComment): void {
+    if (this.blogCommentModerationBusy.has(comment.id)) return;
+
+    const setHidden = (value: boolean) => {
+      this.flaggedComments.update((items) => items.map((c) => (c.id === comment.id ? { ...c, is_hidden: value } : c)));
+    };
+
     if (comment.is_hidden) {
+      setHidden(false);
+      this.blogCommentModerationBusy.add(comment.id);
       this.blog.unhideCommentAdmin(comment.id).subscribe({
         next: () => {
+          this.blogCommentModerationBusy.delete(comment.id);
           this.toast.success(this.t('adminUi.blog.moderation.success.commentUnhidden'));
           this.loadFlaggedComments();
         },
-        error: () => this.toast.error(this.t('adminUi.blog.moderation.errors.unhide'))
+        error: () => {
+          this.blogCommentModerationBusy.delete(comment.id);
+          setHidden(true);
+          this.toast.error(this.t('adminUi.blog.moderation.errors.unhide'));
+        }
       });
       return;
     }
-    const reason = prompt(this.t('adminUi.blog.moderation.prompts.hideReason')) || '';
+    const reasonPrompt = prompt(this.t('adminUi.blog.moderation.prompts.hideReason'));
+    if (reasonPrompt === null) return;
+    const reason = reasonPrompt || '';
+    setHidden(true);
+    this.blogCommentModerationBusy.add(comment.id);
     this.blog.hideCommentAdmin(comment.id, { reason: reason.trim() || null }).subscribe({
       next: () => {
+        this.blogCommentModerationBusy.delete(comment.id);
         this.toast.success(this.t('adminUi.blog.moderation.success.commentHidden'));
         this.loadFlaggedComments();
       },
-      error: () => this.toast.error(this.t('adminUi.blog.moderation.errors.hide'))
+      error: () => {
+        this.blogCommentModerationBusy.delete(comment.id);
+        setHidden(false);
+        this.toast.error(this.t('adminUi.blog.moderation.errors.hide'));
+      }
     });
   }
 
   adminDeleteComment(comment: AdminBlogComment): void {
+    if (this.blogCommentModerationBusy.has(comment.id)) return;
     const ok = confirm(this.t('adminUi.blog.moderation.confirms.deleteComment'));
     if (!ok) return;
     this.blog.deleteComment(comment.id).subscribe({
@@ -11818,6 +11854,14 @@ export class AdminComponent implements OnInit, OnDestroy {
     const target = (key || '').trim();
     if (!target) return;
 
+    const pageIndex = this.contentPages.findIndex((p) => p.key === target);
+    const prevHidden = pageIndex >= 0 ? Boolean(this.contentPages[pageIndex]?.hidden) : null;
+    if (pageIndex >= 0) {
+      this.contentPages[pageIndex] = { ...this.contentPages[pageIndex], hidden };
+      this.contentPages = [...this.contentPages];
+      if (!this.showHiddenPages && hidden) this.ensureSelectedPageIsVisible();
+    }
+
     this.pageVisibilitySaving[target] = true;
     this.admin.getContent(target).subscribe({
       next: (block) => {
@@ -11835,6 +11879,10 @@ export class AdminComponent implements OnInit, OnDestroy {
           },
           error: (err) => {
             this.pageVisibilitySaving[target] = false;
+            if (prevHidden !== null && pageIndex >= 0) {
+              this.contentPages[pageIndex] = { ...this.contentPages[pageIndex], hidden: prevHidden };
+              this.contentPages = [...this.contentPages];
+            }
             if (this.handleContentConflict(err, target, () => this.loadContentPages())) return;
             this.toast.error(this.t('adminUi.site.pages.visibility.errors.save'));
           }
@@ -11842,6 +11890,10 @@ export class AdminComponent implements OnInit, OnDestroy {
       },
       error: () => {
         this.pageVisibilitySaving[target] = false;
+        if (prevHidden !== null && pageIndex >= 0) {
+          this.contentPages[pageIndex] = { ...this.contentPages[pageIndex], hidden: prevHidden };
+          this.contentPages = [...this.contentPages];
+        }
         this.toast.error(this.t('adminUi.site.pages.visibility.errors.load'));
       }
     });
@@ -12150,8 +12202,12 @@ export class AdminComponent implements OnInit, OnDestroy {
     const exists = pages.some((p) => p.key === this.pageBlocksKey);
     if (exists) return;
     const preferred = pages.find((p) => p.key === 'page.about')?.key || pages[0].key;
+    const prev = this.pageBlocksKey;
     this.pageBlocksKey = preferred as PageBuilderKey;
     this.ensureNewPageBlockTypeForKey(this.pageBlocksKey);
+    if (prev !== this.pageBlocksKey) {
+      this.loadPageBlocks(this.pageBlocksKey);
+    }
   }
 
   loadReusableBlocks(): void {
