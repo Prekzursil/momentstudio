@@ -25,6 +25,7 @@ import { AdminReturnsService, ReturnRequestRead } from '../../../core/admin-retu
 import { AdminRecentService } from '../../../core/admin-recent.service';
 import { orderStatusChipClass } from '../../../shared/order-status';
 import { CustomerTimelineComponent } from '../shared/customer-timeline.component';
+import { TagColor, loadTagColorOverrides, tagChipColorClass as tagChipColorClassFromHelper } from './order-tag-colors';
 
 type OrderStatus =
   | 'pending'
@@ -240,7 +241,8 @@ type OrderAction =
                   <div class="flex flex-wrap gap-2">
                     <ng-container *ngFor="let tagValue of order()!.tags || []">
                       <span
-                        class="inline-flex items-center rounded-full px-2 py-0.5 text-xs border border-slate-200 text-slate-700 dark:border-slate-700 dark:text-slate-200"
+                        class="inline-flex items-center rounded-full px-2 py-0.5 text-xs border"
+                        [ngClass]="tagChipColorClass(tagValue)"
                       >
                         {{ tagLabel(tagValue) }}
                         <button
@@ -1597,6 +1599,8 @@ export class AdminOrderDetailComponent implements OnInit {
   shippingLabelFile: File | null = null;
   shippingLabelError = signal<string | null>(null);
 
+  private tagColorOverrides: Record<string, TagColor> = loadTagColorOverrides();
+
   private orderId: string | null = null;
   private navContext:
     | {
@@ -2058,6 +2062,10 @@ export class AdminOrderDetailComponent implements OnInit {
     const key = `adminUi.orders.tags.${tag}`;
     const translated = this.translate.instant(key);
     return translated === key ? tag : translated;
+  }
+
+  tagChipColorClass(tag: string): string {
+    return tagChipColorClassFromHelper(tag, this.tagColorOverrides);
   }
 
   emailStatusLabel(status: string): string {

@@ -92,7 +92,14 @@ from app.schemas.order_admin import (
 from app.schemas.order_admin_note import OrderAdminNoteCreate
 from app.schemas.order_admin_address import AdminOrderAddressesUpdate
 from app.schemas.order_shipment import OrderShipmentCreate, OrderShipmentUpdate, OrderShipmentRead
-from app.schemas.order_tag import OrderTagCreate, OrderTagsResponse
+from app.schemas.order_tag import (
+    OrderTagCreate,
+    OrderTagsResponse,
+    OrderTagStatRead,
+    OrderTagStatsResponse,
+    OrderTagRenameRequest,
+    OrderTagRenameResponse,
+)
 from app.schemas.order_refund import AdminOrderRefundCreate, AdminOrderRefundRequest
 from app.schemas.order_fraud_review import OrderFraudReviewRequest
 from app.schemas.order_exports_admin import AdminOrderDocumentExportListResponse, AdminOrderDocumentExportRead
@@ -1398,6 +1405,30 @@ async def admin_list_order_tags(
 ) -> OrderTagsResponse:
     tags = await order_service.list_order_tags(session)
     return OrderTagsResponse(items=tags)
+
+
+@router.get("/admin/tags/stats", response_model=OrderTagStatsResponse)
+async def admin_list_order_tag_stats(
+    session: AsyncSession = Depends(get_session),
+    _: object = Depends(require_admin_section("orders")),
+) -> OrderTagStatsResponse:
+    rows = await order_service.list_order_tag_stats(session)
+    return OrderTagStatsResponse(items=[OrderTagStatRead(tag=tag, count=count) for tag, count in rows])
+
+
+@router.post("/admin/tags/rename", response_model=OrderTagRenameResponse)
+async def admin_rename_order_tag(
+    payload: OrderTagRenameRequest,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("orders")),
+) -> OrderTagRenameResponse:
+    result = await order_service.rename_order_tag(
+        session,
+        from_tag=payload.from_tag,
+        to_tag=payload.to_tag,
+        actor_user_id=getattr(admin, "id", None),
+    )
+    return OrderTagRenameResponse(**result)
 
 
 @router.get("/admin/export")

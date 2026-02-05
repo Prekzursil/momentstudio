@@ -963,6 +963,80 @@ def test_admin_order_email_events_endpoint(test_app: Dict[str, object]) -> None:
     assert rows_pii[0]["to_email"] == "buyer-email-events@example.com"
 
 
+def test_admin_order_tag_stats_and_rename(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    admin_token, _ = create_user_token(SessionLocal, email="admin-tags@example.com", admin=True)
+    _, user_id = create_user_token(SessionLocal, email="buyer-tags@example.com")
+
+    async def seed_order() -> str:
+        async with SessionLocal() as session:
+            order = Order(
+                user_id=user_id,
+                status=OrderStatus.pending_acceptance,
+                reference_code="TAG1",
+                customer_email="buyer-tags@example.com",
+                customer_name="Buyer",
+                total_amount=Decimal("10.00"),
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                currency="RON",
+                payment_method="cod",
+            )
+            session.add(order)
+            await session.commit()
+            await session.refresh(order)
+            return str(order.id)
+
+    order_id = asyncio.run(seed_order())
+
+    tagged = client.post(
+        f"/api/v1/orders/admin/{order_id}/tags",
+        json={"tag": "VIP"},
+        headers=auth_headers(admin_token),
+    )
+    assert tagged.status_code == 200, tagged.text
+    assert tagged.json()["tags"] == ["vip"]
+
+    stats = client.get("/api/v1/orders/admin/tags/stats", headers=auth_headers(admin_token))
+    assert stats.status_code == 200, stats.text
+    items = stats.json()["items"]
+    vip_row = next((row for row in items if row.get("tag") == "vip"), None)
+    assert vip_row is not None
+    assert int(vip_row.get("count") or 0) >= 1
+
+    rename = client.post(
+        "/api/v1/orders/admin/tags/rename",
+        headers=auth_headers(admin_token),
+        json={"from_tag": "vip", "to_tag": "priority"},
+    )
+    assert rename.status_code == 200, rename.text
+    assert rename.json()["from_tag"] == "vip"
+    assert rename.json()["to_tag"] == "priority"
+    assert int(rename.json()["total"] or 0) >= 1
+
+    detail = client.get(f"/api/v1/orders/admin/{order_id}", headers=auth_headers(admin_token))
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["tags"] == ["priority"]
+
+    old_search = client.get(
+        "/api/v1/orders/admin/search",
+        params={"tag": "vip", "page": 1, "limit": 10},
+        headers=auth_headers(admin_token),
+    )
+    assert old_search.status_code == 200, old_search.text
+    assert not any(item["id"] == order_id for item in old_search.json()["items"])
+
+    new_search = client.get(
+        "/api/v1/orders/admin/search",
+        params={"tag": "priority", "page": 1, "limit": 10},
+        headers=auth_headers(admin_token),
+    )
+    assert new_search.status_code == 200, new_search.text
+    assert any(item["id"] == order_id for item in new_search.json()["items"])
+
+
 def test_admin_partial_refunds(test_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]

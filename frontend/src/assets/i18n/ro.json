@@ -4183,6 +4183,9 @@
         "noChange": "Fără schimbări",
         "clearCourier": "Șterge curierul",
         "apply": "Aplică",
+        "tagAdd": "Etichetă de adăugat",
+        "tagRemove": "Etichetă de eliminat",
+        "applyTags": "Aplică etichete",
         "sendEmails": "Retrimite",
         "emailNotePrompt": "Notă audit (opțională)",
         "emailsQueued": "Am trimis la coadă emailuri pentru {{count}} comenzi.",
@@ -4198,6 +4201,7 @@
         "partial": "Am actualizat {{success}} din {{total}} comenzi.",
         "errors": {
           "chooseAction": "Alege un status sau un curier de aplicat.",
+          "chooseTagAction": "Alege o etichetă de adăugat sau eliminat.",
           "chooseEmail": "Alege emailul de retrimis.",
           "packingSlips": "Nu am putut descărca avizele.",
           "pickList": "Nu am putut descărca lista de colectare."
@@ -4419,6 +4423,7 @@
       "notesPlaceholder": "Scrie o notă internă pentru această comandă…",
       "tags": {
         "all": "Toate etichetele",
+        "manage": "Gestionează etichetele",
         "vip": "VIP",
         "fraud_risk": "Risc fraudă",
         "fraud_approved": "Fraudă aprobată",
@@ -4426,6 +4431,34 @@
         "gift": "Cadou",
         "test": "Comandă test",
         "none": "Nicio etichetă încă.",
+        "manageTitle": "Gestionează etichetele",
+        "manageHint": "Redenumește etichete și setează culori pentru identificare rapidă (salvat per browser/admin).",
+        "searchPlaceholder": "Caută etichete…",
+        "empty": "Nu există etichete.",
+        "resetColor": "Reset",
+        "table": {
+          "tag": "Etichetă",
+          "count": "Număr",
+          "color": "Culoare",
+          "actions": "Acțiuni"
+        },
+        "colors": {
+          "slate": "Gri",
+          "indigo": "Indigo",
+          "violet": "Violet",
+          "emerald": "Verde",
+          "amber": "Chihlimbar",
+          "rose": "Roz",
+          "sky": "Albastru",
+          "teal": "Turcoaz"
+        },
+        "renameTitle": "Redenumește eticheta",
+        "renameFrom": "Din",
+        "renameFromPlaceholder": "Alege o etichetă…",
+        "renameTo": "În",
+        "rename": "Redenumește",
+        "renameConfirm": "Redenumești „{{from}}” în „{{to}}”? Asta actualizează toate comenzile afectate.",
+        "renamed": "Am redenumit eticheta pe {{count}} comenzi.",
         "addLabel": "Adaugă etichetă",
         "markTest": "Marchează ca test",
         "unmarkTest": "Elimină marcajul test",
@@ -4438,7 +4471,10 @@
         },
         "errors": {
           "add": "Nu am putut adăuga eticheta.",
-          "remove": "Nu am putut elimina eticheta."
+          "remove": "Nu am putut elimina eticheta.",
+          "load": "Nu am putut încărca etichetele.",
+          "rename": "Nu am putut redenumi eticheta.",
+          "renameRequired": "Alege eticheta sursă și eticheta destinație."
         }
       },
       "fraudSignals": {

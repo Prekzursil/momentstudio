@@ -35,6 +35,19 @@ export interface AdminOrderListResponse {
   meta: AdminPaginationMeta;
 }
 
+export interface AdminOrderTagStat {
+  tag: string;
+  count: number;
+}
+
+export interface AdminOrderTagRenameResult {
+  from_tag: string;
+  to_tag: string;
+  updated: number;
+  merged: number;
+  total: number;
+}
+
 export type OrderDocumentExportKind = 'packing_slip' | 'packing_slips_batch' | 'shipping_label' | 'receipt';
 
 export interface AdminOrderDocumentExport {
@@ -504,6 +517,28 @@ export class AdminOrdersService {
   listOrderTags(): Observable<string[]> {
     return this.api.get<{ items?: string[] }>('/orders/admin/tags').pipe(
       map((res: any) => (Array.isArray(res?.items) ? res.items : []).filter((t: any) => typeof t === 'string' && t.length))
+    );
+  }
+
+  listOrderTagStats(): Observable<AdminOrderTagStat[]> {
+    return this.api.get<{ items?: AdminOrderTagStat[] }>('/orders/admin/tags/stats').pipe(
+      map((res: any) =>
+        (Array.isArray(res?.items) ? res.items : [])
+          .filter((row: any) => typeof row?.tag === 'string' && row.tag.length)
+          .map((row: any) => ({ tag: String(row.tag), count: Math.max(0, Number(row.count || 0) || 0) }))
+      )
+    );
+  }
+
+  renameOrderTag(payload: { from_tag: string; to_tag: string }): Observable<AdminOrderTagRenameResult> {
+    return this.api.post<AdminOrderTagRenameResult>('/orders/admin/tags/rename', payload as any).pipe(
+      map((res: any) => ({
+        from_tag: String(res?.from_tag || ''),
+        to_tag: String(res?.to_tag || ''),
+        updated: Math.max(0, Number(res?.updated || 0) || 0),
+        merged: Math.max(0, Number(res?.merged || 0) || 0),
+        total: Math.max(0, Number(res?.total || 0) || 0)
+      }))
     );
   }
 

@@ -6,7 +6,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { from, of } from 'rxjs';
-import { catchError, finalize, map, mergeMap, toArray } from 'rxjs/operators';
+import { catchError, concatMap, finalize, map, mergeMap, toArray } from 'rxjs/operators';
 import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
 import { ErrorStateComponent } from '../../../shared/error-state.component';
@@ -16,7 +16,7 @@ import { HelpPanelComponent } from '../../../shared/help-panel.component';
 import { SkeletonComponent } from '../../../shared/skeleton.component';
 import { ToastService } from '../../../core/toast.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
-import { AdminOrderListItem, AdminOrderListResponse, AdminOrdersService } from '../../../core/admin-orders.service';
+import { AdminOrderListItem, AdminOrderListResponse, AdminOrderTagStat, AdminOrdersService } from '../../../core/admin-orders.service';
 import { orderStatusChipClass } from '../../../shared/order-status';
 import { AuthService } from '../../../core/auth.service';
 import { AdminFavoriteItem, AdminFavoritesService } from '../../../core/admin-favorites.service';
@@ -32,6 +32,16 @@ import {
 import { AdminTableLayoutColumnDef, TableLayoutModalComponent } from '../shared/table-layout-modal.component';
 import { AdminPageHeaderComponent } from '../shared/admin-page-header.component';
 import { adminFilterFavoriteKey } from '../shared/admin-filter-favorites';
+
+import {
+  TagColor,
+  TAG_COLOR_PALETTE,
+  normalizeTagKey,
+  loadTagColorOverrides,
+  persistTagColorOverrides,
+  tagColorFor,
+  tagChipColorClass as tagChipColorClassFromHelper
+} from './order-tag-colors';
 
 type OrderStatusFilter =
   | 'all'
@@ -139,6 +149,12 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
 		        <ng-template #secondaryActions>
 		          <app-button size="sm" variant="ghost" [label]="viewToggleLabelKey() | translate" (action)="toggleViewMode()"></app-button>
 		          <app-button size="sm" variant="ghost" [label]="densityToggleLabelKey() | translate" (action)="toggleDensity()"></app-button>
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.orders.tags.manage' | translate"
+                (action)="openTagManager()"
+              ></app-button>
 		          <app-button size="sm" variant="ghost" [label]="'adminUi.tableLayout.title' | translate" (action)="openLayoutModal()"></app-button>
 		        </ng-template>
 	      </app-admin-page-header>
@@ -427,7 +443,8 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
                                   </span>
                                   <ng-container *ngFor="let tagValue of order.tags || []">
                                     <span
-                                      class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] border border-slate-200 text-slate-700 dark:border-slate-700 dark:text-slate-200"
+                                      class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] border"
+                                      [ngClass]="tagChipColorClass(tagValue)"
                                     >
                                       {{ tagLabel(tagValue) }}
                                     </span>
@@ -491,6 +508,38 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
                   [label]="'adminUi.orders.bulk.apply' | translate"
                   [disabled]="bulkBusy || (!bulkStatus && !bulkCourier)"
                   (action)="applyBulkUpdate()"
+                ></app-button>
+
+                <span class="hidden sm:block h-9 w-px bg-slate-200 dark:bg-slate-800"></span>
+
+                <label class="grid gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.orders.bulk.tagAdd' | translate }}
+                  <input
+                    class="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    type="text"
+                    [placeholder]="'vip'"
+                    [(ngModel)]="bulkTagAdd"
+                    [disabled]="bulkBusy"
+                  />
+                </label>
+
+                <label class="grid gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.orders.bulk.tagRemove' | translate }}
+                  <input
+                    class="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    type="text"
+                    [placeholder]="'test'"
+                    [(ngModel)]="bulkTagRemove"
+                    [disabled]="bulkBusy"
+                  />
+                </label>
+
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.orders.bulk.applyTags' | translate"
+                  [disabled]="bulkBusy || (!bulkTagAdd.trim() && !bulkTagRemove.trim())"
+                  (action)="applyBulkTags()"
                 ></app-button>
 
                 <span class="hidden sm:block h-9 w-px bg-slate-200 dark:bg-slate-800"></span>
@@ -646,7 +695,10 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
                   <td *ngSwitchCase="'tags'" [ngClass]="cellPaddingClass()">
                     <div class="flex flex-wrap gap-1">
                       <ng-container *ngFor="let tagValue of order.tags || []">
-                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs border border-slate-200 text-slate-700 dark:border-slate-700 dark:text-slate-200">
+                        <span
+                          class="inline-flex items-center rounded-full px-2 py-0.5 text-xs border"
+                          [ngClass]="tagChipColorClass(tagValue)"
+                        >
                           {{ tagLabel(tagValue) }}
                         </span>
                       </ng-container>
@@ -955,6 +1007,163 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
         </div>
       </ng-container>
 
+      <ng-container *ngIf="tagManagerOpen()">
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closeTagManager()">
+          <div
+            class="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
+            (click)="$event.stopPropagation()"
+          >
+            <div class="flex items-center justify-between gap-3">
+              <div class="grid gap-1">
+                <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.orders.tags.manageTitle' | translate }}
+                </h3>
+                <div class="text-xs text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.orders.tags.manageHint' | translate }}
+                </div>
+              </div>
+              <button
+                type="button"
+                class="rounded-md px-2 py-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
+                (click)="closeTagManager()"
+                [attr.aria-label]="'adminUi.actions.cancel' | translate"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div class="mt-4 grid gap-4">
+              <div class="flex flex-wrap items-end justify-between gap-3">
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.actions.search' | translate }}
+                  <input
+                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    type="text"
+                    [(ngModel)]="tagManagerQuery"
+                    [placeholder]="'adminUi.orders.tags.searchPlaceholder' | translate"
+                  />
+                </label>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.actions.refresh' | translate"
+                  [disabled]="tagManagerLoading()"
+                  (action)="reloadTagManager()"
+                ></app-button>
+              </div>
+
+              <div *ngIf="tagManagerLoading()" class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+                <app-skeleton [rows]="3"></app-skeleton>
+              </div>
+
+              <div
+                *ngIf="!tagManagerLoading() && tagManagerError()"
+                class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+              >
+                {{ tagManagerError() }}
+              </div>
+
+              <div
+                *ngIf="!tagManagerLoading() && !tagManagerError() && filteredTagManagerRows().length === 0"
+                class="text-sm text-slate-600 dark:text-slate-300"
+              >
+                {{ 'adminUi.orders.tags.empty' | translate }}
+              </div>
+
+              <div *ngIf="!tagManagerLoading() && !tagManagerError() && filteredTagManagerRows().length" class="overflow-auto rounded-xl border border-slate-200 dark:border-slate-800">
+                <table class="min-w-[720px] w-full text-sm">
+                  <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+                    <tr>
+                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.tags.table.tag' | translate }}</th>
+                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.tags.table.count' | translate }}</th>
+                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.tags.table.color' | translate }}</th>
+                      <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.orders.tags.table.actions' | translate }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      *ngFor="let row of filteredTagManagerRows()"
+                      class="border-t border-slate-200 dark:border-slate-800"
+                    >
+                      <td class="px-3 py-2">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs border" [ngClass]="tagChipColorClass(row.tag)">
+                            {{ tagLabel(row.tag) }}
+                          </span>
+                          <span class="text-xs text-slate-500 dark:text-slate-400 font-mono">{{ row.tag }}</span>
+                        </div>
+                      </td>
+                      <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                        {{ row.count }}
+                      </td>
+                      <td class="px-3 py-2">
+                        <select
+                          class="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                          [ngModel]="tagColorValue(row.tag)"
+                          (ngModelChange)="setTagColor(row.tag, $event)"
+                        >
+                          <option *ngFor="let c of tagColorPalette" [value]="c">
+                            {{ ('adminUi.orders.tags.colors.' + c) | translate }}
+                          </option>
+                        </select>
+                      </td>
+                      <td class="px-3 py-2 text-right">
+                        <app-button
+                          size="sm"
+                          variant="ghost"
+                          [label]="'adminUi.orders.tags.resetColor' | translate"
+                          (action)="resetTagColor(row.tag)"
+                        ></app-button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+                <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.tags.renameTitle' | translate }}</div>
+                <div class="mt-2 grid gap-3 md:grid-cols-[1fr_1fr_auto] items-end">
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'adminUi.orders.tags.renameFrom' | translate }}
+                    <select
+                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      [(ngModel)]="tagRenameFrom"
+                      [disabled]="tagRenameBusy"
+                    >
+                      <option value="">{{ 'adminUi.orders.tags.renameFromPlaceholder' | translate }}</option>
+                      <option *ngFor="let t of tagOptions()" [value]="t">{{ tagLabel(t) }}</option>
+                    </select>
+                  </label>
+
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'adminUi.orders.tags.renameTo' | translate }}
+                    <input
+                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      type="text"
+                      [(ngModel)]="tagRenameTo"
+                      [placeholder]="'priority'"
+                      [disabled]="tagRenameBusy"
+                    />
+                  </label>
+
+                  <app-button
+                    size="sm"
+                    [label]="'adminUi.orders.tags.rename' | translate"
+                    [disabled]="tagRenameBusy || !tagRenameFrom.trim() || !tagRenameTo.trim()"
+                    (action)="renameTag()"
+                  ></app-button>
+                </div>
+                <div *ngIf="tagRenameError" class="mt-2 text-sm text-rose-700 dark:text-rose-300">{{ tagRenameError }}</div>
+              </div>
+
+              <div class="flex justify-end">
+                <app-button size="sm" variant="ghost" [label]="'adminUi.common.close' | translate" (action)="closeTagManager()"></app-button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </ng-container>
+
       <div *ngIf="selectedIds.size" class="h-24"></div>
 
       <div *ngIf="selectedIds.size" class="fixed inset-x-0 bottom-4 z-40 px-4 sm:px-6">
@@ -1057,12 +1266,27 @@ export class AdminOrdersComponent implements OnInit {
   bulkStatus: '' | Exclude<OrderStatusFilter, 'all'> = '';
   bulkCourier: '' | 'sameday' | 'fan_courier' | 'clear' = '';
   bulkEmailKind: '' | 'confirmation' | 'delivery' = '';
+  bulkTagAdd = '';
+  bulkTagRemove = '';
   bulkBusy = false;
 
   shippingLabelsModalOpen = signal(false);
   shippingLabelsOrderOptions: ShippingLabelsOrderOption[] = [];
   shippingLabelsUploads: ShippingLabelsUploadItem[] = [];
   shippingLabelsBusy = false;
+
+  tagManagerOpen = signal(false);
+  tagManagerLoading = signal(false);
+  tagManagerError = signal<string | null>(null);
+  tagManagerQuery = '';
+  tagManagerRows = signal<AdminOrderTagStat[]>([]);
+  tagRenameFrom = '';
+  tagRenameTo = '';
+  tagRenameBusy = false;
+  tagRenameError = '';
+
+  readonly tagColorPalette: TagColor[] = TAG_COLOR_PALETTE;
+  private tagColorOverrides: Record<string, TagColor> = {};
 
   constructor(
     private ordersApi: AdminOrdersService,
@@ -1074,22 +1298,14 @@ export class AdminOrdersComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    this.tagColorOverrides = loadTagColorOverrides();
     this.favorites.init();
     this.tableLayout.set(loadAdminTableLayout(this.tableLayoutStorageKey(), this.tableColumns, this.tableDefaults));
     this.viewMode.set(this.loadViewMode());
     this.presets = this.loadPresets();
     this.loadExportState();
     this.maybeApplyFiltersFromState();
-    this.ordersApi.listOrderTags().subscribe({
-      next: (tags) => {
-        const merged = new Set<string>(['vip', 'fraud_risk', 'fraud_approved', 'fraud_denied', 'gift', 'test']);
-        for (const t of tags) merged.add(t);
-        this.tagOptions.set(Array.from(merged).sort());
-      },
-      error: () => {
-        // ignore
-      }
-    });
+    this.refreshTagOptions();
     this.load();
   }
 
@@ -1990,6 +2206,190 @@ export class AdminOrdersComponent implements OnInit {
     const key = `adminUi.orders.tags.${tag}`;
     const translated = this.translate.instant(key);
     return translated === key ? tag : translated;
+  }
+
+  tagChipColorClass(tag: string): string {
+    return tagChipColorClassFromHelper(tag, this.tagColorOverrides);
+  }
+
+  openTagManager(): void {
+    this.tagManagerOpen.set(true);
+    this.tagManagerError.set(null);
+    this.tagRenameError = '';
+    this.tagRenameFrom = '';
+    this.tagRenameTo = '';
+    this.reloadTagManager();
+  }
+
+  closeTagManager(): void {
+    this.tagManagerOpen.set(false);
+    this.tagManagerError.set(null);
+    this.tagManagerQuery = '';
+    this.tagManagerRows.set([]);
+    this.tagRenameError = '';
+  }
+
+  reloadTagManager(): void {
+    this.tagManagerLoading.set(true);
+    this.tagManagerError.set(null);
+    this.ordersApi.listOrderTagStats().subscribe({
+      next: (rows) => {
+        this.tagManagerRows.set(rows || []);
+        this.tagManagerLoading.set(false);
+      },
+      error: () => {
+        this.tagManagerError.set(this.translate.instant('adminUi.orders.tags.errors.load'));
+        this.tagManagerLoading.set(false);
+      }
+    });
+    this.refreshTagOptions();
+  }
+
+  filteredTagManagerRows(): AdminOrderTagStat[] {
+    const rows = this.tagManagerRows();
+    const q = (this.tagManagerQuery || '').trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((row) => {
+      const tag = (row.tag || '').toLowerCase();
+      const label = (this.tagLabel(row.tag) || '').toLowerCase();
+      return tag.includes(q) || label.includes(q);
+    });
+  }
+
+  tagColorValue(tag: string): TagColor {
+    return tagColorFor(tag, this.tagColorOverrides);
+  }
+
+  setTagColor(tag: string, value: string): void {
+    const normalizedTag = normalizeTagKey(tag);
+    const color = (value || '').toString().trim() as TagColor;
+    if (!normalizedTag || !this.tagColorPalette.includes(color)) return;
+    this.tagColorOverrides[normalizedTag] = color;
+    persistTagColorOverrides(this.tagColorOverrides);
+  }
+
+  resetTagColor(tag: string): void {
+    const normalizedTag = normalizeTagKey(tag);
+    if (!normalizedTag) return;
+    delete this.tagColorOverrides[normalizedTag];
+    persistTagColorOverrides(this.tagColorOverrides);
+  }
+
+  applyBulkTags(): void {
+    if (!this.selectedIds.size) return;
+    const addTag = (this.bulkTagAdd || '').trim();
+    const removeTag = (this.bulkTagRemove || '').trim();
+    if (!addTag && !removeTag) {
+      this.toast.error(this.translate.instant('adminUi.orders.bulk.errors.chooseTagAction'));
+      return;
+    }
+
+    const ops: { kind: 'add' | 'remove'; tag: string }[] = [];
+    if (removeTag) ops.push({ kind: 'remove', tag: removeTag });
+    if (addTag) ops.push({ kind: 'add', tag: addTag });
+
+    const ids = Array.from(this.selectedIds);
+    this.bulkBusy = true;
+    from(ids)
+      .pipe(
+        mergeMap(
+          (id) =>
+            from(ops).pipe(
+              concatMap((op) =>
+                op.kind === 'add'
+                  ? this.ordersApi.addOrderTag(id, op.tag).pipe(
+                      map(() => true),
+                      catchError(() => of(false))
+                    )
+                  : this.ordersApi.removeOrderTag(id, op.tag).pipe(
+                      map(() => true),
+                      catchError(() => of(false))
+                    )
+              ),
+              toArray(),
+              map((results) => ({ id, ok: results.every(Boolean) }))
+            ),
+          3
+        ),
+        toArray(),
+        finalize(() => {
+          this.bulkBusy = false;
+        })
+      )
+      .subscribe((results) => {
+        const failed = results.filter((r) => !r.ok).map((r) => r.id);
+        const successCount = results.length - failed.length;
+        if (failed.length) {
+          this.selectedIds = new Set(failed);
+          this.toast.error(
+            this.translate.instant('adminUi.orders.bulk.partial', {
+              success: successCount,
+              total: results.length
+            })
+          );
+        } else {
+          this.clearSelection();
+          this.toast.success(this.translate.instant('adminUi.orders.bulk.success', { count: results.length }));
+        }
+        this.bulkTagAdd = '';
+        this.bulkTagRemove = '';
+        this.refreshTagOptions();
+        this.load();
+      });
+  }
+
+  renameTag(): void {
+    if (this.tagRenameBusy) return;
+    const fromTag = (this.tagRenameFrom || '').trim();
+    const toTag = (this.tagRenameTo || '').trim();
+    if (!fromTag || !toTag) {
+      this.tagRenameError = this.translate.instant('adminUi.orders.tags.errors.renameRequired');
+      return;
+    }
+    const ok = window.confirm(
+      this.translate.instant('adminUi.orders.tags.renameConfirm', { from: fromTag, to: toTag })
+    );
+    if (!ok) return;
+
+    this.tagRenameBusy = true;
+    this.tagRenameError = '';
+    this.ordersApi.renameOrderTag({ from_tag: fromTag, to_tag: toTag }).subscribe({
+      next: (res) => {
+        const fromKey = normalizeTagKey(res.from_tag || fromTag);
+        const toKey = normalizeTagKey(res.to_tag || toTag);
+        if (fromKey && toKey && this.tagColorOverrides[fromKey] && !this.tagColorOverrides[toKey]) {
+          this.tagColorOverrides[toKey] = this.tagColorOverrides[fromKey];
+        }
+        if (fromKey) delete this.tagColorOverrides[fromKey];
+        persistTagColorOverrides(this.tagColorOverrides);
+
+        if (this.tag === fromKey) this.tag = toKey;
+        this.toast.success(this.translate.instant('adminUi.orders.tags.renamed', { count: res.total }));
+        this.tagRenameFrom = '';
+        this.tagRenameTo = '';
+        this.reloadTagManager();
+        this.load();
+      },
+      error: (err) => {
+        this.tagRenameError = err?.error?.detail || this.translate.instant('adminUi.orders.tags.errors.rename');
+      },
+      complete: () => {
+        this.tagRenameBusy = false;
+      }
+    });
+  }
+
+  private refreshTagOptions(): void {
+    this.ordersApi.listOrderTags().subscribe({
+      next: (tags) => {
+        const merged = new Set<string>(['vip', 'fraud_risk', 'fraud_approved', 'fraud_denied', 'gift', 'test']);
+        for (const t of tags) merged.add(t);
+        this.tagOptions.set(Array.from(merged).sort());
+      },
+      error: () => {
+        // ignore
+      }
+    });
   }
 
   statusPillClass(status: string): string {

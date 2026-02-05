@@ -4183,6 +4183,9 @@
         "noChange": "No change",
         "clearCourier": "Clear courier",
         "apply": "Apply",
+        "tagAdd": "Tag to add",
+        "tagRemove": "Tag to remove",
+        "applyTags": "Apply tags",
         "sendEmails": "Resend",
         "emailNotePrompt": "Audit note (optional)",
         "emailsQueued": "Queued emails for {{count}} orders.",
@@ -4198,6 +4201,7 @@
         "partial": "Updated {{success}} of {{total}} orders.",
         "errors": {
           "chooseAction": "Choose a status or courier to apply.",
+          "chooseTagAction": "Choose a tag to add or remove.",
           "chooseEmail": "Choose an email to resend.",
           "packingSlips": "Could not download packing slips.",
           "pickList": "Could not download pick list."
@@ -4419,6 +4423,7 @@
       "notesPlaceholder": "Write an internal note for this order…",
       "tags": {
         "all": "All tags",
+        "manage": "Manage tags",
         "vip": "VIP",
         "fraud_risk": "Fraud risk",
         "fraud_approved": "Fraud approved",
@@ -4426,6 +4431,34 @@
         "gift": "Gift",
         "test": "Test order",
         "none": "No tags yet.",
+        "manageTitle": "Manage tags",
+        "manageHint": "Rename tags and set colors for faster scanning (saved per admin browser).",
+        "searchPlaceholder": "Search tags…",
+        "empty": "No tags found.",
+        "resetColor": "Reset",
+        "table": {
+          "tag": "Tag",
+          "count": "Count",
+          "color": "Color",
+          "actions": "Actions"
+        },
+        "colors": {
+          "slate": "Slate",
+          "indigo": "Indigo",
+          "violet": "Violet",
+          "emerald": "Emerald",
+          "amber": "Amber",
+          "rose": "Rose",
+          "sky": "Sky",
+          "teal": "Teal"
+        },
+        "renameTitle": "Rename tag",
+        "renameFrom": "From",
+        "renameFromPlaceholder": "Select a tag…",
+        "renameTo": "To",
+        "rename": "Rename",
+        "renameConfirm": "Rename \"{{from}}\" to \"{{to}}\"? This updates all affected orders.",
+        "renamed": "Renamed tag on {{count}} orders.",
         "addLabel": "Add tag",
         "markTest": "Mark as test",
         "unmarkTest": "Unmark test",
@@ -4438,7 +4471,10 @@
         },
         "errors": {
           "add": "Could not add tag.",
-          "remove": "Could not remove tag."
+          "remove": "Could not remove tag.",
+          "load": "Could not load tags.",
+          "rename": "Could not rename tag.",
+          "renameRequired": "Choose a source and target tag."
         }
       },
       "fraudSignals": {

@@ -1088,6 +1088,85 @@ async def list_order_tags(session: AsyncSession) -> list[str]:
     return [row[0] for row in result.all() if row and row[0]]
 
 
+async def list_order_tag_stats(session: AsyncSession) -> list[tuple[str, int]]:
+    result = await session.execute(
+        select(OrderTag.tag, func.count(OrderTag.id))
+        .group_by(OrderTag.tag)
+        .order_by(func.count(OrderTag.id).desc(), OrderTag.tag.asc())
+    )
+    rows = []
+    for row in result.all():
+        if not row or not row[0]:
+            continue
+        rows.append((str(row[0]), int(row[1] or 0)))
+    return rows
+
+
+async def rename_order_tag(
+    session: AsyncSession,
+    *,
+    from_tag: str,
+    to_tag: str,
+    actor_user_id: UUID | None = None,
+    max_affected_orders: int = 5000,
+) -> dict[str, object]:
+    from_clean = _normalize_order_tag(from_tag)
+    to_clean = _normalize_order_tag(to_tag)
+    if not from_clean:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="from_tag is required")
+    if not to_clean:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="to_tag is required")
+    if from_clean == to_clean:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tags must be different")
+
+    rows = (await session.execute(select(OrderTag).where(OrderTag.tag == from_clean))).scalars().all()
+    if not rows:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found")
+
+    affected_order_ids = {row.order_id for row in rows if getattr(row, "order_id", None)}
+    if len(affected_order_ids) > max_affected_orders:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Too many affected orders ({len(affected_order_ids)}); narrow the scope first.",
+        )
+
+    existing_targets = (
+        await session.execute(
+            select(OrderTag.order_id).where(OrderTag.order_id.in_(affected_order_ids), OrderTag.tag == to_clean)
+        )
+    ).all()
+    orders_with_target = {row[0] for row in existing_targets if row and row[0]}
+
+    updated = 0
+    merged = 0
+    note = f"{from_clean} -> {to_clean}"
+    actor_value = str(actor_user_id) if actor_user_id else None
+
+    for tag_row in rows:
+        order_id = getattr(tag_row, "order_id", None)
+        if not order_id:
+            continue
+        if order_id in orders_with_target:
+            await session.delete(tag_row)
+            merged += 1
+        else:
+            tag_row.tag = to_clean
+            session.add(tag_row)
+            updated += 1
+        session.add(
+            OrderEvent(
+                order_id=order_id,
+                event="tag_renamed",
+                note=note,
+                data={"from": from_clean, "to": to_clean, "actor_user_id": actor_value},
+            )
+        )
+
+    await session.commit()
+    total = updated + merged
+    return {"from_tag": from_clean, "to_tag": to_clean, "updated": updated, "merged": merged, "total": total}
+
+
 async def add_order_tag(session: AsyncSession, order: Order, *, tag: str, actor_user_id: UUID | None = None) -> Order:
     tag_clean = _normalize_order_tag(tag)
     if not tag_clean:
