@@ -1468,6 +1468,7 @@ export class AdminOrderDetailComponent implements OnInit {
 
   private allowedNextStatuses(current: OrderStatus, method: string, order: AdminOrderDetail | null): Set<OrderStatus> {
     const transitions: Record<OrderStatus, OrderStatus[]> = {
+      pending: ['pending_payment', 'pending_acceptance', 'cancelled'],
       pending_payment: ['pending_acceptance', 'cancelled'],
       pending_acceptance: ['paid', 'cancelled'],
       paid: ['shipped', 'refunded', 'cancelled'],

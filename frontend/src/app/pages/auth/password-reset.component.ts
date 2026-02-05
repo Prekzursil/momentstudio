@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ContainerComponent } from '../../layout/container.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
@@ -84,7 +84,7 @@ import { finalize } from 'rxjs';
     </app-container>
   `
 })
-export class PasswordResetComponent {
+export class PasswordResetComponent implements OnInit {
   crumbs = [
     { label: 'nav.home', url: '/' },
     { label: 'auth.resetTitle' }
@@ -97,7 +97,17 @@ export class PasswordResetComponent {
   error = '';
   loading = false;
 
-  constructor(private toast: ToastService, private auth: AuthService, private translate: TranslateService) {}
+  constructor(
+    private toast: ToastService,
+    private auth: AuthService,
+    private translate: TranslateService,
+    private route: ActivatedRoute
+  ) {}
+
+  ngOnInit(): void {
+    const token = this.route.snapshot.queryParamMap.get('token');
+    if (token) this.token = token;
+  }
 
   onSubmit(form: NgForm): void {
     if (!form.valid) {

@@ -9,6 +9,23 @@ import { adminGuard, adminSectionGuard, authGuard } from './core/auth.guard';
 import { unsavedChangesGuard } from './core/unsaved-changes.guard';
 import { shopCategoriesResolver } from './core/shop.resolver';
 import { checkoutPricingSettingsResolver } from './core/checkout.resolver';
+import { appConfig } from './core/app-config';
+
+const mockCheckoutRoutes: Routes =
+  appConfig.appEnv === 'production'
+    ? []
+    : [
+        {
+          path: 'checkout/mock/paypal',
+          loadComponent: () => import('./pages/checkout/paypal-mock.component').then((m) => m.PayPalMockComponent),
+          title: 'PayPal (Mock) | momentstudio'
+        },
+        {
+          path: 'checkout/mock/stripe',
+          loadComponent: () => import('./pages/checkout/stripe-mock.component').then((m) => m.StripeMockComponent),
+          title: 'Stripe (Mock) | momentstudio'
+        }
+      ];
 
 export const routes: Routes = [
   { path: '', component: HomeComponent, title: 'momentstudio' },
@@ -66,16 +83,7 @@ export const routes: Routes = [
       checkoutPricingSettings: checkoutPricingSettingsResolver
     }
   },
-  {
-    path: 'checkout/mock/paypal',
-    loadComponent: () => import('./pages/checkout/paypal-mock.component').then((m) => m.PayPalMockComponent),
-    title: 'PayPal (Mock) | momentstudio'
-  },
-  {
-    path: 'checkout/mock/stripe',
-    loadComponent: () => import('./pages/checkout/stripe-mock.component').then((m) => m.StripeMockComponent),
-    title: 'Stripe (Mock) | momentstudio'
-  },
+  ...mockCheckoutRoutes,
   {
     path: 'checkout/paypal/return',
     loadComponent: () => import('./pages/checkout/paypal-return.component').then((m) => m.PayPalReturnComponent),
