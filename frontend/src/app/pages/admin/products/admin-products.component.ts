@@ -54,6 +54,7 @@ import {
 import { AdminTableLayoutColumnDef, TableLayoutModalComponent } from '../shared/table-layout-modal.component';
 import { AdminPageHeaderComponent } from '../shared/admin-page-header.component';
 import { adminFilterFavoriteKey } from '../shared/admin-filter-favorites';
+import { AdminProductsBulkActionsComponent } from './admin-products-bulk-actions.component';
 
 type ProductStatusFilter = 'all' | 'draft' | 'published' | 'archived';
 type ProductTranslationFilter = 'all' | 'missing_any' | 'missing_en' | 'missing_ro';
@@ -238,7 +239,8 @@ type PriceHistoryChart = {
 	    SkeletonComponent,
     LocalizedCurrencyPipe,
     TableLayoutModalComponent,
-    AdminPageHeaderComponent
+    AdminPageHeaderComponent,
+    AdminProductsBulkActionsComponent
   ],
   template: `
       <div class="grid gap-6">
@@ -978,232 +980,44 @@ type PriceHistoryChart = {
             </div>
           </div>
 
-	          <div
-	            *ngIf="selected.size > 0 && view === 'active'"
-              id="admin-products-bulk-actions"
-	            class="rounded-xl border border-slate-200 bg-slate-50 p-3 grid gap-3 dark:border-slate-800 dark:bg-slate-950/20"
-	          >
-            <div class="flex flex-wrap items-center justify-between gap-3">
-              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                {{ 'adminUi.products.bulk.selected' | translate: { count: selected.size } }}
-              </p>
-              <app-button
-                size="sm"
-                variant="ghost"
-                [label]="'adminUi.products.bulk.clearSelection' | translate"
-                (action)="clearSelection()"
-                [disabled]="bulkBusy() || inlineBusy()"
-              ></app-button>
-            </div>
+          <app-admin-products-bulk-actions
+            *ngIf="selected.size > 0 && view === 'active'"
+            [selectedCount]="selected.size"
+            [disabled]="bulkBusy() || inlineBusy()"
+            [categories]="categories()"
+            [bulkSaleType]="bulkSaleType"
+            (bulkSaleTypeChange)="setBulkSaleType($event)"
+            [bulkSaleValue]="bulkSaleValue"
+            (bulkSaleValueChange)="onBulkSaleValueChange($event)"
+            (applySale)="applySaleToSelected()"
+            (clearSale)="clearSaleForSelected()"
+            [bulkStatusTarget]="bulkStatusTarget"
+            (bulkStatusTargetChange)="bulkStatusTarget = $event"
+            (applyStatus)="openBulkStatusConfirm()"
+            [bulkCategoryId]="bulkCategoryId"
+            (bulkCategoryIdChange)="bulkCategoryId = $event"
+            (applyCategory)="applyCategoryToSelected()"
+            (addAndApplyCategory)="openCreateCategoryFromBulkAssign()"
+            [bulkPublishScheduledFor]="bulkPublishScheduledFor"
+            (bulkPublishScheduledForChange)="bulkPublishScheduledFor = $event"
+            [bulkUnpublishScheduledFor]="bulkUnpublishScheduledFor"
+            (bulkUnpublishScheduledForChange)="bulkUnpublishScheduledFor = $event"
+            (applySchedule)="applyScheduleToSelected()"
+            (clearPublishSchedule)="clearPublishScheduleForSelected()"
+            (clearUnpublishSchedule)="clearUnpublishScheduleForSelected()"
+            [bulkPriceMode]="bulkPriceMode"
+            (bulkPriceModeChange)="setBulkPriceMode($event)"
+            [bulkPriceDirection]="bulkPriceDirection"
+            (bulkPriceDirectionChange)="setBulkPriceDirection($event)"
+            [bulkPriceValue]="bulkPriceValue"
+            (bulkPriceValueChange)="onBulkPriceValueChange($event)"
+            [bulkPricePreview]="bulkPricePreview"
+            (applyPriceAdjustment)="applyPriceAdjustmentToSelected()"
+            [bulkError]="bulkError()"
+            (clearSelection)="clearSelection()"
+          ></app-admin-products-bulk-actions>
 
-            <div class="grid gap-3 lg:grid-cols-[200px_240px_auto_auto] items-end">
-              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.products.sale.type' | translate }}
-                <select
-                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="bulkSaleType"
-                  (change)="bulkSaleValue = ''"
-                  [disabled]="bulkBusy() || inlineBusy()"
-                >
-                  <option [ngValue]="'percent'">{{ 'adminUi.products.sale.typePercent' | translate }}</option>
-                  <option [ngValue]="'amount'">{{ 'adminUi.products.sale.typeAmount' | translate }}</option>
-                </select>
-              </label>
-
-              <app-input
-                [label]="'adminUi.products.bulk.saleValue' | translate"
-                [placeholder]="bulkSaleType === 'percent' ? '10' : '5.00'"
-                type="text"
-                inputMode="decimal"
-                [value]="bulkSaleValue"
-                (valueChange)="onBulkSaleValueChange($event)"
-                [disabled]="bulkBusy() || inlineBusy()"
-              ></app-input>
-
-              <app-button
-                size="sm"
-                [label]="'adminUi.products.bulk.applySale' | translate"
-                (action)="applySaleToSelected()"
-                [disabled]="bulkBusy() || inlineBusy()"
-              ></app-button>
-
-              <div class="flex flex-wrap gap-2 justify-end">
-                <app-button
-                  size="sm"
-                  variant="ghost"
-                  [label]="'adminUi.products.bulk.clearSale' | translate"
-                  (action)="clearSaleForSelected()"
-                  [disabled]="bulkBusy() || inlineBusy()"
-                ></app-button>
-              </div>
-            </div>
-
-            <div class="grid gap-3 lg:grid-cols-[240px_auto] items-end">
-              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.products.table.status' | translate }}
-                <select
-                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="bulkStatusTarget"
-                  [disabled]="bulkBusy() || inlineBusy()"
-                >
-                  <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
-                  <option value="published">{{ 'adminUi.status.published' | translate }}</option>
-                  <option value="archived">{{ 'adminUi.status.archived' | translate }}</option>
-                </select>
-              </label>
-
-              <div class="flex flex-wrap items-center justify-end gap-2">
-                <app-button
-                  size="sm"
-                  [label]="'adminUi.products.bulk.status.apply' | translate"
-                  (action)="openBulkStatusConfirm()"
-                  [disabled]="bulkBusy() || inlineBusy()"
-                ></app-button>
-              </div>
-            </div>
-
-            <div class="h-px bg-slate-200 dark:bg-slate-800/70"></div>
-
-            <div class="grid gap-3 lg:grid-cols-[260px_auto] items-end">
-              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.products.bulk.category.label' | translate }}
-                <select
-                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="bulkCategoryId"
-                  [disabled]="bulkBusy() || inlineBusy()"
-                >
-                  <option value="">{{ 'adminUi.products.bulk.category.placeholder' | translate }}</option>
-                  <option *ngFor="let cat of categories()" [value]="cat.id">{{ cat.name }}</option>
-                </select>
-              </label>
-
-              <div class="flex flex-wrap items-center justify-end gap-2">
-                <app-button
-                  size="sm"
-                  [label]="'adminUi.products.bulk.category.apply' | translate"
-                  (action)="applyCategoryToSelected()"
-                  [disabled]="bulkBusy() || inlineBusy()"
-                ></app-button>
-                <app-button
-                  size="sm"
-                  variant="ghost"
-                  [label]="'adminUi.products.bulk.category.addAndApply' | translate"
-                  (action)="openCreateCategoryFromBulkAssign()"
-                  [disabled]="bulkBusy() || inlineBusy()"
-                ></app-button>
-              </div>
-            </div>
-
-            <div class="h-px bg-slate-200 dark:bg-slate-800/70"></div>
-
-            <div class="grid gap-3 lg:grid-cols-[240px_240px_auto] items-end">
-              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.products.bulk.schedule.publishAt' | translate }}
-                <input
-                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  type="datetime-local"
-                  [(ngModel)]="bulkPublishScheduledFor"
-                  [disabled]="bulkBusy() || inlineBusy()"
-                />
-              </label>
-
-              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.products.bulk.schedule.unpublishAt' | translate }}
-                <input
-                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  type="datetime-local"
-                  [(ngModel)]="bulkUnpublishScheduledFor"
-                  [disabled]="bulkBusy() || inlineBusy()"
-                />
-              </label>
-
-              <app-button
-                size="sm"
-                [label]="'adminUi.products.bulk.schedule.apply' | translate"
-                (action)="applyScheduleToSelected()"
-                [disabled]="bulkBusy() || inlineBusy()"
-              ></app-button>
-            </div>
-
-            <div class="flex flex-wrap items-center justify-end gap-2">
-              <app-button
-                size="sm"
-                variant="ghost"
-                [label]="'adminUi.products.bulk.schedule.clearPublish' | translate"
-                (action)="clearPublishScheduleForSelected()"
-                [disabled]="bulkBusy() || inlineBusy()"
-              ></app-button>
-              <app-button
-                size="sm"
-                variant="ghost"
-                [label]="'adminUi.products.bulk.schedule.clearUnpublish' | translate"
-                (action)="clearUnpublishScheduleForSelected()"
-                [disabled]="bulkBusy() || inlineBusy()"
-              ></app-button>
-            </div>
-
-            <div class="h-px bg-slate-200 dark:bg-slate-800/70"></div>
-
-            <div class="grid gap-3 lg:grid-cols-[200px_200px_240px_auto] items-end">
-              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.products.bulk.priceAdjust.mode' | translate }}
-                <select
-                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="bulkPriceMode"
-                  (change)="bulkPriceValue = ''; bulkPricePreview = null"
-                  [disabled]="bulkBusy() || inlineBusy()"
-                >
-                  <option [ngValue]="'percent'">{{ 'adminUi.products.bulk.priceAdjust.modePercent' | translate }}</option>
-                  <option [ngValue]="'amount'">{{ 'adminUi.products.bulk.priceAdjust.modeAmount' | translate }}</option>
-                </select>
-              </label>
-
-              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.products.bulk.priceAdjust.direction' | translate }}
-                <select
-                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="bulkPriceDirection"
-                  (change)="updateBulkPricePreview()"
-                  [disabled]="bulkBusy() || inlineBusy()"
-                >
-                  <option [ngValue]="'increase'">{{ 'adminUi.products.bulk.priceAdjust.directionIncrease' | translate }}</option>
-                  <option [ngValue]="'decrease'">{{ 'adminUi.products.bulk.priceAdjust.directionDecrease' | translate }}</option>
-                </select>
-              </label>
-
-              <app-input
-                [label]="'adminUi.products.bulk.priceAdjust.value' | translate"
-                [placeholder]="bulkPriceMode === 'percent' ? '10' : '5.00'"
-                type="text"
-                inputMode="decimal"
-                [value]="bulkPriceValue"
-                (valueChange)="onBulkPriceValueChange($event)"
-                [disabled]="bulkBusy() || inlineBusy()"
-              ></app-input>
-
-              <app-button
-                size="sm"
-                [label]="'adminUi.products.bulk.priceAdjust.apply' | translate"
-                (action)="applyPriceAdjustmentToSelected()"
-                [disabled]="bulkBusy() || inlineBusy()"
-              ></app-button>
-            </div>
-
-            <p *ngIf="bulkPricePreview" class="text-xs text-slate-600 dark:text-slate-300">
-              {{ 'adminUi.products.bulk.priceAdjust.preview' | translate: bulkPricePreview }}
-            </p>
-
-            <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.products.bulk.note' | translate }}</p>
-
-            <div
-              *ngIf="bulkError()"
-              class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-2 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
-            >
-              {{ bulkError() }}
-            </div>
-          </div>
-
-	        <app-error-state
+		        <app-error-state
             *ngIf="error()"
             [message]="error()!"
             [requestId]="errorRequestId()"
@@ -4573,6 +4387,22 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       },
       error: () => this.toast.error(this.translate.instant('adminUi.products.quickStatus.undoError'))
     });
+  }
+
+  setBulkSaleType(next: 'percent' | 'amount'): void {
+    this.bulkSaleType = next;
+    this.bulkSaleValue = '';
+  }
+
+  setBulkPriceMode(next: 'percent' | 'amount'): void {
+    this.bulkPriceMode = next;
+    this.bulkPriceValue = '';
+    this.bulkPricePreview = null;
+  }
+
+  setBulkPriceDirection(next: 'increase' | 'decrease'): void {
+    this.bulkPriceDirection = next;
+    this.updateBulkPricePreview();
   }
 
   onBulkSaleValueChange(next: string | number): void {

@@ -61,7 +61,10 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Orders: address validation assistant – Flag likely invalid phone/postcode and suggest corrections (offline rules, no paid APIs).
 - [x] Admin Orders: customer comms timeline – Show transactional email delivery status/history for the order.
 - [x] Admin Orders: internal tag management – Improve tag CRUD (colors/rename) and bulk apply workflows.
-- [ ] Admin Products: refactor into subcomponents – Extract editor/bulk bar/image manager/relationships into dedicated components for maintainability.
+- [x] Admin Products: extract bulk actions bar component – Move bulk sale/status/category/schedule/price-adjust UI into a dedicated component.
+- [ ] Admin Products: extract product editor wizard component – Move the create/edit wizard UI into a dedicated component.
+- [ ] Admin Products: extract image manager component – Move image list/meta/edit modals into a dedicated component.
+- [ ] Admin Products: extract relationships manager component – Move related/upsell selection UI into a dedicated component.
 - [ ] Admin Products: SKU/slug uniqueness feedback – Inline validate uniqueness with non-blocking warnings and guidance.
 - [ ] Admin Products: image upload queue – Support multi-upload with per-file progress and retry for failures.
 - [ ] Admin Products: bulk alt/translation helper – Provide a bulk view for missing alt text/translations with quick edits.
