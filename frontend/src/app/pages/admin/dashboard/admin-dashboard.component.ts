@@ -26,10 +26,13 @@ import {
   AdminDashboardSearchResult,
   AdminDashboardSearchResultType,
   AdminDashboardWindowMetric,
+  AdminDashboardAlertThresholds,
+  AdminDashboardAlertThresholdsUpdateRequest,
   AdminChannelBreakdownResponse,
   AdminFunnelMetricsResponse,
   ScheduledPromoItem,
   ScheduledPublishItem,
+  AdminScheduledReportKind,
   AdminService,
   AdminSummary
 } from '../../../core/admin.service';
@@ -45,6 +48,7 @@ import { MarkdownService } from '../../../core/markdown.service';
 
 type MetricWidgetId = 'kpis' | 'counts' | 'range';
 type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: string | null };
+type AuditPresetId = 'all' | 'security' | 'content' | 'catalog' | 'payments';
 
 @Component({
   selector: 'app-admin-dashboard',
@@ -841,6 +845,13 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
 	        <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
 	          <div class="flex items-center justify-between gap-3 flex-wrap">
 	            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.dashboard.alertsTitle' | translate }}</h2>
+              <app-button
+                *ngIf="isOwner()"
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.dashboard.alerts.configure' | translate"
+                (action)="openAlertThresholds()"
+              ></app-button>
 	          </div>
 
 	          <div *ngIf="!hasAnomalyAlerts()" class="text-sm text-slate-600 dark:text-slate-300">
@@ -1525,6 +1536,43 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
                   <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.dashboard.scheduledEmptyPromos' | translate }}</p>
                 </ng-template>
               </div>
+
+              <div class="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 text-sm lg:col-span-2 dark:border-slate-800 dark:bg-slate-900">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                  <div class="grid gap-0.5">
+                    <div class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.dashboard.scheduledRunNow.title' | translate }}
+                    </div>
+                    <div class="text-xs text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.dashboard.scheduledRunNow.hint' | translate }}
+                    </div>
+                  </div>
+                  <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                    <input type="checkbox" class="h-4 w-4 accent-indigo-600" [(ngModel)]="scheduledRunForce" />
+                    {{ 'adminUi.dashboard.scheduledRunNow.force' | translate }}
+                  </label>
+                </div>
+
+                <div *ngIf="scheduledRunError()" class="text-sm text-rose-700 dark:text-rose-300">
+                  {{ scheduledRunError() }}
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                  <app-button
+                    size="sm"
+                    [disabled]="scheduledRunBusy() !== null"
+                    [label]="'adminUi.dashboard.scheduledRunNow.weekly' | translate"
+                    (action)="runScheduledReport('weekly')"
+                  ></app-button>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [disabled]="scheduledRunBusy() !== null"
+                    [label]="'adminUi.dashboard.scheduledRunNow.monthly' | translate"
+                    (action)="runScheduledReport('monthly')"
+                  ></app-button>
+                </div>
+              </div>
 	          </div>
 	        </section>
 
@@ -1545,6 +1593,49 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
               <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.audit.exportLimitNote' | translate }}</span>
               <app-button size="sm" [label]="'adminUi.audit.export' | translate" (action)="downloadAuditCsv()"></app-button>
             </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              class="h-9 rounded-full border px-3 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+              [ngClass]="auditPresetActive('all') ? 'border-slate-900 bg-slate-900 text-white dark:border-slate-50 dark:bg-slate-50 dark:text-slate-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/50'"
+              (click)="applyAuditPreset('all')"
+            >
+              {{ 'adminUi.audit.presets.all' | translate }}
+            </button>
+            <button
+              type="button"
+              class="h-9 rounded-full border px-3 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+              [ngClass]="auditPresetActive('security') ? 'border-slate-900 bg-slate-900 text-white dark:border-slate-50 dark:bg-slate-50 dark:text-slate-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/50'"
+              (click)="applyAuditPreset('security')"
+            >
+              {{ 'adminUi.audit.presets.security' | translate }}
+            </button>
+            <button
+              type="button"
+              class="h-9 rounded-full border px-3 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+              [ngClass]="auditPresetActive('content') ? 'border-slate-900 bg-slate-900 text-white dark:border-slate-50 dark:bg-slate-50 dark:text-slate-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/50'"
+              (click)="applyAuditPreset('content')"
+            >
+              {{ 'adminUi.audit.presets.content' | translate }}
+            </button>
+            <button
+              type="button"
+              class="h-9 rounded-full border px-3 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+              [ngClass]="auditPresetActive('catalog') ? 'border-slate-900 bg-slate-900 text-white dark:border-slate-50 dark:bg-slate-50 dark:text-slate-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/50'"
+              (click)="applyAuditPreset('catalog')"
+            >
+              {{ 'adminUi.audit.presets.catalog' | translate }}
+            </button>
+            <button
+              type="button"
+              class="h-9 rounded-full border px-3 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+              [ngClass]="auditPresetActive('payments') ? 'border-slate-900 bg-slate-900 text-white dark:border-slate-50 dark:bg-slate-50 dark:text-slate-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/50'"
+              (click)="applyAuditPreset('payments')"
+            >
+              {{ 'adminUi.audit.presets.payments' | translate }}
+            </button>
           </div>
 
           <div class="grid gap-3 md:grid-cols-[220px_1fr_1fr_auto] items-end">
@@ -1799,6 +1890,86 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
 	        </section>
 
           <app-modal
+            [open]="alertThresholdsOpen()"
+            [title]="'adminUi.dashboard.alerts.config.title' | translate"
+            [subtitle]="'adminUi.dashboard.alerts.config.subtitle' | translate"
+            [confirmLabel]="'adminUi.common.save' | translate"
+            [cancelLabel]="'adminUi.common.cancel' | translate"
+            [closeLabel]="'adminUi.common.close' | translate"
+            [confirmDisabled]="alertThresholdsSaving()"
+            (confirm)="saveAlertThresholds()"
+            (closed)="closeAlertThresholds()"
+          >
+            <div class="grid gap-4">
+              <div *ngIf="alertThresholdsError()" class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
+                {{ alertThresholdsError() }}
+              </div>
+
+              <div class="grid gap-3">
+                <div class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.dashboard.alerts.config.sections.failedPayments' | translate }}
+                </div>
+                <div class="grid gap-3 sm:grid-cols-2">
+                  <app-input
+                    type="number"
+                    [min]="1"
+                    [step]="1"
+                    [label]="'adminUi.dashboard.alerts.config.failedPaymentsMinCount' | translate"
+                    [(value)]="alertFailedPaymentsMinCount"
+                  ></app-input>
+                  <app-input
+                    type="number"
+                    [min]="0"
+                    [step]="1"
+                    [label]="'adminUi.dashboard.alerts.config.failedPaymentsMinDeltaPct' | translate"
+                    [placeholder]="'adminUi.dashboard.alerts.config.optionalPlaceholder' | translate"
+                    [(value)]="alertFailedPaymentsMinDeltaPct"
+                  ></app-input>
+                </div>
+              </div>
+
+              <div class="grid gap-3">
+                <div class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.dashboard.alerts.config.sections.refundRequests' | translate }}
+                </div>
+                <div class="grid gap-3 sm:grid-cols-2">
+                  <app-input
+                    type="number"
+                    [min]="1"
+                    [step]="1"
+                    [label]="'adminUi.dashboard.alerts.config.refundRequestsMinCount' | translate"
+                    [(value)]="alertRefundRequestsMinCount"
+                  ></app-input>
+                  <app-input
+                    type="number"
+                    [min]="0"
+                    [max]="100"
+                    [step]="0.5"
+                    [label]="'adminUi.dashboard.alerts.config.refundRequestsMinRatePct' | translate"
+                    [placeholder]="'adminUi.dashboard.alerts.config.optionalPlaceholder' | translate"
+                    [(value)]="alertRefundRequestsMinRatePct"
+                  ></app-input>
+                </div>
+              </div>
+
+              <div class="grid gap-3">
+                <div class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.dashboard.alerts.config.sections.stockouts' | translate }}
+                </div>
+                <div class="grid gap-3 sm:grid-cols-2">
+                  <app-input
+                    type="number"
+                    [min]="1"
+                    [step]="1"
+                    [label]="'adminUi.dashboard.alerts.config.stockoutsMinCount' | translate"
+                    [(value)]="alertStockoutsMinCount"
+                  ></app-input>
+                </div>
+              </div>
+            </div>
+          </app-modal>
+
+          <app-modal
             [open]="onboardingOpen()"
             [title]="'adminUi.onboarding.title' | translate"
             [subtitle]="'adminUi.onboarding.subtitle' | translate"
@@ -1975,6 +2146,18 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
   scheduledLoading = signal(false);
   scheduledError = signal('');
   scheduledTasks = signal<AdminDashboardScheduledTasksResponse | null>(null);
+  scheduledRunForce = false;
+  scheduledRunBusy = signal<AdminScheduledReportKind | null>(null);
+  scheduledRunError = signal('');
+
+  alertThresholdsOpen = signal(false);
+  alertThresholdsSaving = signal(false);
+  alertThresholdsError = signal('');
+  alertFailedPaymentsMinCount: number | string = 1;
+  alertFailedPaymentsMinDeltaPct: number | string = '';
+  alertRefundRequestsMinCount: number | string = 1;
+  alertRefundRequestsMinRatePct: number | string = '';
+  alertStockoutsMinCount: number | string = 1;
 
   jobsLoading = signal(false);
   jobsError = signal('');
@@ -2785,6 +2968,37 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     });
   }
 
+  runScheduledReport(kind: AdminScheduledReportKind): void {
+    if (this.scheduledRunBusy() !== null) return;
+    this.scheduledRunError.set('');
+    this.scheduledRunBusy.set(kind);
+    this.admin.sendScheduledReport({ kind, force: this.scheduledRunForce }).subscribe({
+      next: (resp) => {
+        this.scheduledRunBusy.set(null);
+        if (resp?.skipped) {
+          this.toast.info(
+            this.translate.instant('adminUi.dashboard.scheduledRunNow.skippedTitle'),
+            this.translate.instant('adminUi.dashboard.scheduledRunNow.skippedCopy')
+          );
+          return;
+        }
+        this.toast.success(
+          this.translate.instant('adminUi.dashboard.scheduledRunNow.successTitle'),
+          this.translate.instant('adminUi.dashboard.scheduledRunNow.successCopy', {
+            attempted: resp?.attempted ?? 0,
+            delivered: resp?.delivered ?? 0
+          })
+        );
+      },
+      error: (err) => {
+        this.scheduledRunBusy.set(null);
+        const msg = err?.error?.detail || this.translate.instant('adminUi.dashboard.scheduledRunNow.errorCopy');
+        this.scheduledRunError.set(msg);
+        this.toast.error(this.translate.instant('adminUi.dashboard.scheduledRunNow.errorTitle'), msg);
+      }
+    });
+  }
+
   onRangePresetChange(): void {
     if (this.rangePreset === 'custom') return;
     this.loadSummary();
@@ -3022,21 +3236,127 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     });
   }
 
+  openAlertThresholds(): void {
+    if (!this.isOwner()) return;
+    this.alertThresholdsError.set('');
+    const current = this.summary()?.alert_thresholds;
+    if (current) this.seedAlertThresholdForm(current);
+    this.alertThresholdsOpen.set(true);
+  }
+
+  closeAlertThresholds(): void {
+    this.alertThresholdsOpen.set(false);
+  }
+
+  saveAlertThresholds(): void {
+    if (!this.isOwner()) return;
+    if (this.alertThresholdsSaving()) return;
+
+    const failedPaymentsMinCount = this.parseRequiredCount(this.alertFailedPaymentsMinCount);
+    const failedPaymentsMinDeltaPct = this.parseOptionalNumber(this.alertFailedPaymentsMinDeltaPct);
+    const refundRequestsMinCount = this.parseRequiredCount(this.alertRefundRequestsMinCount);
+    const refundRequestsMinRatePct = this.parseOptionalNumber(this.alertRefundRequestsMinRatePct, { max: 100 });
+    const stockoutsMinCount = this.parseRequiredCount(this.alertStockoutsMinCount);
+
+    if (
+      failedPaymentsMinCount === null ||
+      refundRequestsMinCount === null ||
+      stockoutsMinCount === null ||
+      failedPaymentsMinDeltaPct === undefined ||
+      refundRequestsMinRatePct === undefined
+    ) {
+      this.alertThresholdsError.set(this.translate.instant('adminUi.dashboard.alerts.config.errors.invalid'));
+      return;
+    }
+
+    const payload: AdminDashboardAlertThresholdsUpdateRequest = {
+      failed_payments_min_count: failedPaymentsMinCount,
+      failed_payments_min_delta_pct: failedPaymentsMinDeltaPct,
+      refund_requests_min_count: refundRequestsMinCount,
+      refund_requests_min_rate_pct: refundRequestsMinRatePct,
+      stockouts_min_count: stockoutsMinCount
+    };
+
+    this.alertThresholdsSaving.set(true);
+    this.alertThresholdsError.set('');
+    this.admin.updateAlertThresholds(payload).subscribe({
+      next: (resp) => {
+        this.alertThresholdsSaving.set(false);
+        this.alertThresholdsOpen.set(false);
+        this.seedAlertThresholdForm(resp);
+        this.refreshSummarySilent();
+        this.toast.success(
+          this.translate.instant('adminUi.dashboard.alerts.config.successTitle'),
+          this.translate.instant('adminUi.dashboard.alerts.config.successCopy')
+        );
+      },
+      error: (err) => {
+        this.alertThresholdsSaving.set(false);
+        const msg = err?.error?.detail || this.translate.instant('adminUi.dashboard.alerts.config.errors.save');
+        this.alertThresholdsError.set(msg);
+      }
+    });
+  }
+
+  private seedAlertThresholdForm(thresholds: AdminDashboardAlertThresholds): void {
+    this.alertFailedPaymentsMinCount = Number(thresholds?.failed_payments_min_count ?? 1) || 1;
+    this.alertFailedPaymentsMinDeltaPct =
+      thresholds?.failed_payments_min_delta_pct === null || thresholds?.failed_payments_min_delta_pct === undefined
+        ? ''
+        : Number(thresholds.failed_payments_min_delta_pct);
+    this.alertRefundRequestsMinCount = Number(thresholds?.refund_requests_min_count ?? 1) || 1;
+    this.alertRefundRequestsMinRatePct =
+      thresholds?.refund_requests_min_rate_pct === null || thresholds?.refund_requests_min_rate_pct === undefined
+        ? ''
+        : Number(thresholds.refund_requests_min_rate_pct);
+    this.alertStockoutsMinCount = Number(thresholds?.stockouts_min_count ?? 1) || 1;
+  }
+
+  private parseRequiredCount(value: string | number | null | undefined): number | null {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return null;
+    const intVal = Math.floor(num);
+    if (intVal < 1) return null;
+    return intVal;
+  }
+
+  private parseOptionalNumber(
+    value: string | number | null | undefined,
+    options?: { max?: number }
+  ): number | null | undefined {
+    if (value === null || value === undefined) return null;
+    const num = typeof value === 'number' ? value : Number(value.trim());
+    if (typeof value !== 'number' && !String(value).trim()) return null;
+    if (!Number.isFinite(num)) return undefined;
+    if (num < 0) return undefined;
+    if (options?.max !== undefined && num > options.max) return undefined;
+    return num;
+  }
+
   failedPaymentsAlert(): AdminDashboardWindowMetric | null {
     const metric = this.summary()?.anomalies?.failed_payments;
-    if (!metric || !metric.current) return null;
+    if (!metric) return null;
+    const shouldAlert =
+      typeof metric.is_alert === 'boolean' ? metric.is_alert : Boolean(metric.current);
+    if (!shouldAlert) return null;
     return metric;
   }
 
   refundRequestsAlert(): AdminDashboardWindowMetric | null {
     const metric = this.summary()?.anomalies?.refund_requests;
-    if (!metric || !metric.current) return null;
+    if (!metric) return null;
+    const shouldAlert =
+      typeof metric.is_alert === 'boolean' ? metric.is_alert : Boolean(metric.current);
+    if (!shouldAlert) return null;
     return metric;
   }
 
   stockoutsAlertCount(): number | null {
-    const count = this.summary()?.anomalies?.stockouts?.count ?? 0;
-    return count > 0 ? count : null;
+    const anomaly = this.summary()?.anomalies?.stockouts;
+    const count = anomaly?.count ?? 0;
+    const shouldAlert =
+      typeof anomaly?.is_alert === 'boolean' ? Boolean(anomaly.is_alert) : count > 0;
+    return shouldAlert && count > 0 ? count : null;
   }
 
   hasAnomalyAlerts(): boolean {
@@ -3195,6 +3515,28 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
 
   applyAuditFilters(): void {
     this.loadAudit(1);
+  }
+
+  private auditPresetConfig(preset: AuditPresetId): { entity: AdminAuditEntity; action: string } {
+    if (preset === 'security') return { entity: 'security', action: '' };
+    if (preset === 'content') return { entity: 'content', action: '' };
+    if (preset === 'catalog') return { entity: 'product', action: '' };
+    if (preset === 'payments') {
+      return { entity: 'security', action: 'stripe,paypal,netopia,refund,payment,webhook,coupon,checkout' };
+    }
+    return { entity: 'all', action: '' };
+  }
+
+  applyAuditPreset(preset: AuditPresetId): void {
+    const cfg = this.auditPresetConfig(preset);
+    this.auditEntity = cfg.entity;
+    this.auditAction = cfg.action;
+    this.applyAuditFilters();
+  }
+
+  auditPresetActive(preset: AuditPresetId): boolean {
+    const cfg = this.auditPresetConfig(preset);
+    return this.auditEntity === cfg.entity && (this.auditAction || '').trim() === cfg.action;
   }
 
   auditHasPrev(): boolean {

@@ -1867,13 +1867,35 @@
       "alertsTitle": "Alerte",
       "alertsEmpty": "Nicio alertă momentan.",
       "alerts": {
+        "configure": "Configurează",
         "failedPayments": "Plăți eșuate",
         "refundRequests": "Cereri de retur",
         "stockouts": "Stocuri epuizate",
         "stockoutsHint": "Produse momentan fără stoc.",
         "windowHours": "Ultimele {{hours}}h",
         "windowDays": "Ultimele {{days}} zile",
-        "vsPrevious": "față de perioada anterioară"
+        "vsPrevious": "față de perioada anterioară",
+        "config": {
+          "title": "Praguri alerte",
+          "subtitle": "Ajustează ce anomalii apar ca alerte (doar owner).",
+          "optionalPlaceholder": "Opțional",
+          "sections": {
+            "failedPayments": "Plăți eșuate",
+            "refundRequests": "Cereri de retur",
+            "stockouts": "Stocuri epuizate"
+          },
+          "failedPaymentsMinCount": "Min plăți eșuate (număr)",
+          "failedPaymentsMinDeltaPct": "Min creștere față de anterior (%)",
+          "refundRequestsMinCount": "Min cereri de retur (număr)",
+          "refundRequestsMinRatePct": "Min rată retur (%)",
+          "stockoutsMinCount": "Min stocuri epuizate (număr)",
+          "successTitle": "Praguri salvate",
+          "successCopy": "Alertele din panou se actualizează imediat pe baza noilor praguri.",
+          "errors": {
+            "invalid": "Te rog introdu valori valide pentru praguri.",
+            "save": "Nu am putut salva pragurile pentru alerte."
+          }
+        }
       },
       "systemHealthTitle": "Stare sistem",
       "systemHealth": {
@@ -1989,6 +2011,19 @@
       "promoEndsAt": "Se termină la",
       "promoStartsShort": "Începe",
       "promoEndsShort": "Se termină",
+      "scheduledRunNow": {
+        "title": "Rulează acum",
+        "hint": "Pornește manual sarcini programate sigure.",
+        "force": "Forțează (ignoră protecția deja trimis)",
+        "weekly": "Trimite raport săptămânal",
+        "monthly": "Trimite raport lunar",
+        "successTitle": "Raport trimis",
+        "successCopy": "{{delivered}} livrate ({{attempted}} încercate).",
+        "skippedTitle": "Raport omis",
+        "skippedCopy": "Un raport pentru această perioadă a fost deja trimis (folosește Forțează pentru re-trimitere).",
+        "errorTitle": "Nu am putut trimite raportul",
+        "errorCopy": "Te rog încearcă din nou."
+      },
       "rangeErrors": {
         "missing": "Selectează ambele date (început și sfârșit).",
         "order": "Data de sfârșit trebuie să fie după data de început."
@@ -5209,17 +5244,34 @@
       "filters": {
         "entity": "Entitate",
         "action": "Acțiune conține",
-        "actionPlaceholder": "ex: publish, update, owner_transfer",
+        "actionPlaceholder": "ex: publish, update, owner_transfer (folosește , sau | pentru OR)",
         "user": "Utilizator conține",
         "userPlaceholder": "email, username sau id utilizator",
         "apply": "Aplică"
+      },
+      "presets": {
+        "all": "Toate",
+        "security": "Securitate",
+        "content": "Conținut",
+        "catalog": "Catalog",
+        "payments": "Plăți"
       },
       "pagination": "Pagina {{page}} din {{total}}",
       "prev": "Anterior",
       "next": "Următor",
       "empty": "Nu există intrări de audit.",
       "securityActions": {
-        "owner_transfer": "Transfer proprietar"
+        "owner_transfer": "Transfer proprietar",
+        "dashboard": {
+          "alert_thresholds": {
+            "update": "Praguri alerte actualizate"
+          }
+        },
+        "admin_reports": {
+          "send_now": "Raport admin trimis",
+          "send_now_failed": "Trimitere raport admin blocată",
+          "send_now_error": "Trimitere raport admin eșuată"
+        }
       },
       "errors": {
         "loadTitle": "Nu am putut încărca jurnalul de audit",

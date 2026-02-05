@@ -1867,13 +1867,35 @@
       "alertsTitle": "Alerts",
       "alertsEmpty": "No alerts right now.",
       "alerts": {
+        "configure": "Configure",
         "failedPayments": "Payment failures",
         "refundRequests": "Refund requests",
         "stockouts": "Stockouts",
         "stockoutsHint": "Products currently out of stock.",
         "windowHours": "Last {{hours}}h",
         "windowDays": "Last {{days}}d",
-        "vsPrevious": "vs previous"
+        "vsPrevious": "vs previous",
+        "config": {
+          "title": "Alert thresholds",
+          "subtitle": "Tune which anomalies should surface as alerts (owner-only).",
+          "optionalPlaceholder": "Optional",
+          "sections": {
+            "failedPayments": "Payment failures",
+            "refundRequests": "Refund requests",
+            "stockouts": "Stockouts"
+          },
+          "failedPaymentsMinCount": "Min failed payments (count)",
+          "failedPaymentsMinDeltaPct": "Min spike vs previous (%)",
+          "refundRequestsMinCount": "Min refund requests (count)",
+          "refundRequestsMinRatePct": "Min refund rate (%)",
+          "stockoutsMinCount": "Min stockouts (count)",
+          "successTitle": "Alert thresholds saved",
+          "successCopy": "Dashboard alerts update immediately based on the new thresholds.",
+          "errors": {
+            "invalid": "Please enter valid threshold values.",
+            "save": "Could not save alert thresholds."
+          }
+        }
       },
       "systemHealthTitle": "System health",
       "systemHealth": {
@@ -1989,6 +2011,19 @@
       "promoEndsAt": "Ends at",
       "promoStartsShort": "Starts",
       "promoEndsShort": "Ends",
+      "scheduledRunNow": {
+        "title": "Run now",
+        "hint": "Manually trigger safe scheduled tasks.",
+        "force": "Force (ignore already-sent guard)",
+        "weekly": "Send weekly report",
+        "monthly": "Send monthly report",
+        "successTitle": "Report sent",
+        "successCopy": "{{delivered}} delivered ({{attempted}} attempted).",
+        "skippedTitle": "Report skipped",
+        "skippedCopy": "A report for this period was already sent (use Force to re-send).",
+        "errorTitle": "Failed to send report",
+        "errorCopy": "Please try again."
+      },
       "rangeErrors": {
         "missing": "Select both start and end dates.",
         "order": "End date must be on/after start date."
@@ -5209,17 +5244,34 @@
       "filters": {
         "entity": "Entity",
         "action": "Action contains",
-        "actionPlaceholder": "e.g. publish, update, owner_transfer",
+        "actionPlaceholder": "e.g. publish, update, owner_transfer (use , or | for OR)",
         "user": "User contains",
         "userPlaceholder": "email, username, or user id",
         "apply": "Apply"
+      },
+      "presets": {
+        "all": "All",
+        "security": "Security",
+        "content": "Content",
+        "catalog": "Catalog",
+        "payments": "Payments"
       },
       "pagination": "Page {{page}} of {{total}}",
       "prev": "Prev",
       "next": "Next",
       "empty": "No audit entries found.",
       "securityActions": {
-        "owner_transfer": "Ownership transfer"
+        "owner_transfer": "Ownership transfer",
+        "dashboard": {
+          "alert_thresholds": {
+            "update": "Alert thresholds updated"
+          }
+        },
+        "admin_reports": {
+          "send_now": "Admin report sent",
+          "send_now_failed": "Admin report send blocked",
+          "send_now_error": "Admin report send failed"
+        }
       },
       "errors": {
         "loadTitle": "Could not load audit log",

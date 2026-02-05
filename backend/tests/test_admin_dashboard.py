@@ -322,6 +322,60 @@ def test_admin_summary(test_app: Dict[str, object]) -> None:
     assert "products" in data and "orders" in data and "users" in data
 
 
+def test_admin_dashboard_alert_thresholds_endpoints(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    session_factory = test_app["session_factory"]
+    engine = test_app["engine"]
+    asyncio.run(reset_db(engine))
+    admin_headers = auth_headers(client, session_factory)
+    owner = owner_headers(client, session_factory)
+
+    resp = client.get("/api/v1/admin/dashboard/alert-thresholds", headers=admin_headers)
+    assert resp.status_code == 200, resp.text
+    payload = resp.json()
+    assert payload["failed_payments_min_count"] == 1
+    assert payload["refund_requests_min_count"] == 1
+    assert payload["stockouts_min_count"] == 1
+
+    denied = client.put(
+        "/api/v1/admin/dashboard/alert-thresholds",
+        headers=admin_headers,
+        json={
+            "failed_payments_min_count": 3,
+            "failed_payments_min_delta_pct": 150,
+            "refund_requests_min_count": 2,
+            "refund_requests_min_rate_pct": 25,
+            "stockouts_min_count": 4,
+        },
+    )
+    assert denied.status_code in (401, 403), denied.text
+
+    updated = client.put(
+        "/api/v1/admin/dashboard/alert-thresholds",
+        headers=owner,
+        json={
+            "failed_payments_min_count": 3,
+            "failed_payments_min_delta_pct": 150,
+            "refund_requests_min_count": 2,
+            "refund_requests_min_rate_pct": 25,
+            "stockouts_min_count": 4,
+        },
+    )
+    assert updated.status_code == 200, updated.text
+    updated_payload = updated.json()
+    assert updated_payload["failed_payments_min_count"] == 3
+    assert updated_payload["refund_requests_min_count"] == 2
+    assert updated_payload["stockouts_min_count"] == 4
+
+    summary = client.get("/api/v1/admin/dashboard/summary", headers=admin_headers)
+    assert summary.status_code == 200, summary.text
+    summary_payload = summary.json()
+    assert summary_payload["alert_thresholds"]["failed_payments_min_count"] == 3
+    assert "is_alert" in summary_payload["anomalies"]["failed_payments"]
+    assert "is_alert" in summary_payload["anomalies"]["refund_requests"]
+    assert "is_alert" in summary_payload["anomalies"]["stockouts"]
+
+
 def test_admin_maintenance_toggle(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     session_factory = test_app["session_factory"]
@@ -504,6 +558,18 @@ def test_admin_audit_entries_filters_and_export(test_app: Dict[str, object]) -> 
     )
     assert by_actor.status_code == 200, by_actor.text
     assert by_actor.json()["items"]
+
+    by_action = client.get(
+        "/api/v1/admin/dashboard/audit/entries",
+        headers=headers,
+        params={"action": "update,test"},
+    )
+    assert by_action.status_code == 200, by_action.text
+    items = by_action.json()["items"]
+    assert items
+    assert all(
+        any(token in (item.get("action") or "").lower() for token in ["update", "test"]) for item in items
+    )
 
     csv_resp = client.get(
         "/api/v1/admin/dashboard/audit/export.csv",

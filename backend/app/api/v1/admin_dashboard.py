@@ -3,6 +3,7 @@ import io
 import re
 import unicodedata
 from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -21,6 +22,7 @@ from sqlalchemy import (
     select,
     union_all,
 )
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased, selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -42,6 +44,10 @@ from app.schemas.admin_dashboard_search import (
     AdminDashboardSearchResponse,
     AdminDashboardSearchResult,
 )
+from app.schemas.admin_dashboard_alert_thresholds import (
+    AdminDashboardAlertThresholdsResponse,
+    AdminDashboardAlertThresholdsUpdateRequest,
+)
 from app.schemas.admin_dashboard_scheduled import (
     AdminDashboardScheduledTasksResponse,
     ScheduledPublishItem,
@@ -61,6 +67,7 @@ from app.models.order import Order, OrderRefund, OrderStatus, OrderTag, OrderEve
 from app.models.returns import ReturnRequest, ReturnRequestStatus
 from app.models.support import ContactSubmission
 from app.models.user import AdminAuditLog, EmailVerificationToken, User, RefreshSession, UserRole, UserSecurityEvent
+from app.models.admin_dashboard_settings import AdminDashboardAlertThresholds
 from app.models.promo import PromoCode, StripeCouponMapping
 from app.models.coupons_v2 import Promotion
 from app.models.user_export import UserDataExportJob, UserDataExportStatus
@@ -98,6 +105,100 @@ from app.schemas.analytics import AdminFunnelConversions, AdminFunnelCounts, Adm
 router = APIRouter(prefix="/admin/dashboard", tags=["admin"])
 
 DEFAULT_LOW_STOCK_DASHBOARD_THRESHOLD = 5
+
+
+async def _get_dashboard_alert_thresholds(session: AsyncSession) -> AdminDashboardAlertThresholds:
+    record = await session.scalar(
+        select(AdminDashboardAlertThresholds).where(AdminDashboardAlertThresholds.key == "default")
+    )
+    if record is not None:
+        return record
+
+    record = AdminDashboardAlertThresholds(key="default")
+    session.add(record)
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        record = await session.scalar(
+            select(AdminDashboardAlertThresholds).where(AdminDashboardAlertThresholds.key == "default")
+        )
+        if record is None:
+            raise
+    return record
+
+
+def _dashboard_alert_thresholds_payload(record: AdminDashboardAlertThresholds) -> dict[str, object]:
+    return {
+        "failed_payments_min_count": int(getattr(record, "failed_payments_min_count", 1) or 1),
+        "failed_payments_min_delta_pct": (
+            float(getattr(record, "failed_payments_min_delta_pct"))
+            if getattr(record, "failed_payments_min_delta_pct", None) is not None
+            else None
+        ),
+        "refund_requests_min_count": int(getattr(record, "refund_requests_min_count", 1) or 1),
+        "refund_requests_min_rate_pct": (
+            float(getattr(record, "refund_requests_min_rate_pct"))
+            if getattr(record, "refund_requests_min_rate_pct", None) is not None
+            else None
+        ),
+        "stockouts_min_count": int(getattr(record, "stockouts_min_count", 1) or 1),
+        "updated_at": getattr(record, "updated_at", None),
+    }
+
+
+@router.get("/alert-thresholds", response_model=AdminDashboardAlertThresholdsResponse)
+async def admin_get_alert_thresholds(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("dashboard")),
+) -> AdminDashboardAlertThresholdsResponse:
+    record = await _get_dashboard_alert_thresholds(session)
+    return AdminDashboardAlertThresholdsResponse(**_dashboard_alert_thresholds_payload(record))
+
+
+@router.put("/alert-thresholds", response_model=AdminDashboardAlertThresholdsResponse)
+async def admin_update_alert_thresholds(
+    payload: AdminDashboardAlertThresholdsUpdateRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_owner),
+) -> AdminDashboardAlertThresholdsResponse:
+    record = await _get_dashboard_alert_thresholds(session)
+    before_full = _dashboard_alert_thresholds_payload(record)
+    before = {k: v for k, v in before_full.items() if k != "updated_at"}
+
+    record.failed_payments_min_count = int(payload.failed_payments_min_count)
+    record.failed_payments_min_delta_pct = (
+        Decimal(str(payload.failed_payments_min_delta_pct))
+        if payload.failed_payments_min_delta_pct is not None
+        else None
+    )
+    record.refund_requests_min_count = int(payload.refund_requests_min_count)
+    record.refund_requests_min_rate_pct = (
+        Decimal(str(payload.refund_requests_min_rate_pct))
+        if payload.refund_requests_min_rate_pct is not None
+        else None
+    )
+    record.stockouts_min_count = int(payload.stockouts_min_count)
+    session.add(record)
+
+    after_full = _dashboard_alert_thresholds_payload(record)
+    after = {k: v for k, v in after_full.items() if k != "updated_at"}
+    await audit_chain_service.add_admin_audit_log(
+        session,
+        action="dashboard.alert_thresholds.update",
+        actor_user_id=current_user.id,
+        subject_user_id=None,
+        data={
+            "before": before,
+            "after": after,
+            "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+            "ip_address": (request.client.host if request.client else None),
+        },
+    )
+    await session.commit()
+    await session.refresh(record)
+    return AdminDashboardAlertThresholdsResponse(**_dashboard_alert_thresholds_payload(record))
 
 
 @router.get("/summary")
@@ -411,19 +512,41 @@ async def admin_summary(
     refund_requests = await session.scalar(
         select(func.count())
         .select_from(ReturnRequest)
+        .join(Order, ReturnRequest.order_id == Order.id)
         .where(
             ReturnRequest.status == ReturnRequestStatus.requested,
             ReturnRequest.created_at >= refund_window_start,
             ReturnRequest.created_at < refund_window_end,
+            exclude_test_orders,
         )
     )
     refund_requests_prev = await session.scalar(
         select(func.count())
         .select_from(ReturnRequest)
+        .join(Order, ReturnRequest.order_id == Order.id)
         .where(
             ReturnRequest.status == ReturnRequestStatus.requested,
             ReturnRequest.created_at >= refund_prev_start,
             ReturnRequest.created_at < refund_window_start,
+            exclude_test_orders,
+        )
+    )
+    refund_window_orders = await session.scalar(
+        select(func.count())
+        .select_from(Order)
+        .where(
+            Order.created_at >= refund_window_start,
+            Order.created_at < refund_window_end,
+            exclude_test_orders,
+        )
+    )
+    refund_window_orders_prev = await session.scalar(
+        select(func.count())
+        .select_from(Order)
+        .where(
+            Order.created_at >= refund_prev_start,
+            Order.created_at < refund_window_start,
+            exclude_test_orders,
         )
     )
 
@@ -441,6 +564,48 @@ async def admin_summary(
         if yesterday_value == 0:
             return None
         return (today_value - yesterday_value) / yesterday_value * 100.0
+
+    def _rate_pct(numer: float, denom: float) -> float | None:
+        if denom <= 0:
+            return None
+        return numer / denom * 100.0
+
+    thresholds = await _get_dashboard_alert_thresholds(session)
+    failed_payments_threshold_min_count = int(getattr(thresholds, "failed_payments_min_count", 1) or 1)
+    failed_payments_threshold_min_delta_pct = (
+        float(getattr(thresholds, "failed_payments_min_delta_pct"))
+        if getattr(thresholds, "failed_payments_min_delta_pct", None) is not None
+        else None
+    )
+    refund_requests_threshold_min_count = int(getattr(thresholds, "refund_requests_min_count", 1) or 1)
+    refund_requests_threshold_min_rate_pct = (
+        float(getattr(thresholds, "refund_requests_min_rate_pct"))
+        if getattr(thresholds, "refund_requests_min_rate_pct", None) is not None
+        else None
+    )
+    stockouts_threshold_min_count = int(getattr(thresholds, "stockouts_min_count", 1) or 1)
+
+    failed_payments_delta_pct = _delta_pct(float(failed_payments or 0), float(failed_payments_prev or 0))
+    failed_payments_is_alert = bool(int(failed_payments or 0) >= failed_payments_threshold_min_count) and (
+        failed_payments_threshold_min_delta_pct is None
+        or failed_payments_delta_pct is None
+        or failed_payments_delta_pct >= failed_payments_threshold_min_delta_pct
+    )
+
+    refund_rate_pct = _rate_pct(float(refund_requests or 0), float(refund_window_orders or 0))
+    refund_rate_prev_pct = _rate_pct(float(refund_requests_prev or 0), float(refund_window_orders_prev or 0))
+    refund_rate_delta_pct = (
+        _delta_pct(refund_rate_pct, refund_rate_prev_pct)
+        if refund_rate_pct is not None and refund_rate_prev_pct is not None
+        else None
+    )
+    refund_requests_is_alert = bool(int(refund_requests or 0) >= refund_requests_threshold_min_count) and (
+        refund_requests_threshold_min_rate_pct is None
+        or refund_rate_pct is None
+        or refund_rate_pct >= refund_requests_threshold_min_rate_pct
+    )
+
+    stockouts_is_alert = bool(int(stockouts or 0) >= stockouts_threshold_min_count)
 
     return {
         "products": products_total or 0,
@@ -488,9 +653,8 @@ async def admin_summary(
                 "window_hours": 24,
                 "current": int(failed_payments or 0),
                 "previous": int(failed_payments_prev or 0),
-                "delta_pct": _delta_pct(
-                    float(failed_payments or 0), float(failed_payments_prev or 0)
-                ),
+                "delta_pct": failed_payments_delta_pct,
+                "is_alert": failed_payments_is_alert,
             },
             "refund_requests": {
                 "window_days": 7,
@@ -499,25 +663,81 @@ async def admin_summary(
                 "delta_pct": _delta_pct(
                     float(refund_requests or 0), float(refund_requests_prev or 0)
                 ),
+                "current_denominator": int(refund_window_orders or 0),
+                "previous_denominator": int(refund_window_orders_prev or 0),
+                "current_rate_pct": refund_rate_pct,
+                "previous_rate_pct": refund_rate_prev_pct,
+                "rate_delta_pct": refund_rate_delta_pct,
+                "is_alert": refund_requests_is_alert,
             },
-            "stockouts": {"count": int(stockouts or 0)},
+            "stockouts": {"count": int(stockouts or 0), "is_alert": stockouts_is_alert},
         },
+        "alert_thresholds": _dashboard_alert_thresholds_payload(thresholds),
         "system": {"db_ready": True, "backup_last_at": settings.backup_last_at},
     }
 
 
 @router.post("/reports/send")
 async def admin_send_scheduled_report(
+    request: Request,
     payload: dict = Body(...),
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    current_user: User = Depends(require_admin),
 ) -> dict:
     kind = str(payload.get("kind") or "").strip().lower()
     force = bool(payload.get("force", False))
     try:
-        return await admin_reports_service.send_report_now(session, kind=kind, force=force)
+        result = await admin_reports_service.send_report_now(session, kind=kind, force=force)
     except ValueError as exc:
+        await session.rollback()
+        await audit_chain_service.add_admin_audit_log(
+            session,
+            action="admin_reports.send_now_failed",
+            actor_user_id=current_user.id,
+            subject_user_id=None,
+            data={
+                "kind": kind,
+                "force": force,
+                "error": str(exc)[:500],
+                "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+                "ip_address": (request.client.host if request.client else None),
+            },
+        )
+        await session.commit()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        await session.rollback()
+        await audit_chain_service.add_admin_audit_log(
+            session,
+            action="admin_reports.send_now_error",
+            actor_user_id=current_user.id,
+            subject_user_id=None,
+            data={
+                "kind": kind,
+                "force": force,
+                "error": str(exc)[:500],
+                "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+                "ip_address": (request.client.host if request.client else None),
+            },
+        )
+        await session.commit()
+        raise
+
+    await audit_chain_service.add_admin_audit_log(
+        session,
+        action="admin_reports.send_now",
+        actor_user_id=current_user.id,
+        subject_user_id=None,
+        data={
+            "kind": kind,
+            "force": force,
+            "result": result,
+            "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+            "ip_address": (request.client.host if request.client else None),
+        },
+    )
+    await session.commit()
+    return result
 
 
 @router.get("/funnel", response_model=AdminFunnelMetricsResponse)
@@ -2821,7 +3041,14 @@ def _audit_filters(
     if action:
         needle = action.strip().lower()
         if needle:
-            filters.append(func.lower(getattr(audit.c, "action")).like(f"%{needle}%"))  # type: ignore[attr-defined]
+            tokens = [token.strip() for token in re.split(r"[|,]+", needle) if token.strip()]
+            if len(tokens) <= 1:
+                filters.append(
+                    func.lower(getattr(audit.c, "action")).like(f"%{needle}%")  # type: ignore[attr-defined]
+                )
+            else:
+                action_col = func.lower(getattr(audit.c, "action"))  # type: ignore[attr-defined]
+                filters.append(or_(*[action_col.like(f"%{token}%") for token in tokens]))
 
     if user:
         needle = user.strip().lower()

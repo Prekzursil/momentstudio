@@ -40,6 +40,7 @@ export interface AdminSummary {
   yesterday_refunds: number;
   refunds_delta_pct: number | null;
   anomalies?: AdminDashboardAnomalies;
+  alert_thresholds?: AdminDashboardAlertThresholds;
   system?: AdminDashboardSystemHealth;
 }
 
@@ -49,17 +50,40 @@ export interface AdminDashboardWindowMetric {
   current: number;
   previous: number;
   delta_pct: number | null;
+  is_alert?: boolean;
+  current_denominator?: number;
+  previous_denominator?: number;
+  current_rate_pct?: number | null;
+  previous_rate_pct?: number | null;
+  rate_delta_pct?: number | null;
 }
 
 export interface AdminDashboardAnomalies {
   failed_payments: AdminDashboardWindowMetric;
   refund_requests: AdminDashboardWindowMetric;
-  stockouts: { count: number };
+  stockouts: { count: number; is_alert?: boolean };
 }
 
 export interface AdminDashboardSystemHealth {
   db_ready: boolean;
   backup_last_at: string | null;
+}
+
+export interface AdminDashboardAlertThresholds {
+  failed_payments_min_count: number;
+  failed_payments_min_delta_pct: number | null;
+  refund_requests_min_count: number;
+  refund_requests_min_rate_pct: number | null;
+  stockouts_min_count: number;
+  updated_at: string | null;
+}
+
+export interface AdminDashboardAlertThresholdsUpdateRequest {
+  failed_payments_min_count: number;
+  failed_payments_min_delta_pct: number | null;
+  refund_requests_min_count: number;
+  refund_requests_min_rate_pct: number | null;
+  stockouts_min_count: number;
 }
 
 export interface AdminDashboardPaymentsHealthProvider {
@@ -1330,6 +1354,14 @@ export class AdminService {
 
   sendScheduledReport(payload: { kind: AdminScheduledReportKind; force?: boolean }): Observable<AdminScheduledReportSendResponse> {
     return this.api.post<AdminScheduledReportSendResponse>('/admin/dashboard/reports/send', payload);
+  }
+
+  getAlertThresholds(): Observable<AdminDashboardAlertThresholds> {
+    return this.api.get<AdminDashboardAlertThresholds>('/admin/dashboard/alert-thresholds');
+  }
+
+  updateAlertThresholds(payload: AdminDashboardAlertThresholdsUpdateRequest): Observable<AdminDashboardAlertThresholds> {
+    return this.api.put<AdminDashboardAlertThresholds>('/admin/dashboard/alert-thresholds', payload);
   }
 
   createFeaturedCollection(payload: { name: string; description?: string | null; product_ids?: string[] }): Observable<FeaturedCollection> {
