@@ -1,9 +1,9 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { ScrollingModule } from '@angular/cdk/scrolling';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { forkJoin } from 'rxjs';
+import { forkJoin, Subscription } from 'rxjs';
 import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
 import { ErrorStateComponent } from '../../../shared/error-state.component';
@@ -1227,7 +1227,7 @@ type PriceHistoryChart = {
                       [checked]="allSelectedOnPage()"
                       (change)="toggleSelectAll($event)"
                       [disabled]="bulkBusy() || inlineBusy() || view === 'deleted'"
-                      aria-label="Select all products on page"
+                      [attr.aria-label]="'adminUi.products.a11y.selectAllOnPage' | translate"
                     />
                   </th>
                   <th *ngSwitchCase="'name'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
@@ -1298,7 +1298,7 @@ type PriceHistoryChart = {
 	                      [checked]="selected.has(product.id)"
 	                      (change)="toggleSelected(product.id, $event)"
 	                      [disabled]="bulkBusy() || inlineBusy() || view === 'deleted'"
-	                      [attr.aria-label]="'Select product ' + (product.name || product.slug)"
+	                      [attr.aria-label]="'adminUi.products.a11y.selectProduct' | translate: { name: product.name || product.slug }"
 	                    />
 	                  </td>
 	                  <td *ngSwitchCase="'name'" class="font-medium text-slate-900 dark:text-slate-50" [ngClass]="cellPaddingClass()">
@@ -1331,7 +1331,7 @@ type PriceHistoryChart = {
                             [value]="inlineBasePrice"
                             (input)="onInlineBasePriceChange($any($event.target).value)"
                             [disabled]="inlineBusy()"
-                            aria-label="Base price"
+                            [attr.aria-label]="'adminUi.products.a11y.basePrice' | translate"
                           />
                           <p *ngIf="inlineBasePriceError" class="text-xs text-rose-700 dark:text-rose-200">
                             {{ inlineBasePriceError }}
@@ -1442,7 +1442,7 @@ type PriceHistoryChart = {
                           [value]="inlineStockQuantity"
                           (input)="onInlineStockChange($any($event.target).value)"
                           [disabled]="inlineBusy()"
-                          aria-label="Stock quantity"
+                          [attr.aria-label]="'adminUi.products.a11y.stockQuantity' | translate"
                         />
                         <p *ngIf="inlineStockError" class="text-xs text-rose-700 dark:text-rose-200">
                           {{ inlineStockError }}
@@ -3362,7 +3362,7 @@ type PriceHistoryChart = {
 	    </div>
 	  `
 })
-export class AdminProductsComponent implements OnInit {
+export class AdminProductsComponent implements OnInit, OnDestroy {
   crumbs = [
     { label: 'nav.home', url: '/' },
     { label: 'nav.admin', url: '/admin/dashboard' },
@@ -3401,6 +3401,7 @@ export class AdminProductsComponent implements OnInit {
   private productSearchDebounceHandle: number | null = null;
   private productSearchBlurHandle: number | null = null;
   private productSearchRequestId = 0;
+  private productSearchSub: Subscription | null = null;
   private productFilterDebounceHandle: number | null = null;
 
 	  editorOpen = signal(false);
@@ -3589,6 +3590,31 @@ export class AdminProductsComponent implements OnInit {
     this.load();
   }
 
+  ngOnDestroy(): void {
+    this.cancelProductSearchRequest();
+
+    if (this.productSearchDebounceHandle !== null) {
+      window.clearTimeout(this.productSearchDebounceHandle);
+      this.productSearchDebounceHandle = null;
+    }
+    if (this.productSearchBlurHandle !== null) {
+      window.clearTimeout(this.productSearchBlurHandle);
+      this.productSearchBlurHandle = null;
+    }
+    if (this.productFilterDebounceHandle !== null) {
+      window.clearTimeout(this.productFilterDebounceHandle);
+      this.productFilterDebounceHandle = null;
+    }
+    if (this.duplicateCheckTimeoutId) {
+      clearTimeout(this.duplicateCheckTimeoutId);
+      this.duplicateCheckTimeoutId = null;
+    }
+    if (this.relationshipSearchTimeout) {
+      clearTimeout(this.relationshipSearchTimeout);
+      this.relationshipSearchTimeout = null;
+    }
+  }
+
   openLayoutModal(): void {
     this.layoutModalOpen.set(true);
   }
@@ -3747,6 +3773,7 @@ export class AdminProductsComponent implements OnInit {
     }
 
     if (needle.length < 2) {
+      this.cancelProductSearchRequest();
       this.productSearchResults.set([]);
       this.productSearchLoading.set(false);
       this.productSearchActiveIndex.set(-1);
@@ -3768,11 +3795,18 @@ export class AdminProductsComponent implements OnInit {
     }, 250);
   }
 
+  private cancelProductSearchRequest(): void {
+    if (!this.productSearchSub) return;
+    this.productSearchSub.unsubscribe();
+    this.productSearchSub = null;
+  }
+
   private runProductSearch(needle: string): void {
     this.openProductSearch();
     this.productSearchLoading.set(true);
+    this.cancelProductSearchRequest();
     const requestId = ++this.productSearchRequestId;
-    this.productsApi
+    const sub = this.productsApi
       .search({
         q: needle,
         status: this.status === 'all' ? undefined : this.status,
@@ -3800,6 +3834,10 @@ export class AdminProductsComponent implements OnInit {
           this.productSearchError.set(this.t('adminUi.products.errors.loadList'));
         }
       });
+    sub.add(() => {
+      if (this.productSearchSub === sub) this.productSearchSub = null;
+    });
+    this.productSearchSub = sub;
   }
 
   productSearchActiveDescendant(): string | null {

@@ -3319,6 +3319,12 @@
     "products": {
       "title": "Produse",
       "hint": "Caută după nume, URL sau cod produs (SKU).",
+      "a11y": {
+        "selectAllOnPage": "Selectează toate produsele de pe pagină",
+        "selectProduct": "Selectează produsul {{name}}",
+        "basePrice": "Preț de bază",
+        "stockQuantity": "Cantitate în stoc"
+      },
       "new": "Nou",
       "wizard": {
         "start": "Asistent ghidat",
@@ -3855,6 +3861,10 @@
     "orders": {
       "title": "Comenzi",
       "hint": "Caută după referință, ID, email sau utilizator.",
+      "a11y": {
+        "selectAllOnPage": "Selectează toate comenzile de pe pagină",
+        "selectOrder": "Selectează comanda {{ref}}"
+      },
       "export": "Exportă CSV",
       "exports": {
         "nav": "Documente",

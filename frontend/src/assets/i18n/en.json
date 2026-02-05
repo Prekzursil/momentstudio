@@ -3319,6 +3319,12 @@
     "products": {
       "title": "Products",
       "hint": "Search by name, URL, or product code (SKU).",
+      "a11y": {
+        "selectAllOnPage": "Select all products on page",
+        "selectProduct": "Select product {{name}}",
+        "basePrice": "Base price",
+        "stockQuantity": "Stock quantity"
+      },
       "new": "New",
       "wizard": {
         "start": "Guided wizard",
@@ -3855,6 +3861,10 @@
     "orders": {
       "title": "Orders",
       "hint": "Search by reference, id, email, or username.",
+      "a11y": {
+        "selectAllOnPage": "Select all orders on page",
+        "selectOrder": "Select order {{ref}}"
+      },
       "export": "Export CSV",
       "exports": {
         "nav": "Documents",

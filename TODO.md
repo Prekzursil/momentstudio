@@ -29,6 +29,57 @@ Below is a structured checklist you can turn into issues.
 - [x] Coupons v2: validate marketing opt-in before committing coupon changes when `send_email=true` (avoid partial success).
 - [x] Email: add RFC 8058 one-click unsubscribe headers (`List-Unsubscribe-Post`).
 - [x] Newsletter: auto-unsubscribe landing page on load and return HTML on API GET (fallback UX when clients open the unsubscribe URL).
+### Admin Dashboard & Subpages — Curated Improvements (50)
+- [x] Admin Products: cleanup pending timers on destroy – Clear debounce/poll timeouts and cancel in-flight searches to prevent stale UI updates.
+- [x] Admin Tables: translate selection a11y labels – Replace hard-coded admin `aria-label`s (select all/row/base price/stock qty) with RO/EN i18n keys.
+- [ ] Admin UI: include requestId in error states – Surface backend request IDs on failures and add a one-click “copy requestId” action for support.
+- [ ] Admin UI: standardized error + retry component – Use a shared error state across admin pages (message + requestId + retry CTA).
+- [ ] Admin UI: consistent loading skeletons – Add a shared table skeleton/placeholder so lists don’t flash empty content while loading.
+- [ ] Admin UI: unsaved-changes guard for editors – Prevent navigating away from product/CMS editors when there are unsaved changes.
+- [ ] Admin UI: focus management for modals – Trap focus, restore focus to trigger, and close on Escape consistently across admin modals.
+- [ ] Admin UI: optimistic toggles with rollback – For simple flags (active/featured/visible), update immediately and rollback on failure with clear toast.
+- [ ] Admin UI: copy buttons for IDs/emails – Add one-click copy for order/product/user IDs and key strings with a visible confirmation.
+- [ ] Admin UI: in-app feedback widget – Add an admin-only “Feedback” form stored in DB and visible in Support (no external services).
+- [ ] Admin UI: “What’s new” panel – Show deploy notes from a local markdown file in the repo (no third-party tooling).
+- [ ] Admin Dashboard: KPI drill-down links – Clicking a KPI navigates to the relevant list with filters pre-applied.
+- [ ] Admin Dashboard: payments health widget – Show success rate/failures + recent webhook errors per provider using existing DB logs.
+- [ ] Admin Dashboard: refunds breakdown widget – Show refunds by reason/provider/timeframe with deltas.
+- [ ] Admin Dashboard: shipping performance widget – Track avg time-to-ship and delivery time by courier with trend deltas.
+- [ ] Admin Dashboard: stockout impact widget – Highlight out-of-stock products and estimate missed revenue from recent demand signals.
+- [ ] Admin Dashboard: channel attribution panel – Summarize GMV/orders by UTM/source based on stored analytics events.
+- [ ] Admin Dashboard: configurable alert thresholds – Owner can tune anomaly thresholds (failed payments spike, refund rate, stockouts).
+- [ ] Admin Dashboard: audit quick filters – Add presets like security/content/payments to pre-filter the audit log.
+- [ ] Admin Dashboard: background jobs monitor – List running/completed jobs with retry/cancel and dead-letter views (DB-backed).
+- [ ] Admin Dashboard: scheduled tasks “Run now” – Allow manual run of safe scheduled tasks with audit logging.
+- [ ] Admin Orders: kanban board view – Add optional kanban mode for order statuses with drag/drop and guardrails.
+- [ ] Admin Orders: batch picking list export – Generate pick lists grouped by SKU/qty for selected orders (CSV/PDF).
+- [ ] Admin Orders: batch shipping labels center – Batch upload/generate labels and provide merged download with retry.
+- [ ] Admin Orders: SLA timers & escalation – Track “time to accept/ship” with warning badges and filters.
+- [ ] Admin Orders: fraud review queue – Queue orders flagged by fraud signals with approve/deny actions and audit notes.
+- [ ] Admin Orders: quick next/prev navigation – Navigate to next/previous order in the current filtered list from the detail page.
+- [ ] Admin Orders: courier/tracking validation – Validate tracking URL/number formats per courier before saving.
+- [ ] Admin Orders: address validation assistant – Flag likely invalid phone/postcode and suggest corrections (offline rules, no paid APIs).
+- [ ] Admin Orders: customer comms timeline – Show transactional email delivery status/history for the order.
+- [ ] Admin Orders: internal tag management – Improve tag CRUD (colors/rename) and bulk apply workflows.
+- [ ] Admin Products: refactor into subcomponents – Extract editor/bulk bar/image manager/relationships into dedicated components for maintainability.
+- [ ] Admin Products: SKU/slug uniqueness feedback – Inline validate uniqueness with non-blocking warnings and guidance.
+- [ ] Admin Products: image upload queue – Support multi-upload with per-file progress and retry for failures.
+- [ ] Admin Products: bulk alt/translation helper – Provide a bulk view for missing alt text/translations with quick edits.
+- [ ] Admin Products: stricter sale price validation – Enforce sale <= base and show computed savings preview.
+- [ ] Admin Products: translation diff view – Show side-by-side RO/EN fields to spot missing/partial translations quickly.
+- [ ] Admin Inventory: bulk stock adjustments – Apply stock delta to selected products with required reason and audit note.
+- [ ] Admin Inventory: stock ledger export – Add CSV export for stock adjustments filtered by product/date/reason.
+- [ ] Admin Inventory: reserved stock drill-down – Show which carts/orders reserve stock for a product.
+- [ ] Admin CMS: content diff before publish – Show a diff of draft vs published for pages/blog/home blocks.
+- [ ] Admin CMS: restore previous versions – Allow rollback to a previous version with audit logging.
+- [ ] Admin CMS: redirects guardrails – Detect redirect loops/chains and show warnings before saving.
+- [ ] Admin Media: asset tags + usage browser – Tag assets and show “used in” references for safe cleanup.
+- [ ] Admin Media: focal point + crop preview – Set focal point and preview responsive crops for hero/collection assets.
+- [ ] Admin Users: customer 360 profile – Consolidate user info/orders/tickets/sessions/preferences with PII masking.
+- [ ] Admin Users: resend verification/reset actions – Add admin actions for resend email verification and password reset (audited + rate limited).
+- [ ] Admin Support: assignment + SLA + templates – Add ticket assignment, canned responses, and response-time tracking.
+- [ ] Admin Ops: environment diagnostics panel – Show config health (SMTP/Redis/storage/webhooks) and recent failure messages.
+- [ ] Admin Security: step-up auth for sensitive actions – Require re-auth for refunds, role changes, exports, and PII reveal.
 - [ ] Email: manually verify one-click unsubscribe behavior across Gmail/Outlook (and adjust headers if needed).
 - [x] Docs: add Google OAuth setup guide (origins, redirect URIs, backend env, dev/prod examples).
 - [x] Docs: document when/why dev uses `4201` (port bump + Docker stack) and related CORS/proxy expectations.

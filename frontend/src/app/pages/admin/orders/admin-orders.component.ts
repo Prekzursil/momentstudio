@@ -378,7 +378,7 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
                       [indeterminate]="someSelectedOnPage()"
                       (change)="toggleSelectAllOnPage($any($event.target).checked)"
                       [disabled]="bulkBusy"
-                      aria-label="Select all orders on page"
+                      [attr.aria-label]="'adminUi.orders.a11y.selectAllOnPage' | translate"
                     />
                   </th>
                   <th *ngSwitchCase="'reference'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
@@ -415,7 +415,7 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
                       [checked]="selectedIds.has(order.id)"
                       (change)="toggleSelected(order.id, $any($event.target).checked)"
                       [disabled]="bulkBusy"
-                      [attr.aria-label]="'Select order ' + (order.reference_code || (order.id | slice: 0:8))"
+                      [attr.aria-label]="'adminUi.orders.a11y.selectOrder' | translate: { ref: order.reference_code || (order.id | slice: 0:8) }"
                     />
                   </td>
                   <td
