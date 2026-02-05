@@ -6,14 +6,20 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.dependencies import get_current_user_optional
 from app.db.session import get_session
+from app.core.rate_limit import per_identifier_limiter
 from app.models.analytics_event import AnalyticsEvent
 from app.models.user import User
 from app.schemas.analytics import AnalyticsEventCreate, AnalyticsEventIngestResponse
 
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
+
+analytics_rate_limit = per_identifier_limiter(
+    lambda r: r.client.host if r.client else "anon", settings.analytics_rate_limit_events, 60
+)
 
 _EVENT_RE = re.compile(r"^[a-z0-9_]{1,80}$")
 _ALLOWED_EVENTS = {
@@ -59,6 +65,7 @@ async def ingest_analytics_event(
     request: Request,
     session: AsyncSession = Depends(get_session),
     user: User | None = Depends(get_current_user_optional),
+    _: None = Depends(analytics_rate_limit),
 ) -> AnalyticsEventIngestResponse:
     event = _normalize_event(payload.event)
     if not _EVENT_RE.match(event) or event not in _ALLOWED_EVENTS:
@@ -95,4 +102,3 @@ async def ingest_analytics_event(
         pass
 
     return AnalyticsEventIngestResponse(received=True)
-

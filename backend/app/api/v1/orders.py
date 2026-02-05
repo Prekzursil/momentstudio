@@ -493,7 +493,7 @@ async def checkout(
                     notify_url = f"{base}/api/v1/payments/netopia/webhook"
                     netopia_ntp_id, netopia_payment_url = await netopia_service.start_payment(
                         order_id=str(existing_order.id),
-                        amount_ron=float(pricing.quantize_money(existing_order.total_amount)),
+                        amount_ron=pricing.quantize_money(existing_order.total_amount),
                         description=f"Order {existing_order.reference_code}"
                         if existing_order.reference_code
                         else f"Order {existing_order.id}",
@@ -750,7 +750,7 @@ async def checkout(
         notify_url = f"{base}/api/v1/payments/netopia/webhook"
         netopia_ntp_id, netopia_payment_url = await netopia_service.start_payment(
             order_id=str(order.id),
-            amount_ron=float(pricing.quantize_money(order.total_amount)),
+            amount_ron=pricing.quantize_money(order.total_amount),
             description=f"Order {order.reference_code}" if order.reference_code else f"Order {order.id}",
             billing=billing_payload,
             shipping=shipping_payload,
@@ -1668,7 +1668,7 @@ async def guest_checkout(
                     notify_url = f"{base}/api/v1/payments/netopia/webhook"
                     netopia_ntp_id, netopia_payment_url = await netopia_service.start_payment(
                         order_id=str(existing_order.id),
-                        amount_ron=float(pricing.quantize_money(existing_order.total_amount)),
+                        amount_ron=pricing.quantize_money(existing_order.total_amount),
                         description=f"Order {existing_order.reference_code}"
                         if existing_order.reference_code
                         else f"Order {existing_order.id}",
@@ -1942,7 +1942,7 @@ async def guest_checkout(
         notify_url = f"{base}/api/v1/payments/netopia/webhook"
         netopia_ntp_id, netopia_payment_url = await netopia_service.start_payment(
             order_id=str(order.id),
-            amount_ron=float(pricing.quantize_money(order.total_amount)),
+            amount_ron=pricing.quantize_money(order.total_amount),
             description=f"Order {order.reference_code}" if order.reference_code else f"Order {order.id}",
             billing=billing_payload,
             shipping=shipping_payload,

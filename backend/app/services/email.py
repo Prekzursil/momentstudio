@@ -7,6 +7,8 @@ from email.message import EmailMessage
 from pathlib import Path
 from typing import Sequence
 
+import anyio
+
 try:
     from jinja2 import Environment, FileSystemLoader, select_autoescape
 except ImportError:
@@ -115,12 +117,15 @@ async def send_email(
         return False
     msg = _build_message(to_email, subject, text_body, html_body, attachments=attachments, headers=headers)
     try:
-        with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=10) as smtp:
-            if settings.smtp_use_tls:
-                smtp.starttls()
-            if settings.smtp_username and settings.smtp_password:
-                smtp.login(settings.smtp_username, settings.smtp_password)
-            smtp.send_message(msg)
+        def _send() -> None:
+            with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=10) as smtp:
+                if settings.smtp_use_tls:
+                    smtp.starttls()
+                if settings.smtp_username and settings.smtp_password:
+                    smtp.login(settings.smtp_username, settings.smtp_password)
+                smtp.send_message(msg)
+
+        await anyio.to_thread.run_sync(_send)
         _record_send(now, to_email)
         await _record_email_event(to_email=to_email, subject=subject, status="sent", error_message=None)
         return True
@@ -138,7 +143,10 @@ def _marketing_unsubscribe_context(*, to_email: str) -> tuple[str, dict[str, str
     )
     unsubscribe_url = newsletter_tokens.build_frontend_unsubscribe_url(token=token)
     api_unsubscribe_url = newsletter_tokens.build_api_unsubscribe_url(token=token)
-    headers = {"List-Unsubscribe": f"<{api_unsubscribe_url}>"}
+    headers = {
+        "List-Unsubscribe": f"<{api_unsubscribe_url}>",
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    }
     return unsubscribe_url, headers
 
 
@@ -686,8 +694,17 @@ async def send_new_order_notification(
 
 async def send_password_reset(to_email: str, token: str, lang: str | None = None) -> bool:
     subject = _bilingual_subject("Resetare parolă", "Password reset", preferred_language=lang)
-    text_ro = f"Folosește acest cod pentru a reseta parola: {token}\n\nDacă nu ai cerut resetarea, poți ignora acest email."
-    text_en = f"Use this token to reset your password: {token}\n\nIf you didn’t request this, you can ignore this email."
+    reset_url = f"{settings.frontend_origin.rstrip('/')}/password-reset/confirm?token={token}"
+    text_ro = (
+        f"Resetează parola aici: {reset_url}\n\n"
+        f"Sau folosește acest cod: {token}\n\n"
+        "Dacă nu ai cerut resetarea, poți ignora acest email."
+    )
+    text_en = (
+        f"Reset your password here: {reset_url}\n\n"
+        f"Or use this token: {token}\n\n"
+        "If you didn’t request this, you can ignore this email."
+    )
     text_body, html_body = _bilingual_sections(
         text_ro=text_ro,
         text_en=text_en,

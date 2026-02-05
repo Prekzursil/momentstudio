@@ -53,6 +53,7 @@ class Settings(BaseSettings):
     netopia_public_key_pem: str | None = None
     netopia_public_key_path: str | None = None
     netopia_jwt_alg: str = "RS512"
+    netopia_ipn_max_age_seconds: int = 60 * 60 * 24
     jwt_algorithm: str = "HS256"
     access_token_exp_minutes: int = 30
     admin_impersonation_exp_minutes: int = 10
@@ -77,6 +78,8 @@ class Settings(BaseSettings):
     audit_retention_days_security: int = 0
     audit_hash_chain_enabled: bool = False
     audit_hash_chain_secret: str | None = None
+    audit_log_request_payload: bool = True
+    audit_log_max_body_bytes: int = 4096
     secure_cookies: bool = False
     cookie_samesite: str = "lax"
     maintenance_mode: bool = False
@@ -144,6 +147,7 @@ class Settings(BaseSettings):
     blog_comments_rate_limit_count: int = 10
     blog_comments_rate_limit_window_seconds: int = 60
     blog_comments_max_links: int = 2
+    analytics_rate_limit_events: int = 120
 
     # FX rates (used for display-only approximations; checkout remains in RON)
     fx_rates_url: str = "https://www.bnr.ro/nbrfxrates.xml"

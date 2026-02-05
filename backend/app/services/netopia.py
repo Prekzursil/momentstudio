@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+from decimal import Decimal
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -134,7 +135,7 @@ def _netopia_headers() -> dict[str, str]:
 async def start_payment(
     *,
     order_id: str,
-    amount_ron: float,
+    amount_ron: Decimal,
     description: str,
     billing: dict[str, Any],
     shipping: dict[str, Any],
@@ -153,6 +154,7 @@ async def start_payment(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Netopia not configured")
 
     url = f"{_netopia_base_url().rstrip('/')}/payment/card/start"
+    amount_value = Decimal(str(amount_ron)).quantize(Decimal("0.01"))
     payload = {
         "config": {
             "emailTemplate": "default",
@@ -173,7 +175,7 @@ async def start_payment(
             "dateTime": datetime.now(timezone.utc).isoformat(),
             "orderID": str(order_id),
             "description": (description or "").strip() or str(order_id),
-            "amount": float(amount_ron),
+            "amount": float(amount_value),
             "currency": "RON",
             "billing": billing,
             "shipping": shipping,
@@ -279,6 +281,25 @@ def verify_ipn(*, verification_token: str, payload: bytes) -> dict[str, Any]:
         )
     except JWTError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Netopia signature") from exc
+
+    max_age_seconds = max(60, int(getattr(settings, "netopia_ipn_max_age_seconds", 60 * 60 * 24)))
+    skew_seconds = 5 * 60
+    now_ts = datetime.now(timezone.utc).timestamp()
+    for key in ("iat", "nbf", "exp"):
+        value = claims.get(key)
+        if isinstance(value, str) and value.isdigit():
+            claims[key] = int(value)
+
+    iat = claims.get("iat")
+    if isinstance(iat, (int, float)):
+        if iat - skew_seconds > now_ts:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Netopia token time")
+        if now_ts - float(iat) > max_age_seconds:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Stale Netopia token")
+
+    exp = claims.get("exp")
+    if isinstance(exp, (int, float)) and float(exp) + skew_seconds < now_ts:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Expired Netopia token")
 
     issuer = str(claims.get("iss") or "")
     if issuer != "NETOPIA Payments":

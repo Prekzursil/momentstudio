@@ -1917,7 +1917,7 @@ async def upload_avatar(
         file,
         root=avatars_root,
         filename=filename,
-        allowed_content_types=("image/png", "image/jpeg", "image/webp", "image/gif"),
+        allowed_content_types=("image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"),
         max_bytes=5 * 1024 * 1024,
     )
     current_user.avatar_url = url_path
@@ -1980,9 +1980,16 @@ async def request_password_reset(
     session: AsyncSession = Depends(get_session),
     _: None = Depends(reset_request_rate_limit),
 ) -> dict[str, str]:
-    reset = await auth_service.create_reset_token(session, payload.email)
-    user = await session.get(User, reset.user_id)
-    background_tasks.add_task(email_service.send_password_reset, payload.email, reset.token, getattr(user, "preferred_language", None))
+    email = (payload.email or "").strip().lower()
+    reset = await auth_service.create_reset_token(session, email)
+    if reset:
+        user = await session.get(User, reset.user_id)
+        background_tasks.add_task(
+            email_service.send_password_reset,
+            email,
+            reset.token,
+            getattr(user, "preferred_language", None),
+        )
     return {"status": "sent"}
 
 

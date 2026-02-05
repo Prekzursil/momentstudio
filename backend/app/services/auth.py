@@ -737,10 +737,12 @@ async def _revoke_other_reset_tokens(session: AsyncSession, user_id: uuid.UUID) 
         await session.flush()
 
 
-async def create_reset_token(session: AsyncSession, email: str, expires_minutes: int = 60) -> PasswordResetToken:
-    user = await get_user_by_email(session, email)
+async def create_reset_token(
+    session: AsyncSession, email: str, expires_minutes: int = 60
+) -> PasswordResetToken | None:
+    user = await get_user_by_login_email(session, email)
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        return None
     await _revoke_other_reset_tokens(session, user.id)
     token = secrets.token_urlsafe(32)
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)

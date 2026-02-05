@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from app.core.config import settings
 from app.db.session import SessionLocal
 from app.services import fx_store
+from app.services import leader_lock
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ def start(app: FastAPI) -> None:
         return
 
     stop = asyncio.Event()
-    task = asyncio.create_task(_refresh_loop(stop))
+    task = asyncio.create_task(leader_lock.run_as_leader(name="fx_refresh", stop=stop, work=_refresh_loop))
     app.state.fx_refresh_stop = stop
     app.state.fx_refresh_task = task
 
@@ -57,4 +58,3 @@ async def stop(app: FastAPI) -> None:
         delattr(app.state, "fx_refresh_stop")
     if getattr(app.state, "fx_refresh_task", None) is not None:
         delattr(app.state, "fx_refresh_task")
-

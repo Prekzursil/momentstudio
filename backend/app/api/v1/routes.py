@@ -24,7 +24,7 @@ from app.api.v1 import ops
 from app.api.v1 import observability
 from app.api.v1 import newsletter
 from app.api.v1 import analytics
-from app.models.catalog import Product
+from app.models.catalog import Product, ProductStatus
 from fastapi import Response, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -32,6 +32,8 @@ from app.db.session import get_session
 from app.core.config import settings
 from app.core.metrics import snapshot as metrics_snapshot
 from app.services import sitemap as sitemap_service
+from app.core.dependencies import require_admin_section
+from app.models.user import User
 
 api_router = APIRouter()
 
@@ -79,7 +81,7 @@ async def readiness(session: AsyncSession = Depends(get_session)) -> dict[str, s
 
 
 @api_router.get("/metrics", tags=["metrics"])
-def metrics() -> dict:
+def metrics(_: User = Depends(require_admin_section("ops"))) -> dict:
     return metrics_snapshot()
 
 
@@ -104,14 +106,20 @@ def robots() -> Response:
     lines = [
         "User-agent: *",
         "Allow: /",
-        f"Sitemap: {settings.frontend_origin.rstrip('/')}/api/v1/sitemap.xml",
+        f"Sitemap: {settings.frontend_origin.rstrip('/')}/sitemap.xml",
     ]
     return Response(content="\n".join(lines), media_type="text/plain")
 
 
 @api_router.get("/feeds/products.json", tags=["sitemap"])
 async def product_feed(session: AsyncSession = Depends(get_session)) -> list[dict]:
-    result = await session.execute(select(Product.slug, Product.name, Product.base_price, Product.currency, Product.updated_at))
+    result = await session.execute(
+        select(Product.slug, Product.name, Product.base_price, Product.currency, Product.updated_at).where(
+            Product.status == ProductStatus.published,
+            Product.is_active.is_(True),
+            Product.is_deleted.is_(False),
+        )
+    )
     rows = result.all()
     base = settings.frontend_origin.rstrip("/")
     return [
