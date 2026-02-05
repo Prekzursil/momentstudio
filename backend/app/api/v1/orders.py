@@ -9,7 +9,7 @@ from typing import Any, Callable
 from urllib.parse import quote_plus
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks, UploadFile, File, Body, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks, UploadFile, File, Body, Response, Request
 from fastapi.responses import StreamingResponse, FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -344,6 +344,16 @@ def _sanitize_filename(value: str | None) -> str:
     return name[:255]
 
 
+def _frontend_base_from_request(request: Request | None) -> str:
+    candidate = (request.headers.get("origin") if request else None) or ""
+    origin = candidate.strip().rstrip("/")
+    if origin:
+        allowed = {str(raw or "").strip().rstrip("/") for raw in getattr(settings, "cors_origins", []) or []}
+        if origin in allowed:
+            return origin
+    return settings.frontend_origin.rstrip("/")
+
+
 @router.post("", response_model=OrderRead, status_code=status.HTTP_201_CREATED)
 async def create_order(
     response: Response,
@@ -439,6 +449,7 @@ async def create_order(
 @router.post("/checkout", response_model=GuestCheckoutResponse, status_code=status.HTTP_201_CREATED)
 async def checkout(
     payload: CheckoutRequest,
+    request: Request,
     response: Response,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
@@ -450,6 +461,8 @@ async def checkout(
     needs_consent = not legal_consents_service.is_satisfied(required_versions, accepted_versions)
     if needs_consent and (not payload.accept_terms or not payload.accept_privacy):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Legal consents required")
+
+    base = _frontend_base_from_request(request)
 
     user_cart = await cart_service.get_cart(session, current_user.id, session_id)
     if not user_cart.items:
@@ -487,7 +500,6 @@ async def checkout(
                         last_name=last_name,
                         addr=shipping_addr_obj,
                     )
-                    base = settings.frontend_origin.rstrip("/")
                     cancel_url = f"{base}/checkout/netopia/cancel?order_id={existing_order.id}"
                     redirect_url = f"{base}/checkout/netopia/return?order_id={existing_order.id}"
                     notify_url = f"{base}/api/v1/payments/netopia/webhook"
@@ -667,8 +679,8 @@ async def checkout(
             session=session,
             amount_cents=_money_to_cents(totals.total),
             customer_email=current_user.email,
-            success_url=f"{settings.frontend_origin.rstrip('/')}/checkout/stripe/return?session_id={{CHECKOUT_SESSION_ID}}",
-            cancel_url=f"{settings.frontend_origin.rstrip('/')}/checkout/stripe/cancel?session_id={{CHECKOUT_SESSION_ID}}",
+            success_url=f"{base}/checkout/stripe/return?session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{base}/checkout/stripe/cancel?session_id={{CHECKOUT_SESSION_ID}}",
             lang=current_user.preferred_language,
             metadata={"cart_id": str(user_cart.id), "user_id": str(current_user.id)},
             line_items=stripe_line_items,
@@ -682,8 +694,8 @@ async def checkout(
         paypal_order_id, paypal_approval_url = await paypal_service.create_order(
             total_ron=totals.total,
             reference=str(user_cart.id),
-            return_url=f"{settings.frontend_origin.rstrip('/')}/checkout/paypal/return",
-            cancel_url=f"{settings.frontend_origin.rstrip('/')}/checkout/paypal/cancel",
+            return_url=f"{base}/checkout/paypal/return",
+            cancel_url=f"{base}/checkout/paypal/cancel",
             item_total_ron=totals.subtotal,
             shipping_ron=totals.shipping,
             tax_ron=totals.tax,
@@ -744,7 +756,6 @@ async def checkout(
             last_name=last_name,
             addr=shipping_addr_obj,
         )
-        base = settings.frontend_origin.rstrip("/")
         cancel_url = f"{base}/checkout/netopia/cancel?order_id={order.id}"
         redirect_url = f"{base}/checkout/netopia/return?order_id={order.id}"
         notify_url = f"{base}/api/v1/payments/netopia/webhook"
@@ -1614,6 +1625,7 @@ async def guest_email_verification_status(
 @router.post("/guest-checkout", response_model=GuestCheckoutResponse, status_code=status.HTTP_201_CREATED)
 async def guest_checkout(
     payload: GuestCheckoutRequest,
+    request: Request,
     response: Response,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
@@ -1629,6 +1641,8 @@ async def guest_checkout(
     email = _normalize_email(str(payload.email))
     if not cart.guest_email_verified_at or _normalize_email(cart.guest_email or "") != email:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email verification required")
+
+    base = _frontend_base_from_request(request)
 
     last_order_id = await session.scalar(
         select(Cart.last_order_id).where(Cart.id == cart.id).with_for_update()
@@ -1662,7 +1676,6 @@ async def guest_checkout(
                         last_name=last_name,
                         addr=shipping_addr_obj,
                     )
-                    base = settings.frontend_origin.rstrip("/")
                     cancel_url = f"{base}/checkout/netopia/cancel?order_id={existing_order.id}"
                     redirect_url = f"{base}/checkout/netopia/return?order_id={existing_order.id}"
                     notify_url = f"{base}/api/v1/payments/netopia/webhook"
@@ -1859,8 +1872,8 @@ async def guest_checkout(
             session=session,
             amount_cents=_money_to_cents(totals.total),
             customer_email=email,
-            success_url=f"{settings.frontend_origin.rstrip('/')}/checkout/stripe/return?session_id={{CHECKOUT_SESSION_ID}}",
-            cancel_url=f"{settings.frontend_origin.rstrip('/')}/checkout/stripe/cancel?session_id={{CHECKOUT_SESSION_ID}}",
+            success_url=f"{base}/checkout/stripe/return?session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{base}/checkout/stripe/cancel?session_id={{CHECKOUT_SESSION_ID}}",
             lang=payload.preferred_language,
             metadata={"cart_id": str(cart.id), "user_id": str(user_id) if user_id else ""},
             line_items=stripe_line_items,
@@ -1874,8 +1887,8 @@ async def guest_checkout(
         paypal_order_id, paypal_approval_url = await paypal_service.create_order(
             total_ron=totals.total,
             reference=str(cart.id),
-            return_url=f"{settings.frontend_origin.rstrip('/')}/checkout/paypal/return",
-            cancel_url=f"{settings.frontend_origin.rstrip('/')}/checkout/paypal/cancel",
+            return_url=f"{base}/checkout/paypal/return",
+            cancel_url=f"{base}/checkout/paypal/cancel",
             item_total_ron=totals.subtotal,
             shipping_ron=totals.shipping,
             tax_ron=totals.tax,
@@ -1936,7 +1949,6 @@ async def guest_checkout(
             last_name=last_name,
             addr=shipping_addr_obj,
         )
-        base = settings.frontend_origin.rstrip("/")
         cancel_url = f"{base}/checkout/netopia/cancel?order_id={order.id}"
         redirect_url = f"{base}/checkout/netopia/return?order_id={order.id}"
         notify_url = f"{base}/api/v1/payments/netopia/webhook"

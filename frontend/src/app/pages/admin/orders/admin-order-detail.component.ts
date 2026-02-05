@@ -2347,15 +2347,18 @@ export class AdminOrderDetailComponent implements OnInit {
     const orderId = this.order()?.id;
     if (!orderId) return;
     const currentStatus = ((this.order()?.status as OrderStatus) || 'pending_acceptance') as OrderStatus;
-    if (this.statusValue === 'cancelled' && !this.cancelReason.trim()) {
+    const statusChanged = this.statusValue !== currentStatus;
+    const isCancelling = statusChanged && this.statusValue === 'cancelled';
+    const cancelReasonValue = this.cancelReason.trim();
+    if (isCancelling && !cancelReasonValue) {
       this.toast.error(this.translate.instant('adminUi.orders.errors.cancelReasonRequired'));
       return;
     }
     this.action.set('save');
     this.api
       .update(orderId, {
-        status: this.statusValue !== currentStatus ? this.statusValue : undefined,
-        cancel_reason: this.statusValue === 'cancelled' ? this.cancelReason.trim() : undefined,
+        status: statusChanged ? this.statusValue : undefined,
+        cancel_reason: this.statusValue === 'cancelled' && cancelReasonValue ? cancelReasonValue : undefined,
         tracking_number: this.trackingNumber.trim() || null,
         tracking_url: this.trackingUrl.trim() || null
       }, { include_pii: this.piiReveal() })

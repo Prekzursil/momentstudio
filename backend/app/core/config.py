@@ -148,6 +148,8 @@ class Settings(BaseSettings):
     blog_comments_rate_limit_window_seconds: int = 60
     blog_comments_max_links: int = 2
     analytics_rate_limit_events: int = 120
+    analytics_require_token: bool = False
+    analytics_token_ttl_seconds: int = 60 * 60 * 24
 
     # FX rates (used for display-only approximations; checkout remains in RON)
     fx_rates_url: str = "https://www.bnr.ro/nbrfxrates.xml"
