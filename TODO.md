@@ -2,6 +2,17 @@
 
 Below is a structured checklist you can turn into issues.
 
+## High priority (next)
+- [x] Admin Orders: prevent 400s on status/tracking updates (guide allowed transitions + clearer errors).
+- [ ] Admin Orders: fix cancel-reason UI so it only appears for cancelled status and doesn’t block other updates.
+- [x] Auth: login/register should not get stuck after errors; improve error visibility and re-attempt flow (incl. CAPTCHA).
+- [x] Frontend: stop showing duplicate generic “Request failed” toasts when pages already handle errors.
+- [ ] Checkout: investigate Easybox/FANbox checkout regressions when frontend runs on alternate dev port (4201).
+- [x] Coupons v2: validate marketing opt-in before committing coupon changes when `send_email=true` (avoid partial success).
+- [ ] Email: add RFC 8058 one-click unsubscribe headers (`List-Unsubscribe-Post`) and verify client compatibility.
+- [ ] Docs: add Google OAuth setup guide (origins, redirect URIs, backend env, dev/prod examples).
+- [ ] Docs: document when/why dev uses `4201` (port bump + Docker stack) and related CORS/proxy expectations.
+
 ## Project & Infra
 - [x] Initialize monorepo with `backend/`, `frontend/`, `infra/`.
 - [x] Add `docker-compose.yml` for API, frontend, Postgres.
