@@ -58,13 +58,22 @@ function extractErrorCodeFromBinary(err: HttpErrorResponse) {
 
 export const authAndErrorInterceptor: HttpInterceptorFn = (req, next) => {
   const handler = inject(ErrorHandlerService);
-  const auth = inject(AuthService);
   const apiBase = getApiBaseUrl();
-  const isApiRequest = req.url.startsWith(apiBase);
-  const token = auth.getAccessToken();
-  const stepUpToken = isApiRequest ? auth.getStepUpToken() : null;
+  const absoluteApiBase =
+    apiBase.startsWith('/') && typeof location !== 'undefined' ? `${location.origin}${apiBase}` : apiBase;
+  const isApiRequest = req.url.startsWith(apiBase) || req.url.startsWith(absoluteApiBase);
   const silent = req.headers.has('X-Silent');
 
+  // Avoid injecting AuthService for non-API requests (e.g. i18n JSON, assets).
+  // AuthService depends on HttpClient → interceptors, so injecting it here would create
+  // a cyclic dependency during app bootstrap when TranslateHttpLoader makes its first request.
+  if (!isApiRequest) {
+    return next(req);
+  }
+
+  const auth = inject(AuthService);
+  const token = auth.getAccessToken();
+  const stepUpToken = auth.getStepUpToken();
   const hasAuthHeader = req.headers.has('Authorization');
   const hasStepUpHeader = req.headers.has('X-Admin-Step-Up');
   const setHeaders: Record<string, string> = {};
