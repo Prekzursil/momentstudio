@@ -106,6 +106,11 @@ def robots() -> Response:
     lines = [
         "User-agent: *",
         "Allow: /",
+        "Disallow: /admin",
+        "Disallow: /account",
+        "Disallow: /checkout",
+        "Disallow: /api",
+        "Disallow: /media/private",
         f"Sitemap: {settings.frontend_origin.rstrip('/')}/sitemap.xml",
     ]
     return Response(content="\n".join(lines), media_type="text/plain")
