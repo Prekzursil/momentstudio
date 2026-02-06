@@ -1333,6 +1333,16 @@ export class AdminService {
     return this.api.get<StockAdjustment[]>('/admin/dashboard/stock-adjustments', params as any);
   }
 
+  exportStockAdjustmentsCsv(params: {
+    product_id: string;
+    from_date?: string;
+    to_date?: string;
+    reason?: StockAdjustmentReason;
+    limit?: number;
+  }): Observable<Blob> {
+    return this.api.getBlob('/admin/dashboard/stock-adjustments/export', params as any);
+  }
+
   applyStockAdjustment(payload: {
     product_id: string;
     variant_id?: string | null;

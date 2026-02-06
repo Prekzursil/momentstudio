@@ -2391,6 +2391,61 @@ type PriceHistoryChart = {
 			              </span>
 			            </div>
 
+                  <div class="grid gap-3 items-end md:grid-cols-4">
+                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                      {{ 'adminUi.products.form.stockLedgerExportFrom' | translate }}
+                      <input
+                        class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        type="date"
+                        [(ngModel)]="stockLedgerExportFrom"
+                        [disabled]="stockLedgerExporting() || !editingSlug()"
+                      />
+                    </label>
+
+                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                      {{ 'adminUi.products.form.stockLedgerExportTo' | translate }}
+                      <input
+                        class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        type="date"
+                        [(ngModel)]="stockLedgerExportTo"
+                        [disabled]="stockLedgerExporting() || !editingSlug()"
+                      />
+                    </label>
+
+                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                      {{ 'adminUi.products.form.stockLedgerExportReason' | translate }}
+                      <select
+                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        [(ngModel)]="stockLedgerExportReason"
+                        [disabled]="stockLedgerExporting() || !editingSlug()"
+                      >
+                        <option value="all">{{ 'adminUi.products.form.stockLedgerExportAllReasons' | translate }}</option>
+                        <option value="restock">{{ 'adminUi.products.form.stockReason.restock' | translate }}</option>
+                        <option value="damage">{{ 'adminUi.products.form.stockReason.damage' | translate }}</option>
+                        <option value="manual_correction">{{ 'adminUi.products.form.stockReason.manual_correction' | translate }}</option>
+                      </select>
+                    </label>
+
+                    <div class="flex items-center justify-end gap-2">
+                      <app-button
+                        size="sm"
+                        variant="ghost"
+                        [label]="
+                          (stockLedgerExporting() ? 'adminUi.products.form.stockLedgerExporting' : 'adminUi.products.form.stockLedgerExport') | translate
+                        "
+                        (action)="exportStockLedgerCsv()"
+                        [disabled]="stockLedgerExporting() || !editingSlug()"
+                      ></app-button>
+                    </div>
+                  </div>
+
+			            <div
+			              *ngIf="stockLedgerExportError()"
+			              class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+			            >
+			              {{ stockLedgerExportError() }}
+			            </div>
+
 			            <div *ngIf="stockAdjustments().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
 			              {{ 'adminUi.products.form.stockLedgerEmpty' | translate }}
 			            </div>
@@ -3103,6 +3158,12 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
   stockAdjustReason: StockAdjustmentReason = 'manual_correction';
   stockAdjustDelta = '';
   stockAdjustNote = '';
+
+  stockLedgerExportFrom = '';
+  stockLedgerExportTo = '';
+  stockLedgerExportReason: StockAdjustmentReason | 'all' = 'all';
+  stockLedgerExporting = signal(false);
+  stockLedgerExportError = signal<string | null>(null);
 
   private autoStartNewProduct = false;
   private pendingEditProductSlug: string | null = null;
@@ -5676,6 +5737,49 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
     });
   }
 
+  exportStockLedgerCsv(): void {
+    const productId = this.editingProductId();
+    if (!productId) return;
+    if (this.stockLedgerExporting()) return;
+
+    const fromDate = (this.stockLedgerExportFrom || '').trim();
+    const toDate = (this.stockLedgerExportTo || '').trim();
+    const reason = this.stockLedgerExportReason;
+
+    this.stockLedgerExportError.set(null);
+    this.stockLedgerExporting.set(true);
+
+    this.admin
+      .exportStockAdjustmentsCsv({
+        product_id: productId,
+        from_date: fromDate || undefined,
+        to_date: toDate || undefined,
+        reason: reason === 'all' ? undefined : reason,
+      })
+      .subscribe({
+        next: (blob) => {
+          const slug = (this.editingSlug() || '').trim() || productId.slice(0, 8);
+          const parts = [slug, fromDate || 'all', toDate || 'all', reason === 'all' ? 'all' : reason];
+          const safe = parts.map((p) => (p || '').replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '')).filter(Boolean);
+          const filename = `stock-adjustments-${safe.join('-') || slug}.csv`;
+
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          a.click();
+          URL.revokeObjectURL(url);
+
+          this.toast.success(this.t('adminUi.products.form.stockLedgerExportReady'));
+          this.stockLedgerExporting.set(false);
+        },
+        error: () => {
+          this.stockLedgerExporting.set(false);
+          this.stockLedgerExportError.set(this.t('adminUi.products.form.stockLedgerExportError'));
+        },
+      });
+  }
+
   private setVariantsFromProduct(prod: any): void {
     const rows: AdminProductVariant[] = Array.isArray(prod?.variants) ? prod.variants : [];
     this.variants.set(
@@ -5891,6 +5995,11 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
     this.stockAdjustReason = 'manual_correction';
     this.stockAdjustDelta = '';
     this.stockAdjustNote = '';
+    this.stockLedgerExportFrom = '';
+    this.stockLedgerExportTo = '';
+    this.stockLedgerExportReason = 'all';
+    this.stockLedgerExporting.set(false);
+    this.stockLedgerExportError.set(null);
   }
 
   translationDiffRows(): TranslationDiffRow[] {

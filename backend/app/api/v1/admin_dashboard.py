@@ -30,7 +30,16 @@ from app.core import security
 from app.core.config import settings
 from app.core.dependencies import require_admin, require_admin_section, require_owner
 from app.db.session import get_session
-from app.models.catalog import Product, ProductAuditLog, Category, ProductStatus, ProductTranslation
+from app.models.catalog import (
+    Category,
+    Product,
+    ProductAuditLog,
+    ProductStatus,
+    ProductTranslation,
+    ProductVariant,
+    StockAdjustment,
+    StockAdjustmentReason,
+)
 from app.models.content import ContentBlock, ContentAuditLog
 from app.schemas.catalog_admin import (
     AdminProductByIdsRequest,
@@ -4378,6 +4387,89 @@ async def list_stock_adjustments(
 ) -> list[StockAdjustmentRead]:
     return await catalog_service.list_stock_adjustments(
         session, product_id=product_id, limit=limit, offset=offset
+    )
+
+
+@router.get("/stock-adjustments/export")
+async def export_stock_adjustments(
+    product_id: UUID = Query(...),
+    reason: StockAdjustmentReason | None = Query(default=None),
+    from_date: date | None = Query(default=None),
+    to_date: date | None = Query(default=None),
+    limit: int = Query(default=5000, ge=1, le=20000),
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("inventory")),
+) -> Response:
+    if from_date and to_date and to_date < from_date:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date range")
+
+    product = await session.get(Product, product_id)
+    if not product or getattr(product, "is_deleted", False):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+
+    stmt = (
+        select(StockAdjustment, ProductVariant, User)
+        .select_from(StockAdjustment)
+        .outerjoin(ProductVariant, ProductVariant.id == StockAdjustment.variant_id)
+        .outerjoin(User, User.id == StockAdjustment.actor_user_id)
+        .where(StockAdjustment.product_id == product_id)
+    )
+    if reason is not None:
+        stmt = stmt.where(StockAdjustment.reason == reason)
+    if from_date is not None:
+        stmt = stmt.where(func.date(StockAdjustment.created_at) >= from_date)
+    if to_date is not None:
+        stmt = stmt.where(func.date(StockAdjustment.created_at) <= to_date)
+
+    rows = (
+        (await session.execute(stmt.order_by(StockAdjustment.created_at.desc()).limit(limit)))
+        .all()
+    )
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(
+        [
+            "created_at",
+            "product_slug",
+            "product_name",
+            "sku",
+            "variant_id",
+            "variant_name",
+            "reason",
+            "delta",
+            "before_quantity",
+            "after_quantity",
+            "note",
+            "actor_email",
+            "actor_user_id",
+        ]
+    )
+    for adjustment, variant, actor in rows:
+        created_at = getattr(adjustment, "created_at", None)
+        writer.writerow(
+            [
+                created_at.isoformat() if isinstance(created_at, datetime) else "",
+                product.slug,
+                product.name,
+                product.sku,
+                str(adjustment.variant_id) if adjustment.variant_id else "",
+                getattr(variant, "name", "") or "",
+                adjustment.reason.value,
+                int(adjustment.delta),
+                int(adjustment.before_quantity),
+                int(adjustment.after_quantity),
+                (adjustment.note or ""),
+                getattr(actor, "email", "") or "",
+                str(adjustment.actor_user_id) if adjustment.actor_user_id else "",
+            ]
+        )
+
+    filename = f"stock-adjustments-{product.slug}-{datetime.now(timezone.utc).date().isoformat()}.csv"
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
