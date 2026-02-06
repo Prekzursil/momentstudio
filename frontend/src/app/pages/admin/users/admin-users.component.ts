@@ -871,20 +871,7 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
 	              </button>
 	            </div>
 
-	            <p class="mt-3 text-sm text-slate-700 dark:text-slate-200">
-	              {{ 'adminUi.users.rolePasswordPrompt' | translate }}
-	            </p>
-
-	            <div class="mt-3">
-	              <app-input
-	                [label]="'adminUi.users.rolePasswordLabel' | translate"
-	                type="password"
-	                [(value)]="roleChangePassword"
-	                [placeholder]="'auth.password' | translate"
-	                autocomplete="current-password"
-	              ></app-input>
-	            </div>
-	            <div *ngIf="roleChangeError()" class="mt-2 text-sm text-rose-700 dark:text-rose-300">{{ roleChangeError() }}</div>
+		            <div *ngIf="roleChangeError()" class="mt-2 text-sm text-rose-700 dark:text-rose-300">{{ roleChangeError() }}</div>
 
 	            <div class="mt-4 flex justify-end gap-2">
 	              <app-button
@@ -939,7 +926,6 @@ export class AdminUsersComponent implements OnInit {
   roleChangeOpen = signal(false);
   roleChangeBusy = signal(false);
   roleChangeError = signal<string | null>(null);
-  roleChangePassword = '';
 
   aliases = signal<AdminUserAliasesResponse | null>(null);
   aliasesLoading = signal(false);
@@ -1190,7 +1176,6 @@ export class AdminUsersComponent implements OnInit {
     if (!user) return;
     if (user.role === 'owner') return;
     if (this.selectedRole === user.role) return;
-    this.roleChangePassword = '';
     this.roleChangeError.set(null);
     this.roleChangeOpen.set(true);
   }
@@ -1199,7 +1184,6 @@ export class AdminUsersComponent implements OnInit {
     this.roleChangeOpen.set(false);
     this.roleChangeBusy.set(false);
     this.roleChangeError.set(null);
-    this.roleChangePassword = '';
   }
 
   confirmRoleChange(): void {
@@ -1210,15 +1194,10 @@ export class AdminUsersComponent implements OnInit {
       this.closeRoleChange();
       return;
     }
-    const password = this.roleChangePassword.trim();
-    if (!password) {
-      this.roleChangeError.set(this.t('adminUi.users.rolePasswordRequired'));
-      return;
-    }
 
     this.roleChangeBusy.set(true);
     this.roleChangeError.set(null);
-    this.admin.updateUserRole(user.id, this.selectedRole, password).subscribe({
+    this.admin.updateUserRole(user.id, this.selectedRole).subscribe({
       next: (updated) => {
         this.toast.success(this.t('adminUi.users.success.role'));
         this.selectedUser.set({ ...user, role: updated.role });

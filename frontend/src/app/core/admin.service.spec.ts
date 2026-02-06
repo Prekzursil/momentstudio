@@ -99,12 +99,12 @@ describe('AdminService', () => {
   });
 
   it('should update user role and revoke sessions', () => {
-    service.updateUserRole('u1', 'admin', 'pw').subscribe((res) => {
+    service.updateUserRole('u1', 'admin').subscribe((res) => {
       expect(res.role).toBe('admin');
     });
     const roleReq = httpMock.expectOne('/api/v1/admin/dashboard/users/u1/role');
     expect(roleReq.request.method).toBe('PATCH');
-    expect(roleReq.request.body).toEqual({ role: 'admin', password: 'pw' });
+    expect(roleReq.request.body).toEqual({ role: 'admin' });
     roleReq.flush({ id: 'u1', role: 'admin' });
 
     service.revokeSessions('u1').subscribe((res) => {

@@ -243,41 +243,10 @@ export class AuthService {
   }
 
   ensureStepUp(opts?: { silent?: boolean; prompt?: string }): Observable<string | null> {
-    const existing = this.getStepUpToken();
-    if (existing) return of(existing);
-
-    if (this.stepUpInFlight) {
-      return this.stepUpInFlight;
-    }
-
-    if (typeof window === 'undefined') {
-      return of(null);
-    }
-
-    const promptText = (opts?.prompt || 'Confirm your password to continue.').trim();
-    const password = (window.prompt(promptText) || '').trim();
-    if (!password) {
-      return of(null);
-    }
-
-    const silent = opts?.silent ?? false;
-    const headers = silent ? { 'X-Silent': '1' } : undefined;
-
-    const stepUp$ = this.api.post<StepUpResponse>('/auth/step-up', { password }, headers).pipe(
-      tap((res) => {
-        const token = (res?.step_up_token || '').trim();
-        this.stepUpToken = token ? token : null;
-      }),
-      map(() => this.getStepUpToken()),
-      catchError(() => of(null)),
-      finalize(() => {
-        this.stepUpInFlight = null;
-      }),
-      shareReplay(1)
-    );
-
-    this.stepUpInFlight = stepUp$;
-    return stepUp$;
+    void opts;
+    // Step-up prompts are intentionally disabled to avoid disruptive password popups
+    // throughout the admin UI.
+    return of(null);
   }
 
   login(

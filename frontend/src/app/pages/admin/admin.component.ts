@@ -6959,8 +6959,8 @@ class CmsDraftManager<T> {
               <label class="flex items-center gap-2">
                 <input type="checkbox" [(ngModel)]="maintenanceEnabledValue" /> {{ 'adminUi.maintenance.mode' | translate }}
               </label>
-              <a class="text-indigo-600 dark:text-indigo-300" href="/api/v1/sitemap.xml" target="_blank" rel="noopener">{{ 'adminUi.maintenance.sitemap' | translate }}</a>
-              <a class="text-indigo-600 dark:text-indigo-300" href="/api/v1/robots.txt" target="_blank" rel="noopener">{{ 'adminUi.maintenance.robots' | translate }}</a>
+              <a class="text-indigo-600 dark:text-indigo-300" href="/sitemap.xml" target="_blank" rel="noopener">{{ 'adminUi.maintenance.sitemap' | translate }}</a>
+              <a class="text-indigo-600 dark:text-indigo-300" href="/robots.txt" target="_blank" rel="noopener">{{ 'adminUi.maintenance.robots' | translate }}</a>
               <a class="text-indigo-600 dark:text-indigo-300" href="/api/v1/feeds/products.json" target="_blank" rel="noopener">{{ 'adminUi.maintenance.feed' | translate }}</a>
             </div>
           </section>
@@ -7497,7 +7497,6 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   ownerTransferIdentifier = '';
   ownerTransferConfirm = '';
-  ownerTransferPassword = '';
   ownerTransferLoading = false;
   ownerTransferError: string | null = null;
 
@@ -8092,16 +8091,14 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.ownerTransferError = null;
     const identifier = this.ownerTransferIdentifier.trim();
     const confirm = this.ownerTransferConfirm.trim();
-    const password = this.ownerTransferPassword;
     if (!identifier) {
       this.ownerTransferError = this.t('adminUi.ownerTransfer.errors.identifier');
       return;
     }
     this.ownerTransferLoading = true;
-    this.admin.transferOwner({ identifier, confirm, password }).subscribe({
+    this.admin.transferOwner({ identifier, confirm }).subscribe({
       next: () => {
         this.toast.success(this.t('adminUi.ownerTransfer.successTitle'), this.t('adminUi.ownerTransfer.successCopy'));
-        this.ownerTransferPassword = '';
         this.ownerTransferConfirm = '';
         this.ownerTransferIdentifier = '';
         this.auth.loadCurrentUser().subscribe();
@@ -8934,9 +8931,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   updateRole(): void {
     if (!this.selectedUserId || !this.selectedUserRole) return;
-    const password = (prompt(this.t('adminUi.users.rolePasswordPrompt')) || '').trim();
-    if (!password) return;
-    this.admin.updateUserRole(this.selectedUserId, this.selectedUserRole, password).subscribe({
+    this.admin.updateUserRole(this.selectedUserId, this.selectedUserRole).subscribe({
       next: (updated) => {
         this.users = this.users.map((u) => (u.id === updated.id ? updated : u));
         this.toast.success(this.t('adminUi.users.success.role'));

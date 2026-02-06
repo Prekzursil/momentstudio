@@ -3901,13 +3901,6 @@ async def update_user_role(
     if current_user.role not in (UserRole.owner, UserRole.admin):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only owner/admin can change user roles")
 
-    if not step_up_service.has_step_up(request, current_user):
-        password = str(payload.get("password") or "")
-        if not password:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Password is required")
-        if not security.verify_password(password, current_user.hashed_password):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
-
     user = await session.get(User, user_id)
     if not user:
         raise HTTPException(
@@ -4357,16 +4350,6 @@ async def transfer_owner(
     if confirm.upper() != "TRANSFER":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail='Type "TRANSFER" to confirm'
-        )
-
-    password = str(payload.get("password") or "")
-    if not password:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Password is required"
-        )
-    if not security.verify_password(password, current_owner.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password"
         )
 
     if "@" in identifier:

@@ -25,7 +25,6 @@ from app.core.dependencies import (
     require_verified_email,
 )
 from app.core.config import settings
-from app.core import security
 from app.core.security import create_receipt_token, decode_receipt_token
 from app.db.session import get_session
 from app.models.address import Address
@@ -2548,11 +2547,6 @@ async def admin_refund_order(
     session: AsyncSession = Depends(get_session),
     admin_user=Depends(require_admin),
 ):
-    if not step_up_service.has_step_up(request, admin_user):
-        password = str(payload.password or "")
-        if not password or not security.verify_password(password, admin_user.hashed_password):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
-
     note = (payload.note or "").strip() or None
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
@@ -2596,11 +2590,6 @@ async def admin_create_order_refund(
     session: AsyncSession = Depends(get_session),
     admin_user=Depends(require_admin),
 ) -> AdminOrderRead:
-    if not step_up_service.has_step_up(request, admin_user):
-        password = str(payload.password or "")
-        if not password or not security.verify_password(password, admin_user.hashed_password):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
-
     order = await order_service.get_order_by_id_admin(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")

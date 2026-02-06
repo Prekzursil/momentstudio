@@ -453,14 +453,13 @@ export class AdminOrdersService {
     return this.api.post<Order>(`/orders/admin/${orderId}/void-payment`, {});
   }
 
-  requestRefund(orderId: string, payload: { password: string; note?: string | null }): Observable<Order> {
+  requestRefund(orderId: string, payload: { note?: string | null } = {}): Observable<Order> {
     return this.api.post<Order>(`/orders/admin/${orderId}/refund`, payload);
   }
 
   createPartialRefund(
     orderId: string,
     payload: {
-      password: string;
       amount: string;
       note: string;
       items?: Array<{ order_item_id: string; quantity: number }>;

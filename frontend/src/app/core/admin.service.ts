@@ -1090,7 +1090,7 @@ export class AdminService {
     return this.api.post<AdminAuditRetentionPurgeResponse>('/admin/dashboard/audit/retention/purge', payload);
   }
 
-  transferOwner(payload: { identifier: string; confirm: string; password: string }): Observable<OwnerTransferResponse> {
+  transferOwner(payload: { identifier: string; confirm: string }): Observable<OwnerTransferResponse> {
     return this.api.post<OwnerTransferResponse>('/admin/dashboard/owner/transfer', payload);
   }
 
@@ -1398,8 +1398,8 @@ export class AdminService {
     return this.api.post<StockAdjustment>('/admin/dashboard/stock-adjustments', payload);
   }
 
-  updateUserRole(userId: string, role: string, password: string): Observable<AdminUser> {
-    return this.api.patch<AdminUser>(`/admin/dashboard/users/${userId}/role`, { role, password });
+  updateUserRole(userId: string, role: string): Observable<AdminUser> {
+    return this.api.patch<AdminUser>(`/admin/dashboard/users/${userId}/role`, { role });
   }
 
   getMaintenance(): Observable<{ enabled: boolean }> {

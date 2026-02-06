@@ -1322,15 +1322,6 @@ type OrderAction =
             ></textarea>
           </label>
 
-          <div class="mt-3">
-            <app-input
-              [label]="'adminUi.orders.refundWizard.passwordLabel' | translate"
-              type="password"
-              [(value)]="refundPassword"
-              [placeholder]="'auth.password' | translate"
-              autocomplete="current-password"
-            ></app-input>
-          </div>
           <div *ngIf="refundWizardError()" class="mt-2 text-sm text-rose-700 dark:text-rose-300">{{ refundWizardError() }}</div>
 
           <div class="mt-4 flex justify-end gap-2">
@@ -1463,16 +1454,6 @@ type OrderAction =
             ></textarea>
           </label>
 
-          <div class="mt-3">
-            <app-input
-              [label]="'adminUi.orders.partialRefundWizard.passwordLabel' | translate"
-              type="password"
-              [(value)]="partialRefundPassword"
-              [placeholder]="'auth.password' | translate"
-              autocomplete="current-password"
-            ></app-input>
-          </div>
-
           <label class="mt-3 flex items-start gap-2 text-sm text-slate-700 dark:text-slate-200">
             <input
               type="checkbox"
@@ -1569,9 +1550,7 @@ export class AdminOrderDetailComponent implements OnInit {
   trackingUrl = '';
   cancelReason = '';
   refundNote = '';
-  refundPassword = '';
   partialRefundNote = '';
-  partialRefundPassword = '';
   partialRefundAmount = '';
   partialRefundProcessPayment = false;
   partialRefundQty: Record<string, number> = {};
@@ -2505,7 +2484,6 @@ export class AdminOrderDetailComponent implements OnInit {
     if (!this.order() || !this.canRefund()) return;
     this.refundWizardError.set(null);
     this.refundNote = '';
-    this.refundPassword = '';
     this.refundWizardOpen.set(true);
   }
 
@@ -2513,7 +2491,6 @@ export class AdminOrderDetailComponent implements OnInit {
     this.refundWizardOpen.set(false);
     this.refundWizardError.set(null);
     this.refundNote = '';
-    this.refundPassword = '';
   }
 
   confirmRefund(): void {
@@ -2527,19 +2504,12 @@ export class AdminOrderDetailComponent implements OnInit {
       return;
     }
 
-    const password = this.refundPassword.trim();
-    if (!password) {
-      this.refundWizardError.set(this.translate.instant('adminUi.orders.refundWizard.passwordRequired'));
-      return;
-    }
-
     this.refundWizardError.set(null);
     this.action.set('refund');
-    this.api.requestRefund(orderId, { password, note }).subscribe({
+    this.api.requestRefund(orderId, { note }).subscribe({
       next: () => {
         this.toast.success(this.translate.instant('adminUi.orders.success.refund'));
         this.refundNote = '';
-        this.refundPassword = '';
         this.closeRefundWizard();
         this.load(orderId);
         this.action.set(null);
@@ -2771,7 +2741,6 @@ export class AdminOrderDetailComponent implements OnInit {
 
     this.partialRefundWizardError.set(null);
     this.partialRefundNote = '';
-    this.partialRefundPassword = '';
     this.partialRefundProcessPayment = false;
     this.partialRefundQty = Object.fromEntries((o.items ?? []).map((it) => [it.id, 0]));
     this.partialRefundAmount = this.partialRefundSelectionTotal(o).toFixed(2);
@@ -2782,7 +2751,6 @@ export class AdminOrderDetailComponent implements OnInit {
     this.partialRefundWizardOpen.set(false);
     this.partialRefundWizardError.set(null);
     this.partialRefundNote = '';
-    this.partialRefundPassword = '';
   }
 
   setPartialRefundQty(orderItemId: string, rawValue: unknown, max: number): void {
@@ -2809,12 +2777,6 @@ export class AdminOrderDetailComponent implements OnInit {
     const note = this.partialRefundNote.trim();
     if (!note) {
       this.partialRefundWizardError.set(this.translate.instant('adminUi.orders.partialRefundWizard.noteRequired'));
-      return;
-    }
-
-    const password = this.partialRefundPassword.trim();
-    if (!password) {
-      this.partialRefundWizardError.set(this.translate.instant('adminUi.orders.partialRefundWizard.passwordRequired'));
       return;
     }
 
@@ -2847,7 +2809,6 @@ export class AdminOrderDetailComponent implements OnInit {
     this.action.set('partialRefund');
     this.api
       .createPartialRefund(orderId, {
-        password,
         amount: amount.toFixed(2),
         note,
         items,
@@ -2857,7 +2818,6 @@ export class AdminOrderDetailComponent implements OnInit {
         next: () => {
           this.toast.success(this.translate.instant('adminUi.orders.success.partialRefund'));
           this.partialRefundNote = '';
-          this.partialRefundPassword = '';
           this.partialRefundAmount = '';
           this.partialRefundProcessPayment = false;
           this.partialRefundQty = {};
