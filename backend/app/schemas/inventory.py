@@ -50,3 +50,28 @@ class RestockListItem(BaseModel):
 class RestockListResponse(BaseModel):
     items: list[RestockListItem]
     meta: AdminPaginationMeta
+
+
+class CartReservationItem(BaseModel):
+    cart_id: UUID
+    updated_at: datetime
+    customer_email: str | None = None
+    quantity: int
+
+
+class CartReservationsResponse(BaseModel):
+    cutoff: datetime
+    items: list[CartReservationItem]
+
+
+class OrderReservationItem(BaseModel):
+    order_id: UUID
+    reference_code: str | None = None
+    status: str
+    created_at: datetime
+    customer_email: str | None = None
+    quantity: int
+
+
+class OrderReservationsResponse(BaseModel):
+    items: list[OrderReservationItem]

@@ -689,6 +689,31 @@ export interface RestockListResponse {
   };
 }
 
+export interface CartReservationItem {
+  cart_id: string;
+  updated_at: string;
+  customer_email?: string | null;
+  quantity: number;
+}
+
+export interface CartReservationsResponse {
+  cutoff: string;
+  items: CartReservationItem[];
+}
+
+export interface OrderReservationItem {
+  order_id: string;
+  reference_code?: string | null;
+  status: string;
+  created_at: string;
+  customer_email?: string | null;
+  quantity: number;
+}
+
+export interface OrderReservationsResponse {
+  items: OrderReservationItem[];
+}
+
 export interface RestockNoteUpsert {
   product_id: string;
   variant_id?: string | null;
@@ -1096,6 +1121,26 @@ export class AdminService {
 
   exportRestockListCsv(params: { include_variants?: boolean; default_threshold?: number }): Observable<Blob> {
     return this.api.getBlob('/admin/dashboard/inventory/restock-list/export', params as any);
+  }
+
+  reservedCarts(params: {
+    product_id: string;
+    variant_id?: string | null;
+    include_pii?: boolean;
+    limit?: number;
+    offset?: number;
+  }): Observable<CartReservationsResponse> {
+    return this.api.get<CartReservationsResponse>('/admin/dashboard/inventory/reservations/carts', params as any);
+  }
+
+  reservedOrders(params: {
+    product_id: string;
+    variant_id?: string | null;
+    include_pii?: boolean;
+    limit?: number;
+    offset?: number;
+  }): Observable<OrderReservationsResponse> {
+    return this.api.get<OrderReservationsResponse>('/admin/dashboard/inventory/reservations/orders', params as any);
   }
 
   upsertRestockNote(payload: RestockNoteUpsert): Observable<RestockNoteRead | null> {

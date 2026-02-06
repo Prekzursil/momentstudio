@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Dict
@@ -864,6 +865,115 @@ def test_inventory_restock_list_shows_reserved_stock(
     assert match["reserved_in_orders"] == 4
     assert match["available_quantity"] == 4
     assert match["threshold"] == 5
+
+
+def test_inventory_reserved_carts_drilldown_masks_email_by_default(
+    test_app: Dict[str, object],
+) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    session_factory = test_app["session_factory"]
+    engine = test_app["engine"]
+    asyncio.run(reset_db(engine))
+    headers = auth_headers(client, session_factory)
+    data = asyncio.run(seed_inventory_data(session_factory))
+
+    async def _seed_cart_with_guest_email() -> None:
+        async with session_factory() as session:
+            product = (
+                await session.execute(
+                    select(Product).where(Product.slug == data["product_a_slug"])
+                )
+            ).scalar_one()
+            cart = Cart(
+                session_id="session-with-email",
+                guest_email="guestbuyer@example.com",
+                updated_at=datetime.now(timezone.utc),
+            )
+            cart.items.append(
+                CartItem(
+                    product_id=product.id,
+                    variant_id=None,
+                    quantity=1,
+                    unit_price_at_add=float(product.base_price),
+                )
+            )
+            session.add(cart)
+            await session.commit()
+
+    asyncio.run(_seed_cart_with_guest_email())
+
+    resp = client.get(
+        "/api/v1/admin/dashboard/inventory/reservations/carts",
+        headers=headers,
+        params={"product_id": data["product_a_id"]},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["cutoff"]
+    items = body["items"]
+    assert len(items) >= 1
+
+    cart_with_email = next(
+        (item for item in items if item.get("customer_email")), None
+    )
+    assert cart_with_email is not None
+    assert cart_with_email["customer_email"] != "guestbuyer@example.com"
+    assert cart_with_email["customer_email"].endswith("@example.com")
+
+    resp_pii = client.get(
+        "/api/v1/admin/dashboard/inventory/reservations/carts",
+        headers=headers,
+        params={"product_id": data["product_a_id"], "include_pii": True},
+    )
+    assert resp_pii.status_code == 200, resp_pii.text
+    pii_items = resp_pii.json()["items"]
+    pii_match = next(
+        (item for item in pii_items if item.get("cart_id") == cart_with_email["cart_id"]),
+        None,
+    )
+    assert pii_match is not None
+    assert pii_match["customer_email"] == "guestbuyer@example.com"
+
+
+def test_inventory_reserved_orders_drilldown_masks_email_by_default(
+    test_app: Dict[str, object],
+) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    session_factory = test_app["session_factory"]
+    engine = test_app["engine"]
+    asyncio.run(reset_db(engine))
+    headers = auth_headers(client, session_factory)
+    data = asyncio.run(seed_inventory_data(session_factory))
+
+    resp = client.get(
+        "/api/v1/admin/dashboard/inventory/reservations/orders",
+        headers=headers,
+        params={"product_id": data["product_a_id"]},
+    )
+    assert resp.status_code == 200, resp.text
+    items = resp.json()["items"]
+    assert len(items) == 1
+    item = items[0]
+    assert item["quantity"] == 4
+    assert item["status"] == OrderStatus.pending_acceptance.value
+    assert item["customer_email"] != "buyer@example.com"
+    assert item["customer_email"].endswith("@example.com")
+
+    resp_pii = client.get(
+        "/api/v1/admin/dashboard/inventory/reservations/orders",
+        headers=headers,
+        params={"product_id": data["product_a_id"], "include_pii": True},
+    )
+    assert resp_pii.status_code == 200, resp_pii.text
+    pii_items = resp_pii.json()["items"]
+    assert pii_items[0]["customer_email"] == "buyer@example.com"
+
+    invalid_variant = client.get(
+        "/api/v1/admin/dashboard/inventory/reservations/orders",
+        headers=headers,
+        params={"product_id": data["product_a_id"], "variant_id": str(uuid.uuid4())},
+    )
+    assert invalid_variant.status_code == 400, invalid_variant.text
 
 
 def test_inventory_restock_note_queue_and_clear(test_app: Dict[str, object]) -> None:

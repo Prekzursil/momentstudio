@@ -13,6 +13,7 @@ from app.core.config import settings
 from app.models.cart import Cart, CartItem
 from app.models.catalog import Category, Product, ProductVariant, RestockNote
 from app.models.order import Order, OrderItem, OrderStatus
+from app.models.user import User
 from app.schemas.admin_common import AdminPaginationMeta
 from app.schemas.inventory import (
     RestockListItem,
@@ -97,6 +98,121 @@ async def _reserved_in_open_orders(session: AsyncSession) -> dict[_ReservedKey, 
         _ReservedKey(product_id=row[0], variant_id=row[1]): int(row[2] or 0)
         for row in rows
     }
+
+
+async def list_cart_reservations(
+    session: AsyncSession,
+    *,
+    product_id: UUID,
+    variant_id: UUID | None = None,
+    now: datetime | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[datetime, list[dict]]:
+    now_value = now or datetime.now(timezone.utc)
+    cutoff = _cart_reservation_cutoff(now_value)
+
+    email_expr = func.coalesce(User.email, Cart.guest_email).label("customer_email")
+    qty_expr = func.coalesce(func.sum(CartItem.quantity), 0).label("quantity")
+
+    stmt = (
+        select(Cart.id, Cart.updated_at, email_expr, qty_expr)
+        .select_from(CartItem)
+        .join(Cart, Cart.id == CartItem.cart_id)
+        .outerjoin(User, User.id == Cart.user_id)
+        .where(
+            Cart.updated_at >= cutoff,
+            CartItem.product_id == product_id,
+            CartItem.variant_id == variant_id
+            if variant_id is not None
+            else CartItem.variant_id.is_(None),
+        )
+        .group_by(Cart.id, Cart.updated_at, User.email, Cart.guest_email)
+        .order_by(Cart.updated_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    rows = (await session.execute(stmt)).all()
+    items: list[dict] = []
+    for cart_id, updated_at, customer_email, quantity in rows:
+        items.append(
+            {
+                "cart_id": cart_id,
+                "updated_at": updated_at,
+                "customer_email": customer_email,
+                "quantity": int(quantity or 0),
+            }
+        )
+    return cutoff, items
+
+
+async def list_order_reservations(
+    session: AsyncSession,
+    *,
+    product_id: UUID,
+    variant_id: UUID | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[dict]:
+    open_statuses = {
+        OrderStatus.pending_payment,
+        OrderStatus.pending_acceptance,
+        OrderStatus.paid,
+        OrderStatus.shipped,
+    }
+    reserved_expr = case(
+        (
+            OrderItem.quantity > OrderItem.shipped_quantity,
+            OrderItem.quantity - OrderItem.shipped_quantity,
+        ),
+        else_=0,
+    )
+    qty_expr = func.coalesce(func.sum(reserved_expr), 0).label("quantity")
+
+    stmt = (
+        select(
+            Order.id,
+            Order.reference_code,
+            Order.status,
+            Order.created_at,
+            Order.customer_email,
+            qty_expr,
+        )
+        .select_from(OrderItem)
+        .join(Order, Order.id == OrderItem.order_id)
+        .where(
+            Order.status.in_(open_statuses),
+            OrderItem.product_id == product_id,
+            OrderItem.variant_id == variant_id
+            if variant_id is not None
+            else OrderItem.variant_id.is_(None),
+        )
+        .group_by(
+            Order.id,
+            Order.reference_code,
+            Order.status,
+            Order.created_at,
+            Order.customer_email,
+        )
+        .having(qty_expr > 0)
+        .order_by(Order.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    rows = (await session.execute(stmt)).all()
+    items: list[dict] = []
+    for order_id, reference_code, status_value, created_at, customer_email, quantity in rows:
+        items.append(
+            {
+                "order_id": order_id,
+                "reference_code": reference_code,
+                "status": status_value.value,
+                "created_at": created_at,
+                "customer_email": customer_email,
+                "quantity": int(quantity or 0),
+            }
+        )
+    return items
 
 
 def _note_key(product_id: UUID, variant_id: UUID | None) -> str:

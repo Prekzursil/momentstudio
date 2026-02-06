@@ -7,8 +7,17 @@ import { catchError, concatMap, from, map, of, toArray } from 'rxjs';
 import { BreadcrumbComponent, Crumb } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
 import { ErrorStateComponent } from '../../../shared/error-state.component';
+import { ModalComponent } from '../../../shared/modal.component';
 import { SkeletonComponent } from '../../../shared/skeleton.component';
-import { AdminService, RestockListItem, RestockListResponse, RestockNoteUpsert, StockAdjustmentReason } from '../../../core/admin.service';
+import {
+  AdminService,
+  CartReservationItem,
+  OrderReservationItem,
+  RestockListItem,
+  RestockListResponse,
+  RestockNoteUpsert,
+  StockAdjustmentReason
+} from '../../../core/admin.service';
 import { ToastService } from '../../../core/toast.service';
 import { extractRequestId } from '../../../shared/http-error';
 import { AdminPageHeaderComponent } from '../shared/admin-page-header.component';
@@ -31,6 +40,7 @@ type RestockRow = RestockListItem & {
     BreadcrumbComponent,
     ButtonComponent,
     ErrorStateComponent,
+    ModalComponent,
     SkeletonComponent,
     AdminPageHeaderComponent
   ],
@@ -45,6 +55,13 @@ type RestockRow = RestockListItem & {
             [label]="'adminUi.inventory.export' | translate"
             (action)="exportCsv()"
             [disabled]="loading() || exporting"
+          ></app-button>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="(piiReveal() ? 'adminUi.pii.hide' : 'adminUi.pii.reveal') | translate"
+            (action)="togglePiiReveal()"
+            [disabled]="loading()"
           ></app-button>
         </ng-template>
       </app-admin-page-header>
@@ -227,8 +244,32 @@ type RestockRow = RestockListItem & {
                     </div>
                   </td>
                   <td class="py-3 pr-4 text-right font-semibold text-slate-900 dark:text-slate-50">{{ row.stock_quantity }}</td>
-                  <td class="py-3 pr-4 text-right text-slate-700 dark:text-slate-200">{{ row.reserved_in_carts }}</td>
-                  <td class="py-3 pr-4 text-right text-slate-700 dark:text-slate-200">{{ row.reserved_in_orders }}</td>
+                  <td class="py-3 pr-4 text-right text-slate-700 dark:text-slate-200">
+                    <button
+                      *ngIf="row.reserved_in_carts > 0; else cartsPlain"
+                      type="button"
+                      class="font-semibold underline decoration-dotted underline-offset-2 hover:text-slate-900 dark:hover:text-slate-50"
+                      (click)="openReservations(row, 'carts')"
+                      [disabled]="reservationsLoading()"
+                      [attr.aria-label]="'adminUi.inventory.reservations.openCartsAria' | translate"
+                    >
+                      {{ row.reserved_in_carts }}
+                    </button>
+                    <ng-template #cartsPlain>{{ row.reserved_in_carts }}</ng-template>
+                  </td>
+                  <td class="py-3 pr-4 text-right text-slate-700 dark:text-slate-200">
+                    <button
+                      *ngIf="row.reserved_in_orders > 0; else ordersPlain"
+                      type="button"
+                      class="font-semibold underline decoration-dotted underline-offset-2 hover:text-slate-900 dark:hover:text-slate-50"
+                      (click)="openReservations(row, 'orders')"
+                      [disabled]="reservationsLoading()"
+                      [attr.aria-label]="'adminUi.inventory.reservations.openOrdersAria' | translate"
+                    >
+                      {{ row.reserved_in_orders }}
+                    </button>
+                    <ng-template #ordersPlain>{{ row.reserved_in_orders }}</ng-template>
+                  </td>
                   <td
                     class="py-3 pr-4 text-right font-semibold"
                     [class.text-rose-700]="row.is_critical || row.available_quantity <= 0"
@@ -312,6 +353,98 @@ type RestockRow = RestockListItem & {
           </div>
         </ng-template>
       </section>
+
+      <app-modal
+        [open]="reservationsOpen()"
+        [title]="(reservationTitleKey() | translate)"
+        [subtitle]="reservationSubtitle()"
+        [showActions]="false"
+        [closeLabel]="'adminUi.common.close' | translate"
+        (closed)="closeReservations()"
+      >
+        <ng-container *ngIf="reservationsLoading()">
+          <div class="grid gap-2">
+            <app-skeleton height="2.5rem"></app-skeleton>
+            <app-skeleton height="2.5rem"></app-skeleton>
+            <app-skeleton height="2.5rem"></app-skeleton>
+          </div>
+        </ng-container>
+
+        <div
+          *ngIf="!reservationsLoading() && reservationsError()"
+          class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+        >
+          {{ reservationsError() }}
+        </div>
+
+        <ng-container *ngIf="!reservationsLoading() && !reservationsError()">
+          <ng-container *ngIf="reservationsKind() === 'carts'">
+            <p *ngIf="reservationsCutoff()" class="text-xs text-slate-500 dark:text-slate-400">
+              {{ 'adminUi.inventory.reservations.cutoff' | translate: { cutoff: (reservationsCutoff() | date: 'short') } }}
+            </p>
+
+            <div *ngIf="reservationsCarts().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+              {{ 'adminUi.inventory.reservations.emptyCarts' | translate }}
+            </div>
+
+            <div *ngIf="reservationsCarts().length > 0" class="overflow-x-auto">
+              <table class="min-w-[560px] w-full text-sm">
+                <thead class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  <tr>
+                    <th class="text-left py-2 pr-4">{{ 'adminUi.inventory.reservations.table.id' | translate }}</th>
+                    <th class="text-left py-2 pr-4">{{ 'adminUi.inventory.reservations.table.updated' | translate }}</th>
+                    <th class="text-left py-2 pr-4">{{ 'adminUi.inventory.reservations.table.customer' | translate }}</th>
+                    <th class="text-right py-2">{{ 'adminUi.inventory.reservations.table.qty' | translate }}</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200 dark:divide-slate-800/70">
+                  <tr *ngFor="let item of reservationsCarts()">
+                    <td class="py-2 pr-4 font-mono text-xs text-slate-700 dark:text-slate-200">{{ item.cart_id }}</td>
+                    <td class="py-2 pr-4 text-slate-700 dark:text-slate-200">{{ item.updated_at | date: 'short' }}</td>
+                    <td class="py-2 pr-4 text-slate-700 dark:text-slate-200">{{ item.customer_email || ('adminUi.orders.guest' | translate) }}</td>
+                    <td class="py-2 text-right font-semibold text-slate-900 dark:text-slate-50">{{ item.quantity }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </ng-container>
+
+          <ng-container *ngIf="reservationsKind() === 'orders'">
+            <div *ngIf="reservationsOrders().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+              {{ 'adminUi.inventory.reservations.emptyOrders' | translate }}
+            </div>
+
+            <div *ngIf="reservationsOrders().length > 0" class="overflow-x-auto">
+              <table class="min-w-[720px] w-full text-sm">
+                <thead class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  <tr>
+                    <th class="text-left py-2 pr-4">{{ 'adminUi.inventory.reservations.table.id' | translate }}</th>
+                    <th class="text-left py-2 pr-4">{{ 'adminUi.inventory.reservations.table.created' | translate }}</th>
+                    <th class="text-left py-2 pr-4">{{ 'adminUi.inventory.reservations.table.customer' | translate }}</th>
+                    <th class="text-left py-2 pr-4">{{ 'adminUi.inventory.reservations.table.status' | translate }}</th>
+                    <th class="text-right py-2 pr-4">{{ 'adminUi.inventory.reservations.table.qty' | translate }}</th>
+                    <th class="text-right py-2">{{ 'adminUi.inventory.reservations.table.actions' | translate }}</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200 dark:divide-slate-800/70">
+                  <tr *ngFor="let item of reservationsOrders()">
+                    <td class="py-2 pr-4 font-mono text-xs text-slate-700 dark:text-slate-200">
+                      {{ item.reference_code || item.order_id }}
+                    </td>
+                    <td class="py-2 pr-4 text-slate-700 dark:text-slate-200">{{ item.created_at | date: 'short' }}</td>
+                    <td class="py-2 pr-4 text-slate-700 dark:text-slate-200">{{ item.customer_email || ('adminUi.orders.guest' | translate) }}</td>
+                    <td class="py-2 pr-4 text-slate-700 dark:text-slate-200">{{ ('adminUi.orders.' + item.status) | translate }}</td>
+                    <td class="py-2 pr-4 text-right font-semibold text-slate-900 dark:text-slate-50">{{ item.quantity }}</td>
+                    <td class="py-2 text-right">
+                      <app-button size="sm" variant="ghost" [label]="'adminUi.actions.open' | translate" (action)="openOrder(item.order_id)"></app-button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </ng-container>
+        </ng-container>
+      </app-modal>
     </div>
   `
 })
@@ -333,6 +466,23 @@ export class AdminInventoryComponent implements OnInit {
   page = 1;
   limit = 50;
   exporting = false;
+
+  piiReveal = signal(false);
+
+  reservationsOpen = signal(false);
+  reservationsKind = signal<'carts' | 'orders' | null>(null);
+  reservationsLoading = signal(false);
+  reservationsError = signal<string | null>(null);
+  reservationsCutoff = signal<string | null>(null);
+  reservationsCarts = signal<CartReservationItem[]>([]);
+  reservationsOrders = signal<OrderReservationItem[]>([]);
+  reservationsTarget = signal<{
+    product_id: string;
+    variant_id?: string;
+    sku: string;
+    product_name: string;
+    variant_name?: string | null;
+  } | null>(null);
 
   selected = new Set<string>();
   bulkAdjustBusy = signal(false);
@@ -469,6 +619,54 @@ export class AdminInventoryComponent implements OnInit {
     void this.router.navigate(['/admin/products'], { state: { editProductSlug: row.product_slug } });
   }
 
+  togglePiiReveal(): void {
+    this.piiReveal.set(!this.piiReveal());
+    if (!this.reservationsOpen()) return;
+    this.reloadReservations();
+  }
+
+  reservationTitleKey(): string {
+    const kind = this.reservationsKind();
+    if (kind === 'carts') return 'adminUi.inventory.reservations.cartsTitle';
+    if (kind === 'orders') return 'adminUi.inventory.reservations.ordersTitle';
+    return 'adminUi.inventory.title';
+  }
+
+  reservationSubtitle(): string {
+    const target = this.reservationsTarget();
+    if (!target) return '';
+    const name = target.variant_name ? `${target.product_name} — ${target.variant_name}` : target.product_name;
+    return `${name} · ${target.sku}`;
+  }
+
+  openReservations(row: RestockRow, kind: 'carts' | 'orders'): void {
+    if (this.reservationsLoading()) return;
+    this.reservationsOpen.set(true);
+    this.reservationsKind.set(kind);
+    this.reservationsTarget.set({
+      product_id: row.product_id,
+      variant_id: row.kind === 'variant' ? (row.variant_id ?? undefined) : undefined,
+      sku: row.sku,
+      product_name: row.product_name,
+      variant_name: row.variant_name ?? null
+    });
+    this.reloadReservations();
+  }
+
+  closeReservations(): void {
+    this.reservationsOpen.set(false);
+    this.reservationsKind.set(null);
+    this.reservationsTarget.set(null);
+    this.reservationsError.set(null);
+    this.reservationsCutoff.set(null);
+    this.reservationsCarts.set([]);
+    this.reservationsOrders.set([]);
+  }
+
+  openOrder(orderId: string): void {
+    void this.router.navigate(['/admin/orders', orderId]);
+  }
+
   exportCsv(): void {
     if (this.exporting) return;
     this.exporting = true;
@@ -570,6 +768,62 @@ export class AdminInventoryComponent implements OnInit {
     for (const key of Array.from(this.selected)) {
       if (!present.has(key)) this.selected.delete(key);
     }
+  }
+
+  private reloadReservations(): void {
+    const kind = this.reservationsKind();
+    const target = this.reservationsTarget();
+    if (!kind || !target) return;
+
+    this.reservationsLoading.set(true);
+    this.reservationsError.set(null);
+    this.reservationsCutoff.set(null);
+    this.reservationsCarts.set([]);
+    this.reservationsOrders.set([]);
+
+    const baseParams = {
+      product_id: target.product_id,
+      variant_id: target.variant_id,
+      include_pii: this.piiReveal() ? true : undefined
+    };
+
+    if (kind === 'carts') {
+      this.admin.reservedCarts(baseParams).subscribe({
+        next: (res) => {
+          this.reservationsCutoff.set(res.cutoff || null);
+          this.reservationsCarts.set(res.items || []);
+          this.reservationsLoading.set(false);
+        },
+        error: (err) => {
+          if (err?.status === 403 && this.piiReveal()) {
+            this.piiReveal.set(false);
+            this.toast.error(this.translate.instant('adminUi.pii.notAuthorized'));
+            this.reloadReservations();
+            return;
+          }
+          this.reservationsError.set(this.translate.instant('adminUi.errors.generic'));
+          this.reservationsLoading.set(false);
+        }
+      });
+      return;
+    }
+
+    this.admin.reservedOrders(baseParams).subscribe({
+      next: (res) => {
+        this.reservationsOrders.set(res.items || []);
+        this.reservationsLoading.set(false);
+      },
+      error: (err) => {
+        if (err?.status === 403 && this.piiReveal()) {
+          this.piiReveal.set(false);
+          this.toast.error(this.translate.instant('adminUi.pii.notAuthorized'));
+          this.reloadReservations();
+          return;
+        }
+        this.reservationsError.set(this.translate.instant('adminUi.errors.generic'));
+        this.reservationsLoading.set(false);
+      }
+    });
   }
 
   retryLoad(): void {

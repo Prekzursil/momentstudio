@@ -72,7 +72,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Products: translation diff view – Show side-by-side RO/EN fields to spot missing/partial translations quickly.
 - [x] Admin Inventory: bulk stock adjustments – Apply stock delta to selected products with required reason and audit note.
 - [x] Admin Inventory: stock ledger export – Add CSV export for stock adjustments filtered by product/date/reason.
-- [ ] Admin Inventory: reserved stock drill-down – Show which carts/orders reserve stock for a product.
+- [x] Admin Inventory: reserved stock drill-down – Show which carts/orders reserve stock for a product.
 - [ ] Admin CMS: content diff before publish – Show a diff of draft vs published for pages/blog/home blocks.
 - [ ] Admin CMS: restore previous versions – Allow rollback to a previous version with audit logging.
 - [ ] Admin CMS: redirects guardrails – Detect redirect loops/chains and show warnings before saving.

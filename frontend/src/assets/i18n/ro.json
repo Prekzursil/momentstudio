@@ -1780,6 +1780,24 @@
         "updated": "Actualizat",
         "actions": "Acțiuni"
       },
+      "reservations": {
+        "cartsTitle": "Rezervări în coșuri",
+        "ordersTitle": "Rezervări în comenzi",
+        "cutoff": "Coșuri active actualizate după {{cutoff}}",
+        "emptyCarts": "Niciun coș activ nu rezervă acest produs.",
+        "emptyOrders": "Nicio comandă deschisă nu rezervă acest produs.",
+        "openCartsAria": "Arată rezervările din coșuri",
+        "openOrdersAria": "Arată rezervările din comenzi",
+        "table": {
+          "id": "ID",
+          "updated": "Actualizat",
+          "created": "Creat",
+          "customer": "Client",
+          "status": "Stare",
+          "qty": "Cant.",
+          "actions": "Acțiuni"
+        }
+      },
       "actions": {
         "saving": "Se salvează…"
       },

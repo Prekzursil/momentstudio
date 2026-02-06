@@ -1780,6 +1780,24 @@
         "updated": "Updated",
         "actions": "Actions"
       },
+      "reservations": {
+        "cartsTitle": "Cart reservations",
+        "ordersTitle": "Order reservations",
+        "cutoff": "Active carts updated since {{cutoff}}",
+        "emptyCarts": "No active carts reserve this item.",
+        "emptyOrders": "No open orders reserve this item.",
+        "openCartsAria": "Show cart reservations",
+        "openOrdersAria": "Show order reservations",
+        "table": {
+          "id": "ID",
+          "updated": "Updated",
+          "created": "Created",
+          "customer": "Customer",
+          "status": "Status",
+          "qty": "Qty",
+          "actions": "Actions"
+        }
+      },
       "actions": {
         "saving": "Saving…"
       },

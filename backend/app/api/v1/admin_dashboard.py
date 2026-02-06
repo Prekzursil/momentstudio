@@ -64,6 +64,8 @@ from app.schemas.admin_dashboard_scheduled import (
 )
 from app.schemas.auth import RefreshSessionResponse
 from app.schemas.inventory import (
+    CartReservationsResponse,
+    OrderReservationsResponse,
     RestockListResponse,
     RestockNoteRead,
     RestockNoteUpsert,
@@ -4506,6 +4508,102 @@ async def inventory_restock_list(
         include_variants=include_variants,
         default_threshold=default_threshold,
     )
+
+
+@router.get("/inventory/reservations/carts", response_model=CartReservationsResponse)
+async def inventory_reserved_carts(
+    product_id: UUID = Query(...),
+    variant_id: UUID | None = Query(default=None),
+    include_pii: bool = Query(default=False),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin_section("inventory")),
+) -> CartReservationsResponse:
+    if include_pii:
+        pii_service.require_pii_reveal(current_user)
+
+    product = await session.get(Product, product_id)
+    if not product or getattr(product, "is_deleted", False):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+
+    if variant_id is not None:
+        variant = await session.get(ProductVariant, variant_id)
+        if not variant or variant.product_id != product.id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid variant")
+
+    cutoff, rows = await inventory_service.list_cart_reservations(
+        session,
+        product_id=product.id,
+        variant_id=variant_id,
+        limit=limit,
+        offset=offset,
+    )
+    items: list[dict] = []
+    for row in rows:
+        email_raw = str(row.get("customer_email") or "").strip() or None
+        email_value = email_raw
+        if email_value and not include_pii:
+            email_value = pii_service.mask_email(email_value) or email_value
+        items.append(
+            {
+                "cart_id": row.get("cart_id"),
+                "updated_at": row.get("updated_at"),
+                "customer_email": email_value,
+                "quantity": int(row.get("quantity") or 0),
+            }
+        )
+
+    return CartReservationsResponse(cutoff=cutoff, items=items)
+
+
+@router.get("/inventory/reservations/orders", response_model=OrderReservationsResponse)
+async def inventory_reserved_orders(
+    product_id: UUID = Query(...),
+    variant_id: UUID | None = Query(default=None),
+    include_pii: bool = Query(default=False),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin_section("inventory")),
+) -> OrderReservationsResponse:
+    if include_pii:
+        pii_service.require_pii_reveal(current_user)
+
+    product = await session.get(Product, product_id)
+    if not product or getattr(product, "is_deleted", False):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+
+    if variant_id is not None:
+        variant = await session.get(ProductVariant, variant_id)
+        if not variant or variant.product_id != product.id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid variant")
+
+    rows = await inventory_service.list_order_reservations(
+        session,
+        product_id=product.id,
+        variant_id=variant_id,
+        limit=limit,
+        offset=offset,
+    )
+    items: list[dict] = []
+    for row in rows:
+        email_raw = str(row.get("customer_email") or "").strip() or None
+        email_value = email_raw
+        if email_value and not include_pii:
+            email_value = pii_service.mask_email(email_value) or email_value
+        items.append(
+            {
+                "order_id": row.get("order_id"),
+                "reference_code": row.get("reference_code"),
+                "status": row.get("status"),
+                "created_at": row.get("created_at"),
+                "customer_email": email_value,
+                "quantity": int(row.get("quantity") or 0),
+            }
+        )
+
+    return OrderReservationsResponse(items=items)
 
 
 @router.put("/inventory/restock-notes", response_model=RestockNoteRead | None)
