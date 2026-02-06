@@ -3589,6 +3589,13 @@
         "description": "Descriere",
         "save": "Salvează produsul",
         "upload": "Încarcă imagine",
+        "uploadQueue": "Coada de încărcare",
+        "uploadStatus": {
+          "queued": "În așteptare",
+          "uploading": "Se încarcă",
+          "success": "Gata",
+          "error": "Eșuat"
+        },
         "showDeletedImages": "Arată șterse",
         "hideDeletedImages": "Ascunde șterse",
         "images": "Imagini",
@@ -3606,6 +3613,9 @@
         "noImages": "Nu există imagini.",
         "imageMeta": "SEO imagine",
         "imageAltText": "Text alternativ",
+        "altHelperTitle": "Ajutor text alternativ",
+        "altHelperHint": "Arată imaginile care încă par să aibă un nume de fișier generat automat. Apasă Editare pentru a completa textele RO/EN și legendele.",
+        "altHelperEmpty": "Nu există imagini care necesită atenție.",
         "imageCaption": "Legendă",
         "imageSize": "Original",
         "imageThumbs": "Miniaturi",

@@ -65,9 +65,9 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Products: extract product editor wizard component – Move the create/edit wizard UI into a dedicated component.
 - [x] Admin Products: extract image manager component – Move image list/meta/edit modals into a dedicated component.
 - [x] Admin Products: extract relationships manager component – Move related/upsell selection UI into a dedicated component.
-- [ ] Admin Products: SKU/slug uniqueness feedback – Inline validate uniqueness with non-blocking warnings and guidance.
-- [ ] Admin Products: image upload queue – Support multi-upload with per-file progress and retry for failures.
-- [ ] Admin Products: bulk alt/translation helper – Provide a bulk view for missing alt text/translations with quick edits.
+- [x] Admin Products: SKU/slug uniqueness feedback – Inline validate uniqueness with non-blocking warnings and guidance.
+- [x] Admin Products: image upload queue – Support multi-upload with per-file progress and retry for failures.
+- [x] Admin Products: bulk alt/translation helper – Provide a bulk view for missing alt text/translations with quick edits.
 - [ ] Admin Products: stricter sale price validation – Enforce sale <= base and show computed savings preview.
 - [ ] Admin Products: translation diff view – Show side-by-side RO/EN fields to spot missing/partial translations quickly.
 - [ ] Admin Inventory: bulk stock adjustments – Apply stock delta to selected products with required reason and audit note.

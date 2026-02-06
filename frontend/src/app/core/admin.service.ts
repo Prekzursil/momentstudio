@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import type { HttpEvent } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { ApiService } from './api.service';
 
@@ -1261,6 +1262,12 @@ export class AdminService {
     const form = new FormData();
     form.append('file', file);
     return this.api.post<AdminProductDetail>(`/catalog/products/${slug}/images`, form);
+  }
+
+  uploadProductImageWithProgress(slug: string, file: File): Observable<HttpEvent<AdminProductDetail>> {
+    const form = new FormData();
+    form.append('file', file);
+    return this.api.postWithProgress<AdminProductDetail>(`/catalog/products/${slug}/images`, form);
   }
 
   deleteProductImage(slug: string, imageId: string): Observable<AdminProductDetail> {

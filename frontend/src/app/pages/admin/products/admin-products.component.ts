@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { ScrollingModule } from '@angular/cdk/scrolling';
+import { HttpEventType } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { forkJoin, Subscription } from 'rxjs';
@@ -56,7 +57,7 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
 import { adminFilterFavoriteKey } from '../shared/admin-filter-favorites';
 import { AdminProductsBulkActionsComponent } from './admin-products-bulk-actions.component';
 import { AdminProductsEditorWizardComponent } from './admin-products-editor-wizard.component';
-import { AdminProductsImageManagerComponent } from './admin-products-image-manager.component';
+import { AdminProductsImageManagerComponent, type AdminProductImageUploadItem } from './admin-products-image-manager.component';
 import { AdminProductsRelationshipsManagerComponent } from './admin-products-relationships-manager.component';
 
 type ProductStatusFilter = 'all' | 'draft' | 'published' | 'archived';
@@ -2780,15 +2781,18 @@ type PriceHistoryChart = {
 	          [deletedImagesBusy]="deletedImagesBusy"
 	          [deletedImagesError]="deletedImagesError"
 	          [deletedImages]="deletedImages"
-	          [restoringDeletedImage]="restoringDeletedImage"
-	          [imageMeta]="imageMeta"
-	          [imageStats]="imageStats"
-	          (toggleDeletedImagesRequested)="toggleDeletedImages()"
-	          (uploadRequested)="onUpload($event)"
-	          (makePrimaryRequested)="makeImagePrimary($event)"
-	          (toggleMetaRequested)="toggleImageMeta($event)"
-	          (deleteRequested)="openDeleteImageConfirm($event)"
-	          (reprocessRequested)="reprocessImage()"
+		          [restoringDeletedImage]="restoringDeletedImage"
+		          [imageMeta]="imageMeta"
+		          [imageStats]="imageStats"
+		          [uploads]="imageUploads"
+		          (toggleDeletedImagesRequested)="toggleDeletedImages()"
+		          (uploadRequested)="onUpload($event)"
+		          (retryUploadRequested)="retryImageUpload($event)"
+		          (removeUploadRequested)="removeImageUpload($event)"
+		          (makePrimaryRequested)="makeImagePrimary($event)"
+		          (toggleMetaRequested)="toggleImageMeta($event)"
+		          (deleteRequested)="openDeleteImageConfirm($event)"
+		          (reprocessRequested)="reprocessImage()"
 	          (saveMetaRequested)="saveImageMeta()"
 	          (restoreRequested)="restoreDeletedImage($event)"
 	        ></app-admin-products-image-manager>
@@ -2901,9 +2905,13 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
   imageMetaBusy = signal(false);
   imageMetaError = signal<string | null>(null);
   imageMeta: ImageMetaByLang = this.blankImageMetaByLang();
-  imageMetaExists: Record<'en' | 'ro', boolean> = { en: false, ro: false };
-  imageStats: AdminProductImageOptimizationStats | null = null;
-  adminCategories = signal<Array<{ id: string; name: string }>>([]);
+	  imageMetaExists: Record<'en' | 'ro', boolean> = { en: false, ro: false };
+	  imageStats: AdminProductImageOptimizationStats | null = null;
+	  imageUploads = signal<AdminProductImageUploadItem[]>([]);
+	  private imageUploadFiles = new Map<string, File>();
+	  private imageUploadActiveId: string | null = null;
+	  private imageUploadSub: Subscription | null = null;
+	  adminCategories = signal<Array<{ id: string; name: string }>>([]);
   createCategoryOpen = signal(false);
   createCategoryBusy = signal(false);
   createCategoryError = signal<string | null>(null);
@@ -3057,6 +3065,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.cancelProductSearchRequest();
+    this.resetImageUploads();
 
     if (this.productSearchDebounceHandle !== null) {
       window.clearTimeout(this.productSearchDebounceHandle);
@@ -4744,14 +4753,15 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
 		    this.resetDuplicateCheck();
 		    this.resetRelationships();
 		    this.resetAudit();
-        this.resetMarkdownPreview();
-		    this.images.set([]);
-	    this.resetDeletedImages();
-		    this.resetImageMeta();
-		    this.form = this.blankForm();
-        this.lastSavedState.set({ status: this.form.status, isActive: this.form.is_active });
-		    this.basePriceError = '';
-		    this.saleValueError = '';
+	        this.resetMarkdownPreview();
+			    this.images.set([]);
+		    this.resetDeletedImages();
+			    this.resetImageMeta();
+	        this.resetImageUploads();
+			    this.form = this.blankForm();
+	        this.lastSavedState.set({ status: this.form.status, isActive: this.form.is_active });
+			    this.basePriceError = '';
+			    this.saleValueError = '';
 	    this.resetTranslations();
     this.resetVariants();
     this.resetStockLedger();
@@ -4777,14 +4787,15 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
 		    this.resetDuplicateCheck();
 		    this.resetRelationships();
 		    this.resetAudit();
-        this.resetMarkdownPreview();
-		    this.images.set([]);
-	    this.resetDeletedImages();
-		    this.resetImageMeta();
-		    this.basePriceError = '';
-		    this.saleValueError = '';
-	    this.resetTranslations();
-    this.resetVariants();
+	        this.resetMarkdownPreview();
+			    this.images.set([]);
+		    this.resetDeletedImages();
+			    this.resetImageMeta();
+	        this.resetImageUploads();
+			    this.basePriceError = '';
+			    this.saleValueError = '';
+		    this.resetTranslations();
+	    this.resetVariants();
     this.resetStockLedger();
   }
 
@@ -4811,15 +4822,16 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
 		    this.resetDuplicateCheck();
 		    this.resetRelationships();
 		    this.resetAudit();
-        this.resetMarkdownPreview();
-		    this.basePriceError = '';
-		    this.saleValueError = '';
-		    this.resetTranslations();
-		    this.resetDeletedImages();
-		    this.resetImageMeta();
-		    this.resetVariants();
-	    this.resetStockLedger();
-    this.admin.getProduct(slug).subscribe({
+	        this.resetMarkdownPreview();
+			    this.basePriceError = '';
+			    this.saleValueError = '';
+			    this.resetTranslations();
+			    this.resetDeletedImages();
+			    this.resetImageMeta();
+	        this.resetImageUploads();
+			    this.resetVariants();
+		    this.resetStockLedger();
+	    this.admin.getProduct(slug).subscribe({
       next: (prod: any) => {
         const name = (prod?.name || '').toString().trim();
         this.recent.add({
@@ -5819,24 +5831,120 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
     });
   }
 
+  retryImageUpload(uploadId: string): void {
+    const id = String(uploadId || '').trim();
+    if (!id) return;
+    if (this.imageUploadActiveId === id) return;
+    if (!this.imageUploadFiles.has(id)) return;
+    this.updateImageUpload(id, { status: 'queued', progress: 0, error: null });
+    this.maybeStartImageUpload();
+  }
+
+  removeImageUpload(uploadId: string): void {
+    const id = String(uploadId || '').trim();
+    if (!id) return;
+    if (this.imageUploadActiveId === id) return;
+    this.imageUploads.set(this.imageUploads().filter((item) => item.id !== id));
+    this.imageUploadFiles.delete(id);
+  }
+
   onUpload(event: Event): void {
     const target = event.target as HTMLInputElement | null;
-    const file = target?.files?.[0];
-    if (!file) return;
+    const files = Array.from(target?.files ?? []);
+    if (!files.length) return;
     const slug = this.editingSlug();
     if (!slug) {
       this.toast.error(this.t('adminUi.products.errors.saveFirst'));
+      if (target) target.value = '';
       return;
     }
-    this.admin.uploadProductImage(slug, file).subscribe({
-      next: (prod: any) => {
-        this.toast.success(this.t('adminUi.products.success.imageUpload'));
-        const nextImages = Array.isArray(prod.images) ? [...prod.images] : [];
-        nextImages.sort((a: any, b: any) => Number(a?.sort_order ?? 0) - Number(b?.sort_order ?? 0));
-        this.images.set(nextImages);
-        if (target) target.value = '';
+
+    const existing = this.imageUploads();
+    const next: AdminProductImageUploadItem[] = [];
+    for (const file of files) {
+      const id = this.newImageUploadId();
+      this.imageUploadFiles.set(id, file);
+      next.push({ id, fileName: file.name, bytes: file.size, status: 'queued', progress: 0, error: null });
+    }
+
+    this.imageUploads.set([...existing, ...next]);
+    if (target) target.value = '';
+    this.maybeStartImageUpload();
+  }
+
+  private newImageUploadId(): string {
+    try {
+      if (typeof crypto !== 'undefined' && typeof (crypto as any).randomUUID === 'function') {
+        return (crypto as any).randomUUID();
+      }
+    } catch {
+      // Ignore and fall back.
+    }
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+
+  private updateImageUpload(uploadId: string, patch: Partial<AdminProductImageUploadItem>): void {
+    const id = String(uploadId || '').trim();
+    if (!id) return;
+    this.imageUploads.set(
+      this.imageUploads().map((item) => {
+        if (item.id !== id) return item;
+        return { ...item, ...patch };
+      })
+    );
+  }
+
+  private maybeStartImageUpload(): void {
+    if (this.imageUploadSub) return;
+    const slug = this.editingSlug();
+    if (!slug) return;
+    const next = this.imageUploads().find((item) => item.status === 'queued');
+    if (!next) return;
+
+    const file = this.imageUploadFiles.get(next.id) ?? null;
+    if (!file) {
+      this.updateImageUpload(next.id, { status: 'error', error: this.t('adminUi.products.errors.image'), progress: 0 });
+      return;
+    }
+
+    const uploadId = next.id;
+    this.imageUploadActiveId = uploadId;
+    this.updateImageUpload(uploadId, { status: 'uploading', progress: 0, error: null });
+
+    this.imageUploadSub = this.admin.uploadProductImageWithProgress(slug, file).subscribe({
+      next: (event) => {
+        if (this.imageUploadActiveId !== uploadId) return;
+        if (event.type === HttpEventType.UploadProgress) {
+          const match = this.imageUploads().find((item) => item.id === uploadId);
+          const total = typeof event.total === 'number' && event.total > 0 ? event.total : match?.bytes || null;
+          const progress = total ? Math.round((event.loaded / total) * 100) : 0;
+          this.updateImageUpload(uploadId, { progress: Math.max(0, Math.min(99, progress)) });
+          return;
+        }
+        if (event.type === HttpEventType.Response) {
+          const prod: any = event.body;
+          const nextImages = Array.isArray(prod?.images) ? [...prod.images] : [];
+          nextImages.sort((a: any, b: any) => Number(a?.sort_order ?? 0) - Number(b?.sort_order ?? 0));
+          this.images.set(nextImages);
+          this.updateImageUpload(uploadId, { status: 'success', progress: 100 });
+          this.imageUploadFiles.delete(uploadId);
+        }
       },
-      error: () => this.toast.error(this.t('adminUi.products.errors.image'))
+      error: (err) => {
+        if (this.imageUploadActiveId !== uploadId) return;
+        const requestId = extractRequestId(err);
+        const message = requestId ? `${this.t('adminUi.products.errors.image')} (${requestId})` : this.t('adminUi.products.errors.image');
+        this.updateImageUpload(uploadId, { status: 'error', error: message });
+        this.imageUploadSub = null;
+        this.imageUploadActiveId = null;
+        this.maybeStartImageUpload();
+      },
+      complete: () => {
+        if (this.imageUploadActiveId !== uploadId) return;
+        this.imageUploadSub = null;
+        this.imageUploadActiveId = null;
+        this.maybeStartImageUpload();
+      }
     });
   }
 
@@ -6413,6 +6521,14 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
     this.deletedImagesBusy.set(false);
     this.deletedImagesError.set(null);
     this.restoringDeletedImage.set(null);
+  }
+
+  private resetImageUploads(): void {
+    this.imageUploadSub?.unsubscribe();
+    this.imageUploadSub = null;
+    this.imageUploadActiveId = null;
+    this.imageUploadFiles.clear();
+    this.imageUploads.set([]);
   }
 
   private loadDeletedImages(slug: string): void {

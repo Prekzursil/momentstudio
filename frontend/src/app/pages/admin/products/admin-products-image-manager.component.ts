@@ -8,6 +8,17 @@ import type { AdminDeletedProductImage, AdminProductImageOptimizationStats } fro
 
 type ImageMetaByLang = Record<'en' | 'ro', { alt_text: string; caption: string }>;
 
+export type AdminProductImageUploadStatus = 'queued' | 'uploading' | 'success' | 'error';
+
+export type AdminProductImageUploadItem = {
+  id: string;
+  fileName: string;
+  bytes: number;
+  status: AdminProductImageUploadStatus;
+  progress: number;
+  error: string | null;
+};
+
 @Component({
   selector: 'app-admin-products-image-manager',
   standalone: true,
@@ -32,10 +43,141 @@ type ImageMetaByLang = Record<'en' | 'ro', { alt_text: string; caption: string }
           ></app-button>
           <label class="text-sm text-slate-700 dark:text-slate-200">
             {{ 'adminUi.products.form.upload' | translate }}
-            <input type="file" accept="image/*" class="block mt-1" (change)="uploadRequested.emit($event)" />
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              class="block mt-1"
+              (change)="uploadRequested.emit($event)"
+              [disabled]="!hasEditingSlug"
+            />
           </label>
         </div>
       </div>
+
+      <div
+        *ngIf="uploads().length"
+        class="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+      >
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+            {{ 'adminUi.products.form.uploadQueue' | translate }}
+          </p>
+          <p class="text-xs text-slate-500 dark:text-slate-400">
+            {{ uploads().length }}
+          </p>
+        </div>
+
+        <div *ngFor="let item of uploads()" class="grid gap-2 rounded-lg border border-slate-200 p-3 dark:border-slate-800">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="min-w-0">
+              <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">{{ item.fileName }}</p>
+              <p class="text-xs text-slate-500 dark:text-slate-400">{{ formatBytes(item.bytes) }}</p>
+              <p *ngIf="item.error" class="text-xs text-rose-700 dark:text-rose-200">{{ item.error }}</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <span
+                class="rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+                [class.border-slate-200]="item.status === 'queued'"
+                [class.bg-slate-50]="item.status === 'queued'"
+                [class.text-slate-700]="item.status === 'queued'"
+                [class.dark:border-slate-700]="item.status === 'queued'"
+                [class.dark:bg-slate-950/30]="item.status === 'queued'"
+                [class.dark:text-slate-200]="item.status === 'queued'"
+                [class.border-indigo-200]="item.status === 'uploading'"
+                [class.bg-indigo-50]="item.status === 'uploading'"
+                [class.text-indigo-800]="item.status === 'uploading'"
+                [class.dark:border-indigo-900/40]="item.status === 'uploading'"
+                [class.dark:bg-indigo-950/30]="item.status === 'uploading'"
+                [class.dark:text-indigo-200]="item.status === 'uploading'"
+                [class.border-emerald-200]="item.status === 'success'"
+                [class.bg-emerald-50]="item.status === 'success'"
+                [class.text-emerald-800]="item.status === 'success'"
+                [class.dark:border-emerald-900/40]="item.status === 'success'"
+                [class.dark:bg-emerald-950/30]="item.status === 'success'"
+                [class.dark:text-emerald-200]="item.status === 'success'"
+                [class.border-rose-200]="item.status === 'error'"
+                [class.bg-rose-50]="item.status === 'error'"
+                [class.text-rose-800]="item.status === 'error'"
+                [class.dark:border-rose-900/40]="item.status === 'error'"
+                [class.dark:bg-rose-950/30]="item.status === 'error'"
+                [class.dark:text-rose-200]="item.status === 'error'"
+              >
+                {{ uploadStatusLabelKey(item.status) | translate }}
+              </span>
+
+              <app-button
+                *ngIf="item.status === 'error'"
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.actions.retry' | translate"
+                (action)="retryUploadRequested.emit(item.id)"
+              ></app-button>
+
+              <app-button
+                *ngIf="item.status !== 'uploading'"
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.actions.remove' | translate"
+                (action)="removeUploadRequested.emit(item.id)"
+              ></app-button>
+            </div>
+          </div>
+
+          <div class="grid gap-1">
+            <div class="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+              <div class="h-2 bg-indigo-600 dark:bg-indigo-500" [style.width.%]="item.progress"></div>
+            </div>
+            <p class="text-xs text-slate-500 dark:text-slate-400">{{ item.progress }}%</p>
+          </div>
+        </div>
+      </div>
+
+      <details
+        *ngIf="images().length"
+        data-ignore-dirty
+        class="group rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+      >
+        <summary class="cursor-pointer select-none text-sm font-semibold text-slate-900 dark:text-slate-50">
+          {{ 'adminUi.products.form.altHelperTitle' | translate }}
+          <span
+            *ngIf="altHelperImages().length"
+            class="ml-2 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200"
+          >
+            {{ altHelperImages().length }}
+          </span>
+        </summary>
+        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          {{ 'adminUi.products.form.altHelperHint' | translate }}
+        </p>
+
+        <div *ngIf="altHelperImages().length === 0" class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          {{ 'adminUi.products.form.altHelperEmpty' | translate }}
+        </div>
+
+        <div *ngIf="altHelperImages().length" class="mt-3 grid gap-2">
+          <div
+            *ngFor="let img of altHelperImages()"
+            class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-900"
+          >
+            <div class="flex items-center gap-3 min-w-0">
+              <img [src]="img.url" [alt]="img.alt_text || 'image'" class="h-12 w-12 rounded object-cover" />
+              <div class="min-w-0">
+                <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">
+                  {{ img.alt_text || ('adminUi.products.form.image' | translate) }}
+                </p>
+                <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ img.url }}</p>
+              </div>
+            </div>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.actions.edit' | translate"
+              (action)="toggleMetaRequested.emit(img.id)"
+            ></app-button>
+          </div>
+        </div>
+      </details>
 
       <div *ngIf="images().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
         {{ 'adminUi.products.form.noImages' | translate }}
@@ -228,14 +370,46 @@ export class AdminProductsImageManagerComponent {
   @Input({ required: true }) imageMeta!: ImageMetaByLang;
   @Input() imageStats: AdminProductImageOptimizationStats | null = null;
 
+  @Input({ required: true }) uploads!: Signal<AdminProductImageUploadItem[]>;
+
   @Output() toggleDeletedImagesRequested = new EventEmitter<void>();
   @Output() uploadRequested = new EventEmitter<Event>();
+  @Output() retryUploadRequested = new EventEmitter<string>();
+  @Output() removeUploadRequested = new EventEmitter<string>();
   @Output() makePrimaryRequested = new EventEmitter<string>();
   @Output() toggleMetaRequested = new EventEmitter<string>();
   @Output() deleteRequested = new EventEmitter<string>();
   @Output() reprocessRequested = new EventEmitter<void>();
   @Output() saveMetaRequested = new EventEmitter<void>();
   @Output() restoreRequested = new EventEmitter<string>();
+
+  uploadStatusLabelKey(status: AdminProductImageUploadStatus): string {
+    switch (status) {
+      case 'queued':
+        return 'adminUi.products.form.uploadStatus.queued';
+      case 'uploading':
+        return 'adminUi.products.form.uploadStatus.uploading';
+      case 'success':
+        return 'adminUi.products.form.uploadStatus.success';
+      case 'error':
+        return 'adminUi.products.form.uploadStatus.error';
+      default:
+        return 'adminUi.products.form.uploadStatus.queued';
+    }
+  }
+
+  altHelperImages(): Array<{ id: string; url: string; alt_text?: string | null }> {
+    return this.images().filter((img) => this.altTextNeedsAttention(img.alt_text));
+  }
+
+  private altTextNeedsAttention(value?: string | null): boolean {
+    const alt = (value || '').trim();
+    if (!alt) return true;
+    const normalized = alt.toLowerCase();
+    if (normalized.includes('/') || normalized.includes('\\')) return true;
+    if (/\.(png|jpe?g|webp|gif|svg)$/.test(normalized)) return true;
+    return false;
+  }
 
   formatBytes(value?: number | null): string {
     if (value === null || value === undefined || !Number.isFinite(value)) return '—';

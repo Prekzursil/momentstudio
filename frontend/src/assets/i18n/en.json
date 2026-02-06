@@ -3589,6 +3589,13 @@
         "description": "Description",
         "save": "Save product",
         "upload": "Upload image",
+        "uploadQueue": "Upload queue",
+        "uploadStatus": {
+          "queued": "Queued",
+          "uploading": "Uploading",
+          "success": "Done",
+          "error": "Failed"
+        },
         "showDeletedImages": "Show deleted",
         "hideDeletedImages": "Hide deleted",
         "images": "Images",
@@ -3606,6 +3613,9 @@
         "noImages": "No images yet.",
         "imageMeta": "Image SEO",
         "imageAltText": "Alt text",
+        "altHelperTitle": "Alt text helper",
+        "altHelperHint": "Shows images that still look like auto-generated filenames. Click Edit to update RO/EN alt text and captions.",
+        "altHelperEmpty": "No images need attention.",
         "imageCaption": "Caption",
         "imageSize": "Original",
         "imageThumbs": "Thumbnails",
