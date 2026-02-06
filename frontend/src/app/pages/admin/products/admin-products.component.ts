@@ -2920,12 +2920,10 @@ type PriceHistoryChart = {
 		          (reprocessRequested)="reprocessImage()"
 	          (saveMetaRequested)="saveImageMeta()"
 	          (restoreRequested)="restoreDeletedImage($event)"
-	        ></app-admin-products-image-manager>
-	          </div>
-	        </div>
-	      </section>
+		        ></app-admin-products-image-manager>
+		      </section>
 
-        <div *ngIf="selected.size > 0 && view === 'active'" class="h-24"></div>
+	        <div *ngIf="selected.size > 0 && view === 'active'" class="h-24"></div>
 
         <div *ngIf="selected.size > 0 && view === 'active'" class="fixed inset-x-0 bottom-4 z-40 px-4 sm:px-6">
           <div class="max-w-6xl mx-auto">
