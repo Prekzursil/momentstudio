@@ -22,6 +22,7 @@ from app.schemas.newsletter import (
 from app.services import captcha as captcha_service
 from app.services import email as email_service
 from app.services import newsletter_tokens
+from app.services import step_up as step_up_service
 
 router = APIRouter(prefix="/newsletter", tags=["newsletter"])
 
@@ -224,9 +225,11 @@ async def _unsubscribe_newsletter(*, token: str, session: AsyncSession) -> Newsl
 
 @router.get("/admin/export", response_class=StreamingResponse)
 async def export_confirmed_subscribers_csv(
+    request: Request,
     session: AsyncSession = Depends(get_session),
-    _: object = Depends(require_admin_section("ops")),
+    admin: User = Depends(require_admin_section("ops")),
 ) -> StreamingResponse:
+    step_up_service.require_step_up(request, admin)
     result = await session.execute(
         sa.select(
             NewsletterSubscriber.email,

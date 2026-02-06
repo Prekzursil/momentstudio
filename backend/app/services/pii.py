@@ -3,9 +3,10 @@ from __future__ import annotations
 import re
 from typing import Iterable
 
-from fastapi import HTTPException, status
+from fastapi import HTTPException, Request, status
 
 from app.models.user import User, UserRole
+from app.services import step_up as step_up_service
 
 
 _EMAIL_RE = re.compile(r"(?i)(?<![\w.+-])([\w.+-]{1,64})@([\w-]{1,255}(?:\.[\w-]{2,})+)")
@@ -20,9 +21,11 @@ def can_reveal_pii(user: User | None) -> bool:
     return user.role in PII_REVEAL_ROLES
 
 
-def require_pii_reveal(user: User | None) -> None:
+def require_pii_reveal(user: User | None, *, request: Request) -> None:
     if not can_reveal_pii(user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="PII reveal not permitted")
+    assert user is not None
+    step_up_service.require_step_up(request, user)
 
 
 def mask_email(email: str | None) -> str | None:
@@ -90,4 +93,3 @@ def mask_address_lines(
 
 def mask_many_emails(values: Iterable[str | None]) -> list[str | None]:
     return [mask_email(v) for v in values]
-

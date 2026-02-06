@@ -28,6 +28,15 @@ class TrainingModeUpdateRequest(BaseModel):
     enabled: bool = False
 
 
+class StepUpRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=128, description="Confirm password")
+
+
+class StepUpResponse(BaseModel):
+    step_up_token: str
+    expires_at: datetime
+
+
 class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

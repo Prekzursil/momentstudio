@@ -28,6 +28,7 @@ from app.services import payments as payments_service
 from app.services import email as email_service
 from app.schemas.order import ShippingMethodCreate
 from app.core.config import settings
+from app.core import security
 from app.core.security import create_receipt_token
 
 
@@ -54,7 +55,11 @@ def test_app() -> Dict[str, object]:
 
 
 def auth_headers(token: str) -> dict[str, str]:
-    return {"Authorization": f"Bearer {token}"}
+    headers = {"Authorization": f"Bearer {token}"}
+    payload = security.decode_token(token)
+    if payload and payload.get("sub"):
+        headers["X-Admin-Step-Up"] = security.create_step_up_token(str(payload["sub"]))
+    return headers
 
 
 def create_user_token(session_factory, email="buyer@example.com", admin: bool = False):

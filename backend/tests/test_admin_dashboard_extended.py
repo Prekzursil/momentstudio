@@ -158,7 +158,11 @@ def auth_headers(client: TestClient) -> dict:
     )
     assert resp.status_code == 200, resp.text
     token = resp.json()["tokens"]["access_token"]
-    return {"Authorization": f"Bearer {token}", "X-Maintenance-Bypass": settings.maintenance_bypass_token}
+    headers = {"Authorization": f"Bearer {token}", "X-Maintenance-Bypass": settings.maintenance_bypass_token}
+    payload = security.decode_token(token)
+    if payload and payload.get("sub"):
+        headers["X-Admin-Step-Up"] = security.create_step_up_token(str(payload["sub"]))
+    return headers
 
 
 def test_admin_filters_and_low_stock(test_app: Dict[str, object]) -> None:

@@ -159,6 +159,11 @@ export interface AdminAccessResponse {
   allowed: boolean;
 }
 
+export interface StepUpResponse {
+  step_up_token: string;
+  expires_at: string;
+}
+
 type StorageMode = 'local' | 'session';
 
 @Injectable({ providedIn: 'root' })
@@ -167,8 +172,10 @@ export class AuthService {
   private storageMode: StorageMode = 'session';
   private userSignal = signal<AuthUser | null>(null);
   private tokens: AuthTokens | null = null;
+  private stepUpToken: string | null = null;
   private refreshInFlight: Observable<AuthTokens | null> | null = null;
   private ensureInFlight: Observable<boolean> | null = null;
+  private stepUpInFlight: Observable<string | null> | null = null;
   private lastRevalidateAt = 0;
 
   constructor(private api: ApiService, private router: Router) {
@@ -219,6 +226,58 @@ export class AuthService {
 
   getRefreshToken(): string | null {
     return this.tokens?.refresh_token ?? null;
+  }
+
+  getStepUpToken(): string | null {
+    const token = (this.stepUpToken ?? '').trim();
+    if (!token) return null;
+    if (this.isJwtExpired(token)) {
+      this.stepUpToken = null;
+      return null;
+    }
+    return token;
+  }
+
+  clearStepUpToken(): void {
+    this.stepUpToken = null;
+  }
+
+  ensureStepUp(opts?: { silent?: boolean; prompt?: string }): Observable<string | null> {
+    const existing = this.getStepUpToken();
+    if (existing) return of(existing);
+
+    if (this.stepUpInFlight) {
+      return this.stepUpInFlight;
+    }
+
+    if (typeof window === 'undefined') {
+      return of(null);
+    }
+
+    const promptText = (opts?.prompt || 'Confirm your password to continue.').trim();
+    const password = (window.prompt(promptText) || '').trim();
+    if (!password) {
+      return of(null);
+    }
+
+    const silent = opts?.silent ?? false;
+    const headers = silent ? { 'X-Silent': '1' } : undefined;
+
+    const stepUp$ = this.api.post<StepUpResponse>('/auth/step-up', { password }, headers).pipe(
+      tap((res) => {
+        const token = (res?.step_up_token || '').trim();
+        this.stepUpToken = token ? token : null;
+      }),
+      map(() => this.getStepUpToken()),
+      catchError(() => of(null)),
+      finalize(() => {
+        this.stepUpInFlight = null;
+      }),
+      shareReplay(1)
+    );
+
+    this.stepUpInFlight = stepUp$;
+    return stepUp$;
   }
 
   login(
@@ -568,6 +627,8 @@ export class AuthService {
     this.clearImpersonation();
     this.clearStorage();
     this.tokens = null;
+    this.stepUpToken = null;
+    this.stepUpInFlight = null;
     this.userSignal.set(null);
     this.storageMode = 'session';
     if (opts?.redirectTo) {

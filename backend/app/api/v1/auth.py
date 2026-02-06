@@ -62,6 +62,8 @@ from app.schemas.auth import (
     PasswordResetConfirm,
     PasswordResetRequest,
     RefreshRequest,
+    StepUpRequest,
+    StepUpResponse,
     TrainingModeUpdateRequest,
     TokenPair,
     UserEmailsResponse,
@@ -88,6 +90,7 @@ register_rate_limit = per_identifier_limiter(
     key="auth:register",
 )
 login_rate_limit = limiter("auth:login", settings.auth_rate_limit_login, 60)
+step_up_rate_limit = limiter("auth:step_up", settings.auth_rate_limit_login, 60)
 two_factor_rate_limit = limiter("auth:2fa", settings.auth_rate_limit_login, 60)
 refresh_rate_limit = limiter("auth:refresh", settings.auth_rate_limit_refresh, 60)
 reset_request_rate_limit = limiter("auth:reset_request", settings.auth_rate_limit_reset_request, 60)
@@ -1116,6 +1119,35 @@ async def clear_admin_ip_bypass(response: Response = None) -> None:
 @router.get("/admin/access", status_code=status.HTTP_200_OK, summary="Check whether this session can access the admin UI")
 async def admin_access(_: User = Depends(require_admin_section("dashboard"))) -> dict:
     return {"allowed": True}
+
+
+@router.post("/step-up", response_model=StepUpResponse, status_code=status.HTTP_200_OK)
+async def step_up(
+    payload: StepUpRequest,
+    request: Request,
+    _: None = Depends(step_up_rate_limit),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin_section("dashboard")),
+) -> StepUpResponse:
+    hashed_password = (getattr(current_user, "hashed_password", None) or "").strip()
+    if not hashed_password:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Password authentication is not available for this account")
+
+    if not security.verify_password(payload.password, hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+
+    expires_minutes = 15
+    token = security.create_step_up_token(str(current_user.id), expires_minutes=expires_minutes)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)
+
+    await auth_service.record_security_event(
+        session,
+        current_user.id,
+        "step_up",
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
+    return StepUpResponse(step_up_token=token, expires_at=expires_at)
 
 
 @router.post("/password/change", status_code=status.HTTP_200_OK)

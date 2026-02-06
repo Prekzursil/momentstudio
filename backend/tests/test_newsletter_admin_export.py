@@ -104,7 +104,11 @@ def auth_headers(client: TestClient, session_factory) -> dict[str, str]:
     )
     assert resp.status_code == 200, resp.text
     token = resp.json()["tokens"]["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+    headers = {"Authorization": f"Bearer {token}"}
+    payload = security.decode_token(token)
+    if payload and payload.get("sub"):
+        headers["X-Admin-Step-Up"] = security.create_step_up_token(str(payload["sub"]))
+    return headers
 
 
 def test_admin_export_only_includes_confirmed_opted_in_subscribers(test_app: Dict[str, object]) -> None:

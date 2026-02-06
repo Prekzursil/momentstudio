@@ -2380,6 +2380,28 @@
           "load": "Nu am putut încărca semnalele de sănătate."
         }
       },
+      "diagnostics": {
+        "title": "Diagnostic mediu",
+        "hint": "Verificări de configurare pentru email, cache, stocare și webhook-uri de plăți.",
+        "environment": "Mediu",
+        "paymentsProvider": "Plăți",
+        "lastChecked": "Ultima verificare",
+        "smtp": "SMTP",
+        "redis": "Redis",
+        "storage": "Stocare",
+        "stripe": "Stripe",
+        "paypal": "PayPal",
+        "netopia": "Netopia",
+        "status": {
+          "ok": "OK",
+          "warning": "Necesită setare",
+          "error": "Eroare",
+          "off": "Oprit"
+        },
+        "errors": {
+          "load": "Nu am putut încărca diagnosticarea."
+        }
+      },
       "newsletter": {
         "title": "Abonați newsletter",
         "hint": "Descarcă abonații confirmați (CSV) pentru operațiuni de marketing.",

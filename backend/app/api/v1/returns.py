@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +25,7 @@ from app.services import email as email_service
 from app.services import private_storage
 from app.services import returns as returns_service
 from app.services import pii as pii_service
+from app.services import step_up as step_up_service
 
 router = APIRouter(prefix="/returns", tags=["returns"])
 
@@ -81,6 +82,7 @@ async def create_my_return_request(
 
 @router.get("/admin", response_model=ReturnRequestListResponse)
 async def admin_list_returns(
+    request: Request,
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("returns")),
     q: str | None = Query(default=None),
@@ -91,7 +93,7 @@ async def admin_list_returns(
     include_pii: bool = Query(default=False),
 ) -> ReturnRequestListResponse:
     if include_pii:
-        pii_service.require_pii_reveal(admin)
+        pii_service.require_pii_reveal(admin, request=request)
     rows, total_items = await returns_service.list_return_requests(
         session,
         q=q,
@@ -129,12 +131,13 @@ async def admin_list_returns(
 @router.get("/admin/{return_id}", response_model=ReturnRequestRead)
 async def admin_get_return(
     return_id: UUID,
+    request: Request,
     include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("returns")),
 ) -> ReturnRequestRead:
     if include_pii:
-        pii_service.require_pii_reveal(admin)
+        pii_service.require_pii_reveal(admin, request=request)
     record = await returns_service.get_return_request(session, return_id)
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Return request not found")
@@ -144,12 +147,13 @@ async def admin_get_return(
 @router.get("/admin/by-order/{order_id}", response_model=list[ReturnRequestRead])
 async def admin_list_returns_for_order(
     order_id: UUID,
+    request: Request,
     include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("returns")),
 ) -> list[ReturnRequestRead]:
     if include_pii:
-        pii_service.require_pii_reveal(admin)
+        pii_service.require_pii_reveal(admin, request=request)
     rows, _ = await returns_service.list_return_requests(session, order_id=order_id, page=1, limit=100)
     out: list[ReturnRequestRead] = []
     for r in rows:
@@ -164,9 +168,13 @@ async def admin_list_returns_for_order(
 async def admin_create_return(
     payload: ReturnRequestCreate,
     background_tasks: BackgroundTasks,
+    request: Request,
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("returns")),
 ) -> ReturnRequestRead:
+    if include_pii:
+        pii_service.require_pii_reveal(admin, request=request)
     created = await returns_service.create_return_request(session, payload=payload, actor=admin)
 
     to_email = getattr(created.order, "customer_email", None)
@@ -174,7 +182,7 @@ async def admin_create_return(
         lang = created.user.preferred_language if getattr(created, "user", None) else None
         background_tasks.add_task(email_service.send_return_request_created, to_email, created, lang=lang)
 
-    return await admin_get_return(created.id, session=session, admin=admin, include_pii=True)
+    return await admin_get_return(created.id, request=request, session=session, admin=admin, include_pii=include_pii)
 
 
 @router.patch("/admin/{return_id}", response_model=ReturnRequestRead)
@@ -182,9 +190,13 @@ async def admin_update_return(
     return_id: UUID,
     payload: ReturnRequestUpdate,
     background_tasks: BackgroundTasks,
+    request: Request,
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("returns")),
 ) -> ReturnRequestRead:
+    if include_pii:
+        pii_service.require_pii_reveal(admin, request=request)
     record = await returns_service.get_return_request(session, return_id)
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Return request not found")
@@ -204,19 +216,20 @@ async def admin_update_return(
             lang=lang,
         )
 
-    return await admin_get_return(updated.id, session=session, admin=admin, include_pii=True)
+    return await admin_get_return(updated.id, request=request, session=session, admin=admin, include_pii=include_pii)
 
 
 @router.post("/admin/{return_id}/label", response_model=ReturnRequestRead)
 async def admin_upload_return_label(
     return_id: UUID,
+    request: Request,
     file: UploadFile = File(...),
     include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("returns")),
 ) -> ReturnRequestRead:
     if include_pii:
-        pii_service.require_pii_reveal(admin)
+        pii_service.require_pii_reveal(admin, request=request)
     record = await returns_service.get_return_request(session, return_id)
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Return request not found")
@@ -247,9 +260,11 @@ async def admin_upload_return_label(
 @router.get("/admin/{return_id}/label")
 async def admin_download_return_label(
     return_id: UUID,
+    request: Request,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("returns")),
+    admin: User = Depends(require_admin_section("returns")),
 ) -> FileResponse:
+    step_up_service.require_step_up(request, admin)
     record = await returns_service.get_return_request(session, return_id)
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Return request not found")

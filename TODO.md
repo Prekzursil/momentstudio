@@ -80,10 +80,13 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Media: focal point + crop preview – Set focal point and preview responsive crops for hero/collection assets.
 - [x] Admin Users: customer 360 profile – Consolidate user info/orders/tickets/sessions/preferences with PII masking.
 - [x] Admin Users: resend verification/reset actions – Add admin actions for resend email verification and password reset (audited + rate limited).
-- [ ] Admin Support: assignment + SLA + templates – Add ticket assignment, canned responses, and response-time tracking.
-- [ ] Admin Ops: environment diagnostics panel – Show config health (SMTP/Redis/storage/webhooks) and recent failure messages.
-- [ ] Admin Security: step-up auth for sensitive actions – Require re-auth for refunds, role changes, exports, and PII reveal.
+- [x] Admin Support: assignment + SLA + templates – Add ticket assignment, canned responses, and response-time tracking.
+- [x] Admin Ops: environment diagnostics panel – Show config health (SMTP/Redis/storage/webhooks) and recent failure messages.
+- [x] Admin Security: step-up auth for sensitive actions – Require re-auth for refunds, role changes, exports, and PII reveal.
 - [ ] Email: manually verify one-click unsubscribe behavior across Gmail/Outlook (and adjust headers if needed).
+  - Gmail: verify “Unsubscribe” UI triggers a POST to the `List-Unsubscribe` URL and immediately unsubscribes.
+  - Outlook: verify both `List-Unsubscribe` and the in-body footer link work.
+  - Confirm the backend receives `POST /api/v1/newsletter/unsubscribe?token=...` and returns `200` (HTML for browsers).
 - [x] Docs: add Google OAuth setup guide (origins, redirect URIs, backend env, dev/prod examples).
 - [x] Docs: document when/why dev uses `4201` (port bump + Docker stack) and related CORS/proxy expectations.
 - [x] Scale: use Redis-backed rate limiting for multi-replica deployments (auth limits, analytics ingestion; optional via `REDIS_URL`).

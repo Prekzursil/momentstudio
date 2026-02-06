@@ -101,6 +101,7 @@ from app.services import private_storage
 from app.services import user_export as user_export_service
 from app.services import self_service
 from app.services import pii as pii_service
+from app.services import step_up as step_up_service
 from app.schemas.user_admin import (
     AdminEmailVerificationHistoryResponse,
     AdminEmailVerificationTokenInfo,
@@ -1713,16 +1714,17 @@ async def admin_channel_attribution(
 
 @router.get("/search", response_model=AdminDashboardSearchResponse)
 async def admin_global_search(
-    session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(require_admin_section("dashboard")),
+    request: Request,
     q: str = Query(..., min_length=1, max_length=255),
     include_pii: bool = Query(default=False),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin_section("dashboard")),
 ) -> AdminDashboardSearchResponse:
     needle = (q or "").strip()
     if not needle:
         return AdminDashboardSearchResponse(items=[])
     if include_pii:
-        pii_service.require_pii_reveal(current_user)
+        pii_service.require_pii_reveal(current_user, request=request)
 
     parsed_uuid: UUID | None = None
     try:
@@ -2187,12 +2189,13 @@ async def products_by_ids(
 
 @router.get("/orders")
 async def admin_orders(
+    request: Request,
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(require_admin_section("dashboard")),
-    include_pii: bool = Query(default=False),
 ) -> list[dict]:
     if include_pii:
-        pii_service.require_pii_reveal(current_user)
+        pii_service.require_pii_reveal(current_user, request=request)
     stmt = (
         select(Order, User.email)
         .join(User, Order.user_id == User.id, isouter=True)
@@ -2216,12 +2219,13 @@ async def admin_orders(
 
 @router.get("/users")
 async def admin_users(
+    request: Request,
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(require_admin_section("dashboard")),
-    include_pii: bool = Query(default=False),
 ) -> list[dict]:
     if include_pii:
-        pii_service.require_pii_reveal(current_user)
+        pii_service.require_pii_reveal(current_user, request=request)
     result = await session.execute(
         select(User).order_by(User.created_at.desc()).limit(20)
     )
@@ -2242,16 +2246,17 @@ async def admin_users(
 
 @router.get("/users/search", response_model=AdminUserListResponse)
 async def search_users(
-    session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(require_admin_section("users")),
+    request: Request,
     q: str | None = Query(default=None),
     role: UserRole | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
     include_pii: bool = Query(default=False),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin_section("users")),
 ) -> AdminUserListResponse:
     if include_pii:
-        pii_service.require_pii_reveal(current_user)
+        pii_service.require_pii_reveal(current_user, request=request)
     offset = (page - 1) * limit
     stmt = select(User).where(User.deleted_at.is_(None))
 
@@ -2323,16 +2328,17 @@ def _user_order_stats_subquery() -> object:
 
 @router.get("/users/segments/repeat-buyers", response_model=AdminUserSegmentResponse)
 async def admin_user_segment_repeat_buyers(
-    session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(require_admin_section("users")),
+    request: Request,
     q: str | None = Query(default=None),
     min_orders: int = Query(default=2, ge=1, le=100),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
     include_pii: bool = Query(default=False),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin_section("users")),
 ) -> AdminUserSegmentResponse:
     if include_pii:
-        pii_service.require_pii_reveal(current_user)
+        pii_service.require_pii_reveal(current_user, request=request)
     offset = (page - 1) * limit
     stats = _user_order_stats_subquery()
 
@@ -2403,17 +2409,18 @@ async def admin_user_segment_repeat_buyers(
 
 @router.get("/users/segments/high-aov", response_model=AdminUserSegmentResponse)
 async def admin_user_segment_high_aov(
-    session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(require_admin_section("users")),
+    request: Request,
     q: str | None = Query(default=None),
     min_orders: int = Query(default=1, ge=1, le=100),
     min_aov: float = Query(default=0, ge=0),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
-    include_pii: bool = Query(default=True),
+    include_pii: bool = Query(default=False),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin_section("users")),
 ) -> AdminUserSegmentResponse:
     if include_pii:
-        pii_service.require_pii_reveal(current_user)
+        pii_service.require_pii_reveal(current_user, request=request)
     offset = (page - 1) * limit
     stats = _user_order_stats_subquery()
 
@@ -2487,12 +2494,13 @@ async def admin_user_segment_high_aov(
 @router.get("/users/{user_id}/aliases")
 async def admin_user_aliases(
     user_id: UUID,
+    request: Request,
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(require_admin_section("users")),
-    include_pii: bool = Query(default=False),
 ) -> dict:
     if include_pii:
-        pii_service.require_pii_reveal(current_user)
+        pii_service.require_pii_reveal(current_user, request=request)
     user = await session.get(User, user_id)
     if not user:
         raise HTTPException(
@@ -2523,12 +2531,13 @@ async def admin_user_aliases(
 @router.get("/users/{user_id}/profile", response_model=AdminUserProfileResponse)
 async def admin_user_profile(
     user_id: UUID,
+    request: Request,
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(require_admin_section("users")),
-    include_pii: bool = Query(default=False),
 ) -> AdminUserProfileResponse:
     if include_pii:
-        pii_service.require_pii_reveal(current_user)
+        pii_service.require_pii_reveal(current_user, request=request)
     user = await session.get(User, user_id)
     if not user or user.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -3205,15 +3214,17 @@ async def admin_audit_entries(
 
 @router.get("/audit/export.csv")
 async def admin_audit_export_csv(
-    session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(require_admin_section("audit")),
+    request: Request,
     entity: str | None = Query(
         default="all", pattern="^(all|product|content|security)$"
     ),
     action: str | None = Query(default=None, max_length=120),
     user: str | None = Query(default=None, max_length=255),
     redact: bool = Query(default=True),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin_section("audit")),
 ) -> Response:
+    step_up_service.require_step_up(request, current_user)
     if not redact and current_user.role != UserRole.owner:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -3519,16 +3530,17 @@ async def admin_revoke_user_session(
 
 @router.get("/gdpr/exports", response_model=AdminGdprExportJobsResponse)
 async def admin_gdpr_export_jobs(
-    session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(require_admin_section("users")),
+    request: Request,
     q: str | None = Query(default=None),
     status_filter: UserDataExportStatus | None = Query(default=None, alias="status"),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
     include_pii: bool = Query(default=False),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin_section("users")),
 ) -> AdminGdprExportJobsResponse:
     if include_pii:
-        pii_service.require_pii_reveal(current_user)
+        pii_service.require_pii_reveal(current_user, request=request)
     offset = (page - 1) * limit
     stmt = select(UserDataExportJob, User).join(User, UserDataExportJob.user_id == User.id)
 
@@ -3683,6 +3695,7 @@ async def admin_gdpr_download_export_job(
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(require_admin),
 ) -> FileResponse:
+    step_up_service.require_step_up(request, current_user)
     job = await session.get(UserDataExportJob, job_id)
     if not job:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found")
@@ -3723,15 +3736,16 @@ async def admin_gdpr_download_export_job(
 
 @router.get("/gdpr/deletions", response_model=AdminGdprDeletionRequestsResponse)
 async def admin_gdpr_deletion_requests(
-    session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(require_admin_section("users")),
+    request: Request,
     q: str | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
     include_pii: bool = Query(default=False),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin_section("users")),
 ) -> AdminGdprDeletionRequestsResponse:
     if include_pii:
-        pii_service.require_pii_reveal(current_user)
+        pii_service.require_pii_reveal(current_user, request=request)
     offset = (page - 1) * limit
     stmt = select(User).where(User.deleted_at.is_(None), User.deletion_requested_at.is_not(None))
 
@@ -3887,11 +3901,12 @@ async def update_user_role(
     if current_user.role not in (UserRole.owner, UserRole.admin):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only owner/admin can change user roles")
 
-    password = str(payload.get("password") or "")
-    if not password:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Password is required")
-    if not security.verify_password(password, current_user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+    if not step_up_service.has_step_up(request, current_user):
+        password = str(payload.get("password") or "")
+        if not password:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Password is required")
+        if not security.verify_password(password, current_user.hashed_password):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
 
     user = await session.get(User, user_id)
     if not user:
@@ -4411,8 +4426,11 @@ async def set_maintenance(payload: dict, _: str = Depends(require_admin)) -> dic
 
 @router.get("/export")
 async def export_data(
-    session: AsyncSession = Depends(get_session), _: str = Depends(require_admin)
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin),
 ) -> dict:
+    step_up_service.require_step_up(request, admin)
     return await exporter_service.export_json(session)
 
 
@@ -4471,14 +4489,16 @@ async def list_stock_adjustments(
 
 @router.get("/stock-adjustments/export")
 async def export_stock_adjustments(
+    request: Request,
     product_id: UUID = Query(...),
     reason: StockAdjustmentReason | None = Query(default=None),
     from_date: date | None = Query(default=None),
     to_date: date | None = Query(default=None),
     limit: int = Query(default=5000, ge=1, le=20000),
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("inventory")),
+    admin: User = Depends(require_admin_section("inventory")),
 ) -> Response:
+    step_up_service.require_step_up(request, admin)
     if from_date and to_date and to_date < from_date:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date range")
 
@@ -4589,6 +4609,7 @@ async def inventory_restock_list(
 
 @router.get("/inventory/reservations/carts", response_model=CartReservationsResponse)
 async def inventory_reserved_carts(
+    request: Request,
     product_id: UUID = Query(...),
     variant_id: UUID | None = Query(default=None),
     include_pii: bool = Query(default=False),
@@ -4598,7 +4619,7 @@ async def inventory_reserved_carts(
     current_user: User = Depends(require_admin_section("inventory")),
 ) -> CartReservationsResponse:
     if include_pii:
-        pii_service.require_pii_reveal(current_user)
+        pii_service.require_pii_reveal(current_user, request=request)
 
     product = await session.get(Product, product_id)
     if not product or getattr(product, "is_deleted", False):
@@ -4636,6 +4657,7 @@ async def inventory_reserved_carts(
 
 @router.get("/inventory/reservations/orders", response_model=OrderReservationsResponse)
 async def inventory_reserved_orders(
+    request: Request,
     product_id: UUID = Query(...),
     variant_id: UUID | None = Query(default=None),
     include_pii: bool = Query(default=False),
@@ -4645,7 +4667,7 @@ async def inventory_reserved_orders(
     current_user: User = Depends(require_admin_section("inventory")),
 ) -> OrderReservationsResponse:
     if include_pii:
-        pii_service.require_pii_reveal(current_user)
+        pii_service.require_pii_reveal(current_user, request=request)
 
     product = await session.get(Product, product_id)
     if not product or getattr(product, "is_deleted", False):
@@ -4696,13 +4718,15 @@ async def upsert_inventory_restock_note(
 
 @router.get("/inventory/restock-list/export")
 async def export_inventory_restock_list(
-    session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("inventory")),
+    request: Request,
     include_variants: bool = Query(default=True),
     default_threshold: int = Query(
         default=DEFAULT_LOW_STOCK_DASHBOARD_THRESHOLD, ge=1, le=1000
     ),
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("inventory")),
 ) -> Response:
+    step_up_service.require_step_up(request, admin)
     rows = await inventory_service.list_restock_list(
         session,
         include_variants=include_variants,

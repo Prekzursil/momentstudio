@@ -229,3 +229,22 @@ def test_ops_banners_and_shipping_simulation(test_app: Dict[str, object]) -> Non
     retried = client.post("/api/v1/ops/admin/webhooks/stripe/evt_test/retry", headers=auth_headers(token))
     assert retried.status_code == 200, retried.text
     assert retried.json()["status"] == "processed"
+
+
+def test_ops_diagnostics(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    token = create_admin_token(SessionLocal)
+
+    resp = client.get("/api/v1/ops/admin/diagnostics", headers=auth_headers(token))
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["environment"]
+    assert data["payments_provider"]
+
+    for key in ("smtp", "redis", "storage", "stripe", "paypal", "netopia"):
+        check = data[key]
+        assert check["status"] in {"ok", "warning", "error", "off"}
+        assert isinstance(check["configured"], bool)
+        assert isinstance(check["healthy"], bool)

@@ -131,6 +131,27 @@ export interface EmailEventRead {
   created_at: string;
 }
 
+export type DiagnosticsStatus = 'ok' | 'warning' | 'error' | 'off';
+
+export interface OpsDiagnosticsCheck {
+  status: DiagnosticsStatus;
+  configured: boolean;
+  healthy: boolean;
+  message?: string | null;
+}
+
+export interface OpsDiagnosticsRead {
+  checked_at: string;
+  environment: string;
+  payments_provider: string;
+  smtp: OpsDiagnosticsCheck;
+  redis: OpsDiagnosticsCheck;
+  storage: OpsDiagnosticsCheck;
+  stripe: OpsDiagnosticsCheck;
+  paypal: OpsDiagnosticsCheck;
+  netopia: OpsDiagnosticsCheck;
+}
+
 @Injectable({ providedIn: 'root' })
 export class OpsService {
   constructor(private api: ApiService) {}
@@ -207,6 +228,10 @@ export class OpsService {
     status?: EmailEventStatus;
   }): Observable<EmailEventRead[]> {
     return this.api.get<EmailEventRead[]>('/ops/admin/email-events', params as any);
+  }
+
+  getDiagnostics(): Observable<OpsDiagnosticsRead> {
+    return this.api.get<OpsDiagnosticsRead>('/ops/admin/diagnostics');
   }
 
   downloadNewsletterConfirmedSubscribersExport(): Observable<Blob> {

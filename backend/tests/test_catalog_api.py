@@ -21,6 +21,7 @@ from app.models.passkeys import UserPasskey
 from app.services.auth import create_user
 from app.schemas.user import UserCreate
 from app.core.config import settings
+from app.core import security
 
 
 @pytest.fixture
@@ -46,7 +47,11 @@ def test_app() -> Dict[str, object]:
 
 
 def auth_headers(token: str) -> dict[str, str]:
-    return {"Authorization": f"Bearer {token}"}
+    headers = {"Authorization": f"Bearer {token}"}
+    payload = security.decode_token(token)
+    if payload and payload.get("sub"):
+        headers["X-Admin-Step-Up"] = security.create_step_up_token(str(payload["sub"]))
+    return headers
 
 
 def create_admin_token(session_factory, email="admin@example.com"):

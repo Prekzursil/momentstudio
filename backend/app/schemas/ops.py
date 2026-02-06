@@ -145,3 +145,25 @@ class FailureCount(BaseModel):
 class WebhookBacklogCount(BaseModel):
     pending: int = 0
     since_hours: int
+
+
+DiagnosticsStatus = Literal["ok", "warning", "error", "off"]
+
+
+class OpsDiagnosticsCheck(BaseModel):
+    status: DiagnosticsStatus
+    configured: bool = False
+    healthy: bool = False
+    message: str | None = None
+
+
+class OpsDiagnosticsRead(BaseModel):
+    checked_at: datetime
+    environment: str
+    payments_provider: str
+    smtp: OpsDiagnosticsCheck
+    redis: OpsDiagnosticsCheck
+    storage: OpsDiagnosticsCheck
+    stripe: OpsDiagnosticsCheck
+    paypal: OpsDiagnosticsCheck
+    netopia: OpsDiagnosticsCheck

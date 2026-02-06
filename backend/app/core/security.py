@@ -74,6 +74,11 @@ def create_admin_ip_bypass_token(subject: str, *, expires_minutes: int | None = 
     return _create_token_with_claims(subject, "admin_ip_bypass", timedelta(minutes=minutes))
 
 
+def create_step_up_token(subject: str, *, expires_minutes: int = 15) -> str:
+    minutes = max(1, int(expires_minutes))
+    return _create_token_with_claims(subject, "step_up", timedelta(minutes=minutes))
+
+
 def create_google_completion_token(subject: str) -> str:
     return _create_token_with_claims(subject, "google_completion", timedelta(minutes=settings.google_completion_token_exp_minutes))
 

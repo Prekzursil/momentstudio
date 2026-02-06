@@ -18,6 +18,7 @@ from app.schemas.ops import (
     MaintenanceBannerPublic,
     MaintenanceBannerRead,
     MaintenanceBannerUpdate,
+    OpsDiagnosticsRead,
     ShippingSimulationRequest,
     ShippingSimulationResult,
     WebhookBacklogCount,
@@ -44,6 +45,11 @@ async def admin_list_banners(
 ) -> list[MaintenanceBannerRead]:
     rows = await ops_service.list_maintenance_banners(session)
     return [MaintenanceBannerRead.model_validate(r) for r in rows]
+
+
+@router.get("/admin/diagnostics", response_model=OpsDiagnosticsRead)
+async def admin_diagnostics(_: User = Depends(require_admin_section("ops"))) -> OpsDiagnosticsRead:
+    return await ops_service.get_diagnostics()
 
 
 @router.post("/admin/banners", response_model=MaintenanceBannerRead, status_code=status.HTTP_201_CREATED)

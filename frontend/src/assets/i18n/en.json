@@ -2380,6 +2380,28 @@
           "load": "Could not load health signals."
         }
       },
+      "diagnostics": {
+        "title": "Environment diagnostics",
+        "hint": "Configuration readiness checks for email, caching, storage, and payment webhooks.",
+        "environment": "Environment",
+        "paymentsProvider": "Payments",
+        "lastChecked": "Last checked",
+        "smtp": "SMTP",
+        "redis": "Redis",
+        "storage": "Storage",
+        "stripe": "Stripe",
+        "paypal": "PayPal",
+        "netopia": "Netopia",
+        "status": {
+          "ok": "OK",
+          "warning": "Needs setup",
+          "error": "Error",
+          "off": "Off"
+        },
+        "errors": {
+          "load": "Could not load diagnostics."
+        }
+      },
       "newsletter": {
         "title": "Newsletter subscribers",
         "hint": "Download confirmed subscribers (CSV) for marketing operations.",

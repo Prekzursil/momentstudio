@@ -1,7 +1,7 @@
 import json
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, Path, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Path, Query, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -64,6 +64,7 @@ from app.schemas.catalog_admin import AdminDeletedProductImage, AdminProductAudi
 from app.services import audit_chain as audit_chain_service
 from app.services import catalog as catalog_service
 from app.services import storage
+from app.services import step_up as step_up_service
 
 router = APIRouter(prefix="/catalog", tags=["catalog"])
 
@@ -359,10 +360,12 @@ async def reorder_categories(
 
 @router.get("/categories/export", response_class=StreamingResponse)
 async def export_categories_csv(
+    request: Request,
     template: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
-    _: object = Depends(require_admin_section("products")),
+    admin: User = Depends(require_admin_section("products")),
 ):
+    step_up_service.require_step_up(request, admin)
     content = await catalog_service.export_categories_csv(session, template=template)
     filename = "categories_template.csv" if template else "categories.csv"
     headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
@@ -844,9 +847,11 @@ async def recently_viewed_products(
 
 @router.get("/products/export", response_class=StreamingResponse)
 async def export_products_csv(
+    request: Request,
     session: AsyncSession = Depends(get_session),
-    _: object = Depends(require_admin_section("products")),
+    admin: User = Depends(require_admin_section("products")),
 ):
+    step_up_service.require_step_up(request, admin)
     content = await catalog_service.export_products_csv(session)
     headers = {"Content-Disposition": 'attachment; filename="products.csv"'}
     return StreamingResponse(iter([content]), media_type="text/csv", headers=headers)

@@ -1,21 +1,38 @@
 from __future__ import annotations
 
+import asyncio
+import os
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from contextlib import suppress
+from pathlib import Path
 from uuid import UUID
 
 from fastapi import BackgroundTasks, HTTPException, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
+from app.core.redis_client import get_redis
 from app.models.email_event import EmailDeliveryEvent
 from app.models.email_failure import EmailDeliveryFailure
 from app.models.ops import MaintenanceBanner
 from app.models.webhook import PayPalWebhookEvent, StripeWebhookEvent
-from app.schemas.ops import ShippingSimulationResult, WebhookEventDetail, WebhookEventRead, WebhookStatus
+from app.schemas.ops import (
+    OpsDiagnosticsCheck,
+    OpsDiagnosticsRead,
+    ShippingSimulationResult,
+    WebhookEventDetail,
+    WebhookEventRead,
+    WebhookStatus,
+)
 from app.services import checkout_settings as checkout_settings_service
+from app.services import netopia as netopia_service
 from app.services import order as order_service
+from app.services import payments as stripe_payments
+from app.services import paypal as paypal_service
 from app.services import pricing
+from app.services.payment_provider import payments_provider
 from app.services import webhook_handlers
 
 
@@ -517,3 +534,153 @@ async def retry_webhook(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Retry failed") from exc
 
     raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Retry failed")
+
+
+def _is_production_env() -> bool:
+    env = (settings.environment or "").strip().lower()
+    return env in {"prod", "production", "live"}
+
+
+async def _tcp_connect_check(host: str, port: int, *, timeout_seconds: float) -> tuple[bool, str | None]:
+    cleaned_host = (host or "").strip()
+    if not cleaned_host:
+        return False, "Missing host"
+    try:
+        cleaned_port = int(port)
+    except Exception:
+        return False, "Invalid port"
+
+    try:
+        _, writer = await asyncio.wait_for(
+            asyncio.open_connection(cleaned_host, cleaned_port),
+            timeout=timeout_seconds,
+        )
+        writer.close()
+        with suppress(Exception):
+            await writer.wait_closed()
+        return True, None
+    except Exception as exc:
+        return False, str(exc)
+
+
+async def get_diagnostics() -> OpsDiagnosticsRead:
+    now = datetime.now(timezone.utc)
+    env = (settings.environment or "").strip() or "local"
+    provider = payments_provider()
+    prod = _is_production_env()
+
+    smtp_check = OpsDiagnosticsCheck(status="off", configured=False, healthy=False, message=None)
+    if bool(getattr(settings, "smtp_enabled", False)):
+        smtp_from = (getattr(settings, "smtp_from_email", None) or "").strip()
+        if not smtp_from:
+            smtp_check = OpsDiagnosticsCheck(
+                status="error",
+                configured=True,
+                healthy=False,
+                message="SMTP enabled but SMTP_FROM_EMAIL is missing.",
+            )
+        else:
+            ok, err = await _tcp_connect_check(
+                getattr(settings, "smtp_host", "localhost"),
+                int(getattr(settings, "smtp_port", 0) or 0),
+                timeout_seconds=1.0,
+            )
+            smtp_check = OpsDiagnosticsCheck(
+                status="ok" if ok else "error",
+                configured=True,
+                healthy=ok,
+                message=None if ok else (err or "SMTP connection check failed."),
+            )
+
+    redis_check = OpsDiagnosticsCheck(status="off", configured=False, healthy=False, message=None)
+    redis_url = (getattr(settings, "redis_url", None) or "").strip()
+    if redis_url:
+        client = get_redis()
+        if client is None:
+            redis_check = OpsDiagnosticsCheck(
+                status="error",
+                configured=True,
+                healthy=False,
+                message="REDIS_URL is set but Redis client is unavailable.",
+            )
+        else:
+            try:
+                pong = await asyncio.wait_for(client.ping(), timeout=0.5)
+                ok = bool(pong)
+                redis_check = OpsDiagnosticsCheck(status="ok", configured=True, healthy=ok, message=None if ok else "Redis PING failed.")
+            except Exception as exc:
+                redis_check = OpsDiagnosticsCheck(status="error", configured=True, healthy=False, message=str(exc))
+
+    storage_check = OpsDiagnosticsCheck(status="error", configured=False, healthy=False, message=None)
+    media_root = (getattr(settings, "media_root", None) or "").strip()
+    private_root = (getattr(settings, "private_media_root", None) or "").strip()
+    if media_root and private_root:
+        storage_issues: list[str] = []
+        for raw_path, label in ((media_root, "media_root"), (private_root, "private_media_root")):
+            path = Path(raw_path)
+            if not path.exists():
+                storage_issues.append(f"{label} missing")
+                continue
+            if not path.is_dir():
+                storage_issues.append(f"{label} not a directory")
+                continue
+            if not os.access(path, os.W_OK):
+                storage_issues.append(f"{label} not writable")
+
+        if storage_issues:
+            storage_check = OpsDiagnosticsCheck(
+                status="warning",
+                configured=True,
+                healthy=False,
+                message=", ".join(storage_issues),
+            )
+        else:
+            storage_check = OpsDiagnosticsCheck(status="ok", configured=True, healthy=True, message=None)
+
+    stripe_check = OpsDiagnosticsCheck(status="off", configured=False, healthy=False, message=None)
+    if provider == "real":
+        configured = stripe_payments.is_stripe_configured() and stripe_payments.is_stripe_webhook_configured()
+        if configured:
+            stripe_check = OpsDiagnosticsCheck(status="ok", configured=True, healthy=True, message=None)
+        else:
+            stripe_check = OpsDiagnosticsCheck(
+                status="error" if prod else "warning",
+                configured=False,
+                healthy=False,
+                message="Stripe keys/webhook secret not configured.",
+            )
+
+    paypal_check = OpsDiagnosticsCheck(status="off", configured=False, healthy=False, message=None)
+    if provider == "real":
+        configured = paypal_service.is_paypal_configured() and paypal_service.is_paypal_webhook_configured()
+        if configured:
+            paypal_check = OpsDiagnosticsCheck(status="ok", configured=True, healthy=True, message=None)
+        else:
+            paypal_check = OpsDiagnosticsCheck(
+                status="error" if prod else "warning",
+                configured=False,
+                healthy=False,
+                message="PayPal client/webhook not configured.",
+            )
+
+    netopia_check = OpsDiagnosticsCheck(status="off", configured=False, healthy=False, message=None)
+    if bool(getattr(settings, "netopia_enabled", False)):
+        configured = netopia_service.is_netopia_configured()
+        netopia_check = OpsDiagnosticsCheck(
+            status="ok" if configured else "error",
+            configured=True,
+            healthy=configured,
+            message=None if configured else "Netopia is enabled but credentials/keys are missing.",
+        )
+
+    return OpsDiagnosticsRead(
+        checked_at=now,
+        environment=env,
+        payments_provider=provider,
+        smtp=smtp_check,
+        redis=redis_check,
+        storage=storage_check,
+        stripe=stripe_check,
+        paypal=paypal_check,
+        netopia=netopia_check,
+    )

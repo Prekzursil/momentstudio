@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from io import StringIO
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Query, Request, Response
 from sqlalchemy import select, func, or_, and_, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -48,6 +48,7 @@ from app.schemas.content import (
     SitemapPreviewResponse,
     StructuredDataValidationResponse,
 )
+from app.services import step_up as step_up_service
 from app.schemas.social import SocialThumbnailRequest, SocialThumbnailResponse
 from app.services import content as content_service
 from app.services import sitemap as sitemap_service
@@ -461,10 +462,12 @@ async def admin_upsert_redirect(
 
 @router.get("/admin/redirects/export")
 async def admin_export_redirects(
+    request: Request,
     session: AsyncSession = Depends(get_session),
     q: str | None = Query(default=None, description="Search from/to key"),
-    _: User = Depends(require_admin_section("content")),
+    admin: User = Depends(require_admin_section("content")),
 ) -> Response:
+    step_up_service.require_step_up(request, admin)
     filters = []
     if q:
         needle = f"%{q.strip()}%"
