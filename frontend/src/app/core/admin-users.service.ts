@@ -189,6 +189,10 @@ export class AdminUsersService {
     return this.api.post<{ detail: string }>(`/admin/dashboard/users/${userId}/email/verification/resend`, {});
   }
 
+  resendPasswordReset(userId: string, payload?: { email?: string | null }): Observable<{ detail: string }> {
+    return this.api.post<{ detail: string }>(`/admin/dashboard/users/${userId}/password-reset/resend`, payload || {});
+  }
+
   overrideEmailVerification(userId: string): Observable<AdminUserProfileUser> {
     return this.api.post<AdminUserProfileUser>(`/admin/dashboard/users/${userId}/email/verification/override`, {});
   }

@@ -4732,6 +4732,7 @@
       "lock7d": "Blochează 7 zile",
       "unlock": "Deblochează",
       "passwordResetRequired": "Cere resetarea parolei",
+      "sendPasswordReset": "Trimite email de resetare parolă",
       "saveSecurity": "Salvează securitatea",
       "sessionsTitle": "Sesiuni active",
       "sessionsLoading": "Se încarcă sesiunile…",
@@ -4787,6 +4788,9 @@
         "admin": "Proprietar (basic): acces complet (fără acțiuni doar pentru proprietar).",
         "owner": "Proprietar: acces complet (blocat)."
       },
+      "confirms": {
+        "passwordResetEmail": "Trimite un email de resetare a parolei acestui utilizator?"
+      },
       "success": {
         "revoke": "Sesiuni revocate",
         "sessionRevoked": "Sesiune revocată",
@@ -4794,6 +4798,7 @@
         "internal": "Salvat",
         "impersonate": "Deschis într-o filă nouă",
         "security": "Securitatea a fost actualizată",
+        "passwordResetSent": "Email de resetare parolă trimis",
         "verificationResent": "Email de verificare trimis",
         "verificationOverridden": "Marcat ca verificat",
         "couponIssued": "Cupon emis",
@@ -4805,6 +4810,7 @@
         "profile": "Nu am putut încărca profilul clientului.",
         "internal": "Nu am putut salva notele interne.",
         "security": "Nu am putut actualiza setările de securitate.",
+        "passwordResetSent": "Nu am putut trimite emailul de resetare parolă.",
         "impersonate": "Nu am putut porni impersonarea.",
         "verificationHistory": "Nu am putut încărca istoricul verificării.",
         "verificationResent": "Nu am putut retrimite emailul de verificare.",

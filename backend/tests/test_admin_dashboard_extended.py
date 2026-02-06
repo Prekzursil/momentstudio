@@ -23,7 +23,7 @@ from app.models.promo import PromoCode, StripeCouponMapping
 from app.models.returns import ReturnRequest, ReturnRequestStatus
 from app.models.support import ContactSubmission, ContactSubmissionTopic, ContactSubmissionStatus
 from app.models.passkeys import UserPasskey
-from app.models.user import User, UserRole
+from app.models.user import PasswordResetToken, User, UserRole
 from app.models.user import UserSecurityEvent
 from app.models.webhook import PayPalWebhookEvent, StripeWebhookEvent
 from app.models.analytics_event import AnalyticsEvent
@@ -1424,3 +1424,37 @@ def test_admin_user_email_verification_controls(test_app: Dict[str, object]) -> 
     security_logs = audit.json().get("security", [])
     assert any(item.get("action") == "user.email_verification.resend" for item in security_logs)
     assert any(item.get("action") == "user.email_verification.override" for item in security_logs)
+
+
+def test_admin_user_password_reset_resend_creates_token_and_audit(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    engine = test_app["engine"]
+    session_factory = test_app["session_factory"]
+    asyncio.run(reset_db(engine))
+    seeded = asyncio.run(seed(session_factory))
+    headers = auth_headers(client)
+
+    resend = client.post(
+        f"/api/v1/admin/dashboard/users/{seeded['customer_id']}/password-reset/resend",
+        headers=headers,
+        json={},
+    )
+    assert resend.status_code == 202, resend.text
+
+    async def _count_tokens() -> int:
+        async with session_factory() as session:
+            rows = (
+                await session.execute(
+                    select(PasswordResetToken).where(
+                        PasswordResetToken.user_id == seeded["customer_id"]
+                    )
+                )
+            ).scalars().all()
+            return len(rows)
+
+    assert asyncio.run(_count_tokens()) == 1
+
+    audit = client.get("/api/v1/admin/dashboard/audit", headers=headers)
+    assert audit.status_code == 200, audit.text
+    security_logs = audit.json().get("security", [])
+    assert any(item.get("action") == "user.password_reset.resend" for item in security_logs)

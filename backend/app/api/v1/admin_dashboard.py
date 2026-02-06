@@ -29,6 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core import security
 from app.core.config import settings
 from app.core.dependencies import require_admin, require_admin_section, require_owner
+from app.core.rate_limit import limiter
 from app.db.session import get_session
 from app.models.catalog import (
     Category,
@@ -77,7 +78,15 @@ from app.models.address import Address
 from app.models.order import Order, OrderRefund, OrderStatus, OrderTag, OrderEvent, OrderItem
 from app.models.returns import ReturnRequest, ReturnRequestStatus
 from app.models.support import ContactSubmission
-from app.models.user import AdminAuditLog, EmailVerificationToken, User, RefreshSession, UserRole, UserSecurityEvent
+from app.models.user import (
+    AdminAuditLog,
+    EmailVerificationToken,
+    RefreshSession,
+    User,
+    UserRole,
+    UserSecurityEvent,
+    UserSecondaryEmail,
+)
 from app.models.admin_dashboard_settings import AdminDashboardAlertThresholds
 from app.models.promo import PromoCode, StripeCouponMapping
 from app.models.coupons_v2 import Promotion
@@ -95,6 +104,7 @@ from app.services import pii as pii_service
 from app.schemas.user_admin import (
     AdminEmailVerificationHistoryResponse,
     AdminEmailVerificationTokenInfo,
+    AdminPasswordResetResendRequest,
     AdminUserImpersonationResponse,
     AdminUserInternalUpdate,
     AdminUserSecurityUpdate,
@@ -116,6 +126,9 @@ from app.schemas.analytics import AdminFunnelConversions, AdminFunnelCounts, Adm
 router = APIRouter(prefix="/admin/dashboard", tags=["admin"])
 
 DEFAULT_LOW_STOCK_DASHBOARD_THRESHOLD = 5
+admin_password_reset_resend_rate_limit = limiter(
+    "admin:password_reset_resend", settings.auth_rate_limit_reset_request, 60
+)
 
 
 async def _get_dashboard_alert_thresholds(session: AsyncSession) -> AdminDashboardAlertThresholds:
@@ -4150,6 +4163,70 @@ async def resend_email_verification(
     )
     await session.commit()
     return {"detail": "Verification email sent"}
+
+
+@router.post("/users/{user_id}/password-reset/resend", status_code=status.HTTP_202_ACCEPTED)
+async def resend_password_reset(
+    user_id: UUID,
+    payload: AdminPasswordResetResendRequest,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin_section("users")),
+    _: None = Depends(admin_password_reset_resend_rate_limit),
+) -> dict:
+    user = await session.get(User, user_id)
+    if not user or user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    requested_email = (payload.email or "").strip().lower()
+    target_email = (user.email or "").strip()
+    target_kind = "primary"
+    if requested_email:
+        if requested_email == (user.email or "").strip().lower():
+            target_email = (user.email or "").strip()
+        else:
+            secondary = await session.scalar(
+                select(UserSecondaryEmail).where(
+                    UserSecondaryEmail.user_id == user.id,
+                    func.lower(UserSecondaryEmail.email) == requested_email,
+                    UserSecondaryEmail.verified.is_(True),
+                )
+            )
+            if not secondary:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email")
+            target_email = (secondary.email or "").strip()
+            target_kind = "secondary"
+
+    if not target_email:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User email missing")
+
+    reset = await auth_service.create_reset_token(session, target_email.lower())
+    if not reset:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    background_tasks.add_task(
+        email_service.send_password_reset,
+        target_email,
+        reset.token,
+        user.preferred_language,
+    )
+    await audit_chain_service.add_admin_audit_log(
+        session,
+        action="user.password_reset.resend",
+        actor_user_id=current_user.id,
+        subject_user_id=user.id,
+        data={
+            "password_reset_token_id": str(reset.id),
+            "expires_at": reset.expires_at.isoformat() if reset.expires_at else None,
+            "to_email_masked": pii_service.mask_email(target_email),
+            "to_email_kind": target_kind,
+            "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+            "ip_address": (request.client.host if request.client else None),
+        },
+    )
+    await session.commit()
+    return {"detail": "Password reset email sent"}
 
 
 @router.post("/users/{user_id}/email/verification/override", response_model=AdminUserProfileUser)

@@ -115,6 +115,10 @@ class AdminEmailVerificationHistoryResponse(BaseModel):
     tokens: list[AdminEmailVerificationTokenInfo] = []
 
 
+class AdminPasswordResetResendRequest(BaseModel):
+    email: str | None = None
+
+
 class AdminUserProfileResponse(BaseModel):
     user: AdminUserProfileUser
     addresses: list[AdminUserAddress] = []

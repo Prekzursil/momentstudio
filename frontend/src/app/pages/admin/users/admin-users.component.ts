@@ -484,6 +484,13 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
                   [disabled]="securityBusy()"
                   (action)="saveSecurity()"
                 ></app-button>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.users.sendPasswordReset' | translate"
+                  [disabled]="securityBusy() || passwordResetEmailBusy()"
+                  (action)="sendPasswordResetEmail()"
+                ></app-button>
               </div>
             </div>
 
@@ -949,6 +956,7 @@ export class AdminUsersComponent implements OnInit {
   lockedReason = '';
   passwordResetRequired = false;
   securityBusy = signal(false);
+  passwordResetEmailBusy = signal(false);
 
   emailHistory = signal<AdminEmailVerificationHistoryResponse | null>(null);
   emailHistoryLoading = signal(false);
@@ -1440,6 +1448,24 @@ export class AdminUsersComponent implements OnInit {
       error: () => {
         this.toast.error(this.t('adminUi.users.errors.security'));
         this.securityBusy.set(false);
+      }
+    });
+  }
+
+  sendPasswordResetEmail(): void {
+    const user = this.selectedUser();
+    if (!user) return;
+    const ok = confirm(this.t('adminUi.users.confirms.passwordResetEmail'));
+    if (!ok) return;
+    this.passwordResetEmailBusy.set(true);
+    this.usersApi.resendPasswordReset(user.id).subscribe({
+      next: () => {
+        this.toast.success(this.t('adminUi.users.success.passwordResetSent'));
+        this.passwordResetEmailBusy.set(false);
+      },
+      error: () => {
+        this.toast.error(this.t('adminUi.users.errors.passwordResetSent'));
+        this.passwordResetEmailBusy.set(false);
       }
     });
   }

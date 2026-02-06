@@ -4732,6 +4732,7 @@
       "lock7d": "Lock 7d",
       "unlock": "Unlock",
       "passwordResetRequired": "Require password reset",
+      "sendPasswordReset": "Send password reset email",
       "saveSecurity": "Save security",
       "sessionsTitle": "Active sessions",
       "sessionsLoading": "Loading sessions…",
@@ -4787,6 +4788,9 @@
         "admin": "Owner basic: Full access (except owner-only actions).",
         "owner": "Owner: Full access (locked)."
       },
+      "confirms": {
+        "passwordResetEmail": "Send a password reset email to this user?"
+      },
       "success": {
         "revoke": "Sessions revoked",
         "sessionRevoked": "Session revoked",
@@ -4794,6 +4798,7 @@
         "internal": "Saved",
         "impersonate": "Opened in a new tab",
         "security": "Security updated",
+        "passwordResetSent": "Password reset email sent",
         "verificationResent": "Verification email sent",
         "verificationOverridden": "Marked verified",
         "couponIssued": "Coupon issued",
@@ -4805,6 +4810,7 @@
         "profile": "Could not load customer profile.",
         "internal": "Could not save internal notes.",
         "security": "Could not update security settings.",
+        "passwordResetSent": "Could not send password reset email.",
         "impersonate": "Could not start impersonation.",
         "verificationHistory": "Could not load verification history.",
         "verificationResent": "Could not resend verification email.",
