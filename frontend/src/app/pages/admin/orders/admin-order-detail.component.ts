@@ -2201,21 +2201,9 @@ export class AdminOrderDetailComponent implements OnInit {
     const url = (trackingUrl ?? '').trim();
     if (!number && !url) return null;
 
-    const courierClean = (courier ?? '').trim().toLowerCase();
-    const courierPattern = /^[A-Za-z0-9]{5,30}$/;
-    const genericPattern = /^[A-Za-z0-9][A-Za-z0-9._-]{4,49}$/;
-
-    if (number) {
-      if (courierClean === 'sameday' || courierClean === 'fan_courier') {
-        if (!courierPattern.test(number)) {
-          return this.translate.instant('adminUi.orders.errors.invalidTrackingNumberForCourier', {
-            courier: this.courierName(courierClean)
-          });
-        }
-      } else if (number.includes(' ') || !genericPattern.test(number)) {
-        return this.translate.instant('adminUi.orders.errors.invalidTrackingNumber');
-      }
-    }
+    // Tracking / AWB numbers can vary widely by courier and region, so avoid enforcing
+    // a strict client-side format. The backend still applies basic length constraints.
+    void courier;
 
     if (url) {
       try {
