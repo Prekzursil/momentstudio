@@ -73,13 +73,13 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Inventory: bulk stock adjustments – Apply stock delta to selected products with required reason and audit note.
 - [x] Admin Inventory: stock ledger export – Add CSV export for stock adjustments filtered by product/date/reason.
 - [x] Admin Inventory: reserved stock drill-down – Show which carts/orders reserve stock for a product.
-- [ ] Admin CMS: content diff before publish – Show a diff of draft vs published for pages/blog/home blocks.
-- [ ] Admin CMS: restore previous versions – Allow rollback to a previous version with audit logging.
-- [ ] Admin CMS: redirects guardrails – Detect redirect loops/chains and show warnings before saving.
-- [ ] Admin Media: asset tags + usage browser – Tag assets and show “used in” references for safe cleanup.
-- [ ] Admin Media: focal point + crop preview – Set focal point and preview responsive crops for hero/collection assets.
-- [ ] Admin Users: customer 360 profile – Consolidate user info/orders/tickets/sessions/preferences with PII masking.
-- [ ] Admin Users: resend verification/reset actions – Add admin actions for resend email verification and password reset (audited + rate limited).
+- [x] Admin CMS: content diff before publish – Show a diff of draft vs published for pages/blog/home blocks.
+- [x] Admin CMS: restore previous versions – Allow rollback to a previous version with audit logging.
+- [x] Admin CMS: redirects guardrails – Detect redirect loops/chains and show warnings before saving.
+- [x] Admin Media: asset tags + usage browser – Tag assets and show “used in” references for safe cleanup.
+- [x] Admin Media: focal point + crop preview – Set focal point and preview responsive crops for hero/collection assets.
+- [x] Admin Users: customer 360 profile – Consolidate user info/orders/tickets/sessions/preferences with PII masking.
+- [x] Admin Users: resend verification/reset actions – Add admin actions for resend email verification and password reset (audited + rate limited).
 - [ ] Admin Support: assignment + SLA + templates – Add ticket assignment, canned responses, and response-time tracking.
 - [ ] Admin Ops: environment diagnostics panel – Show config health (SMTP/Redis/storage/webhooks) and recent failure messages.
 - [ ] Admin Security: step-up auth for sensitive actions – Require re-auth for refunds, role changes, exports, and PII reveal.
