@@ -201,13 +201,13 @@ import { ImgFallbackDirective } from '../shared/img-fallback.directive';
             <img
               src="assets/brand/made-by-andrei-visalon-light.png"
               alt="Made by Andrei Visalon"
-              class="block h-12 w-auto opacity-70 dark:hidden"
+              class="block h-14 w-auto opacity-70 dark:hidden sm:h-16 md:h-20"
               loading="lazy"
             />
             <img
               src="assets/brand/made-by-andrei-visalon-dark.png"
               alt="Made by Andrei Visalon"
-              class="hidden h-12 w-auto opacity-80 dark:block"
+              class="hidden h-14 w-auto opacity-90 dark:block sm:h-16 md:h-20"
               loading="lazy"
             />
           </div>
