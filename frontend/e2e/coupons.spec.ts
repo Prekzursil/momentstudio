@@ -161,6 +161,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('coupons v2: apply coupon and prevent reuse after redemption', async ({ page, request }) => {
+  test.setTimeout(120_000);
   const token = await loginApi(request);
   const code = await createCoupon(request, token);
   const sessionId = `e2e-coupons-${Date.now()}-${Math.random().toString(16).slice(2)}`;

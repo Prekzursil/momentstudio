@@ -79,6 +79,7 @@ from app.models.user_export import UserDataExportJob, UserDataExportStatus  # no
 from app.models.support import ContactSubmission, ContactSubmissionMessage, ContactSubmissionStatus, ContactSubmissionTopic  # noqa: F401
 from app.models.returns import ReturnRequest, ReturnRequestItem, ReturnRequestStatus  # noqa: F401
 from app.models.ops import MaintenanceBanner  # noqa: F401
+from app.models.admin_dashboard_settings import AdminDashboardAlertThresholds  # noqa: F401
 
 __all__ = [
     "Base",
@@ -164,4 +165,5 @@ __all__ = [
     "ReturnRequestItem",
     "ReturnRequestStatus",
     "MaintenanceBanner",
+    "AdminDashboardAlertThresholds",
 ]

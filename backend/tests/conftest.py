@@ -18,6 +18,7 @@ def _clear_auth_rate_limits() -> None:
         auth_api.refresh_rate_limit,
         auth_api.reset_request_rate_limit,
         auth_api.reset_confirm_rate_limit,
+        auth_api.step_up_rate_limit,
         auth_api.google_rate_limit,
     ):
         dep.buckets.clear()
@@ -29,6 +30,7 @@ def _clear_auth_rate_limits() -> None:
         auth_api.refresh_rate_limit,
         auth_api.reset_request_rate_limit,
         auth_api.reset_confirm_rate_limit,
+        auth_api.step_up_rate_limit,
         auth_api.google_rate_limit,
     ):
         dep.buckets.clear()

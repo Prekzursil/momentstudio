@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Dict
@@ -113,10 +114,14 @@ def auth_headers(client: TestClient, session_factory) -> dict:
     )
     assert resp.status_code == 200, resp.text
     token = resp.json()["tokens"]["access_token"]
-    return {
+    headers = {
         "Authorization": f"Bearer {token}",
         "X-Maintenance-Bypass": settings.maintenance_bypass_token,
     }
+    payload = security.decode_token(token)
+    if payload and payload.get("sub"):
+        headers["X-Admin-Step-Up"] = security.create_step_up_token(str(payload["sub"]))
+    return headers
 
 
 def owner_headers(client: TestClient, session_factory) -> dict:
@@ -322,6 +327,60 @@ def test_admin_summary(test_app: Dict[str, object]) -> None:
     assert "products" in data and "orders" in data and "users" in data
 
 
+def test_admin_dashboard_alert_thresholds_endpoints(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    session_factory = test_app["session_factory"]
+    engine = test_app["engine"]
+    asyncio.run(reset_db(engine))
+    admin_headers = auth_headers(client, session_factory)
+    owner = owner_headers(client, session_factory)
+
+    resp = client.get("/api/v1/admin/dashboard/alert-thresholds", headers=admin_headers)
+    assert resp.status_code == 200, resp.text
+    payload = resp.json()
+    assert payload["failed_payments_min_count"] == 1
+    assert payload["refund_requests_min_count"] == 1
+    assert payload["stockouts_min_count"] == 1
+
+    denied = client.put(
+        "/api/v1/admin/dashboard/alert-thresholds",
+        headers=admin_headers,
+        json={
+            "failed_payments_min_count": 3,
+            "failed_payments_min_delta_pct": 150,
+            "refund_requests_min_count": 2,
+            "refund_requests_min_rate_pct": 25,
+            "stockouts_min_count": 4,
+        },
+    )
+    assert denied.status_code in (401, 403), denied.text
+
+    updated = client.put(
+        "/api/v1/admin/dashboard/alert-thresholds",
+        headers=owner,
+        json={
+            "failed_payments_min_count": 3,
+            "failed_payments_min_delta_pct": 150,
+            "refund_requests_min_count": 2,
+            "refund_requests_min_rate_pct": 25,
+            "stockouts_min_count": 4,
+        },
+    )
+    assert updated.status_code == 200, updated.text
+    updated_payload = updated.json()
+    assert updated_payload["failed_payments_min_count"] == 3
+    assert updated_payload["refund_requests_min_count"] == 2
+    assert updated_payload["stockouts_min_count"] == 4
+
+    summary = client.get("/api/v1/admin/dashboard/summary", headers=admin_headers)
+    assert summary.status_code == 200, summary.text
+    summary_payload = summary.json()
+    assert summary_payload["alert_thresholds"]["failed_payments_min_count"] == 3
+    assert "is_alert" in summary_payload["anomalies"]["failed_payments"]
+    assert "is_alert" in summary_payload["anomalies"]["refund_requests"]
+    assert "is_alert" in summary_payload["anomalies"]["stockouts"]
+
+
 def test_admin_maintenance_toggle(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     session_factory = test_app["session_factory"]
@@ -504,6 +563,18 @@ def test_admin_audit_entries_filters_and_export(test_app: Dict[str, object]) -> 
     )
     assert by_actor.status_code == 200, by_actor.text
     assert by_actor.json()["items"]
+
+    by_action = client.get(
+        "/api/v1/admin/dashboard/audit/entries",
+        headers=headers,
+        params={"action": "update,test"},
+    )
+    assert by_action.status_code == 200, by_action.text
+    items = by_action.json()["items"]
+    assert items
+    assert all(
+        any(token in (item.get("action") or "").lower() for token in ["update", "test"]) for item in items
+    )
 
     csv_resp = client.get(
         "/api/v1/admin/dashboard/audit/export.csv",
@@ -798,6 +869,115 @@ def test_inventory_restock_list_shows_reserved_stock(
     assert match["reserved_in_orders"] == 4
     assert match["available_quantity"] == 4
     assert match["threshold"] == 5
+
+
+def test_inventory_reserved_carts_drilldown_masks_email_by_default(
+    test_app: Dict[str, object],
+) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    session_factory = test_app["session_factory"]
+    engine = test_app["engine"]
+    asyncio.run(reset_db(engine))
+    headers = auth_headers(client, session_factory)
+    data = asyncio.run(seed_inventory_data(session_factory))
+
+    async def _seed_cart_with_guest_email() -> None:
+        async with session_factory() as session:
+            product = (
+                await session.execute(
+                    select(Product).where(Product.slug == data["product_a_slug"])
+                )
+            ).scalar_one()
+            cart = Cart(
+                session_id="session-with-email",
+                guest_email="guestbuyer@example.com",
+                updated_at=datetime.now(timezone.utc),
+            )
+            cart.items.append(
+                CartItem(
+                    product_id=product.id,
+                    variant_id=None,
+                    quantity=1,
+                    unit_price_at_add=float(product.base_price),
+                )
+            )
+            session.add(cart)
+            await session.commit()
+
+    asyncio.run(_seed_cart_with_guest_email())
+
+    resp = client.get(
+        "/api/v1/admin/dashboard/inventory/reservations/carts",
+        headers=headers,
+        params={"product_id": data["product_a_id"]},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["cutoff"]
+    items = body["items"]
+    assert len(items) >= 1
+
+    cart_with_email = next(
+        (item for item in items if item.get("customer_email")), None
+    )
+    assert cart_with_email is not None
+    assert cart_with_email["customer_email"] != "guestbuyer@example.com"
+    assert cart_with_email["customer_email"].endswith("@example.com")
+
+    resp_pii = client.get(
+        "/api/v1/admin/dashboard/inventory/reservations/carts",
+        headers=headers,
+        params={"product_id": data["product_a_id"], "include_pii": True},
+    )
+    assert resp_pii.status_code == 200, resp_pii.text
+    pii_items = resp_pii.json()["items"]
+    pii_match = next(
+        (item for item in pii_items if item.get("cart_id") == cart_with_email["cart_id"]),
+        None,
+    )
+    assert pii_match is not None
+    assert pii_match["customer_email"] == "guestbuyer@example.com"
+
+
+def test_inventory_reserved_orders_drilldown_masks_email_by_default(
+    test_app: Dict[str, object],
+) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    session_factory = test_app["session_factory"]
+    engine = test_app["engine"]
+    asyncio.run(reset_db(engine))
+    headers = auth_headers(client, session_factory)
+    data = asyncio.run(seed_inventory_data(session_factory))
+
+    resp = client.get(
+        "/api/v1/admin/dashboard/inventory/reservations/orders",
+        headers=headers,
+        params={"product_id": data["product_a_id"]},
+    )
+    assert resp.status_code == 200, resp.text
+    items = resp.json()["items"]
+    assert len(items) == 1
+    item = items[0]
+    assert item["quantity"] == 4
+    assert item["status"] == OrderStatus.pending_acceptance.value
+    assert item["customer_email"] != "buyer@example.com"
+    assert item["customer_email"].endswith("@example.com")
+
+    resp_pii = client.get(
+        "/api/v1/admin/dashboard/inventory/reservations/orders",
+        headers=headers,
+        params={"product_id": data["product_a_id"], "include_pii": True},
+    )
+    assert resp_pii.status_code == 200, resp_pii.text
+    pii_items = resp_pii.json()["items"]
+    assert pii_items[0]["customer_email"] == "buyer@example.com"
+
+    invalid_variant = client.get(
+        "/api/v1/admin/dashboard/inventory/reservations/orders",
+        headers=headers,
+        params={"product_id": data["product_a_id"], "variant_id": str(uuid.uuid4())},
+    )
+    assert invalid_variant.status_code == 400, invalid_variant.text
 
 
 def test_inventory_restock_note_queue_and_clear(test_app: Dict[str, object]) -> None:

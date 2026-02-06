@@ -53,6 +53,7 @@ class Settings(BaseSettings):
     netopia_public_key_pem: str | None = None
     netopia_public_key_path: str | None = None
     netopia_jwt_alg: str = "RS512"
+    netopia_ipn_max_age_seconds: int = 60 * 60 * 24
     jwt_algorithm: str = "HS256"
     access_token_exp_minutes: int = 30
     admin_impersonation_exp_minutes: int = 10
@@ -77,6 +78,8 @@ class Settings(BaseSettings):
     audit_retention_days_security: int = 0
     audit_hash_chain_enabled: bool = False
     audit_hash_chain_secret: str | None = None
+    audit_log_request_payload: bool = True
+    audit_log_max_body_bytes: int = 4096
     secure_cookies: bool = False
     cookie_samesite: str = "lax"
     maintenance_mode: bool = False
@@ -97,10 +100,16 @@ class Settings(BaseSettings):
 
     media_root: str = "uploads"
     private_media_root: str = "private_uploads"
-    cors_origins: list[str] = ["http://localhost:4200"]
+    upload_image_max_width: int = 8192
+    upload_image_max_height: int = 8192
+    upload_image_max_pixels: int = 40_000_000
+    cors_origins: list[str] = ["http://localhost:4200", "http://localhost:4201"]
     cors_allow_credentials: bool = True
     cors_allow_methods: list[str] = ["*"]
     cors_allow_headers: list[str] = ["*"]
+
+    # Optional Redis (recommended for multi-replica deployments; used for shared rate limiting/caches)
+    redis_url: str | None = None
 
     smtp_host: str = "localhost"
     smtp_port: int = 1025
@@ -109,6 +118,8 @@ class Settings(BaseSettings):
     smtp_enabled: bool = False
     smtp_use_tls: bool = False
     smtp_from_email: str | None = None
+    # Optional RFC 2369 mailto fallback for List-Unsubscribe header, e.g. "unsubscribe@momentstudio.ro"
+    list_unsubscribe_mailto: str | None = None
     email_rate_limit_per_minute: int = 60
     email_rate_limit_per_recipient_per_minute: int = 10
     auth_rate_limit_register: int = 10
@@ -144,6 +155,9 @@ class Settings(BaseSettings):
     blog_comments_rate_limit_count: int = 10
     blog_comments_rate_limit_window_seconds: int = 60
     blog_comments_max_links: int = 2
+    analytics_rate_limit_events: int = 120
+    analytics_require_token: bool = False
+    analytics_token_ttl_seconds: int = 60 * 60 * 24
 
     # FX rates (used for display-only approximations; checkout remains in RON)
     fx_rates_url: str = "https://www.bnr.ro/nbrfxrates.xml"
@@ -170,6 +184,9 @@ class Settings(BaseSettings):
     fraud_velocity_window_minutes: int = 60 * 24
     fraud_velocity_threshold: int = 3
     fraud_payment_retry_threshold: int = 2
+    # Admin order SLAs (used for warning badges/filters in the admin orders UI)
+    order_sla_accept_hours: int = 24
+    order_sla_ship_hours: int = 48
 
 
 @lru_cache

@@ -2,6 +2,95 @@
 
 Below is a structured checklist you can turn into issues.
 
+## High priority (next)
+- [x] Admin Orders: prevent 400s on status/tracking updates (guide allowed transitions + clearer errors).
+- [x] Backend Email: prevent SMTP blocking the event loop (wrap `smtplib` send in `anyio.to_thread.run_sync` or switch to async SMTP).
+- [x] Backend Jobs: avoid duplicate scheduled loops when running multiple workers/replicas (move schedulers to worker service or add Postgres advisory-lock leader election).
+- [x] Observability: JSON logs should emit `extra` fields (audit/slow_query) with strict redaction; keep request body logging configurable.
+- [x] Security: expand audit payload redaction for commerce PII (name/phone/address) and add config to disable payload logging entirely.
+- [x] SEO/feeds: filter `/api/v1/feeds/products.json` + sitemap categories to only published/visible content (avoid leaking drafts/hidden categories).
+- [x] Auth: password reset request should not leak user enumeration and should work for verified secondary emails (always return 202; send email only when match exists).
+- [x] SEO: expose `/robots.txt` and `/sitemap.xml` at site root via Nginx/Caddy proxy and ensure robots references the canonical sitemap URL.
+- [x] Uploads: support SVG uploads safely (sanitize and store; skip thumbnails for SVGs).
+- [x] Analytics: rate limit `/api/v1/analytics/events` (IP-based) to prevent DB bloat/DoS.
+- [x] Analytics: add optional signed token to further harden ingestion (for multi-replica deployments).
+- [x] Netopia: use `Decimal` for amounts and add basic IPN time/max-age validation to reduce replay risk.
+- [x] Prod safety: refuse to start with default secrets/bypass tokens or insecure cookie settings when `ENVIRONMENT=production`.
+- [x] Frontend security: prep for strict CSP (move inline theme bootstrap script to external file) and set CSP headers at edge.
+- [x] Infra: set `client_max_body_size` in `frontend/nginx/default.conf` (align with backend upload limit).
+- [x] Frontend: stop relying on backend error `detail` strings in guards; use error `code` and translate to UX.
+- [x] Auth UX: include a reset link in password reset emails and auto-fill the token from URL query param.
+- [x] Ops: restrict `/api/v1/metrics` to admin/internal network (or disable in prod).
+- [x] Frontend: guard/remove `/checkout/mock/*` routes in production builds.
+- [x] Admin Orders: fix cancel-reason UI so it only appears for cancelled status and doesn’t block other updates.
+- [x] Auth: login/register should not get stuck after errors; improve error visibility and re-attempt flow (incl. CAPTCHA).
+- [x] Frontend: stop showing duplicate generic “Request failed” toasts when pages already handle errors.
+- [x] Checkout: investigate Easybox/FANbox checkout regressions when frontend runs on alternate dev port (4201).
+- [x] Coupons v2: validate marketing opt-in before committing coupon changes when `send_email=true` (avoid partial success).
+- [x] Email: add RFC 8058 one-click unsubscribe headers (`List-Unsubscribe-Post`).
+- [x] Newsletter: auto-unsubscribe landing page on load and return HTML on API GET (fallback UX when clients open the unsubscribe URL).
+### Admin Dashboard & Subpages — Curated Improvements (50)
+- [x] Admin Products: cleanup pending timers on destroy – Clear debounce/poll timeouts and cancel in-flight searches to prevent stale UI updates.
+- [x] Admin Tables: translate selection a11y labels – Replace hard-coded admin `aria-label`s (select all/row/base price/stock qty) with RO/EN i18n keys.
+- [x] Admin UI: include requestId in error states – Surface backend request IDs on failures and add a one-click “copy requestId” action for support.
+- [x] Admin UI: standardized error + retry component – Use a shared error state across admin pages (message + requestId + retry CTA).
+- [x] Admin UI: consistent loading skeletons – Add a shared table skeleton/placeholder so lists don’t flash empty content while loading.
+- [x] Admin UI: unsaved-changes guard for editors – Prevent navigating away from product/CMS editors when there are unsaved changes.
+- [x] Admin UI: focus management for modals – Trap focus, restore focus to trigger, and close on Escape consistently across admin modals.
+- [x] Admin UI: optimistic toggles with rollback – For simple flags (active/featured/visible), update immediately and rollback on failure with clear toast.
+- [x] Admin UI: copy buttons for IDs/emails – Add one-click copy for order/product/user IDs and key strings with a visible confirmation.
+- [x] Admin UI: in-app feedback widget – Add an admin-only “Feedback” form stored in DB and visible in Support (no external services).
+- [x] Admin UI: “What’s new” panel – Show deploy notes from a local markdown file in the repo (no third-party tooling).
+- [x] Admin Dashboard: KPI drill-down links – Clicking a KPI navigates to the relevant list with filters pre-applied.
+- [x] Admin Dashboard: payments health widget – Show success rate/failures + recent webhook errors per provider using existing DB logs.
+- [x] Admin Dashboard: refunds breakdown widget – Show refunds by reason/provider/timeframe with deltas.
+- [x] Admin Dashboard: shipping performance widget – Track avg time-to-ship and delivery time by courier with trend deltas.
+- [x] Admin Dashboard: stockout impact widget – Highlight out-of-stock products and estimate missed revenue from recent demand signals.
+- [x] Admin Dashboard: channel attribution panel – Summarize GMV/orders by UTM/source based on stored analytics events.
+- [x] Admin Dashboard: configurable alert thresholds – Owner can tune anomaly thresholds (failed payments spike, refund rate, stockouts).
+- [x] Admin Dashboard: audit quick filters – Add presets like security/content/payments to pre-filter the audit log.
+- [x] Admin Dashboard: background jobs monitor – List running/completed jobs with retry/cancel and dead-letter views (DB-backed).
+- [x] Admin Dashboard: scheduled tasks “Run now” – Allow manual run of safe scheduled tasks with audit logging.
+- [x] Admin Orders: kanban board view – Add optional kanban mode for order statuses with drag/drop and guardrails.
+- [x] Admin Orders: batch picking list export – Generate pick lists grouped by SKU/qty for selected orders (CSV/PDF).
+- [x] Admin Orders: batch shipping labels center – Batch upload/generate labels and provide merged download with retry.
+- [x] Admin Orders: SLA timers & escalation – Track “time to accept/ship” with warning badges and filters.
+- [x] Admin Orders: fraud review queue – Queue orders flagged by fraud signals with approve/deny actions and audit notes.
+- [x] Admin Orders: quick next/prev navigation – Navigate to next/previous order in the current filtered list from the detail page.
+- [x] Admin Orders: courier/tracking validation – Validate tracking URL/number formats per courier before saving.
+- [x] Admin Orders: address validation assistant – Flag likely invalid phone/postcode and suggest corrections (offline rules, no paid APIs).
+- [x] Admin Orders: customer comms timeline – Show transactional email delivery status/history for the order.
+- [x] Admin Orders: internal tag management – Improve tag CRUD (colors/rename) and bulk apply workflows.
+- [x] Admin Products: extract bulk actions bar component – Move bulk sale/status/category/schedule/price-adjust UI into a dedicated component.
+- [x] Admin Products: extract product editor wizard component – Move the create/edit wizard UI into a dedicated component.
+- [x] Admin Products: extract image manager component – Move image list/meta/edit modals into a dedicated component.
+- [x] Admin Products: extract relationships manager component – Move related/upsell selection UI into a dedicated component.
+- [x] Admin Products: SKU/slug uniqueness feedback – Inline validate uniqueness with non-blocking warnings and guidance.
+- [x] Admin Products: image upload queue – Support multi-upload with per-file progress and retry for failures.
+- [x] Admin Products: bulk alt/translation helper – Provide a bulk view for missing alt text/translations with quick edits.
+- [x] Admin Products: stricter sale price validation – Enforce sale <= base and show computed savings preview.
+- [x] Admin Products: translation diff view – Show side-by-side RO/EN fields to spot missing/partial translations quickly.
+- [x] Admin Inventory: bulk stock adjustments – Apply stock delta to selected products with required reason and audit note.
+- [x] Admin Inventory: stock ledger export – Add CSV export for stock adjustments filtered by product/date/reason.
+- [x] Admin Inventory: reserved stock drill-down – Show which carts/orders reserve stock for a product.
+- [x] Admin CMS: content diff before publish – Show a diff of draft vs published for pages/blog/home blocks.
+- [x] Admin CMS: restore previous versions – Allow rollback to a previous version with audit logging.
+- [x] Admin CMS: redirects guardrails – Detect redirect loops/chains and show warnings before saving.
+- [x] Admin Media: asset tags + usage browser – Tag assets and show “used in” references for safe cleanup.
+- [x] Admin Media: focal point + crop preview – Set focal point and preview responsive crops for hero/collection assets.
+- [x] Admin Users: customer 360 profile – Consolidate user info/orders/tickets/sessions/preferences with PII masking.
+- [x] Admin Users: resend verification/reset actions – Add admin actions for resend email verification and password reset (audited + rate limited).
+- [x] Admin Support: assignment + SLA + templates – Add ticket assignment, canned responses, and response-time tracking.
+- [x] Admin Ops: environment diagnostics panel – Show config health (SMTP/Redis/storage/webhooks) and recent failure messages.
+- [x] Admin Security: step-up auth for sensitive actions – Require re-auth for refunds, role changes, exports, and PII reveal.
+- [x] Docs: add Google OAuth setup guide (origins, redirect URIs, backend env, dev/prod examples).
+- [x] Docs: document when/why dev uses `4201` (port bump + Docker stack) and related CORS/proxy expectations.
+- [x] Scale: use Redis-backed rate limiting for multi-replica deployments (auth limits, analytics ingestion; optional via `REDIS_URL`).
+- [x] Frontend SEO/i18n: set `<html lang>` dynamically and use translation keys for route titles/meta.
+- [x] Frontend deps: remove `postinstall` node_modules patch; suppress Node DEP0060 warnings via `node --disable-warning=DEP0060` in `ng` scripts.
+- [x] Docs: align `ARCHITECTURE.md`/`README.md` with current Angular/backend versions and deployment topology.
+- [x] Uploads: add additional upload hardening (max dimensions, image-bomb protection, safe serving headers, storage outside web root).
+
 ## Project & Infra
 - [x] Initialize monorepo with `backend/`, `frontend/`, `infra/`.
 - [x] Add `docker-compose.yml` for API, frontend, Postgres.
@@ -256,6 +345,8 @@ Below is a structured checklist you can turn into issues.
 - [x] Emails: send welcome email when a guest checkout creates an account.
 - [x] Emails: send coupon assignment/revocation notifications (bilingual) with an account link.
 - [x] Receipt UX: add a shareable HTML receipt view (`/receipt/:token`) with clickable product links + a real PDF renderer with embedded hyperlinks (token PDF endpoint).
+- [x] Newsletter: add double opt-in confirmation + unsubscribe URLs (List-Unsubscribe) and enforce marketing opt-in for promotional sends.
+- [x] Newsletter: add admin export of confirmed subscribers (CSV) for marketing ops.
 
 ## Backend - Security, Observability, Testing
 - [x] CORS config for dev/prod.

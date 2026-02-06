@@ -19,6 +19,15 @@ class AnalyticsEventIngestResponse(BaseModel):
     received: bool = True
 
 
+class AnalyticsTokenRequest(BaseModel):
+    session_id: str = Field(min_length=1, max_length=100)
+
+
+class AnalyticsTokenResponse(BaseModel):
+    token: str
+    expires_in: int
+
+
 class AdminFunnelCounts(BaseModel):
     sessions: int = 0
     carts: int = 0
@@ -39,4 +48,3 @@ class AdminFunnelMetricsResponse(BaseModel):
     opt_in_only: bool = True
     counts: AdminFunnelCounts = Field(default_factory=AdminFunnelCounts)
     conversions: AdminFunnelConversions = Field(default_factory=AdminFunnelConversions)
-

@@ -185,12 +185,29 @@ import { ImgFallbackDirective } from '../shared/img-fallback.directive';
         </div>
 
         <div class="lg:col-span-4 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-200 pt-6 dark:border-slate-800">
-          <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{{ 'footer.paymentsAccepted' | translate }}</p>
-          <div class="rounded-xl bg-white px-3 py-2 shadow-sm ring-1 ring-slate-200 dark:bg-slate-50 dark:ring-slate-200">
+          <div class="flex flex-col sm:flex-row items-center gap-4">
+            <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{{ 'footer.paymentsAccepted' | translate }}</p>
+            <div class="rounded-xl bg-white px-3 py-2 shadow-sm ring-1 ring-slate-200 dark:bg-slate-50 dark:ring-slate-200">
+              <img
+                src="assets/payments/netopia-visa-mastercard.png"
+                [alt]="'footer.paymentsAcceptedAlt' | translate"
+                class="h-8 w-auto"
+                loading="lazy"
+              />
+            </div>
+          </div>
+
+          <div class="w-full sm:w-auto flex justify-center sm:justify-end">
             <img
-              src="assets/payments/netopia-visa-mastercard.png"
-              [alt]="'footer.paymentsAcceptedAlt' | translate"
-              class="h-8 w-auto"
+              src="assets/brand/made-by-andrei-visalon-light.png"
+              alt="Made by Andrei Visalon"
+              class="block h-16 w-auto opacity-70 dark:hidden sm:h-20 md:h-24 lg:h-28"
+              loading="lazy"
+            />
+            <img
+              src="assets/brand/made-by-andrei-visalon-dark.png"
+              alt="Made by Andrei Visalon"
+              class="hidden h-16 w-auto opacity-90 dark:block sm:h-20 md:h-24 lg:h-28"
               loading="lazy"
             />
           </div>

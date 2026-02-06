@@ -10,6 +10,7 @@ import {
   MaintenanceBannerRead,
   ShippingMethodRead,
   ShippingSimulationResult,
+  OpsDiagnosticsRead,
   EmailFailureRead,
   WebhookEventRead,
   WebhookEventDetail
@@ -97,9 +98,138 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
             </div>
           </div>
 
-          <p *ngIf="healthCheckedAt() as checkedAt" class="text-xs text-slate-500 dark:text-slate-400">
-            {{ 'adminUi.ops.health.lastChecked' | translate }}: {{ checkedAt | date: 'short' }}
-          </p>
+	          <p *ngIf="healthCheckedAt() as checkedAt" class="text-xs text-slate-500 dark:text-slate-400">
+	            {{ 'adminUi.ops.health.lastChecked' | translate }}: {{ checkedAt | date: 'short' }}
+	          </p>
+	        </div>
+
+	        <div class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
+	          <div class="flex items-center justify-between gap-3 flex-wrap">
+	            <div>
+	              <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.ops.diagnostics.title' | translate }}</div>
+	              <div class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.ops.diagnostics.hint' | translate }}</div>
+	            </div>
+	            <app-button
+	              size="sm"
+	              variant="ghost"
+	              [label]="'adminUi.actions.refresh' | translate"
+	              [disabled]="diagnosticsLoading()"
+	              (action)="loadDiagnostics()"
+	            ></app-button>
+	          </div>
+
+	          <div *ngIf="diagnosticsLoading()" class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+	            <app-skeleton [rows]="2"></app-skeleton>
+	          </div>
+
+	          <div
+	            *ngIf="!diagnosticsLoading() && diagnosticsError()"
+	            class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+	          >
+	            {{ diagnosticsError() }}
+	          </div>
+
+	          <div *ngIf="!diagnosticsLoading() && diagnostics() as diag" class="grid gap-3">
+	            <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
+	              <div>
+	                {{ 'adminUi.ops.diagnostics.environment' | translate }}:
+	                <span class="font-mono text-slate-700 dark:text-slate-200">{{ diag.environment }}</span>
+	                · {{ 'adminUi.ops.diagnostics.paymentsProvider' | translate }}:
+	                <span class="font-mono text-slate-700 dark:text-slate-200">{{ diag.payments_provider }}</span>
+	              </div>
+	              <div>{{ 'adminUi.ops.diagnostics.lastChecked' | translate }}: {{ diag.checked_at | date: 'short' }}</div>
+	            </div>
+
+	            <div class="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+	              <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
+	                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+	                  {{ 'adminUi.ops.diagnostics.smtp' | translate }}
+	                </p>
+	                <div class="mt-2 flex items-center gap-2">
+	                  <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold" [ngClass]="diagnosticsBadgeClass(diag.smtp.status)">
+	                    {{ ('adminUi.ops.diagnostics.status.' + diag.smtp.status) | translate }}
+	                  </span>
+	                </div>
+	                <p *ngIf="diag.smtp.message" class="mt-1 text-xs text-slate-600 dark:text-slate-300">{{ diag.smtp.message }}</p>
+	              </div>
+
+	              <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
+	                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+	                  {{ 'adminUi.ops.diagnostics.redis' | translate }}
+	                </p>
+	                <div class="mt-2 flex items-center gap-2">
+	                  <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold" [ngClass]="diagnosticsBadgeClass(diag.redis.status)">
+	                    {{ ('adminUi.ops.diagnostics.status.' + diag.redis.status) | translate }}
+	                  </span>
+	                </div>
+	                <p *ngIf="diag.redis.message" class="mt-1 text-xs text-slate-600 dark:text-slate-300">{{ diag.redis.message }}</p>
+	              </div>
+
+	              <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
+	                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+	                  {{ 'adminUi.ops.diagnostics.storage' | translate }}
+	                </p>
+	                <div class="mt-2 flex items-center gap-2">
+	                  <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold" [ngClass]="diagnosticsBadgeClass(diag.storage.status)">
+	                    {{ ('adminUi.ops.diagnostics.status.' + diag.storage.status) | translate }}
+	                  </span>
+	                </div>
+	                <p *ngIf="diag.storage.message" class="mt-1 text-xs text-slate-600 dark:text-slate-300">{{ diag.storage.message }}</p>
+	              </div>
+
+	              <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
+	                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+	                  {{ 'adminUi.ops.diagnostics.stripe' | translate }}
+	                </p>
+	                <div class="mt-2 flex items-center gap-2">
+	                  <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold" [ngClass]="diagnosticsBadgeClass(diag.stripe.status)">
+	                    {{ ('adminUi.ops.diagnostics.status.' + diag.stripe.status) | translate }}
+	                  </span>
+	                </div>
+	                <p *ngIf="diag.stripe.message" class="mt-1 text-xs text-slate-600 dark:text-slate-300">{{ diag.stripe.message }}</p>
+	              </div>
+
+	              <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
+	                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+	                  {{ 'adminUi.ops.diagnostics.paypal' | translate }}
+	                </p>
+	                <div class="mt-2 flex items-center gap-2">
+	                  <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold" [ngClass]="diagnosticsBadgeClass(diag.paypal.status)">
+	                    {{ ('adminUi.ops.diagnostics.status.' + diag.paypal.status) | translate }}
+	                  </span>
+	                </div>
+	                <p *ngIf="diag.paypal.message" class="mt-1 text-xs text-slate-600 dark:text-slate-300">{{ diag.paypal.message }}</p>
+	              </div>
+
+	              <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
+	                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+	                  {{ 'adminUi.ops.diagnostics.netopia' | translate }}
+	                </p>
+	                <div class="mt-2 flex items-center gap-2">
+	                  <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold" [ngClass]="diagnosticsBadgeClass(diag.netopia.status)">
+	                    {{ ('adminUi.ops.diagnostics.status.' + diag.netopia.status) | translate }}
+	                  </span>
+	                </div>
+	                <p *ngIf="diag.netopia.message" class="mt-1 text-xs text-slate-600 dark:text-slate-300">{{ diag.netopia.message }}</p>
+	              </div>
+	            </div>
+	          </div>
+	        </div>
+
+	        <div class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
+	          <div class="flex items-center justify-between gap-3 flex-wrap">
+	            <div>
+	              <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.ops.newsletter.title' | translate }}</div>
+              <div class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.ops.newsletter.hint' | translate }}</div>
+            </div>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.ops.newsletter.download' | translate"
+              [disabled]="newsletterExporting()"
+              (action)="downloadNewsletterExport()"
+            ></app-button>
+          </div>
         </div>
 
         <div class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
@@ -625,6 +755,11 @@ export class AdminOpsComponent implements OnInit {
   webhookBacklog24h = signal(0);
   emailFailures24h = signal(0);
   healthCheckedAt = signal<Date | null>(null);
+  newsletterExporting = signal(false);
+
+  diagnosticsLoading = signal(true);
+  diagnosticsError = signal<string | null>(null);
+  diagnostics = signal<OpsDiagnosticsRead | null>(null);
 
   bannersLoading = signal(true);
   bannersError = signal<string | null>(null);
@@ -677,6 +812,7 @@ export class AdminOpsComponent implements OnInit {
   ngOnInit(): void {
     this.resetBannerForm();
     this.loadHealthDashboard();
+    this.loadDiagnostics();
     this.loadBanners();
     this.loadShippingMethods();
     this.applyEmailFailuresDeepLink();
@@ -733,12 +869,59 @@ export class AdminOpsComponent implements OnInit {
     });
   }
 
+  loadDiagnostics(): void {
+    this.diagnosticsLoading.set(true);
+    this.diagnosticsError.set(null);
+
+    this.ops.getDiagnostics().subscribe({
+      next: (res) => {
+        this.diagnostics.set(res);
+        this.diagnosticsLoading.set(false);
+      },
+      error: () => {
+        this.diagnosticsError.set(this.translate.instant('adminUi.ops.diagnostics.errors.load'));
+        this.diagnosticsLoading.set(false);
+      }
+    });
+  }
+
+  diagnosticsBadgeClass(status: string): string {
+    const key = (status || '').trim().toLowerCase();
+    if (key === 'ok') return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100';
+    if (key === 'warning') return 'bg-amber-100 text-amber-900 dark:bg-amber-950/30 dark:text-amber-100';
+    if (key === 'error') return 'bg-rose-100 text-rose-900 dark:bg-rose-950/30 dark:text-rose-100';
+    return 'bg-slate-100 text-slate-900 dark:bg-slate-800/70 dark:text-slate-100';
+  }
+
   crumbs(): { label: string; url?: string }[] {
     return [
       { label: 'nav.home', url: '/' },
       { label: 'nav.admin', url: '/admin/dashboard' },
       { label: 'adminUi.nav.ops' }
     ];
+  }
+
+  downloadNewsletterExport(): void {
+    this.newsletterExporting.set(true);
+    this.ops.downloadNewsletterConfirmedSubscribersExport().subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const stamp = new Date().toISOString().slice(0, 10);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `newsletter-confirmed-subscribers-${stamp}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        this.toast.success(this.translate.instant('adminUi.ops.newsletter.success'));
+        this.newsletterExporting.set(false);
+      },
+      error: () => {
+        this.toast.error(this.translate.instant('adminUi.ops.newsletter.error'));
+        this.newsletterExporting.set(false);
+      }
+    });
   }
 
   bannerStatus(b: MaintenanceBannerRead): string {

@@ -24,11 +24,14 @@ from app.middleware import (
 from app.schemas.error import ErrorResponse
 from app.services import fx_refresh
 from app.services import admin_report_scheduler
+from app.core.startup_checks import validate_production_settings
+from app.core import redis_client
 
 
 def get_application() -> FastAPI:
     configure_logging(settings.log_json)
     init_sentry()
+    validate_production_settings()
     tags_metadata = [
         {"name": "auth", "description": "Authentication and user management"},
         {"name": "catalog", "description": "Products and categories"},
@@ -45,6 +48,7 @@ def get_application() -> FastAPI:
         yield
         await fx_refresh.stop(app)
         await admin_report_scheduler.stop(app)
+        await redis_client.close_redis()
 
     app = FastAPI(
         title=settings.app_name,
@@ -87,7 +91,8 @@ def get_application() -> FastAPI:
                 body["retry_after"] = str(retry_after)
             return JSONResponse(status_code=exc.status_code, content=jsonable_encoder(body), headers=headers)
 
-        err = ErrorResponse(detail=exc.detail, code=None)
+        error_code = headers.get("X-Error-Code") or headers.get("x-error-code")
+        err = ErrorResponse(detail=exc.detail, code=str(error_code) if error_code else None)
         return JSONResponse(status_code=exc.status_code, content=jsonable_encoder(err.model_dump()), headers=headers)
 
     @app.exception_handler(RequestValidationError)

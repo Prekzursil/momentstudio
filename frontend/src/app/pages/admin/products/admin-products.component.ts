@@ -1,11 +1,13 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { ScrollingModule } from '@angular/cdk/scrolling';
+import { HttpEventType } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { forkJoin } from 'rxjs';
+import { forkJoin, Subscription } from 'rxjs';
 import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
+import { CopyButtonComponent } from '../../../shared/copy-button.component';
 import { ErrorStateComponent } from '../../../shared/error-state.component';
 import { extractRequestId } from '../../../shared/http-error';
 import { InputComponent } from '../../../shared/input.component';
@@ -53,6 +55,10 @@ import {
 import { AdminTableLayoutColumnDef, TableLayoutModalComponent } from '../shared/table-layout-modal.component';
 import { AdminPageHeaderComponent } from '../shared/admin-page-header.component';
 import { adminFilterFavoriteKey } from '../shared/admin-filter-favorites';
+import { AdminProductsBulkActionsComponent } from './admin-products-bulk-actions.component';
+import { AdminProductsEditorWizardComponent } from './admin-products-editor-wizard.component';
+import { AdminProductsImageManagerComponent, type AdminProductImageUploadItem } from './admin-products-image-manager.component';
+import { AdminProductsRelationshipsManagerComponent } from './admin-products-relationships-manager.component';
 
 type ProductStatusFilter = 'all' | 'draft' | 'published' | 'archived';
 type ProductTranslationFilter = 'all' | 'missing_any' | 'missing_en' | 'missing_ro';
@@ -66,6 +72,19 @@ type ProductWizardStep = {
   labelKey: string;
   descriptionKey: string;
   anchorId: string;
+};
+
+type TranslationDiffField = 'name' | 'short_description' | 'long_description';
+
+type TranslationDiffRow = {
+  field: TranslationDiffField;
+  labelKey: string;
+  roSnippet: string;
+  enSnippet: string;
+  roMissing: boolean;
+  enMissing: boolean;
+  statusKey: string;
+  tone: 'neutral' | 'warn' | 'error';
 };
 
 const PRODUCT_CREATE_WIZARD_STEPS: ProductWizardStep[] = [
@@ -227,17 +246,22 @@ type PriceHistoryChart = {
     FormsModule,
     ScrollingModule,
     TranslateModule,
-    BreadcrumbComponent,
-    ButtonComponent,
-    ErrorStateComponent,
-    InputComponent,
-    HelpPanelComponent,
-    ModalComponent,
-    SkeletonComponent,
+	    BreadcrumbComponent,
+	    ButtonComponent,
+      CopyButtonComponent,
+	    ErrorStateComponent,
+	    InputComponent,
+	    HelpPanelComponent,
+	    ModalComponent,
+	    SkeletonComponent,
     LocalizedCurrencyPipe,
-    TableLayoutModalComponent,
-    AdminPageHeaderComponent
-  ],
+	    TableLayoutModalComponent,
+	    AdminPageHeaderComponent,
+	    AdminProductsBulkActionsComponent,
+	    AdminProductsEditorWizardComponent,
+	    AdminProductsImageManagerComponent,
+	    AdminProductsRelationshipsManagerComponent
+	  ],
   template: `
       <div class="grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
@@ -976,232 +1000,44 @@ type PriceHistoryChart = {
             </div>
           </div>
 
-	          <div
-	            *ngIf="selected.size > 0 && view === 'active'"
-              id="admin-products-bulk-actions"
-	            class="rounded-xl border border-slate-200 bg-slate-50 p-3 grid gap-3 dark:border-slate-800 dark:bg-slate-950/20"
-	          >
-            <div class="flex flex-wrap items-center justify-between gap-3">
-              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                {{ 'adminUi.products.bulk.selected' | translate: { count: selected.size } }}
-              </p>
-              <app-button
-                size="sm"
-                variant="ghost"
-                [label]="'adminUi.products.bulk.clearSelection' | translate"
-                (action)="clearSelection()"
-                [disabled]="bulkBusy() || inlineBusy()"
-              ></app-button>
-            </div>
+          <app-admin-products-bulk-actions
+            *ngIf="selected.size > 0 && view === 'active'"
+            [selectedCount]="selected.size"
+            [disabled]="bulkBusy() || inlineBusy()"
+            [categories]="categories()"
+            [bulkSaleType]="bulkSaleType"
+            (bulkSaleTypeChange)="setBulkSaleType($event)"
+            [bulkSaleValue]="bulkSaleValue"
+            (bulkSaleValueChange)="onBulkSaleValueChange($event)"
+            (applySale)="applySaleToSelected()"
+            (clearSale)="clearSaleForSelected()"
+            [bulkStatusTarget]="bulkStatusTarget"
+            (bulkStatusTargetChange)="bulkStatusTarget = $event"
+            (applyStatus)="openBulkStatusConfirm()"
+            [bulkCategoryId]="bulkCategoryId"
+            (bulkCategoryIdChange)="bulkCategoryId = $event"
+            (applyCategory)="applyCategoryToSelected()"
+            (addAndApplyCategory)="openCreateCategoryFromBulkAssign()"
+            [bulkPublishScheduledFor]="bulkPublishScheduledFor"
+            (bulkPublishScheduledForChange)="bulkPublishScheduledFor = $event"
+            [bulkUnpublishScheduledFor]="bulkUnpublishScheduledFor"
+            (bulkUnpublishScheduledForChange)="bulkUnpublishScheduledFor = $event"
+            (applySchedule)="applyScheduleToSelected()"
+            (clearPublishSchedule)="clearPublishScheduleForSelected()"
+            (clearUnpublishSchedule)="clearUnpublishScheduleForSelected()"
+            [bulkPriceMode]="bulkPriceMode"
+            (bulkPriceModeChange)="setBulkPriceMode($event)"
+            [bulkPriceDirection]="bulkPriceDirection"
+            (bulkPriceDirectionChange)="setBulkPriceDirection($event)"
+            [bulkPriceValue]="bulkPriceValue"
+            (bulkPriceValueChange)="onBulkPriceValueChange($event)"
+            [bulkPricePreview]="bulkPricePreview"
+            (applyPriceAdjustment)="applyPriceAdjustmentToSelected()"
+            [bulkError]="bulkError()"
+            (clearSelection)="clearSelection()"
+          ></app-admin-products-bulk-actions>
 
-            <div class="grid gap-3 lg:grid-cols-[200px_240px_auto_auto] items-end">
-              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.products.sale.type' | translate }}
-                <select
-                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="bulkSaleType"
-                  (change)="bulkSaleValue = ''"
-                  [disabled]="bulkBusy() || inlineBusy()"
-                >
-                  <option [ngValue]="'percent'">{{ 'adminUi.products.sale.typePercent' | translate }}</option>
-                  <option [ngValue]="'amount'">{{ 'adminUi.products.sale.typeAmount' | translate }}</option>
-                </select>
-              </label>
-
-              <app-input
-                [label]="'adminUi.products.bulk.saleValue' | translate"
-                [placeholder]="bulkSaleType === 'percent' ? '10' : '5.00'"
-                type="text"
-                inputMode="decimal"
-                [value]="bulkSaleValue"
-                (valueChange)="onBulkSaleValueChange($event)"
-                [disabled]="bulkBusy() || inlineBusy()"
-              ></app-input>
-
-              <app-button
-                size="sm"
-                [label]="'adminUi.products.bulk.applySale' | translate"
-                (action)="applySaleToSelected()"
-                [disabled]="bulkBusy() || inlineBusy()"
-              ></app-button>
-
-              <div class="flex flex-wrap gap-2 justify-end">
-                <app-button
-                  size="sm"
-                  variant="ghost"
-                  [label]="'adminUi.products.bulk.clearSale' | translate"
-                  (action)="clearSaleForSelected()"
-                  [disabled]="bulkBusy() || inlineBusy()"
-                ></app-button>
-              </div>
-            </div>
-
-            <div class="grid gap-3 lg:grid-cols-[240px_auto] items-end">
-              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.products.table.status' | translate }}
-                <select
-                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="bulkStatusTarget"
-                  [disabled]="bulkBusy() || inlineBusy()"
-                >
-                  <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
-                  <option value="published">{{ 'adminUi.status.published' | translate }}</option>
-                  <option value="archived">{{ 'adminUi.status.archived' | translate }}</option>
-                </select>
-              </label>
-
-              <div class="flex flex-wrap items-center justify-end gap-2">
-                <app-button
-                  size="sm"
-                  [label]="'adminUi.products.bulk.status.apply' | translate"
-                  (action)="openBulkStatusConfirm()"
-                  [disabled]="bulkBusy() || inlineBusy()"
-                ></app-button>
-              </div>
-            </div>
-
-            <div class="h-px bg-slate-200 dark:bg-slate-800/70"></div>
-
-            <div class="grid gap-3 lg:grid-cols-[260px_auto] items-end">
-              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.products.bulk.category.label' | translate }}
-                <select
-                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="bulkCategoryId"
-                  [disabled]="bulkBusy() || inlineBusy()"
-                >
-                  <option value="">{{ 'adminUi.products.bulk.category.placeholder' | translate }}</option>
-                  <option *ngFor="let cat of categories()" [value]="cat.id">{{ cat.name }}</option>
-                </select>
-              </label>
-
-              <div class="flex flex-wrap items-center justify-end gap-2">
-                <app-button
-                  size="sm"
-                  [label]="'adminUi.products.bulk.category.apply' | translate"
-                  (action)="applyCategoryToSelected()"
-                  [disabled]="bulkBusy() || inlineBusy()"
-                ></app-button>
-                <app-button
-                  size="sm"
-                  variant="ghost"
-                  [label]="'adminUi.products.bulk.category.addAndApply' | translate"
-                  (action)="openCreateCategoryFromBulkAssign()"
-                  [disabled]="bulkBusy() || inlineBusy()"
-                ></app-button>
-              </div>
-            </div>
-
-            <div class="h-px bg-slate-200 dark:bg-slate-800/70"></div>
-
-            <div class="grid gap-3 lg:grid-cols-[240px_240px_auto] items-end">
-              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.products.bulk.schedule.publishAt' | translate }}
-                <input
-                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  type="datetime-local"
-                  [(ngModel)]="bulkPublishScheduledFor"
-                  [disabled]="bulkBusy() || inlineBusy()"
-                />
-              </label>
-
-              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.products.bulk.schedule.unpublishAt' | translate }}
-                <input
-                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  type="datetime-local"
-                  [(ngModel)]="bulkUnpublishScheduledFor"
-                  [disabled]="bulkBusy() || inlineBusy()"
-                />
-              </label>
-
-              <app-button
-                size="sm"
-                [label]="'adminUi.products.bulk.schedule.apply' | translate"
-                (action)="applyScheduleToSelected()"
-                [disabled]="bulkBusy() || inlineBusy()"
-              ></app-button>
-            </div>
-
-            <div class="flex flex-wrap items-center justify-end gap-2">
-              <app-button
-                size="sm"
-                variant="ghost"
-                [label]="'adminUi.products.bulk.schedule.clearPublish' | translate"
-                (action)="clearPublishScheduleForSelected()"
-                [disabled]="bulkBusy() || inlineBusy()"
-              ></app-button>
-              <app-button
-                size="sm"
-                variant="ghost"
-                [label]="'adminUi.products.bulk.schedule.clearUnpublish' | translate"
-                (action)="clearUnpublishScheduleForSelected()"
-                [disabled]="bulkBusy() || inlineBusy()"
-              ></app-button>
-            </div>
-
-            <div class="h-px bg-slate-200 dark:bg-slate-800/70"></div>
-
-            <div class="grid gap-3 lg:grid-cols-[200px_200px_240px_auto] items-end">
-              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.products.bulk.priceAdjust.mode' | translate }}
-                <select
-                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="bulkPriceMode"
-                  (change)="bulkPriceValue = ''; bulkPricePreview = null"
-                  [disabled]="bulkBusy() || inlineBusy()"
-                >
-                  <option [ngValue]="'percent'">{{ 'adminUi.products.bulk.priceAdjust.modePercent' | translate }}</option>
-                  <option [ngValue]="'amount'">{{ 'adminUi.products.bulk.priceAdjust.modeAmount' | translate }}</option>
-                </select>
-              </label>
-
-              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.products.bulk.priceAdjust.direction' | translate }}
-                <select
-                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="bulkPriceDirection"
-                  (change)="updateBulkPricePreview()"
-                  [disabled]="bulkBusy() || inlineBusy()"
-                >
-                  <option [ngValue]="'increase'">{{ 'adminUi.products.bulk.priceAdjust.directionIncrease' | translate }}</option>
-                  <option [ngValue]="'decrease'">{{ 'adminUi.products.bulk.priceAdjust.directionDecrease' | translate }}</option>
-                </select>
-              </label>
-
-              <app-input
-                [label]="'adminUi.products.bulk.priceAdjust.value' | translate"
-                [placeholder]="bulkPriceMode === 'percent' ? '10' : '5.00'"
-                type="text"
-                inputMode="decimal"
-                [value]="bulkPriceValue"
-                (valueChange)="onBulkPriceValueChange($event)"
-                [disabled]="bulkBusy() || inlineBusy()"
-              ></app-input>
-
-              <app-button
-                size="sm"
-                [label]="'adminUi.products.bulk.priceAdjust.apply' | translate"
-                (action)="applyPriceAdjustmentToSelected()"
-                [disabled]="bulkBusy() || inlineBusy()"
-              ></app-button>
-            </div>
-
-            <p *ngIf="bulkPricePreview" class="text-xs text-slate-600 dark:text-slate-300">
-              {{ 'adminUi.products.bulk.priceAdjust.preview' | translate: bulkPricePreview }}
-            </p>
-
-            <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.products.bulk.note' | translate }}</p>
-
-            <div
-              *ngIf="bulkError()"
-              class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-2 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
-            >
-              {{ bulkError() }}
-            </div>
-          </div>
-
-	        <app-error-state
+		        <app-error-state
             *ngIf="error()"
             [message]="error()!"
             [requestId]="errorRequestId()"
@@ -1227,7 +1063,7 @@ type PriceHistoryChart = {
                       [checked]="allSelectedOnPage()"
                       (change)="toggleSelectAll($event)"
                       [disabled]="bulkBusy() || inlineBusy() || view === 'deleted'"
-                      aria-label="Select all products on page"
+                      [attr.aria-label]="'adminUi.products.a11y.selectAllOnPage' | translate"
                     />
                   </th>
                   <th *ngSwitchCase="'name'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
@@ -1298,7 +1134,7 @@ type PriceHistoryChart = {
 	                      [checked]="selected.has(product.id)"
 	                      (change)="toggleSelected(product.id, $event)"
 	                      [disabled]="bulkBusy() || inlineBusy() || view === 'deleted'"
-	                      [attr.aria-label]="'Select product ' + (product.name || product.slug)"
+	                      [attr.aria-label]="'adminUi.products.a11y.selectProduct' | translate: { name: product.name || product.slug }"
 	                    />
 	                  </td>
 	                  <td *ngSwitchCase="'name'" class="font-medium text-slate-900 dark:text-slate-50" [ngClass]="cellPaddingClass()">
@@ -1331,7 +1167,7 @@ type PriceHistoryChart = {
                             [value]="inlineBasePrice"
                             (input)="onInlineBasePriceChange($any($event.target).value)"
                             [disabled]="inlineBusy()"
-                            aria-label="Base price"
+                            [attr.aria-label]="'adminUi.products.a11y.basePrice' | translate"
                           />
                           <p *ngIf="inlineBasePriceError" class="text-xs text-rose-700 dark:text-rose-200">
                             {{ inlineBasePriceError }}
@@ -1442,7 +1278,7 @@ type PriceHistoryChart = {
                           [value]="inlineStockQuantity"
                           (input)="onInlineStockChange($any($event.target).value)"
                           [disabled]="inlineBusy()"
-                          aria-label="Stock quantity"
+                          [attr.aria-label]="'adminUi.products.a11y.stockQuantity' | translate"
                         />
                         <p *ngIf="inlineStockError" class="text-xs text-rose-700 dark:text-rose-200">
                           {{ inlineStockError }}
@@ -1578,8 +1414,16 @@ type PriceHistoryChart = {
                 {{ editingSlug() ? ('adminUi.products.edit' | translate) : ('adminUi.products.create' | translate) }}
               </h2>
               <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                <span *ngIf="editingSlug() as slug" class="font-mono truncate">{{ slug }}</span>
+                <ng-container *ngIf="editingSlug() as slug">
+                  <span class="font-mono truncate">{{ slug }}</span>
+                  <app-copy-button [value]="slug"></app-copy-button>
+                </ng-container>
                 <span *ngIf="!editingSlug() && predictedSlug()" class="font-mono truncate">{{ predictedSlug() }}</span>
+                <ng-container *ngIf="editingProductId() as pid">
+                  <span class="text-slate-300 dark:text-slate-700">·</span>
+                  <span class="font-mono truncate">{{ pid }}</span>
+                  <app-copy-button [value]="pid"></app-copy-button>
+                </ng-container>
 
                 <span
                   *ngIf="editorSaving()"
@@ -1649,67 +1493,23 @@ type PriceHistoryChart = {
           {{ editorError() }}
         </div>
 
-        <div
+        <app-admin-products-editor-wizard
           *ngIf="wizardKind()"
-          class="rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900 dark:border-indigo-900/40 dark:bg-indigo-950/30 dark:text-indigo-100"
-        >
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div class="grid gap-1">
-              <p class="font-semibold">{{ wizardTitleKey() | translate }}</p>
-              <p class="text-xs text-indigo-800 dark:text-indigo-200">{{ wizardStepDescriptionKey() | translate }}</p>
-            </div>
-            <app-button size="sm" variant="ghost" [label]="'adminUi.actions.exit' | translate" (action)="exitWizard()"></app-button>
-          </div>
-
-          <div class="mt-3 flex flex-wrap items-center gap-2">
-            <button
-              *ngFor="let step of wizardSteps(); let idx = index"
-              type="button"
-              class="rounded-full border border-indigo-200 bg-white px-3 py-1 text-xs font-semibold text-indigo-900 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/10 dark:text-indigo-100 dark:hover:bg-indigo-900/30"
-              [class.bg-indigo-600]="idx === wizardStep()"
-              [class.text-white]="idx === wizardStep()"
-              [class.border-indigo-600]="idx === wizardStep()"
-              [class.hover:bg-indigo-700]="idx === wizardStep()"
-              [class.dark:bg-indigo-500/30]="idx === wizardStep()"
-              [class.dark:hover:bg-indigo-500/40]="idx === wizardStep()"
-              (click)="goToWizardStep(idx)"
-            >
-              {{ step.labelKey | translate }}
-            </button>
-          </div>
-
-          <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
-            <app-button
-              size="sm"
-              variant="ghost"
-              [label]="'adminUi.actions.back' | translate"
-              (action)="wizardPrev()"
-              [disabled]="wizardStep() === 0"
-            ></app-button>
-
-            <div class="flex flex-wrap items-center gap-2">
-              <app-button
-                *ngIf="wizardCurrentStepId() === 'save'"
-                size="sm"
-                [label]="'adminUi.products.form.save' | translate"
-                (action)="wizardSave()"
-              ></app-button>
-              <app-button
-                *ngIf="wizardCurrentStepId() === 'publish'"
-                size="sm"
-                [label]="'adminUi.products.wizard.publishNow' | translate"
-                (action)="wizardPublishNow()"
-                [disabled]="!editingSlug()"
-              ></app-button>
-              <app-button
-                size="sm"
-                [label]="wizardNextLabelKey() | translate"
-                (action)="wizardNext()"
-                [disabled]="!wizardCanNext()"
-              ></app-button>
-            </div>
-          </div>
-        </div>
+          [titleKey]="wizardTitleKey()"
+          [descriptionKey]="wizardStepDescriptionKey()"
+          [steps]="wizardSteps()"
+          [stepIndex]="wizardStep()"
+          [currentStepId]="wizardCurrentStepId()"
+          [nextLabelKey]="wizardNextLabelKey()"
+          [canNext]="wizardCanNext()"
+          [hasEditingSlug]="Boolean(editingSlug())"
+          (exit)="exitWizard()"
+          (stepSelected)="goToWizardStep($event)"
+          (prev)="wizardPrev()"
+          (next)="wizardNext()"
+          (save)="wizardSave()"
+          (publishNow)="wizardPublishNow()"
+        ></app-admin-products-editor-wizard>
 
 	        <div class="grid gap-3 md:grid-cols-2">
 	          <app-input
@@ -1863,13 +1663,25 @@ type PriceHistoryChart = {
                 (valueChange)="onSaleValueChange($event)"
 	                [disabled]="!form.sale_enabled"
 	                [hint]="saleValueError || ('adminUi.products.sale.note' | translate)"
-	              ></app-input>
-	            </div>
+		              ></app-input>
+		            </div>
 
-	            <div class="mt-3 grid gap-3 md:grid-cols-3 items-end">
-	              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	                {{ 'adminUi.products.sale.startAt' | translate }}
-	                <input
+                <div *ngIf="salePreviewInfo() as preview" class="mt-2 text-xs text-slate-600 dark:text-slate-300">
+                  {{
+                    'adminUi.products.sale.preview'
+                      | translate
+                        : {
+                            price: (preview.sale | localizedCurrency : editingCurrency()),
+                            saved: (preview.saved | localizedCurrency : editingCurrency()),
+                            percent: (preview.percent | number: '1.0-1')
+                          }
+                  }}
+                </div>
+
+		            <div class="mt-3 grid gap-3 md:grid-cols-3 items-end">
+		              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+		                {{ 'adminUi.products.sale.startAt' | translate }}
+		                <input
 	                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
 	                  type="datetime-local"
 	                  [(ngModel)]="form.sale_start_at"
@@ -2261,185 +2073,23 @@ type PriceHistoryChart = {
             </div>
           </details>
 
-		        <details
-              data-ignore-dirty
-              class="group rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20"
-            >
-		          <summary class="flex items-start justify-between gap-4 cursor-pointer select-none [&::-webkit-details-marker]:hidden">
-                <div class="min-w-0 grid gap-1">
-                  <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
-                    {{ 'adminUi.products.relationships.title' | translate }}
-                  </h3>
-                  <p class="text-xs text-slate-500 dark:text-slate-400">
-                    {{ 'adminUi.products.relationships.hint' | translate }}
-                  </p>
-                </div>
-                <div class="flex items-center gap-2">
-                  <span
-                    *ngIf="relationshipsRelated().length + relationshipsUpsells().length"
-                    class="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
-                  >
-                    {{ relationshipsRelated().length + relationshipsUpsells().length }}
-                  </span>
-                  <span class="text-slate-500 transition-transform group-open:rotate-90 dark:text-slate-400">▸</span>
-                </div>
-              </summary>
-
-              <div class="mt-3 grid gap-3">
-
-              <div
-                *ngIf="!editingSlug()"
-                class="rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900 dark:border-indigo-900/40 dark:bg-indigo-950/30 dark:text-indigo-100"
-              >
-                {{ 'adminUi.products.relationships.saveFirst' | translate }}
-              </div>
-
-		          <div
-		            *ngIf="relationshipsError()"
-		            class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
-		          >
-		            {{ relationshipsError() }}
-		          </div>
-
-		          <div
-		            *ngIf="relationshipsMessage()"
-		            class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-100"
-		          >
-		            {{ relationshipsMessage() }}
-		          </div>
-
-              <div class="grid gap-2">
-                <app-input
-                  [label]="'adminUi.products.relationships.searchLabel' | translate"
-                  [value]="relationshipSearch"
-                  (valueChange)="onRelationshipSearchChange($event)"
-                  [disabled]="relationshipSearchLoading() || relationshipsLoading()"
-                ></app-input>
-
-                <div *ngIf="relationshipSearchLoading()" class="text-xs text-slate-500 dark:text-slate-400">
-                  {{ 'adminUi.products.relationships.searchLoading' | translate }}
-                </div>
-
-                <div
-                  *ngIf="relationshipSearchResults().length"
-                  class="rounded-lg border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-900"
-                >
-                  <div
-                    *ngFor="let p of relationshipSearchResults()"
-                    class="flex flex-wrap items-center justify-between gap-2 rounded-md px-2 py-2 hover:bg-slate-50 dark:hover:bg-slate-800"
-                  >
-                    <div class="min-w-0">
-                      <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">{{ p.name }}</p>
-                      <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ p.slug }} · {{ p.sku }}</p>
-                    </div>
-                    <div class="flex items-center gap-1">
-                      <app-button
-                        size="sm"
-                        variant="ghost"
-                        [label]="'adminUi.products.relationships.addRelated' | translate"
-                        (action)="addRelationship(p, 'related')"
-                        [disabled]="!editingSlug()"
-                      ></app-button>
-                      <app-button
-                        size="sm"
-                        variant="ghost"
-                        [label]="'adminUi.products.relationships.addUpsell' | translate"
-                        (action)="addRelationship(p, 'upsell')"
-                        [disabled]="!editingSlug()"
-                      ></app-button>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="grid gap-4 lg:grid-cols-2">
-                  <div class="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-                    <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                      {{ 'adminUi.products.relationships.related' | translate }}
-                    </p>
-                    <div *ngIf="relationshipsRelated().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
-                      {{ 'adminUi.products.relationships.empty' | translate }}
-                    </div>
-                    <div *ngFor="let p of relationshipsRelated(); let idx = index" class="flex items-center justify-between gap-2">
-                      <div class="min-w-0">
-                        <p class="text-sm font-semibold text-slate-900 dark:text-slate-50 truncate">{{ p.name }}</p>
-                        <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ p.slug }}</p>
-                      </div>
-                      <div class="flex items-center gap-1">
-                        <app-button
-                          size="sm"
-                          variant="ghost"
-                          [label]="'adminUi.actions.up' | translate"
-                          (action)="moveRelationship('related', idx, -1)"
-                          [disabled]="idx === 0 || relationshipsSaving()"
-                        ></app-button>
-                        <app-button
-                          size="sm"
-                          variant="ghost"
-                          [label]="'adminUi.actions.down' | translate"
-                          (action)="moveRelationship('related', idx, 1)"
-                          [disabled]="idx >= relationshipsRelated().length - 1 || relationshipsSaving()"
-                        ></app-button>
-                        <app-button
-                          size="sm"
-                          variant="ghost"
-                          [label]="'adminUi.actions.remove' | translate"
-                          (action)="removeRelationship(p.id, 'related')"
-                          [disabled]="relationshipsSaving()"
-                        ></app-button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-                    <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                      {{ 'adminUi.products.relationships.upsells' | translate }}
-                    </p>
-                    <div *ngIf="relationshipsUpsells().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
-                      {{ 'adminUi.products.relationships.empty' | translate }}
-                    </div>
-                    <div *ngFor="let p of relationshipsUpsells(); let idx = index" class="flex items-center justify-between gap-2">
-                      <div class="min-w-0">
-                        <p class="text-sm font-semibold text-slate-900 dark:text-slate-50 truncate">{{ p.name }}</p>
-                        <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ p.slug }}</p>
-                      </div>
-                      <div class="flex items-center gap-1">
-                        <app-button
-                          size="sm"
-                          variant="ghost"
-                          [label]="'adminUi.actions.up' | translate"
-                          (action)="moveRelationship('upsell', idx, -1)"
-                          [disabled]="idx === 0 || relationshipsSaving()"
-                        ></app-button>
-                        <app-button
-                          size="sm"
-                          variant="ghost"
-                          [label]="'adminUi.actions.down' | translate"
-                          (action)="moveRelationship('upsell', idx, 1)"
-                          [disabled]="idx >= relationshipsUpsells().length - 1 || relationshipsSaving()"
-                        ></app-button>
-                        <app-button
-                          size="sm"
-                          variant="ghost"
-                          [label]="'adminUi.actions.remove' | translate"
-                          (action)="removeRelationship(p.id, 'upsell')"
-                          [disabled]="relationshipsSaving()"
-                        ></app-button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="flex items-center justify-end">
-                  <app-button
-                    size="sm"
-                    [label]="'adminUi.products.relationships.save' | translate"
-                    (action)="saveRelationships()"
-                    [disabled]="relationshipsSaving() || !editingSlug()"
-                  ></app-button>
-	                </div>
-	              </div>
-              </div>
-			        </details>
+		        <app-admin-products-relationships-manager
+		          [hasEditingSlug]="!!editingSlug()"
+		          [relationshipSearch]="relationshipSearch"
+		          [relationshipSearchLoading]="relationshipSearchLoading()"
+		          [relationshipSearchResults]="relationshipSearchResults()"
+		          [relationshipsRelated]="relationshipsRelated()"
+		          [relationshipsUpsells]="relationshipsUpsells()"
+		          [relationshipsLoading]="relationshipsLoading()"
+		          [relationshipsSaving]="relationshipsSaving()"
+		          [relationshipsError]="relationshipsError()"
+		          [relationshipsMessage]="relationshipsMessage()"
+		          (relationshipSearchChanged)="onRelationshipSearchChange($event)"
+		          (addRequested)="addRelationship($event.item, $event.kind)"
+		          (moveRequested)="moveRelationship($event.kind, $event.index, $event.direction)"
+		          (removeRequested)="removeRelationship($event.id, $event.kind)"
+		          (saveRequested)="saveRelationships()"
+		        ></app-admin-products-relationships-manager>
 
 			        <details class="group rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
 			          <summary class="flex items-start justify-between gap-4 cursor-pointer select-none [&::-webkit-details-marker]:hidden">
@@ -2741,6 +2391,61 @@ type PriceHistoryChart = {
 			              </span>
 			            </div>
 
+                  <div class="grid gap-3 items-end md:grid-cols-4">
+                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                      {{ 'adminUi.products.form.stockLedgerExportFrom' | translate }}
+                      <input
+                        class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        type="date"
+                        [(ngModel)]="stockLedgerExportFrom"
+                        [disabled]="stockLedgerExporting() || !editingSlug()"
+                      />
+                    </label>
+
+                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                      {{ 'adminUi.products.form.stockLedgerExportTo' | translate }}
+                      <input
+                        class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        type="date"
+                        [(ngModel)]="stockLedgerExportTo"
+                        [disabled]="stockLedgerExporting() || !editingSlug()"
+                      />
+                    </label>
+
+                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                      {{ 'adminUi.products.form.stockLedgerExportReason' | translate }}
+                      <select
+                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        [(ngModel)]="stockLedgerExportReason"
+                        [disabled]="stockLedgerExporting() || !editingSlug()"
+                      >
+                        <option value="all">{{ 'adminUi.products.form.stockLedgerExportAllReasons' | translate }}</option>
+                        <option value="restock">{{ 'adminUi.products.form.stockReason.restock' | translate }}</option>
+                        <option value="damage">{{ 'adminUi.products.form.stockReason.damage' | translate }}</option>
+                        <option value="manual_correction">{{ 'adminUi.products.form.stockReason.manual_correction' | translate }}</option>
+                      </select>
+                    </label>
+
+                    <div class="flex items-center justify-end gap-2">
+                      <app-button
+                        size="sm"
+                        variant="ghost"
+                        [label]="
+                          (stockLedgerExporting() ? 'adminUi.products.form.stockLedgerExporting' : 'adminUi.products.form.stockLedgerExport') | translate
+                        "
+                        (action)="exportStockLedgerCsv()"
+                        [disabled]="stockLedgerExporting() || !editingSlug()"
+                      ></app-button>
+                    </div>
+                  </div>
+
+			            <div
+			              *ngIf="stockLedgerExportError()"
+			              class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+			            >
+			              {{ stockLedgerExportError() }}
+			            </div>
+
 			            <div *ngIf="stockAdjustments().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
 			              {{ 'adminUi.products.form.stockLedgerEmpty' | translate }}
 			            </div>
@@ -2853,6 +2558,51 @@ type PriceHistoryChart = {
 	            >
 	              {{ translationError() }}
 	            </div>
+
+              <div class="grid gap-2 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                <div class="grid gap-1">
+                  <p class="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                    {{ 'adminUi.products.translations.diffTitle' | translate }}
+                  </p>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ 'adminUi.products.translations.diffHint' | translate }}
+                  </p>
+                </div>
+
+                <div class="mt-3 grid gap-2">
+                  <div
+                    class="grid grid-cols-[140px_1fr_1fr_120px] gap-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
+                  >
+                    <span>{{ 'adminUi.products.translations.diffHeaders.field' | translate }}</span>
+                    <span>RO</span>
+                    <span>EN</span>
+                    <span>{{ 'adminUi.products.translations.diffHeaders.status' | translate }}</span>
+                  </div>
+
+                  <div
+                    *ngFor="let row of translationDiffRows(); trackBy: trackByTranslationDiffRow"
+                    class="grid grid-cols-[140px_1fr_1fr_120px] items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-950/20"
+                  >
+                    <span class="text-xs font-semibold text-slate-700 dark:text-slate-200">{{ row.labelKey | translate }}</span>
+                    <span class="text-xs" [ngClass]="row.roMissing ? 'text-slate-400 dark:text-slate-400' : 'text-slate-700 dark:text-slate-200'">
+                      {{ row.roSnippet }}
+                    </span>
+                    <span class="text-xs" [ngClass]="row.enMissing ? 'text-slate-400 dark:text-slate-400' : 'text-slate-700 dark:text-slate-200'">
+                      {{ row.enSnippet }}
+                    </span>
+                    <span
+                      class="text-xs font-semibold"
+                      [ngClass]="{
+                        'text-rose-700 dark:text-rose-300': row.tone === 'error',
+                        'text-amber-700 dark:text-amber-300': row.tone === 'warn',
+                        'text-slate-500 dark:text-slate-300': row.tone === 'neutral'
+                      }"
+                    >
+                      {{ row.statusKey | translate }}
+                    </span>
+                  </div>
+                </div>
+              </div>
 
 	            <div class="grid gap-4 lg:grid-cols-2">
 	              <div class="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
@@ -3143,195 +2893,37 @@ type PriceHistoryChart = {
               </div>
 		        </div>
 
-	        <div id="product-wizard-images" data-ignore-dirty class="grid gap-3">
-	          <div class="flex items-center justify-between">
-	            <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{{ 'adminUi.products.form.images' | translate }}</p>
-	            <div class="flex flex-wrap items-center gap-2">
-	              <app-button
-	                size="sm"
-	                variant="ghost"
-	                [label]="
-	                  deletedImagesOpen()
-	                    ? ('adminUi.products.form.hideDeletedImages' | translate)
-	                    : ('adminUi.products.form.showDeletedImages' | translate)
-	                "
-	                (action)="toggleDeletedImages()"
-	                [disabled]="deletedImagesBusy() || !editingSlug()"
-	              ></app-button>
-	              <label class="text-sm text-slate-700 dark:text-slate-200">
-	                {{ 'adminUi.products.form.upload' | translate }}
-	                <input type="file" accept="image/*" class="block mt-1" (change)="onUpload($event)" />
-	              </label>
-	            </div>
-	          </div>
+	        <app-admin-products-image-manager
+	          [hasEditingSlug]="!!editingSlug()"
+	          [images]="images"
+	          [editingImageId]="editingImageId"
+	          [imageOrderBusy]="imageOrderBusy"
+	          [imageOrderError]="imageOrderError"
+	          [imageMetaBusy]="imageMetaBusy"
+	          [imageMetaError]="imageMetaError"
+	          [deleteImageConfirmBusy]="deleteImageConfirmBusy"
+	          [deletedImagesOpen]="deletedImagesOpen"
+	          [deletedImagesBusy]="deletedImagesBusy"
+	          [deletedImagesError]="deletedImagesError"
+	          [deletedImages]="deletedImages"
+		          [restoringDeletedImage]="restoringDeletedImage"
+		          [imageMeta]="imageMeta"
+		          [imageStats]="imageStats"
+		          [uploads]="imageUploads"
+		          (toggleDeletedImagesRequested)="toggleDeletedImages()"
+		          (uploadRequested)="onUpload($event)"
+		          (retryUploadRequested)="retryImageUpload($event)"
+		          (removeUploadRequested)="removeImageUpload($event)"
+		          (makePrimaryRequested)="makeImagePrimary($event)"
+		          (toggleMetaRequested)="toggleImageMeta($event)"
+		          (deleteRequested)="openDeleteImageConfirm($event)"
+		          (reprocessRequested)="reprocessImage()"
+	          (saveMetaRequested)="saveImageMeta()"
+	          (restoreRequested)="restoreDeletedImage($event)"
+		        ></app-admin-products-image-manager>
+		      </section>
 
-          <div *ngIf="images().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
-            {{ 'adminUi.products.form.noImages' | translate }}
-          </div>
-
-			          <div *ngIf="images().length > 0" class="grid gap-2">
-			            <div *ngFor="let img of images(); let idx = index" class="rounded-lg border border-slate-200 dark:border-slate-700">
-			              <div class="flex items-center gap-3 p-2">
-			                <img [src]="img.url" [alt]="img.alt_text || 'image'" class="h-12 w-12 rounded object-cover" />
-		                <div class="flex-1 min-w-0">
-		                  <div class="flex flex-wrap items-center gap-2">
-		                    <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">{{ img.alt_text || ('adminUi.products.form.image' | translate) }}</p>
-		                    <span
-		                      *ngIf="idx === 0"
-		                      class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200"
-		                    >
-		                      {{ 'adminUi.storefront.products.images.primaryBadge' | translate }}
-		                    </span>
-		                  </div>
-		                  <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ img.url }}</p>
-		                </div>
-		                <div class="flex items-center gap-1">
-		                  <app-button
-		                    *ngIf="idx > 0"
-		                    size="sm"
-		                    variant="ghost"
-		                    [label]="'adminUi.storefront.products.images.makePrimary' | translate"
-		                    [disabled]="imageOrderBusy() || imageMetaBusy() || deleteImageConfirmBusy()"
-		                    (action)="makeImagePrimary(img.id)"
-		                  ></app-button>
-		                  <app-button
-		                    size="sm"
-		                    variant="ghost"
-		                    [label]="'adminUi.actions.edit' | translate"
-	                    (action)="toggleImageMeta(img.id)"
-	                  ></app-button>
-	                  <app-button
-                      size="sm"
-                      variant="ghost"
-                      [label]="'adminUi.actions.delete' | translate"
-                      (action)="openDeleteImageConfirm(img.id)"
-		                    ></app-button>
-		                </div>
-			              </div>
-
-	              <div *ngIf="editingImageId() === img.id" class="grid gap-4 border-t border-slate-200 p-3 dark:border-slate-700">
-	                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-	                  <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{{ 'adminUi.products.form.imageMeta' | translate }}</p>
-	                  <div class="flex flex-wrap items-center gap-2">
-	                    <app-button
-	                      size="sm"
-	                      variant="ghost"
-	                      [label]="'adminUi.products.form.imageReprocess' | translate"
-	                      (action)="reprocessImage()"
-	                      [disabled]="imageMetaBusy()"
-	                    ></app-button>
-	                    <app-button size="sm" variant="ghost" [label]="'adminUi.actions.save' | translate" (action)="saveImageMeta()" [disabled]="imageMetaBusy()"></app-button>
-			          </div>
-
-                <p *ngIf="imageOrderError()" class="text-sm text-rose-700 dark:text-rose-300">{{ imageOrderError() }}</p>
-	                </div>
-
-	                <p *ngIf="imageMetaError()" class="text-sm text-rose-700 dark:text-rose-300">{{ imageMetaError() }}</p>
-
-	                <div *ngIf="imageStats" class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
-	                  <p>
-	                    {{ 'adminUi.products.form.imageSize' | translate }}:
-	                    <span class="font-semibold">{{ formatBytes(imageStats.original_bytes) }}</span>
-	                    <span *ngIf="imageStats.width && imageStats.height" class="text-slate-500 dark:text-slate-400">
-	                      · {{ imageStats.width }}×{{ imageStats.height }}
-	                    </span>
-	                  </p>
-	                  <p class="text-xs text-slate-500 dark:text-slate-400">
-	                    {{ 'adminUi.products.form.imageThumbs' | translate }}:
-	                    sm {{ formatBytes(imageStats.thumb_sm_bytes) }},
-	                    md {{ formatBytes(imageStats.thumb_md_bytes) }},
-	                    lg {{ formatBytes(imageStats.thumb_lg_bytes) }}
-	                  </p>
-	                </div>
-
-	                <div class="grid gap-3 lg:grid-cols-2">
-	                  <div class="grid gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
-	                    <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">RO</p>
-	                    <app-input [label]="'adminUi.products.form.imageAltText' | translate" [(value)]="imageMeta.ro.alt_text"></app-input>
-	                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	                      {{ 'adminUi.products.form.imageCaption' | translate }}
-	                      <textarea
-	                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-	                        rows="2"
-	                        [(ngModel)]="imageMeta.ro.caption"
-	                      ></textarea>
-	                    </label>
-	                  </div>
-
-	                  <div class="grid gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
-	                    <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">EN</p>
-	                    <app-input [label]="'adminUi.products.form.imageAltText' | translate" [(value)]="imageMeta.en.alt_text"></app-input>
-	                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	                      {{ 'adminUi.products.form.imageCaption' | translate }}
-	                      <textarea
-	                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-	                        rows="2"
-	                        [(ngModel)]="imageMeta.en.caption"
-	                      ></textarea>
-	                    </label>
-		              </div>
-		            </div>
-		          </div>
-
-	          <div
-	            *ngIf="deletedImagesOpen()"
-	            class="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950/20"
-	          >
-	            <div class="flex items-center justify-between gap-3">
-	              <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
-	                {{ 'adminUi.products.form.deletedImages' | translate }}
-	              </p>
-	              <span class="text-xs text-slate-500 dark:text-slate-400">
-	                {{ deletedImages().length }}
-	              </span>
-	            </div>
-
-	            <div *ngIf="deletedImagesBusy()" class="text-sm text-slate-600 dark:text-slate-300">
-	              {{ 'adminUi.actions.loading' | translate }}
-	            </div>
-
-	            <div
-	              *ngIf="deletedImagesError()"
-	              class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
-	            >
-	              {{ deletedImagesError() }}
-	            </div>
-
-	            <div *ngIf="!deletedImagesBusy() && deletedImages().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
-	              {{ 'adminUi.products.form.noDeletedImages' | translate }}
-	            </div>
-
-	            <div *ngIf="!deletedImagesBusy() && deletedImages().length > 0" class="grid gap-2">
-	              <div
-	                *ngFor="let img of deletedImages()"
-	                class="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-900"
-	              >
-	                <img [src]="img.url" [alt]="img.alt_text || 'image'" class="h-12 w-12 rounded object-cover" />
-	                <div class="flex-1 min-w-0">
-	                  <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">
-	                    {{ img.alt_text || ('adminUi.products.form.image' | translate) }}
-	                  </p>
-	                  <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ img.url }}</p>
-	                  <p *ngIf="img.deleted_at" class="text-xs text-slate-500 dark:text-slate-400">
-	                    {{ 'adminUi.products.form.deletedAt' | translate }}: {{ img.deleted_at | date: 'short' }}
-	                  </p>
-	                </div>
-	                <app-button
-	                  size="sm"
-	                  variant="ghost"
-	                  [label]="'adminUi.actions.restore' | translate"
-	                  (action)="restoreDeletedImage(img.id)"
-	                  [disabled]="restoringDeletedImage() === img.id"
-	                ></app-button>
-	              </div>
-	            </div>
-	          </div>
-	        </div>
-	          </div>
-	        </div>
-	      </section>
-
-        <div *ngIf="selected.size > 0 && view === 'active'" class="h-24"></div>
+	        <div *ngIf="selected.size > 0 && view === 'active'" class="h-24"></div>
 
         <div *ngIf="selected.size > 0 && view === 'active'" class="fixed inset-x-0 bottom-4 z-40 px-4 sm:px-6">
           <div class="max-w-6xl mx-auto">
@@ -3362,7 +2954,7 @@ type PriceHistoryChart = {
 	    </div>
 	  `
 })
-export class AdminProductsComponent implements OnInit {
+export class AdminProductsComponent implements OnInit, OnDestroy {
   crumbs = [
     { label: 'nav.home', url: '/' },
     { label: 'nav.admin', url: '/admin/dashboard' },
@@ -3401,6 +2993,7 @@ export class AdminProductsComponent implements OnInit {
   private productSearchDebounceHandle: number | null = null;
   private productSearchBlurHandle: number | null = null;
   private productSearchRequestId = 0;
+  private productSearchSub: Subscription | null = null;
   private productFilterDebounceHandle: number | null = null;
 
 	  editorOpen = signal(false);
@@ -3435,9 +3028,13 @@ export class AdminProductsComponent implements OnInit {
   imageMetaBusy = signal(false);
   imageMetaError = signal<string | null>(null);
   imageMeta: ImageMetaByLang = this.blankImageMetaByLang();
-  imageMetaExists: Record<'en' | 'ro', boolean> = { en: false, ro: false };
-  imageStats: AdminProductImageOptimizationStats | null = null;
-  adminCategories = signal<Array<{ id: string; name: string }>>([]);
+	  imageMetaExists: Record<'en' | 'ro', boolean> = { en: false, ro: false };
+	  imageStats: AdminProductImageOptimizationStats | null = null;
+	  imageUploads = signal<AdminProductImageUploadItem[]>([]);
+	  private imageUploadFiles = new Map<string, File>();
+	  private imageUploadActiveId: string | null = null;
+	  private imageUploadSub: Subscription | null = null;
+	  adminCategories = signal<Array<{ id: string; name: string }>>([]);
   createCategoryOpen = signal(false);
   createCategoryBusy = signal(false);
   createCategoryError = signal<string | null>(null);
@@ -3560,6 +3157,12 @@ export class AdminProductsComponent implements OnInit {
   stockAdjustDelta = '';
   stockAdjustNote = '';
 
+  stockLedgerExportFrom = '';
+  stockLedgerExportTo = '';
+  stockLedgerExportReason: StockAdjustmentReason | 'all' = 'all';
+  stockLedgerExporting = signal(false);
+  stockLedgerExportError = signal<string | null>(null);
+
   private autoStartNewProduct = false;
   private pendingEditProductSlug: string | null = null;
 
@@ -3587,6 +3190,32 @@ export class AdminProductsComponent implements OnInit {
     this.loadCategories();
     this.loadAdminCategories();
     this.load();
+  }
+
+  ngOnDestroy(): void {
+    this.cancelProductSearchRequest();
+    this.resetImageUploads();
+
+    if (this.productSearchDebounceHandle !== null) {
+      window.clearTimeout(this.productSearchDebounceHandle);
+      this.productSearchDebounceHandle = null;
+    }
+    if (this.productSearchBlurHandle !== null) {
+      window.clearTimeout(this.productSearchBlurHandle);
+      this.productSearchBlurHandle = null;
+    }
+    if (this.productFilterDebounceHandle !== null) {
+      window.clearTimeout(this.productFilterDebounceHandle);
+      this.productFilterDebounceHandle = null;
+    }
+    if (this.duplicateCheckTimeoutId) {
+      clearTimeout(this.duplicateCheckTimeoutId);
+      this.duplicateCheckTimeoutId = null;
+    }
+    if (this.relationshipSearchTimeout) {
+      clearTimeout(this.relationshipSearchTimeout);
+      this.relationshipSearchTimeout = null;
+    }
   }
 
   openLayoutModal(): void {
@@ -3747,6 +3376,7 @@ export class AdminProductsComponent implements OnInit {
     }
 
     if (needle.length < 2) {
+      this.cancelProductSearchRequest();
       this.productSearchResults.set([]);
       this.productSearchLoading.set(false);
       this.productSearchActiveIndex.set(-1);
@@ -3768,11 +3398,18 @@ export class AdminProductsComponent implements OnInit {
     }, 250);
   }
 
+  private cancelProductSearchRequest(): void {
+    if (!this.productSearchSub) return;
+    this.productSearchSub.unsubscribe();
+    this.productSearchSub = null;
+  }
+
   private runProductSearch(needle: string): void {
     this.openProductSearch();
     this.productSearchLoading.set(true);
+    this.cancelProductSearchRequest();
     const requestId = ++this.productSearchRequestId;
-    this.productsApi
+    const sub = this.productsApi
       .search({
         q: needle,
         status: this.status === 'all' ? undefined : this.status,
@@ -3800,6 +3437,10 @@ export class AdminProductsComponent implements OnInit {
           this.productSearchError.set(this.t('adminUi.products.errors.loadList'));
         }
       });
+    sub.add(() => {
+      if (this.productSearchSub === sub) this.productSearchSub = null;
+    });
+    this.productSearchSub = sub;
   }
 
   productSearchActiveDescendant(): string | null {
@@ -4527,6 +4168,22 @@ export class AdminProductsComponent implements OnInit {
     });
   }
 
+  setBulkSaleType(next: 'percent' | 'amount'): void {
+    this.bulkSaleType = next;
+    this.bulkSaleValue = '';
+  }
+
+  setBulkPriceMode(next: 'percent' | 'amount'): void {
+    this.bulkPriceMode = next;
+    this.bulkPriceValue = '';
+    this.bulkPricePreview = null;
+  }
+
+  setBulkPriceDirection(next: 'increase' | 'decrease'): void {
+    this.bulkPriceDirection = next;
+    this.updateBulkPricePreview();
+  }
+
   onBulkSaleValueChange(next: string | number): void {
     const raw = String(next ?? '');
     const { clean } = this.sanitizeMoneyInput(raw);
@@ -5225,14 +4882,15 @@ export class AdminProductsComponent implements OnInit {
 		    this.resetDuplicateCheck();
 		    this.resetRelationships();
 		    this.resetAudit();
-        this.resetMarkdownPreview();
-		    this.images.set([]);
-	    this.resetDeletedImages();
-		    this.resetImageMeta();
-		    this.form = this.blankForm();
-        this.lastSavedState.set({ status: this.form.status, isActive: this.form.is_active });
-		    this.basePriceError = '';
-		    this.saleValueError = '';
+	        this.resetMarkdownPreview();
+			    this.images.set([]);
+		    this.resetDeletedImages();
+			    this.resetImageMeta();
+	        this.resetImageUploads();
+			    this.form = this.blankForm();
+	        this.lastSavedState.set({ status: this.form.status, isActive: this.form.is_active });
+			    this.basePriceError = '';
+			    this.saleValueError = '';
 	    this.resetTranslations();
     this.resetVariants();
     this.resetStockLedger();
@@ -5258,15 +4916,24 @@ export class AdminProductsComponent implements OnInit {
 		    this.resetDuplicateCheck();
 		    this.resetRelationships();
 		    this.resetAudit();
-        this.resetMarkdownPreview();
-		    this.images.set([]);
-	    this.resetDeletedImages();
-		    this.resetImageMeta();
-		    this.basePriceError = '';
-		    this.saleValueError = '';
-	    this.resetTranslations();
-    this.resetVariants();
+	        this.resetMarkdownPreview();
+			    this.images.set([]);
+		    this.resetDeletedImages();
+			    this.resetImageMeta();
+	        this.resetImageUploads();
+			    this.basePriceError = '';
+			    this.saleValueError = '';
+		    this.resetTranslations();
+	    this.resetVariants();
     this.resetStockLedger();
+  }
+
+  hasUnsavedChanges(): boolean {
+    return this.editorOpen() && this.editorDirty();
+  }
+
+  discardUnsavedChanges(): void {
+    this.editorDirty.set(false);
   }
 
 		  edit(slug: string): void {
@@ -5284,15 +4951,16 @@ export class AdminProductsComponent implements OnInit {
 		    this.resetDuplicateCheck();
 		    this.resetRelationships();
 		    this.resetAudit();
-        this.resetMarkdownPreview();
-		    this.basePriceError = '';
-		    this.saleValueError = '';
-		    this.resetTranslations();
-		    this.resetDeletedImages();
-		    this.resetImageMeta();
-		    this.resetVariants();
-	    this.resetStockLedger();
-    this.admin.getProduct(slug).subscribe({
+	        this.resetMarkdownPreview();
+			    this.basePriceError = '';
+			    this.saleValueError = '';
+			    this.resetTranslations();
+			    this.resetDeletedImages();
+			    this.resetImageMeta();
+	        this.resetImageUploads();
+			    this.resetVariants();
+		    this.resetStockLedger();
+	    this.admin.getProduct(slug).subscribe({
       next: (prod: any) => {
         const name = (prod?.name || '').toString().trim();
         this.recent.add({
@@ -5549,6 +5217,7 @@ export class AdminProductsComponent implements OnInit {
     if (value === null || value <= 0) return null;
 
     if (this.form.sale_type === 'amount') {
+      if (value > base) return null;
       const discounted = Math.max(0, Math.round((base - value) * 100) / 100);
       return discounted < base ? discounted : null;
     }
@@ -5558,11 +5227,25 @@ export class AdminProductsComponent implements OnInit {
     return discounted < base ? discounted : null;
   }
 
+  salePreviewInfo(): { sale: number; saved: number; percent: number } | null {
+    const sale = this.previewSalePrice();
+    if (sale === null) return null;
+    const base = this.previewBasePrice();
+    if (!(base > 0)) return null;
+    const saved = Math.round((base - sale) * 100) / 100;
+    if (!(saved > 0)) return null;
+    const percent = Math.round((saved / base) * 1000) / 10;
+    return { sale, saved, percent };
+  }
+
   onBasePriceChange(next: string | number): void {
     const raw = String(next ?? '');
     const { clean, changed } = this.sanitizeMoneyInput(raw);
     this.form.base_price = clean;
     this.basePriceError = changed ? this.t('adminUi.products.form.priceFormatHint') : '';
+    if (this.form.sale_enabled) {
+      this.onSaleValueChange(this.form.sale_value);
+    }
   }
 
   onSaleEnabledChange(): void {
@@ -5587,13 +5270,30 @@ export class AdminProductsComponent implements OnInit {
       this.saleValueError = '';
       return;
     }
-    if (this.form.sale_type === 'percent' && clean) {
-      const parsed = Number(clean);
-      if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) {
+    if (!clean) {
+      this.saleValueError = '';
+      return;
+    }
+
+    const parsed = this.parseMoneyInput(clean);
+    if (parsed === null || parsed <= 0) {
+      this.saleValueError = this.t('adminUi.products.sale.positiveHint');
+      return;
+    }
+
+    if (this.form.sale_type === 'percent') {
+      if (parsed > 100) {
         this.saleValueError = this.t('adminUi.products.sale.percentHint');
         return;
       }
+    } else {
+      const base = this.parseMoneyInput(this.form.base_price);
+      if (base !== null && base > 0 && parsed > base) {
+        this.saleValueError = this.t('adminUi.products.sale.amountTooHighHint');
+        return;
+      }
     }
+
     this.saleValueError = changed ? this.t('adminUi.products.sale.valueHint') : '';
   }
 
@@ -5664,10 +5364,20 @@ export class AdminProductsComponent implements OnInit {
           opts?.done?.(false);
           return;
         }
+        if (amount <= 0) {
+          this.editorError.set(this.t('adminUi.products.sale.positiveHint'));
+          opts?.done?.(false);
+          return;
+        }
+        if (amount > basePrice) {
+          this.editorError.set(this.t('adminUi.products.sale.amountTooHighHint'));
+          opts?.done?.(false);
+          return;
+        }
         sale_value = amount;
       } else {
         const percent = this.parseMoneyInput(this.form.sale_value);
-        if (percent === null || percent < 0 || percent > 100) {
+        if (percent === null || percent <= 0 || percent > 100) {
           this.editorError.set(this.t('adminUi.products.sale.percentHint'));
           opts?.done?.(false);
           return;
@@ -6025,6 +5735,49 @@ export class AdminProductsComponent implements OnInit {
     });
   }
 
+  exportStockLedgerCsv(): void {
+    const productId = this.editingProductId();
+    if (!productId) return;
+    if (this.stockLedgerExporting()) return;
+
+    const fromDate = (this.stockLedgerExportFrom || '').trim();
+    const toDate = (this.stockLedgerExportTo || '').trim();
+    const reason = this.stockLedgerExportReason;
+
+    this.stockLedgerExportError.set(null);
+    this.stockLedgerExporting.set(true);
+
+    this.admin
+      .exportStockAdjustmentsCsv({
+        product_id: productId,
+        from_date: fromDate || undefined,
+        to_date: toDate || undefined,
+        reason: reason === 'all' ? undefined : reason,
+      })
+      .subscribe({
+        next: (blob) => {
+          const slug = (this.editingSlug() || '').trim() || productId.slice(0, 8);
+          const parts = [slug, fromDate || 'all', toDate || 'all', reason === 'all' ? 'all' : reason];
+          const safe = parts.map((p) => (p || '').replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '')).filter(Boolean);
+          const filename = `stock-adjustments-${safe.join('-') || slug}.csv`;
+
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          a.click();
+          URL.revokeObjectURL(url);
+
+          this.toast.success(this.t('adminUi.products.form.stockLedgerExportReady'));
+          this.stockLedgerExporting.set(false);
+        },
+        error: () => {
+          this.stockLedgerExporting.set(false);
+          this.stockLedgerExportError.set(this.t('adminUi.products.form.stockLedgerExportError'));
+        },
+      });
+  }
+
   private setVariantsFromProduct(prod: any): void {
     const rows: AdminProductVariant[] = Array.isArray(prod?.variants) ? prod.variants : [];
     this.variants.set(
@@ -6240,6 +5993,71 @@ export class AdminProductsComponent implements OnInit {
     this.stockAdjustReason = 'manual_correction';
     this.stockAdjustDelta = '';
     this.stockAdjustNote = '';
+    this.stockLedgerExportFrom = '';
+    this.stockLedgerExportTo = '';
+    this.stockLedgerExportReason = 'all';
+    this.stockLedgerExporting.set(false);
+    this.stockLedgerExportError.set(null);
+  }
+
+  translationDiffRows(): TranslationDiffRow[] {
+    const fields: Array<{ field: TranslationDiffField; labelKey: string }> = [
+      { field: 'name', labelKey: 'adminUi.products.table.name' },
+      { field: 'short_description', labelKey: 'adminUi.products.form.shortDescription' },
+      { field: 'long_description', labelKey: 'adminUi.products.form.description' }
+    ];
+
+    return fields.map(({ field, labelKey }) => {
+      const roRaw = (this.translations.ro?.[field] ?? '').toString();
+      const enRaw = (this.translations.en?.[field] ?? '').toString();
+      const ro = roRaw.trim();
+      const en = enRaw.trim();
+      const roMissing = !ro;
+      const enMissing = !en;
+
+      let statusKey = 'adminUi.products.translations.diffStatus.different';
+      let tone: TranslationDiffRow['tone'] = 'neutral';
+
+      if (roMissing && enMissing) {
+        statusKey = 'adminUi.products.translations.diffStatus.missingBoth';
+        tone = 'error';
+      } else if (roMissing) {
+        statusKey = 'adminUi.products.translations.diffStatus.missingRo';
+        tone = 'error';
+      } else if (enMissing) {
+        statusKey = 'adminUi.products.translations.diffStatus.missingEn';
+        tone = 'error';
+      } else if (this.normalizeTranslationDiff(ro) === this.normalizeTranslationDiff(en)) {
+        statusKey = 'adminUi.products.translations.diffStatus.same';
+        tone = 'warn';
+      }
+
+      return {
+        field,
+        labelKey,
+        roSnippet: this.translationDiffSnippet(ro),
+        enSnippet: this.translationDiffSnippet(en),
+        roMissing,
+        enMissing,
+        statusKey,
+        tone
+      };
+    });
+  }
+
+  trackByTranslationDiffRow(_index: number, row: TranslationDiffRow): string {
+    return row.field;
+  }
+
+  private normalizeTranslationDiff(value: string): string {
+    return (value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  private translationDiffSnippet(value: string): string {
+    const normalized = this.normalizeTranslationDiff(value);
+    if (!normalized) return '—';
+    if (normalized.length <= 80) return normalized;
+    return `${normalized.slice(0, 77)}…`;
   }
 
   saveTranslation(lang: 'en' | 'ro'): void {
@@ -6292,24 +6110,120 @@ export class AdminProductsComponent implements OnInit {
     });
   }
 
+  retryImageUpload(uploadId: string): void {
+    const id = String(uploadId || '').trim();
+    if (!id) return;
+    if (this.imageUploadActiveId === id) return;
+    if (!this.imageUploadFiles.has(id)) return;
+    this.updateImageUpload(id, { status: 'queued', progress: 0, error: null });
+    this.maybeStartImageUpload();
+  }
+
+  removeImageUpload(uploadId: string): void {
+    const id = String(uploadId || '').trim();
+    if (!id) return;
+    if (this.imageUploadActiveId === id) return;
+    this.imageUploads.set(this.imageUploads().filter((item) => item.id !== id));
+    this.imageUploadFiles.delete(id);
+  }
+
   onUpload(event: Event): void {
     const target = event.target as HTMLInputElement | null;
-    const file = target?.files?.[0];
-    if (!file) return;
+    const files = Array.from(target?.files ?? []);
+    if (!files.length) return;
     const slug = this.editingSlug();
     if (!slug) {
       this.toast.error(this.t('adminUi.products.errors.saveFirst'));
+      if (target) target.value = '';
       return;
     }
-    this.admin.uploadProductImage(slug, file).subscribe({
-      next: (prod: any) => {
-        this.toast.success(this.t('adminUi.products.success.imageUpload'));
-        const nextImages = Array.isArray(prod.images) ? [...prod.images] : [];
-        nextImages.sort((a: any, b: any) => Number(a?.sort_order ?? 0) - Number(b?.sort_order ?? 0));
-        this.images.set(nextImages);
-        if (target) target.value = '';
+
+    const existing = this.imageUploads();
+    const next: AdminProductImageUploadItem[] = [];
+    for (const file of files) {
+      const id = this.newImageUploadId();
+      this.imageUploadFiles.set(id, file);
+      next.push({ id, fileName: file.name, bytes: file.size, status: 'queued', progress: 0, error: null });
+    }
+
+    this.imageUploads.set([...existing, ...next]);
+    if (target) target.value = '';
+    this.maybeStartImageUpload();
+  }
+
+  private newImageUploadId(): string {
+    try {
+      if (typeof crypto !== 'undefined' && typeof (crypto as any).randomUUID === 'function') {
+        return (crypto as any).randomUUID();
+      }
+    } catch {
+      // Ignore and fall back.
+    }
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+
+  private updateImageUpload(uploadId: string, patch: Partial<AdminProductImageUploadItem>): void {
+    const id = String(uploadId || '').trim();
+    if (!id) return;
+    this.imageUploads.set(
+      this.imageUploads().map((item) => {
+        if (item.id !== id) return item;
+        return { ...item, ...patch };
+      })
+    );
+  }
+
+  private maybeStartImageUpload(): void {
+    if (this.imageUploadSub) return;
+    const slug = this.editingSlug();
+    if (!slug) return;
+    const next = this.imageUploads().find((item) => item.status === 'queued');
+    if (!next) return;
+
+    const file = this.imageUploadFiles.get(next.id) ?? null;
+    if (!file) {
+      this.updateImageUpload(next.id, { status: 'error', error: this.t('adminUi.products.errors.image'), progress: 0 });
+      return;
+    }
+
+    const uploadId = next.id;
+    this.imageUploadActiveId = uploadId;
+    this.updateImageUpload(uploadId, { status: 'uploading', progress: 0, error: null });
+
+    this.imageUploadSub = this.admin.uploadProductImageWithProgress(slug, file).subscribe({
+      next: (event) => {
+        if (this.imageUploadActiveId !== uploadId) return;
+        if (event.type === HttpEventType.UploadProgress) {
+          const match = this.imageUploads().find((item) => item.id === uploadId);
+          const total = typeof event.total === 'number' && event.total > 0 ? event.total : match?.bytes || null;
+          const progress = total ? Math.round((event.loaded / total) * 100) : 0;
+          this.updateImageUpload(uploadId, { progress: Math.max(0, Math.min(99, progress)) });
+          return;
+        }
+        if (event.type === HttpEventType.Response) {
+          const prod: any = event.body;
+          const nextImages = Array.isArray(prod?.images) ? [...prod.images] : [];
+          nextImages.sort((a: any, b: any) => Number(a?.sort_order ?? 0) - Number(b?.sort_order ?? 0));
+          this.images.set(nextImages);
+          this.updateImageUpload(uploadId, { status: 'success', progress: 100 });
+          this.imageUploadFiles.delete(uploadId);
+        }
       },
-      error: () => this.toast.error(this.t('adminUi.products.errors.image'))
+      error: (err) => {
+        if (this.imageUploadActiveId !== uploadId) return;
+        const requestId = extractRequestId(err);
+        const message = requestId ? `${this.t('adminUi.products.errors.image')} (${requestId})` : this.t('adminUi.products.errors.image');
+        this.updateImageUpload(uploadId, { status: 'error', error: message });
+        this.imageUploadSub = null;
+        this.imageUploadActiveId = null;
+        this.maybeStartImageUpload();
+      },
+      complete: () => {
+        if (this.imageUploadActiveId !== uploadId) return;
+        this.imageUploadSub = null;
+        this.imageUploadActiveId = null;
+        this.maybeStartImageUpload();
+      }
     });
   }
 
@@ -6886,6 +6800,14 @@ export class AdminProductsComponent implements OnInit {
     this.deletedImagesBusy.set(false);
     this.deletedImagesError.set(null);
     this.restoringDeletedImage.set(null);
+  }
+
+  private resetImageUploads(): void {
+    this.imageUploadSub?.unsubscribe();
+    this.imageUploadSub = null;
+    this.imageUploadActiveId = null;
+    this.imageUploadFiles.clear();
+    this.imageUploads.set([]);
   }
 
   private loadDeletedImages(slug: string): void {

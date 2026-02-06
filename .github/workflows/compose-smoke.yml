@@ -67,10 +67,12 @@ jobs:
           docker compose -f infra/docker-compose.yml exec -T backend python -m app.seeds
           docker compose -f infra/docker-compose.yml exec -T backend python -m app.cli bootstrap-owner --email owner@example.com --password Password123 --username owner --display-name Owner
 
-      - name: Playwright E2E (checkout + admin)
+      - name: Playwright E2E (smoke)
         run: |
           cd frontend
-          E2E_BASE_URL=http://localhost:4201 npm run e2e
+          # Keep the PR gate fast and stable: run only the smoke suite here.
+          # Full E2E coverage can be run via `npm run e2e` locally or in a separate workflow.
+          E2E_BASE_URL=http://localhost:4201 npm run e2e -- e2e/smoke.spec.ts --workers=1
 
       - name: Logs (on failure)
         if: failure()

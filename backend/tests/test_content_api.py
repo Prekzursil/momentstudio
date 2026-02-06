@@ -20,6 +20,7 @@ from app.services import social_thumbnails
 import httpx
 from app.models.content import ContentRedirect
 from app.models.catalog import Category, Product, ProductStatus
+from app.core import security
 
 
 @pytest.fixture
@@ -45,7 +46,11 @@ def test_app() -> Dict[str, object]:
 
 
 def auth_headers(token: str) -> dict[str, str]:
-    return {"Authorization": f"Bearer {token}"}
+    headers = {"Authorization": f"Bearer {token}"}
+    payload = security.decode_token(token)
+    if payload and payload.get("sub"):
+        headers["X-Admin-Step-Up"] = security.create_step_up_token(str(payload["sub"]))
+    return headers
 
 
 def create_admin_token(session_factory) -> str:

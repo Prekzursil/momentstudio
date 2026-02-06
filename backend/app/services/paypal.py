@@ -64,6 +64,14 @@ def _effective_webhook_id() -> str:
     return (settings.paypal_webhook_id_sandbox or settings.paypal_webhook_id or "").strip()
 
 
+def paypal_webhook_id() -> str:
+    return _effective_webhook_id()
+
+
+def is_paypal_webhook_configured() -> bool:
+    return bool(paypal_webhook_id())
+
+
 def _cache_bucket() -> dict[str, object]:
     return _token_cache.setdefault(_paypal_env(), {"access_token": None, "expires_at": None})
 

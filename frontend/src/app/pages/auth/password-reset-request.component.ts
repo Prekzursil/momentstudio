@@ -8,6 +8,7 @@ import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { ToastService } from '../../core/toast.service';
 import { AuthService } from '../../core/auth.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { finalize } from 'rxjs';
 
 @Component({
   selector: 'app-password-reset-request',
@@ -42,15 +43,19 @@ export class PasswordResetRequestComponent {
   onSubmit(form: NgForm): void {
     if (!form.valid) return;
     this.loading = true;
-    this.auth.requestPasswordReset(this.email).subscribe({
-      next: () => this.toast.success(this.translate.instant('auth.resetLinkSent'), `Check ${this.email}`),
-      error: (err) => {
-        const message = err?.error?.detail || this.translate.instant('auth.errorReset');
-        this.toast.error(message);
-      },
-      complete: () => {
-        this.loading = false;
-      }
-    });
+    this.auth
+      .requestPasswordReset(this.email)
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        })
+      )
+      .subscribe({
+        next: () => this.toast.success(this.translate.instant('auth.resetLinkSent'), `Check ${this.email}`),
+        error: (err) => {
+          const message = err?.error?.detail || this.translate.instant('auth.errorReset');
+          this.toast.error(message);
+        }
+      });
   }
 }

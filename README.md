@@ -51,6 +51,7 @@ cd infra && docker compose up --build
 - Backend health: `http://localhost:8001/api/v1/health`
 - Backend docs: `http://localhost:8001/docs`
 - Postgres: `localhost:5433` (named volume; use `docker compose down -v` to reset)
+- Redis: `localhost:6379` (shared rate limiting/caches; optional in non-Compose dev)
 
 After first boot / after a DB reset, seed data and bootstrap the owner:
 
@@ -134,4 +135,6 @@ The `Release` GitHub Actions workflow builds/pushes images when you push a tag l
 - `ARCHITECTURE.md` — high-level design notes
 - `CONTRIBUTING.md` — conventions and workflows
 - `docs/PRODUCTION.md` — production deployment guide
+- `docs/GOOGLE_OAUTH.md` — Google OAuth setup (origins + redirect URIs)
+- `docs/DEV_PORTS.md` — dev ports + proxy/CORS expectations
 - `backend/README.md`, `frontend/README.md`, `infra/README.md`

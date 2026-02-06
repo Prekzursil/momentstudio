@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ContainerComponent } from '../../layout/container.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
@@ -9,6 +9,7 @@ import { PasswordStrengthComponent } from '../../shared/password-strength.compon
 import { ToastService } from '../../core/toast.service';
 import { AuthService } from '../../core/auth.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { finalize } from 'rxjs';
 
 @Component({
   selector: 'app-password-reset',
@@ -83,7 +84,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
     </app-container>
   `
 })
-export class PasswordResetComponent {
+export class PasswordResetComponent implements OnInit {
   crumbs = [
     { label: 'nav.home', url: '/' },
     { label: 'auth.resetTitle' }
@@ -96,7 +97,17 @@ export class PasswordResetComponent {
   error = '';
   loading = false;
 
-  constructor(private toast: ToastService, private auth: AuthService, private translate: TranslateService) {}
+  constructor(
+    private toast: ToastService,
+    private auth: AuthService,
+    private translate: TranslateService,
+    private route: ActivatedRoute
+  ) {}
+
+  ngOnInit(): void {
+    const token = this.route.snapshot.queryParamMap.get('token');
+    if (token) this.token = token;
+  }
 
   onSubmit(form: NgForm): void {
     if (!form.valid) {
@@ -109,17 +120,21 @@ export class PasswordResetComponent {
     }
     this.error = '';
     this.loading = true;
-    this.auth.confirmPasswordReset(this.token, this.password).subscribe({
-      next: () => {
-        this.toast.success(this.translate.instant('auth.successReset'), this.translate.instant('auth.backToLogin'));
-      },
-      error: (err) => {
-        const message = err?.error?.detail || this.translate.instant('auth.errorReset');
-        this.toast.error(message);
-      },
-      complete: () => {
-        this.loading = false;
-      }
-    });
+    this.auth
+      .confirmPasswordReset(this.token, this.password)
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        })
+      )
+      .subscribe({
+        next: () => {
+          this.toast.success(this.translate.instant('auth.successReset'), this.translate.instant('auth.backToLogin'));
+        },
+        error: (err) => {
+          const message = err?.error?.detail || this.translate.instant('auth.errorReset');
+          this.toast.error(message);
+        }
+      });
   }
 }

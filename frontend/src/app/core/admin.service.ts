@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import type { HttpEvent } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { ApiService } from './api.service';
 
@@ -40,6 +41,7 @@ export interface AdminSummary {
   yesterday_refunds: number;
   refunds_delta_pct: number | null;
   anomalies?: AdminDashboardAnomalies;
+  alert_thresholds?: AdminDashboardAlertThresholds;
   system?: AdminDashboardSystemHealth;
 }
 
@@ -49,17 +51,160 @@ export interface AdminDashboardWindowMetric {
   current: number;
   previous: number;
   delta_pct: number | null;
+  is_alert?: boolean;
+  current_denominator?: number;
+  previous_denominator?: number;
+  current_rate_pct?: number | null;
+  previous_rate_pct?: number | null;
+  rate_delta_pct?: number | null;
 }
 
 export interface AdminDashboardAnomalies {
   failed_payments: AdminDashboardWindowMetric;
   refund_requests: AdminDashboardWindowMetric;
-  stockouts: { count: number };
+  stockouts: { count: number; is_alert?: boolean };
 }
 
 export interface AdminDashboardSystemHealth {
   db_ready: boolean;
   backup_last_at: string | null;
+}
+
+export interface AdminDashboardAlertThresholds {
+  failed_payments_min_count: number;
+  failed_payments_min_delta_pct: number | null;
+  refund_requests_min_count: number;
+  refund_requests_min_rate_pct: number | null;
+  stockouts_min_count: number;
+  updated_at: string | null;
+}
+
+export interface AdminDashboardAlertThresholdsUpdateRequest {
+  failed_payments_min_count: number;
+  failed_payments_min_delta_pct: number | null;
+  refund_requests_min_count: number;
+  refund_requests_min_rate_pct: number | null;
+  stockouts_min_count: number;
+}
+
+export interface AdminDashboardPaymentsHealthProvider {
+  provider: string;
+  successful_orders: number;
+  pending_payment_orders: number;
+  success_rate: number | null;
+  webhook_errors: number;
+  webhook_backlog: number;
+}
+
+export interface AdminDashboardPaymentsHealthWebhookError {
+  provider: string;
+  event_id: string;
+  event_type: string | null;
+  attempts: number;
+  last_attempt_at: string;
+  last_error: string | null;
+}
+
+export interface AdminDashboardPaymentsHealthResponse {
+  window_hours: number;
+  window_start: string;
+  window_end: string;
+  providers: AdminDashboardPaymentsHealthProvider[];
+  recent_webhook_errors: AdminDashboardPaymentsHealthWebhookError[];
+}
+
+export interface AdminRefundsBreakdownMetric {
+  count: number;
+  amount: number;
+}
+
+export interface AdminRefundsBreakdownProviderRow {
+  provider: string;
+  current: AdminRefundsBreakdownMetric;
+  previous: AdminRefundsBreakdownMetric;
+  delta_pct: { count: number | null; amount: number | null };
+}
+
+export interface AdminRefundsBreakdownReasonRow {
+  category: string;
+  current: number;
+  previous: number;
+  delta_pct: number | null;
+}
+
+export interface AdminRefundsBreakdownResponse {
+  window_days: number;
+  window_start: string;
+  window_end: string;
+  providers: AdminRefundsBreakdownProviderRow[];
+  missing_refunds: {
+    current: AdminRefundsBreakdownMetric;
+    previous: AdminRefundsBreakdownMetric;
+    delta_pct: { count: number | null; amount: number | null };
+  };
+  reasons: AdminRefundsBreakdownReasonRow[];
+}
+
+export interface AdminShippingPerformanceMetric {
+  count: number;
+  avg_hours: number | null;
+}
+
+export interface AdminShippingPerformanceRow {
+  courier: string;
+  current: AdminShippingPerformanceMetric;
+  previous: AdminShippingPerformanceMetric;
+  delta_pct: { avg_hours: number | null; count: number | null };
+}
+
+export interface AdminShippingPerformanceResponse {
+  window_days: number;
+  window_start: string;
+  window_end: string;
+  time_to_ship: AdminShippingPerformanceRow[];
+  delivery_time: AdminShippingPerformanceRow[];
+}
+
+export interface AdminStockoutImpactItem {
+  product_id: string;
+  product_slug: string;
+  product_name: string;
+  available_quantity: number;
+  reserved_in_carts: number;
+  reserved_in_orders: number;
+  stock_quantity: number;
+  demand_units: number;
+  demand_revenue: number;
+  estimated_missed_revenue: number;
+  currency: string;
+  allow_backorder: boolean;
+}
+
+export interface AdminStockoutImpactResponse {
+  window_days: number;
+  window_start: string;
+  window_end: string;
+  items: AdminStockoutImpactItem[];
+}
+
+export interface AdminChannelAttributionRow {
+  source: string;
+  medium: string | null;
+  campaign: string | null;
+  orders: number;
+  gross_sales: number;
+}
+
+export interface AdminChannelAttributionResponse {
+  range_days: number;
+  range_from: string;
+  range_to: string;
+  total_orders: number;
+  total_gross_sales: number;
+  tracked_orders: number;
+  tracked_gross_sales: number;
+  coverage_pct: number | null;
+  channels: AdminChannelAttributionRow[];
 }
 
 export interface AdminChannelBreakdownRow {
@@ -544,6 +689,31 @@ export interface RestockListResponse {
   };
 }
 
+export interface CartReservationItem {
+  cart_id: string;
+  updated_at: string;
+  customer_email?: string | null;
+  quantity: number;
+}
+
+export interface CartReservationsResponse {
+  cutoff: string;
+  items: CartReservationItem[];
+}
+
+export interface OrderReservationItem {
+  order_id: string;
+  reference_code?: string | null;
+  status: string;
+  created_at: string;
+  customer_email?: string | null;
+  quantity: number;
+}
+
+export interface OrderReservationsResponse {
+  items: OrderReservationItem[];
+}
+
 export interface RestockNoteUpsert {
   product_id: string;
   variant_id?: string | null;
@@ -816,6 +986,28 @@ export class AdminService {
     return this.api.get<AdminSummary>('/admin/dashboard/summary', params);
   }
 
+  paymentsHealth(params?: { since_hours?: number }): Observable<AdminDashboardPaymentsHealthResponse> {
+    return this.api.get<AdminDashboardPaymentsHealthResponse>('/admin/dashboard/payments-health', params as any);
+  }
+
+  refundsBreakdown(params?: { window_days?: number }): Observable<AdminRefundsBreakdownResponse> {
+    return this.api.get<AdminRefundsBreakdownResponse>('/admin/dashboard/refunds-breakdown', params as any);
+  }
+
+  shippingPerformance(params?: { window_days?: number }): Observable<AdminShippingPerformanceResponse> {
+    return this.api.get<AdminShippingPerformanceResponse>('/admin/dashboard/shipping-performance', params as any);
+  }
+
+  stockoutImpact(params?: { window_days?: number; limit?: number }): Observable<AdminStockoutImpactResponse> {
+    return this.api.get<AdminStockoutImpactResponse>('/admin/dashboard/stockout-impact', params as any);
+  }
+
+  channelAttribution(
+    params?: { range_days?: number; range_from?: string; range_to?: string; limit?: number }
+  ): Observable<AdminChannelAttributionResponse> {
+    return this.api.get<AdminChannelAttributionResponse>('/admin/dashboard/channel-attribution', params as any);
+  }
+
   funnel(params?: { range_days?: number; range_from?: string; range_to?: string }): Observable<AdminFunnelMetricsResponse> {
     return this.api.get<AdminFunnelMetricsResponse>('/admin/dashboard/funnel', params);
   }
@@ -898,7 +1090,7 @@ export class AdminService {
     return this.api.post<AdminAuditRetentionPurgeResponse>('/admin/dashboard/audit/retention/purge', payload);
   }
 
-  transferOwner(payload: { identifier: string; confirm: string; password: string }): Observable<OwnerTransferResponse> {
+  transferOwner(payload: { identifier: string; confirm: string }): Observable<OwnerTransferResponse> {
     return this.api.post<OwnerTransferResponse>('/admin/dashboard/owner/transfer', payload);
   }
 
@@ -929,6 +1121,26 @@ export class AdminService {
 
   exportRestockListCsv(params: { include_variants?: boolean; default_threshold?: number }): Observable<Blob> {
     return this.api.getBlob('/admin/dashboard/inventory/restock-list/export', params as any);
+  }
+
+  reservedCarts(params: {
+    product_id: string;
+    variant_id?: string | null;
+    include_pii?: boolean;
+    limit?: number;
+    offset?: number;
+  }): Observable<CartReservationsResponse> {
+    return this.api.get<CartReservationsResponse>('/admin/dashboard/inventory/reservations/carts', params as any);
+  }
+
+  reservedOrders(params: {
+    product_id: string;
+    variant_id?: string | null;
+    include_pii?: boolean;
+    limit?: number;
+    offset?: number;
+  }): Observable<OrderReservationsResponse> {
+    return this.api.get<OrderReservationsResponse>('/admin/dashboard/inventory/reservations/orders', params as any);
   }
 
   upsertRestockNote(payload: RestockNoteUpsert): Observable<RestockNoteRead | null> {
@@ -1097,6 +1309,12 @@ export class AdminService {
     return this.api.post<AdminProductDetail>(`/catalog/products/${slug}/images`, form);
   }
 
+  uploadProductImageWithProgress(slug: string, file: File): Observable<HttpEvent<AdminProductDetail>> {
+    const form = new FormData();
+    form.append('file', file);
+    return this.api.postWithProgress<AdminProductDetail>(`/catalog/products/${slug}/images`, form);
+  }
+
   deleteProductImage(slug: string, imageId: string): Observable<AdminProductDetail> {
     return this.api.delete<AdminProductDetail>(`/catalog/products/${slug}/images/${imageId}`);
   }
@@ -1160,6 +1378,16 @@ export class AdminService {
     return this.api.get<StockAdjustment[]>('/admin/dashboard/stock-adjustments', params as any);
   }
 
+  exportStockAdjustmentsCsv(params: {
+    product_id: string;
+    from_date?: string;
+    to_date?: string;
+    reason?: StockAdjustmentReason;
+    limit?: number;
+  }): Observable<Blob> {
+    return this.api.getBlob('/admin/dashboard/stock-adjustments/export', params as any);
+  }
+
   applyStockAdjustment(payload: {
     product_id: string;
     variant_id?: string | null;
@@ -1170,8 +1398,8 @@ export class AdminService {
     return this.api.post<StockAdjustment>('/admin/dashboard/stock-adjustments', payload);
   }
 
-  updateUserRole(userId: string, role: string, password: string): Observable<AdminUser> {
-    return this.api.patch<AdminUser>(`/admin/dashboard/users/${userId}/role`, { role, password });
+  updateUserRole(userId: string, role: string): Observable<AdminUser> {
+    return this.api.patch<AdminUser>(`/admin/dashboard/users/${userId}/role`, { role });
   }
 
   getMaintenance(): Observable<{ enabled: boolean }> {
@@ -1188,6 +1416,14 @@ export class AdminService {
 
   sendScheduledReport(payload: { kind: AdminScheduledReportKind; force?: boolean }): Observable<AdminScheduledReportSendResponse> {
     return this.api.post<AdminScheduledReportSendResponse>('/admin/dashboard/reports/send', payload);
+  }
+
+  getAlertThresholds(): Observable<AdminDashboardAlertThresholds> {
+    return this.api.get<AdminDashboardAlertThresholds>('/admin/dashboard/alert-thresholds');
+  }
+
+  updateAlertThresholds(payload: AdminDashboardAlertThresholdsUpdateRequest): Observable<AdminDashboardAlertThresholds> {
+    return this.api.put<AdminDashboardAlertThresholds>('/admin/dashboard/alert-thresholds', payload);
   }
 
   createFeaturedCollection(payload: { name: string; description?: string | null; product_ids?: string[] }): Observable<FeaturedCollection> {

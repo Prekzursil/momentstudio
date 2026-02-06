@@ -525,7 +525,7 @@ async def upsert_block(
 async def add_image(session: AsyncSession, block: ContentBlock, file, actor_id: UUID | None = None) -> ContentBlock:
     path, filename = storage.save_upload(
         file,
-        allowed_content_types=("image/png", "image/jpeg", "image/webp", "image/gif"),
+        allowed_content_types=("image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"),
         max_bytes=5 * 1024 * 1024,
         generate_thumbnails=True,
     )

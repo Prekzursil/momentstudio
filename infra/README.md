@@ -3,6 +3,7 @@
 The Docker Compose stack lives in `infra/docker-compose.yml` and starts:
 
 - Postgres (`db`) on `localhost:5433`
+- Redis (`redis`) on `localhost:6379` (used for shared rate limiting/caches)
 - FastAPI backend (`backend`) on `localhost:8001`
 - Angular frontend (`frontend`) on `localhost:4201`
 

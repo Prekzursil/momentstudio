@@ -159,6 +159,11 @@ export interface AdminAccessResponse {
   allowed: boolean;
 }
 
+export interface StepUpResponse {
+  step_up_token: string;
+  expires_at: string;
+}
+
 type StorageMode = 'local' | 'session';
 
 @Injectable({ providedIn: 'root' })
@@ -167,8 +172,10 @@ export class AuthService {
   private storageMode: StorageMode = 'session';
   private userSignal = signal<AuthUser | null>(null);
   private tokens: AuthTokens | null = null;
+  private stepUpToken: string | null = null;
   private refreshInFlight: Observable<AuthTokens | null> | null = null;
   private ensureInFlight: Observable<boolean> | null = null;
+  private stepUpInFlight: Observable<string | null> | null = null;
   private lastRevalidateAt = 0;
 
   constructor(private api: ApiService, private router: Router) {
@@ -219,6 +226,27 @@ export class AuthService {
 
   getRefreshToken(): string | null {
     return this.tokens?.refresh_token ?? null;
+  }
+
+  getStepUpToken(): string | null {
+    const token = (this.stepUpToken ?? '').trim();
+    if (!token) return null;
+    if (this.isJwtExpired(token)) {
+      this.stepUpToken = null;
+      return null;
+    }
+    return token;
+  }
+
+  clearStepUpToken(): void {
+    this.stepUpToken = null;
+  }
+
+  ensureStepUp(opts?: { silent?: boolean; prompt?: string }): Observable<string | null> {
+    void opts;
+    // Step-up prompts are intentionally disabled to avoid disruptive password popups
+    // throughout the admin UI.
+    return of(null);
   }
 
   login(
@@ -568,6 +596,8 @@ export class AuthService {
     this.clearImpersonation();
     this.clearStorage();
     this.tokens = null;
+    this.stepUpToken = null;
+    this.stepUpInFlight = null;
     this.userSignal.set(null);
     this.storageMode = 'session';
     if (opts?.redirectTo) {

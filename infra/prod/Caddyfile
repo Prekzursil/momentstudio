@@ -22,8 +22,30 @@ www.{$PUBLIC_DOMAIN} {
 		reverse_proxy backend:8000
 	}
 
+	@robots path /robots.txt
+	handle @robots {
+		rewrite * /api/v1/robots.txt
+		reverse_proxy backend:8000
+	}
+
+	@sitemap path /sitemap.xml
+	handle @sitemap {
+		rewrite * /api/v1/sitemap.xml
+		reverse_proxy backend:8000
+	}
+
 	# Everything else is served by the frontend (Angular build).
 	handle {
+			header {
+				Referrer-Policy "no-referrer"
+				X-Content-Type-Options "nosniff"
+				X-Frame-Options "DENY"
+				Permissions-Policy "geolocation=(self), microphone=(), camera=()"
+				# Angular CLI emits `onload="this.media='all'"` for the main stylesheet. CSP hashes don't
+				# apply to event handlers unless `unsafe-hashes` is present, so allow only this handler
+				# without enabling `unsafe-inline`.
+				Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' https://challenges.cloudflare.com 'unsafe-hashes' 'sha256-MhtPZXr7+LpJUY5qtMutB+qWfQtMaPccfe7QXtCcEYc='; connect-src 'self' https:; frame-src https://challenges.cloudflare.com; manifest-src 'self'; font-src 'self' data:;"
+			}
 		reverse_proxy frontend:80
 	}
 }

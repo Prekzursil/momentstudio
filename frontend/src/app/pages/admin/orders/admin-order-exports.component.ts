@@ -6,13 +6,15 @@ import { AdminOrderDocumentExport, AdminOrdersService } from '../../../core/admi
 import { ToastService } from '../../../core/toast.service';
 import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
+import { ErrorStateComponent } from '../../../shared/error-state.component';
+import { extractRequestId } from '../../../shared/http-error';
 import { SkeletonComponent } from '../../../shared/skeleton.component';
 import { AdminPageHeaderComponent } from '../shared/admin-page-header.component';
 
 @Component({
   selector: 'app-admin-order-exports',
   standalone: true,
-  imports: [CommonModule, TranslateModule, BreadcrumbComponent, ButtonComponent, SkeletonComponent, AdminPageHeaderComponent],
+  imports: [CommonModule, TranslateModule, BreadcrumbComponent, ButtonComponent, ErrorStateComponent, SkeletonComponent, AdminPageHeaderComponent],
   template: `
     <div class="grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
@@ -31,12 +33,13 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
         <app-skeleton [rows]="6"></app-skeleton>
       </div>
 
-      <div
+      <app-error-state
         *ngIf="!loading() && error()"
-        class="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
-      >
-        {{ error() }}
-      </div>
+        [message]="error()!"
+        [requestId]="errorRequestId()"
+        [showRetry]="true"
+        (retry)="load()"
+      ></app-error-state>
 
       <div
         *ngIf="!loading() && !error()"
@@ -103,6 +106,7 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
 export class AdminOrderExportsComponent implements OnInit {
   loading = signal(true);
   error = signal<string | null>(null);
+  errorRequestId = signal<string | null>(null);
   items = signal<AdminOrderDocumentExport[]>([]);
   meta = signal<{ total_pages: number } | null>(null);
   busyId = signal<string | null>(null);
@@ -140,14 +144,16 @@ export class AdminOrderExportsComponent implements OnInit {
   load(): void {
     this.loading.set(true);
     this.error.set(null);
+    this.errorRequestId.set(null);
     this.api.listDocumentExports({ page: this.page, limit: this.limit }).subscribe({
       next: (res) => {
         this.items.set(res?.items || []);
         this.meta.set((res as any)?.meta || null);
         this.loading.set(false);
       },
-      error: () => {
+      error: (err) => {
         this.error.set(this.translate.instant('adminUi.orders.exports.errors.load'));
+        this.errorRequestId.set(extractRequestId(err));
         this.items.set([]);
         this.meta.set(null);
         this.loading.set(false);

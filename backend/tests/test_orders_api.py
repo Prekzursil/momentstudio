@@ -17,6 +17,7 @@ from app.models.address import Address
 from app.models.catalog import Category, Product, ProductStatus
 from app.models.cart import Cart, CartItem
 from app.models.coupons_v2 import Coupon, CouponRedemption, CouponReservation, CouponVisibility, Promotion, PromotionDiscountType
+from app.models.email_event import EmailDeliveryEvent
 from app.models.order import Order, OrderEvent, OrderStatus, OrderItem
 from app.models.passkeys import UserPasskey
 from app.models.user import User, UserRole
@@ -27,6 +28,7 @@ from app.services import payments as payments_service
 from app.services import email as email_service
 from app.schemas.order import ShippingMethodCreate
 from app.core.config import settings
+from app.core import security
 from app.core.security import create_receipt_token
 
 
@@ -53,7 +55,11 @@ def test_app() -> Dict[str, object]:
 
 
 def auth_headers(token: str) -> dict[str, str]:
-    return {"Authorization": f"Bearer {token}"}
+    headers = {"Authorization": f"Bearer {token}"}
+    payload = security.decode_token(token)
+    if payload and payload.get("sub"):
+        headers["X-Admin-Step-Up"] = security.create_step_up_token(str(payload["sub"]))
+    return headers
 
 
 def create_user_token(session_factory, email="buyer@example.com", admin: bool = False):
@@ -411,6 +417,9 @@ def test_admin_order_search_and_detail(test_app: Dict[str, object], monkeypatch:
     payload = search.json()
     assert payload["meta"]["total_items"] >= 1
     assert any(item["id"] == order_id for item in payload["items"])
+    matching = next((item for item in payload["items"] if item["id"] == order_id), None)
+    assert matching is not None
+    assert matching.get("payment_method") in {"stripe", "paypal", "netopia", "cod"}
 
     by_user = client.get(
         "/api/v1/orders/admin/search",
@@ -690,10 +699,38 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     assert fulfill.status_code == 200
     assert fulfill.json()["items"][0]["shipped_quantity"] == 1
 
-    # invalid transition pending -> shipped
+    async def seed_cod_pending_acceptance_order() -> str:
+        async with SessionLocal() as session:
+            order = Order(
+                user_id=user_id,
+                status=OrderStatus.pending_acceptance,
+                reference_code="CODPEND1",
+                customer_email="buyer@example.com",
+                customer_name="Buyer",
+                total_amount=Decimal("10.00"),
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                currency="RON",
+                payment_method="cod",
+            )
+            session.add(order)
+            await session.commit()
+            await session.refresh(order)
+            return str(order.id)
+
+    cod_pending_id = asyncio.run(seed_cod_pending_acceptance_order())
+    cod_ship = client.patch(
+        f"/api/v1/orders/admin/{cod_pending_id}",
+        json={"status": "shipped"},
+        headers=auth_headers(admin_token),
+    )
+    assert cod_ship.status_code == 200, cod_ship.text
+    assert cod_ship.json()["status"] == "shipped"
+
+    # invalid transition pending -> refunded
     bad = client.patch(
         f"/api/v1/orders/admin/{order_id}",
-        json={"status": "shipped"},
+        json={"status": "refunded"},
         headers=auth_headers(admin_token),
     )
     assert bad.status_code == 400
@@ -806,7 +843,7 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     assert packing.headers.get("content-type", "").startswith("application/pdf")
     assert packing.headers.get("content-disposition", "").startswith("attachment;")
     assert packing.content.startswith(b"%PDF")
-    assert sent["shipped"] == 1
+    assert sent["shipped"] == 2
 
     batch_packing = client.post(
         "/api/v1/orders/admin/batch/packing-slips",
@@ -817,6 +854,25 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     assert batch_packing.headers.get("content-type", "").startswith("application/pdf")
     assert batch_packing.headers.get("content-disposition", "").startswith("attachment;")
     assert batch_packing.content.startswith(b"%PDF")
+
+    pick_list_csv = client.post(
+        "/api/v1/orders/admin/batch/pick-list.csv",
+        headers=auth_headers(admin_token),
+        json={"order_ids": [order_id, stripe_order_id]},
+    )
+    assert pick_list_csv.status_code == 200, pick_list_csv.text
+    assert pick_list_csv.headers.get("content-type", "").startswith("text/csv")
+    assert b"sku,product_name,variant,quantity,orders" in pick_list_csv.content
+
+    pick_list_pdf = client.post(
+        "/api/v1/orders/admin/batch/pick-list.pdf",
+        headers=auth_headers(admin_token),
+        json={"order_ids": [order_id, stripe_order_id]},
+    )
+    assert pick_list_pdf.status_code == 200, pick_list_pdf.text
+    assert pick_list_pdf.headers.get("content-type", "").startswith("application/pdf")
+    assert pick_list_pdf.headers.get("content-disposition", "").startswith("attachment;")
+    assert pick_list_pdf.content.startswith(b"%PDF")
 
     receipt = client.get(f"/api/v1/orders/{order_id}/receipt", headers=auth_headers(token))
     assert receipt.status_code == 200
@@ -853,6 +909,137 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     )
     assert confirm.status_code == 200
     assert sent["count"] == 2
+
+
+def test_admin_order_email_events_endpoint(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    admin_token, _ = create_user_token(SessionLocal, email="admin-email-events@example.com", admin=True)
+    _, user_id = create_user_token(SessionLocal, email="buyer-email-events@example.com")
+
+    async def seed() -> tuple[str, str]:
+        async with SessionLocal() as session:
+            order = Order(
+                user_id=user_id,
+                status=OrderStatus.pending_acceptance,
+                reference_code="EMAIL1",
+                customer_email="buyer-email-events@example.com",
+                customer_name="Buyer",
+                total_amount=Decimal("10.00"),
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                currency="RON",
+                payment_method="cod",
+            )
+            session.add(order)
+            await session.commit()
+            await session.refresh(order)
+
+            event = EmailDeliveryEvent(
+                to_email="buyer-email-events@example.com",
+                subject="Comanda EMAIL1 a fost expediată",
+                status="sent",
+                error_message=None,
+            )
+            session.add(event)
+            await session.commit()
+            await session.refresh(event)
+            return str(order.id), str(event.id)
+
+    order_id, event_id = asyncio.run(seed())
+
+    masked = client.get(f"/api/v1/orders/admin/{order_id}/email-events", headers=auth_headers(admin_token))
+    assert masked.status_code == 200, masked.text
+    rows = masked.json()
+    assert len(rows) == 1
+    assert rows[0]["id"] == event_id
+    assert rows[0]["to_email"] != "buyer-email-events@example.com"
+    assert rows[0]["subject"] == "Comanda EMAIL1 a fost expediată"
+    assert rows[0]["status"] == "sent"
+
+    unmasked = client.get(
+        f"/api/v1/orders/admin/{order_id}/email-events",
+        headers=auth_headers(admin_token),
+        params={"include_pii": True},
+    )
+    assert unmasked.status_code == 200, unmasked.text
+    rows_pii = unmasked.json()
+    assert rows_pii[0]["to_email"] == "buyer-email-events@example.com"
+
+
+def test_admin_order_tag_stats_and_rename(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    admin_token, _ = create_user_token(SessionLocal, email="admin-tags@example.com", admin=True)
+    _, user_id = create_user_token(SessionLocal, email="buyer-tags@example.com")
+
+    async def seed_order() -> str:
+        async with SessionLocal() as session:
+            order = Order(
+                user_id=user_id,
+                status=OrderStatus.pending_acceptance,
+                reference_code="TAG1",
+                customer_email="buyer-tags@example.com",
+                customer_name="Buyer",
+                total_amount=Decimal("10.00"),
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                currency="RON",
+                payment_method="cod",
+            )
+            session.add(order)
+            await session.commit()
+            await session.refresh(order)
+            return str(order.id)
+
+    order_id = asyncio.run(seed_order())
+
+    tagged = client.post(
+        f"/api/v1/orders/admin/{order_id}/tags",
+        json={"tag": "VIP"},
+        headers=auth_headers(admin_token),
+    )
+    assert tagged.status_code == 200, tagged.text
+    assert tagged.json()["tags"] == ["vip"]
+
+    stats = client.get("/api/v1/orders/admin/tags/stats", headers=auth_headers(admin_token))
+    assert stats.status_code == 200, stats.text
+    items = stats.json()["items"]
+    vip_row = next((row for row in items if row.get("tag") == "vip"), None)
+    assert vip_row is not None
+    assert int(vip_row.get("count") or 0) >= 1
+
+    rename = client.post(
+        "/api/v1/orders/admin/tags/rename",
+        headers=auth_headers(admin_token),
+        json={"from_tag": "vip", "to_tag": "priority"},
+    )
+    assert rename.status_code == 200, rename.text
+    assert rename.json()["from_tag"] == "vip"
+    assert rename.json()["to_tag"] == "priority"
+    assert int(rename.json()["total"] or 0) >= 1
+
+    detail = client.get(f"/api/v1/orders/admin/{order_id}", headers=auth_headers(admin_token))
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["tags"] == ["priority"]
+
+    old_search = client.get(
+        "/api/v1/orders/admin/search",
+        params={"tag": "vip", "page": 1, "limit": 10},
+        headers=auth_headers(admin_token),
+    )
+    assert old_search.status_code == 200, old_search.text
+    assert not any(item["id"] == order_id for item in old_search.json()["items"])
+
+    new_search = client.get(
+        "/api/v1/orders/admin/search",
+        params={"tag": "priority", "page": 1, "limit": 10},
+        headers=auth_headers(admin_token),
+    )
+    assert new_search.status_code == 200, new_search.text
+    assert any(item["id"] == order_id for item in new_search.json()["items"])
 
 
 def test_admin_partial_refunds(test_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1480,3 +1667,93 @@ def test_admin_shipping_label_upload_download_and_delete(
         headers=auth_headers(admin_token),
     )
     assert missing.status_code == 404
+
+
+def test_admin_batch_shipping_labels_zip(test_app: Dict[str, object], tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    monkeypatch.setattr(settings, "private_media_root", str(tmp_path / "private_uploads"))
+
+    admin_token, _ = create_user_token(SessionLocal, email="admin-batch-labels@example.com", admin=True)
+
+    async def seed_orders() -> tuple[UUID, UUID]:
+        async with SessionLocal() as session:
+            first = Order(
+                user_id=None,
+                status=OrderStatus.pending_acceptance,
+                reference_code="BATCHLABEL1",
+                customer_email="batch1@example.com",
+                customer_name="Batch One",
+                total_amount=Decimal("10.00"),
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                currency="RON",
+            )
+            second = Order(
+                user_id=None,
+                status=OrderStatus.pending_acceptance,
+                reference_code="BATCHLABEL2",
+                customer_email="batch2@example.com",
+                customer_name="Batch Two",
+                total_amount=Decimal("10.00"),
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                currency="RON",
+            )
+            session.add_all([first, second])
+            await session.commit()
+            await session.refresh(first)
+            await session.refresh(second)
+            return first.id, second.id
+
+    first_id, second_id = asyncio.run(seed_orders())
+
+    missing_all = client.post(
+        "/api/v1/orders/admin/batch/shipping-labels.zip",
+        headers=auth_headers(admin_token),
+        json={"order_ids": [str(first_id), str(second_id)]},
+    )
+    assert missing_all.status_code == 404
+    assert str(first_id) in (missing_all.json().get("detail") or {}).get("missing_shipping_label_order_ids", [])
+
+    upload_first = client.post(
+        f"/api/v1/orders/admin/{first_id}/shipping-label",
+        headers=auth_headers(admin_token),
+        files={"file": ("label.pdf", b"%PDF-1.4 first", "application/pdf")},
+    )
+    assert upload_first.status_code == 200, upload_first.text
+
+    missing_one = client.post(
+        "/api/v1/orders/admin/batch/shipping-labels.zip",
+        headers=auth_headers(admin_token),
+        json={"order_ids": [str(first_id), str(second_id)]},
+    )
+    assert missing_one.status_code == 404
+    assert str(second_id) in (missing_one.json().get("detail") or {}).get("missing_shipping_label_order_ids", [])
+
+    upload_second = client.post(
+        f"/api/v1/orders/admin/{second_id}/shipping-label",
+        headers=auth_headers(admin_token),
+        files={"file": ("label2.pdf", b"%PDF-1.4 second", "application/pdf")},
+    )
+    assert upload_second.status_code == 200, upload_second.text
+
+    download = client.post(
+        "/api/v1/orders/admin/batch/shipping-labels.zip",
+        headers=auth_headers(admin_token),
+        json={"order_ids": [str(first_id), str(second_id)]},
+    )
+    assert download.status_code == 200, download.text
+    assert download.headers.get("content-type", "").startswith("application/zip")
+    assert download.content[:2] == b"PK"
+
+    import io
+    import zipfile
+
+    with zipfile.ZipFile(io.BytesIO(download.content)) as zf:
+        names = zf.namelist()
+        assert any("BATCHLABEL1" in name for name in names)
+        assert any("BATCHLABEL2" in name for name in names)
+        first_file = zf.read(names[0])
+        assert first_file.startswith(b"%PDF")

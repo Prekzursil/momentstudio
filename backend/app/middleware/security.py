@@ -12,27 +12,93 @@ from app.core.security import decode_token
 
 audit_logger = logging.getLogger("app.audit")
 
-SENSITIVE_KEYS = {"password", "new_password", "token", "refresh_token", "email"}
+_SENSITIVE_EXACT_KEYS = {
+    # Auth/session secrets
+    "password",
+    "new_password",
+    "current_password",
+    "token",
+    "refresh_token",
+    "access_token",
+    "id_token",
+    "client_secret",
+    "secret",
+    "api_key",
+    "captcha_token",
+    "turnstile_token",
+    # Common PII fields
+    "email",
+    "phone",
+    "first_name",
+    "middle_name",
+    "last_name",
+}
+_SENSITIVE_KEY_FRAGMENTS = (
+    "password",
+    "token",
+    "secret",
+    "api_key",
+    "authorization",
+    "cookie",
+    "session",
+    "address",
+    "street",
+    "city",
+    "county",
+    "state",
+    "postal",
+    "zip",
+    "note",
+)
 
 
-def _redact_payload(payload: Any) -> Any:
+def _is_sensitive_key(key: str) -> bool:
+    lowered = (key or "").strip().lower()
+    if not lowered:
+        return False
+    if lowered in _SENSITIVE_EXACT_KEYS:
+        return True
+    return any(fragment in lowered for fragment in _SENSITIVE_KEY_FRAGMENTS)
+
+
+def _redact_payload(payload: Any, *, _depth: int = 0) -> Any:
+    if _depth >= 6:
+        return "***"
     if isinstance(payload, dict):
-        return {k: ("***" if k.lower() in SENSITIVE_KEYS else _redact_payload(v)) for k, v in payload.items()}
+        redacted: dict[str, Any] = {}
+        for idx, (k, v) in enumerate(payload.items()):
+            if idx >= 80:
+                redacted["..."] = "truncated"
+                break
+            key = str(k)
+            redacted[key] = "***" if _is_sensitive_key(key) else _redact_payload(v, _depth=_depth + 1)
+        return redacted
     if isinstance(payload, list):
-        return [_redact_payload(item) for item in payload]
+        items: list[Any] = []
+        for idx, item in enumerate(payload):
+            if idx >= 80:
+                items.append("...truncated")
+                break
+            items.append(_redact_payload(item, _depth=_depth + 1))
+        return items
+    if isinstance(payload, str) and len(payload) > 2000:
+        return payload[:2000]
     return payload
 
 
 class AuditMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         body_text: str | None = None
-        try:
-            raw_body = await request.body()
-            request._body = raw_body  # type: ignore[attr-defined]
-            if raw_body and len(raw_body) < 4096:
-                body_text = raw_body.decode("utf-8", errors="replace")
-        except Exception:
-            body_text = None
+        max_bytes = int(getattr(settings, "audit_log_max_body_bytes", 4096) or 4096)
+        log_payload = bool(getattr(settings, "audit_log_request_payload", True))
+        if log_payload:
+            try:
+                raw_body = await request.body()
+                request._body = raw_body  # type: ignore[attr-defined]
+                if raw_body and len(raw_body) < max_bytes:
+                    body_text = raw_body.decode("utf-8", errors="replace")
+            except Exception:
+                body_text = None
 
         user_id: str | None = None
         auth_header = request.headers.get("authorization")

@@ -35,6 +35,16 @@ services:
       retries: 20
     logging: *default_logging
 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    logging: *default_logging
+
   backend:
     build:
       context: ../..
@@ -45,10 +55,13 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-production}
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-adrianaart}
       FRONTEND_ORIGIN: https://${PUBLIC_DOMAIN:-momentstudio.ro}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
     volumes:
       - ../../uploads:/app/uploads
       - ../../private_uploads:/app/private_uploads

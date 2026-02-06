@@ -3,7 +3,7 @@ import { Observable } from 'rxjs';
 
 import { ApiService } from './api.service';
 
-export type SupportTopic = 'contact' | 'support' | 'refund' | 'dispute';
+export type SupportTopic = 'contact' | 'support' | 'refund' | 'dispute' | 'feedback';
 export type SupportStatus = 'new' | 'triaged' | 'resolved';
 export type StaffRole = 'customer' | 'support' | 'fulfillment' | 'content' | 'admin' | 'owner';
 
@@ -81,6 +81,10 @@ export interface SupportSlaSettings {
 @Injectable({ providedIn: 'root' })
 export class AdminSupportService {
   constructor(private api: ApiService) {}
+
+  submitFeedback(payload: { message: string; context?: string | null }): Observable<AdminContactSubmissionRead> {
+    return this.api.post<AdminContactSubmissionRead>('/support/admin/feedback', payload);
+  }
 
   list(params: {
     q?: string;

@@ -20,6 +20,7 @@ import { AdminFavoriteItem, AdminFavoritesService } from '../../../core/admin-fa
 import { ToastService } from '../../../core/toast.service';
 import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
+import { CopyButtonComponent } from '../../../shared/copy-button.component';
 import { ErrorStateComponent } from '../../../shared/error-state.component';
 import { extractRequestId } from '../../../shared/http-error';
 import { InputComponent } from '../../../shared/input.component';
@@ -67,6 +68,7 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
 	    TranslateModule,
 	    BreadcrumbComponent,
 	    ButtonComponent,
+      CopyButtonComponent,
 	    ErrorStateComponent,
 	    InputComponent,
 	    HelpPanelComponent,
@@ -314,7 +316,14 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
           <div *ngIf="selectedUser()" class="grid gap-3">
             <div class="rounded-xl border border-slate-200 p-3 grid gap-1 dark:border-slate-800">
               <div class="font-semibold text-slate-900 dark:text-slate-50">{{ identityLabel(selectedUser()!) }}</div>
-              <div class="text-sm text-slate-600 dark:text-slate-300">{{ selectedUser()!.email }}</div>
+              <div class="flex flex-wrap items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                <span class="truncate max-w-[320px]">{{ selectedUser()!.email }}</span>
+                <app-copy-button [value]="selectedUser()!.email"></app-copy-button>
+              </div>
+              <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                <span class="font-mono break-all">{{ selectedUser()!.id }}</span>
+                <app-copy-button [value]="selectedUser()!.id"></app-copy-button>
+              </div>
               <div *ngIf="vip" class="mt-2">
                 <span class="inline-flex items-center rounded-full bg-indigo-100 px-2 py-1 text-xs font-semibold text-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-100">
                   {{ 'adminUi.users.vip' | translate }}
@@ -474,6 +483,13 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
                   [label]="'adminUi.users.saveSecurity' | translate"
                   [disabled]="securityBusy()"
                   (action)="saveSecurity()"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.users.sendPasswordReset' | translate"
+                  [disabled]="securityBusy() || passwordResetEmailBusy()"
+                  (action)="sendPasswordResetEmail()"
                 ></app-button>
               </div>
             </div>
@@ -855,20 +871,7 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
 	              </button>
 	            </div>
 
-	            <p class="mt-3 text-sm text-slate-700 dark:text-slate-200">
-	              {{ 'adminUi.users.rolePasswordPrompt' | translate }}
-	            </p>
-
-	            <div class="mt-3">
-	              <app-input
-	                [label]="'adminUi.users.rolePasswordLabel' | translate"
-	                type="password"
-	                [(value)]="roleChangePassword"
-	                [placeholder]="'auth.password' | translate"
-	                autocomplete="current-password"
-	              ></app-input>
-	            </div>
-	            <div *ngIf="roleChangeError()" class="mt-2 text-sm text-rose-700 dark:text-rose-300">{{ roleChangeError() }}</div>
+		            <div *ngIf="roleChangeError()" class="mt-2 text-sm text-rose-700 dark:text-rose-300">{{ roleChangeError() }}</div>
 
 	            <div class="mt-4 flex justify-end gap-2">
 	              <app-button
@@ -923,7 +926,6 @@ export class AdminUsersComponent implements OnInit {
   roleChangeOpen = signal(false);
   roleChangeBusy = signal(false);
   roleChangeError = signal<string | null>(null);
-  roleChangePassword = '';
 
   aliases = signal<AdminUserAliasesResponse | null>(null);
   aliasesLoading = signal(false);
@@ -940,6 +942,7 @@ export class AdminUsersComponent implements OnInit {
   lockedReason = '';
   passwordResetRequired = false;
   securityBusy = signal(false);
+  passwordResetEmailBusy = signal(false);
 
   emailHistory = signal<AdminEmailVerificationHistoryResponse | null>(null);
   emailHistoryLoading = signal(false);
@@ -1173,7 +1176,6 @@ export class AdminUsersComponent implements OnInit {
     if (!user) return;
     if (user.role === 'owner') return;
     if (this.selectedRole === user.role) return;
-    this.roleChangePassword = '';
     this.roleChangeError.set(null);
     this.roleChangeOpen.set(true);
   }
@@ -1182,7 +1184,6 @@ export class AdminUsersComponent implements OnInit {
     this.roleChangeOpen.set(false);
     this.roleChangeBusy.set(false);
     this.roleChangeError.set(null);
-    this.roleChangePassword = '';
   }
 
   confirmRoleChange(): void {
@@ -1193,15 +1194,10 @@ export class AdminUsersComponent implements OnInit {
       this.closeRoleChange();
       return;
     }
-    const password = this.roleChangePassword.trim();
-    if (!password) {
-      this.roleChangeError.set(this.t('adminUi.users.rolePasswordRequired'));
-      return;
-    }
 
     this.roleChangeBusy.set(true);
     this.roleChangeError.set(null);
-    this.admin.updateUserRole(user.id, this.selectedRole, password).subscribe({
+    this.admin.updateUserRole(user.id, this.selectedRole).subscribe({
       next: (updated) => {
         this.toast.success(this.t('adminUi.users.success.role'));
         this.selectedUser.set({ ...user, role: updated.role });
@@ -1431,6 +1427,24 @@ export class AdminUsersComponent implements OnInit {
       error: () => {
         this.toast.error(this.t('adminUi.users.errors.security'));
         this.securityBusy.set(false);
+      }
+    });
+  }
+
+  sendPasswordResetEmail(): void {
+    const user = this.selectedUser();
+    if (!user) return;
+    const ok = confirm(this.t('adminUi.users.confirms.passwordResetEmail'));
+    if (!ok) return;
+    this.passwordResetEmailBusy.set(true);
+    this.usersApi.resendPasswordReset(user.id).subscribe({
+      next: () => {
+        this.toast.success(this.t('adminUi.users.success.passwordResetSent'));
+        this.passwordResetEmailBusy.set(false);
+      },
+      error: () => {
+        this.toast.error(this.t('adminUi.users.errors.passwordResetSent'));
+        this.passwordResetEmailBusy.set(false);
       }
     });
   }

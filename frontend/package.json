@@ -3,13 +3,12 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "postinstall": "node scripts/patch-node-deprecations.mjs",
     "prestart": "node scripts/generate-config.mjs",
-    "start": "ng serve --proxy-config proxy.conf.json",
+    "start": "node --disable-warning=DEP0060 ./node_modules/@angular/cli/bin/ng.js serve --proxy-config proxy.conf.json",
     "prebuild": "node scripts/generate-config.mjs",
-    "build": "ng build",
+    "build": "node --disable-warning=DEP0060 ./node_modules/@angular/cli/bin/ng.js build",
     "pretest": "node scripts/generate-config.mjs",
-    "test": "ng test",
+    "test": "node --disable-warning=DEP0060 ./node_modules/@angular/cli/bin/ng.js test",
     "lint": "eslint .",
     "i18n:check": "node scripts/check-i18n.mjs",
     "e2e": "playwright test"

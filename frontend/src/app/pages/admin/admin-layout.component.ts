@@ -8,10 +8,13 @@ import { filter } from 'rxjs/operators';
 import { AuthService } from '../../core/auth.service';
 import { AdminFavoritesService } from '../../core/admin-favorites.service';
 import { AdminRecentService } from '../../core/admin-recent.service';
+import { AdminSupportService } from '../../core/admin-support.service';
 import { AdminService } from '../../core/admin.service';
 import { AdminUiPrefsService } from '../../core/admin-ui-prefs.service';
 import { OpsService } from '../../core/ops.service';
+import { ToastService } from '../../core/toast.service';
 import { ContainerComponent } from '../../layout/container.component';
+import { ModalComponent } from '../../shared/modal.component';
 
 type AdminNavItem = {
   path: string;
@@ -23,7 +26,7 @@ type AdminNavItem = {
 @Component({
   selector: 'app-admin-layout',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, RouterLinkActive, RouterOutlet, TranslateModule, ContainerComponent],
+  imports: [CommonModule, FormsModule, RouterLink, RouterLinkActive, RouterOutlet, TranslateModule, ContainerComponent, ModalComponent],
   template: `
 	    <app-container classes="py-8">
 	      <div class="grid lg:grid-cols-[260px_1fr] gap-6">
@@ -272,25 +275,80 @@ type AdminNavItem = {
               </ng-container>
               <ng-template #fullLabel>{{ item.labelKey | translate }}</ng-template>
             </a>
-            <button
-              type="button"
-              class="h-9 w-9 rounded-lg border border-transparent text-slate-400 hover:bg-slate-50 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-slate-800/60 dark:hover:text-slate-200"
-              [attr.aria-label]="(isNavFavorite(item) ? 'adminUi.favorites.unpin' : 'adminUi.favorites.pin') | translate"
-              (click)="toggleNavFavorite(item, $event)"
-            >
-              <span aria-hidden="true" class="text-base leading-none" [class.text-amber-500]="isNavFavorite(item)">
-                {{ isNavFavorite(item) ? '★' : '☆' }}
-              </span>
-            </button>
-          </div>
-        </aside>
+	            <button
+	              type="button"
+	              class="h-9 w-9 rounded-lg border border-transparent text-slate-400 hover:bg-slate-50 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-slate-800/60 dark:hover:text-slate-200"
+	              [attr.aria-label]="(isNavFavorite(item) ? 'adminUi.favorites.unpin' : 'adminUi.favorites.pin') | translate"
+	              (click)="toggleNavFavorite(item, $event)"
+	            >
+	              <span aria-hidden="true" class="text-base leading-none" [class.text-amber-500]="isNavFavorite(item)">
+	                {{ isNavFavorite(item) ? '★' : '☆' }}
+	              </span>
+	            </button>
+	          </div>
 
-        <main class="min-w-0">
-          <router-outlet></router-outlet>
-        </main>
-      </div>
-    </app-container>
-  `
+            <div class="mt-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+              <button
+                type="button"
+                class="w-full rounded-lg hover:bg-slate-50 hover:text-slate-900 dark:hover:bg-slate-800/60 dark:hover:text-white"
+                [ngClass]="uiPrefs.sidebarCompact() ? 'px-2.5 py-1.5 text-xs font-semibold' : 'px-3 py-2 text-sm font-semibold'"
+                (click)="openFeedback()"
+              >
+                {{ 'adminUi.feedback.open' | translate }}
+              </button>
+            </div>
+	        </aside>
+	
+	        <main class="min-w-0">
+	          <router-outlet></router-outlet>
+	        </main>
+	      </div>
+
+        <app-modal
+          [open]="feedbackOpen"
+          [title]="'adminUi.feedback.title' | translate"
+          [subtitle]="'adminUi.feedback.subtitle' | translate"
+          [cancelLabel]="'adminUi.actions.cancel' | translate"
+          [confirmLabel]="'adminUi.feedback.submit' | translate"
+          [confirmDisabled]="feedbackSending || !(feedbackMessage || '').trim()"
+          (confirm)="submitFeedback()"
+          (closed)="closeFeedback()"
+        >
+          <div class="grid gap-3">
+            <p class="text-xs text-slate-600 dark:text-slate-300">
+              {{ 'adminUi.feedback.hint' | translate }}
+            </p>
+
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+              {{ 'adminUi.feedback.messageLabel' | translate }}
+              <textarea
+                class="min-h-[120px] w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                [placeholder]="'adminUi.feedback.messagePlaceholder' | translate"
+                [(ngModel)]="feedbackMessage"
+              ></textarea>
+            </label>
+
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+              {{ 'adminUi.feedback.contextLabel' | translate }}
+              <textarea
+                class="min-h-[84px] w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                [placeholder]="'adminUi.feedback.contextPlaceholder' | translate"
+                [(ngModel)]="feedbackContext"
+              ></textarea>
+            </label>
+
+            <label class="inline-flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
+              <input type="checkbox" [(ngModel)]="feedbackIncludePage" />
+              {{ 'adminUi.feedback.includePage' | translate }}
+            </label>
+
+            <div *ngIf="feedbackError" class="text-sm text-rose-700 dark:text-rose-200">
+              {{ feedbackError }}
+            </div>
+          </div>
+        </app-modal>
+	    </app-container>
+	  `
 })
 export class AdminLayoutComponent implements OnInit, OnDestroy {
   constructor(
@@ -301,13 +359,16 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
     public uiPrefs: AdminUiPrefsService,
     private recent: AdminRecentService,
     private admin: AdminService,
-    private ops: OpsService
+    private ops: OpsService,
+    private support: AdminSupportService,
+    private toast: ToastService
   ) {}
 
   private pendingGoAt: number | null = null;
   navQuery = '';
   private navSub?: Subscription;
   private alertsIntervalId: number | null = null;
+  private feedbackSub?: Subscription;
 
   alertsLoading = false;
   alertsError: string | null = null;
@@ -316,6 +377,13 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
   failedEmailsCount = 0;
   trainingSaving = false;
   trainingError: string | null = null;
+
+  feedbackOpen = false;
+  feedbackMessage = '';
+  feedbackContext = '';
+  feedbackIncludePage = true;
+  feedbackSending = false;
+  feedbackError: string | null = null;
 
   private readonly allNavItems: AdminNavItem[] = [
     { path: '/admin/dashboard', labelKey: 'adminUi.nav.dashboard', section: 'dashboard', exact: true },
@@ -347,10 +415,53 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.navSub?.unsubscribe();
+    this.feedbackSub?.unsubscribe();
     if (this.alertsIntervalId !== null) {
       window.clearInterval(this.alertsIntervalId);
       this.alertsIntervalId = null;
     }
+  }
+
+  openFeedback(): void {
+    this.feedbackOpen = true;
+    this.feedbackMessage = '';
+    this.feedbackContext = '';
+    this.feedbackIncludePage = true;
+    this.feedbackSending = false;
+    this.feedbackError = null;
+  }
+
+  closeFeedback(): void {
+    this.feedbackOpen = false;
+    this.feedbackSending = false;
+    this.feedbackError = null;
+  }
+
+  submitFeedback(): void {
+    if (this.feedbackSending) return;
+    const message = (this.feedbackMessage || '').trim();
+    if (!message) return;
+
+    const contextParts: string[] = [];
+    if (this.feedbackIncludePage) contextParts.push(`Page: ${this.router.url}`);
+    const extra = (this.feedbackContext || '').trim();
+    if (extra) contextParts.push(extra);
+    const context = contextParts.join('\n').trim() || null;
+
+    this.feedbackSending = true;
+    this.feedbackError = null;
+    this.feedbackSub?.unsubscribe();
+    this.feedbackSub = this.support.submitFeedback({ message, context }).subscribe({
+      next: () => {
+        this.feedbackSending = false;
+        this.toast.success(this.translate.instant('adminUi.feedback.success'));
+        this.closeFeedback();
+      },
+      error: () => {
+        this.feedbackSending = false;
+        this.feedbackError = this.translate.instant('adminUi.feedback.errors.send');
+      }
+    });
   }
 
   filteredNavItems(): AdminNavItem[] {

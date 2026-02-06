@@ -1,7 +1,9 @@
 import csv
 import io
 import re
+import unicodedata
 from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -20,14 +22,25 @@ from sqlalchemy import (
     select,
     union_all,
 )
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased, selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import security
 from app.core.config import settings
 from app.core.dependencies import require_admin, require_admin_section, require_owner
+from app.core.rate_limit import limiter
 from app.db.session import get_session
-from app.models.catalog import Product, ProductAuditLog, Category, ProductStatus, ProductTranslation
+from app.models.catalog import (
+    Category,
+    Product,
+    ProductAuditLog,
+    ProductStatus,
+    ProductTranslation,
+    ProductVariant,
+    StockAdjustment,
+    StockAdjustmentReason,
+)
 from app.models.content import ContentBlock, ContentAuditLog
 from app.schemas.catalog_admin import (
     AdminProductByIdsRequest,
@@ -41,6 +54,10 @@ from app.schemas.admin_dashboard_search import (
     AdminDashboardSearchResponse,
     AdminDashboardSearchResult,
 )
+from app.schemas.admin_dashboard_alert_thresholds import (
+    AdminDashboardAlertThresholdsResponse,
+    AdminDashboardAlertThresholdsUpdateRequest,
+)
 from app.schemas.admin_dashboard_scheduled import (
     AdminDashboardScheduledTasksResponse,
     ScheduledPublishItem,
@@ -48,6 +65,8 @@ from app.schemas.admin_dashboard_scheduled import (
 )
 from app.schemas.auth import RefreshSessionResponse
 from app.schemas.inventory import (
+    CartReservationsResponse,
+    OrderReservationsResponse,
     RestockListResponse,
     RestockNoteRead,
     RestockNoteUpsert,
@@ -56,14 +75,24 @@ from app.services import exporter as exporter_service
 from app.services import inventory as inventory_service
 from app.services import catalog as catalog_service
 from app.models.address import Address
-from app.models.order import Order, OrderRefund, OrderStatus, OrderTag
+from app.models.order import Order, OrderRefund, OrderStatus, OrderTag, OrderEvent, OrderItem
 from app.models.returns import ReturnRequest, ReturnRequestStatus
 from app.models.support import ContactSubmission
-from app.models.user import AdminAuditLog, EmailVerificationToken, User, RefreshSession, UserRole, UserSecurityEvent
+from app.models.user import (
+    AdminAuditLog,
+    EmailVerificationToken,
+    RefreshSession,
+    User,
+    UserRole,
+    UserSecurityEvent,
+    UserSecondaryEmail,
+)
+from app.models.admin_dashboard_settings import AdminDashboardAlertThresholds
 from app.models.promo import PromoCode, StripeCouponMapping
 from app.models.coupons_v2 import Promotion
 from app.models.user_export import UserDataExportJob, UserDataExportStatus
 from app.models.analytics_event import AnalyticsEvent
+from app.models.webhook import PayPalWebhookEvent, StripeWebhookEvent
 from app.services import auth as auth_service
 from app.services import audit_chain as audit_chain_service
 from app.services import email as email_service
@@ -72,9 +101,11 @@ from app.services import private_storage
 from app.services import user_export as user_export_service
 from app.services import self_service
 from app.services import pii as pii_service
+from app.services import step_up as step_up_service
 from app.schemas.user_admin import (
     AdminEmailVerificationHistoryResponse,
     AdminEmailVerificationTokenInfo,
+    AdminPasswordResetResendRequest,
     AdminUserImpersonationResponse,
     AdminUserInternalUpdate,
     AdminUserSecurityUpdate,
@@ -96,6 +127,103 @@ from app.schemas.analytics import AdminFunnelConversions, AdminFunnelCounts, Adm
 router = APIRouter(prefix="/admin/dashboard", tags=["admin"])
 
 DEFAULT_LOW_STOCK_DASHBOARD_THRESHOLD = 5
+admin_password_reset_resend_rate_limit = limiter(
+    "admin:password_reset_resend", settings.auth_rate_limit_reset_request, 60
+)
+
+
+async def _get_dashboard_alert_thresholds(session: AsyncSession) -> AdminDashboardAlertThresholds:
+    record = await session.scalar(
+        select(AdminDashboardAlertThresholds).where(AdminDashboardAlertThresholds.key == "default")
+    )
+    if record is not None:
+        return record
+
+    record = AdminDashboardAlertThresholds(key="default")
+    session.add(record)
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        record = await session.scalar(
+            select(AdminDashboardAlertThresholds).where(AdminDashboardAlertThresholds.key == "default")
+        )
+        if record is None:
+            raise
+    return record
+
+
+def _dashboard_alert_thresholds_payload(record: AdminDashboardAlertThresholds) -> dict[str, object]:
+    return {
+        "failed_payments_min_count": int(getattr(record, "failed_payments_min_count", 1) or 1),
+        "failed_payments_min_delta_pct": (
+            float(getattr(record, "failed_payments_min_delta_pct"))
+            if getattr(record, "failed_payments_min_delta_pct", None) is not None
+            else None
+        ),
+        "refund_requests_min_count": int(getattr(record, "refund_requests_min_count", 1) or 1),
+        "refund_requests_min_rate_pct": (
+            float(getattr(record, "refund_requests_min_rate_pct"))
+            if getattr(record, "refund_requests_min_rate_pct", None) is not None
+            else None
+        ),
+        "stockouts_min_count": int(getattr(record, "stockouts_min_count", 1) or 1),
+        "updated_at": getattr(record, "updated_at", None),
+    }
+
+
+@router.get("/alert-thresholds", response_model=AdminDashboardAlertThresholdsResponse)
+async def admin_get_alert_thresholds(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("dashboard")),
+) -> AdminDashboardAlertThresholdsResponse:
+    record = await _get_dashboard_alert_thresholds(session)
+    return AdminDashboardAlertThresholdsResponse(**_dashboard_alert_thresholds_payload(record))
+
+
+@router.put("/alert-thresholds", response_model=AdminDashboardAlertThresholdsResponse)
+async def admin_update_alert_thresholds(
+    payload: AdminDashboardAlertThresholdsUpdateRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_owner),
+) -> AdminDashboardAlertThresholdsResponse:
+    record = await _get_dashboard_alert_thresholds(session)
+    before_full = _dashboard_alert_thresholds_payload(record)
+    before = {k: v for k, v in before_full.items() if k != "updated_at"}
+
+    record.failed_payments_min_count = int(payload.failed_payments_min_count)
+    record.failed_payments_min_delta_pct = (
+        Decimal(str(payload.failed_payments_min_delta_pct))
+        if payload.failed_payments_min_delta_pct is not None
+        else None
+    )
+    record.refund_requests_min_count = int(payload.refund_requests_min_count)
+    record.refund_requests_min_rate_pct = (
+        Decimal(str(payload.refund_requests_min_rate_pct))
+        if payload.refund_requests_min_rate_pct is not None
+        else None
+    )
+    record.stockouts_min_count = int(payload.stockouts_min_count)
+    session.add(record)
+
+    after_full = _dashboard_alert_thresholds_payload(record)
+    after = {k: v for k, v in after_full.items() if k != "updated_at"}
+    await audit_chain_service.add_admin_audit_log(
+        session,
+        action="dashboard.alert_thresholds.update",
+        actor_user_id=current_user.id,
+        subject_user_id=None,
+        data={
+            "before": before,
+            "after": after,
+            "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+            "ip_address": (request.client.host if request.client else None),
+        },
+    )
+    await session.commit()
+    await session.refresh(record)
+    return AdminDashboardAlertThresholdsResponse(**_dashboard_alert_thresholds_payload(record))
 
 
 @router.get("/summary")
@@ -409,19 +537,41 @@ async def admin_summary(
     refund_requests = await session.scalar(
         select(func.count())
         .select_from(ReturnRequest)
+        .join(Order, ReturnRequest.order_id == Order.id)
         .where(
             ReturnRequest.status == ReturnRequestStatus.requested,
             ReturnRequest.created_at >= refund_window_start,
             ReturnRequest.created_at < refund_window_end,
+            exclude_test_orders,
         )
     )
     refund_requests_prev = await session.scalar(
         select(func.count())
         .select_from(ReturnRequest)
+        .join(Order, ReturnRequest.order_id == Order.id)
         .where(
             ReturnRequest.status == ReturnRequestStatus.requested,
             ReturnRequest.created_at >= refund_prev_start,
             ReturnRequest.created_at < refund_window_start,
+            exclude_test_orders,
+        )
+    )
+    refund_window_orders = await session.scalar(
+        select(func.count())
+        .select_from(Order)
+        .where(
+            Order.created_at >= refund_window_start,
+            Order.created_at < refund_window_end,
+            exclude_test_orders,
+        )
+    )
+    refund_window_orders_prev = await session.scalar(
+        select(func.count())
+        .select_from(Order)
+        .where(
+            Order.created_at >= refund_prev_start,
+            Order.created_at < refund_window_start,
+            exclude_test_orders,
         )
     )
 
@@ -439,6 +589,48 @@ async def admin_summary(
         if yesterday_value == 0:
             return None
         return (today_value - yesterday_value) / yesterday_value * 100.0
+
+    def _rate_pct(numer: float, denom: float) -> float | None:
+        if denom <= 0:
+            return None
+        return numer / denom * 100.0
+
+    thresholds = await _get_dashboard_alert_thresholds(session)
+    failed_payments_threshold_min_count = int(getattr(thresholds, "failed_payments_min_count", 1) or 1)
+    failed_payments_threshold_min_delta_pct = (
+        float(getattr(thresholds, "failed_payments_min_delta_pct"))
+        if getattr(thresholds, "failed_payments_min_delta_pct", None) is not None
+        else None
+    )
+    refund_requests_threshold_min_count = int(getattr(thresholds, "refund_requests_min_count", 1) or 1)
+    refund_requests_threshold_min_rate_pct = (
+        float(getattr(thresholds, "refund_requests_min_rate_pct"))
+        if getattr(thresholds, "refund_requests_min_rate_pct", None) is not None
+        else None
+    )
+    stockouts_threshold_min_count = int(getattr(thresholds, "stockouts_min_count", 1) or 1)
+
+    failed_payments_delta_pct = _delta_pct(float(failed_payments or 0), float(failed_payments_prev or 0))
+    failed_payments_is_alert = bool(int(failed_payments or 0) >= failed_payments_threshold_min_count) and (
+        failed_payments_threshold_min_delta_pct is None
+        or failed_payments_delta_pct is None
+        or failed_payments_delta_pct >= failed_payments_threshold_min_delta_pct
+    )
+
+    refund_rate_pct = _rate_pct(float(refund_requests or 0), float(refund_window_orders or 0))
+    refund_rate_prev_pct = _rate_pct(float(refund_requests_prev or 0), float(refund_window_orders_prev or 0))
+    refund_rate_delta_pct = (
+        _delta_pct(refund_rate_pct, refund_rate_prev_pct)
+        if refund_rate_pct is not None and refund_rate_prev_pct is not None
+        else None
+    )
+    refund_requests_is_alert = bool(int(refund_requests or 0) >= refund_requests_threshold_min_count) and (
+        refund_requests_threshold_min_rate_pct is None
+        or refund_rate_pct is None
+        or refund_rate_pct >= refund_requests_threshold_min_rate_pct
+    )
+
+    stockouts_is_alert = bool(int(stockouts or 0) >= stockouts_threshold_min_count)
 
     return {
         "products": products_total or 0,
@@ -486,9 +678,8 @@ async def admin_summary(
                 "window_hours": 24,
                 "current": int(failed_payments or 0),
                 "previous": int(failed_payments_prev or 0),
-                "delta_pct": _delta_pct(
-                    float(failed_payments or 0), float(failed_payments_prev or 0)
-                ),
+                "delta_pct": failed_payments_delta_pct,
+                "is_alert": failed_payments_is_alert,
             },
             "refund_requests": {
                 "window_days": 7,
@@ -497,25 +688,81 @@ async def admin_summary(
                 "delta_pct": _delta_pct(
                     float(refund_requests or 0), float(refund_requests_prev or 0)
                 ),
+                "current_denominator": int(refund_window_orders or 0),
+                "previous_denominator": int(refund_window_orders_prev or 0),
+                "current_rate_pct": refund_rate_pct,
+                "previous_rate_pct": refund_rate_prev_pct,
+                "rate_delta_pct": refund_rate_delta_pct,
+                "is_alert": refund_requests_is_alert,
             },
-            "stockouts": {"count": int(stockouts or 0)},
+            "stockouts": {"count": int(stockouts or 0), "is_alert": stockouts_is_alert},
         },
+        "alert_thresholds": _dashboard_alert_thresholds_payload(thresholds),
         "system": {"db_ready": True, "backup_last_at": settings.backup_last_at},
     }
 
 
 @router.post("/reports/send")
 async def admin_send_scheduled_report(
+    request: Request,
     payload: dict = Body(...),
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin),
+    current_user: User = Depends(require_admin),
 ) -> dict:
     kind = str(payload.get("kind") or "").strip().lower()
     force = bool(payload.get("force", False))
     try:
-        return await admin_reports_service.send_report_now(session, kind=kind, force=force)
+        result = await admin_reports_service.send_report_now(session, kind=kind, force=force)
     except ValueError as exc:
+        await session.rollback()
+        await audit_chain_service.add_admin_audit_log(
+            session,
+            action="admin_reports.send_now_failed",
+            actor_user_id=current_user.id,
+            subject_user_id=None,
+            data={
+                "kind": kind,
+                "force": force,
+                "error": str(exc)[:500],
+                "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+                "ip_address": (request.client.host if request.client else None),
+            },
+        )
+        await session.commit()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        await session.rollback()
+        await audit_chain_service.add_admin_audit_log(
+            session,
+            action="admin_reports.send_now_error",
+            actor_user_id=current_user.id,
+            subject_user_id=None,
+            data={
+                "kind": kind,
+                "force": force,
+                "error": str(exc)[:500],
+                "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+                "ip_address": (request.client.host if request.client else None),
+            },
+        )
+        await session.commit()
+        raise
+
+    await audit_chain_service.add_admin_audit_log(
+        session,
+        action="admin_reports.send_now",
+        actor_user_id=current_user.id,
+        subject_user_id=None,
+        data={
+            "kind": kind,
+            "force": force,
+            "result": result,
+            "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+            "ip_address": (request.client.host if request.client else None),
+        },
+    )
+    await session.commit()
+    return result
 
 
 @router.get("/funnel", response_model=AdminFunnelMetricsResponse)
@@ -706,18 +953,778 @@ async def admin_channel_breakdown(
     }
 
 
+@router.get("/payments-health")
+async def admin_payments_health(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("ops")),
+    since_hours: int = Query(default=24, ge=1, le=168),
+) -> dict:
+    now = datetime.now(timezone.utc)
+    since = now - timedelta(hours=int(since_hours))
+    successful_statuses = (OrderStatus.paid, OrderStatus.shipped, OrderStatus.delivered)
+
+    test_order_ids = select(OrderTag.order_id).where(OrderTag.tag == "test")
+    exclude_test_orders = Order.id.notin_(test_order_ids)
+
+    method_col = func.lower(func.coalesce(Order.payment_method, literal("unknown")))
+    success_rows = await session.execute(
+        select(method_col, func.count().label("count"))
+        .select_from(Order)
+        .where(
+            Order.created_at >= since,
+            Order.created_at < now,
+            Order.status.in_(successful_statuses),
+            exclude_test_orders,
+        )
+        .group_by(method_col)
+    )
+    pending_rows = await session.execute(
+        select(method_col, func.count().label("count"))
+        .select_from(Order)
+        .where(
+            Order.created_at >= since,
+            Order.created_at < now,
+            Order.status == OrderStatus.pending_payment,
+            exclude_test_orders,
+        )
+        .group_by(method_col)
+    )
+    success_map = {str(row[0] or "unknown"): int(row[1] or 0) for row in success_rows.all()}
+    pending_map = {str(row[0] or "unknown"): int(row[1] or 0) for row in pending_rows.all()}
+
+    def _safe_int(value: int | None) -> int:
+        return int(value or 0)
+
+    def _success_rate(success: int, pending: int) -> float | None:
+        denom = success + pending
+        if denom <= 0:
+            return None
+        return success / denom
+
+    def _error_filter(model) -> Any:
+        return (
+            model.last_attempt_at >= since,
+            model.last_error.is_not(None),
+            model.last_error != "",
+        )
+
+    def _backlog_filter(model) -> Any:
+        return (
+            model.last_attempt_at >= since,
+            model.processed_at.is_(None),
+            or_(model.last_error.is_(None), model.last_error == ""),
+        )
+
+    stripe_errors = await session.scalar(select(func.count()).select_from(StripeWebhookEvent).where(*_error_filter(StripeWebhookEvent)))
+    stripe_backlog = await session.scalar(select(func.count()).select_from(StripeWebhookEvent).where(*_backlog_filter(StripeWebhookEvent)))
+    paypal_errors = await session.scalar(select(func.count()).select_from(PayPalWebhookEvent).where(*_error_filter(PayPalWebhookEvent)))
+    paypal_backlog = await session.scalar(select(func.count()).select_from(PayPalWebhookEvent).where(*_backlog_filter(PayPalWebhookEvent)))
+
+    stripe_recent_rows = (
+        (
+            await session.execute(
+                select(StripeWebhookEvent)
+                .where(*_error_filter(StripeWebhookEvent))
+                .order_by(StripeWebhookEvent.last_attempt_at.desc())
+                .limit(8)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    paypal_recent_rows = (
+        (
+            await session.execute(
+                select(PayPalWebhookEvent)
+                .where(*_error_filter(PayPalWebhookEvent))
+                .order_by(PayPalWebhookEvent.last_attempt_at.desc())
+                .limit(8)
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    recent_errors: list[dict] = []
+    for row in stripe_recent_rows:
+        recent_errors.append(
+            {
+                "provider": "stripe",
+                "event_id": row.stripe_event_id,
+                "event_type": row.event_type,
+                "attempts": int(row.attempts or 0),
+                "last_attempt_at": row.last_attempt_at,
+                "last_error": row.last_error,
+            }
+        )
+    for row in paypal_recent_rows:
+        recent_errors.append(
+            {
+                "provider": "paypal",
+                "event_id": row.paypal_event_id,
+                "event_type": row.event_type,
+                "attempts": int(row.attempts or 0),
+                "last_attempt_at": row.last_attempt_at,
+                "last_error": row.last_error,
+            }
+        )
+    recent_errors.sort(key=lambda item: item.get("last_attempt_at") or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+    recent_errors = recent_errors[:12]
+
+    preferred_order = ["stripe", "paypal", "netopia", "cod", "unknown"]
+    methods = list({*success_map.keys(), *pending_map.keys(), *preferred_order})
+    methods.sort(key=lambda key: (preferred_order.index(key) if key in preferred_order else len(preferred_order), key))
+
+    providers: list[dict] = []
+    for method in methods:
+        success = _safe_int(success_map.get(method))
+        pending = _safe_int(pending_map.get(method))
+        if method == "stripe":
+            webhook_error_count = _safe_int(int(stripe_errors or 0))
+            webhook_backlog_count = _safe_int(int(stripe_backlog or 0))
+        elif method == "paypal":
+            webhook_error_count = _safe_int(int(paypal_errors or 0))
+            webhook_backlog_count = _safe_int(int(paypal_backlog or 0))
+        else:
+            webhook_error_count = 0
+            webhook_backlog_count = 0
+
+        providers.append(
+            {
+                "provider": method,
+                "successful_orders": success,
+                "pending_payment_orders": pending,
+                "success_rate": _success_rate(success, pending),
+                "webhook_errors": webhook_error_count,
+                "webhook_backlog": webhook_backlog_count,
+            }
+        )
+
+    return {
+        "window_hours": int(since_hours),
+        "window_start": since,
+        "window_end": now,
+        "providers": providers,
+        "recent_webhook_errors": recent_errors,
+    }
+
+
+@router.get("/refunds-breakdown")
+async def admin_refunds_breakdown(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("dashboard")),
+    window_days: int = Query(default=30, ge=1, le=365),
+) -> dict:
+    now = datetime.now(timezone.utc)
+    window = timedelta(days=int(window_days))
+    start = now - window
+    prev_start = start - window
+
+    test_order_ids = select(OrderTag.order_id).where(OrderTag.tag == "test")
+    exclude_test_orders = Order.id.notin_(test_order_ids)
+
+    provider_col = func.lower(func.coalesce(OrderRefund.provider, literal("unknown")))
+
+    async def _provider_rows(window_start: datetime, window_end: datetime) -> list[tuple[str, int, float]]:
+        rows = await session.execute(
+            select(
+                provider_col,
+                func.count().label("count"),
+                func.coalesce(func.sum(OrderRefund.amount), 0).label("amount"),
+            )
+            .select_from(OrderRefund)
+            .join(Order, OrderRefund.order_id == Order.id)
+            .where(
+                OrderRefund.created_at >= window_start,
+                OrderRefund.created_at < window_end,
+                exclude_test_orders,
+            )
+            .group_by(provider_col)
+        )
+        items: list[tuple[str, int, float]] = []
+        for provider, count, amount in rows.all():
+            items.append((str(provider or "unknown"), int(count or 0), float(amount or 0)))
+        return items
+
+    current_provider = await _provider_rows(start, now)
+    previous_provider = await _provider_rows(prev_start, start)
+    prev_provider_map = {row[0]: row for row in previous_provider}
+
+    def _delta_pct(current: float, previous: float) -> float | None:
+        if previous == 0:
+            return None
+        return (current - previous) / previous * 100.0
+
+    providers: list[dict] = []
+    for provider, count, amount in current_provider:
+        _, prev_count, prev_amount = prev_provider_map.get(provider, (provider, 0, 0.0))
+        providers.append(
+            {
+                "provider": provider,
+                "current": {"count": int(count), "amount": float(amount)},
+                "previous": {"count": int(prev_count), "amount": float(prev_amount)},
+                "delta_pct": {
+                    "count": _delta_pct(float(count), float(prev_count)),
+                    "amount": _delta_pct(float(amount), float(prev_amount)),
+                },
+            }
+        )
+    providers.sort(key=lambda row: (row.get("current", {}).get("amount", 0), row.get("current", {}).get("count", 0)), reverse=True)
+
+    async def _missing_refunds(window_start: datetime, window_end: datetime) -> tuple[int, float]:
+        row = await session.execute(
+            select(
+                func.count().label("count"),
+                func.coalesce(func.sum(Order.total_amount), 0).label("amount"),
+            )
+            .select_from(Order)
+            .outerjoin(OrderRefund, OrderRefund.order_id == Order.id)
+            .where(
+                Order.status == OrderStatus.refunded,
+                Order.updated_at >= window_start,
+                Order.updated_at < window_end,
+                OrderRefund.id.is_(None),
+                exclude_test_orders,
+            )
+        )
+        count, amount = row.one()
+        return int(count or 0), float(amount or 0)
+
+    missing_current_count, missing_current_amount = await _missing_refunds(start, now)
+    missing_prev_count, missing_prev_amount = await _missing_refunds(prev_start, start)
+
+    def _normalize_text(value: str) -> str:
+        raw = (value or "").strip()
+        if not raw:
+            return ""
+        normalized = unicodedata.normalize("NFKD", raw)
+        return normalized.encode("ascii", "ignore").decode("ascii").lower()
+
+    def _reason_category(reason: str) -> str:
+        t = _normalize_text(reason)
+        if not t:
+            return "other"
+        if any(key in t for key in ("damaged", "broken", "defect", "defective", "crack", "spart", "stricat", "zgariat", "deterior")):
+            return "damaged"
+        if any(key in t for key in ("wrong", "different", "gresit", "incorect", "alt produs", "other item", "not the one")):
+            return "wrong_item"
+        if any(key in t for key in ("not as described", "different than expected", "nu corespunde", "nu este ca", "description", "poza", "picture")):
+            return "not_as_described"
+        if any(key in t for key in ("size", "fit", "too big", "too small", "marime", "potriv")):
+            return "size_fit"
+        if any(key in t for key in ("delivery", "shipping", "ship", "courier", "curier", "livrare", "intarzi", "intarzier")):
+            return "delivery_issue"
+        if any(key in t for key in ("changed my mind", "dont want", "do not want", "no longer", "nu mai", "razgand", "renunt")):
+            return "changed_mind"
+        return "other"
+
+    async def _reason_counts(window_start: datetime, window_end: datetime) -> dict[str, int]:
+        rows = await session.execute(
+            select(ReturnRequest.reason)
+            .select_from(ReturnRequest)
+            .join(Order, ReturnRequest.order_id == Order.id)
+            .where(
+                ReturnRequest.status == ReturnRequestStatus.refunded,
+                ReturnRequest.updated_at >= window_start,
+                ReturnRequest.updated_at < window_end,
+                exclude_test_orders,
+            )
+        )
+        counts: dict[str, int] = {}
+        for reason in rows.scalars().all():
+            category = _reason_category(str(reason or ""))
+            counts[category] = counts.get(category, 0) + 1
+        return counts
+
+    current_reasons = await _reason_counts(start, now)
+    previous_reasons = await _reason_counts(prev_start, start)
+
+    categories = ["damaged", "wrong_item", "not_as_described", "size_fit", "delivery_issue", "changed_mind", "other"]
+    reasons: list[dict] = []
+    for category in categories:
+        cur = int(current_reasons.get(category, 0))
+        prev = int(previous_reasons.get(category, 0))
+        reasons.append(
+            {
+                "category": category,
+                "current": cur,
+                "previous": prev,
+                "delta_pct": _delta_pct(float(cur), float(prev)),
+            }
+        )
+    reasons.sort(key=lambda row: row.get("current", 0), reverse=True)
+
+    return {
+        "window_days": int(window_days),
+        "window_start": start,
+        "window_end": now,
+        "providers": providers,
+        "missing_refunds": {
+            "current": {"count": missing_current_count, "amount": float(missing_current_amount)},
+            "previous": {"count": missing_prev_count, "amount": float(missing_prev_amount)},
+            "delta_pct": {
+                "count": _delta_pct(float(missing_current_count), float(missing_prev_count)),
+                "amount": _delta_pct(float(missing_current_amount), float(missing_prev_amount)),
+            },
+        },
+        "reasons": reasons,
+    }
+
+
+@router.get("/shipping-performance")
+async def admin_shipping_performance(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("orders")),
+    window_days: int = Query(default=30, ge=1, le=365),
+) -> dict:
+    now = datetime.now(timezone.utc)
+    window = timedelta(days=int(window_days))
+    start = now - window
+    prev_start = start - window
+
+    test_order_ids = select(OrderTag.order_id).where(OrderTag.tag == "test")
+    exclude_test_orders = Order.id.notin_(test_order_ids)
+
+    shipped_subq = (
+        select(
+            OrderEvent.order_id.label("order_id"),
+            func.min(OrderEvent.created_at).label("shipped_at"),
+        )
+        .where(
+            OrderEvent.event.in_(("status_change", "status_auto_ship")),
+            OrderEvent.note.is_not(None),
+            OrderEvent.note.like("% -> shipped"),
+        )
+        .group_by(OrderEvent.order_id)
+        .subquery()
+    )
+    delivered_subq = (
+        select(
+            OrderEvent.order_id.label("order_id"),
+            func.min(OrderEvent.created_at).label("delivered_at"),
+        )
+        .where(
+            OrderEvent.event == "status_change",
+            OrderEvent.note.is_not(None),
+            OrderEvent.note.like("% -> delivered"),
+        )
+        .group_by(OrderEvent.order_id)
+        .subquery()
+    )
+
+    courier_col = func.lower(func.coalesce(Order.courier, literal("unknown"))).label("courier")
+
+    def _delta_pct(current: float | None, previous: float | None) -> float | None:
+        if current is None or previous is None or previous == 0:
+            return None
+        return (current - previous) / previous * 100.0
+
+    async def _collect_ship_durations(window_start: datetime, window_end: datetime) -> dict[str, list[float]]:
+        rows = await session.execute(
+            select(Order.created_at, courier_col, shipped_subq.c.shipped_at)
+            .select_from(Order)
+            .join(shipped_subq, shipped_subq.c.order_id == Order.id)
+            .where(
+                shipped_subq.c.shipped_at >= window_start,
+                shipped_subq.c.shipped_at < window_end,
+                exclude_test_orders,
+            )
+        )
+        durations: dict[str, list[float]] = {}
+        for created_at, courier, shipped_at in rows.all():
+            if not created_at or not shipped_at:
+                continue
+            hours = (shipped_at - created_at).total_seconds() / 3600.0
+            if hours < 0 or hours > 24 * 365:
+                continue
+            key = str(courier or "unknown")
+            durations.setdefault(key, []).append(float(hours))
+        return durations
+
+    async def _collect_delivery_durations(window_start: datetime, window_end: datetime) -> dict[str, list[float]]:
+        rows = await session.execute(
+            select(courier_col, shipped_subq.c.shipped_at, delivered_subq.c.delivered_at)
+            .select_from(Order)
+            .join(delivered_subq, delivered_subq.c.order_id == Order.id)
+            .join(shipped_subq, shipped_subq.c.order_id == Order.id)
+            .where(
+                delivered_subq.c.delivered_at >= window_start,
+                delivered_subq.c.delivered_at < window_end,
+                exclude_test_orders,
+            )
+        )
+        durations: dict[str, list[float]] = {}
+        for courier, shipped_at, delivered_at in rows.all():
+            if not shipped_at or not delivered_at:
+                continue
+            hours = (delivered_at - shipped_at).total_seconds() / 3600.0
+            if hours < 0 or hours > 24 * 365:
+                continue
+            key = str(courier or "unknown")
+            durations.setdefault(key, []).append(float(hours))
+        return durations
+
+    def _avg(values: list[float]) -> float | None:
+        if not values:
+            return None
+        return sum(values) / len(values)
+
+    current_ship = await _collect_ship_durations(start, now)
+    previous_ship = await _collect_ship_durations(prev_start, start)
+
+    ship_rows: list[dict] = []
+    for courier in sorted(set(current_ship) | set(previous_ship)):
+        cur_avg = _avg(current_ship.get(courier, []))
+        prev_avg = _avg(previous_ship.get(courier, []))
+        ship_rows.append(
+            {
+                "courier": courier,
+                "current": {"count": len(current_ship.get(courier, [])), "avg_hours": cur_avg},
+                "previous": {"count": len(previous_ship.get(courier, [])), "avg_hours": prev_avg},
+                "delta_pct": {
+                    "avg_hours": _delta_pct(cur_avg, prev_avg),
+                    "count": _delta_pct(float(len(current_ship.get(courier, []))), float(len(previous_ship.get(courier, [])))),
+                },
+            }
+        )
+    ship_rows.sort(key=lambda row: (row.get("current", {}).get("count", 0), row.get("courier", "")), reverse=True)
+
+    current_delivery = await _collect_delivery_durations(start, now)
+    previous_delivery = await _collect_delivery_durations(prev_start, start)
+
+    delivery_rows: list[dict] = []
+    for courier in sorted(set(current_delivery) | set(previous_delivery)):
+        cur_avg = _avg(current_delivery.get(courier, []))
+        prev_avg = _avg(previous_delivery.get(courier, []))
+        delivery_rows.append(
+            {
+                "courier": courier,
+                "current": {"count": len(current_delivery.get(courier, [])), "avg_hours": cur_avg},
+                "previous": {"count": len(previous_delivery.get(courier, [])), "avg_hours": prev_avg},
+                "delta_pct": {
+                    "avg_hours": _delta_pct(cur_avg, prev_avg),
+                    "count": _delta_pct(float(len(current_delivery.get(courier, []))), float(len(previous_delivery.get(courier, [])))),
+                },
+            }
+        )
+    delivery_rows.sort(key=lambda row: (row.get("current", {}).get("count", 0), row.get("courier", "")), reverse=True)
+
+    return {
+        "window_days": int(window_days),
+        "window_start": start,
+        "window_end": now,
+        "time_to_ship": ship_rows,
+        "delivery_time": delivery_rows,
+    }
+
+
+@router.get("/stockout-impact")
+async def admin_stockout_impact(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("inventory")),
+    window_days: int = Query(default=30, ge=1, le=365),
+    limit: int = Query(default=8, ge=1, le=30),
+) -> dict:
+    now = datetime.now(timezone.utc)
+    since = now - timedelta(days=int(window_days))
+    successful_statuses = (OrderStatus.paid, OrderStatus.shipped, OrderStatus.delivered)
+
+    test_order_ids = select(OrderTag.order_id).where(OrderTag.tag == "test")
+    exclude_test_orders = Order.id.notin_(test_order_ids)
+
+    restock_rows = await inventory_service.list_restock_list(
+        session,
+        include_variants=False,
+        default_threshold=DEFAULT_LOW_STOCK_DASHBOARD_THRESHOLD,
+    )
+    stockouts = [row for row in restock_rows if int(getattr(row, "available_quantity", 0) or 0) <= 0]
+    if not stockouts:
+        return {"window_days": int(window_days), "window_start": since, "window_end": now, "items": []}
+
+    product_ids = [row.product_id for row in stockouts]
+
+    demand_rows = await session.execute(
+        select(
+            OrderItem.product_id,
+            func.coalesce(func.sum(OrderItem.quantity), 0).label("units"),
+            func.coalesce(func.sum(OrderItem.subtotal), 0).label("revenue"),
+        )
+        .select_from(OrderItem)
+        .join(Order, Order.id == OrderItem.order_id)
+        .where(
+            Order.created_at >= since,
+            Order.created_at < now,
+            Order.status.in_(successful_statuses),
+            OrderItem.product_id.in_(product_ids),
+            exclude_test_orders,
+        )
+        .group_by(OrderItem.product_id)
+    )
+    demand_map = {
+        row[0]: (int(row[1] or 0), float(row[2] or 0))
+        for row in demand_rows.all()
+    }
+
+    product_rows = await session.execute(
+        select(
+            Product.id,
+            Product.base_price,
+            Product.sale_price,
+            Product.currency,
+            Product.allow_backorder,
+        ).where(Product.id.in_(product_ids))
+    )
+    product_map = {
+        row[0]: {
+            "base_price": float(row[1] or 0),
+            "sale_price": float(row[2] or 0) if row[2] is not None else None,
+            "currency": str(row[3] or "RON"),
+            "allow_backorder": bool(row[4]),
+        }
+        for row in product_rows.all()
+    }
+
+    items: list[dict] = []
+    for row in stockouts:
+        meta = product_map.get(row.product_id, {})
+        allow_backorder = bool(meta.get("allow_backorder", False))
+        base_price = float(meta.get("base_price", 0) or 0)
+        sale_price = meta.get("sale_price")
+        current_price = float(sale_price if sale_price is not None else base_price)
+
+        demand_units, demand_revenue = demand_map.get(row.product_id, (0, 0.0))
+        avg_price = float(demand_revenue / demand_units) if demand_units > 0 else current_price
+        reserved_carts = int(getattr(row, "reserved_in_carts", 0) or 0)
+        reserved_orders = int(getattr(row, "reserved_in_orders", 0) or 0)
+        estimated_missed = 0.0 if allow_backorder else float(reserved_carts) * avg_price
+
+        items.append(
+            {
+                "product_id": str(row.product_id),
+                "product_slug": row.product_slug,
+                "product_name": row.product_name,
+                "available_quantity": int(getattr(row, "available_quantity", 0) or 0),
+                "reserved_in_carts": reserved_carts,
+                "reserved_in_orders": reserved_orders,
+                "stock_quantity": int(getattr(row, "stock_quantity", 0) or 0),
+                "demand_units": int(demand_units),
+                "demand_revenue": float(demand_revenue),
+                "estimated_missed_revenue": float(estimated_missed),
+                "currency": str(meta.get("currency") or "RON"),
+                "allow_backorder": allow_backorder,
+            }
+        )
+
+    items.sort(
+        key=lambda item: (
+            float(item.get("estimated_missed_revenue", 0)),
+            float(item.get("demand_revenue", 0)),
+            int(item.get("reserved_in_carts", 0)),
+        ),
+        reverse=True,
+    )
+
+    return {
+        "window_days": int(window_days),
+        "window_start": since,
+        "window_end": now,
+        "items": items[: int(limit)],
+    }
+
+
+@router.get("/channel-attribution")
+async def admin_channel_attribution(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("dashboard")),
+    range_days: int = Query(default=30, ge=1, le=365),
+    range_from: date | None = Query(default=None),
+    range_to: date | None = Query(default=None),
+    limit: int = Query(default=12, ge=1, le=50),
+) -> dict:
+    now = datetime.now(timezone.utc)
+    successful_statuses = (OrderStatus.paid, OrderStatus.shipped, OrderStatus.delivered)
+    sales_statuses = (*successful_statuses, OrderStatus.refunded)
+
+    if (range_from is None) != (range_to is None):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="range_from and range_to must be provided together",
+        )
+
+    if range_from is not None and range_to is not None:
+        if range_to < range_from:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="range_to must be on/after range_from",
+            )
+        start = datetime.combine(range_from, datetime.min.time(), tzinfo=timezone.utc)
+        end = datetime.combine(range_to + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc)
+        effective_range_days = (range_to - range_from).days + 1
+    else:
+        start = now - timedelta(days=range_days)
+        end = now
+        effective_range_days = range_days
+
+    test_order_ids = select(OrderTag.order_id).where(OrderTag.tag == "test")
+    exclude_test_orders = Order.id.notin_(test_order_ids)
+
+    total_orders = await session.scalar(
+        select(func.count())
+        .select_from(Order)
+        .where(
+            Order.created_at >= start,
+            Order.created_at < end,
+            Order.status.in_(sales_statuses),
+            exclude_test_orders,
+        )
+    )
+    total_gross_sales = await session.scalar(
+        select(func.coalesce(func.sum(Order.total_amount), 0))
+        .select_from(Order)
+        .where(
+            Order.created_at >= start,
+            Order.created_at < end,
+            Order.status.in_(sales_statuses),
+            exclude_test_orders,
+        )
+    )
+
+    checkout_rows = await session.execute(
+        select(AnalyticsEvent.session_id, AnalyticsEvent.order_id)
+        .select_from(AnalyticsEvent)
+        .where(
+            AnalyticsEvent.event == "checkout_success",
+            AnalyticsEvent.created_at >= start,
+            AnalyticsEvent.created_at < end,
+            AnalyticsEvent.order_id.is_not(None),
+        )
+        .order_by(AnalyticsEvent.created_at.asc())
+    )
+    order_to_session: dict[UUID, str] = {}
+    session_ids: set[str] = set()
+    for session_id, order_id in checkout_rows.all():
+        if not session_id or not order_id:
+            continue
+        if order_id in order_to_session:
+            continue
+        order_to_session[order_id] = str(session_id)
+        session_ids.add(str(session_id))
+
+    if not order_to_session:
+        return {
+            "range_days": int(effective_range_days),
+            "range_from": start.date().isoformat(),
+            "range_to": (end - timedelta(microseconds=1)).date().isoformat(),
+            "total_orders": int(total_orders or 0),
+            "total_gross_sales": float(total_gross_sales or 0),
+            "tracked_orders": 0,
+            "tracked_gross_sales": 0.0,
+            "coverage_pct": None if not total_orders else 0.0,
+            "channels": [],
+        }
+
+    order_ids = list(order_to_session.keys())
+    order_rows = await session.execute(
+        select(Order.id, Order.total_amount)
+        .select_from(Order)
+        .where(
+            Order.id.in_(order_ids),
+            Order.created_at >= start,
+            Order.created_at < end,
+            Order.status.in_(sales_statuses),
+            exclude_test_orders,
+        )
+    )
+    order_amounts = {row[0]: float(row[1] or 0) for row in order_rows.all()}
+
+    session_start_rows = await session.execute(
+        select(AnalyticsEvent.session_id, AnalyticsEvent.payload, AnalyticsEvent.created_at)
+        .select_from(AnalyticsEvent)
+        .where(
+            AnalyticsEvent.event == "session_start",
+            AnalyticsEvent.session_id.in_(session_ids),
+        )
+        .order_by(AnalyticsEvent.created_at.asc())
+    )
+    session_payload: dict[str, dict | None] = {}
+    for session_id, payload, _created_at in session_start_rows.all():
+        key = str(session_id)
+        if key in session_payload:
+            continue
+        session_payload[key] = payload if isinstance(payload, dict) else None
+
+    def _normalize(value: object) -> str:
+        if not isinstance(value, str):
+            return ""
+        return value.strip()
+
+    def _extract_channel(payload: dict | None) -> tuple[str, str | None, str | None]:
+        src = _normalize((payload or {}).get("utm_source")).lower()
+        med = _normalize((payload or {}).get("utm_medium")).lower() or None
+        camp = _normalize((payload or {}).get("utm_campaign")) or None
+        if not src:
+            return ("direct", None, None)
+        return (src, med, camp)
+
+    channels: dict[tuple[str, str | None, str | None], dict[str, float]] = {}
+    tracked_orders = 0
+    tracked_sales = 0.0
+    for order_id, session_id in order_to_session.items():
+        amount = order_amounts.get(order_id)
+        if amount is None:
+            continue
+        tracked_orders += 1
+        tracked_sales += float(amount)
+        payload = session_payload.get(session_id)
+        src, med, camp = _extract_channel(payload)
+        key = (src, med, camp)
+        entry = channels.setdefault(key, {"orders": 0.0, "gross_sales": 0.0})
+        entry["orders"] += 1.0
+        entry["gross_sales"] += float(amount)
+
+    channel_rows: list[dict] = []
+    for (src, med, camp), entry in channels.items():
+        channel_rows.append(
+            {
+                "source": src,
+                "medium": med,
+                "campaign": camp,
+                "orders": int(entry.get("orders", 0) or 0),
+                "gross_sales": float(entry.get("gross_sales", 0) or 0),
+            }
+        )
+    channel_rows.sort(key=lambda row: (row.get("gross_sales", 0), row.get("orders", 0)), reverse=True)
+
+    coverage_pct = None
+    if total_orders:
+        coverage_pct = tracked_orders / int(total_orders or 1)
+
+    return {
+        "range_days": int(effective_range_days),
+        "range_from": start.date().isoformat(),
+        "range_to": (end - timedelta(microseconds=1)).date().isoformat(),
+        "total_orders": int(total_orders or 0),
+        "total_gross_sales": float(total_gross_sales or 0),
+        "tracked_orders": int(tracked_orders),
+        "tracked_gross_sales": float(tracked_sales),
+        "coverage_pct": coverage_pct,
+        "channels": channel_rows[: int(limit)],
+    }
+
+
 @router.get("/search", response_model=AdminDashboardSearchResponse)
 async def admin_global_search(
-    session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(require_admin_section("dashboard")),
+    request: Request,
     q: str = Query(..., min_length=1, max_length=255),
     include_pii: bool = Query(default=False),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin_section("dashboard")),
 ) -> AdminDashboardSearchResponse:
     needle = (q or "").strip()
     if not needle:
         return AdminDashboardSearchResponse(items=[])
     if include_pii:
-        pii_service.require_pii_reveal(current_user)
+        pii_service.require_pii_reveal(current_user, request=request)
 
     parsed_uuid: UUID | None = None
     try:
@@ -1182,12 +2189,13 @@ async def products_by_ids(
 
 @router.get("/orders")
 async def admin_orders(
+    request: Request,
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(require_admin_section("dashboard")),
-    include_pii: bool = Query(default=False),
 ) -> list[dict]:
     if include_pii:
-        pii_service.require_pii_reveal(current_user)
+        pii_service.require_pii_reveal(current_user, request=request)
     stmt = (
         select(Order, User.email)
         .join(User, Order.user_id == User.id, isouter=True)
@@ -1211,12 +2219,13 @@ async def admin_orders(
 
 @router.get("/users")
 async def admin_users(
+    request: Request,
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(require_admin_section("dashboard")),
-    include_pii: bool = Query(default=False),
 ) -> list[dict]:
     if include_pii:
-        pii_service.require_pii_reveal(current_user)
+        pii_service.require_pii_reveal(current_user, request=request)
     result = await session.execute(
         select(User).order_by(User.created_at.desc()).limit(20)
     )
@@ -1237,16 +2246,17 @@ async def admin_users(
 
 @router.get("/users/search", response_model=AdminUserListResponse)
 async def search_users(
-    session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(require_admin_section("users")),
+    request: Request,
     q: str | None = Query(default=None),
     role: UserRole | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
     include_pii: bool = Query(default=False),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin_section("users")),
 ) -> AdminUserListResponse:
     if include_pii:
-        pii_service.require_pii_reveal(current_user)
+        pii_service.require_pii_reveal(current_user, request=request)
     offset = (page - 1) * limit
     stmt = select(User).where(User.deleted_at.is_(None))
 
@@ -1318,16 +2328,17 @@ def _user_order_stats_subquery() -> object:
 
 @router.get("/users/segments/repeat-buyers", response_model=AdminUserSegmentResponse)
 async def admin_user_segment_repeat_buyers(
-    session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(require_admin_section("users")),
+    request: Request,
     q: str | None = Query(default=None),
     min_orders: int = Query(default=2, ge=1, le=100),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
     include_pii: bool = Query(default=False),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin_section("users")),
 ) -> AdminUserSegmentResponse:
     if include_pii:
-        pii_service.require_pii_reveal(current_user)
+        pii_service.require_pii_reveal(current_user, request=request)
     offset = (page - 1) * limit
     stats = _user_order_stats_subquery()
 
@@ -1398,17 +2409,18 @@ async def admin_user_segment_repeat_buyers(
 
 @router.get("/users/segments/high-aov", response_model=AdminUserSegmentResponse)
 async def admin_user_segment_high_aov(
-    session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(require_admin_section("users")),
+    request: Request,
     q: str | None = Query(default=None),
     min_orders: int = Query(default=1, ge=1, le=100),
     min_aov: float = Query(default=0, ge=0),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
-    include_pii: bool = Query(default=True),
+    include_pii: bool = Query(default=False),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin_section("users")),
 ) -> AdminUserSegmentResponse:
     if include_pii:
-        pii_service.require_pii_reveal(current_user)
+        pii_service.require_pii_reveal(current_user, request=request)
     offset = (page - 1) * limit
     stats = _user_order_stats_subquery()
 
@@ -1482,12 +2494,13 @@ async def admin_user_segment_high_aov(
 @router.get("/users/{user_id}/aliases")
 async def admin_user_aliases(
     user_id: UUID,
+    request: Request,
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(require_admin_section("users")),
-    include_pii: bool = Query(default=False),
 ) -> dict:
     if include_pii:
-        pii_service.require_pii_reveal(current_user)
+        pii_service.require_pii_reveal(current_user, request=request)
     user = await session.get(User, user_id)
     if not user:
         raise HTTPException(
@@ -1518,12 +2531,13 @@ async def admin_user_aliases(
 @router.get("/users/{user_id}/profile", response_model=AdminUserProfileResponse)
 async def admin_user_profile(
     user_id: UUID,
+    request: Request,
+    include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(require_admin_section("users")),
-    include_pii: bool = Query(default=False),
 ) -> AdminUserProfileResponse:
     if include_pii:
-        pii_service.require_pii_reveal(current_user)
+        pii_service.require_pii_reveal(current_user, request=request)
     user = await session.get(User, user_id)
     if not user or user.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -2060,7 +3074,14 @@ def _audit_filters(
     if action:
         needle = action.strip().lower()
         if needle:
-            filters.append(func.lower(getattr(audit.c, "action")).like(f"%{needle}%"))  # type: ignore[attr-defined]
+            tokens = [token.strip() for token in re.split(r"[|,]+", needle) if token.strip()]
+            if len(tokens) <= 1:
+                filters.append(
+                    func.lower(getattr(audit.c, "action")).like(f"%{needle}%")  # type: ignore[attr-defined]
+                )
+            else:
+                action_col = func.lower(getattr(audit.c, "action"))  # type: ignore[attr-defined]
+                filters.append(or_(*[action_col.like(f"%{token}%") for token in tokens]))
 
     if user:
         needle = user.strip().lower()
@@ -2193,15 +3214,17 @@ async def admin_audit_entries(
 
 @router.get("/audit/export.csv")
 async def admin_audit_export_csv(
-    session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(require_admin_section("audit")),
+    request: Request,
     entity: str | None = Query(
         default="all", pattern="^(all|product|content|security)$"
     ),
     action: str | None = Query(default=None, max_length=120),
     user: str | None = Query(default=None, max_length=255),
     redact: bool = Query(default=True),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin_section("audit")),
 ) -> Response:
+    step_up_service.require_step_up(request, current_user)
     if not redact and current_user.role != UserRole.owner:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -2507,16 +3530,17 @@ async def admin_revoke_user_session(
 
 @router.get("/gdpr/exports", response_model=AdminGdprExportJobsResponse)
 async def admin_gdpr_export_jobs(
-    session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(require_admin_section("users")),
+    request: Request,
     q: str | None = Query(default=None),
     status_filter: UserDataExportStatus | None = Query(default=None, alias="status"),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
     include_pii: bool = Query(default=False),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin_section("users")),
 ) -> AdminGdprExportJobsResponse:
     if include_pii:
-        pii_service.require_pii_reveal(current_user)
+        pii_service.require_pii_reveal(current_user, request=request)
     offset = (page - 1) * limit
     stmt = select(UserDataExportJob, User).join(User, UserDataExportJob.user_id == User.id)
 
@@ -2671,6 +3695,7 @@ async def admin_gdpr_download_export_job(
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(require_admin),
 ) -> FileResponse:
+    step_up_service.require_step_up(request, current_user)
     job = await session.get(UserDataExportJob, job_id)
     if not job:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found")
@@ -2711,15 +3736,16 @@ async def admin_gdpr_download_export_job(
 
 @router.get("/gdpr/deletions", response_model=AdminGdprDeletionRequestsResponse)
 async def admin_gdpr_deletion_requests(
-    session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(require_admin_section("users")),
+    request: Request,
     q: str | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=25, ge=1, le=100),
     include_pii: bool = Query(default=False),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin_section("users")),
 ) -> AdminGdprDeletionRequestsResponse:
     if include_pii:
-        pii_service.require_pii_reveal(current_user)
+        pii_service.require_pii_reveal(current_user, request=request)
     offset = (page - 1) * limit
     stmt = select(User).where(User.deleted_at.is_(None), User.deletion_requested_at.is_not(None))
 
@@ -2874,12 +3900,6 @@ async def update_user_role(
 ) -> dict:
     if current_user.role not in (UserRole.owner, UserRole.admin):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only owner/admin can change user roles")
-
-    password = str(payload.get("password") or "")
-    if not password:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Password is required")
-    if not security.verify_password(password, current_user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
 
     user = await session.get(User, user_id)
     if not user:
@@ -3153,6 +4173,70 @@ async def resend_email_verification(
     return {"detail": "Verification email sent"}
 
 
+@router.post("/users/{user_id}/password-reset/resend", status_code=status.HTTP_202_ACCEPTED)
+async def resend_password_reset(
+    user_id: UUID,
+    payload: AdminPasswordResetResendRequest,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin_section("users")),
+    _: None = Depends(admin_password_reset_resend_rate_limit),
+) -> dict:
+    user = await session.get(User, user_id)
+    if not user or user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    requested_email = (payload.email or "").strip().lower()
+    target_email = (user.email or "").strip()
+    target_kind = "primary"
+    if requested_email:
+        if requested_email == (user.email or "").strip().lower():
+            target_email = (user.email or "").strip()
+        else:
+            secondary = await session.scalar(
+                select(UserSecondaryEmail).where(
+                    UserSecondaryEmail.user_id == user.id,
+                    func.lower(UserSecondaryEmail.email) == requested_email,
+                    UserSecondaryEmail.verified.is_(True),
+                )
+            )
+            if not secondary:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email")
+            target_email = (secondary.email or "").strip()
+            target_kind = "secondary"
+
+    if not target_email:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User email missing")
+
+    reset = await auth_service.create_reset_token(session, target_email.lower())
+    if not reset:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    background_tasks.add_task(
+        email_service.send_password_reset,
+        target_email,
+        reset.token,
+        user.preferred_language,
+    )
+    await audit_chain_service.add_admin_audit_log(
+        session,
+        action="user.password_reset.resend",
+        actor_user_id=current_user.id,
+        subject_user_id=user.id,
+        data={
+            "password_reset_token_id": str(reset.id),
+            "expires_at": reset.expires_at.isoformat() if reset.expires_at else None,
+            "to_email_masked": pii_service.mask_email(target_email),
+            "to_email_kind": target_kind,
+            "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+            "ip_address": (request.client.host if request.client else None),
+        },
+    )
+    await session.commit()
+    return {"detail": "Password reset email sent"}
+
+
 @router.post("/users/{user_id}/email/verification/override", response_model=AdminUserProfileUser)
 async def override_email_verification(
     user_id: UUID,
@@ -3268,16 +4352,6 @@ async def transfer_owner(
             status_code=status.HTTP_400_BAD_REQUEST, detail='Type "TRANSFER" to confirm'
         )
 
-    password = str(payload.get("password") or "")
-    if not password:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Password is required"
-        )
-    if not security.verify_password(password, current_owner.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password"
-        )
-
     if "@" in identifier:
         target = await auth_service.get_user_by_any_email(session, identifier)
     else:
@@ -3335,8 +4409,11 @@ async def set_maintenance(payload: dict, _: str = Depends(require_admin)) -> dic
 
 @router.get("/export")
 async def export_data(
-    session: AsyncSession = Depends(get_session), _: str = Depends(require_admin)
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin),
 ) -> dict:
+    step_up_service.require_step_up(request, admin)
     return await exporter_service.export_json(session)
 
 
@@ -3393,6 +4470,91 @@ async def list_stock_adjustments(
     )
 
 
+@router.get("/stock-adjustments/export")
+async def export_stock_adjustments(
+    request: Request,
+    product_id: UUID = Query(...),
+    reason: StockAdjustmentReason | None = Query(default=None),
+    from_date: date | None = Query(default=None),
+    to_date: date | None = Query(default=None),
+    limit: int = Query(default=5000, ge=1, le=20000),
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("inventory")),
+) -> Response:
+    step_up_service.require_step_up(request, admin)
+    if from_date and to_date and to_date < from_date:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date range")
+
+    product = await session.get(Product, product_id)
+    if not product or getattr(product, "is_deleted", False):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+
+    stmt = (
+        select(StockAdjustment, ProductVariant, User)
+        .select_from(StockAdjustment)
+        .outerjoin(ProductVariant, ProductVariant.id == StockAdjustment.variant_id)
+        .outerjoin(User, User.id == StockAdjustment.actor_user_id)
+        .where(StockAdjustment.product_id == product_id)
+    )
+    if reason is not None:
+        stmt = stmt.where(StockAdjustment.reason == reason)
+    if from_date is not None:
+        stmt = stmt.where(func.date(StockAdjustment.created_at) >= from_date)
+    if to_date is not None:
+        stmt = stmt.where(func.date(StockAdjustment.created_at) <= to_date)
+
+    rows = (
+        (await session.execute(stmt.order_by(StockAdjustment.created_at.desc()).limit(limit)))
+        .all()
+    )
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(
+        [
+            "created_at",
+            "product_slug",
+            "product_name",
+            "sku",
+            "variant_id",
+            "variant_name",
+            "reason",
+            "delta",
+            "before_quantity",
+            "after_quantity",
+            "note",
+            "actor_email",
+            "actor_user_id",
+        ]
+    )
+    for adjustment, variant, actor in rows:
+        created_at = getattr(adjustment, "created_at", None)
+        writer.writerow(
+            [
+                created_at.isoformat() if isinstance(created_at, datetime) else "",
+                product.slug,
+                product.name,
+                product.sku,
+                str(adjustment.variant_id) if adjustment.variant_id else "",
+                getattr(variant, "name", "") or "",
+                adjustment.reason.value,
+                int(adjustment.delta),
+                int(adjustment.before_quantity),
+                int(adjustment.after_quantity),
+                (adjustment.note or ""),
+                getattr(actor, "email", "") or "",
+                str(adjustment.actor_user_id) if adjustment.actor_user_id else "",
+            ]
+        )
+
+    filename = f"stock-adjustments-{product.slug}-{datetime.now(timezone.utc).date().isoformat()}.csv"
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.post(
     "/stock-adjustments",
     response_model=StockAdjustmentRead,
@@ -3428,6 +4590,104 @@ async def inventory_restock_list(
     )
 
 
+@router.get("/inventory/reservations/carts", response_model=CartReservationsResponse)
+async def inventory_reserved_carts(
+    request: Request,
+    product_id: UUID = Query(...),
+    variant_id: UUID | None = Query(default=None),
+    include_pii: bool = Query(default=False),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin_section("inventory")),
+) -> CartReservationsResponse:
+    if include_pii:
+        pii_service.require_pii_reveal(current_user, request=request)
+
+    product = await session.get(Product, product_id)
+    if not product or getattr(product, "is_deleted", False):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+
+    if variant_id is not None:
+        variant = await session.get(ProductVariant, variant_id)
+        if not variant or variant.product_id != product.id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid variant")
+
+    cutoff, rows = await inventory_service.list_cart_reservations(
+        session,
+        product_id=product.id,
+        variant_id=variant_id,
+        limit=limit,
+        offset=offset,
+    )
+    items: list[dict] = []
+    for row in rows:
+        email_raw = str(row.get("customer_email") or "").strip() or None
+        email_value = email_raw
+        if email_value and not include_pii:
+            email_value = pii_service.mask_email(email_value) or email_value
+        items.append(
+            {
+                "cart_id": row.get("cart_id"),
+                "updated_at": row.get("updated_at"),
+                "customer_email": email_value,
+                "quantity": int(row.get("quantity") or 0),
+            }
+        )
+
+    return CartReservationsResponse(cutoff=cutoff, items=items)
+
+
+@router.get("/inventory/reservations/orders", response_model=OrderReservationsResponse)
+async def inventory_reserved_orders(
+    request: Request,
+    product_id: UUID = Query(...),
+    variant_id: UUID | None = Query(default=None),
+    include_pii: bool = Query(default=False),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin_section("inventory")),
+) -> OrderReservationsResponse:
+    if include_pii:
+        pii_service.require_pii_reveal(current_user, request=request)
+
+    product = await session.get(Product, product_id)
+    if not product or getattr(product, "is_deleted", False):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+
+    if variant_id is not None:
+        variant = await session.get(ProductVariant, variant_id)
+        if not variant or variant.product_id != product.id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid variant")
+
+    rows = await inventory_service.list_order_reservations(
+        session,
+        product_id=product.id,
+        variant_id=variant_id,
+        limit=limit,
+        offset=offset,
+    )
+    items: list[dict] = []
+    for row in rows:
+        email_raw = str(row.get("customer_email") or "").strip() or None
+        email_value = email_raw
+        if email_value and not include_pii:
+            email_value = pii_service.mask_email(email_value) or email_value
+        items.append(
+            {
+                "order_id": row.get("order_id"),
+                "reference_code": row.get("reference_code"),
+                "status": row.get("status"),
+                "created_at": row.get("created_at"),
+                "customer_email": email_value,
+                "quantity": int(row.get("quantity") or 0),
+            }
+        )
+
+    return OrderReservationsResponse(items=items)
+
+
 @router.put("/inventory/restock-notes", response_model=RestockNoteRead | None)
 async def upsert_inventory_restock_note(
     payload: RestockNoteUpsert,
@@ -3441,13 +4701,15 @@ async def upsert_inventory_restock_note(
 
 @router.get("/inventory/restock-list/export")
 async def export_inventory_restock_list(
-    session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("inventory")),
+    request: Request,
     include_variants: bool = Query(default=True),
     default_threshold: int = Query(
         default=DEFAULT_LOW_STOCK_DASHBOARD_THRESHOLD, ge=1, le=1000
     ),
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("inventory")),
 ) -> Response:
+    step_up_service.require_step_up(request, admin)
     rows = await inventory_service.list_restock_list(
         session,
         include_variants=include_variants,

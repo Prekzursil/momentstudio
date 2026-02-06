@@ -17,15 +17,35 @@ export interface AdminOrderListItem {
   status: string;
   total_amount: number;
   currency: string;
+  payment_method?: string | null;
   created_at: string;
   customer_email?: string | null;
   customer_username?: string | null;
   tags?: string[];
+  sla_kind?: 'accept' | 'ship' | string | null;
+  sla_started_at?: string | null;
+  sla_due_at?: string | null;
+  sla_overdue?: boolean;
+  fraud_flagged?: boolean;
+  fraud_severity?: 'low' | 'medium' | 'high' | string | null;
 }
 
 export interface AdminOrderListResponse {
   items: AdminOrderListItem[];
   meta: AdminPaginationMeta;
+}
+
+export interface AdminOrderTagStat {
+  tag: string;
+  count: number;
+}
+
+export interface AdminOrderTagRenameResult {
+  from_tag: string;
+  to_tag: string;
+  updated: number;
+  merged: number;
+  total: number;
 }
 
 export type OrderDocumentExportKind = 'packing_slip' | 'packing_slips_batch' | 'shipping_label' | 'receipt';
@@ -52,6 +72,15 @@ export interface AdminOrderEvent {
   event: string;
   note?: string | null;
   data?: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface AdminOrderEmailEvent {
+  id: string;
+  to_email: string;
+  subject: string;
+  status: 'sent' | 'failed' | string;
+  error_message?: string | null;
   created_at: string;
 }
 
@@ -124,6 +153,8 @@ export class AdminOrdersService {
     user_id?: string;
     status?: string;
     tag?: string;
+    sla?: string;
+    fraud?: string;
     from?: string;
     to?: string;
     page?: number;
@@ -169,6 +200,16 @@ export class AdminOrdersService {
     );
   }
 
+  listEmailEvents(
+    orderId: string,
+    params?: { limit?: number; since_hours?: number; include_pii?: boolean }
+  ): Observable<AdminOrderEmailEvent[]> {
+    const finalParams = { ...params, include_pii: params?.include_pii ?? true };
+    return this.api.get<AdminOrderEmailEvent[]>(`/orders/admin/${orderId}/email-events`, finalParams as any).pipe(
+      map((rows: any) => (Array.isArray(rows) ? rows : []))
+    );
+  }
+
   update(
     orderId: string,
     payload: {
@@ -182,6 +223,35 @@ export class AdminOrdersService {
   ): Observable<AdminOrderDetail> {
     const params = { include_pii: opts?.include_pii ?? true };
     return this.api.patch<AdminOrderDetail>(`/orders/admin/${orderId}`, payload, undefined, params as any).pipe(
+      map((o: any) => ({
+        ...o,
+        total_amount: parseMoney(o?.total_amount),
+        tax_amount: parseMoney(o?.tax_amount),
+        fee_amount: parseMoney(o?.fee_amount),
+        shipping_amount: parseMoney(o?.shipping_amount),
+        refunds: (o?.refunds ?? []).map((r: any) => ({
+          ...r,
+          amount: parseMoney(r?.amount)
+        })),
+        admin_notes: o?.admin_notes ?? [],
+        fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
+        shipments: Array.isArray(o?.shipments) ? o.shipments : [],
+        items: (o?.items ?? []).map((it: any) => ({
+          ...it,
+          unit_price: parseMoney(it?.unit_price),
+          subtotal: parseMoney(it?.subtotal)
+        }))
+      }))
+    );
+  }
+
+  reviewFraud(
+    orderId: string,
+    payload: { decision: 'approve' | 'deny'; note?: string | null },
+    opts?: { include_pii?: boolean }
+  ): Observable<AdminOrderDetail> {
+    const params = { include_pii: opts?.include_pii ?? true };
+    return this.api.post<AdminOrderDetail>(`/orders/admin/${orderId}/fraud-review`, payload, undefined, params as any).pipe(
       map((o: any) => ({
         ...o,
         total_amount: parseMoney(o?.total_amount),
@@ -383,14 +453,13 @@ export class AdminOrdersService {
     return this.api.post<Order>(`/orders/admin/${orderId}/void-payment`, {});
   }
 
-  requestRefund(orderId: string, payload: { password: string; note?: string | null }): Observable<Order> {
+  requestRefund(orderId: string, payload: { note?: string | null } = {}): Observable<Order> {
     return this.api.post<Order>(`/orders/admin/${orderId}/refund`, payload);
   }
 
   createPartialRefund(
     orderId: string,
     payload: {
-      password: string;
       amount: string;
       note: string;
       items?: Array<{ order_item_id: string; quantity: number }>;
@@ -447,6 +516,28 @@ export class AdminOrdersService {
   listOrderTags(): Observable<string[]> {
     return this.api.get<{ items?: string[] }>('/orders/admin/tags').pipe(
       map((res: any) => (Array.isArray(res?.items) ? res.items : []).filter((t: any) => typeof t === 'string' && t.length))
+    );
+  }
+
+  listOrderTagStats(): Observable<AdminOrderTagStat[]> {
+    return this.api.get<{ items?: AdminOrderTagStat[] }>('/orders/admin/tags/stats').pipe(
+      map((res: any) =>
+        (Array.isArray(res?.items) ? res.items : [])
+          .filter((row: any) => typeof row?.tag === 'string' && row.tag.length)
+          .map((row: any) => ({ tag: String(row.tag), count: Math.max(0, Number(row.count || 0) || 0) }))
+      )
+    );
+  }
+
+  renameOrderTag(payload: { from_tag: string; to_tag: string }): Observable<AdminOrderTagRenameResult> {
+    return this.api.post<AdminOrderTagRenameResult>('/orders/admin/tags/rename', payload as any).pipe(
+      map((res: any) => ({
+        from_tag: String(res?.from_tag || ''),
+        to_tag: String(res?.to_tag || ''),
+        updated: Math.max(0, Number(res?.updated || 0) || 0),
+        merged: Math.max(0, Number(res?.merged || 0) || 0),
+        total: Math.max(0, Number(res?.total || 0) || 0)
+      }))
     );
   }
 
@@ -512,6 +603,18 @@ export class AdminOrdersService {
 
   downloadBatchPackingSlips(orderIds: string[]): Observable<Blob> {
     return this.api.postBlob('/orders/admin/batch/packing-slips', { order_ids: orderIds });
+  }
+
+  downloadPickListCsv(orderIds: string[]): Observable<Blob> {
+    return this.api.postBlob('/orders/admin/batch/pick-list.csv', { order_ids: orderIds });
+  }
+
+  downloadPickListPdf(orderIds: string[]): Observable<Blob> {
+    return this.api.postBlob('/orders/admin/batch/pick-list.pdf', { order_ids: orderIds });
+  }
+
+  downloadBatchShippingLabelsZip(orderIds: string[]): Observable<Blob> {
+    return this.api.postBlob('/orders/admin/batch/shipping-labels.zip', { order_ids: orderIds });
   }
 
   downloadReceiptPdf(orderId: string): Observable<Blob> {

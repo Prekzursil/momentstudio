@@ -59,18 +59,25 @@ export const adminSectionGuard =
         return auth.checkAdminAccess({ silent: true }).pipe(
           map(() => true),
           catchError((err) => {
+            const code = err?.error?.code || err?.headers?.get?.('X-Error-Code') || err?.headers?.get?.('x-error-code');
             const detail = err?.error?.detail;
-            if (detail === 'Two-factor authentication or passkey required for admin access') {
+            if (code === 'admin_mfa_required' || detail === 'Two-factor authentication or passkey required for admin access') {
               toast.error(translate.instant('adminUi.security.mfaRequired'));
               return of(router.parseUrl('/account/security'));
             }
             if (
+              code === 'admin_ip_denied' ||
+              code === 'admin_ip_allowlist' ||
               detail === 'Admin access is blocked from this IP address' ||
               detail === 'Admin access is restricted to approved IP addresses'
             ) {
               toast.error(translate.instant('adminUi.ipBypass.restricted'));
               const next = encodeURIComponent(state.url || '/admin/dashboard');
               return of(router.parseUrl(`/admin/ip-bypass?returnUrl=${next}`));
+            }
+            if (code === 'training_readonly') {
+              toast.error(translate.instant('adminUi.trainingMode.hint'));
+              return of(router.parseUrl('/admin/dashboard'));
             }
             toast.error(detail || 'You do not have access to this section.');
             return of(router.parseUrl('/'));

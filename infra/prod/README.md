@@ -6,6 +6,7 @@ This folder contains a production-oriented Docker Compose stack for **momentstud
 - Frontend (Angular build served by nginx)
 - Backend (FastAPI + Alembic migrations at startup)
 - Postgres
+- Redis (shared rate limiting/caches; recommended for multi-replica)
 
 ## 0) DNS + firewall prerequisites
 
@@ -53,6 +54,7 @@ Edit:
 - `backend/.env`
   - set `ENVIRONMENT=production`
   - set a strong `SECRET_KEY`
+  - optional (recommended for multi-replica): set `REDIS_URL=redis://redis:6379/0`
   - optional CAPTCHA (Cloudflare Turnstile): set `CAPTCHA_ENABLED=1` and `TURNSTILE_SECRET_KEY=...`
   - configure Stripe/PayPal/Netopia + SMTP as needed
 - `frontend/.env`

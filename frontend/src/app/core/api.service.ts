@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpEvent, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { appConfig } from './app-config';
 
@@ -22,6 +22,21 @@ export class ApiService {
   ): Observable<T> {
     const httpParams = this.buildParams(params);
     return this.http.post<T>(`${this.baseUrl}${path}`, body, { headers, params: httpParams });
+  }
+
+  postWithProgress<T>(
+    path: string,
+    body: unknown,
+    headers?: Record<string, string>,
+    params?: Record<string, string | number | boolean | string[] | number[] | undefined>
+  ): Observable<HttpEvent<T>> {
+    const httpParams = this.buildParams(params);
+    return this.http.post<T>(`${this.baseUrl}${path}`, body, {
+      headers,
+      params: httpParams,
+      observe: 'events',
+      reportProgress: true,
+    });
   }
 
   put<T>(

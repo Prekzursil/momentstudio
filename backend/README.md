@@ -21,6 +21,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 Key env vars:
 - `SECRET_KEY`, `JWT_ALGORITHM`, `ACCESS_TOKEN_EXP_MINUTES`, `REFRESH_TOKEN_EXP_DAYS`
 - `DATABASE_URL` (async driver, e.g., `postgresql+asyncpg://...`)
+- Optional (recommended for multi-replica): `REDIS_URL` (shared rate limiting/caches)
 - `SMTP_*`, `FRONTEND_ORIGIN`
 - `STRIPE_ENV` and `STRIPE_SECRET_KEY_SANDBOX` / `STRIPE_SECRET_KEY_LIVE` (or legacy `STRIPE_SECRET_KEY`)
 - `STRIPE_WEBHOOK_SECRET_SANDBOX` / `STRIPE_WEBHOOK_SECRET_LIVE` (or legacy `STRIPE_WEBHOOK_SECRET`) if processing webhooks
@@ -33,6 +34,7 @@ Key env vars:
 - Frontend calls `/auth/google/start` and then posts the returned `code`/`state` to `/auth/google/callback` to exchange for tokens.
 - Authenticated users can link/unlink via `/auth/google/link/start` → `/auth/google/link` (requires password) and `/auth/google/unlink`.
 - Update the frontend `.env`/config to point `GOOGLE_REDIRECT_URI` at the Angular callback route when testing locally.
+- See `docs/GOOGLE_OAUTH.md` for a step-by-step Google Console walkthrough.
 
 ## Database and migrations
 

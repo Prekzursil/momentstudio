@@ -11,3 +11,14 @@ class NewsletterSubscribeResponse(BaseModel):
     subscribed: bool = True
     already_subscribed: bool = False
 
+
+class NewsletterTokenRequest(BaseModel):
+    token: str = Field(..., min_length=10, max_length=5000)
+
+
+class NewsletterConfirmResponse(BaseModel):
+    confirmed: bool = True
+
+
+class NewsletterUnsubscribeResponse(BaseModel):
+    unsubscribed: bool = True

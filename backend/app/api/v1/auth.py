@@ -62,6 +62,8 @@ from app.schemas.auth import (
     PasswordResetConfirm,
     PasswordResetRequest,
     RefreshRequest,
+    StepUpRequest,
+    StepUpResponse,
     TrainingModeUpdateRequest,
     TokenPair,
     UserEmailsResponse,
@@ -82,9 +84,13 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 logger = logging.getLogger(__name__)
 
 register_rate_limit = per_identifier_limiter(
-    lambda r: r.client.host if r.client else "anon", settings.auth_rate_limit_register, 60
+    lambda r: r.client.host if r.client else "anon",
+    settings.auth_rate_limit_register,
+    60,
+    key="auth:register",
 )
 login_rate_limit = limiter("auth:login", settings.auth_rate_limit_login, 60)
+step_up_rate_limit = limiter("auth:step_up", settings.auth_rate_limit_login, 60)
 two_factor_rate_limit = limiter("auth:2fa", settings.auth_rate_limit_login, 60)
 refresh_rate_limit = limiter("auth:refresh", settings.auth_rate_limit_refresh, 60)
 reset_request_rate_limit = limiter("auth:reset_request", settings.auth_rate_limit_reset_request, 60)
@@ -93,6 +99,7 @@ google_rate_limit = per_identifier_limiter(
     lambda r: r.client.host if r.client else "anon",
     settings.auth_rate_limit_google,
     60,
+    key="auth:google",
 )
 
 _REQUIRED_REGISTRATION_CONSENT_KEYS = ("page.terms-and-conditions", "page.privacy-policy")
@@ -1114,6 +1121,35 @@ async def admin_access(_: User = Depends(require_admin_section("dashboard"))) ->
     return {"allowed": True}
 
 
+@router.post("/step-up", response_model=StepUpResponse, status_code=status.HTTP_200_OK)
+async def step_up(
+    payload: StepUpRequest,
+    request: Request,
+    _: None = Depends(step_up_rate_limit),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin_section("dashboard")),
+) -> StepUpResponse:
+    hashed_password = (getattr(current_user, "hashed_password", None) or "").strip()
+    if not hashed_password:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Password authentication is not available for this account")
+
+    if not security.verify_password(payload.password, hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+
+    expires_minutes = 15
+    token = security.create_step_up_token(str(current_user.id), expires_minutes=expires_minutes)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)
+
+    await auth_service.record_security_event(
+        session,
+        current_user.id,
+        "step_up",
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
+    return StepUpResponse(step_up_token=token, expires_at=expires_at)
+
+
 @router.post("/password/change", status_code=status.HTTP_200_OK)
 async def change_password(
     payload: ChangePasswordRequest,
@@ -1917,7 +1953,7 @@ async def upload_avatar(
         file,
         root=avatars_root,
         filename=filename,
-        allowed_content_types=("image/png", "image/jpeg", "image/webp", "image/gif"),
+        allowed_content_types=("image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"),
         max_bytes=5 * 1024 * 1024,
     )
     current_user.avatar_url = url_path
@@ -1980,9 +2016,16 @@ async def request_password_reset(
     session: AsyncSession = Depends(get_session),
     _: None = Depends(reset_request_rate_limit),
 ) -> dict[str, str]:
-    reset = await auth_service.create_reset_token(session, payload.email)
-    user = await session.get(User, reset.user_id)
-    background_tasks.add_task(email_service.send_password_reset, payload.email, reset.token, getattr(user, "preferred_language", None))
+    email = (payload.email or "").strip().lower()
+    reset = await auth_service.create_reset_token(session, email)
+    if reset:
+        user = await session.get(User, reset.user_id)
+        background_tasks.add_task(
+            email_service.send_password_reset,
+            email,
+            reset.token,
+            getattr(user, "preferred_language", None),
+        )
     return {"status": "sent"}
 
 

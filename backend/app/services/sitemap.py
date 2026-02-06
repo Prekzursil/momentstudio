@@ -15,7 +15,7 @@ async def build_sitemap_urls(session: AsyncSession, *, langs: list[str] | None =
     now = datetime.now(timezone.utc)
     languages = langs or ["en", "ro"]
 
-    categories = (await session.execute(select(Category.slug))).scalars().all()
+    categories = (await session.execute(select(Category.slug).where(Category.is_visible.is_(True)))).scalars().all()
     products = (
         await session.execute(
             select(Product.slug).where(

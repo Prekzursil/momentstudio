@@ -21,6 +21,7 @@ from app.models.passkeys import UserPasskey
 from app.services.auth import create_user
 from app.schemas.user import UserCreate
 from app.core.config import settings
+from app.core import security
 
 
 @pytest.fixture
@@ -46,7 +47,11 @@ def test_app() -> Dict[str, object]:
 
 
 def auth_headers(token: str) -> dict[str, str]:
-    return {"Authorization": f"Bearer {token}"}
+    headers = {"Authorization": f"Bearer {token}"}
+    payload = security.decode_token(token)
+    if payload and payload.get("sub"):
+        headers["X-Admin-Step-Up"] = security.create_step_up_token(str(payload["sub"]))
+    return headers
 
 
 def create_admin_token(session_factory, email="admin@example.com"):
@@ -1550,3 +1555,95 @@ def test_stock_adjustment_ledger_records_changes(test_app: Dict[str, object]) ->
     rows = list_res.json()
     assert len(rows) == 2
     assert any(row["id"] == applied["id"] for row in rows)
+
+
+def test_stock_adjustment_export_csv_filters(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    admin_token = create_admin_token(SessionLocal, email="stock-export@example.com")
+
+    category_res = client.post(
+        "/api/v1/catalog/categories",
+        json={"name": "Art"},
+        headers=auth_headers(admin_token),
+    )
+    assert category_res.status_code == 201, category_res.text
+    category_id = category_res.json()["id"]
+
+    create_res = client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": category_id,
+            "slug": "stock-export-cup",
+            "name": "Stock Export Cup",
+            "base_price": 10.0,
+            "currency": "RON",
+            "stock_quantity": 3,
+            "status": "published",
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert create_res.status_code == 201, create_res.text
+    product_id = create_res.json()["id"]
+
+    patch_res = client.patch(
+        "/api/v1/catalog/products/stock-export-cup",
+        json={"stock_quantity": 10},
+        headers=auth_headers(admin_token),
+    )
+    assert patch_res.status_code == 200, patch_res.text
+
+    apply_res = client.post(
+        "/api/v1/admin/dashboard/stock-adjustments",
+        json={"product_id": product_id, "delta": -2, "reason": "damage", "note": "broken"},
+        headers=auth_headers(admin_token),
+    )
+    assert apply_res.status_code == 201, apply_res.text
+
+    export_res = client.get(
+        "/api/v1/admin/dashboard/stock-adjustments/export",
+        params={"product_id": product_id},
+        headers=auth_headers(admin_token),
+    )
+    assert export_res.status_code == 200, export_res.text
+    assert "text/csv" in (export_res.headers.get("content-type") or "")
+
+    rows = list(csv.reader(io.StringIO(export_res.text)))
+    assert rows[0] == [
+        "created_at",
+        "product_slug",
+        "product_name",
+        "sku",
+        "variant_id",
+        "variant_name",
+        "reason",
+        "delta",
+        "before_quantity",
+        "after_quantity",
+        "note",
+        "actor_email",
+        "actor_user_id",
+    ]
+    assert len(rows) == 3
+
+    damage_res = client.get(
+        "/api/v1/admin/dashboard/stock-adjustments/export",
+        params={"product_id": product_id, "reason": "damage"},
+        headers=auth_headers(admin_token),
+    )
+    assert damage_res.status_code == 200, damage_res.text
+    damage_rows = list(csv.reader(io.StringIO(damage_res.text)))
+    assert len(damage_rows) == 2
+    assert damage_rows[1][6] == "damage"
+
+    tomorrow = (datetime.now(timezone.utc).date() + timedelta(days=1)).isoformat()
+    empty_res = client.get(
+        "/api/v1/admin/dashboard/stock-adjustments/export",
+        params={"product_id": product_id, "from_date": tomorrow},
+        headers=auth_headers(admin_token),
+    )
+    assert empty_res.status_code == 200, empty_res.text
+    empty_rows = list(csv.reader(io.StringIO(empty_res.text)))
+    assert empty_rows[0] == rows[0]
+    assert len(empty_rows) == 1

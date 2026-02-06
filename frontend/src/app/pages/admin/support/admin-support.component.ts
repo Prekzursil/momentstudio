@@ -5,6 +5,8 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { BreadcrumbComponent, Crumb } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
+import { ErrorStateComponent } from '../../../shared/error-state.component';
+import { extractRequestId } from '../../../shared/http-error';
 import { InputComponent } from '../../../shared/input.component';
 import { SkeletonComponent } from '../../../shared/skeleton.component';
 import { AdminPageHeaderComponent } from '../shared/admin-page-header.component';
@@ -30,6 +32,7 @@ import {
     TranslateModule,
     BreadcrumbComponent,
     ButtonComponent,
+    ErrorStateComponent,
     InputComponent,
     SkeletonComponent,
     AdminPageHeaderComponent
@@ -69,6 +72,9 @@ import {
               </option>
               <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="dispute">
                 {{ 'adminUi.support.topics.dispute' | translate }}
+              </option>
+              <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="feedback">
+                {{ 'adminUi.support.topics.feedback' | translate }}
               </option>
 	            </select>
 	          </label>
@@ -132,9 +138,13 @@ import {
               <app-skeleton [rows]="6"></app-skeleton>
             </div>
 
-            <div *ngIf="!loading() && error()" class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
-              {{ error() }}
-            </div>
+            <app-error-state
+              *ngIf="!loading() && error()"
+              [message]="error()"
+              [requestId]="errorRequestId()"
+              [showRetry]="true"
+              (retry)="retryLoad()"
+            ></app-error-state>
 
             <div *ngIf="!loading() && !items().length" class="text-sm text-slate-600 dark:text-slate-300">
               {{ 'adminUi.support.empty' | translate }}
@@ -588,6 +598,7 @@ export class AdminSupportComponent implements OnInit {
   saving = signal<boolean>(false);
   replying = signal<boolean>(false);
   error = signal<string>('');
+  errorRequestId = signal<string | null>(null);
 
   assigneesLoading = signal<boolean>(false);
   assignees = signal<SupportAgentRef[]>([]);
@@ -645,6 +656,10 @@ export class AdminSupportComponent implements OnInit {
 
   applyFilters(): void {
     this.meta.set({ ...this.meta(), page: 1 });
+    this.load();
+  }
+
+  retryLoad(): void {
     this.load();
   }
 
@@ -901,6 +916,7 @@ export class AdminSupportComponent implements OnInit {
   private load(): void {
     this.loading.set(true);
     this.error.set('');
+    this.errorRequestId.set(null);
     const meta = this.meta();
     this.api
       .list({
@@ -917,9 +933,10 @@ export class AdminSupportComponent implements OnInit {
           this.items.set(resp.items);
           this.meta.set(resp.meta);
         },
-        error: () => {
+        error: (err) => {
           this.items.set([]);
           this.error.set(this.translate.instant('adminUi.support.errors.load'));
+          this.errorRequestId.set(extractRequestId(err));
           this.loading.set(false);
         },
         complete: () => this.loading.set(false)

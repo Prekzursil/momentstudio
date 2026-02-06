@@ -7,7 +7,7 @@ import string
 import re
 
 from fastapi import HTTPException, status
-from sqlalchemy import String, cast, exists, func, or_
+from sqlalchemy import String, and_, case, cast, exists, func, literal, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -33,6 +33,7 @@ from app.schemas.order_admin_address import AdminOrderAddressesUpdate
 from app.schemas.order_shipment import OrderShipmentCreate, OrderShipmentUpdate
 from app.services import address as address_service
 from app.services import checkout_settings as checkout_settings_service
+from app.services import tracking as tracking_service
 from app.services import pricing
 from app.services import taxes as taxes_service
 from app.services.taxes import TaxableProductLine
@@ -341,23 +342,109 @@ async def admin_search_orders(
     statuses: list[OrderStatus] | None = None,
     pending_any: bool = False,
     tag: str | None = None,
+    sla: str | None = None,
+    fraud: str | None = None,
     include_test: bool = True,
     from_dt=None,
     to_dt=None,
     page: int = 1,
     limit: int = 20,
-) -> tuple[list[tuple[Order, str | None, str | None]], int]:
+) -> tuple[list[tuple[Order, str | None, str | None, str | None, datetime | None, bool, str | None]], int]:
     """Paginated order search for the admin UI.
 
-    Returns rows of (Order, customer_email, customer_username) plus total_items.
+    Returns rows of (Order, customer_email, customer_username, sla_kind, sla_started_at, fraud_flagged, fraud_severity) plus total_items.
     """
     from app.models.user import User
+    from app.core.config import settings
 
     cleaned_q = (q or "").strip()
     tag_clean = _normalize_order_tag(tag) if tag is not None else None
     page = max(1, int(page or 1))
     limit = max(1, min(100, int(limit or 20)))
     offset = (page - 1) * limit
+
+    sla_clean = (sla or "").strip().lower() or None
+    fraud_clean = (fraud or "").strip().lower() or None
+    now = datetime.now(timezone.utc)
+    accept_hours = max(1, int(getattr(settings, "order_sla_accept_hours", 24) or 24))
+    ship_hours = max(1, int(getattr(settings, "order_sla_ship_hours", 48) or 48))
+    accept_cutoff = now - timedelta(hours=accept_hours)
+    ship_cutoff = now - timedelta(hours=ship_hours)
+
+    window_minutes = max(1, int(getattr(settings, "fraud_velocity_window_minutes", 60 * 24) or 60 * 24))
+    threshold = max(2, int(getattr(settings, "fraud_velocity_threshold", 3) or 3))
+    retry_threshold = max(1, int(getattr(settings, "fraud_payment_retry_threshold", 2) or 2))
+    fraud_since = now - timedelta(minutes=window_minutes)
+
+    entered_pending_acceptance_at = (
+        select(func.max(OrderEvent.created_at))
+        .where(
+            OrderEvent.order_id == Order.id,
+            OrderEvent.event == "status_change",
+            OrderEvent.note.is_not(None),
+            OrderEvent.note.like("% -> pending_acceptance"),
+        )
+        .correlate(Order)
+        .scalar_subquery()
+    )
+    entered_paid_at = (
+        select(func.max(OrderEvent.created_at))
+        .where(
+            OrderEvent.order_id == Order.id,
+            OrderEvent.event == "status_change",
+            OrderEvent.note.is_not(None),
+            OrderEvent.note.like("% -> paid"),
+        )
+        .correlate(Order)
+        .scalar_subquery()
+    )
+    accept_started_at = func.coalesce(entered_pending_acceptance_at, Order.created_at)
+    ship_started_at = func.coalesce(entered_paid_at, Order.created_at)
+
+    sla_kind_col = case(
+        (Order.status == OrderStatus.pending_acceptance, literal("accept")),
+        (Order.status == OrderStatus.paid, literal("ship")),
+        else_=literal(None),
+    ).label("sla_kind")
+    sla_started_at_col = case(
+        (Order.status == OrderStatus.pending_acceptance, accept_started_at),
+        (Order.status == OrderStatus.paid, ship_started_at),
+        else_=literal(None),
+    ).label("sla_started_at")
+
+    email_velocity_subq = (
+        select(
+            func.lower(Order.customer_email).label("email"),
+            func.count(Order.id).label("email_count"),
+        )
+        .where(Order.created_at >= fraud_since)
+        .group_by(func.lower(Order.customer_email))
+        .having(func.count(Order.id) > 1)
+        .subquery()
+    )
+    user_velocity_subq = (
+        select(
+            Order.user_id.label("user_id"),
+            func.count(Order.id).label("user_count"),
+        )
+        .where(Order.user_id.is_not(None), Order.created_at >= fraud_since)
+        .group_by(Order.user_id)
+        .having(func.count(Order.id) > 1)
+        .subquery()
+    )
+    email_count = func.coalesce(email_velocity_subq.c.email_count, 0)
+    user_count = func.coalesce(user_velocity_subq.c.user_count, 0)
+    fraud_flagged_expr = or_(email_count > 1, user_count > 1, Order.payment_retry_count >= retry_threshold)
+    fraud_flagged_col = fraud_flagged_expr.label("fraud_flagged")
+    fraud_severity_col = case(
+        (or_(email_count >= threshold, user_count >= threshold), literal("high")),
+        (
+            or_(email_count > 1, user_count > 1, Order.payment_retry_count >= retry_threshold),
+            literal("medium"),
+        ),
+        (Order.payment_retry_count > 0, literal("low")),
+        else_=literal(None),
+    ).label("fraud_severity")
 
     filters: list[ColumnElement[bool]] = []
     if user_id:
@@ -376,6 +463,37 @@ async def admin_search_orders(
         filters.append(Order.status.in_(statuses))
     elif status:
         filters.append(Order.status == status)
+    if sla_clean:
+        if sla_clean == "accept_overdue":
+            filters.append(Order.status == OrderStatus.pending_acceptance)
+            filters.append(accept_started_at <= accept_cutoff)
+        elif sla_clean == "ship_overdue":
+            filters.append(Order.status == OrderStatus.paid)
+            filters.append(ship_started_at <= ship_cutoff)
+        elif sla_clean == "any_overdue":
+            filters.append(
+                or_(
+                    and_(Order.status == OrderStatus.pending_acceptance, accept_started_at <= accept_cutoff),
+                    and_(Order.status == OrderStatus.paid, ship_started_at <= ship_cutoff),
+                )
+            )
+    if fraud_clean:
+        fraud_approved = exists(
+            select(OrderTag.id).where(OrderTag.order_id == Order.id, OrderTag.tag == "fraud_approved")
+        )
+        fraud_denied = exists(
+            select(OrderTag.id).where(OrderTag.order_id == Order.id, OrderTag.tag == "fraud_denied")
+        )
+        if fraud_clean == "queue":
+            filters.append(fraud_flagged_expr)
+            filters.append(~fraud_approved)
+            filters.append(~fraud_denied)
+        elif fraud_clean == "flagged":
+            filters.append(fraud_flagged_expr)
+        elif fraud_clean == "approved":
+            filters.append(fraud_approved)
+        elif fraud_clean == "denied":
+            filters.append(fraud_denied)
     if from_dt:
         filters.append(Order.created_at >= from_dt)
     if to_dt:
@@ -391,14 +509,30 @@ async def admin_search_orders(
             )
         )
 
-    count_stmt = select(func.count()).select_from(Order).join(User, Order.user_id == User.id, isouter=True)
+    count_stmt = (
+        select(func.count())
+        .select_from(Order)
+        .join(User, Order.user_id == User.id, isouter=True)
+        .join(email_velocity_subq, email_velocity_subq.c.email == func.lower(Order.customer_email), isouter=True)
+        .join(user_velocity_subq, user_velocity_subq.c.user_id == Order.user_id, isouter=True)
+    )
     if filters:
         count_stmt = count_stmt.where(*filters)
     total_items = int((await session.execute(count_stmt)).scalar_one() or 0)
 
     stmt = (
-        select(Order, Order.customer_email, User.username)
+        select(
+            Order,
+            Order.customer_email,
+            User.username,
+            sla_kind_col,
+            sla_started_at_col,
+            fraud_flagged_col,
+            fraud_severity_col,
+        )
         .join(User, Order.user_id == User.id, isouter=True)
+        .join(email_velocity_subq, email_velocity_subq.c.email == func.lower(Order.customer_email), isouter=True)
+        .join(user_velocity_subq, user_velocity_subq.c.user_id == Order.user_id, isouter=True)
         .order_by(Order.created_at.desc())
         .offset(offset)
         .limit(limit)
@@ -408,8 +542,9 @@ async def admin_search_orders(
 
     result = await session.execute(stmt)
     raw_rows = result.all()
-    rows: list[tuple[Order, str | None, str | None]] = [
-        (order, email, username) for (order, email, username) in raw_rows
+    rows: list[tuple[Order, str | None, str | None, str | None, datetime | None, bool, str | None]] = [
+        (order, email, username, sla_kind, sla_started_at, bool(fraud_flagged), fraud_severity)
+        for (order, email, username, sla_kind, sla_started_at, fraud_flagged, fraud_severity) in raw_rows
     ]
     return rows, total_items
 
@@ -707,7 +842,10 @@ async def update_order(
         }:
             if cancel_reason_clean is None or not cancel_reason_clean:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cancel reason is required")
-        allowed = ALLOWED_TRANSITIONS.get(current_status, set())
+        allowed = set(ALLOWED_TRANSITIONS.get(current_status, set()))
+        # COD orders start in "pending_acceptance" and should be shippable without a payment capture step.
+        if payment_method == "cod" and current_status == OrderStatus.pending_acceptance:
+            allowed.update({OrderStatus.shipped, OrderStatus.delivered})
         if next_status not in allowed:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status transition")
         order.status = next_status
@@ -744,6 +882,19 @@ async def update_order(
                     },
                 )
             )
+
+    if any(field in data for field in ("tracking_number", "tracking_url", "courier")):
+        target_courier = data.get("courier") if "courier" in data else getattr(order, "courier", None)
+        if "tracking_number" in data:
+            data["tracking_number"] = tracking_service.validate_tracking_number(
+                courier=target_courier, tracking_number=data.get("tracking_number")
+            )
+        elif "courier" in data:
+            existing_tracking = getattr(order, "tracking_number", None)
+            if (existing_tracking or "").strip():
+                tracking_service.validate_tracking_number(courier=target_courier, tracking_number=existing_tracking)
+        if "tracking_url" in data:
+            data["tracking_url"] = tracking_service.validate_tracking_url(tracking_url=data.get("tracking_url"))
 
     if shipping_method:
         order.shipping_method_id = shipping_method.id
@@ -937,6 +1088,85 @@ async def list_order_tags(session: AsyncSession) -> list[str]:
     return [row[0] for row in result.all() if row and row[0]]
 
 
+async def list_order_tag_stats(session: AsyncSession) -> list[tuple[str, int]]:
+    result = await session.execute(
+        select(OrderTag.tag, func.count(OrderTag.id))
+        .group_by(OrderTag.tag)
+        .order_by(func.count(OrderTag.id).desc(), OrderTag.tag.asc())
+    )
+    rows = []
+    for row in result.all():
+        if not row or not row[0]:
+            continue
+        rows.append((str(row[0]), int(row[1] or 0)))
+    return rows
+
+
+async def rename_order_tag(
+    session: AsyncSession,
+    *,
+    from_tag: str,
+    to_tag: str,
+    actor_user_id: UUID | None = None,
+    max_affected_orders: int = 5000,
+) -> dict[str, object]:
+    from_clean = _normalize_order_tag(from_tag)
+    to_clean = _normalize_order_tag(to_tag)
+    if not from_clean:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="from_tag is required")
+    if not to_clean:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="to_tag is required")
+    if from_clean == to_clean:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tags must be different")
+
+    rows = (await session.execute(select(OrderTag).where(OrderTag.tag == from_clean))).scalars().all()
+    if not rows:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found")
+
+    affected_order_ids = {row.order_id for row in rows if getattr(row, "order_id", None)}
+    if len(affected_order_ids) > max_affected_orders:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Too many affected orders ({len(affected_order_ids)}); narrow the scope first.",
+        )
+
+    existing_targets = (
+        await session.execute(
+            select(OrderTag.order_id).where(OrderTag.order_id.in_(affected_order_ids), OrderTag.tag == to_clean)
+        )
+    ).all()
+    orders_with_target = {row[0] for row in existing_targets if row and row[0]}
+
+    updated = 0
+    merged = 0
+    note = f"{from_clean} -> {to_clean}"
+    actor_value = str(actor_user_id) if actor_user_id else None
+
+    for tag_row in rows:
+        order_id = getattr(tag_row, "order_id", None)
+        if not order_id:
+            continue
+        if order_id in orders_with_target:
+            await session.delete(tag_row)
+            merged += 1
+        else:
+            tag_row.tag = to_clean
+            session.add(tag_row)
+            updated += 1
+        session.add(
+            OrderEvent(
+                order_id=order_id,
+                event="tag_renamed",
+                note=note,
+                data={"from": from_clean, "to": to_clean, "actor_user_id": actor_value},
+            )
+        )
+
+    await session.commit()
+    total = updated + merged
+    return {"from_tag": from_clean, "to_tag": to_clean, "updated": updated, "merged": merged, "total": total}
+
+
 async def add_order_tag(session: AsyncSession, order: Order, *, tag: str, actor_user_id: UUID | None = None) -> Order:
     tag_clean = _normalize_order_tag(tag)
     if not tag_clean:
@@ -977,6 +1207,60 @@ async def remove_order_tag(session: AsyncSession, order: Order, *, tag: str, act
     return hydrated or order
 
 
+async def review_order_fraud(
+    session: AsyncSession,
+    order: Order,
+    *,
+    decision: str,
+    note: str | None = None,
+    actor_user_id: UUID | None = None,
+) -> Order:
+    decision_clean = (decision or "").strip().lower()
+    if decision_clean not in {"approve", "deny"}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid fraud review decision")
+
+    target_tag = "fraud_approved" if decision_clean == "approve" else "fraud_denied"
+    remove_tag = "fraud_denied" if decision_clean == "approve" else "fraud_approved"
+
+    note_clean = (note or "").strip() or None
+    if note_clean:
+        note_clean = note_clean[:500]
+
+    tags = (
+        await session.execute(
+            select(OrderTag).where(OrderTag.order_id == order.id, OrderTag.tag.in_([target_tag, remove_tag]))
+        )
+    ).scalars().all()
+    by_tag = {row.tag: row for row in tags if row and row.tag}
+
+    removed = by_tag.get(remove_tag)
+    if removed is not None:
+        await session.delete(removed)
+
+    if target_tag not in by_tag:
+        session.add(OrderTag(order_id=order.id, actor_user_id=actor_user_id, tag=target_tag))
+
+    audit_note = f"{decision_clean}: {note_clean}" if note_clean else decision_clean
+    session.add(
+        OrderEvent(
+            order_id=order.id,
+            event="fraud_review",
+            note=audit_note[:2000] if audit_note else None,
+            data={
+                "decision": decision_clean,
+                "note": note_clean,
+                "actor_user_id": str(actor_user_id) if actor_user_id else None,
+            },
+        )
+    )
+    admin_note = f"Fraud review: {decision_clean}" + (f" - {note_clean}" if note_clean else "")
+    session.add(OrderAdminNote(order_id=order.id, actor_user_id=actor_user_id, note=admin_note[:5000]))
+
+    await session.commit()
+    hydrated = await get_order_by_id_admin(session, order.id)
+    return hydrated or order
+
+
 async def create_order_shipment(
     session: AsyncSession,
     order: Order,
@@ -991,6 +1275,11 @@ async def create_order_shipment(
 
     courier = (payload.courier or "").strip() or None
     tracking_url = (payload.tracking_url or "").strip() or None
+    tracking_number_validated = tracking_service.validate_tracking_number(courier=courier, tracking_number=tracking_number)
+    if not tracking_number_validated:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tracking number is required")
+    tracking_number = tracking_number_validated
+    tracking_url = tracking_service.validate_tracking_url(tracking_url=tracking_url)
 
     existing = (
         (
@@ -1088,6 +1377,12 @@ async def update_order_shipment(
 
     if "courier" in data:
         shipment.courier = (str(data.get("courier") or "")).strip() or None
+
+    shipment.tracking_number = tracking_service.validate_tracking_number(
+        courier=getattr(shipment, "courier", None),
+        tracking_number=getattr(shipment, "tracking_number", None),
+    ) or shipment.tracking_number
+    shipment.tracking_url = tracking_service.validate_tracking_url(tracking_url=getattr(shipment, "tracking_url", None))
 
     session.add(shipment)
 

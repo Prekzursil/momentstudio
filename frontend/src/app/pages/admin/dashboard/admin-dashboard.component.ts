@@ -1,4 +1,5 @@
 import { CommonModule } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
 import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -16,14 +17,22 @@ import {
   AdminAuditEntity,
   AdminAuditEntryUnified,
   AdminAuditRetentionResponse,
+  AdminDashboardPaymentsHealthResponse,
+  AdminRefundsBreakdownResponse,
+  AdminShippingPerformanceResponse,
+  AdminStockoutImpactResponse,
+  AdminChannelAttributionResponse,
   AdminDashboardScheduledTasksResponse,
   AdminDashboardSearchResult,
   AdminDashboardSearchResultType,
   AdminDashboardWindowMetric,
+  AdminDashboardAlertThresholds,
+  AdminDashboardAlertThresholdsUpdateRequest,
   AdminChannelBreakdownResponse,
   AdminFunnelMetricsResponse,
   ScheduledPromoItem,
   ScheduledPublishItem,
+  AdminScheduledReportKind,
   AdminService,
   AdminSummary
 } from '../../../core/admin.service';
@@ -35,9 +44,11 @@ import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 import { extractRequestId } from '../../../shared/http-error';
 import { AdminRecentItem, AdminRecentService } from '../../../core/admin-recent.service';
 import { AdminFavoriteItem, AdminFavoritesService } from '../../../core/admin-favorites.service';
+import { MarkdownService } from '../../../core/markdown.service';
 
 type MetricWidgetId = 'kpis' | 'counts' | 'range';
 type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: string | null };
+type AuditPresetId = 'all' | 'security' | 'content' | 'catalog' | 'payments';
 
 @Component({
   selector: 'app-admin-dashboard',
@@ -136,13 +147,36 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
 	                [label]="'adminUi.dashboard.customizeWidgets' | translate"
 	                (action)="toggleCustomizeWidgets()"
 	              ></app-button>
-              </div>
-	          </div>
+	              </div>
+		          </div>
 
-	          <div class="grid gap-3">
-	            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-	              {{ 'adminUi.dashboard.quickActionsTitle' | translate }}
-	            </p>
+              <app-card
+                [title]="'adminUi.dashboard.whatsNew.title' | translate"
+                [subtitle]="'adminUi.dashboard.whatsNew.subtitle' | translate"
+              >
+                <div class="flex justify-end">
+                  <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadWhatsNew(true)"></app-button>
+                </div>
+
+                <div *ngIf="whatsNewLoading()" class="mt-3">
+                  <app-skeleton [rows]="3"></app-skeleton>
+                </div>
+
+                <div *ngIf="whatsNewError()" class="mt-3 text-sm text-rose-700 dark:text-rose-200">
+                  {{ whatsNewError() }}
+                </div>
+
+                <div
+                  *ngIf="!whatsNewLoading() && !whatsNewError() && whatsNewHtml()"
+                  class="mt-3 grid gap-2 text-sm text-slate-700 dark:text-slate-200"
+                  [innerHTML]="whatsNewHtml()"
+                ></div>
+              </app-card>
+
+		          <div class="grid gap-3">
+		            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+		              {{ 'adminUi.dashboard.quickActionsTitle' | translate }}
+		            </p>
 
 	            <div class="grid gap-3 md:grid-cols-[1fr_auto] items-end">
 	              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -811,6 +845,13 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
 	        <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
 	          <div class="flex items-center justify-between gap-3 flex-wrap">
 	            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.dashboard.alertsTitle' | translate }}</h2>
+              <app-button
+                *ngIf="isOwner()"
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.dashboard.alerts.configure' | translate"
+                (action)="openAlertThresholds()"
+              ></app-button>
 	          </div>
 
 	          <div *ngIf="!hasAnomalyAlerts()" class="text-sm text-slate-600 dark:text-slate-300">
@@ -818,53 +859,59 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
 	          </div>
 
 	          <div *ngIf="hasAnomalyAlerts()" class="grid gap-4 md:grid-cols-3">
-	            <div
-	              *ngIf="failedPaymentsAlert() as failed"
-	              class="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-slate-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
-	            >
-	              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-rose-700 dark:text-rose-200">
-	                {{ 'adminUi.dashboard.alerts.failedPayments' | translate }}
-	              </p>
-	              <div class="mt-2 text-2xl font-semibold text-rose-900 dark:text-rose-50">{{ failed.current }}</div>
-	              <p class="mt-1 text-xs text-rose-700 dark:text-rose-200">
-	                {{ 'adminUi.dashboard.alerts.windowHours' | translate: { hours: failed.window_hours || 24 } }} ·
-	                {{ 'adminUi.dashboard.alerts.vsPrevious' | translate }}: {{ failed.previous }} · {{ deltaLabel(failed.delta_pct) }}
-	              </p>
-	            </div>
+                <button
+                  *ngIf="failedPaymentsAlert() as failed"
+                  type="button"
+                  class="w-full text-left rounded-2xl border border-rose-200 bg-rose-50 p-4 text-slate-800 transition hover:bg-rose-100/70 focus:outline-none focus:ring-2 focus:ring-rose-400/40 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100 dark:hover:bg-rose-950/40"
+                  (click)="openFailedPayments()"
+                >
+                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-rose-700 dark:text-rose-200">
+                    {{ 'adminUi.dashboard.alerts.failedPayments' | translate }}
+                  </p>
+                  <div class="mt-2 text-2xl font-semibold text-rose-900 dark:text-rose-50">{{ failed.current }}</div>
+                  <p class="mt-1 text-xs text-rose-700 dark:text-rose-200">
+                    {{ 'adminUi.dashboard.alerts.windowHours' | translate: { hours: failed.window_hours || 24 } }} ·
+                    {{ 'adminUi.dashboard.alerts.vsPrevious' | translate }}: {{ failed.previous }} · {{ deltaLabel(failed.delta_pct) }}
+                  </p>
+                </button>
 
-	            <div
-	              *ngIf="refundRequestsAlert() as refunds"
-	              class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-slate-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
-	            >
-	              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-200">
-	                {{ 'adminUi.dashboard.alerts.refundRequests' | translate }}
-	              </p>
-	              <div class="mt-2 text-2xl font-semibold text-amber-900 dark:text-amber-50">{{ refunds.current }}</div>
-	              <p class="mt-1 text-xs text-amber-700 dark:text-amber-200">
-	                {{ 'adminUi.dashboard.alerts.windowDays' | translate: { days: refunds.window_days || 7 } }} ·
-	                {{ 'adminUi.dashboard.alerts.vsPrevious' | translate }}: {{ refunds.previous }} · {{ deltaLabel(refunds.delta_pct) }}
-	              </p>
-	            </div>
+                <button
+                  *ngIf="refundRequestsAlert() as refunds"
+                  type="button"
+                  class="w-full text-left rounded-2xl border border-amber-200 bg-amber-50 p-4 text-slate-800 transition hover:bg-amber-100/70 focus:outline-none focus:ring-2 focus:ring-amber-400/40 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100 dark:hover:bg-amber-950/40"
+                  (click)="openRefundRequests()"
+                >
+                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-200">
+                    {{ 'adminUi.dashboard.alerts.refundRequests' | translate }}
+                  </p>
+                  <div class="mt-2 text-2xl font-semibold text-amber-900 dark:text-amber-50">{{ refunds.current }}</div>
+                  <p class="mt-1 text-xs text-amber-700 dark:text-amber-200">
+                    {{ 'adminUi.dashboard.alerts.windowDays' | translate: { days: refunds.window_days || 7 } }} ·
+                    {{ 'adminUi.dashboard.alerts.vsPrevious' | translate }}: {{ refunds.previous }} · {{ deltaLabel(refunds.delta_pct) }}
+                  </p>
+                </button>
 
-	            <div
-	              *ngIf="stockoutsAlertCount() as stockouts"
-	              class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-slate-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
-	            >
-	              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-200">
-	                {{ 'adminUi.dashboard.alerts.stockouts' | translate }}
-	              </p>
-	              <div class="mt-2 text-2xl font-semibold text-amber-900 dark:text-amber-50">{{ stockouts }}</div>
-	              <p class="mt-1 text-xs text-amber-700 dark:text-amber-200">
-	                {{ 'adminUi.dashboard.alerts.stockoutsHint' | translate }}
-	              </p>
-	            </div>
-	          </div>
-	        </section>
+                <button
+                  *ngIf="stockoutsAlertCount() as stockouts"
+                  type="button"
+                  class="w-full text-left rounded-2xl border border-amber-200 bg-amber-50 p-4 text-slate-800 transition hover:bg-amber-100/70 focus:outline-none focus:ring-2 focus:ring-amber-400/40 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100 dark:hover:bg-amber-950/40"
+                  (click)="openStockouts()"
+                >
+                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-200">
+                    {{ 'adminUi.dashboard.alerts.stockouts' | translate }}
+                  </p>
+                  <div class="mt-2 text-2xl font-semibold text-amber-900 dark:text-amber-50">{{ stockouts }}</div>
+                  <p class="mt-1 text-xs text-amber-700 dark:text-amber-200">
+                    {{ 'adminUi.dashboard.alerts.stockoutsHint' | translate }}
+                  </p>
+                </button>
+              </div>
+            </section>
 
-	        <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-	          <div class="flex items-center justify-between gap-3 flex-wrap">
-	            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
-	              {{ 'adminUi.dashboard.systemHealthTitle' | translate }}
+		        <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+		          <div class="flex items-center justify-between gap-3 flex-wrap">
+		            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+		              {{ 'adminUi.dashboard.systemHealthTitle' | translate }}
 	            </h2>
 	          </div>
 
@@ -895,14 +942,519 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
 	                </p>
 	              </ng-template>
 	            </div>
-	          </div>
-	        </section>
+		          </div>
+		        </section>
 
-	        <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-	          <div class="flex items-center justify-between gap-3 flex-wrap">
-	            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.dashboard.scheduledTitle' | translate }}</h2>
-              <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadScheduledTasks()"></app-button>
-	          </div>
+		        <section
+		          *ngIf="canShowPaymentsHealth()"
+		          class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+		        >
+		          <div class="flex items-center justify-between gap-3 flex-wrap">
+		            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+		              {{ 'adminUi.dashboard.paymentsHealth.title' | translate }}
+		            </h2>
+		            <app-button
+		              size="sm"
+		              variant="ghost"
+		              [label]="'adminUi.actions.refresh' | translate"
+		              [disabled]="paymentsHealthLoading()"
+		              (action)="loadPaymentsHealth()"
+		            ></app-button>
+		          </div>
+
+		          <app-error-state
+		            *ngIf="paymentsHealthError()"
+		            [message]="paymentsHealthError()!"
+		            [requestId]="paymentsHealthRequestId()"
+		            [showRetry]="true"
+		            (retry)="loadPaymentsHealth()"
+		          ></app-error-state>
+
+		          <div *ngIf="paymentsHealthLoading()" class="grid gap-2">
+		            <app-skeleton height="3rem"></app-skeleton>
+		            <app-skeleton height="3rem"></app-skeleton>
+		          </div>
+
+		          <ng-container *ngIf="!paymentsHealthLoading() && !paymentsHealthError() && paymentsHealth() as health">
+		            <div class="text-xs text-slate-500 dark:text-slate-400">
+		              {{ 'adminUi.dashboard.paymentsHealth.window' | translate: { hours: health.window_hours || 24 } }}
+		            </div>
+
+		            <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+		              <div
+		                *ngFor="let row of health.providers"
+		                class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+		              >
+		                <div class="flex items-center justify-between gap-2">
+		                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+		                    {{ paymentsProviderLabelKey(row.provider) | translate }}
+		                  </p>
+		                  <span class="text-xs font-semibold text-slate-700 dark:text-slate-200">
+		                    {{ row.success_rate === null ? '—' : (row.success_rate | percent: '1.0-0') }}
+		                  </span>
+		                </div>
+
+		                <div class="mt-2 grid gap-1 text-sm text-slate-700 dark:text-slate-200">
+		                  <div class="flex items-center justify-between">
+		                    <span class="text-xs text-slate-500 dark:text-slate-400">
+		                      {{ 'adminUi.dashboard.paymentsHealth.successful' | translate }}
+		                    </span>
+		                    <span class="font-semibold text-slate-900 dark:text-slate-50">{{ row.successful_orders }}</span>
+		                  </div>
+		                  <div class="flex items-center justify-between">
+		                    <span class="text-xs text-slate-500 dark:text-slate-400">
+		                      {{ 'adminUi.dashboard.paymentsHealth.pending' | translate }}
+		                    </span>
+		                    <span class="font-semibold text-slate-900 dark:text-slate-50">{{ row.pending_payment_orders }}</span>
+		                  </div>
+
+		                  <ng-container *ngIf="supportsWebhookMetrics(row.provider)">
+		                    <div class="flex items-center justify-between">
+		                      <span class="text-xs text-slate-500 dark:text-slate-400">
+		                        {{ 'adminUi.dashboard.paymentsHealth.webhookErrors' | translate }}
+		                      </span>
+		                      <span
+		                        class="font-semibold"
+		                        [ngClass]="row.webhook_errors ? 'text-rose-700 dark:text-rose-200' : 'text-slate-900 dark:text-slate-50'"
+		                      >
+		                        {{ row.webhook_errors }}
+		                      </span>
+		                    </div>
+		                    <div class="flex items-center justify-between">
+		                      <span class="text-xs text-slate-500 dark:text-slate-400">
+		                        {{ 'adminUi.dashboard.paymentsHealth.webhookBacklog' | translate }}
+		                      </span>
+		                      <span
+		                        class="font-semibold"
+		                        [ngClass]="row.webhook_backlog ? 'text-amber-700 dark:text-amber-200' : 'text-slate-900 dark:text-slate-50'"
+		                      >
+		                        {{ row.webhook_backlog }}
+		                      </span>
+		                    </div>
+		                  </ng-container>
+		                </div>
+		              </div>
+		            </div>
+
+		            <div *ngIf="(health.recent_webhook_errors || []).length" class="grid gap-2">
+		              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+		                {{ 'adminUi.dashboard.paymentsHealth.recentErrorsTitle' | translate }}
+		              </p>
+		              <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+		                <table class="w-full text-xs">
+		                  <thead>
+		                    <tr class="text-left text-slate-500 dark:text-slate-400">
+		                      <th class="py-2 px-3">{{ 'adminUi.dashboard.paymentsHealth.table.provider' | translate }}</th>
+		                      <th class="py-2 px-3">{{ 'adminUi.dashboard.paymentsHealth.table.event' | translate }}</th>
+		                      <th class="py-2 px-3">{{ 'adminUi.dashboard.paymentsHealth.table.attempted' | translate }}</th>
+		                      <th class="py-2 px-3">{{ 'adminUi.dashboard.paymentsHealth.table.error' | translate }}</th>
+		                    </tr>
+		                  </thead>
+		                  <tbody>
+		                    <tr
+		                      *ngFor="let evt of health.recent_webhook_errors"
+		                      class="border-t border-slate-100 dark:border-slate-800"
+		                    >
+		                      <td class="py-2 px-3 text-slate-700 dark:text-slate-200">
+		                        {{ paymentsProviderLabelKey(evt.provider) | translate }}
+		                      </td>
+		                      <td class="py-2 px-3 text-slate-700 dark:text-slate-200 font-mono">
+		                        {{ evt.event_type || evt.event_id }}
+		                      </td>
+		                      <td class="py-2 px-3 text-slate-500 dark:text-slate-400">{{ evt.last_attempt_at | date: 'short' }}</td>
+		                      <td class="py-2 px-3 text-rose-700 dark:text-rose-200">
+		                        <span class="block max-w-[520px] truncate">{{ evt.last_error }}</span>
+		                      </td>
+		                    </tr>
+		                  </tbody>
+		                </table>
+		              </div>
+		            </div>
+		          </ng-container>
+		        </section>
+
+		        <section
+		          *ngIf="canShowRefundsBreakdown()"
+		          class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+		        >
+		          <div class="flex items-center justify-between gap-3 flex-wrap">
+		            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+		              {{ 'adminUi.dashboard.refundsBreakdown.title' | translate }}
+		            </h2>
+		            <app-button
+		              size="sm"
+		              variant="ghost"
+		              [label]="'adminUi.actions.refresh' | translate"
+		              [disabled]="refundsBreakdownLoading()"
+		              (action)="loadRefundsBreakdown()"
+		            ></app-button>
+		          </div>
+
+		          <app-error-state
+		            *ngIf="refundsBreakdownError()"
+		            [message]="refundsBreakdownError()!"
+		            [requestId]="refundsBreakdownRequestId()"
+		            [showRetry]="true"
+		            (retry)="loadRefundsBreakdown()"
+		          ></app-error-state>
+
+		          <div *ngIf="refundsBreakdownLoading()" class="grid gap-2">
+		            <app-skeleton height="3rem"></app-skeleton>
+		            <app-skeleton height="3rem"></app-skeleton>
+		          </div>
+
+		          <ng-container *ngIf="!refundsBreakdownLoading() && !refundsBreakdownError() && refundsBreakdown() as breakdown">
+		            <div class="text-xs text-slate-500 dark:text-slate-400">
+		              {{ 'adminUi.dashboard.refundsBreakdown.window' | translate: { days: breakdown.window_days || 30 } }}
+		            </div>
+
+		            <div class="grid gap-4 lg:grid-cols-3">
+		              <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
+		                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+		                  {{ 'adminUi.dashboard.refundsBreakdown.missingTitle' | translate }}
+		                </p>
+		                <div class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">
+		                  {{ (breakdown.missing_refunds.current.amount || 0) | localizedCurrency : 'RON' }}
+		                </div>
+		                <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+		                  {{ 'adminUi.dashboard.refundsBreakdown.missingHint' | translate }}
+		                </p>
+		                <div class="mt-3 grid gap-1 text-sm text-slate-700 dark:text-slate-200">
+		                  <div class="flex items-center justify-between">
+		                    <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.dashboard.refundsBreakdown.table.count' | translate }}</span>
+		                    <span class="font-semibold text-slate-900 dark:text-slate-50">
+		                      {{ breakdown.missing_refunds.current.count }} · {{ deltaLabel(breakdown.missing_refunds.delta_pct.count) }}
+		                    </span>
+		                  </div>
+		                  <div class="flex items-center justify-between">
+		                    <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.dashboard.refundsBreakdown.table.amount' | translate }}</span>
+		                    <span class="font-semibold text-slate-900 dark:text-slate-50">
+		                      {{ deltaLabel(breakdown.missing_refunds.delta_pct.amount) }}
+		                    </span>
+		                  </div>
+		                </div>
+		              </div>
+
+		              <div class="lg:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
+		                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+		                  {{ 'adminUi.dashboard.refundsBreakdown.byProviderTitle' | translate }}
+		                </p>
+		                <div class="mt-3 overflow-x-auto">
+		                  <table class="min-w-[640px] w-full text-xs">
+		                    <thead>
+		                      <tr class="text-left text-slate-500 dark:text-slate-400">
+		                        <th class="py-2 pr-3">{{ 'adminUi.dashboard.refundsBreakdown.table.provider' | translate }}</th>
+		                        <th class="py-2 pr-3 text-right">{{ 'adminUi.dashboard.refundsBreakdown.table.amount' | translate }}</th>
+		                        <th class="py-2 pr-3 text-right">{{ 'adminUi.dashboard.refundsBreakdown.table.delta' | translate }}</th>
+		                        <th class="py-2 pr-3 text-right">{{ 'adminUi.dashboard.refundsBreakdown.table.count' | translate }}</th>
+		                        <th class="py-2 text-right">{{ 'adminUi.dashboard.refundsBreakdown.table.delta' | translate }}</th>
+		                      </tr>
+		                    </thead>
+		                    <tbody>
+		                      <tr
+		                        *ngFor="let row of breakdown.providers"
+		                        class="border-t border-slate-100 dark:border-slate-800"
+		                      >
+		                        <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">
+		                          {{ refundProviderLabelKey(row.provider) | translate }}
+		                        </td>
+		                        <td class="py-2 pr-3 text-right text-slate-700 dark:text-slate-200">
+		                          {{ (row.current.amount || 0) | localizedCurrency : 'RON' }}
+		                        </td>
+		                        <td class="py-2 pr-3 text-right text-slate-500 dark:text-slate-400">
+		                          {{ deltaLabel(row.delta_pct.amount) }}
+		                        </td>
+		                        <td class="py-2 pr-3 text-right text-slate-700 dark:text-slate-200">{{ row.current.count }}</td>
+		                        <td class="py-2 text-right text-slate-500 dark:text-slate-400">{{ deltaLabel(row.delta_pct.count) }}</td>
+		                      </tr>
+		                    </tbody>
+		                  </table>
+		                </div>
+		              </div>
+		            </div>
+
+		            <div class="grid gap-2">
+		              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+		                {{ 'adminUi.dashboard.refundsBreakdown.byReasonTitle' | translate }}
+		              </p>
+		              <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+		                <div
+		                  *ngFor="let row of breakdown.reasons"
+		                  class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+		                >
+		                  <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+		                    {{ refundReasonLabelKey(row.category) | translate }}
+		                  </p>
+		                  <div class="mt-2 flex items-baseline justify-between gap-2">
+		                    <span class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ row.current }}</span>
+		                    <span class="text-xs text-slate-500 dark:text-slate-400">{{ deltaLabel(row.delta_pct) }}</span>
+		                  </div>
+		                </div>
+		              </div>
+		            </div>
+		          </ng-container>
+		        </section>
+
+            <section
+              *ngIf="canShowShippingPerformance()"
+              class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+            >
+              <div class="flex items-center justify-between gap-3 flex-wrap">
+                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.dashboard.shippingPerformance.title' | translate }}
+                </h2>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.actions.refresh' | translate"
+                  [disabled]="shippingPerformanceLoading()"
+                  (action)="loadShippingPerformance()"
+                ></app-button>
+              </div>
+
+              <app-error-state
+                *ngIf="shippingPerformanceError()"
+                [message]="shippingPerformanceError()!"
+                [requestId]="shippingPerformanceRequestId()"
+                [showRetry]="true"
+                (retry)="loadShippingPerformance()"
+              ></app-error-state>
+
+              <div *ngIf="shippingPerformanceLoading()" class="grid gap-2">
+                <app-skeleton height="3rem"></app-skeleton>
+                <app-skeleton height="3rem"></app-skeleton>
+              </div>
+
+              <ng-container
+                *ngIf="!shippingPerformanceLoading() && !shippingPerformanceError() && shippingPerformance() as perf"
+              >
+                <div class="text-xs text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.dashboard.shippingPerformance.window' | translate: { days: perf.window_days || 30 } }}
+                </div>
+
+                <div class="grid gap-4 lg:grid-cols-2">
+                  <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.dashboard.shippingPerformance.timeToShip' | translate }}
+                    </p>
+                    <div *ngIf="(perf.time_to_ship || []).length === 0" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.dashboard.shippingPerformance.empty' | translate }}
+                    </div>
+                    <div *ngIf="(perf.time_to_ship || []).length" class="mt-3 overflow-x-auto">
+                      <table class="min-w-[520px] w-full text-xs">
+                        <thead>
+                          <tr class="text-left text-slate-500 dark:text-slate-400">
+                            <th class="py-2 pr-3">{{ 'adminUi.dashboard.shippingPerformance.table.courier' | translate }}</th>
+                            <th class="py-2 pr-3 text-right">{{ 'adminUi.dashboard.shippingPerformance.table.avgHours' | translate }}</th>
+                            <th class="py-2 pr-3 text-right">{{ 'adminUi.dashboard.shippingPerformance.table.delta' | translate }}</th>
+                            <th class="py-2 text-right">{{ 'adminUi.dashboard.shippingPerformance.table.count' | translate }}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr *ngFor="let row of perf.time_to_ship" class="border-t border-slate-100 dark:border-slate-800">
+                            <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">{{ formatChannelKey(row.courier) }}</td>
+                            <td class="py-2 pr-3 text-right text-slate-700 dark:text-slate-200">
+                              {{ row.current.avg_hours === null ? '—' : (row.current.avg_hours | number: '1.0-1') }}
+                            </td>
+                            <td class="py-2 pr-3 text-right text-slate-500 dark:text-slate-400">{{ deltaLabel(row.delta_pct.avg_hours) }}</td>
+                            <td class="py-2 text-right text-slate-700 dark:text-slate-200">{{ row.current.count }}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.dashboard.shippingPerformance.deliveryTime' | translate }}
+                    </p>
+                    <div *ngIf="(perf.delivery_time || []).length === 0" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.dashboard.shippingPerformance.empty' | translate }}
+                    </div>
+                    <div *ngIf="(perf.delivery_time || []).length" class="mt-3 overflow-x-auto">
+                      <table class="min-w-[520px] w-full text-xs">
+                        <thead>
+                          <tr class="text-left text-slate-500 dark:text-slate-400">
+                            <th class="py-2 pr-3">{{ 'adminUi.dashboard.shippingPerformance.table.courier' | translate }}</th>
+                            <th class="py-2 pr-3 text-right">{{ 'adminUi.dashboard.shippingPerformance.table.avgHours' | translate }}</th>
+                            <th class="py-2 pr-3 text-right">{{ 'adminUi.dashboard.shippingPerformance.table.delta' | translate }}</th>
+                            <th class="py-2 text-right">{{ 'adminUi.dashboard.shippingPerformance.table.count' | translate }}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr *ngFor="let row of perf.delivery_time" class="border-t border-slate-100 dark:border-slate-800">
+                            <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">{{ formatChannelKey(row.courier) }}</td>
+                            <td class="py-2 pr-3 text-right text-slate-700 dark:text-slate-200">
+                              {{ row.current.avg_hours === null ? '—' : (row.current.avg_hours | number: '1.0-1') }}
+                            </td>
+                            <td class="py-2 pr-3 text-right text-slate-500 dark:text-slate-400">{{ deltaLabel(row.delta_pct.avg_hours) }}</td>
+                            <td class="py-2 text-right text-slate-700 dark:text-slate-200">{{ row.current.count }}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </ng-container>
+            </section>
+
+            <section
+              *ngIf="canShowStockoutImpact()"
+              class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+            >
+              <div class="flex items-center justify-between gap-3 flex-wrap">
+                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.dashboard.stockoutImpact.title' | translate }}
+                </h2>
+                <div class="flex items-center gap-2">
+                  <app-button size="sm" variant="ghost" [label]="'adminUi.actions.openInventory' | translate" (action)="openInventory()"></app-button>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.actions.refresh' | translate"
+                    [disabled]="stockoutImpactLoading()"
+                    (action)="loadStockoutImpact()"
+                  ></app-button>
+                </div>
+              </div>
+
+              <app-error-state
+                *ngIf="stockoutImpactError()"
+                [message]="stockoutImpactError()!"
+                [requestId]="stockoutImpactRequestId()"
+                [showRetry]="true"
+                (retry)="loadStockoutImpact()"
+              ></app-error-state>
+
+              <div *ngIf="stockoutImpactLoading()" class="grid gap-2">
+                <app-skeleton height="3rem"></app-skeleton>
+                <app-skeleton height="3rem"></app-skeleton>
+              </div>
+
+              <ng-container *ngIf="!stockoutImpactLoading() && !stockoutImpactError() && stockoutImpact() as impact">
+                <div class="text-xs text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.dashboard.stockoutImpact.window' | translate: { days: impact.window_days || 30 } }}
+                </div>
+
+                <div *ngIf="(impact.items || []).length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.dashboard.stockoutImpact.empty' | translate }}
+                </div>
+
+                <div *ngIf="(impact.items || []).length" class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+                  <table class="min-w-[760px] w-full text-xs">
+                    <thead>
+                      <tr class="text-left text-slate-500 dark:text-slate-400">
+                        <th class="py-2 px-3">{{ 'adminUi.dashboard.stockoutImpact.table.product' | translate }}</th>
+                        <th class="py-2 px-3 text-right">{{ 'adminUi.dashboard.stockoutImpact.table.available' | translate }}</th>
+                        <th class="py-2 px-3 text-right">{{ 'adminUi.dashboard.stockoutImpact.table.carts' | translate }}</th>
+                        <th class="py-2 px-3 text-right">{{ 'adminUi.dashboard.stockoutImpact.table.sales' | translate }}</th>
+                        <th class="py-2 px-3 text-right">{{ 'adminUi.dashboard.stockoutImpact.table.missed' | translate }}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let item of impact.items" class="border-t border-slate-100 dark:border-slate-800">
+                        <td class="py-2 px-3 text-slate-700 dark:text-slate-200">
+                          <div class="flex items-center gap-2">
+                            <span class="font-semibold">{{ item.product_name }}</span>
+                            <span *ngIf="item.allow_backorder" class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
+                              {{ 'adminUi.dashboard.stockoutImpact.backorder' | translate }}
+                            </span>
+                          </div>
+                          <div class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{{ item.product_slug }}</div>
+                        </td>
+                        <td class="py-2 px-3 text-right font-semibold" [ngClass]="item.available_quantity <= 0 ? 'text-rose-700 dark:text-rose-200' : 'text-slate-700 dark:text-slate-200'">
+                          {{ item.available_quantity }}
+                        </td>
+                        <td class="py-2 px-3 text-right text-slate-700 dark:text-slate-200">{{ item.reserved_in_carts }}</td>
+                        <td class="py-2 px-3 text-right text-slate-700 dark:text-slate-200">
+                          {{ item.demand_revenue | localizedCurrency : item.currency }}
+                        </td>
+                        <td class="py-2 px-3 text-right font-semibold text-slate-900 dark:text-slate-50">
+                          {{ item.estimated_missed_revenue | localizedCurrency : item.currency }}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </ng-container>
+            </section>
+
+            <section
+              *ngIf="canShowChannelAttribution()"
+              class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+            >
+              <div class="flex items-center justify-between gap-3 flex-wrap">
+                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.dashboard.channelAttribution.title' | translate }}
+                </h2>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.actions.refresh' | translate"
+                  [disabled]="channelAttributionLoading()"
+                  (action)="loadChannelAttribution()"
+                ></app-button>
+              </div>
+
+              <app-error-state
+                *ngIf="channelAttributionError()"
+                [message]="channelAttributionError()!"
+                [requestId]="channelAttributionRequestId()"
+                [showRetry]="true"
+                (retry)="loadChannelAttribution()"
+              ></app-error-state>
+
+              <div *ngIf="channelAttributionLoading()" class="grid gap-2">
+                <app-skeleton height="3rem"></app-skeleton>
+                <app-skeleton height="3rem"></app-skeleton>
+              </div>
+
+              <ng-container
+                *ngIf="!channelAttributionLoading() && !channelAttributionError() && channelAttribution() as attribution"
+              >
+                <div class="grid gap-1 text-xs text-slate-500 dark:text-slate-400">
+                  <div>
+                    {{ 'adminUi.dashboard.channelAttribution.coverage' | translate: { tracked: attribution.tracked_orders, total: attribution.total_orders } }}
+                    · {{ attribution.coverage_pct === null ? '—' : (attribution.coverage_pct | percent: '1.0-0') }}
+                  </div>
+                  <div>{{ 'adminUi.dashboard.channelAttribution.note' | translate }}</div>
+                </div>
+
+                <div *ngIf="(attribution.channels || []).length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.dashboard.channelAttribution.empty' | translate }}
+                </div>
+
+                <div *ngIf="(attribution.channels || []).length" class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+                  <table class="min-w-[760px] w-full text-xs">
+                    <thead>
+                      <tr class="text-left text-slate-500 dark:text-slate-400">
+                        <th class="py-2 px-3">{{ 'adminUi.dashboard.channelAttribution.table.channel' | translate }}</th>
+                        <th class="py-2 px-3 text-right">{{ 'adminUi.dashboard.channelAttribution.table.orders' | translate }}</th>
+                        <th class="py-2 px-3 text-right">{{ 'adminUi.dashboard.channelAttribution.table.sales' | translate }}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let row of attribution.channels" class="border-t border-slate-100 dark:border-slate-800">
+                        <td class="py-2 px-3 text-slate-700 dark:text-slate-200">
+                          <div class="font-semibold">{{ row.source }}<ng-container *ngIf="row.medium"> / {{ row.medium }}</ng-container></div>
+                          <div *ngIf="row.campaign" class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{{ row.campaign }}</div>
+                        </td>
+                        <td class="py-2 px-3 text-right text-slate-700 dark:text-slate-200">{{ row.orders }}</td>
+                        <td class="py-2 px-3 text-right text-slate-700 dark:text-slate-200">
+                          {{ row.gross_sales | localizedCurrency : 'RON' }}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </ng-container>
+            </section>
+
+		        <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+		          <div class="flex items-center justify-between gap-3 flex-wrap">
+		            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.dashboard.scheduledTitle' | translate }}</h2>
+	              <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadScheduledTasks()"></app-button>
+		          </div>
 
             <div *ngIf="scheduledError()" class="text-sm text-rose-700 dark:text-rose-300">
               {{ scheduledError() }}
@@ -984,6 +1536,43 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
                   <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.dashboard.scheduledEmptyPromos' | translate }}</p>
                 </ng-template>
               </div>
+
+              <div class="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 text-sm lg:col-span-2 dark:border-slate-800 dark:bg-slate-900">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                  <div class="grid gap-0.5">
+                    <div class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.dashboard.scheduledRunNow.title' | translate }}
+                    </div>
+                    <div class="text-xs text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.dashboard.scheduledRunNow.hint' | translate }}
+                    </div>
+                  </div>
+                  <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                    <input type="checkbox" class="h-4 w-4 accent-indigo-600" [(ngModel)]="scheduledRunForce" />
+                    {{ 'adminUi.dashboard.scheduledRunNow.force' | translate }}
+                  </label>
+                </div>
+
+                <div *ngIf="scheduledRunError()" class="text-sm text-rose-700 dark:text-rose-300">
+                  {{ scheduledRunError() }}
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                  <app-button
+                    size="sm"
+                    [disabled]="scheduledRunBusy() !== null"
+                    [label]="'adminUi.dashboard.scheduledRunNow.weekly' | translate"
+                    (action)="runScheduledReport('weekly')"
+                  ></app-button>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [disabled]="scheduledRunBusy() !== null"
+                    [label]="'adminUi.dashboard.scheduledRunNow.monthly' | translate"
+                    (action)="runScheduledReport('monthly')"
+                  ></app-button>
+                </div>
+              </div>
 	          </div>
 	        </section>
 
@@ -1004,6 +1593,49 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
               <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.audit.exportLimitNote' | translate }}</span>
               <app-button size="sm" [label]="'adminUi.audit.export' | translate" (action)="downloadAuditCsv()"></app-button>
             </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              class="h-9 rounded-full border px-3 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+              [ngClass]="auditPresetActive('all') ? 'border-slate-900 bg-slate-900 text-white dark:border-slate-50 dark:bg-slate-50 dark:text-slate-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/50'"
+              (click)="applyAuditPreset('all')"
+            >
+              {{ 'adminUi.audit.presets.all' | translate }}
+            </button>
+            <button
+              type="button"
+              class="h-9 rounded-full border px-3 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+              [ngClass]="auditPresetActive('security') ? 'border-slate-900 bg-slate-900 text-white dark:border-slate-50 dark:bg-slate-50 dark:text-slate-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/50'"
+              (click)="applyAuditPreset('security')"
+            >
+              {{ 'adminUi.audit.presets.security' | translate }}
+            </button>
+            <button
+              type="button"
+              class="h-9 rounded-full border px-3 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+              [ngClass]="auditPresetActive('content') ? 'border-slate-900 bg-slate-900 text-white dark:border-slate-50 dark:bg-slate-50 dark:text-slate-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/50'"
+              (click)="applyAuditPreset('content')"
+            >
+              {{ 'adminUi.audit.presets.content' | translate }}
+            </button>
+            <button
+              type="button"
+              class="h-9 rounded-full border px-3 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+              [ngClass]="auditPresetActive('catalog') ? 'border-slate-900 bg-slate-900 text-white dark:border-slate-50 dark:bg-slate-50 dark:text-slate-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/50'"
+              (click)="applyAuditPreset('catalog')"
+            >
+              {{ 'adminUi.audit.presets.catalog' | translate }}
+            </button>
+            <button
+              type="button"
+              class="h-9 rounded-full border px-3 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+              [ngClass]="auditPresetActive('payments') ? 'border-slate-900 bg-slate-900 text-white dark:border-slate-50 dark:bg-slate-50 dark:text-slate-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/50'"
+              (click)="applyAuditPreset('payments')"
+            >
+              {{ 'adminUi.audit.presets.payments' | translate }}
+            </button>
           </div>
 
           <div class="grid gap-3 md:grid-cols-[220px_1fr_1fr_auto] items-end">
@@ -1234,13 +1866,6 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
               [hint]="'adminUi.ownerTransfer.confirmHint' | translate"
               [ariaLabel]="'adminUi.ownerTransfer.confirmLabel' | translate"
             ></app-input>
-            <app-input
-              [label]="'auth.currentPassword' | translate"
-              type="password"
-              autocomplete="current-password"
-              [(value)]="ownerTransferPassword"
-              [ariaLabel]="'auth.currentPassword' | translate"
-            ></app-input>
           </div>
 
           <div *ngIf="ownerTransferError" class="text-sm text-rose-700 dark:text-rose-300">
@@ -1256,6 +1881,86 @@ type AdminOnboardingState = { completed_at?: string | null; dismissed_at?: strin
             ></app-button>
           </div>
 	        </section>
+
+          <app-modal
+            [open]="alertThresholdsOpen()"
+            [title]="'adminUi.dashboard.alerts.config.title' | translate"
+            [subtitle]="'adminUi.dashboard.alerts.config.subtitle' | translate"
+            [confirmLabel]="'adminUi.common.save' | translate"
+            [cancelLabel]="'adminUi.common.cancel' | translate"
+            [closeLabel]="'adminUi.common.close' | translate"
+            [confirmDisabled]="alertThresholdsSaving()"
+            (confirm)="saveAlertThresholds()"
+            (closed)="closeAlertThresholds()"
+          >
+            <div class="grid gap-4">
+              <div *ngIf="alertThresholdsError()" class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
+                {{ alertThresholdsError() }}
+              </div>
+
+              <div class="grid gap-3">
+                <div class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.dashboard.alerts.config.sections.failedPayments' | translate }}
+                </div>
+                <div class="grid gap-3 sm:grid-cols-2">
+                  <app-input
+                    type="number"
+                    [min]="1"
+                    [step]="1"
+                    [label]="'adminUi.dashboard.alerts.config.failedPaymentsMinCount' | translate"
+                    [(value)]="alertFailedPaymentsMinCount"
+                  ></app-input>
+                  <app-input
+                    type="number"
+                    [min]="0"
+                    [step]="1"
+                    [label]="'adminUi.dashboard.alerts.config.failedPaymentsMinDeltaPct' | translate"
+                    [placeholder]="'adminUi.dashboard.alerts.config.optionalPlaceholder' | translate"
+                    [(value)]="alertFailedPaymentsMinDeltaPct"
+                  ></app-input>
+                </div>
+              </div>
+
+              <div class="grid gap-3">
+                <div class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.dashboard.alerts.config.sections.refundRequests' | translate }}
+                </div>
+                <div class="grid gap-3 sm:grid-cols-2">
+                  <app-input
+                    type="number"
+                    [min]="1"
+                    [step]="1"
+                    [label]="'adminUi.dashboard.alerts.config.refundRequestsMinCount' | translate"
+                    [(value)]="alertRefundRequestsMinCount"
+                  ></app-input>
+                  <app-input
+                    type="number"
+                    [min]="0"
+                    [max]="100"
+                    [step]="0.5"
+                    [label]="'adminUi.dashboard.alerts.config.refundRequestsMinRatePct' | translate"
+                    [placeholder]="'adminUi.dashboard.alerts.config.optionalPlaceholder' | translate"
+                    [(value)]="alertRefundRequestsMinRatePct"
+                  ></app-input>
+                </div>
+              </div>
+
+              <div class="grid gap-3">
+                <div class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.dashboard.alerts.config.sections.stockouts' | translate }}
+                </div>
+                <div class="grid gap-3 sm:grid-cols-2">
+                  <app-input
+                    type="number"
+                    [min]="1"
+                    [step]="1"
+                    [label]="'adminUi.dashboard.alerts.config.stockoutsMinCount' | translate"
+                    [(value)]="alertStockoutsMinCount"
+                  ></app-input>
+                </div>
+              </div>
+            </div>
+          </app-modal>
 
           <app-modal
             [open]="onboardingOpen()"
@@ -1360,11 +2065,34 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
   loading = signal(true);
   error = signal<string | null>(null);
   errorRequestId = signal<string | null>(null);
-  summary = signal<AdminSummary | null>(null);
-  channelBreakdown = signal<AdminChannelBreakdownResponse | null>(null);
-  channelBreakdownLoading = signal(false);
-  channelBreakdownError = signal<string | null>(null);
-  funnelMetrics = signal<AdminFunnelMetricsResponse | null>(null);
+	  whatsNewLoading = signal(false);
+	  whatsNewError = signal<string | null>(null);
+	  whatsNewHtml = signal('');
+	  summary = signal<AdminSummary | null>(null);
+	  paymentsHealth = signal<AdminDashboardPaymentsHealthResponse | null>(null);
+	  paymentsHealthLoading = signal(false);
+	  paymentsHealthError = signal<string | null>(null);
+	  paymentsHealthRequestId = signal<string | null>(null);
+	  refundsBreakdown = signal<AdminRefundsBreakdownResponse | null>(null);
+	  refundsBreakdownLoading = signal(false);
+	  refundsBreakdownError = signal<string | null>(null);
+	  refundsBreakdownRequestId = signal<string | null>(null);
+    shippingPerformance = signal<AdminShippingPerformanceResponse | null>(null);
+    shippingPerformanceLoading = signal(false);
+    shippingPerformanceError = signal<string | null>(null);
+    shippingPerformanceRequestId = signal<string | null>(null);
+    stockoutImpact = signal<AdminStockoutImpactResponse | null>(null);
+    stockoutImpactLoading = signal(false);
+    stockoutImpactError = signal<string | null>(null);
+    stockoutImpactRequestId = signal<string | null>(null);
+    channelAttribution = signal<AdminChannelAttributionResponse | null>(null);
+    channelAttributionLoading = signal(false);
+    channelAttributionError = signal<string | null>(null);
+    channelAttributionRequestId = signal<string | null>(null);
+	  channelBreakdown = signal<AdminChannelBreakdownResponse | null>(null);
+	  channelBreakdownLoading = signal(false);
+	  channelBreakdownError = signal<string | null>(null);
+	  funnelMetrics = signal<AdminFunnelMetricsResponse | null>(null);
   funnelLoading = signal(false);
   funnelError = signal<string | null>(null);
   lastUpdatedAt = signal<string | null>(null);
@@ -1411,6 +2139,18 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
   scheduledLoading = signal(false);
   scheduledError = signal('');
   scheduledTasks = signal<AdminDashboardScheduledTasksResponse | null>(null);
+  scheduledRunForce = false;
+  scheduledRunBusy = signal<AdminScheduledReportKind | null>(null);
+  scheduledRunError = signal('');
+
+  alertThresholdsOpen = signal(false);
+  alertThresholdsSaving = signal(false);
+  alertThresholdsError = signal('');
+  alertFailedPaymentsMinCount: number | string = 1;
+  alertFailedPaymentsMinDeltaPct: number | string = '';
+  alertRefundRequestsMinCount: number | string = 1;
+  alertRefundRequestsMinRatePct: number | string = '';
+  alertStockoutsMinCount: number | string = 1;
 
   jobsLoading = signal(false);
   jobsError = signal('');
@@ -1421,7 +2161,6 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
 
   ownerTransferIdentifier = '';
   ownerTransferConfirm = '';
-  ownerTransferPassword = '';
   ownerTransferLoading = false;
   ownerTransferError = '';
 
@@ -1435,7 +2174,9 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     public recent: AdminRecentService,
     private router: Router,
     private toast: ToastService,
-    private translate: TranslateService
+    private translate: TranslateService,
+    private http: HttpClient,
+    private markdown: MarkdownService
   ) {}
 
   ngAfterViewInit(): void {
@@ -1456,19 +2197,25 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     }, 0);
   }
 
-  ngOnInit(): void {
-    this.loadWidgetPrefs();
-    this.loadLiveRefreshPreference();
-    this.loadSalesMetricPreference();
-    this.loadSummary();
-    this.loadFunnelMetrics();
-    this.loadChannelBreakdown();
-    this.loadScheduledTasks();
-    this.loadBackgroundJobs();
-    this.loadAudit(1);
-    this.loadAuditRetention();
-    this.maybeShowOnboarding();
-  }
+	  ngOnInit(): void {
+	    this.loadWidgetPrefs();
+	    this.loadLiveRefreshPreference();
+	    this.loadSalesMetricPreference();
+	    this.loadSummary();
+      this.loadWhatsNew();
+		    this.loadFunnelMetrics();
+		    this.loadChannelBreakdown();
+        if (this.canShowPaymentsHealth()) this.loadPaymentsHealth();
+        if (this.canShowRefundsBreakdown()) this.loadRefundsBreakdown();
+        if (this.canShowShippingPerformance()) this.loadShippingPerformance();
+        if (this.canShowStockoutImpact()) this.loadStockoutImpact();
+        if (this.canShowChannelAttribution()) this.loadChannelAttribution();
+		    this.loadScheduledTasks();
+		    this.loadBackgroundJobs();
+		    this.loadAudit(1);
+		    this.loadAuditRetention();
+		    this.maybeShowOnboarding();
+	  }
 
   clearRecent(): void {
     this.recent.clear();
@@ -1532,6 +2279,24 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     this.openOrdersWithFilters({ q: '', status: 'refunded', tag: '', fromDate: '', toDate: '', includeTestOrders: false, limit: 20 });
   }
 
+  openFailedPayments(): void {
+    const metric = this.failedPaymentsAlert();
+    const windowHours = typeof metric?.window_hours === 'number' && metric.window_hours > 0 ? metric.window_hours : 24;
+    const now = new Date();
+    const from = new Date(now.getTime() - windowHours * 60 * 60 * 1000);
+    const fromDate = from.toISOString().slice(0, 10);
+    const toDate = now.toISOString().slice(0, 10);
+    this.openOrdersWithFilters({ q: '', status: 'pending_payment', tag: '', fromDate, toDate, includeTestOrders: false, limit: 20 });
+  }
+
+  openRefundRequests(): void {
+    void this.router.navigate(['/admin/returns'], { queryParams: { status: 'requested' } });
+  }
+
+  openStockouts(): void {
+    this.openInventory();
+  }
+
   openOrdersRange(): void {
     const sum = this.summary();
     const fromDate = sum?.range_from || '';
@@ -1559,6 +2324,11 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     this.refreshSummarySilent();
     this.refreshChannelBreakdownSilent();
     this.refreshFunnelSilent();
+    if (this.canShowPaymentsHealth()) this.loadPaymentsHealth();
+    if (this.canShowRefundsBreakdown()) this.loadRefundsBreakdown();
+    if (this.canShowShippingPerformance()) this.loadShippingPerformance();
+    if (this.canShowStockoutImpact()) this.loadStockoutImpact();
+    if (this.canShowChannelAttribution()) this.loadChannelAttribution();
     this.loadScheduledTasks();
     this.loadBackgroundJobs();
   }
@@ -1622,6 +2392,62 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
 
   shouldShowJobsPanel(): boolean {
     return this.auth.canAccessAdminSection('users') || this.auth.canAccessAdminSection('coupons');
+  }
+
+  canShowPaymentsHealth(): boolean {
+    return this.auth.canAccessAdminSection('ops');
+  }
+
+  canShowRefundsBreakdown(): boolean {
+    return this.auth.canAccessAdminSection('orders') || this.auth.canAccessAdminSection('returns');
+  }
+
+  canShowShippingPerformance(): boolean {
+    return this.auth.canAccessAdminSection('orders');
+  }
+
+  canShowStockoutImpact(): boolean {
+    return this.auth.canAccessAdminSection('inventory');
+  }
+
+  canShowChannelAttribution(): boolean {
+    return this.auth.canAccessAdminSection('dashboard');
+  }
+
+  paymentsProviderLabelKey(provider: string): string {
+    const key = (provider || '').trim().toLowerCase();
+    if (key === 'stripe' || key === 'paypal' || key === 'netopia' || key === 'cod') {
+      return `adminUi.dashboard.paymentsHealth.providers.${key}`;
+    }
+    return 'adminUi.dashboard.paymentsHealth.providers.unknown';
+  }
+
+  supportsWebhookMetrics(provider: string): boolean {
+    const key = (provider || '').trim().toLowerCase();
+    return key === 'stripe' || key === 'paypal';
+  }
+
+  refundProviderLabelKey(provider: string): string {
+    const key = (provider || '').trim().toLowerCase();
+    if (key === 'stripe' || key === 'paypal' || key === 'manual') {
+      return `adminUi.dashboard.refundsBreakdown.providers.${key}`;
+    }
+    return 'adminUi.dashboard.refundsBreakdown.providers.unknown';
+  }
+
+  refundReasonLabelKey(category: string): string {
+    const key = (category || '').trim().toLowerCase();
+    const allowed = new Set([
+      'damaged',
+      'wrong_item',
+      'not_as_described',
+      'size_fit',
+      'delivery_issue',
+      'changed_mind',
+      'other'
+    ]);
+    if (allowed.has(key)) return `adminUi.dashboard.refundsBreakdown.reasons.${key}`;
+    return 'adminUi.dashboard.refundsBreakdown.reasons.other';
   }
 
   canManageGdprJobs(): boolean {
@@ -1783,13 +2609,32 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     });
   }
 
-  onboardingOpen = signal(false);
-  private readonly onboardingStorageKey = 'admin.onboarding.v1';
+	  onboardingOpen = signal(false);
+	  private readonly onboardingStorageKey = 'admin.onboarding.v1';
 
-  private loadSummary(): void {
-    this.loading.set(true);
-    this.error.set(null);
-    this.errorRequestId.set(null);
+    loadWhatsNew(force = false): void {
+      if (this.whatsNewLoading()) return;
+      if (!force && this.whatsNewHtml()) return;
+      this.whatsNewLoading.set(true);
+      this.whatsNewError.set(null);
+      this.http.get('assets/whats-new.md', { responseType: 'text' }).subscribe({
+        next: (md) => {
+          const raw = (md || '').trim();
+          this.whatsNewHtml.set(raw ? this.markdown.render(md) : '');
+          this.whatsNewLoading.set(false);
+        },
+        error: () => {
+          this.whatsNewHtml.set('');
+          this.whatsNewError.set(this.translate.instant('adminUi.dashboard.whatsNew.errors.load'));
+          this.whatsNewLoading.set(false);
+        }
+      });
+    }
+
+	  private loadSummary(): void {
+	    this.loading.set(true);
+	    this.error.set(null);
+	    this.errorRequestId.set(null);
     this.rangeError = '';
     this.admin.summary(this.buildSummaryParams()).subscribe({
       next: (data) => {
@@ -1840,6 +2685,117 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
       },
       error: () => {
         // ignore background refresh failures
+      }
+    });
+  }
+
+  loadPaymentsHealth(): void {
+    if (this.paymentsHealthLoading()) return;
+    this.paymentsHealthLoading.set(true);
+    this.paymentsHealthError.set(null);
+    this.paymentsHealthRequestId.set(null);
+    this.admin.paymentsHealth({ since_hours: 24 }).subscribe({
+      next: (data) => {
+        this.paymentsHealth.set(data);
+        this.paymentsHealthLoading.set(false);
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.translate.instant('adminUi.dashboard.paymentsHealth.error');
+        this.paymentsHealthError.set(msg);
+        this.paymentsHealthRequestId.set(extractRequestId(err));
+        this.paymentsHealthLoading.set(false);
+      }
+    });
+  }
+
+  loadRefundsBreakdown(): void {
+    if (this.refundsBreakdownLoading()) return;
+    this.refundsBreakdownLoading.set(true);
+    this.refundsBreakdownError.set(null);
+    this.refundsBreakdownRequestId.set(null);
+    this.admin.refundsBreakdown({ window_days: 30 }).subscribe({
+      next: (data) => {
+        this.refundsBreakdown.set(data);
+        this.refundsBreakdownLoading.set(false);
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.translate.instant('adminUi.dashboard.refundsBreakdown.error');
+        this.refundsBreakdownError.set(msg);
+        this.refundsBreakdownRequestId.set(extractRequestId(err));
+        this.refundsBreakdownLoading.set(false);
+      }
+    });
+  }
+
+  private resolveWindowDays(fallback = 30): number {
+    const params = this.buildSummaryParams();
+    if (params?.range_days) return params.range_days;
+    const from = (params?.range_from || '').trim();
+    const to = (params?.range_to || '').trim();
+    if (!from || !to) return fallback;
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+    if (!Number.isFinite(fromDate.getTime()) || !Number.isFinite(toDate.getTime())) return fallback;
+    const diffMs = toDate.getTime() - fromDate.getTime();
+    if (diffMs < 0) return fallback;
+    const days = Math.floor(diffMs / (24 * 60 * 60 * 1000)) + 1;
+    return days > 0 ? days : fallback;
+  }
+
+  loadShippingPerformance(): void {
+    if (this.shippingPerformanceLoading()) return;
+    this.shippingPerformanceLoading.set(true);
+    this.shippingPerformanceError.set(null);
+    this.shippingPerformanceRequestId.set(null);
+    this.admin.shippingPerformance({ window_days: this.resolveWindowDays(30) }).subscribe({
+      next: (data) => {
+        this.shippingPerformance.set(data);
+        this.shippingPerformanceLoading.set(false);
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.translate.instant('adminUi.dashboard.shippingPerformance.error');
+        this.shippingPerformanceError.set(msg);
+        this.shippingPerformanceRequestId.set(extractRequestId(err));
+        this.shippingPerformanceLoading.set(false);
+      }
+    });
+  }
+
+  loadStockoutImpact(): void {
+    if (this.stockoutImpactLoading()) return;
+    this.stockoutImpactLoading.set(true);
+    this.stockoutImpactError.set(null);
+    this.stockoutImpactRequestId.set(null);
+    this.admin.stockoutImpact({ window_days: this.resolveWindowDays(30), limit: 8 }).subscribe({
+      next: (data) => {
+        this.stockoutImpact.set(data);
+        this.stockoutImpactLoading.set(false);
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.translate.instant('adminUi.dashboard.stockoutImpact.error');
+        this.stockoutImpactError.set(msg);
+        this.stockoutImpactRequestId.set(extractRequestId(err));
+        this.stockoutImpactLoading.set(false);
+      }
+    });
+  }
+
+  loadChannelAttribution(): void {
+    if (this.channelAttributionLoading()) return;
+    this.channelAttributionLoading.set(true);
+    this.channelAttributionError.set(null);
+    this.channelAttributionRequestId.set(null);
+    const params = this.buildSummaryParams() ?? { range_days: 30 };
+    this.admin.channelAttribution({ ...params, limit: 12 }).subscribe({
+      next: (data) => {
+        this.channelAttribution.set(data);
+        this.channelAttributionLoading.set(false);
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.translate.instant('adminUi.dashboard.channelAttribution.error');
+        this.channelAttributionError.set(msg);
+        this.channelAttributionRequestId.set(extractRequestId(err));
+        this.channelAttributionLoading.set(false);
       }
     });
   }
@@ -2004,6 +2960,37 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     });
   }
 
+  runScheduledReport(kind: AdminScheduledReportKind): void {
+    if (this.scheduledRunBusy() !== null) return;
+    this.scheduledRunError.set('');
+    this.scheduledRunBusy.set(kind);
+    this.admin.sendScheduledReport({ kind, force: this.scheduledRunForce }).subscribe({
+      next: (resp) => {
+        this.scheduledRunBusy.set(null);
+        if (resp?.skipped) {
+          this.toast.info(
+            this.translate.instant('adminUi.dashboard.scheduledRunNow.skippedTitle'),
+            this.translate.instant('adminUi.dashboard.scheduledRunNow.skippedCopy')
+          );
+          return;
+        }
+        this.toast.success(
+          this.translate.instant('adminUi.dashboard.scheduledRunNow.successTitle'),
+          this.translate.instant('adminUi.dashboard.scheduledRunNow.successCopy', {
+            attempted: resp?.attempted ?? 0,
+            delivered: resp?.delivered ?? 0
+          })
+        );
+      },
+      error: (err) => {
+        this.scheduledRunBusy.set(null);
+        const msg = err?.error?.detail || this.translate.instant('adminUi.dashboard.scheduledRunNow.errorCopy');
+        this.scheduledRunError.set(msg);
+        this.toast.error(this.translate.instant('adminUi.dashboard.scheduledRunNow.errorTitle'), msg);
+      }
+    });
+  }
+
   onRangePresetChange(): void {
     if (this.rangePreset === 'custom') return;
     this.loadSummary();
@@ -2031,6 +3018,9 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     this.loadSummary();
     this.loadFunnelMetrics();
     this.loadChannelBreakdown();
+    if (this.canShowChannelAttribution()) this.loadChannelAttribution();
+    if (this.canShowShippingPerformance()) this.loadShippingPerformance();
+    if (this.canShowStockoutImpact()) this.loadStockoutImpact();
   }
 
   private buildSummaryParams(): { range_days?: number; range_from?: string; range_to?: string } | undefined {
@@ -2238,21 +3228,127 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     });
   }
 
+  openAlertThresholds(): void {
+    if (!this.isOwner()) return;
+    this.alertThresholdsError.set('');
+    const current = this.summary()?.alert_thresholds;
+    if (current) this.seedAlertThresholdForm(current);
+    this.alertThresholdsOpen.set(true);
+  }
+
+  closeAlertThresholds(): void {
+    this.alertThresholdsOpen.set(false);
+  }
+
+  saveAlertThresholds(): void {
+    if (!this.isOwner()) return;
+    if (this.alertThresholdsSaving()) return;
+
+    const failedPaymentsMinCount = this.parseRequiredCount(this.alertFailedPaymentsMinCount);
+    const failedPaymentsMinDeltaPct = this.parseOptionalNumber(this.alertFailedPaymentsMinDeltaPct);
+    const refundRequestsMinCount = this.parseRequiredCount(this.alertRefundRequestsMinCount);
+    const refundRequestsMinRatePct = this.parseOptionalNumber(this.alertRefundRequestsMinRatePct, { max: 100 });
+    const stockoutsMinCount = this.parseRequiredCount(this.alertStockoutsMinCount);
+
+    if (
+      failedPaymentsMinCount === null ||
+      refundRequestsMinCount === null ||
+      stockoutsMinCount === null ||
+      failedPaymentsMinDeltaPct === undefined ||
+      refundRequestsMinRatePct === undefined
+    ) {
+      this.alertThresholdsError.set(this.translate.instant('adminUi.dashboard.alerts.config.errors.invalid'));
+      return;
+    }
+
+    const payload: AdminDashboardAlertThresholdsUpdateRequest = {
+      failed_payments_min_count: failedPaymentsMinCount,
+      failed_payments_min_delta_pct: failedPaymentsMinDeltaPct,
+      refund_requests_min_count: refundRequestsMinCount,
+      refund_requests_min_rate_pct: refundRequestsMinRatePct,
+      stockouts_min_count: stockoutsMinCount
+    };
+
+    this.alertThresholdsSaving.set(true);
+    this.alertThresholdsError.set('');
+    this.admin.updateAlertThresholds(payload).subscribe({
+      next: (resp) => {
+        this.alertThresholdsSaving.set(false);
+        this.alertThresholdsOpen.set(false);
+        this.seedAlertThresholdForm(resp);
+        this.refreshSummarySilent();
+        this.toast.success(
+          this.translate.instant('adminUi.dashboard.alerts.config.successTitle'),
+          this.translate.instant('adminUi.dashboard.alerts.config.successCopy')
+        );
+      },
+      error: (err) => {
+        this.alertThresholdsSaving.set(false);
+        const msg = err?.error?.detail || this.translate.instant('adminUi.dashboard.alerts.config.errors.save');
+        this.alertThresholdsError.set(msg);
+      }
+    });
+  }
+
+  private seedAlertThresholdForm(thresholds: AdminDashboardAlertThresholds): void {
+    this.alertFailedPaymentsMinCount = Number(thresholds?.failed_payments_min_count ?? 1) || 1;
+    this.alertFailedPaymentsMinDeltaPct =
+      thresholds?.failed_payments_min_delta_pct === null || thresholds?.failed_payments_min_delta_pct === undefined
+        ? ''
+        : Number(thresholds.failed_payments_min_delta_pct);
+    this.alertRefundRequestsMinCount = Number(thresholds?.refund_requests_min_count ?? 1) || 1;
+    this.alertRefundRequestsMinRatePct =
+      thresholds?.refund_requests_min_rate_pct === null || thresholds?.refund_requests_min_rate_pct === undefined
+        ? ''
+        : Number(thresholds.refund_requests_min_rate_pct);
+    this.alertStockoutsMinCount = Number(thresholds?.stockouts_min_count ?? 1) || 1;
+  }
+
+  private parseRequiredCount(value: string | number | null | undefined): number | null {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return null;
+    const intVal = Math.floor(num);
+    if (intVal < 1) return null;
+    return intVal;
+  }
+
+  private parseOptionalNumber(
+    value: string | number | null | undefined,
+    options?: { max?: number }
+  ): number | null | undefined {
+    if (value === null || value === undefined) return null;
+    const num = typeof value === 'number' ? value : Number(value.trim());
+    if (typeof value !== 'number' && !String(value).trim()) return null;
+    if (!Number.isFinite(num)) return undefined;
+    if (num < 0) return undefined;
+    if (options?.max !== undefined && num > options.max) return undefined;
+    return num;
+  }
+
   failedPaymentsAlert(): AdminDashboardWindowMetric | null {
     const metric = this.summary()?.anomalies?.failed_payments;
-    if (!metric || !metric.current) return null;
+    if (!metric) return null;
+    const shouldAlert =
+      typeof metric.is_alert === 'boolean' ? metric.is_alert : Boolean(metric.current);
+    if (!shouldAlert) return null;
     return metric;
   }
 
   refundRequestsAlert(): AdminDashboardWindowMetric | null {
     const metric = this.summary()?.anomalies?.refund_requests;
-    if (!metric || !metric.current) return null;
+    if (!metric) return null;
+    const shouldAlert =
+      typeof metric.is_alert === 'boolean' ? metric.is_alert : Boolean(metric.current);
+    if (!shouldAlert) return null;
     return metric;
   }
 
   stockoutsAlertCount(): number | null {
-    const count = this.summary()?.anomalies?.stockouts?.count ?? 0;
-    return count > 0 ? count : null;
+    const anomaly = this.summary()?.anomalies?.stockouts;
+    const count = anomaly?.count ?? 0;
+    const shouldAlert =
+      typeof anomaly?.is_alert === 'boolean' ? Boolean(anomaly.is_alert) : count > 0;
+    return shouldAlert && count > 0 ? count : null;
   }
 
   hasAnomalyAlerts(): boolean {
@@ -2413,6 +3509,28 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     this.loadAudit(1);
   }
 
+  private auditPresetConfig(preset: AuditPresetId): { entity: AdminAuditEntity; action: string } {
+    if (preset === 'security') return { entity: 'security', action: '' };
+    if (preset === 'content') return { entity: 'content', action: '' };
+    if (preset === 'catalog') return { entity: 'product', action: '' };
+    if (preset === 'payments') {
+      return { entity: 'security', action: 'stripe,paypal,netopia,refund,payment,webhook,coupon,checkout' };
+    }
+    return { entity: 'all', action: '' };
+  }
+
+  applyAuditPreset(preset: AuditPresetId): void {
+    const cfg = this.auditPresetConfig(preset);
+    this.auditEntity = cfg.entity;
+    this.auditAction = cfg.action;
+    this.applyAuditFilters();
+  }
+
+  auditPresetActive(preset: AuditPresetId): boolean {
+    const cfg = this.auditPresetConfig(preset);
+    return this.auditEntity === cfg.entity && (this.auditAction || '').trim() === cfg.action;
+  }
+
   auditHasPrev(): boolean {
     const current = this.auditEntries()?.meta?.page || 1;
     return current > 1;
@@ -2518,13 +3636,12 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     this.ownerTransferError = '';
     this.ownerTransferLoading = true;
     this.admin
-      .transferOwner({ identifier, confirm: this.ownerTransferConfirm, password: this.ownerTransferPassword })
+      .transferOwner({ identifier, confirm: this.ownerTransferConfirm })
       .subscribe({
         next: () => {
           this.ownerTransferLoading = false;
           this.ownerTransferIdentifier = '';
           this.ownerTransferConfirm = '';
-          this.ownerTransferPassword = '';
           this.toast.success(
             this.translate.instant('adminUi.ownerTransfer.successTitle'),
             this.translate.instant('adminUi.ownerTransfer.successCopy')

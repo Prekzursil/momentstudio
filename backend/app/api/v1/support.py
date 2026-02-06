@@ -19,6 +19,7 @@ from app.models.user import User
 from app.schemas.admin_common import AdminPaginationMeta
 from app.schemas.content import ContentBlockUpdate
 from app.schemas.support import (
+    AdminFeedbackCreate,
     ContactSubmissionCreate,
     ContactSubmissionListItem,
     ContactSubmissionListResponse,
@@ -109,6 +110,8 @@ async def submit_contact(
     session: AsyncSession = Depends(get_session),
     current_user: User | None = Depends(get_current_user_optional),
 ) -> ContactSubmissionRead:
+    if payload.topic == ContactSubmissionTopic.feedback:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported topic")
     await captcha_service.verify(payload.captcha_token, remote_ip=request.client.host if request.client else None)
     record = await support_service.create_contact_submission(
         session,
@@ -154,6 +157,8 @@ async def create_my_ticket(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> TicketRead:
+    if payload.topic == ContactSubmissionTopic.feedback:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported topic")
     display_name = (getattr(user, "name", None) or "").strip() or (getattr(user, "username", None) or "").strip() or "Customer"
     record = await support_service.create_contact_submission(
         session,
@@ -204,6 +209,7 @@ async def reply_my_ticket(
 
 @router.get("/admin/submissions", response_model=ContactSubmissionListResponse)
 async def admin_list_contact_submissions(
+    request: Request,
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("support")),
     q: str | None = Query(default=None),
@@ -217,7 +223,7 @@ async def admin_list_contact_submissions(
     include_pii: bool = Query(default=False),
 ) -> ContactSubmissionListResponse:
     if include_pii:
-        pii_service.require_pii_reveal(admin)
+        pii_service.require_pii_reveal(admin, request=request)
     topic_filter = channel_filter or topic_filter
     rows, total_items = await support_service.list_contact_submissions(
         session,
@@ -255,6 +261,29 @@ async def admin_list_support_assignees(
 ) -> list[SupportAgentRef]:
     rows = await support_service.list_support_agents(session)
     return [SupportAgentRef.model_validate(r) for r in rows]
+
+
+@router.post("/admin/feedback", response_model=ContactSubmissionRead, status_code=status.HTTP_201_CREATED)
+async def admin_submit_feedback(
+    payload: AdminFeedbackCreate,
+    session: AsyncSession = Depends(get_session),
+    staff: User = Depends(require_admin_section("dashboard")),
+) -> ContactSubmissionRead:
+    display_name = (getattr(staff, "name", None) or "").strip() or (getattr(staff, "username", None) or "").strip() or "Staff"
+    context = (payload.context or "").strip() or None
+    record = await support_service.create_contact_submission(
+        session,
+        topic=ContactSubmissionTopic.feedback,
+        name=display_name,
+        email=str(staff.email),
+        message=payload.message,
+        admin_note=context,
+        user=staff,
+    )
+    hydrated = await support_service.get_contact_submission_with_messages(session, record.id)
+    if not hydrated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
+    return ContactSubmissionRead.model_validate(hydrated)
 
 
 @router.get("/admin/canned-responses", response_model=list[SupportCannedResponseRead])
@@ -322,12 +351,13 @@ async def admin_delete_canned_response(
 @router.get("/admin/submissions/{submission_id}", response_model=ContactSubmissionRead)
 async def admin_get_contact_submission(
     submission_id: UUID,
+    request: Request,
     include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("support")),
 ) -> ContactSubmissionRead:
     if include_pii:
-        pii_service.require_pii_reveal(admin)
+        pii_service.require_pii_reveal(admin, request=request)
     record = await support_service.get_contact_submission_with_messages(session, submission_id)
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
@@ -339,12 +369,13 @@ async def admin_get_contact_submission(
 async def admin_update_contact_submission(
     submission_id: UUID,
     payload: ContactSubmissionUpdate,
+    request: Request,
     include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("support")),
 ) -> ContactSubmissionRead:
     if include_pii:
-        pii_service.require_pii_reveal(admin)
+        pii_service.require_pii_reveal(admin, request=request)
     record = await support_service.get_contact_submission_with_messages(session, submission_id)
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
@@ -369,12 +400,13 @@ async def admin_reply_contact_submission(
     submission_id: UUID,
     payload: TicketMessageCreate,
     background_tasks: BackgroundTasks,
+    request: Request,
     include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("support")),
 ) -> ContactSubmissionRead:
     if include_pii:
-        pii_service.require_pii_reveal(admin)
+        pii_service.require_pii_reveal(admin, request=request)
     record = await support_service.get_contact_submission_with_messages(session, submission_id)
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")

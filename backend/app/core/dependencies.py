@@ -70,7 +70,11 @@ async def _require_admin_mfa(session: AsyncSession, user: User) -> None:
         return
     if await _has_passkey(session, user.id):
         return
-    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_ADMIN_MFA_REQUIRED_DETAIL)
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=_ADMIN_MFA_REQUIRED_DETAIL,
+        headers={"X-Error-Code": "admin_mfa_required"},
+    )
 
 
 def _parse_ip_networks(values: list[str]) -> list[_IPNetwork]:
@@ -124,19 +128,35 @@ def _require_admin_ip_access(request: Request, user: User) -> None:
 
     ip_raw = (_extract_admin_client_ip(request) or "").strip()
     if not ip_raw:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_ADMIN_IP_DENIED_DETAIL)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=_ADMIN_IP_DENIED_DETAIL,
+            headers={"X-Error-Code": "admin_ip_denied"},
+        )
     try:
         client_ip = ip_address(ip_raw)
     except ValueError:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_ADMIN_IP_DENIED_DETAIL)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=_ADMIN_IP_DENIED_DETAIL,
+            headers={"X-Error-Code": "admin_ip_denied"},
+        )
 
     deny = _parse_ip_networks(deny_raw)
     if any(client_ip in network for network in deny):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_ADMIN_IP_DENIED_DETAIL)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=_ADMIN_IP_DENIED_DETAIL,
+            headers={"X-Error-Code": "admin_ip_denied"},
+        )
 
     allow = _parse_ip_networks(allow_raw)
     if allow and not any(client_ip in network for network in allow):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_ADMIN_IP_ALLOWLIST_DETAIL)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=_ADMIN_IP_ALLOWLIST_DETAIL,
+            headers={"X-Error-Code": "admin_ip_allowlist"},
+        )
 
 
 def _require_training_mode_writes_allowed(request: Request, user: User) -> None:
@@ -144,7 +164,11 @@ def _require_training_mode_writes_allowed(request: Request, user: User) -> None:
         return
     if request.method.upper() in _TRAINING_SAFE_METHODS:
         return
-    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_TRAINING_MODE_DETAIL)
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=_TRAINING_MODE_DETAIL,
+        headers={"X-Error-Code": "training_readonly"},
+    )
 
 
 async def get_current_user(

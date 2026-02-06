@@ -2,6 +2,7 @@ import csv
 import io
 import mimetypes
 import secrets
+import zipfile
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
@@ -9,8 +10,9 @@ from typing import Any, Callable
 from urllib.parse import quote_plus
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks, UploadFile, File, Body, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks, UploadFile, File, Body, Response, Request
 from fastapi.responses import StreamingResponse, FileResponse
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -23,11 +25,11 @@ from app.core.dependencies import (
     require_verified_email,
 )
 from app.core.config import settings
-from app.core import security
 from app.core.security import create_receipt_token, decode_receipt_token
 from app.db.session import get_session
 from app.models.address import Address
 from app.models.cart import Cart
+from app.models.email_event import EmailDeliveryEvent
 from app.models.order import Order, OrderItem, OrderStatus, OrderEvent
 from app.models.order_document_export import OrderDocumentExportKind
 from app.models.user import User
@@ -53,6 +55,7 @@ from app.services import auth as auth_service
 from app.services import private_storage
 from app.services import receipts as receipt_service
 from app.services import packing_slips as packing_slips_service
+from app.services import pick_lists as pick_lists_service
 from app.services import order_document_exports as order_exports_service
 from app.schemas.checkout import (
     CheckoutRequest,
@@ -79,6 +82,7 @@ from app.api.v1 import cart as cart_api
 from app.schemas.order_admin import (
     AdminOrderListItem,
     AdminOrderListResponse,
+    AdminOrderEmailEventRead,
     AdminOrderRead,
     AdminPaginationMeta,
     AdminOrderEmailResendRequest,
@@ -87,14 +91,23 @@ from app.schemas.order_admin import (
 from app.schemas.order_admin_note import OrderAdminNoteCreate
 from app.schemas.order_admin_address import AdminOrderAddressesUpdate
 from app.schemas.order_shipment import OrderShipmentCreate, OrderShipmentUpdate, OrderShipmentRead
-from app.schemas.order_tag import OrderTagCreate, OrderTagsResponse
+from app.schemas.order_tag import (
+    OrderTagCreate,
+    OrderTagsResponse,
+    OrderTagStatRead,
+    OrderTagStatsResponse,
+    OrderTagRenameRequest,
+    OrderTagRenameResponse,
+)
 from app.schemas.order_refund import AdminOrderRefundCreate, AdminOrderRefundRequest
+from app.schemas.order_fraud_review import OrderFraudReviewRequest
 from app.schemas.order_exports_admin import AdminOrderDocumentExportListResponse, AdminOrderDocumentExportRead
 from app.schemas.receipt import ReceiptRead, ReceiptShareTokenRead
 from app.services import notifications as notification_service
 from app.services import promo_usage
 from app.services import pricing
 from app.services import pii as pii_service
+from app.services import step_up as step_up_service
 from app.services import legal_consents as legal_consents_service
 from app.services.payment_provider import is_mock_payments
 from app.models.legal import LegalConsentContext
@@ -344,6 +357,16 @@ def _sanitize_filename(value: str | None) -> str:
     return name[:255]
 
 
+def _frontend_base_from_request(request: Request | None) -> str:
+    candidate = (request.headers.get("origin") if request else None) or ""
+    origin = candidate.strip().rstrip("/")
+    if origin:
+        allowed = {str(raw or "").strip().rstrip("/") for raw in getattr(settings, "cors_origins", []) or []}
+        if origin in allowed:
+            return origin
+    return settings.frontend_origin.rstrip("/")
+
+
 @router.post("", response_model=OrderRead, status_code=status.HTTP_201_CREATED)
 async def create_order(
     response: Response,
@@ -439,6 +462,7 @@ async def create_order(
 @router.post("/checkout", response_model=GuestCheckoutResponse, status_code=status.HTTP_201_CREATED)
 async def checkout(
     payload: CheckoutRequest,
+    request: Request,
     response: Response,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
@@ -450,6 +474,8 @@ async def checkout(
     needs_consent = not legal_consents_service.is_satisfied(required_versions, accepted_versions)
     if needs_consent and (not payload.accept_terms or not payload.accept_privacy):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Legal consents required")
+
+    base = _frontend_base_from_request(request)
 
     user_cart = await cart_service.get_cart(session, current_user.id, session_id)
     if not user_cart.items:
@@ -487,13 +513,12 @@ async def checkout(
                         last_name=last_name,
                         addr=shipping_addr_obj,
                     )
-                    base = settings.frontend_origin.rstrip("/")
                     cancel_url = f"{base}/checkout/netopia/cancel?order_id={existing_order.id}"
                     redirect_url = f"{base}/checkout/netopia/return?order_id={existing_order.id}"
                     notify_url = f"{base}/api/v1/payments/netopia/webhook"
                     netopia_ntp_id, netopia_payment_url = await netopia_service.start_payment(
                         order_id=str(existing_order.id),
-                        amount_ron=float(pricing.quantize_money(existing_order.total_amount)),
+                        amount_ron=pricing.quantize_money(existing_order.total_amount),
                         description=f"Order {existing_order.reference_code}"
                         if existing_order.reference_code
                         else f"Order {existing_order.id}",
@@ -667,8 +692,8 @@ async def checkout(
             session=session,
             amount_cents=_money_to_cents(totals.total),
             customer_email=current_user.email,
-            success_url=f"{settings.frontend_origin.rstrip('/')}/checkout/stripe/return?session_id={{CHECKOUT_SESSION_ID}}",
-            cancel_url=f"{settings.frontend_origin.rstrip('/')}/checkout/stripe/cancel?session_id={{CHECKOUT_SESSION_ID}}",
+            success_url=f"{base}/checkout/stripe/return?session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{base}/checkout/stripe/cancel?session_id={{CHECKOUT_SESSION_ID}}",
             lang=current_user.preferred_language,
             metadata={"cart_id": str(user_cart.id), "user_id": str(current_user.id)},
             line_items=stripe_line_items,
@@ -682,8 +707,8 @@ async def checkout(
         paypal_order_id, paypal_approval_url = await paypal_service.create_order(
             total_ron=totals.total,
             reference=str(user_cart.id),
-            return_url=f"{settings.frontend_origin.rstrip('/')}/checkout/paypal/return",
-            cancel_url=f"{settings.frontend_origin.rstrip('/')}/checkout/paypal/cancel",
+            return_url=f"{base}/checkout/paypal/return",
+            cancel_url=f"{base}/checkout/paypal/cancel",
             item_total_ron=totals.subtotal,
             shipping_ron=totals.shipping,
             tax_ron=totals.tax,
@@ -744,13 +769,12 @@ async def checkout(
             last_name=last_name,
             addr=shipping_addr_obj,
         )
-        base = settings.frontend_origin.rstrip("/")
         cancel_url = f"{base}/checkout/netopia/cancel?order_id={order.id}"
         redirect_url = f"{base}/checkout/netopia/return?order_id={order.id}"
         notify_url = f"{base}/api/v1/payments/netopia/webhook"
         netopia_ntp_id, netopia_payment_url = await netopia_service.start_payment(
             order_id=str(order.id),
-            amount_ron=float(pricing.quantize_money(order.total_amount)),
+            amount_ron=pricing.quantize_money(order.total_amount),
             description=f"Order {order.reference_code}" if order.reference_code else f"Order {order.id}",
             billing=billing_payload,
             shipping=shipping_payload,
@@ -1250,10 +1274,13 @@ async def admin_list_orders(
 
 @router.get("/admin/search", response_model=AdminOrderListResponse)
 async def admin_search_orders(
+    request: Request,
     q: str | None = Query(default=None, max_length=200),
     user_id: UUID | None = Query(default=None),
     status: str | None = Query(default=None),
     tag: str | None = Query(default=None, max_length=50),
+    sla: str | None = Query(default=None, max_length=30),
+    fraud: str | None = Query(default=None, max_length=30),
     from_dt: datetime | None = Query(default=None, alias="from"),
     to_dt: datetime | None = Query(default=None, alias="to"),
     page: int = Query(default=1, ge=1),
@@ -1264,7 +1291,7 @@ async def admin_search_orders(
     admin: User = Depends(require_admin_section("orders")),
 ) -> AdminOrderListResponse:
     if include_pii:
-        pii_service.require_pii_reveal(admin)
+        pii_service.require_pii_reveal(admin, request=request)
     status_clean = (status or "").strip().lower() if status else None
     pending_any = False
     parsed_status = None
@@ -1284,6 +1311,30 @@ async def admin_search_orders(
                 parsed_status = OrderStatus(status_clean)
             except ValueError:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid order status")
+    sla_clean = (sla or "").strip().lower() if sla else None
+    parsed_sla: str | None = None
+    if sla_clean:
+        if sla_clean in {"accept_overdue", "acceptance_overdue", "overdue_acceptance", "overdue_accept"}:
+            parsed_sla = "accept_overdue"
+        elif sla_clean in {"ship_overdue", "shipping_overdue", "overdue_shipping", "overdue_ship"}:
+            parsed_sla = "ship_overdue"
+        elif sla_clean in {"any_overdue", "overdue", "any"}:
+            parsed_sla = "any_overdue"
+        else:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid SLA filter")
+    fraud_clean = (fraud or "").strip().lower() if fraud else None
+    parsed_fraud: str | None = None
+    if fraud_clean:
+        if fraud_clean in {"queue", "review", "needs_review", "needs-review"}:
+            parsed_fraud = "queue"
+        elif fraud_clean in {"flagged", "risk"}:
+            parsed_fraud = "flagged"
+        elif fraud_clean in {"approved"}:
+            parsed_fraud = "approved"
+        elif fraud_clean in {"denied"}:
+            parsed_fraud = "denied"
+        else:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid fraud filter")
     rows, total_items = await order_service.admin_search_orders(
         session,
         q=q,
@@ -1292,26 +1343,57 @@ async def admin_search_orders(
         statuses=parsed_statuses,
         pending_any=pending_any,
         tag=tag,
+        sla=parsed_sla,
+        fraud=parsed_fraud,
         from_dt=from_dt,
         to_dt=to_dt,
         page=page,
         limit=limit,
         include_test=include_test,
     )
-    items = [
-        AdminOrderListItem(
-            id=order.id,
-            reference_code=order.reference_code,
-            status=order.status,
-            total_amount=order.total_amount,
-            currency=order.currency,
-            created_at=order.created_at,
-            customer_email=email if include_pii else pii_service.mask_email(email),
-            customer_username=username,
-            tags=[t.tag for t in (getattr(order, "tags", None) or [])],
+    now = datetime.now(timezone.utc)
+    accept_hours = max(1, int(getattr(settings, "order_sla_accept_hours", 24) or 24))
+    ship_hours = max(1, int(getattr(settings, "order_sla_ship_hours", 48) or 48))
+
+    def _ensure_utc(dt: datetime | None) -> datetime | None:
+        if not dt:
+            return None
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+
+    items: list[AdminOrderListItem] = []
+    for (order, email, username, sla_kind, sla_started_at, fraud_flagged, fraud_severity) in rows:
+        sla_started_at = _ensure_utc(sla_started_at)
+        sla_due_at: datetime | None = None
+        sla_overdue = False
+        if sla_kind == "accept" and sla_started_at:
+            sla_due_at = sla_started_at + timedelta(hours=accept_hours)
+            sla_overdue = sla_due_at <= now
+        elif sla_kind == "ship" and sla_started_at:
+            sla_due_at = sla_started_at + timedelta(hours=ship_hours)
+            sla_overdue = sla_due_at <= now
+
+        items.append(
+            AdminOrderListItem(
+                id=order.id,
+                reference_code=order.reference_code,
+                status=order.status,
+                total_amount=order.total_amount,
+                currency=order.currency,
+                payment_method=getattr(order, "payment_method", None),
+                created_at=order.created_at,
+                customer_email=email if include_pii else pii_service.mask_email(email),
+                customer_username=username,
+                tags=[t.tag for t in (getattr(order, "tags", None) or [])],
+                sla_kind=sla_kind,
+                sla_started_at=sla_started_at,
+                sla_due_at=sla_due_at,
+                sla_overdue=sla_overdue,
+                fraud_flagged=bool(fraud_flagged),
+                fraud_severity=fraud_severity,
+            )
         )
-        for (order, email, username) in rows
-    ]
     total_pages = max(1, (int(total_items) + limit - 1) // limit)
     meta = AdminPaginationMeta(total_items=int(total_items), total_pages=total_pages, page=page, limit=limit)
     return AdminOrderListResponse(items=items, meta=meta)
@@ -1326,15 +1408,41 @@ async def admin_list_order_tags(
     return OrderTagsResponse(items=tags)
 
 
-@router.get("/admin/export")
-async def admin_export_orders(
+@router.get("/admin/tags/stats", response_model=OrderTagStatsResponse)
+async def admin_list_order_tag_stats(
+    session: AsyncSession = Depends(get_session),
+    _: object = Depends(require_admin_section("orders")),
+) -> OrderTagStatsResponse:
+    rows = await order_service.list_order_tag_stats(session)
+    return OrderTagStatsResponse(items=[OrderTagStatRead(tag=tag, count=count) for tag, count in rows])
+
+
+@router.post("/admin/tags/rename", response_model=OrderTagRenameResponse)
+async def admin_rename_order_tag(
+    payload: OrderTagRenameRequest,
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("orders")),
+) -> OrderTagRenameResponse:
+    result = await order_service.rename_order_tag(
+        session,
+        from_tag=payload.from_tag,
+        to_tag=payload.to_tag,
+        actor_user_id=getattr(admin, "id", None),
+    )
+    return OrderTagRenameResponse(**result)
+
+
+@router.get("/admin/export")
+async def admin_export_orders(
+    request: Request,
     columns: list[str] | None = Query(default=None),
     include_pii: bool = Query(default=False),
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("orders")),
 ):
+    step_up_service.require_step_up(request, admin)
     if include_pii:
-        pii_service.require_pii_reveal(admin)
+        pii_service.require_pii_reveal(admin, request=request)
     orders = await order_service.list_orders(session)
     allowed: dict[str, Callable[[Order], Any]] = {
         "id": lambda o: str(o.id),
@@ -1428,9 +1536,11 @@ async def admin_list_document_exports(
 @router.get("/admin/exports/{export_id}/download")
 async def admin_download_document_export(
     export_id: UUID,
+    request: Request,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("orders")),
+    admin: User = Depends(require_admin_section("orders")),
 ) -> FileResponse:
+    step_up_service.require_step_up(request, admin)
     export, _ref = await order_exports_service.get_export(session, export_id)
     if not export:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export not found")
@@ -1453,8 +1563,6 @@ async def _serialize_admin_order(
     include_pii: bool = False,
     current_user: User | None = None,
 ) -> AdminOrderRead:
-    if include_pii:
-        pii_service.require_pii_reveal(current_user)
     fraud_signals = await order_service.compute_fraud_signals(session, order)
     base = OrderRead.model_validate(order).model_dump()
 
@@ -1509,6 +1617,7 @@ async def _serialize_admin_order(
 @router.get("/admin/{order_id}", response_model=AdminOrderRead)
 async def admin_get_order(
     order_id: UUID,
+    request: Request,
     include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("orders")),
@@ -1517,7 +1626,65 @@ async def admin_get_order(
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
 
+    if include_pii:
+        pii_service.require_pii_reveal(admin, request=request)
+
     return await _serialize_admin_order(session, order, include_pii=include_pii, current_user=admin)
+
+
+@router.get("/admin/{order_id}/email-events", response_model=list[AdminOrderEmailEventRead])
+async def admin_list_order_email_events(
+    order_id: UUID,
+    request: Request,
+    include_pii: bool = Query(default=False),
+    limit: int = Query(default=50, ge=1, le=200),
+    since_hours: int = Query(default=168, ge=1, le=2160),
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("orders")),
+) -> list[AdminOrderEmailEventRead]:
+    order = await order_service.get_order_by_id_admin(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+
+    if include_pii:
+        pii_service.require_pii_reveal(admin, request=request)
+
+    customer_email = getattr(order, "customer_email", None) or (
+        getattr(order.user, "email", None) if getattr(order, "user", None) else None
+    )
+    cleaned_email = (customer_email or "").strip().lower()
+    if not cleaned_email:
+        return []
+
+    ref = (getattr(order, "reference_code", None) or str(getattr(order, "id", "")) or "").strip()
+    ref_lower = ref.lower()
+
+    now = datetime.now(timezone.utc)
+    since = now - timedelta(hours=max(1, int(since_hours or 0)))
+
+    stmt = (
+        select(EmailDeliveryEvent)
+        .where(EmailDeliveryEvent.created_at >= since)
+        .where(func.lower(EmailDeliveryEvent.to_email) == cleaned_email)
+        .order_by(EmailDeliveryEvent.created_at.desc())
+        .limit(max(1, min(int(limit or 0), 200)))
+    )
+    if ref_lower:
+        stmt = stmt.where(func.lower(EmailDeliveryEvent.subject).like(f"%{ref_lower}%"))
+
+    rows = (await session.execute(stmt)).scalars().all()
+    to_email_value = cleaned_email if include_pii else pii_service.mask_email(cleaned_email)
+    return [
+        AdminOrderEmailEventRead(
+            id=row.id,
+            to_email=to_email_value,
+            subject=row.subject,
+            status=row.status,
+            error_message=row.error_message,
+            created_at=row.created_at,
+        )
+        for row in rows
+    ]
 
 
 @router.post("/guest-checkout/email/request", response_model=GuestEmailVerificationRequestResponse)
@@ -1614,6 +1781,7 @@ async def guest_email_verification_status(
 @router.post("/guest-checkout", response_model=GuestCheckoutResponse, status_code=status.HTTP_201_CREATED)
 async def guest_checkout(
     payload: GuestCheckoutRequest,
+    request: Request,
     response: Response,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
@@ -1629,6 +1797,8 @@ async def guest_checkout(
     email = _normalize_email(str(payload.email))
     if not cart.guest_email_verified_at or _normalize_email(cart.guest_email or "") != email:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email verification required")
+
+    base = _frontend_base_from_request(request)
 
     last_order_id = await session.scalar(
         select(Cart.last_order_id).where(Cart.id == cart.id).with_for_update()
@@ -1662,13 +1832,12 @@ async def guest_checkout(
                         last_name=last_name,
                         addr=shipping_addr_obj,
                     )
-                    base = settings.frontend_origin.rstrip("/")
                     cancel_url = f"{base}/checkout/netopia/cancel?order_id={existing_order.id}"
                     redirect_url = f"{base}/checkout/netopia/return?order_id={existing_order.id}"
                     notify_url = f"{base}/api/v1/payments/netopia/webhook"
                     netopia_ntp_id, netopia_payment_url = await netopia_service.start_payment(
                         order_id=str(existing_order.id),
-                        amount_ron=float(pricing.quantize_money(existing_order.total_amount)),
+                        amount_ron=pricing.quantize_money(existing_order.total_amount),
                         description=f"Order {existing_order.reference_code}"
                         if existing_order.reference_code
                         else f"Order {existing_order.id}",
@@ -1859,8 +2028,8 @@ async def guest_checkout(
             session=session,
             amount_cents=_money_to_cents(totals.total),
             customer_email=email,
-            success_url=f"{settings.frontend_origin.rstrip('/')}/checkout/stripe/return?session_id={{CHECKOUT_SESSION_ID}}",
-            cancel_url=f"{settings.frontend_origin.rstrip('/')}/checkout/stripe/cancel?session_id={{CHECKOUT_SESSION_ID}}",
+            success_url=f"{base}/checkout/stripe/return?session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{base}/checkout/stripe/cancel?session_id={{CHECKOUT_SESSION_ID}}",
             lang=payload.preferred_language,
             metadata={"cart_id": str(cart.id), "user_id": str(user_id) if user_id else ""},
             line_items=stripe_line_items,
@@ -1874,8 +2043,8 @@ async def guest_checkout(
         paypal_order_id, paypal_approval_url = await paypal_service.create_order(
             total_ron=totals.total,
             reference=str(cart.id),
-            return_url=f"{settings.frontend_origin.rstrip('/')}/checkout/paypal/return",
-            cancel_url=f"{settings.frontend_origin.rstrip('/')}/checkout/paypal/cancel",
+            return_url=f"{base}/checkout/paypal/return",
+            cancel_url=f"{base}/checkout/paypal/cancel",
             item_total_ron=totals.subtotal,
             shipping_ron=totals.shipping,
             tax_ron=totals.tax,
@@ -1936,13 +2105,12 @@ async def guest_checkout(
             last_name=last_name,
             addr=shipping_addr_obj,
         )
-        base = settings.frontend_origin.rstrip("/")
         cancel_url = f"{base}/checkout/netopia/cancel?order_id={order.id}"
         redirect_url = f"{base}/checkout/netopia/return?order_id={order.id}"
         notify_url = f"{base}/api/v1/payments/netopia/webhook"
         netopia_ntp_id, netopia_payment_url = await netopia_service.start_payment(
             order_id=str(order.id),
-            amount_ron=float(pricing.quantize_money(order.total_amount)),
+            amount_ron=pricing.quantize_money(order.total_amount),
             description=f"Order {order.reference_code}" if order.reference_code else f"Order {order.id}",
             billing=billing_payload,
             shipping=shipping_payload,
@@ -2003,10 +2171,13 @@ async def admin_update_order(
     background_tasks: BackgroundTasks,
     order_id: UUID,
     payload: OrderUpdate,
+    request: Request,
     include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("orders")),
 ):
+    if include_pii:
+        pii_service.require_pii_reveal(admin, request=request)
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
@@ -2138,11 +2309,14 @@ async def admin_update_order(
 @router.patch("/admin/{order_id}/addresses", response_model=AdminOrderRead)
 async def admin_update_order_addresses(
     order_id: UUID,
+    request: Request,
     payload: AdminOrderAddressesUpdate = Body(...),
     include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
+    if include_pii:
+        pii_service.require_pii_reveal(admin, request=request)
     order = await order_service.get_order_by_id_admin(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
@@ -2173,11 +2347,14 @@ async def admin_list_order_shipments(
 @router.post("/admin/{order_id}/shipments", response_model=AdminOrderRead)
 async def admin_create_order_shipment(
     order_id: UUID,
+    request: Request,
     payload: OrderShipmentCreate = Body(...),
     include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
+    if include_pii:
+        pii_service.require_pii_reveal(admin, request=request)
     order = await order_service.get_order_by_id_admin(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
@@ -2196,11 +2373,14 @@ async def admin_create_order_shipment(
 async def admin_update_order_shipment(
     order_id: UUID,
     shipment_id: UUID,
+    request: Request,
     payload: OrderShipmentUpdate = Body(...),
     include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
+    if include_pii:
+        pii_service.require_pii_reveal(admin, request=request)
     order = await order_service.get_order_by_id_admin(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
@@ -2220,10 +2400,13 @@ async def admin_update_order_shipment(
 async def admin_delete_order_shipment(
     order_id: UUID,
     shipment_id: UUID,
+    request: Request,
     include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
+    if include_pii:
+        pii_service.require_pii_reveal(admin, request=request)
     order = await order_service.get_order_by_id_admin(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
@@ -2241,11 +2424,14 @@ async def admin_delete_order_shipment(
 @router.post("/admin/{order_id}/shipping-label", response_model=AdminOrderRead)
 async def admin_upload_shipping_label(
     order_id: UUID,
+    request: Request,
     file: UploadFile = File(...),
     include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
+    if include_pii:
+        pii_service.require_pii_reveal(admin, request=request)
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
@@ -2289,10 +2475,12 @@ async def admin_upload_shipping_label(
 @router.get("/admin/{order_id}/shipping-label")
 async def admin_download_shipping_label(
     order_id: UUID,
+    request: Request,
     action: str | None = Query(default=None, max_length=20),
     session: AsyncSession = Depends(get_session),
-    admin=Depends(require_admin_section("orders")),
+    admin: User = Depends(require_admin_section("orders")),
 ) -> FileResponse:
+    step_up_service.require_step_up(request, admin)
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
@@ -2354,14 +2542,11 @@ async def admin_retry_payment(
 async def admin_refund_order(
     background_tasks: BackgroundTasks,
     order_id: UUID,
+    request: Request,
     payload: AdminOrderRefundRequest = Body(...),
     session: AsyncSession = Depends(get_session),
     admin_user=Depends(require_admin),
 ):
-    password = str(payload.password or "")
-    if not password or not security.verify_password(password, admin_user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
-
     note = (payload.note or "").strip() or None
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
@@ -2400,14 +2585,11 @@ async def admin_refund_order(
 async def admin_create_order_refund(
     background_tasks: BackgroundTasks,
     order_id: UUID,
+    request: Request,
     payload: AdminOrderRefundCreate = Body(...),
     session: AsyncSession = Depends(get_session),
     admin_user=Depends(require_admin),
 ) -> AdminOrderRead:
-    password = str(payload.password or "")
-    if not password or not security.verify_password(password, admin_user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
-
     order = await order_service.get_order_by_id_admin(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
@@ -2454,11 +2636,14 @@ async def admin_create_order_refund(
 @router.post("/admin/{order_id}/notes", response_model=AdminOrderRead)
 async def admin_add_order_note(
     order_id: UUID,
+    request: Request,
     payload: OrderAdminNoteCreate = Body(...),
     include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
+    if include_pii:
+        pii_service.require_pii_reveal(admin, request=request)
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
@@ -2471,11 +2656,14 @@ async def admin_add_order_note(
 @router.post("/admin/{order_id}/tags", response_model=AdminOrderRead)
 async def admin_add_order_tag(
     order_id: UUID,
+    request: Request,
     payload: OrderTagCreate = Body(...),
     include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
+    if include_pii:
+        pii_service.require_pii_reveal(admin, request=request)
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
@@ -2491,10 +2679,13 @@ async def admin_add_order_tag(
 async def admin_remove_order_tag(
     order_id: UUID,
     tag: str,
+    request: Request,
     include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("orders")),
 ) -> AdminOrderRead:
+    if include_pii:
+        pii_service.require_pii_reveal(admin, request=request)
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
@@ -2503,6 +2694,31 @@ async def admin_remove_order_tag(
         session, order, tag=tag, actor_user_id=getattr(admin, "id", None)
     )
 
+    return await _serialize_admin_order(session, updated, include_pii=include_pii, current_user=admin)
+
+
+@router.post("/admin/{order_id}/fraud-review", response_model=AdminOrderRead)
+async def admin_review_order_fraud(
+    order_id: UUID,
+    request: Request,
+    payload: OrderFraudReviewRequest = Body(...),
+    include_pii: bool = Query(default=False),
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("orders")),
+) -> AdminOrderRead:
+    if include_pii:
+        pii_service.require_pii_reveal(admin, request=request)
+    order = await order_service.get_order_by_id(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+
+    updated = await order_service.review_order_fraud(
+        session,
+        order,
+        decision=payload.decision,
+        note=payload.note,
+        actor_user_id=getattr(admin, "id", None),
+    )
     return await _serialize_admin_order(session, updated, include_pii=include_pii, current_user=admin)
 
 
@@ -2572,11 +2788,14 @@ async def admin_send_confirmation_email(
 async def admin_fulfill_item(
     order_id: UUID,
     item_id: UUID,
+    request: Request,
     shipped_quantity: int = 0,
     include_pii: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("orders")),
 ):
+    if include_pii:
+        pii_service.require_pii_reveal(admin, request=request)
     order = await order_service.get_order_by_id_admin(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
@@ -2602,9 +2821,11 @@ async def admin_order_events(
 @router.get("/admin/{order_id}/packing-slip")
 async def admin_packing_slip(
     order_id: UUID,
+    request: Request,
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("orders")),
 ):
+    step_up_service.require_step_up(request, admin)
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
@@ -2625,9 +2846,11 @@ async def admin_packing_slip(
 @router.post("/admin/batch/packing-slips")
 async def admin_batch_packing_slips(
     payload: AdminOrderIdsRequest,
+    request: Request,
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("orders")),
 ):
+    step_up_service.require_step_up(request, admin)
     ids = list(dict.fromkeys(payload.order_ids))
     if not ids:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No orders selected")
@@ -2666,12 +2889,173 @@ async def admin_batch_packing_slips(
     return Response(content=pdf, media_type="application/pdf", headers=headers)
 
 
-@router.get("/admin/{order_id}/receipt")
-async def admin_download_receipt_pdf(
-    order_id: UUID,
+@router.post("/admin/batch/pick-list.csv")
+async def admin_batch_pick_list_csv(
+    payload: AdminOrderIdsRequest,
+    request: Request,
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("orders")),
 ):
+    step_up_service.require_step_up(request, admin)
+    ids = list(dict.fromkeys(payload.order_ids))
+    if not ids:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No orders selected")
+    if len(ids) > 100:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Too many orders selected")
+
+    result = await session.execute(
+        select(Order)
+        .execution_options(populate_existing=True)
+        .options(
+            selectinload(Order.items).selectinload(OrderItem.product),
+            selectinload(Order.items).selectinload(OrderItem.variant),
+        )
+        .where(Order.id.in_(ids))
+    )
+    orders = list(result.scalars().unique())
+    found = {o.id for o in orders}
+    missing = [str(order_id) for order_id in ids if order_id not in found]
+    if missing:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"missing_order_ids": missing})
+
+    order_by_id = {o.id: o for o in orders}
+    ordered = [order_by_id[order_id] for order_id in ids if order_id in order_by_id]
+    rows = pick_lists_service.build_pick_list_rows(ordered)
+    csv_bytes = pick_lists_service.render_pick_list_csv(rows)
+    headers = {
+        "Content-Disposition": 'attachment; filename="pick-list.csv"',
+        "Cache-Control": "no-store",
+    }
+    return Response(content=csv_bytes, media_type="text/csv; charset=utf-8", headers=headers)
+
+
+@router.post("/admin/batch/pick-list.pdf")
+async def admin_batch_pick_list_pdf(
+    payload: AdminOrderIdsRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("orders")),
+):
+    step_up_service.require_step_up(request, admin)
+    ids = list(dict.fromkeys(payload.order_ids))
+    if not ids:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No orders selected")
+    if len(ids) > 100:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Too many orders selected")
+
+    result = await session.execute(
+        select(Order)
+        .execution_options(populate_existing=True)
+        .options(
+            selectinload(Order.items).selectinload(OrderItem.product),
+            selectinload(Order.items).selectinload(OrderItem.variant),
+        )
+        .where(Order.id.in_(ids))
+    )
+    orders = list(result.scalars().unique())
+    found = {o.id for o in orders}
+    missing = [str(order_id) for order_id in ids if order_id not in found]
+    if missing:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"missing_order_ids": missing})
+
+    order_by_id = {o.id: o for o in orders}
+    ordered = [order_by_id[order_id] for order_id in ids if order_id in order_by_id]
+    rows = pick_lists_service.build_pick_list_rows(ordered)
+    pdf = pick_lists_service.render_pick_list_pdf(rows, orders=ordered)
+    headers = {
+        "Content-Disposition": 'attachment; filename="pick-list.pdf"',
+        "Cache-Control": "no-store",
+    }
+    return Response(content=pdf, media_type="application/pdf", headers=headers)
+
+
+@router.post("/admin/batch/shipping-labels.zip")
+async def admin_batch_shipping_labels_zip(
+    payload: AdminOrderIdsRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("orders")),
+):
+    step_up_service.require_step_up(request, admin)
+    ids = list(dict.fromkeys(payload.order_ids))
+    if not ids:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No orders selected")
+    if len(ids) > 50:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Too many orders selected")
+
+    result = await session.execute(select(Order).execution_options(populate_existing=True).where(Order.id.in_(ids)))
+    orders = list(result.scalars().unique())
+    found = {o.id for o in orders}
+    missing = [str(order_id) for order_id in ids if order_id not in found]
+    if missing:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"missing_order_ids": missing})
+
+    order_by_id = {o.id: o for o in orders}
+    ordered = [order_by_id[order_id] for order_id in ids if order_id in order_by_id]
+
+    files: list[tuple[Order, Path, str]] = []
+    missing_labels: list[str] = []
+    total_bytes = 0
+    for order in ordered:
+        rel = getattr(order, "shipping_label_path", None)
+        if not rel:
+            missing_labels.append(str(order.id))
+            continue
+        path = private_storage.resolve_private_path(rel)
+        if not path.exists():
+            missing_labels.append(str(order.id))
+            continue
+
+        size = path.stat().st_size
+        total_bytes += size
+        if total_bytes > 200 * 1024 * 1024:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Shipping labels archive too large")
+
+        base_name = _sanitize_filename(getattr(order, "shipping_label_filename", None) or path.name)
+        ref = getattr(order, "reference_code", None) or str(order.id)[:8]
+        zip_name = _sanitize_filename(f"{ref}-{base_name}" if base_name else str(ref))
+        files.append((order, path, zip_name))
+
+    if missing_labels:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"missing_shipping_label_order_ids": missing_labels},
+        )
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for _, path, zip_name in files:
+            zf.write(path, arcname=zip_name)
+    buf.seek(0)
+
+    actor = (getattr(admin, "email", None) or getattr(admin, "username", None) or "admin").strip()
+    note = f"{actor}: batch" if actor else "batch"
+    for order, _, _ in files:
+        session.add(OrderEvent(order_id=order.id, event="shipping_label_downloaded", note=note))
+    await session.commit()
+
+    def _iter_zip(file_obj: io.BytesIO, chunk_size: int = 1024 * 1024):
+        while True:
+            chunk = file_obj.read(chunk_size)
+            if not chunk:
+                break
+            yield chunk
+
+    headers = {
+        "Content-Disposition": 'attachment; filename="shipping-labels.zip"',
+        "Cache-Control": "no-store",
+    }
+    return StreamingResponse(_iter_zip(buf), media_type="application/zip", headers=headers)
+
+
+@router.get("/admin/{order_id}/receipt")
+async def admin_download_receipt_pdf(
+    order_id: UUID,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("orders")),
+):
+    step_up_service.require_step_up(request, admin)
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")

@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ContainerComponent } from '../../layout/container.component';
@@ -379,6 +379,8 @@ export class RegisterComponent implements OnInit, OnDestroy {
   private googleCompletionToken: string | null = null;
   private langSub?: Subscription;
 
+  @ViewChild(CaptchaTurnstileComponent) captcha: CaptchaTurnstileComponent | undefined;
+
   constructor(
     private toast: ToastService,
     private auth: AuthService,
@@ -390,6 +392,11 @@ export class RegisterComponent implements OnInit, OnDestroy {
     this.langSub = this.translate.onLangChange.subscribe((evt) => {
       this.countries = listPhoneCountries(evt.lang || 'en');
     });
+  }
+
+  private resetCaptcha(): void {
+    this.captchaToken = null;
+    this.captcha?.reset();
   }
 
   ngOnInit(): void {
@@ -516,12 +523,14 @@ export class RegisterComponent implements OnInit, OnDestroy {
     this.loading = true;
     const preferredLanguage = (this.translate.currentLang || '').startsWith('ro') ? 'ro' : 'en';
 
-    if (this.completionMode) {
-      if (!this.googleCompletionToken) {
-        this.loading = false;
-        this.toast.error(this.translate.instant('auth.googleError'));
-        return;
-      }
+	    if (this.completionMode) {
+	      if (!this.googleCompletionToken) {
+	        this.loading = false;
+	        const msg = this.translate.instant('auth.googleError');
+	        this.error = msg;
+	        this.toast.error(msg);
+	        return;
+	      }
 
       this.auth
         .completeGoogleRegistration(this.googleCompletionToken, {
@@ -550,14 +559,18 @@ export class RegisterComponent implements OnInit, OnDestroy {
             }
             this.toast.success(this.translate.instant('account.completeProfile.title'));
             void this.router.navigateByUrl('/account');
-          },
-          error: (err) => {
-            const message = err?.error?.detail || this.translate.instant('auth.errorRegister');
-            this.toast.error(message);
-          }
-        });
-      return;
-    }
+	          },
+	          error: (err) => {
+	            const detail = err?.error?.detail;
+	            const message = typeof detail === 'string' && detail.trim()
+	              ? detail
+	              : this.translate.instant('auth.errorRegister');
+	            this.error = message;
+	            this.toast.error(message);
+	          }
+	        });
+	      return;
+	    }
 
     this.auth
       .register({
@@ -581,14 +594,20 @@ export class RegisterComponent implements OnInit, OnDestroy {
         })
       )
       .subscribe({
-        next: (res) => {
-          this.toast.success(this.translate.instant('auth.successRegister'), `Welcome, ${res.user.email}`);
-          void this.router.navigateByUrl('/account');
-        },
-        error: (err) => {
-          const message = err?.error?.detail || this.translate.instant('auth.errorRegister');
-          this.toast.error(message);
-        }
-      });
-  }
+	        next: (res) => {
+	          this.error = '';
+	          this.toast.success(this.translate.instant('auth.successRegister'), `Welcome, ${res.user.email}`);
+	          void this.router.navigateByUrl('/account');
+	        },
+	        error: (err) => {
+	          const detail = err?.error?.detail;
+	          const message = typeof detail === 'string' && detail.trim()
+	            ? detail
+	            : this.translate.instant('auth.errorRegister');
+	          this.resetCaptcha();
+	          this.error = message;
+	          this.toast.error(message);
+	        }
+	      });
+	  }
 }
