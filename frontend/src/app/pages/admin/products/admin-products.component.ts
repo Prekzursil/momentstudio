@@ -74,6 +74,19 @@ type ProductWizardStep = {
   anchorId: string;
 };
 
+type TranslationDiffField = 'name' | 'short_description' | 'long_description';
+
+type TranslationDiffRow = {
+  field: TranslationDiffField;
+  labelKey: string;
+  roSnippet: string;
+  enSnippet: string;
+  roMissing: boolean;
+  enMissing: boolean;
+  statusKey: string;
+  tone: 'neutral' | 'warn' | 'error';
+};
+
 const PRODUCT_CREATE_WIZARD_STEPS: ProductWizardStep[] = [
   {
     id: 'basics',
@@ -2490,6 +2503,51 @@ type PriceHistoryChart = {
 	            >
 	              {{ translationError() }}
 	            </div>
+
+              <div class="grid gap-2 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                <div class="grid gap-1">
+                  <p class="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                    {{ 'adminUi.products.translations.diffTitle' | translate }}
+                  </p>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ 'adminUi.products.translations.diffHint' | translate }}
+                  </p>
+                </div>
+
+                <div class="mt-3 grid gap-2">
+                  <div
+                    class="grid grid-cols-[140px_1fr_1fr_120px] gap-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
+                  >
+                    <span>{{ 'adminUi.products.translations.diffHeaders.field' | translate }}</span>
+                    <span>RO</span>
+                    <span>EN</span>
+                    <span>{{ 'adminUi.products.translations.diffHeaders.status' | translate }}</span>
+                  </div>
+
+                  <div
+                    *ngFor="let row of translationDiffRows(); trackBy: trackByTranslationDiffRow"
+                    class="grid grid-cols-[140px_1fr_1fr_120px] items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-950/20"
+                  >
+                    <span class="text-xs font-semibold text-slate-700 dark:text-slate-200">{{ row.labelKey | translate }}</span>
+                    <span class="text-xs" [ngClass]="row.roMissing ? 'text-slate-400 dark:text-slate-400' : 'text-slate-700 dark:text-slate-200'">
+                      {{ row.roSnippet }}
+                    </span>
+                    <span class="text-xs" [ngClass]="row.enMissing ? 'text-slate-400 dark:text-slate-400' : 'text-slate-700 dark:text-slate-200'">
+                      {{ row.enSnippet }}
+                    </span>
+                    <span
+                      class="text-xs font-semibold"
+                      [ngClass]="{
+                        'text-rose-700 dark:text-rose-300': row.tone === 'error',
+                        'text-amber-700 dark:text-amber-300': row.tone === 'warn',
+                        'text-slate-500 dark:text-slate-300': row.tone === 'neutral'
+                      }"
+                    >
+                      {{ row.statusKey | translate }}
+                    </span>
+                  </div>
+                </div>
+              </div>
 
 	            <div class="grid gap-4 lg:grid-cols-2">
 	              <div class="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
@@ -5833,6 +5891,66 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
     this.stockAdjustReason = 'manual_correction';
     this.stockAdjustDelta = '';
     this.stockAdjustNote = '';
+  }
+
+  translationDiffRows(): TranslationDiffRow[] {
+    const fields: Array<{ field: TranslationDiffField; labelKey: string }> = [
+      { field: 'name', labelKey: 'adminUi.products.table.name' },
+      { field: 'short_description', labelKey: 'adminUi.products.form.shortDescription' },
+      { field: 'long_description', labelKey: 'adminUi.products.form.description' }
+    ];
+
+    return fields.map(({ field, labelKey }) => {
+      const roRaw = (this.translations.ro?.[field] ?? '').toString();
+      const enRaw = (this.translations.en?.[field] ?? '').toString();
+      const ro = roRaw.trim();
+      const en = enRaw.trim();
+      const roMissing = !ro;
+      const enMissing = !en;
+
+      let statusKey = 'adminUi.products.translations.diffStatus.different';
+      let tone: TranslationDiffRow['tone'] = 'neutral';
+
+      if (roMissing && enMissing) {
+        statusKey = 'adminUi.products.translations.diffStatus.missingBoth';
+        tone = 'error';
+      } else if (roMissing) {
+        statusKey = 'adminUi.products.translations.diffStatus.missingRo';
+        tone = 'error';
+      } else if (enMissing) {
+        statusKey = 'adminUi.products.translations.diffStatus.missingEn';
+        tone = 'error';
+      } else if (this.normalizeTranslationDiff(ro) === this.normalizeTranslationDiff(en)) {
+        statusKey = 'adminUi.products.translations.diffStatus.same';
+        tone = 'warn';
+      }
+
+      return {
+        field,
+        labelKey,
+        roSnippet: this.translationDiffSnippet(ro),
+        enSnippet: this.translationDiffSnippet(en),
+        roMissing,
+        enMissing,
+        statusKey,
+        tone
+      };
+    });
+  }
+
+  trackByTranslationDiffRow(_index: number, row: TranslationDiffRow): string {
+    return row.field;
+  }
+
+  private normalizeTranslationDiff(value: string): string {
+    return (value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  private translationDiffSnippet(value: string): string {
+    const normalized = this.normalizeTranslationDiff(value);
+    if (!normalized) return '—';
+    if (normalized.length <= 80) return normalized;
+    return `${normalized.slice(0, 77)}…`;
   }
 
   saveTranslation(lang: 'en' | 'ro'): void {

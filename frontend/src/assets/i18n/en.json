@@ -3785,6 +3785,19 @@
       "translations": {
         "title": "Translations",
         "hint": "Optional per-language overrides. If empty, the storefront falls back to the default fields.",
+        "diffTitle": "Diff view",
+        "diffHint": "Compare RO/EN fields at a glance and spot missing or identical text quickly.",
+        "diffHeaders": {
+          "field": "Field",
+          "status": "Status"
+        },
+        "diffStatus": {
+          "missingRo": "Missing RO",
+          "missingEn": "Missing EN",
+          "missingBoth": "Missing RO + EN",
+          "same": "Same",
+          "different": "Different"
+        },
         "filter": {
           "all": "All products",
           "missingAny": "Missing (any)",

@@ -3785,6 +3785,19 @@
       "translations": {
         "title": "Traduceri",
         "hint": "Suprascrieri opționale pe limbă. Dacă sunt goale, magazinul folosește câmpurile implicite.",
+        "diffTitle": "Diferențe",
+        "diffHint": "Compară rapid câmpurile RO/EN și găsește traducerile lipsă sau copiate identic.",
+        "diffHeaders": {
+          "field": "Câmp",
+          "status": "Status"
+        },
+        "diffStatus": {
+          "missingRo": "Lipsește RO",
+          "missingEn": "Lipsește EN",
+          "missingBoth": "Lipsește RO + EN",
+          "same": "La fel",
+          "different": "Diferit"
+        },
         "filter": {
           "all": "Toate produsele",
           "missingAny": "Lipsesc (oricare)",

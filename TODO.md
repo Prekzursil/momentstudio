@@ -69,7 +69,7 @@ Below is a structured checklist you can turn into issues.
 - [x] Admin Products: image upload queue – Support multi-upload with per-file progress and retry for failures.
 - [x] Admin Products: bulk alt/translation helper – Provide a bulk view for missing alt text/translations with quick edits.
 - [x] Admin Products: stricter sale price validation – Enforce sale <= base and show computed savings preview.
-- [ ] Admin Products: translation diff view – Show side-by-side RO/EN fields to spot missing/partial translations quickly.
+- [x] Admin Products: translation diff view – Show side-by-side RO/EN fields to spot missing/partial translations quickly.
 - [ ] Admin Inventory: bulk stock adjustments – Apply stock delta to selected products with required reason and audit note.
 - [ ] Admin Inventory: stock ledger export – Add CSV export for stock adjustments filtered by product/date/reason.
 - [ ] Admin Inventory: reserved stock drill-down – Show which carts/orders reserve stock for a product.
