@@ -1783,6 +1783,25 @@
       "actions": {
         "saving": "Saving…"
       },
+      "bulkAdjust": {
+        "selected": "{{count}} selected",
+        "clearSelection": "Clear selection",
+        "selectAll": "Select all items on this page",
+        "selectRow": "Select item",
+        "reason": "Reason",
+        "delta": "Stock delta",
+        "note": "Audit note (required)",
+        "apply": "Apply",
+        "applying": "Applying…",
+        "success": {
+          "applied": "Applied stock adjustment to {{count}} item(s)."
+        },
+        "errors": {
+          "deltaInvalid": "Enter a non-zero whole number.",
+          "noteRequired": "Add an audit note to explain the adjustment.",
+          "failed": "Some stock adjustments failed."
+        }
+      },
       "success": {
         "noteSaved": "Restock note saved"
       },

@@ -1783,6 +1783,25 @@
       "actions": {
         "saving": "Se salvează…"
       },
+      "bulkAdjust": {
+        "selected": "{{count}} selectate",
+        "clearSelection": "Golește selecția",
+        "selectAll": "Selectează toate elementele de pe această pagină",
+        "selectRow": "Selectează elementul",
+        "reason": "Motiv",
+        "delta": "Diferență stoc",
+        "note": "Notă audit (obligatorie)",
+        "apply": "Aplică",
+        "applying": "Se aplică…",
+        "success": {
+          "applied": "Ajustare de stoc aplicată pentru {{count}} element(e)."
+        },
+        "errors": {
+          "deltaInvalid": "Introdu un număr întreg diferit de 0.",
+          "noteRequired": "Adaugă o notă de audit pentru ajustare.",
+          "failed": "Unele ajustări de stoc au eșuat."
+        }
+      },
       "success": {
         "noteSaved": "Nota de reaprovizionare a fost salvată"
       },
