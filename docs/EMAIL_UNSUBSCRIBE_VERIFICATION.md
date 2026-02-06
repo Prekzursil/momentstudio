@@ -53,3 +53,7 @@ Expected result:
 If Outlook (or another client) refuses the HTTP URL method, consider adding an additional mailto value to `List-Unsubscribe` (RFC 2369 allows a comma-separated list), e.g.:
 
 `List-Unsubscribe: <https://…>, <mailto:unsubscribe@your-domain>`
+
+This project supports this via `LIST_UNSUBSCRIBE_MAILTO` (optional). When set, marketing emails will emit:
+
+`List-Unsubscribe: <https://…>, <mailto:...>`

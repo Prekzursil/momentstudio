@@ -143,8 +143,13 @@ def _marketing_unsubscribe_context(*, to_email: str) -> tuple[str, dict[str, str
     )
     unsubscribe_url = newsletter_tokens.build_frontend_unsubscribe_url(token=token)
     api_unsubscribe_url = newsletter_tokens.build_api_unsubscribe_url(token=token)
+    list_unsubscribe_values: list[str] = [f"<{api_unsubscribe_url}>"]
+    mailto = str(settings.list_unsubscribe_mailto or "").strip()
+    if mailto:
+        mailto_value = mailto if mailto.lower().startswith("mailto:") else f"mailto:{mailto}"
+        list_unsubscribe_values.append(f"<{mailto_value}>")
     headers = {
-        "List-Unsubscribe": f"<{api_unsubscribe_url}>",
+        "List-Unsubscribe": ", ".join(list_unsubscribe_values),
         "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
     }
     return unsubscribe_url, headers

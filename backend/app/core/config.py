@@ -118,6 +118,8 @@ class Settings(BaseSettings):
     smtp_enabled: bool = False
     smtp_use_tls: bool = False
     smtp_from_email: str | None = None
+    # Optional RFC 2369 mailto fallback for List-Unsubscribe header, e.g. "unsubscribe@momentstudio.ro"
+    list_unsubscribe_mailto: str | None = None
     email_rate_limit_per_minute: int = 60
     email_rate_limit_per_recipient_per_minute: int = 10
     auth_rate_limit_register: int = 10
