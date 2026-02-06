@@ -1650,13 +1650,25 @@ type PriceHistoryChart = {
                 (valueChange)="onSaleValueChange($event)"
 	                [disabled]="!form.sale_enabled"
 	                [hint]="saleValueError || ('adminUi.products.sale.note' | translate)"
-	              ></app-input>
-	            </div>
+		              ></app-input>
+		            </div>
 
-	            <div class="mt-3 grid gap-3 md:grid-cols-3 items-end">
-	              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	                {{ 'adminUi.products.sale.startAt' | translate }}
-	                <input
+                <div *ngIf="salePreviewInfo() as preview" class="mt-2 text-xs text-slate-600 dark:text-slate-300">
+                  {{
+                    'adminUi.products.sale.preview'
+                      | translate
+                        : {
+                            price: (preview.sale | localizedCurrency : editingCurrency()),
+                            saved: (preview.saved | localizedCurrency : editingCurrency()),
+                            percent: (preview.percent | number: '1.0-1')
+                          }
+                  }}
+                </div>
+
+		            <div class="mt-3 grid gap-3 md:grid-cols-3 items-end">
+		              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+		                {{ 'adminUi.products.sale.startAt' | translate }}
+		                <input
 	                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
 	                  type="datetime-local"
 	                  [(ngModel)]="form.sale_start_at"
@@ -5088,6 +5100,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
     if (value === null || value <= 0) return null;
 
     if (this.form.sale_type === 'amount') {
+      if (value > base) return null;
       const discounted = Math.max(0, Math.round((base - value) * 100) / 100);
       return discounted < base ? discounted : null;
     }
@@ -5097,11 +5110,25 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
     return discounted < base ? discounted : null;
   }
 
+  salePreviewInfo(): { sale: number; saved: number; percent: number } | null {
+    const sale = this.previewSalePrice();
+    if (sale === null) return null;
+    const base = this.previewBasePrice();
+    if (!(base > 0)) return null;
+    const saved = Math.round((base - sale) * 100) / 100;
+    if (!(saved > 0)) return null;
+    const percent = Math.round((saved / base) * 1000) / 10;
+    return { sale, saved, percent };
+  }
+
   onBasePriceChange(next: string | number): void {
     const raw = String(next ?? '');
     const { clean, changed } = this.sanitizeMoneyInput(raw);
     this.form.base_price = clean;
     this.basePriceError = changed ? this.t('adminUi.products.form.priceFormatHint') : '';
+    if (this.form.sale_enabled) {
+      this.onSaleValueChange(this.form.sale_value);
+    }
   }
 
   onSaleEnabledChange(): void {
@@ -5126,13 +5153,30 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       this.saleValueError = '';
       return;
     }
-    if (this.form.sale_type === 'percent' && clean) {
-      const parsed = Number(clean);
-      if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) {
+    if (!clean) {
+      this.saleValueError = '';
+      return;
+    }
+
+    const parsed = this.parseMoneyInput(clean);
+    if (parsed === null || parsed <= 0) {
+      this.saleValueError = this.t('adminUi.products.sale.positiveHint');
+      return;
+    }
+
+    if (this.form.sale_type === 'percent') {
+      if (parsed > 100) {
         this.saleValueError = this.t('adminUi.products.sale.percentHint');
         return;
       }
+    } else {
+      const base = this.parseMoneyInput(this.form.base_price);
+      if (base !== null && base > 0 && parsed > base) {
+        this.saleValueError = this.t('adminUi.products.sale.amountTooHighHint');
+        return;
+      }
     }
+
     this.saleValueError = changed ? this.t('adminUi.products.sale.valueHint') : '';
   }
 
@@ -5203,10 +5247,20 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
           opts?.done?.(false);
           return;
         }
+        if (amount <= 0) {
+          this.editorError.set(this.t('adminUi.products.sale.positiveHint'));
+          opts?.done?.(false);
+          return;
+        }
+        if (amount > basePrice) {
+          this.editorError.set(this.t('adminUi.products.sale.amountTooHighHint'));
+          opts?.done?.(false);
+          return;
+        }
         sale_value = amount;
       } else {
         const percent = this.parseMoneyInput(this.form.sale_value);
-        if (percent === null || percent < 0 || percent > 100) {
+        if (percent === null || percent <= 0 || percent > 100) {
           this.editorError.set(this.t('adminUi.products.sale.percentHint'));
           opts?.done?.(false);
           return;

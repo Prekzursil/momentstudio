@@ -3673,9 +3673,12 @@
         "endAt": "End at",
         "autoPublish": "Auto-publish when sale starts",
         "note": "Changing sale pricing forces the product back to Draft until republished.",
+        "preview": "Sale price: {{price}} · Save {{saved}} ({{percent}}%)",
         "startRequired": "Choose a sale start date when auto-publish is enabled.",
         "valueHint": "Use numbers and a dot with up to 2 decimals (example: 10.00).",
-        "percentHint": "Enter a percentage between 0 and 100."
+        "percentHint": "Enter a percentage between 0 and 100.",
+        "positiveHint": "Enter a discount greater than 0.",
+        "amountTooHighHint": "Discount cannot exceed the base price."
       },
       "bulk": {
         "selected": "{{count}} selected",

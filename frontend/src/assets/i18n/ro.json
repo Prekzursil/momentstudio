@@ -3673,9 +3673,12 @@
         "endAt": "Se termină la",
         "autoPublish": "Publică automat când începe reducerea",
         "note": "Modificarea reducerii mută produsul în Draft până la republicare.",
+        "preview": "Preț redus: {{price}} · Economisești {{saved}} ({{percent}}%)",
         "startRequired": "Alege o dată de început atunci când publicarea automată este activată.",
         "valueHint": "Folosește doar cifre și punct, cu maxim 2 zecimale (exemplu: 10.00).",
-        "percentHint": "Introdu un procent între 0 și 100."
+        "percentHint": "Introdu un procent între 0 și 100.",
+        "positiveHint": "Introdu o reducere mai mare decât 0.",
+        "amountTooHighHint": "Reducerea nu poate depăși prețul de bază."
       },
       "bulk": {
         "selected": "{{count}} selectate",
