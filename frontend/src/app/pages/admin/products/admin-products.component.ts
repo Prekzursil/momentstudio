@@ -55,6 +55,9 @@ import { AdminTableLayoutColumnDef, TableLayoutModalComponent } from '../shared/
 import { AdminPageHeaderComponent } from '../shared/admin-page-header.component';
 import { adminFilterFavoriteKey } from '../shared/admin-filter-favorites';
 import { AdminProductsBulkActionsComponent } from './admin-products-bulk-actions.component';
+import { AdminProductsEditorWizardComponent } from './admin-products-editor-wizard.component';
+import { AdminProductsImageManagerComponent } from './admin-products-image-manager.component';
+import { AdminProductsRelationshipsManagerComponent } from './admin-products-relationships-manager.component';
 
 type ProductStatusFilter = 'all' | 'draft' | 'published' | 'archived';
 type ProductTranslationFilter = 'all' | 'missing_any' | 'missing_en' | 'missing_ro';
@@ -238,10 +241,13 @@ type PriceHistoryChart = {
 	    ModalComponent,
 	    SkeletonComponent,
     LocalizedCurrencyPipe,
-    TableLayoutModalComponent,
-    AdminPageHeaderComponent,
-    AdminProductsBulkActionsComponent
-  ],
+	    TableLayoutModalComponent,
+	    AdminPageHeaderComponent,
+	    AdminProductsBulkActionsComponent,
+	    AdminProductsEditorWizardComponent,
+	    AdminProductsImageManagerComponent,
+	    AdminProductsRelationshipsManagerComponent
+	  ],
   template: `
       <div class="grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
@@ -1473,67 +1479,23 @@ type PriceHistoryChart = {
           {{ editorError() }}
         </div>
 
-        <div
+        <app-admin-products-editor-wizard
           *ngIf="wizardKind()"
-          class="rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900 dark:border-indigo-900/40 dark:bg-indigo-950/30 dark:text-indigo-100"
-        >
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div class="grid gap-1">
-              <p class="font-semibold">{{ wizardTitleKey() | translate }}</p>
-              <p class="text-xs text-indigo-800 dark:text-indigo-200">{{ wizardStepDescriptionKey() | translate }}</p>
-            </div>
-            <app-button size="sm" variant="ghost" [label]="'adminUi.actions.exit' | translate" (action)="exitWizard()"></app-button>
-          </div>
-
-          <div class="mt-3 flex flex-wrap items-center gap-2">
-            <button
-              *ngFor="let step of wizardSteps(); let idx = index"
-              type="button"
-              class="rounded-full border border-indigo-200 bg-white px-3 py-1 text-xs font-semibold text-indigo-900 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/10 dark:text-indigo-100 dark:hover:bg-indigo-900/30"
-              [class.bg-indigo-600]="idx === wizardStep()"
-              [class.text-white]="idx === wizardStep()"
-              [class.border-indigo-600]="idx === wizardStep()"
-              [class.hover:bg-indigo-700]="idx === wizardStep()"
-              [class.dark:bg-indigo-500/30]="idx === wizardStep()"
-              [class.dark:hover:bg-indigo-500/40]="idx === wizardStep()"
-              (click)="goToWizardStep(idx)"
-            >
-              {{ step.labelKey | translate }}
-            </button>
-          </div>
-
-          <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
-            <app-button
-              size="sm"
-              variant="ghost"
-              [label]="'adminUi.actions.back' | translate"
-              (action)="wizardPrev()"
-              [disabled]="wizardStep() === 0"
-            ></app-button>
-
-            <div class="flex flex-wrap items-center gap-2">
-              <app-button
-                *ngIf="wizardCurrentStepId() === 'save'"
-                size="sm"
-                [label]="'adminUi.products.form.save' | translate"
-                (action)="wizardSave()"
-              ></app-button>
-              <app-button
-                *ngIf="wizardCurrentStepId() === 'publish'"
-                size="sm"
-                [label]="'adminUi.products.wizard.publishNow' | translate"
-                (action)="wizardPublishNow()"
-                [disabled]="!editingSlug()"
-              ></app-button>
-              <app-button
-                size="sm"
-                [label]="wizardNextLabelKey() | translate"
-                (action)="wizardNext()"
-                [disabled]="!wizardCanNext()"
-              ></app-button>
-            </div>
-          </div>
-        </div>
+          [titleKey]="wizardTitleKey()"
+          [descriptionKey]="wizardStepDescriptionKey()"
+          [steps]="wizardSteps()"
+          [stepIndex]="wizardStep()"
+          [currentStepId]="wizardCurrentStepId()"
+          [nextLabelKey]="wizardNextLabelKey()"
+          [canNext]="wizardCanNext()"
+          [hasEditingSlug]="Boolean(editingSlug())"
+          (exit)="exitWizard()"
+          (stepSelected)="goToWizardStep($event)"
+          (prev)="wizardPrev()"
+          (next)="wizardNext()"
+          (save)="wizardSave()"
+          (publishNow)="wizardPublishNow()"
+        ></app-admin-products-editor-wizard>
 
 	        <div class="grid gap-3 md:grid-cols-2">
 	          <app-input
@@ -2085,185 +2047,23 @@ type PriceHistoryChart = {
             </div>
           </details>
 
-		        <details
-              data-ignore-dirty
-              class="group rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20"
-            >
-		          <summary class="flex items-start justify-between gap-4 cursor-pointer select-none [&::-webkit-details-marker]:hidden">
-                <div class="min-w-0 grid gap-1">
-                  <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
-                    {{ 'adminUi.products.relationships.title' | translate }}
-                  </h3>
-                  <p class="text-xs text-slate-500 dark:text-slate-400">
-                    {{ 'adminUi.products.relationships.hint' | translate }}
-                  </p>
-                </div>
-                <div class="flex items-center gap-2">
-                  <span
-                    *ngIf="relationshipsRelated().length + relationshipsUpsells().length"
-                    class="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
-                  >
-                    {{ relationshipsRelated().length + relationshipsUpsells().length }}
-                  </span>
-                  <span class="text-slate-500 transition-transform group-open:rotate-90 dark:text-slate-400">▸</span>
-                </div>
-              </summary>
-
-              <div class="mt-3 grid gap-3">
-
-              <div
-                *ngIf="!editingSlug()"
-                class="rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900 dark:border-indigo-900/40 dark:bg-indigo-950/30 dark:text-indigo-100"
-              >
-                {{ 'adminUi.products.relationships.saveFirst' | translate }}
-              </div>
-
-		          <div
-		            *ngIf="relationshipsError()"
-		            class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
-		          >
-		            {{ relationshipsError() }}
-		          </div>
-
-		          <div
-		            *ngIf="relationshipsMessage()"
-		            class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-100"
-		          >
-		            {{ relationshipsMessage() }}
-		          </div>
-
-              <div class="grid gap-2">
-                <app-input
-                  [label]="'adminUi.products.relationships.searchLabel' | translate"
-                  [value]="relationshipSearch"
-                  (valueChange)="onRelationshipSearchChange($event)"
-                  [disabled]="relationshipSearchLoading() || relationshipsLoading()"
-                ></app-input>
-
-                <div *ngIf="relationshipSearchLoading()" class="text-xs text-slate-500 dark:text-slate-400">
-                  {{ 'adminUi.products.relationships.searchLoading' | translate }}
-                </div>
-
-                <div
-                  *ngIf="relationshipSearchResults().length"
-                  class="rounded-lg border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-900"
-                >
-                  <div
-                    *ngFor="let p of relationshipSearchResults()"
-                    class="flex flex-wrap items-center justify-between gap-2 rounded-md px-2 py-2 hover:bg-slate-50 dark:hover:bg-slate-800"
-                  >
-                    <div class="min-w-0">
-                      <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">{{ p.name }}</p>
-                      <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ p.slug }} · {{ p.sku }}</p>
-                    </div>
-                    <div class="flex items-center gap-1">
-                      <app-button
-                        size="sm"
-                        variant="ghost"
-                        [label]="'adminUi.products.relationships.addRelated' | translate"
-                        (action)="addRelationship(p, 'related')"
-                        [disabled]="!editingSlug()"
-                      ></app-button>
-                      <app-button
-                        size="sm"
-                        variant="ghost"
-                        [label]="'adminUi.products.relationships.addUpsell' | translate"
-                        (action)="addRelationship(p, 'upsell')"
-                        [disabled]="!editingSlug()"
-                      ></app-button>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="grid gap-4 lg:grid-cols-2">
-                  <div class="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-                    <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                      {{ 'adminUi.products.relationships.related' | translate }}
-                    </p>
-                    <div *ngIf="relationshipsRelated().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
-                      {{ 'adminUi.products.relationships.empty' | translate }}
-                    </div>
-                    <div *ngFor="let p of relationshipsRelated(); let idx = index" class="flex items-center justify-between gap-2">
-                      <div class="min-w-0">
-                        <p class="text-sm font-semibold text-slate-900 dark:text-slate-50 truncate">{{ p.name }}</p>
-                        <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ p.slug }}</p>
-                      </div>
-                      <div class="flex items-center gap-1">
-                        <app-button
-                          size="sm"
-                          variant="ghost"
-                          [label]="'adminUi.actions.up' | translate"
-                          (action)="moveRelationship('related', idx, -1)"
-                          [disabled]="idx === 0 || relationshipsSaving()"
-                        ></app-button>
-                        <app-button
-                          size="sm"
-                          variant="ghost"
-                          [label]="'adminUi.actions.down' | translate"
-                          (action)="moveRelationship('related', idx, 1)"
-                          [disabled]="idx >= relationshipsRelated().length - 1 || relationshipsSaving()"
-                        ></app-button>
-                        <app-button
-                          size="sm"
-                          variant="ghost"
-                          [label]="'adminUi.actions.remove' | translate"
-                          (action)="removeRelationship(p.id, 'related')"
-                          [disabled]="relationshipsSaving()"
-                        ></app-button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-                    <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                      {{ 'adminUi.products.relationships.upsells' | translate }}
-                    </p>
-                    <div *ngIf="relationshipsUpsells().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
-                      {{ 'adminUi.products.relationships.empty' | translate }}
-                    </div>
-                    <div *ngFor="let p of relationshipsUpsells(); let idx = index" class="flex items-center justify-between gap-2">
-                      <div class="min-w-0">
-                        <p class="text-sm font-semibold text-slate-900 dark:text-slate-50 truncate">{{ p.name }}</p>
-                        <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ p.slug }}</p>
-                      </div>
-                      <div class="flex items-center gap-1">
-                        <app-button
-                          size="sm"
-                          variant="ghost"
-                          [label]="'adminUi.actions.up' | translate"
-                          (action)="moveRelationship('upsell', idx, -1)"
-                          [disabled]="idx === 0 || relationshipsSaving()"
-                        ></app-button>
-                        <app-button
-                          size="sm"
-                          variant="ghost"
-                          [label]="'adminUi.actions.down' | translate"
-                          (action)="moveRelationship('upsell', idx, 1)"
-                          [disabled]="idx >= relationshipsUpsells().length - 1 || relationshipsSaving()"
-                        ></app-button>
-                        <app-button
-                          size="sm"
-                          variant="ghost"
-                          [label]="'adminUi.actions.remove' | translate"
-                          (action)="removeRelationship(p.id, 'upsell')"
-                          [disabled]="relationshipsSaving()"
-                        ></app-button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="flex items-center justify-end">
-                  <app-button
-                    size="sm"
-                    [label]="'adminUi.products.relationships.save' | translate"
-                    (action)="saveRelationships()"
-                    [disabled]="relationshipsSaving() || !editingSlug()"
-                  ></app-button>
-	                </div>
-	              </div>
-              </div>
-			        </details>
+		        <app-admin-products-relationships-manager
+		          [hasEditingSlug]="!!editingSlug()"
+		          [relationshipSearch]="relationshipSearch"
+		          [relationshipSearchLoading]="relationshipSearchLoading()"
+		          [relationshipSearchResults]="relationshipSearchResults()"
+		          [relationshipsRelated]="relationshipsRelated()"
+		          [relationshipsUpsells]="relationshipsUpsells()"
+		          [relationshipsLoading]="relationshipsLoading()"
+		          [relationshipsSaving]="relationshipsSaving()"
+		          [relationshipsError]="relationshipsError()"
+		          [relationshipsMessage]="relationshipsMessage()"
+		          (relationshipSearchChanged)="onRelationshipSearchChange($event)"
+		          (addRequested)="addRelationship($event.item, $event.kind)"
+		          (moveRequested)="moveRelationship($event.kind, $event.index, $event.direction)"
+		          (removeRequested)="removeRelationship($event.id, $event.kind)"
+		          (saveRequested)="saveRelationships()"
+		        ></app-admin-products-relationships-manager>
 
 			        <details class="group rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
 			          <summary class="flex items-start justify-between gap-4 cursor-pointer select-none [&::-webkit-details-marker]:hidden">
@@ -2967,190 +2767,31 @@ type PriceHistoryChart = {
               </div>
 		        </div>
 
-	        <div id="product-wizard-images" data-ignore-dirty class="grid gap-3">
-	          <div class="flex items-center justify-between">
-	            <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{{ 'adminUi.products.form.images' | translate }}</p>
-	            <div class="flex flex-wrap items-center gap-2">
-	              <app-button
-	                size="sm"
-	                variant="ghost"
-	                [label]="
-	                  deletedImagesOpen()
-	                    ? ('adminUi.products.form.hideDeletedImages' | translate)
-	                    : ('adminUi.products.form.showDeletedImages' | translate)
-	                "
-	                (action)="toggleDeletedImages()"
-	                [disabled]="deletedImagesBusy() || !editingSlug()"
-	              ></app-button>
-	              <label class="text-sm text-slate-700 dark:text-slate-200">
-	                {{ 'adminUi.products.form.upload' | translate }}
-	                <input type="file" accept="image/*" class="block mt-1" (change)="onUpload($event)" />
-	              </label>
-	            </div>
-	          </div>
-
-          <div *ngIf="images().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
-            {{ 'adminUi.products.form.noImages' | translate }}
-          </div>
-
-			          <div *ngIf="images().length > 0" class="grid gap-2">
-			            <div *ngFor="let img of images(); let idx = index" class="rounded-lg border border-slate-200 dark:border-slate-700">
-			              <div class="flex items-center gap-3 p-2">
-			                <img [src]="img.url" [alt]="img.alt_text || 'image'" class="h-12 w-12 rounded object-cover" />
-		                <div class="flex-1 min-w-0">
-		                  <div class="flex flex-wrap items-center gap-2">
-		                    <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">{{ img.alt_text || ('adminUi.products.form.image' | translate) }}</p>
-		                    <span
-		                      *ngIf="idx === 0"
-		                      class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200"
-		                    >
-		                      {{ 'adminUi.storefront.products.images.primaryBadge' | translate }}
-		                    </span>
-		                  </div>
-		                  <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ img.url }}</p>
-		                </div>
-		                <div class="flex items-center gap-1">
-		                  <app-button
-		                    *ngIf="idx > 0"
-		                    size="sm"
-		                    variant="ghost"
-		                    [label]="'adminUi.storefront.products.images.makePrimary' | translate"
-		                    [disabled]="imageOrderBusy() || imageMetaBusy() || deleteImageConfirmBusy()"
-		                    (action)="makeImagePrimary(img.id)"
-		                  ></app-button>
-		                  <app-button
-		                    size="sm"
-		                    variant="ghost"
-		                    [label]="'adminUi.actions.edit' | translate"
-	                    (action)="toggleImageMeta(img.id)"
-	                  ></app-button>
-	                  <app-button
-                      size="sm"
-                      variant="ghost"
-                      [label]="'adminUi.actions.delete' | translate"
-                      (action)="openDeleteImageConfirm(img.id)"
-		                    ></app-button>
-		                </div>
-			              </div>
-
-	              <div *ngIf="editingImageId() === img.id" class="grid gap-4 border-t border-slate-200 p-3 dark:border-slate-700">
-	                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-	                  <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{{ 'adminUi.products.form.imageMeta' | translate }}</p>
-	                  <div class="flex flex-wrap items-center gap-2">
-	                    <app-button
-	                      size="sm"
-	                      variant="ghost"
-	                      [label]="'adminUi.products.form.imageReprocess' | translate"
-	                      (action)="reprocessImage()"
-	                      [disabled]="imageMetaBusy()"
-	                    ></app-button>
-	                    <app-button size="sm" variant="ghost" [label]="'adminUi.actions.save' | translate" (action)="saveImageMeta()" [disabled]="imageMetaBusy()"></app-button>
-			          </div>
-
-                <p *ngIf="imageOrderError()" class="text-sm text-rose-700 dark:text-rose-300">{{ imageOrderError() }}</p>
-	                </div>
-
-	                <p *ngIf="imageMetaError()" class="text-sm text-rose-700 dark:text-rose-300">{{ imageMetaError() }}</p>
-
-	                <div *ngIf="imageStats" class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
-	                  <p>
-	                    {{ 'adminUi.products.form.imageSize' | translate }}:
-	                    <span class="font-semibold">{{ formatBytes(imageStats.original_bytes) }}</span>
-	                    <span *ngIf="imageStats.width && imageStats.height" class="text-slate-500 dark:text-slate-400">
-	                      · {{ imageStats.width }}×{{ imageStats.height }}
-	                    </span>
-	                  </p>
-	                  <p class="text-xs text-slate-500 dark:text-slate-400">
-	                    {{ 'adminUi.products.form.imageThumbs' | translate }}:
-	                    sm {{ formatBytes(imageStats.thumb_sm_bytes) }},
-	                    md {{ formatBytes(imageStats.thumb_md_bytes) }},
-	                    lg {{ formatBytes(imageStats.thumb_lg_bytes) }}
-	                  </p>
-	                </div>
-
-	                <div class="grid gap-3 lg:grid-cols-2">
-	                  <div class="grid gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
-	                    <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">RO</p>
-	                    <app-input [label]="'adminUi.products.form.imageAltText' | translate" [(value)]="imageMeta.ro.alt_text"></app-input>
-	                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	                      {{ 'adminUi.products.form.imageCaption' | translate }}
-	                      <textarea
-	                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-	                        rows="2"
-	                        [(ngModel)]="imageMeta.ro.caption"
-	                      ></textarea>
-	                    </label>
-	                  </div>
-
-	                  <div class="grid gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
-	                    <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">EN</p>
-	                    <app-input [label]="'adminUi.products.form.imageAltText' | translate" [(value)]="imageMeta.en.alt_text"></app-input>
-	                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	                      {{ 'adminUi.products.form.imageCaption' | translate }}
-	                      <textarea
-	                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-	                        rows="2"
-	                        [(ngModel)]="imageMeta.en.caption"
-	                      ></textarea>
-	                    </label>
-		              </div>
-		            </div>
-		          </div>
-
-	          <div
-	            *ngIf="deletedImagesOpen()"
-	            class="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950/20"
-	          >
-	            <div class="flex items-center justify-between gap-3">
-	              <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
-	                {{ 'adminUi.products.form.deletedImages' | translate }}
-	              </p>
-	              <span class="text-xs text-slate-500 dark:text-slate-400">
-	                {{ deletedImages().length }}
-	              </span>
-	            </div>
-
-	            <div *ngIf="deletedImagesBusy()" class="text-sm text-slate-600 dark:text-slate-300">
-	              {{ 'adminUi.actions.loading' | translate }}
-	            </div>
-
-	            <div
-	              *ngIf="deletedImagesError()"
-	              class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
-	            >
-	              {{ deletedImagesError() }}
-	            </div>
-
-	            <div *ngIf="!deletedImagesBusy() && deletedImages().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
-	              {{ 'adminUi.products.form.noDeletedImages' | translate }}
-	            </div>
-
-	            <div *ngIf="!deletedImagesBusy() && deletedImages().length > 0" class="grid gap-2">
-	              <div
-	                *ngFor="let img of deletedImages()"
-	                class="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-900"
-	              >
-	                <img [src]="img.url" [alt]="img.alt_text || 'image'" class="h-12 w-12 rounded object-cover" />
-	                <div class="flex-1 min-w-0">
-	                  <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">
-	                    {{ img.alt_text || ('adminUi.products.form.image' | translate) }}
-	                  </p>
-	                  <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ img.url }}</p>
-	                  <p *ngIf="img.deleted_at" class="text-xs text-slate-500 dark:text-slate-400">
-	                    {{ 'adminUi.products.form.deletedAt' | translate }}: {{ img.deleted_at | date: 'short' }}
-	                  </p>
-	                </div>
-	                <app-button
-	                  size="sm"
-	                  variant="ghost"
-	                  [label]="'adminUi.actions.restore' | translate"
-	                  (action)="restoreDeletedImage(img.id)"
-	                  [disabled]="restoringDeletedImage() === img.id"
-	                ></app-button>
-	              </div>
-	            </div>
-	          </div>
-	        </div>
+	        <app-admin-products-image-manager
+	          [hasEditingSlug]="!!editingSlug()"
+	          [images]="images"
+	          [editingImageId]="editingImageId"
+	          [imageOrderBusy]="imageOrderBusy"
+	          [imageOrderError]="imageOrderError"
+	          [imageMetaBusy]="imageMetaBusy"
+	          [imageMetaError]="imageMetaError"
+	          [deleteImageConfirmBusy]="deleteImageConfirmBusy"
+	          [deletedImagesOpen]="deletedImagesOpen"
+	          [deletedImagesBusy]="deletedImagesBusy"
+	          [deletedImagesError]="deletedImagesError"
+	          [deletedImages]="deletedImages"
+	          [restoringDeletedImage]="restoringDeletedImage"
+	          [imageMeta]="imageMeta"
+	          [imageStats]="imageStats"
+	          (toggleDeletedImagesRequested)="toggleDeletedImages()"
+	          (uploadRequested)="onUpload($event)"
+	          (makePrimaryRequested)="makeImagePrimary($event)"
+	          (toggleMetaRequested)="toggleImageMeta($event)"
+	          (deleteRequested)="openDeleteImageConfirm($event)"
+	          (reprocessRequested)="reprocessImage()"
+	          (saveMetaRequested)="saveImageMeta()"
+	          (restoreRequested)="restoreDeletedImage($event)"
+	        ></app-admin-products-image-manager>
 	          </div>
 	        </div>
 	      </section>
