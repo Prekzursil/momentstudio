@@ -87,6 +87,7 @@ Below is a structured checklist you can turn into issues.
   - Gmail: verify “Unsubscribe” UI triggers a POST to the `List-Unsubscribe` URL and immediately unsubscribes.
   - Outlook: verify both `List-Unsubscribe` and the in-body footer link work.
   - Confirm the backend receives `POST /api/v1/newsletter/unsubscribe?token=...` and returns `200` (HTML for browsers).
+  - If Outlook refuses the HTTP method, set `LIST_UNSUBSCRIBE_MAILTO` to add a mailto fallback (see `docs/EMAIL_UNSUBSCRIBE_VERIFICATION.md`).
 - [x] Docs: add Google OAuth setup guide (origins, redirect URIs, backend env, dev/prod examples).
 - [x] Docs: document when/why dev uses `4201` (port bump + Docker stack) and related CORS/proxy expectations.
 - [x] Scale: use Redis-backed rate limiting for multi-replica deployments (auth limits, analytics ingestion; optional via `REDIS_URL`).
