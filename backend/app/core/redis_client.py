@@ -2,30 +2,37 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-try:
-    from redis.asyncio import Redis  # type: ignore[import-not-found]
-except Exception:  # pragma: no cover
-    Redis = None  # type: ignore[assignment]
+if TYPE_CHECKING:
+    from redis.asyncio import Redis as RedisClient
 
-_client: "Redis | None" = None
+_client: "RedisClient | None" = None
 
 
-def get_redis() -> "Redis | None":
+def _resolve_redis_class() -> type["RedisClient"] | None:
+    try:
+        from redis.asyncio import Redis  # type: ignore[import-not-found]
+    except Exception:  # pragma: no cover
+        return None
+    return Redis
+
+
+def get_redis() -> "RedisClient | None":
     """Return a shared Redis client when REDIS_URL is configured."""
     global _client
-    if Redis is None:
-        return None
     url = (getattr(settings, "redis_url", None) or "").strip()
     if not url:
         return None
+    redis_class = _resolve_redis_class()
+    if redis_class is None:
+        return None
     if _client is None:
-        _client = Redis.from_url(url, encoding="utf-8", decode_responses=True)
+        _client = redis_class.from_url(url, encoding="utf-8", decode_responses=True)
     return _client
 
 
@@ -47,4 +54,3 @@ def json_dumps(value: Any) -> str:
 
 def json_loads(raw: str) -> Any:
     return json.loads(raw)
-
