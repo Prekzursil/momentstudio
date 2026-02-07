@@ -6,6 +6,7 @@ from decimal import Decimal
 from email.message import EmailMessage
 from pathlib import Path
 from typing import Sequence
+from urllib.parse import urlencode
 
 import anyio
 
@@ -720,10 +721,25 @@ async def send_password_reset(to_email: str, token: str, lang: str | None = None
     return await send_email(to_email, subject, text_body, html_body)
 
 
-async def send_verification_email(to_email: str, token: str, lang: str | None = None) -> bool:
+async def send_verification_email(to_email: str, token: str, lang: str | None = None, kind: str = "primary") -> bool:
     subject = _bilingual_subject("Verifică-ți emailul", "Verify your email", preferred_language=lang)
-    text_ro = f"Folosește acest cod pentru a verifica emailul: {token}"
-    text_en = f"Use this token to verify your email: {token}"
+    kind_norm = (kind or "primary").strip().lower()
+    params: dict[str, str] = {"token": token}
+    if kind_norm and kind_norm != "primary":
+        params["kind"] = kind_norm
+    if kind_norm == "guest":
+        params["email"] = to_email
+        params["next"] = "/checkout"
+    verify_url = f"{settings.frontend_origin.rstrip('/')}/verify-email?{urlencode(params)}"
+
+    text_ro = (
+        f"Apasă pe acest link pentru a verifica emailul: {verify_url}\n\n"
+        f"Sau folosește acest cod: {token}"
+    )
+    text_en = (
+        f"Click this link to verify your email: {verify_url}\n\n"
+        f"Or use this token: {token}"
+    )
     text_body, html_body = _bilingual_sections(
         text_ro=text_ro,
         text_en=text_en,

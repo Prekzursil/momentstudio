@@ -419,8 +419,9 @@ def test_secondary_emails_flow(monkeypatch: pytest.MonkeyPatch, test_app: Dict[s
 
     sent: dict[str, str] = {}
 
-    async def fake_send(email: str, token: str, lang: str | None = None):
+    async def fake_send(email: str, token: str, lang: str | None = None, kind: str = "primary"):
         _ = lang
+        _ = kind
         sent[email] = token
         return True
 
@@ -493,8 +494,9 @@ def test_primary_email_verification_strips_whitespace(monkeypatch: pytest.Monkey
 
     sent: dict[str, str] = {}
 
-    async def fake_send(email: str, token: str, lang: str | None = None):
+    async def fake_send(email: str, token: str, lang: str | None = None, kind: str = "primary"):
         _ = lang
+        _ = kind
         sent[email] = token
         return True
 

@@ -102,6 +102,24 @@ google_rate_limit = per_identifier_limiter(
     key="auth:google",
 )
 
+
+def _user_or_ip_identifier(request: Request) -> str:
+    auth_header = request.headers.get("authorization") or ""
+    if auth_header.lower().startswith("bearer "):
+        token = auth_header.split(" ", 1)[1]
+        decoded = decode_token(token)
+        if decoded and decoded.get("sub"):
+            return f"user:{decoded['sub']}"
+    return f"ip:{request.client.host if request.client else 'anon'}"
+
+
+verify_request_rate_limit = per_identifier_limiter(
+    _user_or_ip_identifier,
+    settings.auth_rate_limit_verify_request,
+    60,
+    key="auth:verify_request",
+)
+
 _REQUIRED_REGISTRATION_CONSENT_KEYS = ("page.terms-and-conditions", "page.privacy-policy")
 
 
@@ -1178,6 +1196,7 @@ async def change_password(
 @router.post("/verify/request", status_code=status.HTTP_202_ACCEPTED)
 async def request_email_verification(
     background_tasks: BackgroundTasks,
+    _: None = Depends(verify_request_rate_limit),
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
@@ -1467,7 +1486,7 @@ async def add_my_secondary_email(
     session: AsyncSession = Depends(get_session),
 ) -> SecondaryEmailResponse:
     secondary, token = await auth_service.add_secondary_email(session, current_user, str(payload.email))
-    background_tasks.add_task(email_service.send_verification_email, secondary.email, token.token, current_user.preferred_language)
+    background_tasks.add_task(email_service.send_verification_email, secondary.email, token.token, current_user.preferred_language, "secondary")
     return SecondaryEmailResponse.model_validate(secondary)
 
 
@@ -1485,7 +1504,7 @@ async def request_secondary_email_verification(
     token = await auth_service.request_secondary_email_verification(session, current_user, secondary_email_id)
     secondary = await session.get(UserSecondaryEmail, secondary_email_id)
     if secondary:
-        background_tasks.add_task(email_service.send_verification_email, secondary.email, token.token, current_user.preferred_language)
+        background_tasks.add_task(email_service.send_verification_email, secondary.email, token.token, current_user.preferred_language, "secondary")
     return {"detail": "Verification email sent"}
 
 

@@ -8,6 +8,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.rate_limit import per_identifier_limiter
 from app.core.dependencies import require_admin_section
 from app.db.session import get_session
 from app.models.user import User
@@ -28,12 +29,20 @@ router = APIRouter(prefix="/newsletter", tags=["newsletter"])
 
 _CONFIRM_RESEND_COOLDOWN = timedelta(minutes=2)
 
+newsletter_subscribe_rate_limit = per_identifier_limiter(
+    lambda r: r.client.host if r.client else "anon",
+    settings.newsletter_rate_limit_subscribe,
+    60 * 10,
+    key="newsletter:subscribe",
+)
+
 
 @router.post("/subscribe", response_model=NewsletterSubscribeResponse)
 async def subscribe_newsletter(
     payload: NewsletterSubscribeRequest,
     request: Request,
     background_tasks: BackgroundTasks,
+    _: None = Depends(newsletter_subscribe_rate_limit),
     session: AsyncSession = Depends(get_session),
 ) -> NewsletterSubscribeResponse:
     await captcha_service.verify(payload.captcha_token, remote_ip=request.client.host if request.client else None)

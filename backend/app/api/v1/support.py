@@ -6,6 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, R
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.rate_limit import per_identifier_limiter
 from app.core.dependencies import (
     get_current_user,
     get_current_user_optional,
@@ -45,6 +46,13 @@ from app.services import support as support_service
 from app.services import pii as pii_service
 
 router = APIRouter(prefix="/support", tags=["support"])
+
+contact_rate_limit = per_identifier_limiter(
+    lambda r: r.client.host if r.client else "anon",
+    settings.support_rate_limit_contact,
+    60 * 10,
+    key="support:contact",
+)
 
 
 def _submission_to_ticket(submission, *, include_thread: bool) -> TicketRead:
@@ -107,6 +115,7 @@ async def submit_contact(
     payload: ContactSubmissionCreate,
     background_tasks: BackgroundTasks,
     request: Request,
+    _: None = Depends(contact_rate_limit),
     session: AsyncSession = Depends(get_session),
     current_user: User | None = Depends(get_current_user_optional),
 ) -> ContactSubmissionRead:

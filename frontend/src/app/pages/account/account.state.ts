@@ -109,7 +109,6 @@ export class AccountState implements OnInit, OnDestroy {
   avatar: string | null = null;
   avatarBusy = false;
   placeholderAvatar = 'assets/placeholder/avatar-placeholder.svg';
-  verificationToken = '';
   verificationStatus: string | null = null;
   primaryVerificationResendUntil = signal<number | null>(null);
 
@@ -1251,41 +1250,6 @@ export class AccountState implements OnInit, OnDestroy {
       },
       error: () => this.toast.error(this.t('account.verification.sendError'))
     });
-  }
-
-  submitVerification(): void {
-    const token = this.normalizeToken(this.verificationToken);
-    if (!token) {
-      this.verificationStatus = this.t('account.verification.tokenRequired');
-      return;
-    }
-    this.auth.confirmEmailVerification(token).subscribe({
-      next: (res) => {
-        this.emailVerified.set(res.email_verified);
-        this.verificationStatus = this.t('account.verification.verifiedStatus');
-        this.toast.success(this.t('account.verification.verifiedToast'));
-        this.verificationToken = '';
-        this.auth.loadCurrentUser().subscribe({
-          next: (user) => {
-            this.profile.set(user);
-            this.emailVerified.set(Boolean(user.email_verified));
-          }
-        });
-      },
-      error: () => {
-        this.verificationStatus = this.t('account.verification.invalidTokenStatus');
-        this.toast.error(this.t('account.verification.invalidTokenToast'));
-      }
-    });
-  }
-
-  private normalizeToken(raw: string): string {
-    const value = String(raw || '').trim();
-    if (!value) return '';
-    return value.replace(
-      /(?:\s|\u200B|\u200C|\u200D|\uFEFF|\u2060|\u00AD|\u200E|\u200F)+/g,
-      ''
-    );
   }
 
   onAvatarChange(event: Event): void {

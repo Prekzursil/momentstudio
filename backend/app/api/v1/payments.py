@@ -11,6 +11,8 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
 from app.core.dependencies import get_current_user_optional
+from app.core.rate_limit import per_identifier_limiter
+from app.core.security import decode_token
 from app.db.session import get_session
 from app.models.cart import Cart
 from app.models.order import Order, OrderItem, OrderStatus, OrderEvent
@@ -30,6 +32,27 @@ from app.schemas.payment_capabilities import PaymentsCapabilitiesResponse, Payme
 from app.services.payment_provider import is_mock_payments
 
 router = APIRouter(prefix="/payments", tags=["payments"])
+
+
+def _user_or_session_or_ip_identifier(request: Request) -> str:
+    auth_header = request.headers.get("authorization") or ""
+    if auth_header.lower().startswith("bearer "):
+        token = auth_header.split(" ", 1)[1]
+        decoded = decode_token(token)
+        if decoded and decoded.get("sub"):
+            return f"user:{decoded['sub']}"
+    session_id = (request.headers.get("X-Session-Id") or "").strip()
+    if session_id:
+        return f"sid:{session_id}"
+    return f"ip:{request.client.host if request.client else 'anon'}"
+
+
+payment_intent_rate_limit = per_identifier_limiter(
+    _user_or_session_or_ip_identifier,
+    settings.payments_rate_limit_intent,
+    60,
+    key="payments:intent",
+)
 
 
 def _account_orders_url(order: Order) -> str:
@@ -86,6 +109,7 @@ async def payment_capabilities() -> PaymentsCapabilitiesResponse:
 
 @router.post("/intent", status_code=status.HTTP_200_OK)
 async def create_payment_intent(
+    _: None = Depends(payment_intent_rate_limit),
     session: AsyncSession = Depends(get_session),
     current_user=Depends(get_current_user_optional),
     session_id: str | None = Depends(cart_api.session_header),

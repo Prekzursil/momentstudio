@@ -14,6 +14,11 @@ Below is a structured checklist you can turn into issues.
 - [x] Frontend: include missing `favicon.ico` so production matches local dev.
 - [x] Inventory: confirm desired stock behavior on cancellations vs refunds/returns; implement physical stock adjustments if needed.
 - [x] Payments: surface backend payment capability “reason” in checkout UI when a method is disabled.
+- [x] Consent UX: prevent early “Accept” click in scroll-to-accept modals (disable until bottom; handle dynamic content/layout).
+- [x] Auth UX: replace manual email verification code entry with clickable verification links (primary + secondary + guest checkout).
+- [x] Security: add app-level rate limits for checkout/payment intent/support/newsletter/verification resend endpoints.
+- [ ] Edge security: enforce rate limits at CDN/WAF/proxy for checkout + verification endpoints and configure trusted proxy headers for real client IPs.
+- [ ] Auth UX: support optional `next=` redirect in verification emails (return user to checkout/account after confirming).
 - [ ] Dev safety: prevent accidental use of production `DATABASE_URL` when `ENVIRONMENT=local` (configurable allowlist/opt-out).
 - [ ] Payments UX: return payment capability `reason_code` values so checkout can localize disabled-method messages (keep `reason` as fallback).
 - [x] Admin Orders: prevent 400s on status/tracking updates (guide allowed transitions + clearer errors).

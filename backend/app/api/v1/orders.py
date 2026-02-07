@@ -25,7 +25,8 @@ from app.core.dependencies import (
     require_verified_email,
 )
 from app.core.config import settings
-from app.core.security import create_receipt_token, decode_receipt_token
+from app.core.security import create_receipt_token, decode_receipt_token, decode_token
+from app.core.rate_limit import per_identifier_limiter
 from app.db.session import get_session
 from app.models.address import Address
 from app.models.cart import Cart
@@ -78,6 +79,39 @@ from app.services import payments
 from app.services import netopia as netopia_service
 from app.services import paypal as paypal_service
 from app.services import address as address_service
+
+
+def _user_or_session_or_ip_identifier(request: Request) -> str:
+    auth_header = request.headers.get("authorization") or ""
+    if auth_header.lower().startswith("bearer "):
+        token = auth_header.split(" ", 1)[1]
+        decoded = decode_token(token)
+        if decoded and decoded.get("sub"):
+            return f"user:{decoded['sub']}"
+    session_id = (request.headers.get("X-Session-Id") or "").strip()
+    if session_id:
+        return f"sid:{session_id}"
+    return f"ip:{request.client.host if request.client else 'anon'}"
+
+
+checkout_rate_limit = per_identifier_limiter(
+    _user_or_session_or_ip_identifier,
+    settings.orders_rate_limit_checkout,
+    60 * 10,
+    key="orders:checkout",
+)
+guest_checkout_rate_limit = per_identifier_limiter(
+    _user_or_session_or_ip_identifier,
+    settings.orders_rate_limit_guest_checkout,
+    60 * 10,
+    key="orders:guest_checkout",
+)
+guest_email_request_rate_limit = per_identifier_limiter(
+    _user_or_session_or_ip_identifier,
+    settings.orders_rate_limit_guest_email_request,
+    60 * 10,
+    key="orders:guest_email_request",
+)
 from app.api.v1 import cart as cart_api
 from app.schemas.order_admin import (
     AdminOrderListItem,
@@ -465,6 +499,7 @@ async def checkout(
     request: Request,
     response: Response,
     background_tasks: BackgroundTasks,
+    _: None = Depends(checkout_rate_limit),
     session: AsyncSession = Depends(get_session),
     current_user=Depends(require_verified_email),
     session_id: str | None = Depends(cart_api.session_header),
@@ -1695,6 +1730,7 @@ async def admin_list_order_email_events(
 async def request_guest_email_verification(
     payload: GuestEmailVerificationRequest,
     background_tasks: BackgroundTasks,
+    _: None = Depends(guest_email_request_rate_limit),
     session: AsyncSession = Depends(get_session),
     session_id: str | None = Depends(cart_api.session_header),
     lang: str | None = Query(default=None, pattern="^(en|ro)$"),
@@ -1722,7 +1758,7 @@ async def request_guest_email_verification(
     session.add(cart)
     await session.commit()
 
-    background_tasks.add_task(email_service.send_verification_email, email, token, lang)
+    background_tasks.add_task(email_service.send_verification_email, email, token, lang, "guest")
     return GuestEmailVerificationRequestResponse(sent=True)
 
 
@@ -1788,6 +1824,7 @@ async def guest_checkout(
     request: Request,
     response: Response,
     background_tasks: BackgroundTasks,
+    _: None = Depends(guest_checkout_rate_limit),
     session: AsyncSession = Depends(get_session),
     session_id: str | None = Depends(cart_api.session_header),
 ):

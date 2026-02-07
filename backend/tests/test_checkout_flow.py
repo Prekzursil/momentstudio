@@ -205,7 +205,7 @@ def test_guest_checkout_email_verification_and_create_account(
         captured["admin_customer_email"] = customer_email
         return True
 
-    async def fake_send_verification_email(to_email, token, lang=None):
+    async def fake_send_verification_email(to_email, token, lang=None, kind="primary"):
         captured["verification_to"] = to_email
         captured["verification_token"] = token
         return True
@@ -360,7 +360,7 @@ def test_guest_checkout_email_verification_rate_limited(
     )
     assert add.status_code in (200, 201), add.text
 
-    async def fake_send_verification_email(to_email, token, lang=None):
+    async def fake_send_verification_email(to_email, token, lang=None, kind="primary"):
         return True
 
     monkeypatch.setattr(email_service, "send_verification_email", fake_send_verification_email)

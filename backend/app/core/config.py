@@ -140,6 +140,16 @@ class Settings(BaseSettings):
     auth_rate_limit_reset_request: int = 30
     auth_rate_limit_reset_confirm: int = 60
     auth_rate_limit_google: int = 20
+    auth_rate_limit_verify_request: int = 10
+
+    # Anti-abuse limits for checkout and email-trigger endpoints.
+    # These are best-effort app-level controls; production deployments should also enforce limits at the edge (CDN/WAF/proxy).
+    orders_rate_limit_checkout: int = 50
+    orders_rate_limit_guest_checkout: int = 50
+    orders_rate_limit_guest_email_request: int = 20
+    payments_rate_limit_intent: int = 120
+    support_rate_limit_contact: int = 20
+    newsletter_rate_limit_subscribe: int = 30
 
     frontend_origin: str = "http://localhost:4200"
     content_preview_token: str = "preview-token"

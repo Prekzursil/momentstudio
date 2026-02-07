@@ -76,17 +76,7 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
                     (action)="resendVerification()"
                   ></app-button>
                 </div>
-                <form class="flex gap-2 items-center" (ngSubmit)="submitVerification()">
-                  <input
-                    [(ngModel)]="verificationToken"
-                    name="verificationToken"
-                    type="text"
-                    [placeholder]="'auth.emailVerificationTokenPlaceholder' | translate"
-                    class="border border-amber-300 bg-white rounded-lg px-3 py-2 text-sm flex-1 text-slate-900 dark:border-amber-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400"
-                    required
-                  />
-                  <app-button size="sm" [label]="'auth.emailVerificationConfirm' | translate" type="submit"></app-button>
-                </form>
+                <p class="text-xs text-amber-800 dark:text-amber-200">{{ 'account.verification.linkInstructions' | translate }}</p>
                 <p *ngIf="verificationStatus" class="text-xs text-amber-800 dark:text-amber-200">{{ verificationStatus }}</p>
               </div>
             </ng-template>

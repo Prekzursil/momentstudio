@@ -6,6 +6,7 @@ import {
   HostListener,
   Input,
   OnChanges,
+  OnDestroy,
   Output,
   SimpleChanges,
   ViewChild
@@ -47,16 +48,17 @@ export type ModalBodyScrollEvent = {
         (scroll)="emitBodyScroll()"
       >
         <ng-content></ng-content>
+        <div #bodyEndSentinel aria-hidden="true" class="h-px w-full"></div>
       </div>
       <div class="flex justify-end gap-3 px-4 sm:px-6 py-3 sm:py-4 border-t border-slate-200 dark:border-slate-800 shrink-0" *ngIf="showActions">
         <app-button variant="ghost" [label]="cancelLabel" (action)="close()"></app-button>
-        <app-button [label]="confirmLabel" [disabled]="confirmDisabled" (action)="confirm.emit()"></app-button>
+        <app-button [label]="confirmLabel" [disabled]="effectiveConfirmDisabled()" (action)="confirm.emit()"></app-button>
       </div>
     </div>
   </div>
   `
 })
-export class ModalComponent implements AfterViewInit, OnChanges {
+export class ModalComponent implements AfterViewInit, OnChanges, OnDestroy {
   @Input() open = false;
   @Input() title = 'Modal';
   @Input() subtitle = '';
@@ -65,12 +67,20 @@ export class ModalComponent implements AfterViewInit, OnChanges {
   @Input() cancelLabel = 'Cancel';
   @Input() confirmLabel = 'Confirm';
   @Input() confirmDisabled = false;
+  @Input() requireScrollToConfirm = false;
   @Output() confirm = new EventEmitter<void>();
   @Output() closed = new EventEmitter<void>();
   @Output() bodyScroll = new EventEmitter<ModalBodyScrollEvent>();
   @ViewChild('dialogRef') dialogRef?: ElementRef<HTMLDivElement>;
   @ViewChild('bodyRef') bodyRef?: ElementRef<HTMLDivElement>;
+  @ViewChild('bodyEndSentinel') bodyEndSentinel?: ElementRef<HTMLDivElement>;
   private previouslyFocused: HTMLElement | null = null;
+  private scrollGateReady = true;
+  private scrollGateSettled = true;
+  private scrollGateSettleTimer: ReturnType<typeof setTimeout> | null = null;
+  private scrollGateObserver: IntersectionObserver | null = null;
+  private scrollGateMutationObserver: MutationObserver | null = null;
+  private scrollGateLoadListener: ((event: Event) => void) | null = null;
 
   @HostListener('document:keydown.escape')
   handleEscape(): void {
@@ -90,22 +100,69 @@ export class ModalComponent implements AfterViewInit, OnChanges {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (!('open' in changes)) return;
-    const prev = Boolean(changes['open'].previousValue);
-    const next = Boolean(changes['open'].currentValue);
-    if (next) {
+    const openChange = changes['open'];
+    const gateChange = changes['requireScrollToConfirm'];
+
+    const prevOpen = openChange ? Boolean(openChange.previousValue) : this.open;
+    const nextOpen = openChange ? Boolean(openChange.currentValue) : this.open;
+
+    const prevGate = gateChange ? Boolean(gateChange.previousValue) : this.requireScrollToConfirm;
+    const nextGate = gateChange ? Boolean(gateChange.currentValue) : this.requireScrollToConfirm;
+
+    if (openChange && nextOpen && !prevOpen) {
       this.capturePreviousFocus();
       this.focusDialog();
-      setTimeout(() => this.emitBodyScroll());
+    }
+
+    if (openChange && prevOpen && !nextOpen) {
+      this.stopScrollGate();
+      this.restorePreviousFocus();
       return;
     }
-    if (prev) this.restorePreviousFocus();
+
+    const shouldStartGate =
+      nextOpen &&
+      nextGate &&
+      ((openChange && nextOpen && !prevOpen) || (gateChange && nextGate && !prevGate));
+    if (shouldStartGate) {
+      // Disable immediately to avoid a short "click before scroll" window before observers attach.
+      this.scrollGateReady = false;
+      this.scrollGateSettled = false;
+      setTimeout(() => {
+        this.startScrollGate();
+        this.emitBodyScroll();
+      });
+      return;
+    }
+
+    const shouldStopGate = nextOpen && !nextGate && gateChange && !nextGate && prevGate;
+    if (shouldStopGate) {
+      this.stopScrollGate();
+      return;
+    }
+
+    if (openChange && nextOpen && !prevOpen) {
+      setTimeout(() => {
+        this.emitBodyScroll();
+      });
+    }
+  }
+
+  ngOnDestroy(): void {
+    this.stopScrollGate();
   }
 
   close(): void {
+    this.stopScrollGate();
     this.open = false;
     this.closed.emit();
     this.restorePreviousFocus();
+  }
+
+  effectiveConfirmDisabled(): boolean {
+    if (this.confirmDisabled) return true;
+    if (!this.requireScrollToConfirm) return false;
+    return !this.scrollGateReady;
   }
 
   emitBodyScroll(): void {
@@ -115,6 +172,7 @@ export class ModalComponent implements AfterViewInit, OnChanges {
     const clientHeight = el.clientHeight;
     const scrollHeight = el.scrollHeight;
     const atBottom = scrollTop + clientHeight >= scrollHeight - 8;
+    this.updateScrollGate({ clientHeight, scrollHeight, atBottom });
     this.bodyScroll.emit({ scrollTop, clientHeight, scrollHeight, atBottom });
   }
 
@@ -190,5 +248,80 @@ export class ModalComponent implements AfterViewInit, OnChanges {
       if (!document.contains(target)) return;
       target.focus();
     });
+  }
+
+  private startScrollGate(): void {
+    this.stopScrollGate();
+    if (!this.open || !this.requireScrollToConfirm) {
+      this.scrollGateReady = true;
+      this.scrollGateSettled = true;
+      return;
+    }
+
+    this.scrollGateReady = false;
+    this.scrollGateSettled = false;
+
+    // Avoid a short window where async content (e.g. images/markdown) hasn't affected scrollHeight yet.
+    this.scrollGateSettleTimer = setTimeout(() => {
+      this.scrollGateSettled = true;
+      this.emitBodyScroll();
+    }, 250);
+
+    const root = this.bodyRef?.nativeElement;
+    const sentinel = this.bodyEndSentinel?.nativeElement;
+    if (!root || !sentinel || typeof IntersectionObserver === 'undefined') return;
+
+    this.scrollGateObserver = new IntersectionObserver(
+      () => {
+        this.emitBodyScroll();
+      },
+      { root, threshold: [0, 1], rootMargin: '0px 0px 8px 0px' }
+    );
+    this.scrollGateObserver.observe(sentinel);
+
+    if (typeof MutationObserver !== 'undefined') {
+      this.scrollGateMutationObserver = new MutationObserver(() => this.emitBodyScroll());
+      this.scrollGateMutationObserver.observe(root, { childList: true, subtree: true });
+    }
+
+    this.scrollGateLoadListener = () => this.emitBodyScroll();
+    // `load` doesn't bubble, but it is capturable (useful for <img>).
+    root.addEventListener('load', this.scrollGateLoadListener, true);
+  }
+
+  private stopScrollGate(): void {
+    if (this.scrollGateSettleTimer) {
+      clearTimeout(this.scrollGateSettleTimer);
+      this.scrollGateSettleTimer = null;
+    }
+    if (this.scrollGateObserver) {
+      this.scrollGateObserver.disconnect();
+      this.scrollGateObserver = null;
+    }
+    if (this.scrollGateMutationObserver) {
+      this.scrollGateMutationObserver.disconnect();
+      this.scrollGateMutationObserver = null;
+    }
+    const root = this.bodyRef?.nativeElement;
+    if (root && this.scrollGateLoadListener) {
+      root.removeEventListener('load', this.scrollGateLoadListener, true);
+    }
+    this.scrollGateLoadListener = null;
+    this.scrollGateReady = true;
+    this.scrollGateSettled = true;
+  }
+
+  private updateScrollGate(measure: Pick<ModalBodyScrollEvent, 'clientHeight' | 'scrollHeight' | 'atBottom'>): void {
+    if (!this.open || !this.requireScrollToConfirm) {
+      this.scrollGateReady = true;
+      return;
+    }
+    const scrollable = measure.scrollHeight > measure.clientHeight + 8;
+    if (scrollable) {
+      this.scrollGateSettled = true;
+      this.scrollGateReady = measure.atBottom;
+      return;
+    }
+    this.scrollGateReady = this.scrollGateSettled;
   }
 }

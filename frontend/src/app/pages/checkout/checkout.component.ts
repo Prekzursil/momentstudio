@@ -184,8 +184,24 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
               *ngIf="auth.isAuthenticated() && !emailVerified()"
               class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 flex items-start justify-between gap-3 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
             >
-              <span>{{ 'auth.emailVerificationNeeded' | translate }}</span>
-              <app-button size="sm" variant="ghost" [label]="'auth.emailVerificationConfirm' | translate" routerLink="/account"></app-button>
+              <div class="grid gap-2 w-full">
+                <div class="flex items-start justify-between gap-3">
+                  <span>{{ 'auth.emailVerificationNeeded' | translate }}</span>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="
+                      primaryEmailVerificationResendRemainingSeconds() > 0
+                        ? ('account.verification.resendIn' | translate: { seconds: primaryEmailVerificationResendRemainingSeconds() })
+                        : ('auth.emailVerificationResend' | translate)
+                    "
+                    [disabled]="primaryEmailVerificationBusy || primaryEmailVerificationResendRemainingSeconds() > 0"
+                    (action)="resendPrimaryEmailVerification()"
+                  ></app-button>
+                </div>
+                <p class="text-xs text-amber-800 dark:text-amber-200">{{ 'account.verification.linkInstructions' | translate }}</p>
+                <p *ngIf="primaryEmailVerificationStatus" class="text-xs text-amber-800 dark:text-amber-200">{{ primaryEmailVerificationStatus }}</p>
+              </div>
             </div>
 		            <form #checkoutForm="ngForm" #checkoutFormEl class="grid gap-4" (ngSubmit)="placeOrder(checkoutForm)">
 	              <app-checkout-shipping-step [vm]="vm" [checkoutForm]="checkoutForm"></app-checkout-shipping-step>
@@ -348,6 +364,9 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
   guestConfirmingCode = false;
   guestEmailError = '';
   guestResendSecondsLeft = 0;
+  primaryEmailVerificationBusy = false;
+  primaryEmailVerificationStatus = '';
+  private primaryEmailVerificationResendUntil = 0;
   private guestResendCooldownUntil = 0;
   private guestResendTimer: ReturnType<typeof setInterval> | null = null;
   private lastGuestEmailRequested: string | null = null;
@@ -647,6 +666,33 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
 
   emailVerified(): boolean {
     return Boolean(this.auth.user()?.email_verified);
+  }
+
+  primaryEmailVerificationResendRemainingSeconds(): number {
+    if (!this.primaryEmailVerificationResendUntil) return 0;
+    return Math.max(0, Math.ceil((this.primaryEmailVerificationResendUntil - Date.now()) / 1_000));
+  }
+
+  resendPrimaryEmailVerification(): void {
+    if (!this.auth.isAuthenticated()) return;
+    if (this.primaryEmailVerificationBusy) return;
+    if (this.primaryEmailVerificationResendRemainingSeconds() > 0) return;
+
+    this.primaryEmailVerificationBusy = true;
+    this.primaryEmailVerificationStatus = '';
+
+    this.auth.requestEmailVerification().subscribe({
+      next: () => {
+        this.primaryEmailVerificationStatus = this.translate.instant('account.verification.sentStatus');
+        this.primaryEmailVerificationResendUntil = Date.now() + 60_000;
+      },
+      error: () => {
+        this.primaryEmailVerificationStatus = this.translate.instant('account.verification.sendError');
+      },
+      complete: () => {
+        this.primaryEmailVerificationBusy = false;
+      }
+    });
   }
 
   private prefillFromUser(): void {

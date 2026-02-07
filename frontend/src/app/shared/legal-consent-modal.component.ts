@@ -35,6 +35,7 @@ interface ContentBlock {
       [cancelLabel]="'legal.modal.close' | translate"
       [confirmLabel]="'legal.modal.accept' | translate"
       [confirmDisabled]="confirmDisabled()"
+      [requireScrollToConfirm]="!loading && !error"
       (confirm)="handleAccept()"
       (closed)="handleClosed()"
       (bodyScroll)="onBodyScroll($event)"
@@ -133,7 +134,6 @@ export class LegalConsentModalComponent implements OnChanges, OnDestroy {
   bodyHtml = '';
   pageBlocks: PageBlock[] = [];
   private images: ContentImage[] = [];
-  private canAccept = false;
   private needsScroll = false;
   private langSub?: Subscription;
 
@@ -174,12 +174,11 @@ export class LegalConsentModalComponent implements OnChanges, OnDestroy {
 
   onBodyScroll(evt: ModalBodyScrollEvent): void {
     this.needsScroll = evt.scrollHeight > evt.clientHeight + 8;
-    this.canAccept = !this.needsScroll || evt.atBottom;
-    this.subtitle = this.canAccept || !this.needsScroll ? '' : this.translate.instant('legal.modal.scrollToAccept');
+    this.subtitle = !this.needsScroll || evt.atBottom ? '' : this.translate.instant('legal.modal.scrollToAccept');
   }
 
   confirmDisabled(): boolean {
-    return this.loading || Boolean(this.error) || !this.canAccept;
+    return this.loading || Boolean(this.error);
   }
 
   handleAccept(): void {
@@ -201,7 +200,6 @@ export class LegalConsentModalComponent implements OnChanges, OnDestroy {
     this.bodyHtml = '';
     this.pageBlocks = [];
     this.images = [];
-    this.canAccept = false;
     this.needsScroll = false;
   }
 
@@ -214,7 +212,6 @@ export class LegalConsentModalComponent implements OnChanges, OnDestroy {
       this.bodyHtml = '';
       this.pageBlocks = [];
       this.images = [];
-      this.canAccept = false;
       this.needsScroll = false;
       return;
     }
@@ -226,7 +223,6 @@ export class LegalConsentModalComponent implements OnChanges, OnDestroy {
     this.bodyHtml = '';
     this.pageBlocks = [];
     this.images = [];
-    this.canAccept = false;
     this.needsScroll = false;
     this.subtitle = this.translate.instant('legal.modal.loading');
 
@@ -247,7 +243,6 @@ export class LegalConsentModalComponent implements OnChanges, OnDestroy {
         this.bodyHtml = '';
         this.pageBlocks = [];
         this.images = [];
-        this.canAccept = false;
         this.needsScroll = false;
         this.subtitle = '';
         this.error = err?.error?.detail || this.translate.instant('legal.modal.loadError');
