@@ -494,6 +494,29 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
               </div>
             </div>
 
+            <div
+              *ngIf="canManageRoles() && selectedUser()!.role !== 'owner'"
+              class="rounded-xl border border-rose-200 p-3 grid gap-3 dark:border-rose-900/40"
+            >
+              <div class="text-xs font-semibold tracking-wide uppercase text-rose-700 dark:text-rose-200">
+                {{ 'adminUi.users.deleteTitle' | translate }}
+              </div>
+              <p class="text-sm text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.users.deleteHint' | translate }}
+              </p>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center rounded-full px-3 py-2 text-sm font-semibold border border-rose-200 text-rose-700 hover:border-rose-300 hover:text-rose-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-600 disabled:opacity-60 disabled:cursor-not-allowed dark:border-rose-900/60 dark:text-rose-200 dark:hover:border-rose-800 dark:hover:text-rose-100"
+                [disabled]="deleteUserBusy()"
+                (click)="openDeleteUser()"
+              >
+                {{ 'adminUi.users.deleteAction' | translate }}
+              </button>
+              <div *ngIf="deleteUserError()" class="text-sm text-rose-700 dark:text-rose-200">
+                {{ deleteUserError() }}
+              </div>
+            </div>
+
             <div class="rounded-xl border border-slate-200 p-3 grid gap-3 dark:border-slate-800">
               <div class="flex items-center justify-between gap-3">
                 <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
@@ -664,7 +687,7 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
                   (action)="loadEmailHistory()"
                 ></app-button>
                 <app-button
-                  *ngIf="isOwner() && !selectedUser()!.email_verified"
+                  *ngIf="canManageRoles() && !selectedUser()!.email_verified"
                   size="sm"
                   variant="ghost"
                   [label]="'adminUi.users.overrideVerification' | translate"
@@ -873,6 +896,20 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
 
 		            <div *ngIf="roleChangeError()" class="mt-2 text-sm text-rose-700 dark:text-rose-300">{{ roleChangeError() }}</div>
 
+                <p class="mt-3 text-sm text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.users.rolePasswordPrompt' | translate }}
+                </p>
+                <div class="mt-3">
+                  <app-input
+                    type="password"
+                    [label]="'adminUi.users.rolePasswordLabel' | translate"
+                    [placeholder]="'adminUi.users.rolePasswordLabel' | translate"
+                    [disabled]="roleChangeBusy()"
+                    [(value)]="roleChangePassword"
+                    [ariaLabel]="'adminUi.users.rolePasswordLabel' | translate"
+                  ></app-input>
+                </div>
+
 	            <div class="mt-4 flex justify-end gap-2">
 	              <app-button
 	                size="sm"
@@ -886,6 +923,71 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
 	                [label]="'adminUi.users.setRole' | translate"
 	                [disabled]="roleChangeBusy()"
 	                (action)="confirmRoleChange()"
+	              ></app-button>
+	            </div>
+	          </div>
+	        </div>
+	      </ng-container>
+
+	      <ng-container *ngIf="deleteUserOpen() && selectedUser() as u">
+	        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closeDeleteUser()">
+	          <div
+	            class="w-full max-w-md rounded-2xl border border-rose-200 bg-white p-4 shadow-xl dark:border-rose-900/40 dark:bg-slate-900"
+	            (click)="$event.stopPropagation()"
+	          >
+	            <div class="flex items-start justify-between gap-3">
+	              <div class="grid gap-1">
+	                <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.users.deleteTitle' | translate }}</h3>
+	                <div class="text-xs text-slate-600 dark:text-slate-300">{{ identityLabel(u) }}</div>
+	              </div>
+	              <button
+	                type="button"
+	                class="rounded-md px-2 py-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
+	                (click)="closeDeleteUser()"
+	                [attr.aria-label]="'adminUi.actions.cancel' | translate"
+	              >
+	                ✕
+	              </button>
+	            </div>
+
+              <p class="mt-3 text-sm text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.users.deleteHint' | translate }}
+              </p>
+
+	            <div *ngIf="deleteUserError()" class="mt-2 text-sm text-rose-700 dark:text-rose-300">{{ deleteUserError() }}</div>
+
+              <div class="mt-3 grid gap-3">
+                <app-input
+                  [label]="'adminUi.users.deleteConfirmLabel' | translate"
+                  [(value)]="deleteUserConfirm"
+                  [placeholder]="'adminUi.users.deleteConfirmPlaceholder' | translate"
+                  [hint]="'adminUi.users.deleteConfirmHint' | translate"
+                  [disabled]="deleteUserBusy()"
+                  [ariaLabel]="'adminUi.users.deleteConfirmLabel' | translate"
+                ></app-input>
+                <app-input
+                  type="password"
+                  [label]="'adminUi.users.deletePasswordLabel' | translate"
+                  [(value)]="deleteUserPassword"
+                  [placeholder]="'adminUi.users.deletePasswordPlaceholder' | translate"
+                  [disabled]="deleteUserBusy()"
+                  [ariaLabel]="'adminUi.users.deletePasswordLabel' | translate"
+                ></app-input>
+              </div>
+
+	            <div class="mt-4 flex justify-end gap-2">
+	              <app-button
+	                size="sm"
+	                variant="ghost"
+	                [label]="'adminUi.actions.cancel' | translate"
+	                [disabled]="deleteUserBusy()"
+	                (action)="closeDeleteUser()"
+	              ></app-button>
+	              <app-button
+	                size="sm"
+	                [label]="'adminUi.users.deleteAction' | translate"
+	                [disabled]="deleteUserBusy()"
+	                (action)="confirmDeleteUser()"
 	              ></app-button>
 	            </div>
 	          </div>
@@ -926,6 +1028,12 @@ export class AdminUsersComponent implements OnInit {
   roleChangeOpen = signal(false);
   roleChangeBusy = signal(false);
   roleChangeError = signal<string | null>(null);
+  roleChangePassword = '';
+  deleteUserOpen = signal(false);
+  deleteUserBusy = signal(false);
+  deleteUserError = signal<string | null>(null);
+  deleteUserPassword = '';
+  deleteUserConfirm = '';
 
   aliases = signal<AdminUserAliasesResponse | null>(null);
   aliasesLoading = signal(false);
@@ -1177,6 +1285,7 @@ export class AdminUsersComponent implements OnInit {
     if (user.role === 'owner') return;
     if (this.selectedRole === user.role) return;
     this.roleChangeError.set(null);
+    this.roleChangePassword = '';
     this.roleChangeOpen.set(true);
   }
 
@@ -1184,6 +1293,7 @@ export class AdminUsersComponent implements OnInit {
     this.roleChangeOpen.set(false);
     this.roleChangeBusy.set(false);
     this.roleChangeError.set(null);
+    this.roleChangePassword = '';
   }
 
   confirmRoleChange(): void {
@@ -1195,9 +1305,17 @@ export class AdminUsersComponent implements OnInit {
       return;
     }
 
+    const password = (this.roleChangePassword || '').trim();
+    if (!password) {
+      const msg = this.t('adminUi.users.rolePasswordRequired');
+      this.roleChangeError.set(msg);
+      this.toast.error(msg);
+      return;
+    }
+
     this.roleChangeBusy.set(true);
     this.roleChangeError.set(null);
-    this.admin.updateUserRole(user.id, this.selectedRole).subscribe({
+    this.admin.updateUserRole(user.id, this.selectedRole, password).subscribe({
       next: (updated) => {
         this.toast.success(this.t('adminUi.users.success.role'));
         this.selectedUser.set({ ...user, role: updated.role });
@@ -1211,6 +1329,64 @@ export class AdminUsersComponent implements OnInit {
         this.roleChangeError.set(msg);
         this.toast.error(msg);
         this.roleChangeBusy.set(false);
+      }
+    });
+  }
+
+  openDeleteUser(): void {
+    const user = this.selectedUser();
+    if (!user) return;
+    if (user.role === 'owner') return;
+    this.deleteUserError.set(null);
+    this.deleteUserPassword = '';
+    this.deleteUserConfirm = '';
+    this.deleteUserOpen.set(true);
+  }
+
+  closeDeleteUser(): void {
+    this.deleteUserOpen.set(false);
+    this.deleteUserBusy.set(false);
+    this.deleteUserError.set(null);
+    this.deleteUserPassword = '';
+    this.deleteUserConfirm = '';
+  }
+
+  confirmDeleteUser(): void {
+    const user = this.selectedUser();
+    if (!user) return;
+    if (user.role === 'owner') return;
+
+    const confirm = (this.deleteUserConfirm || '').trim().toUpperCase();
+    if (confirm !== 'DELETE') {
+      const msg = this.t('adminUi.users.deleteConfirmRequired');
+      this.deleteUserError.set(msg);
+      this.toast.error(msg);
+      return;
+    }
+
+    const password = (this.deleteUserPassword || '').trim();
+    if (!password) {
+      const msg = this.t('adminUi.users.deletePasswordRequired');
+      this.deleteUserError.set(msg);
+      this.toast.error(msg);
+      return;
+    }
+
+    this.deleteUserBusy.set(true);
+    this.deleteUserError.set(null);
+    this.usersApi.executeGdprDeletion(user.id, password).subscribe({
+      next: () => {
+        this.toast.success(this.t('adminUi.users.success.delete'));
+        this.closeDeleteUser();
+        this.selectedUser.set(null);
+        this.profile.set(null);
+        this.load();
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.t('adminUi.users.errors.delete');
+        this.deleteUserError.set(msg);
+        this.toast.error(msg);
+        this.deleteUserBusy.set(false);
       }
     });
   }

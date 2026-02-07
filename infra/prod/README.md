@@ -95,6 +95,12 @@ After first deploy (or after a DB reset):
 ./infra/prod/bootstrap-owner.sh --email owner@example.com --password 'Password123' --username owner --display-name Owner
 ```
 
+For momentstudio.ro (example/reminder):
+
+```bash
+./infra/prod/bootstrap-owner.sh --email momentstudio.ro@gmail.com --password 'NEW_PASSWORD' --username owner --display-name Adriana
+```
+
 ## 5) Backups + restores
 
 Create a backup (DB + uploads):

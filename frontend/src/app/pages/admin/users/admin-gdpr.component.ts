@@ -10,6 +10,7 @@ import { ToastService } from '../../../core/toast.service';
 import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
 import { InputComponent } from '../../../shared/input.component';
+import { ModalComponent } from '../../../shared/modal.component';
 import { SkeletonComponent } from '../../../shared/skeleton.component';
 
 type ExportStatusFilter = 'all' | 'pending' | 'running' | 'succeeded' | 'failed';
@@ -17,7 +18,16 @@ type ExportStatusFilter = 'all' | 'pending' | 'running' | 'succeeded' | 'failed'
 @Component({
   selector: 'app-admin-gdpr',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslateModule, BreadcrumbComponent, ButtonComponent, InputComponent, SkeletonComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    TranslateModule,
+    BreadcrumbComponent,
+    ButtonComponent,
+    InputComponent,
+    ModalComponent,
+    SkeletonComponent
+  ],
   template: `
     <div class="grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
@@ -248,6 +258,36 @@ type ExportStatusFilter = 'all' | 'pending' | 'running' | 'succeeded' | 'failed'
           </ng-template>
         </div>
       </section>
+
+      <app-modal
+        [open]="executeDeletionModalOpen()"
+        [title]="'adminUi.gdpr.executeNow' | translate"
+        [subtitle]="'adminUi.gdpr.confirms.executeDeletion' | translate"
+        [confirmLabel]="'adminUi.gdpr.executeNow' | translate"
+        [cancelLabel]="'adminUi.common.cancel' | translate"
+        [closeLabel]="'adminUi.common.close' | translate"
+        [confirmDisabled]="executeDeletionConfirmDisabled()"
+        (confirm)="confirmExecuteDeletion()"
+        (closed)="closeExecuteDeletionModal()"
+      >
+        <div class="grid gap-3">
+          <div *ngIf="executeDeletionTarget() as target" class="text-sm text-slate-700 dark:text-slate-200">
+            {{ target.user.email }}
+          </div>
+
+          <app-input
+            type="password"
+            [label]="'adminUi.gdpr.passwordLabel' | translate"
+            [(value)]="executeDeletionPassword"
+            [placeholder]="'adminUi.gdpr.passwordPlaceholder' | translate"
+            [ariaLabel]="'adminUi.gdpr.passwordLabel' | translate"
+          ></app-input>
+
+          <div *ngIf="executeDeletionModalError" class="text-sm text-rose-700 dark:text-rose-300">
+            {{ executeDeletionModalError }}
+          </div>
+        </div>
+      </app-modal>
     </div>
   `
 })
@@ -279,6 +319,10 @@ export class AdminGdprComponent implements OnInit {
   retryingJobId = signal<string | null>(null);
   downloadingJobId = signal<string | null>(null);
   deletionBusyUserId = signal<string | null>(null);
+  executeDeletionModalOpen = signal(false);
+  executeDeletionTarget = signal<AdminGdprDeletionRequestItem | null>(null);
+  executeDeletionPassword = '';
+  executeDeletionModalError = '';
 
   constructor(
     private usersApi: AdminUsersService,
@@ -410,16 +454,55 @@ export class AdminGdprComponent implements OnInit {
     const userId = item?.user?.id;
     if (!userId) return;
     if (!this.canAdminActions()) return;
-    if (!window.confirm(this.t('adminUi.gdpr.confirms.executeDeletion'))) return;
+    this.executeDeletionTarget.set(item);
+    this.executeDeletionPassword = '';
+    this.executeDeletionModalError = '';
+    this.executeDeletionModalOpen.set(true);
+  }
+
+  executeDeletionConfirmDisabled(): boolean {
+    if (this.deletionBusyUserId()) return true;
+    return !(this.executeDeletionPassword || '').trim();
+  }
+
+  closeExecuteDeletionModal(): void {
+    this.executeDeletionModalOpen.set(false);
+    this.executeDeletionTarget.set(null);
+    this.executeDeletionPassword = '';
+    this.executeDeletionModalError = '';
+  }
+
+  confirmExecuteDeletion(): void {
+    const item = this.executeDeletionTarget();
+    const userId = item?.user?.id;
+    if (!userId) {
+      this.closeExecuteDeletionModal();
+      return;
+    }
+    if (!this.canAdminActions()) {
+      this.closeExecuteDeletionModal();
+      return;
+    }
+
+    const password = (this.executeDeletionPassword || '').trim();
+    if (!password) {
+      this.executeDeletionModalError = this.t('adminUi.gdpr.passwordRequired');
+      return;
+    }
+
     this.deletionBusyUserId.set(userId);
-    this.usersApi.executeGdprDeletion(userId).subscribe({
+    this.usersApi.executeGdprDeletion(userId, password).subscribe({
       next: () => {
         this.toast.success(this.t('adminUi.gdpr.success.executeDeletion'));
         this.loadDeletions();
         this.deletionBusyUserId.set(null);
+        this.closeExecuteDeletionModal();
       },
-      error: () => {
-        this.toast.error(this.t('adminUi.gdpr.errors.executeDeletion'));
+      error: (err) => {
+        const detail = err?.error?.detail;
+        this.executeDeletionModalError =
+          typeof detail === 'string' && detail ? detail : this.t('adminUi.gdpr.errors.executeDeletion');
+        this.toast.error(this.executeDeletionModalError);
         this.deletionBusyUserId.set(null);
       }
     });

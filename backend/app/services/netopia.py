@@ -22,6 +22,29 @@ NETOPIA_BASE_URL_LIVE = "https://secure.mobilpay.ro/pay"
 NETOPIA_BASE_URL_SANDBOX = "https://secure.sandbox.netopia-payments.com"
 
 
+def _netopia_env() -> str:
+    env = (settings.netopia_env or "sandbox").strip().lower()
+    return "live" if env == "live" else "sandbox"
+
+
+def _netopia_api_key() -> str:
+    env = _netopia_env()
+    preferred = settings.netopia_api_key_live if env == "live" else settings.netopia_api_key_sandbox
+    api_key = (preferred or "").strip()
+    if api_key:
+        return api_key
+    return (settings.netopia_api_key or "").strip()
+
+
+def _netopia_pos_signature() -> str:
+    env = _netopia_env()
+    preferred = settings.netopia_pos_signature_live if env == "live" else settings.netopia_pos_signature_sandbox
+    pos_signature = (preferred or "").strip()
+    if pos_signature:
+        return pos_signature
+    return (settings.netopia_pos_signature or "").strip()
+
+
 def _payload_hash_b64(payload: bytes) -> str:
     return base64.b64encode(hashlib.sha512(payload).digest()).decode("ascii")
 
@@ -38,10 +61,15 @@ def _to_subject_public_key_pem(public_key: asymmetric_types.PublicKeyTypes) -> s
 
 
 def _public_key_pem() -> str:
-    pem = (settings.netopia_public_key_pem or "").strip()
+    env = _netopia_env()
+    preferred_pem = settings.netopia_public_key_pem_live if env == "live" else settings.netopia_public_key_pem_sandbox
+    pem = (preferred_pem or settings.netopia_public_key_pem or "").strip()
     if pem:
         return pem
-    path = (settings.netopia_public_key_path or "").strip()
+    preferred_path = (
+        settings.netopia_public_key_path_live if env == "live" else settings.netopia_public_key_path_sandbox
+    )
+    path = (preferred_path or settings.netopia_public_key_path or "").strip()
     if path:
         try:
             key_bytes = Path(path).read_bytes()
@@ -110,20 +138,44 @@ def _public_key_pem() -> str:
 
 
 def is_netopia_configured() -> bool:
-    return bool(
-        (settings.netopia_api_key or "").strip()
-        and (settings.netopia_pos_signature or "").strip()
-        and _public_key_pem()
-    )
+    configured, _ = netopia_configuration_status()
+    return configured
+
+
+def netopia_configuration_status() -> tuple[bool, str | None]:
+    env = _netopia_env()
+    missing: list[str] = []
+
+    api_key = _netopia_api_key()
+    if not api_key:
+        missing.append(f"NETOPIA_API_KEY_{env.upper()} (or NETOPIA_API_KEY)")
+
+    pos_signature = _netopia_pos_signature()
+    if not pos_signature:
+        missing.append(f"NETOPIA_POS_SIGNATURE_{env.upper()} (or NETOPIA_POS_SIGNATURE)")
+
+    try:
+        public_key = _public_key_pem()
+    except HTTPException as exc:
+        return False, str(getattr(exc, "detail", "") or "Netopia public key could not be loaded")
+
+    if not public_key:
+        missing.append(
+            f"NETOPIA_PUBLIC_KEY_PEM_{env.upper()} / NETOPIA_PUBLIC_KEY_PATH_{env.upper()} (or NETOPIA_PUBLIC_KEY_PEM / NETOPIA_PUBLIC_KEY_PATH)"
+        )
+
+    if missing:
+        return False, "Missing Netopia configuration: " + ", ".join(missing)
+
+    return True, None
 
 
 def _netopia_base_url() -> str:
-    env = (settings.netopia_env or "sandbox").strip().lower()
-    return NETOPIA_BASE_URL_LIVE if env == "live" else NETOPIA_BASE_URL_SANDBOX
+    return NETOPIA_BASE_URL_LIVE if _netopia_env() == "live" else NETOPIA_BASE_URL_SANDBOX
 
 
 def _netopia_headers() -> dict[str, str]:
-    api_key = (settings.netopia_api_key or "").strip()
+    api_key = _netopia_api_key()
     if not api_key:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Netopia not configured")
     return {
@@ -149,7 +201,7 @@ async def start_payment(
     if not settings.netopia_enabled:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
 
-    pos_signature = (settings.netopia_pos_signature or "").strip()
+    pos_signature = _netopia_pos_signature()
     if not pos_signature:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Netopia not configured")
 
@@ -223,7 +275,7 @@ async def get_status(*, ntp_id: str, order_id: str) -> dict[str, Any]:
     if not settings.netopia_enabled:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
 
-    pos_signature = (settings.netopia_pos_signature or "").strip()
+    pos_signature = _netopia_pos_signature()
     if not pos_signature:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Netopia not configured")
 
@@ -257,7 +309,7 @@ def verify_ipn(*, verification_token: str, payload: bytes) -> dict[str, Any]:
     if not settings.netopia_enabled:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
 
-    pos_signature = (settings.netopia_pos_signature or "").strip()
+    pos_signature = _netopia_pos_signature()
     if not pos_signature:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Netopia not configured")
 

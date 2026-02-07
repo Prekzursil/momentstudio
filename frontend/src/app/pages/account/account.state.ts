@@ -1254,11 +1254,12 @@ export class AccountState implements OnInit, OnDestroy {
   }
 
   submitVerification(): void {
-    if (!this.verificationToken) {
+    const token = this.normalizeToken(this.verificationToken);
+    if (!token) {
       this.verificationStatus = this.t('account.verification.tokenRequired');
       return;
     }
-    this.auth.confirmEmailVerification(this.verificationToken).subscribe({
+    this.auth.confirmEmailVerification(token).subscribe({
       next: (res) => {
         this.emailVerified.set(res.email_verified);
         this.verificationStatus = this.t('account.verification.verifiedStatus');
@@ -1276,6 +1277,15 @@ export class AccountState implements OnInit, OnDestroy {
         this.toast.error(this.t('account.verification.invalidTokenToast'));
       }
     });
+  }
+
+  private normalizeToken(raw: string): string {
+    const value = String(raw || '').trim();
+    if (!value) return '';
+    return value.replace(
+      /(?:\s|\u200B|\u200C|\u200D|\uFEFF|\u2060|\u00AD|\u200E|\u200F)+/g,
+      ''
+    );
   }
 
   onAvatarChange(event: Event): void {

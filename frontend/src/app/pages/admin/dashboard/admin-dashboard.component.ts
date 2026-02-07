@@ -1866,6 +1866,13 @@ type AuditPresetId = 'all' | 'security' | 'content' | 'catalog' | 'payments';
               [hint]="'adminUi.ownerTransfer.confirmHint' | translate"
               [ariaLabel]="'adminUi.ownerTransfer.confirmLabel' | translate"
             ></app-input>
+            <app-input
+              type="password"
+              [label]="'adminUi.ownerTransfer.passwordLabel' | translate"
+              [(value)]="ownerTransferPassword"
+              [placeholder]="'adminUi.ownerTransfer.passwordPlaceholder' | translate"
+              [ariaLabel]="'adminUi.ownerTransfer.passwordLabel' | translate"
+            ></app-input>
           </div>
 
           <div *ngIf="ownerTransferError" class="text-sm text-rose-700 dark:text-rose-300">
@@ -2161,6 +2168,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
 
   ownerTransferIdentifier = '';
   ownerTransferConfirm = '';
+  ownerTransferPassword = '';
   ownerTransferLoading = false;
   ownerTransferError = '';
 
@@ -3633,15 +3641,21 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
       this.ownerTransferError = this.translate.instant('adminUi.ownerTransfer.errors.identifier');
       return;
     }
+    const password = (this.ownerTransferPassword || '').trim();
+    if (!password) {
+      this.ownerTransferError = this.translate.instant('adminUi.ownerTransfer.passwordRequired');
+      return;
+    }
     this.ownerTransferError = '';
     this.ownerTransferLoading = true;
     this.admin
-      .transferOwner({ identifier, confirm: this.ownerTransferConfirm })
+      .transferOwner({ identifier, confirm: this.ownerTransferConfirm, password })
       .subscribe({
         next: () => {
           this.ownerTransferLoading = false;
           this.ownerTransferIdentifier = '';
           this.ownerTransferConfirm = '';
+          this.ownerTransferPassword = '';
           this.toast.success(
             this.translate.instant('adminUi.ownerTransfer.successTitle'),
             this.translate.instant('adminUi.ownerTransfer.successCopy')

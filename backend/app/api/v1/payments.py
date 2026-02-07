@@ -49,13 +49,13 @@ async def payment_capabilities() -> PaymentsCapabilitiesResponse:
     paypal_enabled = bool(mock_mode or paypal_configured)
     paypal_reason = None if paypal_enabled else "PayPal is not configured"
 
-    netopia_configured = netopia_service.is_netopia_configured()
+    netopia_configured, netopia_config_reason = netopia_service.netopia_configuration_status()
     netopia_supported = True
     netopia_enabled = False
     if not settings.netopia_enabled:
         netopia_reason = "Netopia is disabled"
     elif not netopia_configured:
-        netopia_reason = "Netopia is not configured"
+        netopia_reason = netopia_config_reason or "Netopia is not configured"
     else:
         netopia_enabled = True
         netopia_reason = None

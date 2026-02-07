@@ -49,9 +49,18 @@ class Settings(BaseSettings):
     netopia_env: str = "sandbox"
     # API key generated in NETOPIA Payments admin panel (required to start payments / check status).
     netopia_api_key: str | None = None
+    # Prefer *_SANDBOX/*_LIVE; NETOPIA_* vars remain as fallbacks.
+    netopia_api_key_sandbox: str | None = None
+    netopia_api_key_live: str | None = None
     netopia_pos_signature: str | None = None
+    netopia_pos_signature_sandbox: str | None = None
+    netopia_pos_signature_live: str | None = None
     netopia_public_key_pem: str | None = None
+    netopia_public_key_pem_sandbox: str | None = None
+    netopia_public_key_pem_live: str | None = None
     netopia_public_key_path: str | None = None
+    netopia_public_key_path_sandbox: str | None = None
+    netopia_public_key_path_live: str | None = None
     netopia_jwt_alg: str = "RS512"
     netopia_ipn_max_age_seconds: int = 60 * 60 * 24
     jwt_algorithm: str = "HS256"
@@ -70,6 +79,9 @@ class Settings(BaseSettings):
     webauthn_rp_name: str | None = None
     webauthn_allowed_origins: list[str] = []
     account_deletion_cooldown_hours: int = 24
+    account_deletion_scheduler_enabled: bool = True
+    account_deletion_poll_interval_seconds: int = 60 * 10
+    account_deletion_batch_limit: int = 200
     gdpr_export_sla_days: int = 30
     gdpr_deletion_sla_days: int = 30
     order_export_retention_days: int = 30

@@ -52,9 +52,12 @@ Use `backend/.env.example` and `frontend/.env.example` as the authoritative list
   - Optional Netopia:
     - `NETOPIA_ENABLED=1`
     - `NETOPIA_ENV=live` (or `sandbox`)
-    - `NETOPIA_API_KEY=...` (from the Netopia admin panel)
-    - `NETOPIA_POS_SIGNATURE=...`
-    - `NETOPIA_PUBLIC_KEY_PEM=...` (or `NETOPIA_PUBLIC_KEY_PATH=...`; supports `.cer` DER/PEM)
+    - Live credentials:
+      - `NETOPIA_API_KEY_LIVE=...` (from the Netopia admin panel)
+      - `NETOPIA_POS_SIGNATURE_LIVE=...`
+      - `NETOPIA_PUBLIC_KEY_PEM_LIVE=...` (or `NETOPIA_PUBLIC_KEY_PATH_LIVE=...`; supports `.cer` DER/PEM)
+    - Sandbox credentials (optional, for testing): `NETOPIA_*_SANDBOX=...`
+    - Legacy single-env vars (`NETOPIA_API_KEY`, `NETOPIA_POS_SIGNATURE`, `NETOPIA_PUBLIC_KEY_*`) are still supported as fallbacks.
 
 Recommended hardening:
 

@@ -99,6 +99,21 @@ class AdminUserSecurityUpdate(BaseModel):
     password_reset_required: bool | None = None
 
 
+class AdminUserRoleUpdateRequest(BaseModel):
+    role: str = Field(..., min_length=1, max_length=20)
+    password: str = Field(..., min_length=1, max_length=200)
+
+
+class AdminUserDeleteRequest(BaseModel):
+    password: str = Field(..., min_length=1, max_length=200)
+
+
+class AdminOwnerTransferRequest(BaseModel):
+    identifier: str = Field(..., min_length=1, max_length=255)
+    confirm: str = Field(..., min_length=1, max_length=20)
+    password: str = Field(..., min_length=1, max_length=200)
+
+
 class AdminUserImpersonationResponse(BaseModel):
     access_token: str
     expires_at: datetime

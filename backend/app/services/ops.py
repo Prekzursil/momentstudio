@@ -665,12 +665,12 @@ async def get_diagnostics() -> OpsDiagnosticsRead:
 
     netopia_check = OpsDiagnosticsCheck(status="off", configured=False, healthy=False, message=None)
     if bool(getattr(settings, "netopia_enabled", False)):
-        configured = netopia_service.is_netopia_configured()
+        configured, reason = netopia_service.netopia_configuration_status()
         netopia_check = OpsDiagnosticsCheck(
-            status="ok" if configured else "error",
-            configured=True,
+            status="ok" if configured else ("error" if prod else "warning"),
+            configured=configured,
             healthy=configured,
-            message=None if configured else "Netopia is enabled but credentials/keys are missing.",
+            message=None if configured else (reason or "Netopia is enabled but credentials/keys are missing."),
         )
 
     return OpsDiagnosticsRead(

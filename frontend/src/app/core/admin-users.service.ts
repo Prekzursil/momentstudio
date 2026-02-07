@@ -218,8 +218,8 @@ export class AdminUsersService {
     return this.api.get<AdminGdprDeletionRequestsResponse>('/admin/dashboard/gdpr/deletions', params as any);
   }
 
-  executeGdprDeletion(userId: string): Observable<void> {
-    return this.api.post<void>(`/admin/dashboard/gdpr/deletions/${userId}/execute`, {});
+  executeGdprDeletion(userId: string, password: string): Observable<void> {
+    return this.api.post<void>(`/admin/dashboard/gdpr/deletions/${userId}/execute`, { password });
   }
 
   cancelGdprDeletion(userId: string): Observable<void> {
