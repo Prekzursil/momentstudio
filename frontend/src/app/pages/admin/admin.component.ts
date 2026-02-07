@@ -8095,8 +8095,13 @@ export class AdminComponent implements OnInit, OnDestroy {
       this.ownerTransferError = this.t('adminUi.ownerTransfer.errors.identifier');
       return;
     }
+    const password = (window.prompt(this.t('adminUi.ownerTransfer.passwordLabel')) || '').trim();
+    if (!password) {
+      this.ownerTransferError = this.t('adminUi.ownerTransfer.passwordRequired');
+      return;
+    }
     this.ownerTransferLoading = true;
-    this.admin.transferOwner({ identifier, confirm }).subscribe({
+    this.admin.transferOwner({ identifier, confirm, password }).subscribe({
       next: () => {
         this.toast.success(this.t('adminUi.ownerTransfer.successTitle'), this.t('adminUi.ownerTransfer.successCopy'));
         this.ownerTransferConfirm = '';
@@ -8931,7 +8936,12 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   updateRole(): void {
     if (!this.selectedUserId || !this.selectedUserRole) return;
-    this.admin.updateUserRole(this.selectedUserId, this.selectedUserRole).subscribe({
+    const password = (window.prompt(this.t('adminUi.users.rolePasswordPrompt')) || '').trim();
+    if (!password) {
+      this.toast.error(this.t('adminUi.users.rolePasswordRequired'));
+      return;
+    }
+    this.admin.updateUserRole(this.selectedUserId, this.selectedUserRole, password).subscribe({
       next: (updated) => {
         this.users = this.users.map((u) => (u.id === updated.id ? updated : u));
         this.toast.success(this.t('adminUi.users.success.role'));

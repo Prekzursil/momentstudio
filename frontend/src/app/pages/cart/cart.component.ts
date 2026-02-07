@@ -184,21 +184,6 @@ const SAVED_FOR_LATER_KEY = 'cart_saved_for_later';
                 </div>
                 <p *ngIf="isMaxQuantity(item)" class="text-xs text-amber-700 dark:text-amber-300">{{ 'cart.maxQtyReached' | translate }}</p>
                 <p *ngIf="itemErrors[item.id]" class="text-sm text-amber-700 dark:text-amber-300">{{ itemErrors[item.id] | translate }}</p>
-                <div class="grid gap-1">
-                  <label class="text-xs text-slate-500 dark:text-slate-400" [attr.for]="'note-' + item.id">{{ 'cart.noteLabel' | translate }}</label>
-                  <textarea
-                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    rows="2"
-                    maxlength="255"
-                    [id]="'note-' + item.id"
-                    [name]="'note-' + item.id"
-                    [placeholder]="'cart.notePlaceholder' | translate"
-                    [ngModel]="itemNotes[item.id] ?? item.note ?? ''"
-                    (ngModelChange)="itemNotes[item.id] = $event"
-                    (blur)="saveNote(item.id)"
-                  ></textarea>
-                  <p *ngIf="itemNoteErrors[item.id]" class="text-xs text-amber-700 dark:text-amber-300">{{ itemNoteErrors[item.id] | translate }}</p>
-                </div>
               </div>
             </div>
           </div>
@@ -449,8 +434,6 @@ export class CartComponent implements OnInit {
   ];
   skeletonRows = [0, 1, 2];
   itemErrors: Record<string, string> = {};
-  itemNotes: Record<string, string> = {};
-  itemNoteErrors: Record<string, string> = {};
   movingToWishlist: Record<string, boolean> = {};
   savingForLater: Record<string, boolean> = {};
   restoringSaved: Record<string, boolean> = {};
@@ -696,8 +679,6 @@ export class CartComponent implements OnInit {
   remove(id: string): void {
     this.cart.remove(id);
     delete this.itemErrors[id];
-    delete this.itemNotes[id];
-    delete this.itemNoteErrors[id];
     delete this.movingToWishlist[id];
     delete this.savingForLater[id];
     if (this.promoStatus === 'success') this.pendingPromoRefresh = true;
@@ -820,23 +801,8 @@ export class CartComponent implements OnInit {
     if (!confirm(this.translate.instant('cart.confirmClear'))) return;
     this.cart.clear();
     this.itemErrors = {};
-    this.itemNotes = {};
-    this.itemNoteErrors = {};
     this.movingToWishlist = {};
     this.resetPromoState();
-  }
-
-  saveNote(id: string): void {
-    const current = this.items().find((i) => i.id === id)?.note ?? '';
-    const next = (this.itemNotes[id] ?? '').trim();
-    if ((current ?? '') === next) return;
-    const { errorKey } = this.cart.updateNote(id, next);
-    if (errorKey) {
-      this.itemNoteErrors[id] = errorKey;
-      return;
-    }
-    delete this.itemNoteErrors[id];
-    if (this.promoStatus === 'success') this.pendingPromoRefresh = true;
   }
 
   moveToWishlist(item: CartItem): void {

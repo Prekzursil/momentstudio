@@ -487,6 +487,38 @@ def test_secondary_emails_flow(monkeypatch: pytest.MonkeyPatch, test_app: Dict[s
     after = emails_after.json()
     assert all(e["email"] != "user@example.com" for e in after["secondary_emails"])
 
+
+def test_primary_email_verification_strips_whitespace(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+
+    sent: dict[str, str] = {}
+
+    async def fake_send(email: str, token: str, lang: str | None = None):
+        _ = lang
+        sent[email] = token
+        return True
+
+    monkeypatch.setattr("app.services.email.send_verification_email", fake_send)
+
+    res = client.post(
+        "/api/v1/auth/register",
+        json=make_register_payload(email="primary@example.com", username="primary", password="supersecret", name="User"),
+    )
+    assert res.status_code == 201, res.text
+    access = res.json()["tokens"]["access_token"]
+
+    token = sent.get("primary@example.com")
+    assert token
+
+    mangled = f"  \u200b{token[:12]} \n\t {token[12:]} \u200b  "
+    confirm = client.post("/api/v1/auth/verify/confirm", json={"token": mangled})
+    assert confirm.status_code == 200, confirm.text
+    assert confirm.json()["email_verified"] is True
+
+    me = client.get("/api/v1/auth/me", headers=auth_headers(access))
+    assert me.status_code == 200, me.text
+    assert me.json()["email_verified"] is True
+
 def test_register_rejects_invalid_phone(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
 

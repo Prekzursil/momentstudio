@@ -13,7 +13,7 @@ from app.core.config import settings
 from app.models.blog import BlogComment
 from app.models.content import ContentBlock
 from app.models.order import Order, OrderItem
-from app.models.user import RefreshSession, User
+from app.models.user import RefreshSession, User, UserSecondaryEmail
 from app.models.wishlist import WishlistItem
 
 
@@ -31,6 +31,41 @@ def is_deletion_due(user: User, *, now: datetime | None = None) -> bool:
     return scheduled <= now_utc
 
 
+def _deleted_username(user_id: Any) -> str:
+    try:
+        suffix = str(getattr(user_id, "hex", "") or "").strip()
+    except Exception:
+        suffix = ""
+    suffix = suffix or secrets.token_hex(16)
+    return f"deleted-{suffix[:22]}"
+
+
+async def process_due_account_deletions(session: AsyncSession, *, limit: int = 200) -> int:
+    now = datetime.now(timezone.utc)
+    limit_clean = max(1, min(int(limit or 0), 2000))
+    rows = (
+        (
+            await session.execute(
+                sa.select(User)
+                .where(
+                    User.deleted_at.is_(None),
+                    User.deletion_scheduled_for.is_not(None),
+                    User.deletion_scheduled_for <= now,
+                )
+                .order_by(User.deletion_scheduled_for.asc())
+                .limit(limit_clean)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    deleted = 0
+    for user in rows:
+        await execute_account_deletion(session, user)
+        deleted += 1
+    return deleted
+
+
 async def execute_account_deletion(session: AsyncSession, user: User) -> None:
     if getattr(user, "deleted_at", None) is not None:
         return
@@ -41,6 +76,7 @@ async def execute_account_deletion(session: AsyncSession, user: User) -> None:
     user.deletion_scheduled_for = _ensure_utc(getattr(user, "deletion_scheduled_for", None)) or now
 
     user.email = f"deleted+{user.id}@example.invalid"
+    user.username = _deleted_username(user.id)
     user.name = None
     user.first_name = None
     user.middle_name = None
@@ -59,6 +95,7 @@ async def execute_account_deletion(session: AsyncSession, user: User) -> None:
     user.hashed_password = security.hash_password(secrets.token_urlsafe(32))
 
     session.add(user)
+    await session.execute(sa.delete(UserSecondaryEmail).where(UserSecondaryEmail.user_id == user.id))
     await session.execute(
         sa.update(RefreshSession)
         .where(RefreshSession.user_id == user.id, RefreshSession.revoked.is_(False))

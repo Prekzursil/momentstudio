@@ -19,6 +19,7 @@ ALLOWED_SOCIAL_DOMAINS: Final[tuple[str, ...]] = (
 _MAX_HTML_BYTES: Final[int] = 1_000_000
 _CACHE_TTL: Final[timedelta] = timedelta(hours=6)
 _UA: Final[str] = "momentstudio/1.0 (+https://momentstudio.ro)"
+_INSTAGRAM_UA: Final[str] = "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)"
 
 
 @dataclass(frozen=True)
@@ -105,6 +106,13 @@ def _extract_first_image(html: str, *, base_url: str) -> str | None:
     return None
 
 
+def _user_agent_for_host(host: str | None) -> str:
+    host_clean = (host or "").strip().lower()
+    if host_clean == "instagram.com" or host_clean.endswith(".instagram.com"):
+        return _INSTAGRAM_UA
+    return _UA
+
+
 async def fetch_social_thumbnail_url(url: str) -> str | None:
     parsed = urlparse((url or "").strip())
     if parsed.scheme not in {"http", "https"}:
@@ -119,7 +127,7 @@ async def fetch_social_thumbnail_url(url: str) -> str | None:
     if cached and cached.expires_at > now:
         return cached.thumbnail_url
 
-    headers = {"User-Agent": _UA, "Accept": "text/html,application/xhtml+xml"}
+    headers = {"User-Agent": _user_agent_for_host(parsed.hostname), "Accept": "text/html,application/xhtml+xml"}
     timeout = httpx.Timeout(8.0, connect=5.0)
 
     async with httpx.AsyncClient(follow_redirects=True, timeout=timeout, headers=headers) as client:
@@ -157,4 +165,3 @@ def try_extract_instagram_handle(url: str) -> str | None:
         return None
     handle = (match.group("handle") or "").strip()
     return handle or None
-

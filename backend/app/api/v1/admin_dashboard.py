@@ -105,9 +105,12 @@ from app.services import step_up as step_up_service
 from app.schemas.user_admin import (
     AdminEmailVerificationHistoryResponse,
     AdminEmailVerificationTokenInfo,
+    AdminOwnerTransferRequest,
     AdminPasswordResetResendRequest,
+    AdminUserDeleteRequest,
     AdminUserImpersonationResponse,
     AdminUserInternalUpdate,
+    AdminUserRoleUpdateRequest,
     AdminUserSecurityUpdate,
     AdminUserListItem,
     AdminUserListResponse,
@@ -3818,10 +3821,14 @@ async def admin_gdpr_deletion_requests(
 @router.post("/gdpr/deletions/{user_id}/execute", status_code=status.HTTP_204_NO_CONTENT)
 async def admin_gdpr_execute_deletion(
     user_id: UUID,
+    payload: AdminUserDeleteRequest,
     request: Request,
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(require_admin),
 ) -> None:
+    if not security.verify_password(payload.password, current_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+
     user = await session.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -3893,13 +3900,16 @@ async def admin_gdpr_cancel_deletion(
 @router.patch("/users/{user_id}/role")
 async def update_user_role(
     user_id: UUID,
-    payload: dict,
+    payload: AdminUserRoleUpdateRequest,
     request: Request,
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(require_admin),
 ) -> dict:
     if current_user.role not in (UserRole.owner, UserRole.admin):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only owner/admin can change user roles")
+
+    if not security.verify_password(payload.password, current_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
 
     user = await session.get(User, user_id)
     if not user:
@@ -3911,7 +3921,7 @@ async def update_user_role(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Owner role can only be transferred",
         )
-    role = payload.get("role")
+    role = payload.role
     if role not in (
         UserRole.customer.value,
         UserRole.support.value,
@@ -4242,7 +4252,7 @@ async def override_email_verification(
     user_id: UUID,
     request: Request,
     session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(require_owner),
+    current_user: User = Depends(require_admin),
 ) -> AdminUserProfileUser:
     user = await session.get(User, user_id)
     if not user or user.deleted_at is not None:
@@ -4336,21 +4346,24 @@ async def impersonate_user(
 
 @router.post("/owner/transfer")
 async def transfer_owner(
-    payload: dict,
+    payload: AdminOwnerTransferRequest,
     session: AsyncSession = Depends(get_session),
     current_owner: User = Depends(require_owner),
 ) -> dict:
-    identifier = str(payload.get("identifier") or "").strip()
+    identifier = str(payload.identifier or "").strip()
     if not identifier:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Identifier is required"
         )
 
-    confirm = str(payload.get("confirm") or "").strip()
+    confirm = str(payload.confirm or "").strip()
     if confirm.upper() != "TRANSFER":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail='Type "TRANSFER" to confirm'
         )
+
+    if not security.verify_password(payload.password, current_owner.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
 
     if "@" in identifier:
         target = await auth_service.get_user_by_any_email(session, identifier)

@@ -30,6 +30,27 @@ from app.schemas.user import UserCreate
 from app.services import self_service
 
 
+_INVISIBLE_TOKEN_CHARS = {
+    ord("\u200b"): None,  # zero-width space
+    ord("\u200c"): None,  # zero-width non-joiner
+    ord("\u200d"): None,  # zero-width joiner
+    ord("\ufeff"): None,  # zero-width no-break space
+    ord("\u2060"): None,  # word joiner
+    ord("\u00ad"): None,  # soft hyphen
+    ord("\u200e"): None,  # left-to-right mark
+    ord("\u200f"): None,  # right-to-left mark
+}
+
+
+def _normalize_token(token: str) -> str:
+    raw = str(token or "").strip()
+    if not raw:
+        return ""
+    cleaned = raw.translate(_INVISIBLE_TOKEN_CHARS)
+    cleaned = re.sub(r"\s+", "", cleaned)
+    return cleaned
+
+
 async def get_user_by_email(session: AsyncSession, email: str) -> User | None:
     email = (email or "").strip().lower()
     result = await session.execute(select(User).where(func.lower(User.email) == email))
@@ -611,7 +632,9 @@ async def request_secondary_email_verification(
 
 
 async def confirm_secondary_email_verification(session: AsyncSession, token: str) -> UserSecondaryEmail:
-    token = (token or "").strip()
+    token = _normalize_token(token)
+    if not token:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token")
     record = (
         (
             await session.execute(
@@ -754,6 +777,9 @@ async def create_reset_token(
 
 
 async def confirm_reset_token(session: AsyncSession, token: str, new_password: str) -> User:
+    token = _normalize_token(token)
+    if not token:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token")
     result = await session.execute(
         select(PasswordResetToken).where(PasswordResetToken.token == token, PasswordResetToken.used.is_(False))
     )
@@ -1015,6 +1041,9 @@ async def create_email_verification(session: AsyncSession, user: User, expires_m
 
 
 async def confirm_email_verification(session: AsyncSession, token: str) -> User:
+    token = _normalize_token(token)
+    if not token:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token")
     result = await session.execute(
         select(EmailVerificationToken).where(EmailVerificationToken.token == token, EmailVerificationToken.used.is_(False))
     )

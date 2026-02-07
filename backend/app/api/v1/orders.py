@@ -750,8 +750,12 @@ async def checkout(
     if payment_method == "netopia":
         if not settings.netopia_enabled:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Netopia is disabled")
-        if not netopia_service.is_netopia_configured():
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Netopia is not configured")
+        netopia_configured, netopia_reason = netopia_service.netopia_configuration_status()
+        if not netopia_configured:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=netopia_reason or "Netopia is not configured",
+            )
         first_name, last_name = _split_customer_name(getattr(order, "customer_name", None) or "")
         shipping_addr_obj = order.shipping_address or shipping_addr
         billing_addr_obj = order.billing_address or billing_addr or shipping_addr_obj
@@ -2086,8 +2090,12 @@ async def guest_checkout(
     if payment_method == "netopia":
         if not settings.netopia_enabled:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Netopia is disabled")
-        if not netopia_service.is_netopia_configured():
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Netopia is not configured")
+        netopia_configured, netopia_reason = netopia_service.netopia_configuration_status()
+        if not netopia_configured:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=netopia_reason or "Netopia is not configured",
+            )
         first_name, last_name = _split_customer_name(getattr(order, "customer_name", None) or "")
         shipping_addr_obj = order.shipping_address or shipping_addr
         billing_addr_obj = order.billing_address or billing_addr or shipping_addr_obj

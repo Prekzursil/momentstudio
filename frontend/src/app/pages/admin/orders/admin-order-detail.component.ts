@@ -166,15 +166,15 @@ type OrderAction =
                   {{ 'adminUi.orders.paymentMethod' | translate }}: {{ paymentMethodLabel() }}
                 </div>
               </div>
-              <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+                <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
                 <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.tracking' | translate }}</div>
-                <div class="mt-1 font-semibold text-slate-900 dark:text-slate-50 truncate">
+                <div class="mt-1 font-semibold text-slate-900 dark:text-slate-50 break-words whitespace-normal">
                   {{ order()!.tracking_number || '—' }}
                 </div>
                 <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
                   {{ 'adminUi.orders.deliveryMethod' | translate }}: {{ deliveryLabel() }}
                 </div>
-                <div *ngIf="lockerLabel()" class="mt-1 text-xs text-slate-600 dark:text-slate-300 truncate">
+                <div *ngIf="lockerLabel()" class="mt-1 text-xs text-slate-600 dark:text-slate-300 break-words whitespace-normal">
                   {{ lockerLabel() }}
                 </div>
               </div>

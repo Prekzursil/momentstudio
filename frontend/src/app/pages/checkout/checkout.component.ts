@@ -401,7 +401,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
 	  paymentMethod: CheckoutPaymentMethod = 'cod';
 	  stripeEnabled = Boolean(appConfig.stripeEnabled);
 	  paypalEnabled = Boolean(appConfig.paypalEnabled);
-	  netopiaEnabled = false;
+	  netopiaEnabled = Boolean(appConfig.netopiaEnabled);
 	  private syncDebounceHandle: ReturnType<typeof setTimeout> | null = null;
   private queuedSyncItems: CartItem[] | null = null;
   private checkoutRedirectedToCart = false;
@@ -1783,7 +1783,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
         next: (cap) => {
           this.stripeEnabled = Boolean(appConfig.stripeEnabled) && Boolean(cap?.stripe?.enabled);
           this.paypalEnabled = Boolean(cap?.paypal?.enabled);
-          this.netopiaEnabled = Boolean(cap?.netopia?.enabled);
+          this.netopiaEnabled = Boolean(appConfig.netopiaEnabled) && Boolean(cap?.netopia?.enabled);
           this.ensurePaymentMethodAvailable();
         },
         error: () => {
