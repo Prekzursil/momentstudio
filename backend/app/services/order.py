@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
+from collections import defaultdict
 from typing import Sequence
 from uuid import UUID
 import random
@@ -16,7 +17,7 @@ from sqlalchemy.sql.elements import ColumnElement
 
 from app.models.cart import Cart
 from app.models.address import Address
-from app.models.catalog import Product, ProductStatus
+from app.models.catalog import Product, ProductStatus, ProductVariant
 from app.models.order import (
     Order,
     OrderAdminNote,
@@ -40,6 +41,284 @@ from app.services.taxes import TaxableProductLine
 from app.services import payments
 from app.services import paypal
 from app.services import promo_usage
+
+
+_ORDER_STOCK_COMMIT_EVENT = "stock_committed"
+_ORDER_STOCK_RESTORE_EVENT = "stock_restored"
+
+
+async def _commit_stock_for_order(session: AsyncSession, order: Order) -> None:
+    existing = (
+        (
+            await session.execute(
+                select(OrderEvent.id).where(
+                    OrderEvent.order_id == order.id,
+                    OrderEvent.event == _ORDER_STOCK_COMMIT_EVENT,
+                )
+            )
+        )
+        .scalars()
+        .first()
+    )
+    if existing:
+        return
+
+    items: list[OrderItem] = list(getattr(order, "items", []) or [])
+    if not items:
+        await session.refresh(order, attribute_names=["items"])
+        items = list(getattr(order, "items", []) or [])
+    if not items:
+        return
+
+    qty_by_key: dict[tuple[UUID, UUID | None], int] = defaultdict(int)
+    for item in items:
+        product_id = getattr(item, "product_id", None)
+        if not product_id:
+            continue
+        qty = int(getattr(item, "quantity", 0) or 0)
+        if qty <= 0:
+            continue
+        qty_by_key[(product_id, getattr(item, "variant_id", None))] += qty
+
+    if not qty_by_key:
+        return
+
+    product_ids = {pid for pid, vid in qty_by_key.keys() if vid is None}
+    variant_ids = {vid for _, vid in qty_by_key.keys() if vid is not None}
+
+    products: dict[UUID, Product] = {}
+    if product_ids:
+        products = {
+            p.id: p
+            for p in (
+                (
+                    await session.execute(
+                        select(Product).where(Product.id.in_(product_ids)).with_for_update()
+                    )
+                )
+                .scalars()
+                .all()
+            )
+        }
+
+    variants: dict[UUID, ProductVariant] = {}
+    if variant_ids:
+        variants = {
+            v.id: v
+            for v in (
+                (
+                    await session.execute(
+                        select(ProductVariant).where(ProductVariant.id.in_(variant_ids)).with_for_update()
+                    )
+                )
+                .scalars()
+                .all()
+            )
+        }
+
+    lines: list[dict[str, object]] = []
+    for (product_id, variant_id), qty in qty_by_key.items():
+        if variant_id:
+            variant = variants.get(variant_id)
+            if not variant:
+                continue
+            before = int(getattr(variant, "stock_quantity", 0) or 0)
+            after = max(0, before - qty)
+            variant.stock_quantity = after
+            session.add(variant)
+            deducted = before - after
+            lines.append(
+                {
+                    "product_id": str(product_id),
+                    "variant_id": str(variant_id),
+                    "requested_qty": int(qty),
+                    "deducted_qty": int(deducted),
+                    "shortage_qty": int(max(0, qty - deducted)),
+                    "before": int(before),
+                    "after": int(after),
+                }
+            )
+            continue
+
+        product = products.get(product_id)
+        if not product:
+            continue
+        before = int(getattr(product, "stock_quantity", 0) or 0)
+        after = max(0, before - qty)
+        product.stock_quantity = after
+        session.add(product)
+        deducted = before - after
+        lines.append(
+            {
+                "product_id": str(product_id),
+                "variant_id": None,
+                "requested_qty": int(qty),
+                "deducted_qty": int(deducted),
+                "shortage_qty": int(max(0, qty - deducted)),
+                "before": int(before),
+                "after": int(after),
+            }
+        )
+
+    if not lines:
+        return
+
+    session.add(
+        OrderEvent(
+            order_id=order.id,
+            event=_ORDER_STOCK_COMMIT_EVENT,
+            note=None,
+            data={"lines": lines},
+        )
+    )
+
+
+def _try_uuid(value: object) -> UUID | None:
+    if value is None:
+        return None
+    try:
+        return UUID(str(value))
+    except Exception:
+        return None
+
+
+async def _restore_stock_for_order(session: AsyncSession, order: Order) -> None:
+    already_restored = (
+        (
+            await session.execute(
+                select(OrderEvent.id).where(
+                    OrderEvent.order_id == order.id,
+                    OrderEvent.event == _ORDER_STOCK_RESTORE_EVENT,
+                )
+            )
+        )
+        .scalars()
+        .first()
+    )
+    if already_restored:
+        return
+
+    committed = (
+        (
+            await session.execute(
+                select(OrderEvent).where(
+                    OrderEvent.order_id == order.id,
+                    OrderEvent.event == _ORDER_STOCK_COMMIT_EVENT,
+                )
+            )
+        )
+        .scalars()
+        .first()
+    )
+    if not committed:
+        return
+
+    data = getattr(committed, "data", None) or {}
+    raw_lines = data.get("lines") if isinstance(data, dict) else None
+    if not isinstance(raw_lines, list):
+        return
+
+    restore_by_key: dict[tuple[UUID, UUID | None], int] = defaultdict(int)
+    for raw in raw_lines:
+        if not isinstance(raw, dict):
+            continue
+        product_id = _try_uuid(raw.get("product_id"))
+        if not product_id:
+            continue
+        variant_id = _try_uuid(raw.get("variant_id")) if raw.get("variant_id") else None
+        try:
+            deducted_qty = int(raw.get("deducted_qty") or 0)
+        except Exception:
+            deducted_qty = 0
+        if deducted_qty <= 0:
+            continue
+        restore_by_key[(product_id, variant_id)] += deducted_qty
+
+    if not restore_by_key:
+        return
+
+    product_ids = {pid for pid, vid in restore_by_key.keys() if vid is None}
+    variant_ids = {vid for _, vid in restore_by_key.keys() if vid is not None}
+
+    products: dict[UUID, Product] = {}
+    if product_ids:
+        products = {
+            p.id: p
+            for p in (
+                (
+                    await session.execute(
+                        select(Product).where(Product.id.in_(product_ids)).with_for_update()
+                    )
+                )
+                .scalars()
+                .all()
+            )
+        }
+
+    variants: dict[UUID, ProductVariant] = {}
+    if variant_ids:
+        variants = {
+            v.id: v
+            for v in (
+                (
+                    await session.execute(
+                        select(ProductVariant).where(ProductVariant.id.in_(variant_ids)).with_for_update()
+                    )
+                )
+                .scalars()
+                .all()
+            )
+        }
+
+    restored_lines: list[dict[str, object]] = []
+    for (product_id, variant_id), qty in restore_by_key.items():
+        if variant_id:
+            variant = variants.get(variant_id)
+            if not variant:
+                continue
+            before = int(getattr(variant, "stock_quantity", 0) or 0)
+            after = before + int(qty)
+            variant.stock_quantity = after
+            session.add(variant)
+            restored_lines.append(
+                {
+                    "product_id": str(product_id),
+                    "variant_id": str(variant_id),
+                    "restored_qty": int(qty),
+                    "before": int(before),
+                    "after": int(after),
+                }
+            )
+            continue
+
+        product = products.get(product_id)
+        if not product:
+            continue
+        before = int(getattr(product, "stock_quantity", 0) or 0)
+        after = before + int(qty)
+        product.stock_quantity = after
+        session.add(product)
+        restored_lines.append(
+            {
+                "product_id": str(product_id),
+                "variant_id": None,
+                "restored_qty": int(qty),
+                "before": int(before),
+                "after": int(after),
+            }
+        )
+
+    if not restored_lines:
+        return
+
+    session.add(
+        OrderEvent(
+            order_id=order.id,
+            event=_ORDER_STOCK_RESTORE_EVENT,
+            note=None,
+            data={"lines": restored_lines, "committed_event_id": str(getattr(committed, "id", "") or "") or None},
+        )
+    )
 
 
 async def build_order_from_cart(
@@ -850,6 +1129,10 @@ async def update_order(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status transition")
         order.status = next_status
         data.pop("status")
+        if next_status in {OrderStatus.paid, OrderStatus.shipped, OrderStatus.delivered}:
+            await _commit_stock_for_order(session, order)
+        elif next_status == OrderStatus.cancelled:
+            await _restore_stock_for_order(session, order)
         await _log_event(
             session,
             order.id,
@@ -1005,6 +1288,7 @@ async def update_order(
     ):
         previous = OrderStatus(order.status)
         order.status = OrderStatus.shipped
+        await _commit_stock_for_order(session, order)
         await _log_event(
             session,
             order.id,
@@ -1742,6 +2026,7 @@ async def void_payment(session: AsyncSession, order: Order, intent_id: str | Non
     if not (getattr(order, "cancel_reason", None) or "").strip():
         order.cancel_reason = "Cancelled via payment void/refund."
     await _log_event(session, order.id, event, note)
+    await _restore_stock_for_order(session, order)
     session.add(order)
     await session.commit()
     hydrated = await get_order_by_id(session, order.id)

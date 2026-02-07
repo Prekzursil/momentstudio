@@ -1579,6 +1579,92 @@ def test_admin_accept_requires_payment_capture_and_cancel_reason(
     assert edit_reason.json()["cancel_reason"] == "Out of stock (refund issued)"
 
 
+def test_admin_cancel_restores_stock_for_committed_orders(
+    test_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    async def fake_email(*_args, **_kwargs):
+        return True
+
+    monkeypatch.setattr(email_service, "send_order_processing_update", fake_email)
+    monkeypatch.setattr(email_service, "send_order_cancelled_update", fake_email)
+
+    _, user_id = create_user_token(SessionLocal, email="buyer-stock@example.com")
+    admin_token, _ = create_user_token(SessionLocal, email="admin-stock@example.com", admin=True)
+
+    async def seed_order_with_stock() -> tuple[UUID, UUID]:
+        async with SessionLocal() as session:
+            category = Category(slug="stock", name="Stock")
+            product = Product(
+                category=category,
+                slug="stock-prod",
+                sku="STOCK-PROD",
+                name="Stock Product",
+                base_price=Decimal("20.00"),
+                currency="RON",
+                stock_quantity=5,
+                status=ProductStatus.published,
+            )
+            order = Order(
+                user_id=user_id,
+                status=OrderStatus.pending_acceptance,
+                reference_code="STOCK1",
+                customer_email="buyer-stock@example.com",
+                customer_name="Buyer Stock",
+                total_amount=Decimal("40.00"),
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                currency="RON",
+                payment_method="cod",
+            )
+            session.add_all([product, order])
+            await session.flush()
+            session.add(
+                OrderItem(
+                    order_id=order.id,
+                    product_id=product.id,
+                    variant_id=None,
+                    quantity=2,
+                    unit_price=Decimal("20.00"),
+                    subtotal=Decimal("40.00"),
+                )
+            )
+            await session.commit()
+            await session.refresh(order)
+            await session.refresh(product)
+            return order.id, product.id
+
+    order_id, product_id = asyncio.run(seed_order_with_stock())
+
+    accept = client.patch(
+        f"/api/v1/orders/admin/{order_id}",
+        headers=auth_headers(admin_token),
+        json={"status": "paid"},
+    )
+    assert accept.status_code == 200, accept.text
+    assert accept.json()["status"] == "paid"
+
+    async def get_stock() -> int:
+        async with SessionLocal() as session:
+            prod = await session.get(Product, product_id)
+            assert prod is not None
+            return int(getattr(prod, "stock_quantity", 0) or 0)
+
+    assert asyncio.run(get_stock()) == 3
+
+    cancel = client.patch(
+        f"/api/v1/orders/admin/{order_id}",
+        headers=auth_headers(admin_token),
+        json={"status": "cancelled", "cancel_reason": "Customer requested cancellation"},
+    )
+    assert cancel.status_code == 200, cancel.text
+    assert cancel.json()["status"] == "cancelled"
+
+    assert asyncio.run(get_stock()) == 5
+
+
 def test_admin_shipping_label_upload_download_and_delete(
     test_app: Dict[str, object], tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
