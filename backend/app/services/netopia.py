@@ -60,6 +60,30 @@ def _to_subject_public_key_pem(public_key: asymmetric_types.PublicKeyTypes) -> s
     )
 
 
+def _read_netopia_key_bytes(path: str) -> bytes:
+    raw = (path or "").strip()
+    if not raw:
+        return b""
+
+    preferred = Path(raw)
+    candidates: list[Path] = [preferred]
+    if not preferred.is_absolute():
+        private_root = Path((getattr(settings, "private_media_root", None) or "private_uploads").strip() or "private_uploads")
+        candidates.append(private_root / raw)
+
+    last_exc: OSError | None = None
+    for candidate in candidates:
+        try:
+            if candidate.is_file():
+                return candidate.read_bytes()
+        except OSError as exc:
+            last_exc = exc
+
+    if last_exc:
+        raise last_exc
+    raise FileNotFoundError(raw)
+
+
 def _public_key_pem() -> str:
     env = _netopia_env()
     preferred_pem = settings.netopia_public_key_pem_live if env == "live" else settings.netopia_public_key_pem_sandbox
@@ -72,11 +96,11 @@ def _public_key_pem() -> str:
     path = (preferred_path or settings.netopia_public_key_path or "").strip()
     if path:
         try:
-            key_bytes = Path(path).read_bytes()
+            key_bytes = _read_netopia_key_bytes(path)
         except OSError as exc:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Netopia public key could not be read",
+                detail="Netopia public key could not be read (check NETOPIA_PUBLIC_KEY_PATH_*)",
             ) from exc
 
         if not key_bytes:
