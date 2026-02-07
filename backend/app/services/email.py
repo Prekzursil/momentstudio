@@ -721,15 +721,29 @@ async def send_password_reset(to_email: str, token: str, lang: str | None = None
     return await send_email(to_email, subject, text_body, html_body)
 
 
-async def send_verification_email(to_email: str, token: str, lang: str | None = None, kind: str = "primary") -> bool:
+def _sanitize_next_path(next_path: str | None) -> str | None:
+    raw = str(next_path or "").strip()
+    if not raw:
+        return None
+    if not raw.startswith("/") or raw.startswith("//") or "://" in raw:
+        return None
+    return raw
+
+
+async def send_verification_email(
+    to_email: str, token: str, lang: str | None = None, kind: str = "primary", next_path: str | None = None
+) -> bool:
     subject = _bilingual_subject("Verifică-ți emailul", "Verify your email", preferred_language=lang)
     kind_norm = (kind or "primary").strip().lower()
     params: dict[str, str] = {"token": token}
     if kind_norm and kind_norm != "primary":
         params["kind"] = kind_norm
+    next_norm = _sanitize_next_path(next_path)
     if kind_norm == "guest":
         params["email"] = to_email
-        params["next"] = "/checkout"
+        params["next"] = next_norm or "/checkout"
+    elif next_norm:
+        params["next"] = next_norm
     verify_url = f"{settings.frontend_origin.rstrip('/')}/verify-email?{urlencode(params)}"
 
     text_ro = (

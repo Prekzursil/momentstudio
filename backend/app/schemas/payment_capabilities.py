@@ -5,6 +5,7 @@ class PaymentMethodCapability(BaseModel):
     supported: bool = True
     configured: bool = True
     enabled: bool = True
+    reason_code: str | None = None
     reason: str | None = None
 
 
@@ -14,4 +15,3 @@ class PaymentsCapabilitiesResponse(BaseModel):
     paypal: PaymentMethodCapability
     netopia: PaymentMethodCapability
     cod: PaymentMethodCapability
-

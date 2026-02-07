@@ -67,21 +67,26 @@ async def payment_capabilities() -> PaymentsCapabilitiesResponse:
     stripe_configured = payments.is_stripe_configured()
     stripe_enabled = bool(mock_mode or stripe_configured)
     stripe_reason = None if stripe_enabled else "Stripe is not configured"
+    stripe_reason_code = None if stripe_enabled else "missing_credentials"
 
     paypal_configured = paypal_service.is_paypal_configured()
     paypal_enabled = bool(mock_mode or paypal_configured)
     paypal_reason = None if paypal_enabled else "PayPal is not configured"
+    paypal_reason_code = None if paypal_enabled else "missing_credentials"
 
     netopia_configured, netopia_config_reason = netopia_service.netopia_configuration_status()
     netopia_supported = True
     netopia_enabled = False
     if not settings.netopia_enabled:
         netopia_reason = "Netopia is disabled"
+        netopia_reason_code = "disabled_in_env"
     elif not netopia_configured:
         netopia_reason = netopia_config_reason or "Netopia is not configured"
+        netopia_reason_code = "missing_credentials"
     else:
         netopia_enabled = True
         netopia_reason = None
+        netopia_reason_code = None
 
     return PaymentsCapabilitiesResponse(
         payments_provider=str(getattr(settings, "payments_provider", "") or "real"),
@@ -89,18 +94,21 @@ async def payment_capabilities() -> PaymentsCapabilitiesResponse:
             supported=True,
             configured=stripe_configured,
             enabled=stripe_enabled,
+            reason_code=stripe_reason_code,
             reason=stripe_reason,
         ),
         paypal=PaymentMethodCapability(
             supported=True,
             configured=paypal_configured,
             enabled=paypal_enabled,
+            reason_code=paypal_reason_code,
             reason=paypal_reason,
         ),
         netopia=PaymentMethodCapability(
             supported=netopia_supported,
             configured=netopia_configured,
             enabled=netopia_enabled,
+            reason_code=netopia_reason_code,
             reason=netopia_reason,
         ),
         cod=PaymentMethodCapability(supported=True, configured=True, enabled=True, reason=None),

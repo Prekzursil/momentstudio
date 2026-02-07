@@ -63,7 +63,7 @@ type SavedCheckout = {
 };
 
 type CheckoutPaymentMethod = 'cod' | 'netopia' | 'paypal' | 'stripe';
-type PaymentMethodCapability = { enabled?: boolean; reason?: string | null };
+type PaymentMethodCapability = { enabled?: boolean; reason?: string | null; reason_code?: string | null };
 
 type CheckoutQuote = {
   subtotal: number;
@@ -681,7 +681,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     this.primaryEmailVerificationBusy = true;
     this.primaryEmailVerificationStatus = '';
 
-    this.auth.requestEmailVerification().subscribe({
+    this.auth.requestEmailVerification('/checkout').subscribe({
       next: () => {
         this.primaryEmailVerificationStatus = this.translate.instant('account.verification.sentStatus');
         this.primaryEmailVerificationResendUntil = Date.now() + 60_000;
@@ -1834,8 +1834,15 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
           const netopiaUiEnabled = Boolean(appConfig.netopiaEnabled);
           const netopiaBackendEnabled = Boolean(cap?.netopia?.enabled);
           this.netopiaEnabled = netopiaUiEnabled && netopiaBackendEnabled;
-          this.netopiaDisabledReason =
-            netopiaUiEnabled && !netopiaBackendEnabled ? String(cap?.netopia?.reason || '').trim() : '';
+          if (netopiaUiEnabled && !netopiaBackendEnabled) {
+            const reasonCode = String(cap?.netopia?.reason_code || '').trim();
+            const reasonKey = reasonCode ? `checkout.paymentDisabledReasons.${reasonCode}` : '';
+            const translated = reasonKey ? this.translate.instant(reasonKey) : '';
+            const fallback = String(cap?.netopia?.reason || '').trim();
+            this.netopiaDisabledReason = translated && translated !== reasonKey ? translated : fallback;
+          } else {
+            this.netopiaDisabledReason = '';
+          }
           this.ensurePaymentMethodAvailable();
         },
         error: () => {

@@ -1338,6 +1338,10 @@
     "paymentStripeHint": "Pay with Stripe (you’ll be redirected).",
     "paymentNetopiaHint": "Pay with Netopia (you’ll be redirected).",
     "paymentNetopiaDisabled": "Netopia is not configured yet.",
+    "paymentDisabledReasons": {
+      "disabled_in_env": "This payment method is currently disabled.",
+      "missing_credentials": "This payment method is not configured yet."
+    },
     "paymentMethodUnavailable": "This payment method is not available for your current cart.",
     "paymentPayPalHint": "Pay with PayPal (you’ll be redirected).",
     "paymentCashHint": "Pay in cash upon delivery (RON).",

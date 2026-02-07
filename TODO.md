@@ -17,10 +17,10 @@ Below is a structured checklist you can turn into issues.
 - [x] Consent UX: prevent early “Accept” click in scroll-to-accept modals (disable until bottom; handle dynamic content/layout).
 - [x] Auth UX: replace manual email verification code entry with clickable verification links (primary + secondary + guest checkout).
 - [x] Security: add app-level rate limits for checkout/payment intent/support/newsletter/verification resend endpoints.
-- [ ] Edge security: enforce rate limits at CDN/WAF/proxy for checkout + verification endpoints and configure trusted proxy headers for real client IPs.
-- [ ] Auth UX: support optional `next=` redirect in verification emails (return user to checkout/account after confirming).
-- [ ] Dev safety: prevent accidental use of production `DATABASE_URL` when `ENVIRONMENT=local` (configurable allowlist/opt-out).
-- [ ] Payments UX: return payment capability `reason_code` values so checkout can localize disabled-method messages (keep `reason` as fallback).
+- [x] Edge security: enforce rate limits at CDN/WAF/proxy for checkout + verification endpoints and configure trusted proxy headers for real client IPs.
+- [x] Auth UX: support optional `next=` redirect in verification emails (return user to checkout/account after confirming).
+- [x] Dev safety: prevent accidental use of production `DATABASE_URL` when `ENVIRONMENT=local` (configurable allowlist/opt-out).
+- [x] Payments UX: return payment capability `reason_code` values so checkout can localize disabled-method messages (keep `reason` as fallback).
 - [x] Admin Orders: prevent 400s on status/tracking updates (guide allowed transitions + clearer errors).
 - [x] Backend Email: prevent SMTP blocking the event loop (wrap `smtplib` send in `anyio.to_thread.run_sync` or switch to async SMTP).
 - [x] Backend Jobs: avoid duplicate scheduled loops when running multiple workers/replicas (move schedulers to worker service or add Postgres advisory-lock leader election).

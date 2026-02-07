@@ -115,6 +115,7 @@ export class VerifyEmailComponent implements OnInit {
         next: () => {
           this.succeed(this.translate.instant('auth.verifyEmail.secondarySuccess'));
           this.refreshAuthUserIfPossible();
+          if (rawNext) this.safeNavigateNext(rawNext, '/account');
         },
         error: () => this.fail(this.translate.instant('auth.verifyEmail.invalidOrExpired'))
       });
@@ -125,6 +126,7 @@ export class VerifyEmailComponent implements OnInit {
       next: () => {
         this.succeed(this.translate.instant('auth.verifyEmail.success'));
         this.refreshAuthUserIfPossible();
+        if (rawNext) this.safeNavigateNext(rawNext, '/account');
       },
       error: () => this.fail(this.translate.instant('auth.verifyEmail.invalidOrExpired'))
     });
@@ -164,4 +166,3 @@ export class VerifyEmailComponent implements OnInit {
     this.errorMessage = message;
   }
 }
-

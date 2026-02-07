@@ -1196,6 +1196,7 @@ async def change_password(
 @router.post("/verify/request", status_code=status.HTTP_202_ACCEPTED)
 async def request_email_verification(
     background_tasks: BackgroundTasks,
+    next: str | None = None,
     _: None = Depends(verify_request_rate_limit),
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
@@ -1206,6 +1207,7 @@ async def request_email_verification(
         current_user.email,
         record.token,
         current_user.preferred_language,
+        next_path=next,
     )
     return {"detail": "Verification email sent"}
 
@@ -1486,7 +1488,14 @@ async def add_my_secondary_email(
     session: AsyncSession = Depends(get_session),
 ) -> SecondaryEmailResponse:
     secondary, token = await auth_service.add_secondary_email(session, current_user, str(payload.email))
-    background_tasks.add_task(email_service.send_verification_email, secondary.email, token.token, current_user.preferred_language, "secondary")
+    background_tasks.add_task(
+        email_service.send_verification_email,
+        secondary.email,
+        token.token,
+        current_user.preferred_language,
+        "secondary",
+        next_path="/account",
+    )
     return SecondaryEmailResponse.model_validate(secondary)
 
 
@@ -1498,13 +1507,21 @@ async def add_my_secondary_email(
 async def request_secondary_email_verification(
     secondary_email_id: UUID,
     background_tasks: BackgroundTasks,
+    next: str | None = None,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     token = await auth_service.request_secondary_email_verification(session, current_user, secondary_email_id)
     secondary = await session.get(UserSecondaryEmail, secondary_email_id)
     if secondary:
-        background_tasks.add_task(email_service.send_verification_email, secondary.email, token.token, current_user.preferred_language, "secondary")
+        background_tasks.add_task(
+            email_service.send_verification_email,
+            secondary.email,
+            token.token,
+            current_user.preferred_language,
+            "secondary",
+            next_path=next or "/account",
+        )
     return {"detail": "Verification email sent"}
 
 

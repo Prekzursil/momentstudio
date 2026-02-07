@@ -1242,7 +1242,7 @@ export class AccountState implements OnInit, OnDestroy {
 
   resendVerification(): void {
     if (this.primaryVerificationResendRemainingSeconds() > 0) return;
-    this.auth.requestEmailVerification().subscribe({
+    this.auth.requestEmailVerification('/account').subscribe({
       next: () => {
         this.verificationStatus = this.t('account.verification.sentStatus');
         this.primaryVerificationResendUntil.set(Date.now() + 60_000);
@@ -2608,7 +2608,7 @@ export class AccountState implements OnInit, OnDestroy {
     if (this.secondaryEmailResendRemainingSeconds(secondaryEmailId) > 0) return;
     this.secondaryEmailMessage = null;
     this.secondaryVerificationStatus = null;
-    this.auth.requestSecondaryEmailVerification(secondaryEmailId).subscribe({
+    this.auth.requestSecondaryEmailVerification(secondaryEmailId, '/account').subscribe({
       next: () => {
         this.secondaryEmailMessage = this.t('account.security.emails.verificationResent');
         this.bumpSecondaryEmailResendCooldown(secondaryEmailId);

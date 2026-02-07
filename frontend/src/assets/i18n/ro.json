@@ -1338,6 +1338,10 @@
     "paymentStripeHint": "Plătește cu Stripe (vei fi redirecționat).",
     "paymentNetopiaHint": "Plătește cu Netopia (vei fi redirecționat).",
     "paymentNetopiaDisabled": "Netopia nu este încă configurat.",
+    "paymentDisabledReasons": {
+      "disabled_in_env": "Această metodă de plată este dezactivată momentan.",
+      "missing_credentials": "Această metodă de plată nu este încă configurată."
+    },
     "paymentMethodUnavailable": "Această metodă de plată nu este disponibilă pentru coșul curent.",
     "paymentPayPalHint": "Plătește cu PayPal (vei fi redirecționat).",
     "paymentCashHint": "Plătești în numerar la livrare (RON).",
