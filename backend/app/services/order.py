@@ -362,21 +362,110 @@ async def build_order_from_cart(
     if not cart.items:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty")
 
-    product_ids = {item.product_id for item in cart.items if getattr(item, "product_id", None)}
+    qty_by_key: dict[tuple[UUID, UUID | None], int] = defaultdict(int)
+    product_ids: set[UUID] = set()
+    variant_ids: set[UUID] = set()
+    for item in cart.items:
+        product_id = getattr(item, "product_id", None)
+        if not product_id:
+            continue
+        quantity = int(getattr(item, "quantity", 0) or 0)
+        if quantity <= 0:
+            continue
+        product_ids.add(product_id)
+        variant_id = getattr(item, "variant_id", None)
+        if variant_id:
+            variant_ids.add(variant_id)
+        qty_by_key[(product_id, variant_id)] += quantity
+
+    products_by_id: dict[UUID, Product] = {}
     if product_ids:
-        result = await session.execute(
-            select(Product.id, Product.status, Product.is_active, Product.is_deleted).where(Product.id.in_(product_ids))
+        rows = (
+            (
+                await session.execute(
+                    select(Product)
+                    .where(Product.id.in_(product_ids))
+                    .order_by(Product.id)
+                    .with_for_update()
+                )
+            )
+            .scalars()
+            .all()
         )
-        rows = list(result.all())
-        found = {row[0] for row in rows}
-        missing = product_ids - found
+        products_by_id = {p.id: p for p in rows}
+        missing = product_ids - set(products_by_id.keys())
         unavailable = [
             pid
-            for (pid, status_value, is_active, is_deleted) in rows
-            if is_deleted or not is_active or ProductStatus(status_value) != ProductStatus.published
+            for pid, prod in products_by_id.items()
+            if getattr(prod, "is_deleted", False)
+            or not bool(getattr(prod, "is_active", True))
+            or getattr(prod, "status", None) != ProductStatus.published
         ]
         if missing or unavailable:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="One or more cart items are unavailable")
+
+    variants_by_id: dict[UUID, ProductVariant] = {}
+    if variant_ids:
+        variant_rows = (
+            (
+                await session.execute(
+                    select(ProductVariant)
+                    .where(ProductVariant.id.in_(variant_ids))
+                    .order_by(ProductVariant.id)
+                    .with_for_update()
+                )
+            )
+            .scalars()
+            .all()
+        )
+        variants_by_id = {v.id: v for v in variant_rows}
+        missing_variants = variant_ids - set(variants_by_id.keys())
+        if missing_variants:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid variant")
+
+    if qty_by_key:
+        open_statuses = {OrderStatus.pending_payment, OrderStatus.pending_acceptance}
+        reserved_expr = case(
+            (
+                OrderItem.quantity > OrderItem.shipped_quantity,
+                OrderItem.quantity - OrderItem.shipped_quantity,
+            ),
+            else_=0,
+        )
+        reserved_stmt = (
+            select(
+                OrderItem.product_id,
+                OrderItem.variant_id,
+                func.coalesce(func.sum(reserved_expr), 0).label("qty"),
+            )
+            .select_from(OrderItem)
+            .join(Order, Order.id == OrderItem.order_id)
+            .where(Order.status.in_(open_statuses), OrderItem.product_id.in_(product_ids))
+            .group_by(OrderItem.product_id, OrderItem.variant_id)
+        )
+        reserved_rows = (await session.execute(reserved_stmt)).all()
+        reserved_by_key: dict[tuple[UUID, UUID | None], int] = {
+            (row[0], row[1]): int(row[2] or 0) for row in reserved_rows
+        }
+
+        for (product_id, variant_id), quantity in qty_by_key.items():
+            product = products_by_id.get(product_id)
+            if not product:
+                continue
+            if bool(getattr(product, "allow_backorder", False)):
+                continue
+
+            reserved_qty = int(reserved_by_key.get((product_id, variant_id), 0) or 0)
+            if variant_id:
+                variant = variants_by_id.get(variant_id)
+                if not variant or getattr(variant, "product_id", None) != product_id:
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid variant")
+                stock_qty = int(getattr(variant, "stock_quantity", 0) or 0)
+            else:
+                stock_qty = int(getattr(product, "stock_quantity", 0) or 0)
+            available_qty = stock_qty - reserved_qty
+            if quantity > available_qty:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Insufficient stock")
 
     subtotal = Decimal("0.00")
     items: list[OrderItem] = []

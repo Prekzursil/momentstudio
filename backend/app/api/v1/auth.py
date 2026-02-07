@@ -1,10 +1,12 @@
-from pathlib import Path
 import logging
 import re
 from datetime import datetime, timedelta, timezone, date
+from functools import partial
+from pathlib import Path
 from urllib.parse import urlencode
 from uuid import UUID
 
+import anyio
 from jose import jwt
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
@@ -1985,12 +1987,15 @@ async def upload_avatar(
     avatars_root = Path(settings.media_root) / "avatars"
     extension = Path(file.filename or "").suffix.lower() or ".png"
     filename = f"avatar-{current_user.id}{extension}"
-    url_path, saved_name = storage.save_upload(
-        file,
-        root=avatars_root,
-        filename=filename,
-        allowed_content_types=("image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"),
-        max_bytes=5 * 1024 * 1024,
+    url_path, saved_name = await anyio.to_thread.run_sync(
+        partial(
+            storage.save_upload,
+            file,
+            root=avatars_root,
+            filename=filename,
+            allowed_content_types=("image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"),
+            max_bytes=5 * 1024 * 1024,
+        )
     )
     current_user.avatar_url = url_path
     session.add(current_user)

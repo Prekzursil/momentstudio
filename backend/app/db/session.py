@@ -9,7 +9,15 @@ from app.core.config import settings
 
 connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
 
-engine = create_async_engine(settings.database_url, future=True, echo=False, connect_args=connect_args)
+engine_kwargs: dict[str, object] = {"future": True, "echo": False, "connect_args": connect_args}
+if settings.database_url.startswith("postgresql"):
+    if settings.db_pool_size is not None:
+        engine_kwargs["pool_size"] = int(settings.db_pool_size)
+    if settings.db_max_overflow is not None:
+        engine_kwargs["max_overflow"] = int(settings.db_max_overflow)
+    engine_kwargs["pool_pre_ping"] = True
+
+engine = create_async_engine(settings.database_url, **engine_kwargs)
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False, autoflush=False, class_=AsyncSession)
 
 logger = logging.getLogger("app.db.slowquery")

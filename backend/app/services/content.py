@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from functools import partial
 import uuid
 from uuid import UUID
 import re
@@ -7,6 +8,7 @@ from urllib.parse import parse_qs, urlsplit
 from pathlib import Path
 from typing import Any
 
+import anyio
 from fastapi import HTTPException, status
 from PIL import Image, ImageOps
 from sqlalchemy import String, cast, func, or_, select, update
@@ -523,11 +525,14 @@ async def upsert_block(
 
 
 async def add_image(session: AsyncSession, block: ContentBlock, file, actor_id: UUID | None = None) -> ContentBlock:
-    path, filename = storage.save_upload(
-        file,
-        allowed_content_types=("image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"),
-        max_bytes=5 * 1024 * 1024,
-        generate_thumbnails=True,
+    path, filename = await anyio.to_thread.run_sync(
+        partial(
+            storage.save_upload,
+            file,
+            allowed_content_types=("image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"),
+            max_bytes=5 * 1024 * 1024,
+            generate_thumbnails=True,
+        )
     )
     next_sort = (max([img.sort_order for img in block.images], default=0) or 0) + 1
     image = ContentImage(content_block_id=block.id, url=path, alt_text=filename, sort_order=next_sort)
@@ -571,100 +576,104 @@ async def edit_image_asset(
     if out_format == "GIF":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="GIF editing is not supported")
 
-    with Image.open(source_path) as opened:
-        img = ImageOps.exif_transpose(opened) or opened
-        base_w, base_h = img.size
+    def _process_image() -> tuple[str, int, int]:
+        with Image.open(source_path) as opened:
+            img = ImageOps.exif_transpose(opened) or opened
+            base_w, base_h = img.size
 
-        focal_x = int(getattr(image, "focal_x", 50) or 50)
-        focal_y = int(getattr(image, "focal_y", 50) or 50)
-        fx = base_w * (focal_x / 100.0)
-        fy = base_h * (focal_y / 100.0)
+            focal_x = int(getattr(image, "focal_x", 50) or 50)
+            focal_y = int(getattr(image, "focal_y", 50) or 50)
+            fx = base_w * (focal_x / 100.0)
+            fy = base_h * (focal_y / 100.0)
 
-        rotate_cw = int(getattr(payload, "rotate_cw", 0) or 0)
-        if rotate_cw == 90:
-            img = img.transpose(Image.Transpose.ROTATE_270)
-            fx, fy = base_h - fy, fx
-        elif rotate_cw == 180:
-            img = img.transpose(Image.Transpose.ROTATE_180)
-            fx, fy = base_w - fx, base_h - fy
-        elif rotate_cw == 270:
-            img = img.transpose(Image.Transpose.ROTATE_90)
-            fx, fy = fy, base_w - fx
+            rotate_cw = int(getattr(payload, "rotate_cw", 0) or 0)
+            if rotate_cw == 90:
+                img = img.transpose(Image.Transpose.ROTATE_270)
+                fx, fy = base_h - fy, fx
+            elif rotate_cw == 180:
+                img = img.transpose(Image.Transpose.ROTATE_180)
+                fx, fy = base_w - fx, base_h - fy
+            elif rotate_cw == 270:
+                img = img.transpose(Image.Transpose.ROTATE_90)
+                fx, fy = fy, base_w - fx
 
-        width, height = img.size
-
-        if payload.crop_aspect_w is not None and payload.crop_aspect_h is not None:
-            target_ratio = float(payload.crop_aspect_w) / float(payload.crop_aspect_h)
-            current_ratio = float(width) / float(height) if height else 0.0
-            if current_ratio > target_ratio:
-                crop_h = float(height)
-                crop_w = crop_h * target_ratio
-            else:
-                crop_w = float(width)
-                crop_h = crop_w / target_ratio if target_ratio else float(height)
-
-            left = fx - crop_w / 2
-            top = fy - crop_h / 2
-            left = max(0.0, min(left, float(width) - crop_w))
-            top = max(0.0, min(top, float(height) - crop_h))
-            right = left + crop_w
-            bottom = top + crop_h
-
-            crop_box = (int(round(left)), int(round(top)), int(round(right)), int(round(bottom)))
-            crop_box = (
-                max(0, min(crop_box[0], width - 1)),
-                max(0, min(crop_box[1], height - 1)),
-                max(1, min(crop_box[2], width)),
-                max(1, min(crop_box[3], height)),
-            )
-            if crop_box[2] <= crop_box[0] or crop_box[3] <= crop_box[1]:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid crop")
-
-            img = img.crop(crop_box)
-            fx -= crop_box[0]
-            fy -= crop_box[1]
             width, height = img.size
 
-        if payload.resize_max_width or payload.resize_max_height:
-            scale = 1.0
-            if payload.resize_max_width:
-                scale = min(scale, float(payload.resize_max_width) / float(width))
-            if payload.resize_max_height:
-                scale = min(scale, float(payload.resize_max_height) / float(height))
-            scale = min(scale, 1.0)
-            if scale < 1.0:
-                new_w = max(1, int(round(float(width) * scale)))
-                new_h = max(1, int(round(float(height) * scale)))
-                img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
-                fx *= scale
-                fy *= scale
+            if payload.crop_aspect_w is not None and payload.crop_aspect_h is not None:
+                target_ratio = float(payload.crop_aspect_w) / float(payload.crop_aspect_h)
+                current_ratio = float(width) / float(height) if height else 0.0
+                if current_ratio > target_ratio:
+                    crop_h = float(height)
+                    crop_w = crop_h * target_ratio
+                else:
+                    crop_w = float(width)
+                    crop_h = crop_w / target_ratio if target_ratio else float(height)
+
+                left = fx - crop_w / 2
+                top = fy - crop_h / 2
+                left = max(0.0, min(left, float(width) - crop_w))
+                top = max(0.0, min(top, float(height) - crop_h))
+                right = left + crop_w
+                bottom = top + crop_h
+
+                crop_box = (int(round(left)), int(round(top)), int(round(right)), int(round(bottom)))
+                crop_box = (
+                    max(0, min(crop_box[0], width - 1)),
+                    max(0, min(crop_box[1], height - 1)),
+                    max(1, min(crop_box[2], width)),
+                    max(1, min(crop_box[3], height)),
+                )
+                if crop_box[2] <= crop_box[0] or crop_box[3] <= crop_box[1]:
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid crop")
+
+                img = img.crop(crop_box)
+                fx -= crop_box[0]
+                fy -= crop_box[1]
                 width, height = img.size
 
-        new_focal_x = int(round((fx / float(width)) * 100)) if width else 50
-        new_focal_y = int(round((fy / float(height)) * 100)) if height else 50
-        new_focal_x = max(0, min(100, new_focal_x))
-        new_focal_y = max(0, min(100, new_focal_y))
+            if payload.resize_max_width or payload.resize_max_height:
+                scale = 1.0
+                if payload.resize_max_width:
+                    scale = min(scale, float(payload.resize_max_width) / float(width))
+                if payload.resize_max_height:
+                    scale = min(scale, float(payload.resize_max_height) / float(height))
+                scale = min(scale, 1.0)
+                if scale < 1.0:
+                    new_w = max(1, int(round(float(width) * scale)))
+                    new_h = max(1, int(round(float(height) * scale)))
+                    img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+                    fx *= scale
+                    fy *= scale
+                    width, height = img.size
 
-        base_root = storage.ensure_media_root()
-        edited_root = base_root / "edited"
-        edited_root.mkdir(parents=True, exist_ok=True)
-        new_filename = f"{uuid.uuid4().hex}{suffix or '.png'}"
-        destination = edited_root / new_filename
+            new_focal_x = int(round((fx / float(width)) * 100)) if width else 50
+            new_focal_y = int(round((fy / float(height)) * 100)) if height else 50
+            new_focal_x = max(0, min(100, new_focal_x))
+            new_focal_y = max(0, min(100, new_focal_y))
 
-        save_kwargs: dict[str, object] = {"optimize": True}
-        image_to_save = img
-        if out_format == "JPEG":
-            if image_to_save.mode not in ("RGB", "L"):
-                image_to_save = image_to_save.convert("RGB")
-            save_kwargs.update({"quality": 90, "progressive": True})
-        elif out_format == "WEBP":
-            save_kwargs.update({"quality": 85})
+            base_root = storage.ensure_media_root()
+            edited_root = base_root / "edited"
+            edited_root.mkdir(parents=True, exist_ok=True)
+            new_filename = f"{uuid.uuid4().hex}{suffix or '.png'}"
+            destination = edited_root / new_filename
 
-        image_to_save.save(destination, format=out_format, **save_kwargs)
-        storage.generate_thumbnails(destination)
+            save_kwargs: dict[str, object] = {"optimize": True}
+            image_to_save = img
+            if out_format == "JPEG":
+                if image_to_save.mode not in ("RGB", "L"):
+                    image_to_save = image_to_save.convert("RGB")
+                save_kwargs.update({"quality": 90, "progressive": True})
+            elif out_format == "WEBP":
+                save_kwargs.update({"quality": 85})
 
-        rel_path = destination.relative_to(base_root).as_posix()
-        new_url = f"/media/{rel_path}"
+            image_to_save.save(destination, format=out_format, **save_kwargs)
+            storage.generate_thumbnails(destination)
+
+            rel_path = destination.relative_to(base_root).as_posix()
+            new_url = f"/media/{rel_path}"
+            return new_url, int(new_focal_x), int(new_focal_y)
+
+    new_url, new_focal_x, new_focal_y = await anyio.to_thread.run_sync(_process_image)
 
     block = await session.scalar(select(ContentBlock).where(ContentBlock.id == image.content_block_id))
     if not block:

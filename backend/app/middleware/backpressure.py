@@ -56,7 +56,16 @@ class MaintenanceModeMiddleware(BaseHTTPMiddleware):
 
 
 def _is_exempt(request: Request, bypass_token: str | None) -> bool:
-    if request.url.path.startswith("/api/v1/health"):
+    path = request.url.path
+    if path.startswith("/api/v1/health"):
+        return True
+    # Maintenance mode must not block payment webhooks/IPNs. Gate storefront traffic, but keep
+    # gateway callbacks reachable so order state stays consistent.
+    if path in {
+        "/api/v1/payments/webhook",
+        "/api/v1/payments/paypal/webhook",
+        "/api/v1/payments/netopia/webhook",
+    }:
         return True
     if bypass_token and request.headers.get("X-Maintenance-Bypass") == bypass_token:
         return True

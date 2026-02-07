@@ -5,11 +5,13 @@ import secrets
 import zipfile
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
+from functools import partial
 from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import quote_plus
 from uuid import UUID
 
+import anyio
 from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks, UploadFile, File, Body, Response, Request
 from fastapi.responses import StreamingResponse, FileResponse
 from sqlalchemy import func
@@ -2483,11 +2485,14 @@ async def admin_upload_shipping_label(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
 
     old_path = getattr(order, "shipping_label_path", None)
-    rel_path, original_name = private_storage.save_private_upload(
-        file,
-        subdir=f"shipping-labels/{order_id}",
-        allowed_content_types=("application/pdf", "image/png", "image/jpeg", "image/webp"),
-        max_bytes=10 * 1024 * 1024,
+    rel_path, original_name = await anyio.to_thread.run_sync(
+        partial(
+            private_storage.save_private_upload,
+            file,
+            subdir=f"shipping-labels/{order_id}",
+            allowed_content_types=("application/pdf", "image/png", "image/jpeg", "image/webp"),
+            max_bytes=10 * 1024 * 1024,
+        )
     )
     now = datetime.now(timezone.utc)
     order.shipping_label_path = rel_path
@@ -2875,7 +2880,7 @@ async def admin_packing_slip(
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
-    pdf = packing_slips_service.render_packing_slip_pdf(order)
+    pdf = await anyio.to_thread.run_sync(partial(packing_slips_service.render_packing_slip_pdf, order))
     ref = getattr(order, "reference_code", None) or str(order.id)
     await order_exports_service.create_pdf_export(
         session,
@@ -2922,7 +2927,9 @@ async def admin_batch_packing_slips(
 
     order_by_id = {o.id: o for o in orders}
     ordered = [order_by_id[order_id] for order_id in ids if order_id in order_by_id]
-    pdf = packing_slips_service.render_batch_packing_slips_pdf(ordered)
+    pdf = await anyio.to_thread.run_sync(
+        partial(packing_slips_service.render_batch_packing_slips_pdf, ordered)
+    )
     await order_exports_service.create_pdf_export(
         session,
         kind=OrderDocumentExportKind.packing_slips_batch,
@@ -3107,7 +3114,9 @@ async def admin_download_receipt_pdf(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
     ref = getattr(order, "reference_code", None) or str(order.id)
     filename = f"receipt-{ref}.pdf"
-    pdf = receipt_service.render_order_receipt_pdf(order, order.items)
+    pdf = await anyio.to_thread.run_sync(
+        partial(receipt_service.render_order_receipt_pdf, order, order.items)
+    )
     await order_exports_service.create_pdf_export(
         session,
         kind=OrderDocumentExportKind.receipt,
@@ -3280,7 +3289,9 @@ async def download_receipt_by_token(
     ref = order.reference_code or str(order.id)
     filename = f"receipt-{ref}.pdf"
     headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
-    pdf = receipt_service.render_order_receipt_pdf(order, order.items, redacted=not allow_full)
+    pdf = await anyio.to_thread.run_sync(
+        partial(receipt_service.render_order_receipt_pdf, order, order.items, redacted=not allow_full)
+    )
     return StreamingResponse(io.BytesIO(pdf), media_type="application/pdf", headers=headers)
 
 

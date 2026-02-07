@@ -1,6 +1,8 @@
 import json
+from functools import partial
 from uuid import UUID
 
+import anyio
 from fastapi import APIRouter, Depends, File, HTTPException, Path, Query, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select, update
@@ -405,12 +407,15 @@ async def upload_category_image(
 
     media_root = storage.ensure_media_root()
     dest = media_root / "catalog" / "categories" / slug
-    path, _filename = storage.save_upload(
-        file,
-        root=dest,
-        allowed_content_types=("image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"),
-        max_bytes=5 * 1024 * 1024,
-        generate_thumbnails=True,
+    path, _filename = await anyio.to_thread.run_sync(
+        partial(
+            storage.save_upload,
+            file,
+            root=dest,
+            allowed_content_types=("image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"),
+            max_bytes=5 * 1024 * 1024,
+            generate_thumbnails=True,
+        )
     )
 
     field = "thumbnail_url" if kind == "thumbnail" else "banner_url"
@@ -713,11 +718,14 @@ async def upload_product_image(
     if not product or product.is_deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
 
-    path, filename = storage.save_upload(
-        file,
-        allowed_content_types=("image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"),
-        max_bytes=5 * 1024 * 1024,
-        generate_thumbnails=True,
+    path, filename = await anyio.to_thread.run_sync(
+        partial(
+            storage.save_upload,
+            file,
+            allowed_content_types=("image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"),
+            max_bytes=5 * 1024 * 1024,
+            generate_thumbnails=True,
+        )
     )
     await catalog_service.add_product_image_from_path(
         session, product, url=path, alt_text=filename, sort_order=len(product.images) + 1

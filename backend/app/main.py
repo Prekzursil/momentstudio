@@ -25,6 +25,7 @@ from app.schemas.error import ErrorResponse
 from app.services import fx_refresh
 from app.services import admin_report_scheduler
 from app.services import account_deletion_scheduler
+from app.services import order_expiration_scheduler
 from app.core.startup_checks import validate_production_settings
 from app.core import redis_client
 
@@ -47,10 +48,12 @@ def get_application() -> FastAPI:
         fx_refresh.start(app)
         admin_report_scheduler.start(app)
         account_deletion_scheduler.start(app)
+        order_expiration_scheduler.start(app)
         yield
         await fx_refresh.stop(app)
         await admin_report_scheduler.stop(app)
         await account_deletion_scheduler.stop(app)
+        await order_expiration_scheduler.stop(app)
         await redis_client.close_redis()
 
     app = FastAPI(

@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     dev_safety_database_allow_hosts: list[str] = ["localhost", "127.0.0.1", "db"]
 
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/adrianaart"
+    db_pool_size: int | None = None
+    db_max_overflow: int | None = None
     backup_last_at: str | None = None
     secret_key: str = "dev-secret-key"
     # Payments provider mode used by our API endpoints.
@@ -214,6 +216,11 @@ class Settings(BaseSettings):
     # Admin order SLAs (used for warning badges/filters in the admin orders UI)
     order_sla_accept_hours: int = 24
     order_sla_ship_hours: int = 48
+    # Pending payment orders can reserve stock; expire them after a TTL to free inventory.
+    order_pending_payment_expiry_enabled: bool = True
+    order_pending_payment_expiry_minutes: int = 60 * 2
+    order_pending_payment_expiry_poll_interval_seconds: int = 60 * 10
+    order_pending_payment_expiry_batch_limit: int = 200
 
 
 @lru_cache

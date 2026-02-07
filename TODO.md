@@ -3,6 +3,12 @@
 Below is a structured checklist you can turn into issues.
 
 ## High priority (next)
+- [x] Inventory: prevent oversell under concurrency by treating open orders as stock reservations (lock + recheck) and expiring stale `pending_payment` orders after a TTL.
+- [x] Backend Jobs: add a leader-locked scheduler to auto-cancel expired `pending_payment` orders (frees reserved stock without manual cleanup).
+- [x] Email: make email rendering deterministic (Jinja2 dependency + template render tests) and remove unsafe “dump context” fallbacks.
+- [x] Maintenance: do not block payment webhooks/IPNs when maintenance mode is enabled (Stripe/PayPal/Netopia callbacks must keep working).
+- [x] Performance: offload heavy synchronous work (uploads + PDF rendering) off the event loop to keep API latency stable under load.
+- [x] Content: fix missing Romanian translations for the seeded homepage hero banner (headline/subheadline/CTA) so RO doesn’t fall back to EN.
 - [x] Payments: support dual Netopia credentials (`*_SANDBOX` + `*_LIVE`) and improve disabled/config-missing diagnostics.
 - [x] Admin Users: require password confirmation for role changes, owner transfer, and admin-driven account deletion.
 - [x] Auth: normalize verification/reset tokens (strip whitespace/zero-width chars) to prevent “verified but not activated” cases.

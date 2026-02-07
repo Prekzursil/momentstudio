@@ -16,6 +16,20 @@ def test_maintenance_mode_returns_503(monkeypatch):
     monkeypatch.setattr(settings, "maintenance_mode", False)
 
 
+def test_maintenance_mode_allows_payment_webhooks(monkeypatch):
+    monkeypatch.setattr(settings, "maintenance_mode", True)
+    app = get_application()
+    client = TestClient(app)
+    for path in (
+        "/api/v1/payments/webhook",
+        "/api/v1/payments/paypal/webhook",
+        "/api/v1/payments/netopia/webhook",
+    ):
+        res = client.post(path, json={})
+        assert res.status_code != 503, f"{path} should not be blocked by maintenance mode"
+    monkeypatch.setattr(settings, "maintenance_mode", False)
+
+
 def test_backpressure_zero_concurrency(monkeypatch):
     monkeypatch.setattr(settings, "max_concurrent_requests", 0)
     app = FastAPI()
