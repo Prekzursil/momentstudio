@@ -23,12 +23,10 @@ class CartItemCreate(BaseModel):
     variant_id: UUID | None = None
     quantity: int = Field(ge=1)
     max_quantity: int | None = Field(default=None, ge=1)
-    note: str | None = Field(default=None, max_length=255)
 
 
 class CartItemUpdate(BaseModel):
     quantity: int = Field(ge=1)
-    note: str | None = Field(default=None, max_length=255)
 
 
 class CartItemRead(BaseModel):
@@ -39,7 +37,6 @@ class CartItemRead(BaseModel):
     variant_id: UUID | None = None
     quantity: int
     max_quantity: int | None = None
-    note: str | None = None
     unit_price_at_add: Decimal
     name: str | None = None
     slug: str | None = None

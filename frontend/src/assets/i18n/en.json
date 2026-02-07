@@ -1213,8 +1213,6 @@
     "moveToCartFailed": "Could not move item to cart.",
     "remove": "Remove",
     "removeItem": "Remove {{name}}",
-    "noteLabel": "Note (optional)",
-    "notePlaceholder": "Add a gift note (optional)",
     "summary": "Order summary",
     "subtotal": "Subtotal",
     "shipping": "Shipping",
@@ -1238,8 +1236,7 @@
     "errors": {
       "notFound": "Item not found.",
       "minQty": "Quantity must be at least 1.",
-      "insufficientStock": "Not enough stock available.",
-      "noteTooLong": "Note is too long (max 255 characters)."
+      "insufficientStock": "Not enough stock available."
     }
   },
   "checkout": {
