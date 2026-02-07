@@ -48,6 +48,9 @@ _ORDER_STOCK_RESTORE_EVENT = "stock_restored"
 
 
 async def _commit_stock_for_order(session: AsyncSession, order: Order) -> None:
+    # Serialize stock adjustments per-order so concurrent status updates can't double-deduct inventory.
+    await session.execute(select(Order.id).where(Order.id == order.id).with_for_update())
+
     existing = (
         (
             await session.execute(
@@ -183,6 +186,9 @@ def _try_uuid(value: object) -> UUID | None:
 
 
 async def _restore_stock_for_order(session: AsyncSession, order: Order) -> None:
+    # Serialize stock adjustments per-order so concurrent cancellations can't double-restock inventory.
+    await session.execute(select(Order.id).where(Order.id == order.id).with_for_update())
+
     already_restored = (
         (
             await session.execute(
