@@ -113,7 +113,7 @@ def test_cart_crud_flow(test_app: Dict[str, object]) -> None:
     # Create/add item
     res = client.post(
         "/api/v1/cart/items",
-        json={"product_id": str(product_id), "quantity": 2, "note": "Gift"},
+        json={"product_id": str(product_id), "quantity": 2},
         headers=auth_headers(token),
     )
     assert res.status_code == 201, res.text
@@ -123,7 +123,6 @@ def test_cart_crud_flow(test_app: Dict[str, object]) -> None:
     res = client.get("/api/v1/cart", headers=auth_headers(token))
     assert res.status_code == 200
     assert res.json()["items"][0]["quantity"] == 2
-    assert res.json()["items"][0]["note"] == "Gift"
     assert res.json()["totals"]["subtotal"] == "20.00"
 
     # Update quantity

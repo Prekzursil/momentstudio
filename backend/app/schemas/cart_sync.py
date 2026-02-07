@@ -6,7 +6,6 @@ class CartSyncItem(BaseModel):
     product_id: UUID
     variant_id: UUID | None = None
     quantity: int = Field(gt=0)
-    note: str | None = None
     max_quantity: int | None = Field(default=None, gt=0)
 
 

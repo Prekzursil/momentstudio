@@ -72,8 +72,6 @@ async def _reserved_in_open_orders(session: AsyncSession) -> dict[_ReservedKey, 
     open_statuses = {
         OrderStatus.pending_payment,
         OrderStatus.pending_acceptance,
-        OrderStatus.paid,
-        OrderStatus.shipped,
     }
     reserved_expr = case(
         (
@@ -157,8 +155,6 @@ async def list_order_reservations(
     open_statuses = {
         OrderStatus.pending_payment,
         OrderStatus.pending_acceptance,
-        OrderStatus.paid,
-        OrderStatus.shipped,
     }
     reserved_expr = case(
         (

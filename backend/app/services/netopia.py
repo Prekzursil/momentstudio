@@ -60,6 +60,42 @@ def _to_subject_public_key_pem(public_key: asymmetric_types.PublicKeyTypes) -> s
     )
 
 
+def _read_netopia_key_bytes(path: str) -> bytes:
+    raw = (path or "").strip()
+    if not raw:
+        return b""
+
+    preferred = Path(raw)
+    candidates: list[Path] = [preferred]
+    if not preferred.is_absolute():
+        private_root_value = (getattr(settings, "private_media_root", None) or "private_uploads").strip() or "private_uploads"
+        private_root = Path(private_root_value)
+        candidates.append(private_root / raw)
+
+        # Also try resolving relative to the backend/app root (e.g. when running `uvicorn` from
+        # `backend/`) and one level above it (repo root), so deployments can keep certs under
+        # `private_uploads/` without relying on process CWD.
+        try:
+            module_root = Path(__file__).resolve().parents[2]
+        except (OSError, IndexError):
+            module_root = None
+        if module_root is not None:
+            candidates.append(module_root / private_root / raw)
+            candidates.append(module_root.parent / private_root / raw)
+
+    last_exc: OSError | None = None
+    for candidate in candidates:
+        try:
+            if candidate.is_file():
+                return candidate.read_bytes()
+        except OSError as exc:
+            last_exc = exc
+
+    if last_exc:
+        raise last_exc
+    raise FileNotFoundError(raw)
+
+
 def _public_key_pem() -> str:
     env = _netopia_env()
     preferred_pem = settings.netopia_public_key_pem_live if env == "live" else settings.netopia_public_key_pem_sandbox
@@ -72,11 +108,11 @@ def _public_key_pem() -> str:
     path = (preferred_path or settings.netopia_public_key_path or "").strip()
     if path:
         try:
-            key_bytes = Path(path).read_bytes()
+            key_bytes = _read_netopia_key_bytes(path)
         except OSError as exc:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Netopia public key could not be read",
+                detail="Netopia public key could not be read (check NETOPIA_PUBLIC_KEY_PATH_*)",
             ) from exc
 
         if not key_bytes:

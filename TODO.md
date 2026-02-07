@@ -12,8 +12,10 @@ Below is a structured checklist you can turn into issues.
 - [x] Cart: remove unused “gift note” field (not persisted/used).
 - [x] Prod docs: add `bootstrap-owner.sh` reminder command under `infra/prod/`.
 - [x] Frontend: include missing `favicon.ico` so production matches local dev.
-- [ ] Inventory: confirm desired stock behavior on cancellations vs refunds/returns; implement physical stock adjustments if needed.
-- [ ] Payments: surface backend payment capability “reason” in checkout UI when a method is disabled.
+- [x] Inventory: confirm desired stock behavior on cancellations vs refunds/returns; implement physical stock adjustments if needed.
+- [x] Payments: surface backend payment capability “reason” in checkout UI when a method is disabled.
+- [ ] Dev safety: prevent accidental use of production `DATABASE_URL` when `ENVIRONMENT=local` (configurable allowlist/opt-out).
+- [ ] Payments UX: return payment capability `reason_code` values so checkout can localize disabled-method messages (keep `reason` as fallback).
 - [x] Admin Orders: prevent 400s on status/tracking updates (guide allowed transitions + clearer errors).
 - [x] Backend Email: prevent SMTP blocking the event loop (wrap `smtplib` send in `anyio.to_thread.run_sync` or switch to async SMTP).
 - [x] Backend Jobs: avoid duplicate scheduled loops when running multiple workers/replicas (move schedulers to worker service or add Postgres advisory-lock leader election).

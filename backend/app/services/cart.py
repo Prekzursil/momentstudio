@@ -433,7 +433,6 @@ async def serialize_cart(
                         else (item.product.stock_quantity if item.product else None)
                     )
                 ),
-                note=item.note,
                 unit_price_at_add=Decimal(item.unit_price_at_add),
                 name=item.product.name if item.product else None,
                 slug=item.product.slug if item.product else None,
@@ -487,7 +486,6 @@ async def add_item(
         product_id=product.id,
         variant_id=variant.id if variant else None,
         quantity=payload.quantity,
-        note=payload.note,
         unit_price_at_add=unit_price,
         max_quantity=payload.max_quantity,
     )
@@ -519,7 +517,6 @@ async def update_item(session: AsyncSession, cart: Cart, item_id: UUID, payload:
     _enforce_max_quantity(payload.quantity, item.max_quantity)
 
     item.quantity = payload.quantity
-    item.note = payload.note
     session.add(item)
     await session.commit()
     await session.refresh(item)
@@ -557,7 +554,6 @@ async def sync_cart(session: AsyncSession, cart: Cart, items: list[CartSyncItem]
                 product_id=item.product_id,
                 variant_id=item.variant_id,
                 quantity=item.quantity,
-                note=item.note,
                 max_quantity=item.max_quantity,
             ),
             commit=False,

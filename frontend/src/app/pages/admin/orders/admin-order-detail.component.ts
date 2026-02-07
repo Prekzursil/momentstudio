@@ -145,7 +145,7 @@ type OrderAction =
               </div>
             </div>
 
-            <div class="grid md:grid-cols-3 gap-3 text-sm">
+            <div class="grid gap-3 text-sm md:grid-cols-2">
               <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
                 <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.table.status' | translate }}</div>
                 <div class="mt-2">
@@ -166,16 +166,127 @@ type OrderAction =
                   {{ 'adminUi.orders.paymentMethod' | translate }}: {{ paymentMethodLabel() }}
                 </div>
               </div>
-                <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
-                <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.tracking' | translate }}</div>
-                <div class="mt-1 font-semibold text-slate-900 dark:text-slate-50 break-words whitespace-normal">
-                  {{ order()!.tracking_number || '—' }}
+              <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 min-w-0 md:col-span-2">
+                <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.deliveryMethod' | translate }}</div>
+
+                <div class="mt-2 grid gap-3 min-w-0 sm:grid-cols-2 lg:grid-cols-3">
+                  <div class="grid gap-0.5 min-w-0">
+                    <div class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.orders.shipments.courier' | translate }}
+                    </div>
+                    <div class="font-semibold text-slate-900 dark:text-slate-50 break-words whitespace-normal min-w-0">
+                      {{ courierName(order()!.courier) }}
+                    </div>
+                  </div>
+
+                  <div class="grid gap-0.5 min-w-0">
+                    <div class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.orders.deliveryType' | translate }}
+                    </div>
+                    <div class="text-slate-700 dark:text-slate-200 break-words whitespace-normal min-w-0">
+                      {{ deliveryTypeLabel() }}
+                    </div>
+                  </div>
+
+                  <div *ngIf="order()!.shipping_method?.name" class="grid gap-0.5 min-w-0">
+                    <div class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.orders.diff.shippingMethod' | translate }}
+                    </div>
+                    <div class="text-slate-700 dark:text-slate-200 break-words whitespace-normal min-w-0">
+                      {{ order()!.shipping_method?.name }}
+                    </div>
+                  </div>
+
+                  <div class="grid gap-0.5 min-w-0">
+                    <div class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.orders.trackingNumber' | translate }}
+                    </div>
+                    <div class="flex items-start gap-2 min-w-0">
+                      <div class="font-mono font-semibold text-slate-900 dark:text-slate-50 break-all min-w-0">
+                        {{ order()!.tracking_number || '—' }}
+                      </div>
+                      <app-copy-button *ngIf="order()!.tracking_number" [value]="order()!.tracking_number"></app-copy-button>
+                    </div>
+                  </div>
+
+                  <div class="grid gap-0.5 min-w-0 sm:col-span-2 lg:col-span-2">
+                    <div class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.orders.trackingUrl' | translate }}
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 min-w-0">
+                      <ng-container *ngIf="order()!.tracking_url; else noTrackingUrl">
+                        <a
+                          class="text-xs font-semibold text-indigo-600 hover:underline dark:text-indigo-300 break-all"
+                          [href]="order()!.tracking_url!"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {{ 'adminUi.orders.shipments.openTracking' | translate }}
+                        </a>
+                        <app-copy-button [value]="order()!.tracking_url!"></app-copy-button>
+                      </ng-container>
+                      <ng-template #noTrackingUrl>
+                        <div class="text-slate-700 dark:text-slate-200">—</div>
+                      </ng-template>
+                    </div>
+                  </div>
                 </div>
-                <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                  {{ 'adminUi.orders.deliveryMethod' | translate }}: {{ deliveryLabel() }}
-                </div>
-                <div *ngIf="lockerLabel()" class="mt-1 text-xs text-slate-600 dark:text-slate-300 break-words whitespace-normal">
-                  {{ lockerLabel() }}
+
+                <div class="mt-3 rounded-lg border border-slate-200/60 bg-slate-50 p-3 dark:border-slate-800/60 dark:bg-slate-900/40 min-w-0">
+                  <ng-container *ngIf="(order()!.delivery_type || '').toLowerCase() === 'locker'; else homeDeliverySummary">
+                    <div class="grid gap-3 min-w-0 sm:grid-cols-2">
+                      <div class="grid gap-0.5 min-w-0">
+                        <div class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                          {{ 'adminUi.orders.lockerName' | translate }}
+                        </div>
+                        <div class="flex flex-wrap items-start gap-2 min-w-0">
+                          <div class="font-semibold text-slate-900 dark:text-slate-50 break-words whitespace-normal min-w-0">
+                            {{ order()!.locker_name || '—' }}
+                          </div>
+                          <app-copy-button *ngIf="order()!.locker_name" [value]="order()!.locker_name!"></app-copy-button>
+                        </div>
+                      </div>
+
+                      <div class="grid gap-0.5 min-w-0 sm:col-span-2">
+                        <div class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                          {{ 'adminUi.orders.lockerAddress' | translate }}
+                        </div>
+                        <div class="flex flex-wrap items-start gap-2 min-w-0">
+                          <div class="text-slate-700 dark:text-slate-200 break-words whitespace-normal min-w-0">
+                            {{ order()!.locker_address || '—' }}
+                          </div>
+                          <app-copy-button *ngIf="order()!.locker_address" [value]="order()!.locker_address!"></app-copy-button>
+                        </div>
+                      </div>
+
+                      <div *ngIf="order()!.locker_id" class="grid gap-0.5 min-w-0">
+                        <div class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                          {{ 'adminUi.orders.lockerId' | translate }}
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-300 min-w-0">
+                          <span class="font-mono break-all">{{ order()!.locker_id }}</span>
+                          <app-copy-button [value]="order()!.locker_id!"></app-copy-button>
+                        </div>
+                      </div>
+                    </div>
+                  </ng-container>
+
+                  <ng-template #homeDeliverySummary>
+                    <div *ngIf="order()!.shipping_address as addr" class="grid gap-1 min-w-0">
+                      <div class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                        {{ 'adminUi.orders.shippingAddress' | translate }}
+                      </div>
+                      <div class="text-slate-700 dark:text-slate-200 break-words whitespace-normal min-w-0">
+                        {{ addr.line1 }}<ng-container *ngIf="addr.line2">, {{ addr.line2 }}</ng-container>
+                      </div>
+                      <div class="text-slate-700 dark:text-slate-200 break-words whitespace-normal min-w-0">
+                        {{ addr.city }}{{ addr.region ? ', ' + addr.region : '' }} {{ addr.postal_code }}
+                      </div>
+                      <div class="text-slate-700 dark:text-slate-200 break-words whitespace-normal min-w-0">
+                        {{ addr.country }}
+                      </div>
+                    </div>
+                  </ng-template>
                 </div>
               </div>
             </div>
@@ -2834,30 +2945,13 @@ export class AdminOrderDetailComponent implements OnInit {
       });
   }
 
-  deliveryLabel(): string {
+  deliveryTypeLabel(): string {
     const o = this.order();
     if (!o) return '—';
-    const courierRaw = (o.courier ?? '').trim().toLowerCase();
-    const courier = courierRaw === 'sameday' ? 'Sameday' : courierRaw === 'fan_courier' ? 'Fan Courier' : (o.courier ?? '').trim();
     const type = (o.delivery_type ?? '').trim().toLowerCase();
-    const deliveryType =
-      type === 'locker'
-        ? this.translate.instant('adminUi.orders.deliveryLocker')
-        : type === 'home'
-          ? this.translate.instant('adminUi.orders.deliveryHome')
-          : (o.delivery_type ?? '').trim();
-    const parts = [courier, deliveryType].filter((p) => (p || '').trim());
-    return parts.length ? parts.join(' · ') : '—';
-  }
-
-  lockerLabel(): string | null {
-    const o = this.order();
-    if (!o) return null;
-    if ((o.delivery_type ?? '').toLowerCase() !== 'locker') return null;
-    const name = (o.locker_name ?? '').trim();
-    const address = (o.locker_address ?? '').trim();
-    const detail = [name, address].filter((p) => p).join(' — ');
-    return detail ? `${this.translate.instant('adminUi.orders.locker')}: ${detail}` : null;
+    if (type === 'locker') return this.translate.instant('adminUi.orders.deliveryLocker');
+    if (type === 'home') return this.translate.instant('adminUi.orders.deliveryHome');
+    return (o.delivery_type ?? '').trim() || '—';
   }
 
   save(): void {

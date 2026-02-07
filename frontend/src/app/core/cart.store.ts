@@ -14,7 +14,6 @@ export interface CartItem {
   quantity: number;
   stock: number;
   image?: string;
-  note?: string | null;
 }
 
 export interface CartQuote {
@@ -103,8 +102,7 @@ export class CartStore {
           currency: res.currency ?? payload.currency ?? 'RON',
           quantity: res.quantity,
           stock: res.max_quantity == null ? UNLIMITED_CART_STOCK : Number(res.max_quantity ?? payload.stock ?? 99),
-          image: res.image_url ?? payload.image ?? '',
-          note: res.note ?? null
+          image: res.image_url ?? payload.image ?? ''
         }))
       )
       .subscribe({
@@ -134,7 +132,6 @@ export class CartStore {
       product_id: i.product_id,
       variant_id: i.variant_id ?? undefined,
       quantity: i.quantity,
-      note: i.note ?? undefined,
       max_quantity: undefined
     }));
     this.api.sync(payload).subscribe({
@@ -160,20 +157,6 @@ export class CartStore {
     if (quantity > items[idx].stock) return { errorKey: 'cart.errors.insufficientStock' };
     const updated = [...items];
     updated[idx] = { ...updated[idx], quantity };
-    this.itemsSignal.set(updated);
-    this.persist();
-    this.scheduleSyncBackend();
-    return {};
-  }
-
-  updateNote(id: string, note: string): { errorKey?: string } {
-    const trimmed = (note ?? '').trim();
-    if (trimmed.length > 255) return { errorKey: 'cart.errors.noteTooLong' };
-    const items = this.itemsSignal();
-    const idx = items.findIndex((i) => i.id === id);
-    if (idx === -1) return { errorKey: 'cart.errors.notFound' };
-    const updated = [...items];
-    updated[idx] = { ...updated[idx], note: trimmed || null };
     this.itemsSignal.set(updated);
     this.persist();
     this.scheduleSyncBackend();
@@ -224,8 +207,7 @@ export class CartStore {
       currency: i.currency ?? currency,
       quantity: i.quantity,
       stock: i.max_quantity == null ? UNLIMITED_CART_STOCK : Number(i.max_quantity ?? 99),
-      image: i.image_url ?? '',
-      note: i.note ?? null
+      image: i.image_url ?? ''
     }));
   }
 

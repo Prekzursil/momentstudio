@@ -193,8 +193,8 @@ export class AdminUsersService {
     return this.api.post<{ detail: string }>(`/admin/dashboard/users/${userId}/password-reset/resend`, payload || {});
   }
 
-  overrideEmailVerification(userId: string): Observable<AdminUserProfileUser> {
-    return this.api.post<AdminUserProfileUser>(`/admin/dashboard/users/${userId}/email/verification/override`, {});
+  overrideEmailVerification(userId: string, password: string): Observable<AdminUserProfileUser> {
+    return this.api.post<AdminUserProfileUser>(`/admin/dashboard/users/${userId}/email/verification/override`, { password });
   }
 
   listGdprExportJobs(params: {

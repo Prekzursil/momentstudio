@@ -1213,8 +1213,6 @@
     "moveToCartFailed": "Nu am putut muta produsul în coș.",
     "remove": "Elimină",
     "removeItem": "Elimină {{name}}",
-    "noteLabel": "Notă (opțional)",
-    "notePlaceholder": "Adaugă o notă cadou (opțional)",
     "summary": "Sumar comandă",
     "subtotal": "Subtotal",
     "shipping": "Livrare",
@@ -1238,8 +1236,7 @@
     "errors": {
       "notFound": "Produsul nu a fost găsit.",
       "minQty": "Cantitatea trebuie să fie cel puțin 1.",
-      "insufficientStock": "Stoc insuficient.",
-      "noteTooLong": "Nota este prea lungă (maxim 255 de caractere)."
+      "insufficientStock": "Stoc insuficient."
     }
   },
   "checkout": {
@@ -4381,9 +4378,13 @@
       "customerCommsTitle": "Client",
       "paymentIntent": "Intent plată",
       "deliveryMethod": "Livrare",
+      "deliveryType": "Tip livrare",
       "deliveryHome": "Livrare la adresă",
       "deliveryLocker": "Ridicare din locker",
       "locker": "Locker",
+      "lockerName": "Nume locker",
+      "lockerAddress": "Adresă locker",
+      "lockerId": "ID locker",
       "cancelReason": "Motiv anulare",
       "cancelReasonPlaceholder": "De ce a fost anulată comanda?",
       "cancelReasonHint": "Obligatoriu la anulare. Se afișează clientului și este inclus în emailul de anulare.",
@@ -4789,6 +4790,10 @@
       "resendVerification": "Retrimite verificarea",
       "loadVerificationHistory": "Încarcă istoricul",
       "overrideVerification": "Marchează verificat",
+      "overrideVerificationPasswordPrompt": "Confirmă parola pentru a marca acest email ca verificat.",
+      "overrideVerificationPasswordLabel": "Parola ta",
+      "overrideVerificationPasswordPlaceholder": "Introdu parola",
+      "overrideVerificationPasswordRequired": "Parola este obligatorie.",
       "loadingVerificationHistory": "Se încarcă istoricul verificării…",
       "verificationUsed": "Folosit",
       "verificationPending": "În așteptare",
