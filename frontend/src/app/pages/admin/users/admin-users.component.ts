@@ -873,10 +873,10 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
 	        </section>
 	      </div>
 
-	      <ng-container *ngIf="roleChangeOpen() && selectedUser() as u">
-	        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closeRoleChange()">
-	          <div
-	            class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
+	              <ng-container *ngIf="roleChangeOpen() && selectedUser() as u">
+		        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closeRoleChange()">
+		          <div
+		            class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
 	            (click)="$event.stopPropagation()"
 	          >
 	            <div class="flex items-start justify-between gap-3">
@@ -926,13 +926,69 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
 	              ></app-button>
 	            </div>
 	          </div>
-	        </div>
-	      </ng-container>
+		        </div>
+		      </ng-container>
 
-	      <ng-container *ngIf="deleteUserOpen() && selectedUser() as u">
-	        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closeDeleteUser()">
-	          <div
-	            class="w-full max-w-md rounded-2xl border border-rose-200 bg-white p-4 shadow-xl dark:border-rose-900/40 dark:bg-slate-900"
+		      <ng-container *ngIf="overrideVerificationOpen() && selectedUser() as u">
+		        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closeOverrideVerification()">
+		          <div
+		            class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
+		            (click)="$event.stopPropagation()"
+		          >
+		            <div class="flex items-start justify-between gap-3">
+		              <div class="grid gap-1">
+		                <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.users.overrideVerification' | translate }}</h3>
+		                <div class="text-xs text-slate-600 dark:text-slate-300">{{ identityLabel(u) }}</div>
+		              </div>
+		              <button
+		                type="button"
+		                class="rounded-md px-2 py-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
+		                (click)="closeOverrideVerification()"
+		                [attr.aria-label]="'adminUi.actions.cancel' | translate"
+		              >
+		                ✕
+		              </button>
+		            </div>
+
+		            <div *ngIf="overrideVerificationError()" class="mt-2 text-sm text-rose-700 dark:text-rose-300">{{ overrideVerificationError() }}</div>
+
+                <p class="mt-3 text-sm text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.users.overrideVerificationPasswordPrompt' | translate }}
+                </p>
+                <div class="mt-3">
+                  <app-input
+                    type="password"
+                    [label]="'adminUi.users.overrideVerificationPasswordLabel' | translate"
+                    [placeholder]="'adminUi.users.overrideVerificationPasswordPlaceholder' | translate"
+                    [disabled]="emailVerificationBusy()"
+                    [(value)]="overrideVerificationPassword"
+                    [ariaLabel]="'adminUi.users.overrideVerificationPasswordLabel' | translate"
+                  ></app-input>
+                </div>
+
+		            <div class="mt-4 flex justify-end gap-2">
+		              <app-button
+		                size="sm"
+		                variant="ghost"
+		                [label]="'adminUi.actions.cancel' | translate"
+		                [disabled]="emailVerificationBusy()"
+		                (action)="closeOverrideVerification()"
+		              ></app-button>
+		              <app-button
+		                size="sm"
+		                [label]="'adminUi.users.overrideVerification' | translate"
+		                [disabled]="emailVerificationBusy()"
+		                (action)="confirmOverrideVerification()"
+		              ></app-button>
+		            </div>
+		          </div>
+		        </div>
+		      </ng-container>
+
+		      <ng-container *ngIf="deleteUserOpen() && selectedUser() as u">
+		        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closeDeleteUser()">
+		          <div
+		            class="w-full max-w-md rounded-2xl border border-rose-200 bg-white p-4 shadow-xl dark:border-rose-900/40 dark:bg-slate-900"
 	            (click)="$event.stopPropagation()"
 	          >
 	            <div class="flex items-start justify-between gap-3">
@@ -1052,10 +1108,13 @@ export class AdminUsersComponent implements OnInit {
   securityBusy = signal(false);
   passwordResetEmailBusy = signal(false);
 
-  emailHistory = signal<AdminEmailVerificationHistoryResponse | null>(null);
-  emailHistoryLoading = signal(false);
-  emailHistoryError = signal<string | null>(null);
-  emailVerificationBusy = signal(false);
+	  emailHistory = signal<AdminEmailVerificationHistoryResponse | null>(null);
+	  emailHistoryLoading = signal(false);
+	  emailHistoryError = signal<string | null>(null);
+	  emailVerificationBusy = signal(false);
+	  overrideVerificationOpen = signal(false);
+	  overrideVerificationError = signal<string | null>(null);
+	  overrideVerificationPassword = '';
 
   sessions = signal<AdminUserSession[] | null>(null);
   sessionsLoading = signal(false);
@@ -1642,11 +1701,11 @@ export class AdminUsersComponent implements OnInit {
     });
   }
 
-  resendVerification(): void {
-    const user = this.selectedUser();
-    if (!user) return;
-    this.emailVerificationBusy.set(true);
-    this.usersApi.resendEmailVerification(user.id).subscribe({
+	  resendVerification(): void {
+	    const user = this.selectedUser();
+	    if (!user) return;
+	    this.emailVerificationBusy.set(true);
+	    this.usersApi.resendEmailVerification(user.id).subscribe({
       next: () => {
         this.toast.success(this.t('adminUi.users.success.verificationResent'));
         this.emailVerificationBusy.set(false);
@@ -1657,31 +1716,63 @@ export class AdminUsersComponent implements OnInit {
         this.emailVerificationBusy.set(false);
       }
     });
-  }
+	  }
 
-  overrideVerification(): void {
-    const user = this.selectedUser();
-    if (!user) return;
-    this.emailVerificationBusy.set(true);
-    this.usersApi.overrideEmailVerification(user.id).subscribe({
-      next: (updated) => {
-        const profile = this.profile();
-        if (profile) {
-          this.profile.set({ ...profile, user: { ...profile.user, ...updated } });
-        }
-        const nextVerified = Boolean(updated?.email_verified);
-        this.selectedUser.set({ ...user, email_verified: nextVerified });
-        this.users.set(this.users().map((u) => (u.id === user.id ? { ...u, email_verified: nextVerified } : u)));
-        this.toast.success(this.t('adminUi.users.success.verificationOverridden'));
-        this.emailVerificationBusy.set(false);
-        this.loadEmailHistory();
-      },
-      error: () => {
-        this.toast.error(this.t('adminUi.users.errors.verificationOverridden'));
-        this.emailVerificationBusy.set(false);
-      }
-    });
-  }
+	  overrideVerification(): void {
+	    const user = this.selectedUser();
+	    if (!user) return;
+      if (user.email_verified) return;
+	    this.overrideVerificationError.set(null);
+	    this.overrideVerificationPassword = '';
+	    this.overrideVerificationOpen.set(true);
+	  }
+
+	  closeOverrideVerification(): void {
+	    this.overrideVerificationOpen.set(false);
+	    this.overrideVerificationError.set(null);
+	    this.overrideVerificationPassword = '';
+	  }
+
+	  confirmOverrideVerification(): void {
+	    const user = this.selectedUser();
+	    if (!user) return;
+	    if (user.email_verified) {
+	      this.closeOverrideVerification();
+	      return;
+	    }
+
+	    const password = (this.overrideVerificationPassword || '').trim();
+	    if (!password) {
+	      const msg = this.t('adminUi.users.overrideVerificationPasswordRequired');
+	      this.overrideVerificationError.set(msg);
+	      this.toast.error(msg);
+	      return;
+	    }
+
+	    this.emailVerificationBusy.set(true);
+	    this.overrideVerificationError.set(null);
+	    this.usersApi.overrideEmailVerification(user.id, password).subscribe({
+	      next: (updated) => {
+	        const profile = this.profile();
+	        if (profile) {
+	          this.profile.set({ ...profile, user: { ...profile.user, ...updated } });
+	        }
+	        const nextVerified = Boolean(updated?.email_verified);
+	        this.selectedUser.set({ ...user, email_verified: nextVerified });
+	        this.users.set(this.users().map((u) => (u.id === user.id ? { ...u, email_verified: nextVerified } : u)));
+	        this.toast.success(this.t('adminUi.users.success.verificationOverridden'));
+	        this.emailVerificationBusy.set(false);
+          this.closeOverrideVerification();
+	        this.loadEmailHistory();
+	      },
+	      error: (err) => {
+	        const msg = err?.error?.detail || this.t('adminUi.users.errors.verificationOverridden');
+	        this.overrideVerificationError.set(msg);
+	        this.toast.error(msg);
+	        this.emailVerificationBusy.set(false);
+	      }
+	    });
+	  }
 
   impersonate(): void {
     const user = this.selectedUser();

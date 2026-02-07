@@ -4250,10 +4250,14 @@ async def resend_password_reset(
 @router.post("/users/{user_id}/email/verification/override", response_model=AdminUserProfileUser)
 async def override_email_verification(
     user_id: UUID,
+    payload: AdminUserDeleteRequest,
     request: Request,
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(require_admin),
 ) -> AdminUserProfileUser:
+    if not security.verify_password(payload.password, current_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+
     user = await session.get(User, user_id)
     if not user or user.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
