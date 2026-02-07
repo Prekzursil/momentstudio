@@ -1419,6 +1419,7 @@ def test_admin_user_email_verification_controls(test_app: Dict[str, object]) -> 
     override = client.post(
         f"/api/v1/admin/dashboard/users/{seeded['customer_id']}/email/verification/override",
         headers=headers,
+        json={"password": "Password123"},
     )
     assert override.status_code == 200, override.text
     assert override.json()["email_verified"] is True
