@@ -169,7 +169,7 @@ type OrderAction =
               <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 min-w-0 md:col-span-2">
                 <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.deliveryMethod' | translate }}</div>
 
-                <div class="mt-2 grid gap-3 min-w-0 md:grid-cols-2">
+                <div class="mt-2 grid gap-3 min-w-0 sm:grid-cols-2 lg:grid-cols-3">
                   <div class="grid gap-0.5 min-w-0">
                     <div class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
                       {{ 'adminUi.orders.shipments.courier' | translate }}
@@ -199,41 +199,74 @@ type OrderAction =
 
                   <div class="grid gap-0.5 min-w-0">
                     <div class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
-                      {{ 'adminUi.orders.tracking' | translate }}
+                      {{ 'adminUi.orders.trackingNumber' | translate }}
                     </div>
                     <div class="flex items-start gap-2 min-w-0">
-                      <div class="font-semibold text-slate-900 dark:text-slate-50 break-words whitespace-normal min-w-0">
+                      <div class="font-mono font-semibold text-slate-900 dark:text-slate-50 break-all min-w-0">
                         {{ order()!.tracking_number || '—' }}
                       </div>
                       <app-copy-button *ngIf="order()!.tracking_number" [value]="order()!.tracking_number"></app-copy-button>
                     </div>
-                    <a
-                      *ngIf="order()!.tracking_url"
-                      class="text-xs font-semibold text-indigo-600 hover:underline dark:text-indigo-300"
-                      [href]="order()!.tracking_url!"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {{ 'adminUi.orders.shipments.openTracking' | translate }}
-                    </a>
+                  </div>
+
+                  <div class="grid gap-0.5 min-w-0 sm:col-span-2 lg:col-span-2">
+                    <div class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.orders.trackingUrl' | translate }}
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 min-w-0">
+                      <ng-container *ngIf="order()!.tracking_url; else noTrackingUrl">
+                        <a
+                          class="text-xs font-semibold text-indigo-600 hover:underline dark:text-indigo-300 break-all"
+                          [href]="order()!.tracking_url!"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {{ 'adminUi.orders.shipments.openTracking' | translate }}
+                        </a>
+                        <app-copy-button [value]="order()!.tracking_url!"></app-copy-button>
+                      </ng-container>
+                      <ng-template #noTrackingUrl>
+                        <div class="text-slate-700 dark:text-slate-200">—</div>
+                      </ng-template>
+                    </div>
                   </div>
                 </div>
 
                 <div class="mt-3 rounded-lg border border-slate-200/60 bg-slate-50 p-3 dark:border-slate-800/60 dark:bg-slate-900/40 min-w-0">
                   <ng-container *ngIf="(order()!.delivery_type || '').toLowerCase() === 'locker'; else homeDeliverySummary">
-                    <div class="grid gap-1 min-w-0">
-                      <div class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
-                        {{ 'adminUi.orders.locker' | translate }}
+                    <div class="grid gap-3 min-w-0 sm:grid-cols-2">
+                      <div class="grid gap-0.5 min-w-0">
+                        <div class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                          {{ 'adminUi.orders.lockerName' | translate }}
+                        </div>
+                        <div class="flex flex-wrap items-start gap-2 min-w-0">
+                          <div class="font-semibold text-slate-900 dark:text-slate-50 break-words whitespace-normal min-w-0">
+                            {{ order()!.locker_name || '—' }}
+                          </div>
+                          <app-copy-button *ngIf="order()!.locker_name" [value]="order()!.locker_name!"></app-copy-button>
+                        </div>
                       </div>
-                      <div class="font-semibold text-slate-900 dark:text-slate-50 break-words whitespace-normal min-w-0">
-                        {{ order()!.locker_name || '—' }}
+
+                      <div class="grid gap-0.5 min-w-0 sm:col-span-2">
+                        <div class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                          {{ 'adminUi.orders.lockerAddress' | translate }}
+                        </div>
+                        <div class="flex flex-wrap items-start gap-2 min-w-0">
+                          <div class="text-slate-700 dark:text-slate-200 break-words whitespace-normal min-w-0">
+                            {{ order()!.locker_address || '—' }}
+                          </div>
+                          <app-copy-button *ngIf="order()!.locker_address" [value]="order()!.locker_address!"></app-copy-button>
+                        </div>
                       </div>
-                      <div class="text-slate-700 dark:text-slate-200 break-words whitespace-normal min-w-0">
-                        {{ order()!.locker_address || '—' }}
-                      </div>
-                      <div *ngIf="order()!.locker_id" class="flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-300 min-w-0">
-                        <span class="font-mono break-all">{{ order()!.locker_id }}</span>
-                        <app-copy-button [value]="order()!.locker_id!"></app-copy-button>
+
+                      <div *ngIf="order()!.locker_id" class="grid gap-0.5 min-w-0">
+                        <div class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                          {{ 'adminUi.orders.lockerId' | translate }}
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-300 min-w-0">
+                          <span class="font-mono break-all">{{ order()!.locker_id }}</span>
+                          <app-copy-button [value]="order()!.locker_id!"></app-copy-button>
+                        </div>
                       </div>
                     </div>
                   </ng-container>
