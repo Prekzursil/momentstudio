@@ -4381,6 +4381,7 @@
       "customerCommsTitle": "Client",
       "paymentIntent": "Intent plată",
       "deliveryMethod": "Livrare",
+      "deliveryType": "Tip livrare",
       "deliveryHome": "Livrare la adresă",
       "deliveryLocker": "Ridicare din locker",
       "locker": "Locker",

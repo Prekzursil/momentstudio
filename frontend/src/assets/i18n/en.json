@@ -4381,6 +4381,7 @@
       "customerCommsTitle": "Customer",
       "paymentIntent": "Payment intent",
       "deliveryMethod": "Delivery",
+      "deliveryType": "Delivery type",
       "deliveryHome": "Home delivery",
       "deliveryLocker": "Locker pickup",
       "locker": "Locker",
