@@ -101,13 +101,19 @@ import { ButtonComponent } from '../../shared/button.component';
         </a>
       </p>
       <p class="text-xs text-slate-600 dark:text-slate-300" *ngIf="vm.paymentMethod === 'netopia'">
-        <span>{{
-          vm.netopiaEnabled
-            ? (vm.isPaymentMethodAvailable('netopia')
-                ? ('checkout.paymentNetopiaHint' | translate)
-                : ('checkout.paymentMethodUnavailable' | translate))
-            : ('checkout.paymentNetopiaDisabled' | translate)
-        }}</span>
+        <ng-container *ngIf="vm.netopiaEnabled; else netopiaDisabled">
+          <span>{{
+            vm.isPaymentMethodAvailable('netopia')
+              ? ('checkout.paymentNetopiaHint' | translate)
+              : ('checkout.paymentMethodUnavailable' | translate)
+          }}</span>
+        </ng-container>
+        <ng-template #netopiaDisabled>
+          <span>
+            {{ 'checkout.paymentNetopiaDisabled' | translate }}
+            <ng-container *ngIf="vm.netopiaDisabledReason"> ({{ vm.netopiaDisabledReason }})</ng-container>
+          </span>
+        </ng-template>
         <a class="ml-1 underline text-indigo-700 hover:text-indigo-800 dark:text-indigo-300 dark:hover:text-indigo-200" routerLink="/contact">
           {{ 'checkout.paymentHelpLink' | translate }}
         </a>

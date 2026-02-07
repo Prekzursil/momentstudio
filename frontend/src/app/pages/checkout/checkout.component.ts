@@ -63,6 +63,7 @@ type SavedCheckout = {
 };
 
 type CheckoutPaymentMethod = 'cod' | 'netopia' | 'paypal' | 'stripe';
+type PaymentMethodCapability = { enabled?: boolean; reason?: string | null };
 
 type CheckoutQuote = {
   subtotal: number;
@@ -402,6 +403,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
 	  stripeEnabled = Boolean(appConfig.stripeEnabled);
 	  paypalEnabled = Boolean(appConfig.paypalEnabled);
 	  netopiaEnabled = Boolean(appConfig.netopiaEnabled);
+    netopiaDisabledReason = '';
 	  private syncDebounceHandle: ReturnType<typeof setTimeout> | null = null;
   private queuedSyncItems: CartItem[] | null = null;
   private checkoutRedirectedToCart = false;
@@ -1775,15 +1777,19 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
 
     private loadPaymentCapabilities(): void {
       this.api.get<{
-        stripe?: { enabled?: boolean };
-        paypal?: { enabled?: boolean };
-        netopia?: { enabled?: boolean };
+        stripe?: PaymentMethodCapability;
+        paypal?: PaymentMethodCapability;
+        netopia?: PaymentMethodCapability;
       }>('/payments/capabilities')
       .subscribe({
         next: (cap) => {
           this.stripeEnabled = Boolean(appConfig.stripeEnabled) && Boolean(cap?.stripe?.enabled);
           this.paypalEnabled = Boolean(cap?.paypal?.enabled);
-          this.netopiaEnabled = Boolean(appConfig.netopiaEnabled) && Boolean(cap?.netopia?.enabled);
+          const netopiaUiEnabled = Boolean(appConfig.netopiaEnabled);
+          const netopiaBackendEnabled = Boolean(cap?.netopia?.enabled);
+          this.netopiaEnabled = netopiaUiEnabled && netopiaBackendEnabled;
+          this.netopiaDisabledReason =
+            netopiaUiEnabled && !netopiaBackendEnabled ? String(cap?.netopia?.reason || '').trim() : '';
           this.ensurePaymentMethodAvailable();
         },
         error: () => {
