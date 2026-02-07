@@ -68,8 +68,20 @@ def _read_netopia_key_bytes(path: str) -> bytes:
     preferred = Path(raw)
     candidates: list[Path] = [preferred]
     if not preferred.is_absolute():
-        private_root = Path((getattr(settings, "private_media_root", None) or "private_uploads").strip() or "private_uploads")
+        private_root_value = (getattr(settings, "private_media_root", None) or "private_uploads").strip() or "private_uploads"
+        private_root = Path(private_root_value)
         candidates.append(private_root / raw)
+
+        # Also try resolving relative to the backend/app root (e.g. when running `uvicorn` from
+        # `backend/`) and one level above it (repo root), so deployments can keep certs under
+        # `private_uploads/` without relying on process CWD.
+        try:
+            module_root = Path(__file__).resolve().parents[2]
+        except (OSError, IndexError):
+            module_root = None
+        if module_root is not None:
+            candidates.append(module_root / private_root / raw)
+            candidates.append(module_root.parent / private_root / raw)
 
     last_exc: OSError | None = None
     for candidate in candidates:
