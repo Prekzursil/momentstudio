@@ -80,6 +80,40 @@ from app.services import netopia as netopia_service
 from app.services import paypal as paypal_service
 from app.services import address as address_service
 
+from app.api.v1 import cart as cart_api
+from app.models.legal import LegalConsentContext
+from app.schemas.order_admin import (
+    AdminOrderEmailEventRead,
+    AdminOrderIdsRequest,
+    AdminOrderListItem,
+    AdminOrderListResponse,
+    AdminOrderRead,
+    AdminPaginationMeta,
+    AdminOrderEmailResendRequest,
+)
+from app.schemas.order_admin_address import AdminOrderAddressesUpdate
+from app.schemas.order_admin_note import OrderAdminNoteCreate
+from app.schemas.order_exports_admin import AdminOrderDocumentExportListResponse, AdminOrderDocumentExportRead
+from app.schemas.order_fraud_review import OrderFraudReviewRequest
+from app.schemas.order_refund import AdminOrderRefundCreate, AdminOrderRefundRequest
+from app.schemas.order_shipment import OrderShipmentCreate, OrderShipmentUpdate, OrderShipmentRead
+from app.schemas.order_tag import (
+    OrderTagCreate,
+    OrderTagRenameRequest,
+    OrderTagRenameResponse,
+    OrderTagsResponse,
+    OrderTagStatRead,
+    OrderTagStatsResponse,
+)
+from app.schemas.receipt import ReceiptRead, ReceiptShareTokenRead
+from app.services import legal_consents as legal_consents_service
+from app.services import notifications as notification_service
+from app.services import pii as pii_service
+from app.services import pricing
+from app.services import promo_usage
+from app.services import step_up as step_up_service
+from app.services.payment_provider import is_mock_payments
+
 
 def _user_or_session_or_ip_identifier(request: Request) -> str:
     auth_header = request.headers.get("authorization") or ""
@@ -112,39 +146,6 @@ guest_email_request_rate_limit = per_identifier_limiter(
     60 * 10,
     key="orders:guest_email_request",
 )
-from app.api.v1 import cart as cart_api
-from app.schemas.order_admin import (
-    AdminOrderListItem,
-    AdminOrderListResponse,
-    AdminOrderEmailEventRead,
-    AdminOrderRead,
-    AdminPaginationMeta,
-    AdminOrderEmailResendRequest,
-    AdminOrderIdsRequest,
-)
-from app.schemas.order_admin_note import OrderAdminNoteCreate
-from app.schemas.order_admin_address import AdminOrderAddressesUpdate
-from app.schemas.order_shipment import OrderShipmentCreate, OrderShipmentUpdate, OrderShipmentRead
-from app.schemas.order_tag import (
-    OrderTagCreate,
-    OrderTagsResponse,
-    OrderTagStatRead,
-    OrderTagStatsResponse,
-    OrderTagRenameRequest,
-    OrderTagRenameResponse,
-)
-from app.schemas.order_refund import AdminOrderRefundCreate, AdminOrderRefundRequest
-from app.schemas.order_fraud_review import OrderFraudReviewRequest
-from app.schemas.order_exports_admin import AdminOrderDocumentExportListResponse, AdminOrderDocumentExportRead
-from app.schemas.receipt import ReceiptRead, ReceiptShareTokenRead
-from app.services import notifications as notification_service
-from app.services import promo_usage
-from app.services import pricing
-from app.services import pii as pii_service
-from app.services import step_up as step_up_service
-from app.services import legal_consents as legal_consents_service
-from app.services.payment_provider import is_mock_payments
-from app.models.legal import LegalConsentContext
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
