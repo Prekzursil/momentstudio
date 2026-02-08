@@ -137,11 +137,16 @@ def _detect_image_mime_path(path: Path) -> str | None:
 
 
 def delete_file(filepath: str) -> None:
-    if filepath.startswith("/media/"):
-        rel = filepath.removeprefix("/media/")
-        path = Path(settings.media_root) / rel
-    else:
-        path = Path(filepath)
+    base_root = Path(settings.media_root).resolve()
+    try:
+        if filepath.startswith("/media/"):
+            path = _media_url_to_path(filepath)
+        else:
+            path = Path(filepath).resolve()
+            path.relative_to(base_root)
+    except Exception:
+        # Best-effort cleanup: never delete outside MEDIA_ROOT.
+        return
     if path.exists():
         path.unlink()
         for suffix in ("-sm", "-md", "-lg"):
@@ -309,7 +314,7 @@ def _sanitize_svg(content: bytes) -> bytes:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported SVG content")
 
     try:
-        import xml.etree.ElementTree as ET
+        from defusedxml import ElementTree as ET
 
         root = ET.fromstring(raw.decode("utf-8", errors="replace"))
     except Exception as exc:
