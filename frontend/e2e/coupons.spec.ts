@@ -22,7 +22,14 @@ async function acceptConsentIfNeeded(page: Page, checkboxIndex: number): Promise
     throw new Error(`Consent checkbox ${checkboxIndex} is disabled but not checked.`);
   }
 
+  const slug = checkboxIndex === 0 ? 'terms-and-conditions' : 'privacy-policy';
+  const contentResponse = page
+    .waitForResponse((res) => res.url().includes(`/api/v1/content/pages/${slug}`) && res.status() === 200, {
+      timeout: 10_000
+    })
+    .catch(() => null);
   await checkbox.click();
+  await contentResponse;
 
   const dialog = page.locator('div[role="dialog"][aria-modal="true"]').last();
   const acceptButton = dialog.getByRole('button', { name: 'Accept' });
