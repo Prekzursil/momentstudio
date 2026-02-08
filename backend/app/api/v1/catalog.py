@@ -70,6 +70,15 @@ from app.services import step_up as step_up_service
 
 router = APIRouter(prefix="/catalog", tags=["catalog"])
 
+_CSV_IMPORT_MAX_BYTES = 25 * 1024 * 1024
+
+
+async def _read_upload_csv_bytes(file: UploadFile, *, max_bytes: int = _CSV_IMPORT_MAX_BYTES) -> bytes:
+    raw = await file.read(max_bytes + 1)
+    if len(raw) > max_bytes:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CSV file too large")
+    return raw
+
 
 @router.get("/categories", response_model=list[CategoryRead])
 async def list_categories(
@@ -383,7 +392,7 @@ async def import_categories_csv(
 ) -> ImportResult:
     if not file.filename.endswith(".csv"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CSV file required")
-    raw = await file.read()
+    raw = await _read_upload_csv_bytes(file)
     try:
         content = raw.decode()
     except UnicodeDecodeError:
@@ -874,7 +883,7 @@ async def import_products_csv(
 ) -> ImportResult:
     if not file.filename.endswith(".csv"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CSV file required")
-    raw = await file.read()
+    raw = await _read_upload_csv_bytes(file)
     try:
         content = raw.decode()
     except UnicodeDecodeError:
