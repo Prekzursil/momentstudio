@@ -4,6 +4,7 @@ import { catchError, map, switchMap } from 'rxjs/operators';
 import { from, of, throwError } from 'rxjs';
 import { AuthService } from './auth.service';
 import { appConfig } from './app-config';
+import { HttpErrorBusService } from './http-error-bus.service';
 
 function getApiBaseUrl(): string {
   return appConfig.apiBaseUrl.replace(/\/$/, '');
@@ -74,6 +75,7 @@ export const authAndErrorInterceptor: HttpInterceptorFn = (req, next) => {
   }
 
   const auth = inject(AuthService);
+  const errors = inject(HttpErrorBusService);
   const token = auth.getAccessToken();
   const stepUpToken = auth.getStepUpToken();
   const hasAuthHeader = req.headers.has('Authorization');
@@ -123,7 +125,7 @@ export const authAndErrorInterceptor: HttpInterceptorFn = (req, next) => {
             const retryReq = req.clone({
               withCredentials: true,
               setHeaders: nextToken ? { Authorization: `Bearer ${nextToken}` } : {}
-            });
+              });
             return next(retryReq);
           }),
           catchError(() => throwError(() => err))
@@ -163,6 +165,16 @@ export const authAndErrorInterceptor: HttpInterceptorFn = (req, next) => {
             );
           })
         );
+      }
+
+      // Global, low-noise error surface:
+      // - only network failures (status 0) and 5xx
+      // - honor X-Silent to avoid spamming background calls
+      if (!silent && err instanceof HttpErrorResponse) {
+        const status = err.status ?? 0;
+        if (status === 0 || (status >= 500 && status < 600)) {
+          errors.emit({ status, method: req.method, url: req.url });
+        }
       }
 
       return throwError(() => err);
