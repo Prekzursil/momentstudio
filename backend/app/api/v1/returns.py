@@ -243,7 +243,7 @@ async def admin_upload_return_label(
             file,
             subdir=f"return-labels/{return_id}",
             allowed_content_types=("application/pdf", "image/png", "image/jpeg", "image/webp"),
-            max_bytes=10 * 1024 * 1024,
+            max_bytes=None,
         )
     )
     now = datetime.now(timezone.utc)

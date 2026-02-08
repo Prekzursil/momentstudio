@@ -413,7 +413,7 @@ async def upload_category_image(
             file,
             root=dest,
             allowed_content_types=("image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"),
-            max_bytes=5 * 1024 * 1024,
+            max_bytes=None,
             generate_thumbnails=True,
         )
     )
@@ -723,7 +723,7 @@ async def upload_product_image(
             storage.save_upload,
             file,
             allowed_content_types=("image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"),
-            max_bytes=5 * 1024 * 1024,
+            max_bytes=None,
             generate_thumbnails=True,
         )
     )

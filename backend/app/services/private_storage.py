@@ -23,7 +23,7 @@ def save_private_upload(
     subdir: str,
     root: str | Path | None = None,
     allowed_content_types: tuple[str, ...] = ("application/pdf", "image/png", "image/jpeg", "image/webp"),
-    max_bytes: int = 10 * 1024 * 1024,
+    max_bytes: int | None = 10 * 1024 * 1024,
 ) -> tuple[str, str]:
     private_root = Path(root or settings.private_media_root).resolve()
     private_root.mkdir(parents=True, exist_ok=True)
@@ -35,25 +35,56 @@ def save_private_upload(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload destination")
     dest_dir.mkdir(parents=True, exist_ok=True)
 
-    content = file.file.read(max_bytes + 1)
-    if len(content) > max_bytes:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File too large")
-
-    if not file.content_type or file.content_type not in allowed_content_types:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
-
-    sniff = _detect_mime(content)
-    if not sniff or sniff not in allowed_content_types:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
-
     original_name = Path(file.filename or "").name or "shipping-label"
-    suffix = _suffix_for_mime(sniff, original_name)
-    filename = f"{uuid.uuid4().hex}{suffix}"
-    destination = dest_dir / filename
-    destination.write_bytes(content)
+    original_suffix = Path(original_name).suffix.lower() or ".bin"
+    temp_name = f"{uuid.uuid4().hex}{original_suffix}"
+    destination = dest_dir / temp_name
 
-    rel_path = destination.relative_to(private_root).as_posix()
-    return rel_path, original_name
+    def _cleanup(path: Path) -> None:
+        try:
+            if path.exists():
+                path.unlink()
+        except Exception:  # pragma: no cover
+            logger.warning("private_upload_cleanup_failed", extra={"path": str(path)})
+
+    def _stream_copy(dest: Path) -> int:
+        chunk_size = 1024 * 1024
+        written = 0
+        with dest.open("wb") as out:
+            while True:
+                chunk = file.file.read(chunk_size)
+                if not chunk:
+                    break
+                written += len(chunk)
+                if max_bytes is not None and written > max_bytes:
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File too large")
+                out.write(chunk)
+        return written
+
+    try:
+        _stream_copy(destination)
+
+        if not file.content_type or file.content_type not in allowed_content_types:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
+
+        sniff = _detect_mime_path(destination)
+        if not sniff or sniff not in allowed_content_types:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
+
+        suffix = _suffix_for_mime(sniff, original_name)
+        final_path = destination
+        if suffix and destination.suffix.lower() != suffix.lower():
+            final_path = destination.with_name(f"{destination.stem}{suffix}")
+            destination.rename(final_path)
+
+        rel_path = final_path.relative_to(private_root).as_posix()
+        return rel_path, original_name
+    except HTTPException:
+        _cleanup(destination)
+        raise
+    except Exception as exc:
+        _cleanup(destination)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Upload failed") from exc
 
 
 def save_private_bytes(
@@ -108,6 +139,35 @@ def _detect_mime(content: bytes) -> str | None:
     if content.startswith(b"%PDF"):
         return "application/pdf"
     return _detect_image_mime(content)
+
+
+def _detect_mime_path(path: Path) -> str | None:
+    try:
+        with path.open("rb") as fp:
+            head = fp.read(2048)
+    except OSError:
+        return None
+    if head.startswith(b"%PDF"):
+        return "application/pdf"
+
+    try:
+        with Image.open(path) as img:
+            image_format = img.format
+            img.verify()
+    except (UnidentifiedImageError, OSError, ValueError):
+        return None
+
+    if not image_format:
+        return None
+
+    normalized = image_format.upper()
+    if normalized == "JPEG":
+        return "image/jpeg"
+    if normalized == "PNG":
+        return "image/png"
+    if normalized == "WEBP":
+        return "image/webp"
+    return None
 
 
 def _detect_image_mime(content: bytes) -> str | None:

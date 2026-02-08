@@ -36,38 +36,111 @@ def save_upload(
     except ValueError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload destination")
 
-    read_len = max_bytes + 1 if max_bytes is not None else -1
-    content = file.file.read(read_len)
-    if max_bytes is not None and len(content) > max_bytes:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File too large")
-
-    sniff_mime: str | None = None
-    if allowed_content_types:
-        if not file.content_type or file.content_type not in allowed_content_types:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
-        sniff_mime = _detect_image_mime(content)
-        if not sniff_mime or sniff_mime not in allowed_content_types:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
-
-    is_svg = sniff_mime == "image/svg+xml"
-    if is_svg:
-        content = _sanitize_svg(content)
-
-    canonical_suffix = _suffix_for_mime(sniff_mime) if sniff_mime else None
-    original_suffix = Path(file.filename or "").suffix.lower()
     safe_name = Path(filename or "").name if filename else ""
-    if not safe_name:
-        safe_name = f"{uuid.uuid4().hex}{canonical_suffix or original_suffix or '.bin'}"
-    elif canonical_suffix:
-        safe_name = f"{Path(safe_name).stem}{canonical_suffix}"
-    destination = dest_root / safe_name
-    destination.write_bytes(content)
+    original_suffix = Path(file.filename or "").suffix.lower()
+    if safe_name:
+        initial_stem = Path(safe_name).stem
+        initial_suffix = Path(safe_name).suffix or original_suffix or ".bin"
+    else:
+        initial_stem = uuid.uuid4().hex
+        initial_suffix = original_suffix or ".bin"
 
-    if generate_thumbnails and allowed_content_types and not is_svg:
-        _generate_thumbnails(destination)
+    destination = dest_root / f"{initial_stem}{initial_suffix}"
 
-    rel_path = destination.relative_to(base_root).as_posix()
-    return f"/media/{rel_path}", destination.name
+    def _cleanup(path: Path) -> None:
+        try:
+            if path.exists():
+                path.unlink()
+        except Exception:  # pragma: no cover
+            logger.warning("upload_cleanup_failed", extra={"path": str(path)})
+
+    def _stream_copy(dest: Path) -> int:
+        chunk_size = 1024 * 1024
+        written = 0
+        with dest.open("wb") as out:
+            while True:
+                chunk = file.file.read(chunk_size)
+                if not chunk:
+                    break
+                written += len(chunk)
+                if max_bytes is not None and written > max_bytes:
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File too large")
+                out.write(chunk)
+        return written
+
+    try:
+        _stream_copy(destination)
+
+        sniff_mime: str | None = None
+        if allowed_content_types:
+            if not file.content_type or file.content_type not in allowed_content_types:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
+            sniff_mime = _detect_image_mime_path(destination)
+            if not sniff_mime or sniff_mime not in allowed_content_types:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
+
+        is_svg = sniff_mime == "image/svg+xml"
+        if is_svg:
+            raw = destination.read_bytes()
+            sanitized = _sanitize_svg(raw)
+            destination.write_bytes(sanitized)
+
+        canonical_suffix = _suffix_for_mime(sniff_mime) if sniff_mime else None
+        final_path = destination
+        if canonical_suffix and destination.suffix.lower() != canonical_suffix:
+            final_path = destination.with_name(f"{destination.stem}{canonical_suffix}")
+            destination.rename(final_path)
+
+        if generate_thumbnails and allowed_content_types and not is_svg:
+            _generate_thumbnails(final_path)
+
+        rel_path = final_path.relative_to(base_root).as_posix()
+        return f"/media/{rel_path}", final_path.name
+    except HTTPException:
+        _cleanup(destination)
+        raise
+    except Exception as exc:
+        _cleanup(destination)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Upload failed") from exc
+
+
+def _detect_image_mime_path(path: Path) -> str | None:
+    try:
+        with path.open("rb") as fp:
+            head = fp.read(2048)
+    except OSError:
+        return None
+
+    svg = _detect_svg_mime(head)
+    if svg:
+        return svg
+
+    try:
+        with Image.open(path) as img:
+            width, height = img.size
+            _validate_raster_dimensions(width=int(width), height=int(height))
+            image_format = img.format
+            img.verify()
+    except HTTPException:
+        raise
+    except Image.DecompressionBombError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image too large")
+    except (UnidentifiedImageError, OSError, ValueError):
+        return None
+
+    if not image_format:
+        return None
+
+    normalized = image_format.upper()
+    if normalized == "JPEG":
+        return "image/jpeg"
+    if normalized == "PNG":
+        return "image/png"
+    if normalized == "WEBP":
+        return "image/webp"
+    if normalized == "GIF":
+        return "image/gif"
+    return None
 
 
 def delete_file(filepath: str) -> None:
