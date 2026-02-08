@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from jose import jwt
+import jwt
 
 from app.core.config import settings
 from app.core.security import decode_token
@@ -45,4 +45,3 @@ def build_frontend_unsubscribe_url(*, token: str) -> str:
 
 def build_api_unsubscribe_url(*, token: str) -> str:
     return f"{settings.frontend_origin.rstrip('/')}/api/v1/newsletter/unsubscribe?token={token}"
-

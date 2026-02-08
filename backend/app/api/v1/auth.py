@@ -7,7 +7,7 @@ from urllib.parse import urlencode
 from uuid import UUID
 
 import anyio
-from jose import jwt
+import jwt
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
 from fastapi.responses import FileResponse, JSONResponse

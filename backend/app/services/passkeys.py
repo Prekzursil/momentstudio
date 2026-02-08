@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import dataclasses
 from datetime import datetime, timezone
+from typing import cast
 from urllib.parse import urlsplit
 
 from fastapi import HTTPException, status
@@ -82,6 +84,16 @@ def _as_camel_authentication_options(opts: dict) -> dict:
     }
 
 
+def _jsonify_webauthn_options(value: object) -> object:
+    if isinstance(value, (bytes, bytearray)):
+        return bytes_to_base64url(bytes(value))
+    if isinstance(value, dict):
+        return {key: _jsonify_webauthn_options(val) for key, val in value.items()}
+    if isinstance(value, list):
+        return [_jsonify_webauthn_options(item) for item in value]
+    return value
+
+
 async def list_passkeys(session: AsyncSession, user_id) -> list[UserPasskey]:
     result = await session.execute(
         select(UserPasskey).where(UserPasskey.user_id == user_id).order_by(UserPasskey.created_at.desc())
@@ -104,14 +116,15 @@ async def generate_registration_options_for_user(session: AsyncSession, user: Us
     options = generate_registration_options(
         rp_id=rp_id(),
         rp_name=rp_name(),
-        user_id=str(user.id),
+        user_id=user.id.bytes,
         user_name=user.email,
         user_display_name=getattr(user, "name", None) or user.email,
         authenticator_selection=selection,
         exclude_credentials=exclude,
     )
     challenge = options.challenge
-    payload = options.model_dump(mode="json")
+    payload = dataclasses.asdict(options)
+    payload = cast(dict, _jsonify_webauthn_options(payload))
     return _as_camel_registration_options(payload), challenge
 
 
@@ -171,7 +184,8 @@ async def generate_authentication_options_for_user(session: AsyncSession, user: 
         user_verification=UserVerificationRequirement.REQUIRED,
     )
     challenge = options.challenge
-    payload = options.model_dump(mode="json")
+    payload = dataclasses.asdict(options)
+    payload = cast(dict, _jsonify_webauthn_options(payload))
     return _as_camel_authentication_options(payload), challenge
 
 

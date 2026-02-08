@@ -14,8 +14,8 @@ from cryptography.hazmat.primitives.asymmetric import types as asymmetric_types
 from fastapi import HTTPException, status
 import httpx
 import simplejson
-from jose import jwt
-from jose.exceptions import JWTError
+import jwt
+from jwt.exceptions import PyJWTError
 
 from app.core.config import settings
 
@@ -369,7 +369,7 @@ def verify_ipn(*, verification_token: str, payload: bytes) -> dict[str, Any]:
                 "verify_iat": False,
             },
         )
-    except JWTError as exc:
+    except PyJWTError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Netopia signature") from exc
 
     max_age_seconds = max(60, int(getattr(settings, "netopia_ipn_max_age_seconds", 60 * 60 * 24)))

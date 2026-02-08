@@ -538,7 +538,7 @@ async def auto_publish_due_sales(session: AsyncSession, *, now: datetime | None 
         .where(clause)
         .values(status=ProductStatus.published, publish_at=func.coalesce(Product.publish_at, now_dt))
     )
-    updated = int(res.rowcount or 0)
+    updated = int(getattr(res, "rowcount", 0) or 0)
     if updated:
         await session.commit()
     return updated
@@ -563,7 +563,7 @@ async def apply_due_product_schedules(session: AsyncSession, *, now: datetime | 
             publish_scheduled_for=None,
         )
     )
-    updated += int(res.rowcount or 0)
+    updated += int(getattr(res, "rowcount", 0) or 0)
 
     unpublish_clause = and_(
         Product.is_deleted.is_(False),
@@ -576,7 +576,7 @@ async def apply_due_product_schedules(session: AsyncSession, *, now: datetime | 
         .where(unpublish_clause)
         .values(status=ProductStatus.archived, unpublish_scheduled_for=None)
     )
-    updated += int(res.rowcount or 0)
+    updated += int(getattr(res, "rowcount", 0) or 0)
 
     if updated:
         await session.commit()
