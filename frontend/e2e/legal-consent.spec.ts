@@ -36,7 +36,7 @@ test.beforeEach(async ({ page }) => {
 test('registration requires reading legal docs in a scroll-to-accept modal', async ({ page }) => {
   await page.goto('/register');
 
-  const unique = uniqueSessionId('e2e-register').replace(/[^a-z0-9]/gi, '').slice(0, 16);
+  const unique = uniqueSessionId('e2e-register').replaceAll(/[^a-z0-9]/gi, '').slice(0, 16);
   const username = `e2e_${unique}`.slice(0, 25);
   const email = `e2e_${unique}@example.com`;
   const password = uniqueSessionId('e2e-pass').slice(0, 24);
