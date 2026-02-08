@@ -36,6 +36,11 @@ def save_upload(
     except ValueError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload destination")
 
+    admin_ceiling = int(getattr(settings, "admin_upload_max_bytes", 0) or 0)
+    effective_max_bytes = max_bytes
+    if effective_max_bytes is None and admin_ceiling > 0:
+        effective_max_bytes = admin_ceiling
+
     safe_name = Path(filename or "").name if filename else ""
     original_suffix = Path(file.filename or "").suffix.lower()
     if safe_name:
@@ -63,7 +68,7 @@ def save_upload(
                 if not chunk:
                     break
                 written += len(chunk)
-                if max_bytes is not None and written > max_bytes:
+                if effective_max_bytes is not None and written > effective_max_bytes:
                     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File too large")
                 out.write(chunk)
         return written

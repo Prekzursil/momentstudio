@@ -120,6 +120,10 @@ class Settings(BaseSettings):
 
     media_root: str = "uploads"
     private_media_root: str = "private_uploads"
+    # Admin uploads (product images, CMS assets, shipping labels) are allowed to be much larger
+    # than customer uploads, but should still have a ceiling to avoid accidental disk exhaustion.
+    # Set to 0 to disable the ceiling (not recommended in production).
+    admin_upload_max_bytes: int = 512 * 1024 * 1024
     upload_image_max_width: int = 8192
     upload_image_max_height: int = 8192
     upload_image_max_pixels: int = 40_000_000

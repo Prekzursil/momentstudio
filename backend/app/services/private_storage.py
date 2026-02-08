@@ -35,6 +35,11 @@ def save_private_upload(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload destination")
     dest_dir.mkdir(parents=True, exist_ok=True)
 
+    admin_ceiling = int(getattr(settings, "admin_upload_max_bytes", 0) or 0)
+    effective_max_bytes = max_bytes
+    if effective_max_bytes is None and admin_ceiling > 0:
+        effective_max_bytes = admin_ceiling
+
     original_name = Path(file.filename or "").name or "shipping-label"
     original_suffix = Path(original_name).suffix.lower() or ".bin"
     temp_name = f"{uuid.uuid4().hex}{original_suffix}"
@@ -56,7 +61,7 @@ def save_private_upload(
                 if not chunk:
                     break
                 written += len(chunk)
-                if max_bytes is not None and written > max_bytes:
+                if effective_max_bytes is not None and written > effective_max_bytes:
                     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File too large")
                 out.write(chunk)
         return written
