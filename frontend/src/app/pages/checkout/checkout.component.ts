@@ -66,6 +66,18 @@ type SavedCheckout = {
 type CheckoutPaymentMethod = 'cod' | 'netopia' | 'paypal' | 'stripe';
 type PaymentMethodCapability = { enabled?: boolean; reason?: string | null; reason_code?: string | null };
 
+type CheckoutStartResponse = {
+  order_id: string;
+  reference_code?: string;
+  paypal_order_id?: string | null;
+  paypal_approval_url?: string | null;
+  netopia_ntp_id?: string | null;
+  netopia_payment_url?: string | null;
+  stripe_session_id?: string | null;
+  stripe_checkout_url?: string | null;
+  payment_method?: string;
+};
+
 type CheckoutQuote = {
   subtotal: number;
   fee: number;
@@ -1280,6 +1292,69 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     localStorage.setItem(CHECKOUT_NETOPIA_PENDING_KEY, JSON.stringify(summary));
   }
 
+  private persistAddressIfRequested(): void {
+    if (this.saveAddress) this.persistAddress();
+  }
+
+  private showPaymentNotReadyError(): void {
+    this.placing = false;
+    this.errorMessage = this.translate.instant('checkout.paymentNotReady');
+    this.announceAssertive(this.errorMessage);
+    this.focusGlobalError();
+    this.detectChangesSafe();
+  }
+
+  private handleCheckoutStartResponse(res: CheckoutStartResponse): void {
+    const method = (res.payment_method as CheckoutPaymentMethod | undefined) ?? this.paymentMethod;
+    const summary = this.buildSuccessSummary(res.order_id, res.reference_code ?? null, method);
+
+    switch (this.paymentMethod) {
+      case 'paypal': {
+        this.persistPayPalPendingSummary(summary);
+        this.persistAddressIfRequested();
+        if (res.paypal_approval_url) {
+          this.checkoutFlowCompleted = true;
+          window.location.assign(res.paypal_approval_url);
+          return;
+        }
+        this.showPaymentNotReadyError();
+        return;
+      }
+      case 'stripe': {
+        this.persistStripePendingSummary(summary);
+        this.persistAddressIfRequested();
+        if (res.stripe_checkout_url) {
+          this.checkoutFlowCompleted = true;
+          window.location.assign(res.stripe_checkout_url);
+          return;
+        }
+        this.showPaymentNotReadyError();
+        return;
+      }
+      case 'netopia': {
+        this.persistNetopiaPendingSummary(summary);
+        this.persistAddressIfRequested();
+        if (res.netopia_payment_url) {
+          this.checkoutFlowCompleted = true;
+          window.location.assign(res.netopia_payment_url);
+          return;
+        }
+        this.showPaymentNotReadyError();
+        return;
+      }
+      case 'cod': {
+        this.persistSuccessSummary(summary);
+        this.persistAddressIfRequested();
+        this.cart.clear();
+        this.checkoutFlowCompleted = true;
+        void this.router.navigate(['/checkout/success']);
+        return;
+      }
+      default:
+        this.showPaymentNotReadyError();
+    }
+  }
+
   private hydrateCartAndQuote(res: CartResponse): void {
     this.cart.hydrateFromBackend(res);
     this.setQuote(res);
@@ -2123,25 +2198,15 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       body['billing_postal_code'] = this.billing.postal;
       body['billing_country'] = this.billing.country || this.address.country || 'RO';
 	    }
-	    body['payment_method'] = this.paymentMethod;
-      body['accept_terms'] = this.acceptTerms;
-      body['accept_privacy'] = this.acceptPrivacy;
-	    this.api
-	      .post<{
-	        order_id: string;
-	        reference_code?: string;
-        paypal_order_id?: string | null;
-        paypal_approval_url?: string | null;
-        netopia_ntp_id?: string | null;
-        netopia_payment_url?: string | null;
-        stripe_session_id?: string | null;
-        stripe_checkout_url?: string | null;
-        payment_method?: string;
-      }>(
-        '/orders/checkout',
-        body,
-        this.cartApi.headers()
-      )
+		    body['payment_method'] = this.paymentMethod;
+	      body['accept_terms'] = this.acceptTerms;
+	      body['accept_privacy'] = this.acceptPrivacy;
+		    this.api
+		      .post<CheckoutStartResponse>(
+	        '/orders/checkout',
+	        body,
+	        this.cartApi.headers()
+	      )
       .pipe(
         timeout({ first: checkoutTimeoutMs }),
         finalize(() => {
@@ -2160,82 +2225,16 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
             this.detectChangesSafe();
           });
         })
-      )
-      .subscribe({
-        next: (res) => {
-          this.zone.run(() => {
-            settled = true;
-            const method = (res.payment_method as CheckoutPaymentMethod | undefined) ?? this.paymentMethod;
-            if (this.paymentMethod === 'paypal') {
-              this.persistPayPalPendingSummary(
-                this.buildSuccessSummary(res.order_id, res.reference_code ?? null, method)
-              );
-              if (this.saveAddress) this.persistAddress();
-              if (res.paypal_approval_url) {
-                this.checkoutFlowCompleted = true;
-                window.location.assign(res.paypal_approval_url);
-                return;
-              }
-              this.placing = false;
-              this.errorMessage = this.translate.instant('checkout.paymentNotReady');
-              this.announceAssertive(this.errorMessage);
-              this.focusGlobalError();
-              this.detectChangesSafe();
-              return;
-            }
-            if (this.paymentMethod === 'stripe') {
-              this.persistStripePendingSummary(
-                this.buildSuccessSummary(res.order_id, res.reference_code ?? null, method)
-              );
-              if (this.saveAddress) this.persistAddress();
-              if (res.stripe_checkout_url) {
-                this.checkoutFlowCompleted = true;
-                window.location.assign(res.stripe_checkout_url);
-                return;
-              }
-              this.placing = false;
-              this.errorMessage = this.translate.instant('checkout.paymentNotReady');
-              this.announceAssertive(this.errorMessage);
-              this.focusGlobalError();
-              this.detectChangesSafe();
-              return;
-            }
-            if (this.paymentMethod === 'netopia') {
-              this.persistNetopiaPendingSummary(
-                this.buildSuccessSummary(res.order_id, res.reference_code ?? null, method)
-              );
-              if (this.saveAddress) this.persistAddress();
-              if (res.netopia_payment_url) {
-                this.checkoutFlowCompleted = true;
-                window.location.assign(res.netopia_payment_url);
-                return;
-              }
-              this.placing = false;
-              this.errorMessage = this.translate.instant('checkout.paymentNotReady');
-              this.announceAssertive(this.errorMessage);
-              this.focusGlobalError();
-              this.detectChangesSafe();
-              return;
-            }
-            if (this.paymentMethod === 'cod') {
-              this.persistSuccessSummary(
-                this.buildSuccessSummary(res.order_id, res.reference_code ?? null, method)
-              );
-              if (this.saveAddress) this.persistAddress();
-              this.cart.clear();
-              this.checkoutFlowCompleted = true;
-              void this.router.navigate(['/checkout/success']);
-              return;
-            }
-            this.placing = false;
-            this.errorMessage = this.translate.instant('checkout.paymentNotReady');
-            this.announceAssertive(this.errorMessage);
-            this.focusGlobalError();
-            this.detectChangesSafe();
-          });
-        },
-        error: (err) => {
-          this.zone.run(() => {
+	      )
+	      .subscribe({
+	        next: (res) => {
+	          this.zone.run(() => {
+	            settled = true;
+	            this.handleCheckoutStartResponse(res);
+	          });
+	        },
+	        error: (err) => {
+	          this.zone.run(() => {
             settled = true;
             this.placing = false;
             const isTimeout = String((err as any)?.name || '').toLowerCase().includes('timeout');
@@ -2296,24 +2295,14 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       payload['last_name'] = this.guestLastName;
       payload['date_of_birth'] = this.guestDob;
       payload['preferred_language'] = preferredLanguage;
-    }
-
-    this.api
-      .post<{
-        order_id: string;
-        reference_code?: string;
-        paypal_order_id?: string | null;
-        paypal_approval_url?: string | null;
-        netopia_ntp_id?: string | null;
-        netopia_payment_url?: string | null;
-        stripe_session_id?: string | null;
-        stripe_checkout_url?: string | null;
-        payment_method?: string;
-      }>(
-        '/orders/guest-checkout',
-        payload,
-        this.cartApi.headers()
-      )
+	    }
+	
+	    this.api
+	      .post<CheckoutStartResponse>(
+	        '/orders/guest-checkout',
+	        payload,
+	        this.cartApi.headers()
+	      )
       .pipe(
         timeout({ first: checkoutTimeoutMs }),
         finalize(() => {
@@ -2331,82 +2320,16 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
             this.detectChangesSafe();
           });
         })
-      )
-      .subscribe({
-        next: (res) => {
-          this.zone.run(() => {
-            settled = true;
-            const method = (res.payment_method as CheckoutPaymentMethod | undefined) ?? this.paymentMethod;
-            if (this.paymentMethod === 'paypal') {
-              this.persistPayPalPendingSummary(
-                this.buildSuccessSummary(res.order_id, res.reference_code ?? null, method)
-              );
-              if (this.saveAddress) this.persistAddress();
-              if (res.paypal_approval_url) {
-                this.checkoutFlowCompleted = true;
-                window.location.assign(res.paypal_approval_url);
-                return;
-              }
-              this.placing = false;
-              this.errorMessage = this.translate.instant('checkout.paymentNotReady');
-              this.announceAssertive(this.errorMessage);
-              this.focusGlobalError();
-              this.detectChangesSafe();
-              return;
-            }
-            if (this.paymentMethod === 'stripe') {
-              this.persistStripePendingSummary(
-                this.buildSuccessSummary(res.order_id, res.reference_code ?? null, method)
-              );
-              if (this.saveAddress) this.persistAddress();
-              if (res.stripe_checkout_url) {
-                this.checkoutFlowCompleted = true;
-                window.location.assign(res.stripe_checkout_url);
-                return;
-              }
-              this.placing = false;
-              this.errorMessage = this.translate.instant('checkout.paymentNotReady');
-              this.announceAssertive(this.errorMessage);
-              this.focusGlobalError();
-              this.detectChangesSafe();
-              return;
-            }
-            if (this.paymentMethod === 'netopia') {
-              this.persistNetopiaPendingSummary(
-                this.buildSuccessSummary(res.order_id, res.reference_code ?? null, method)
-              );
-              if (this.saveAddress) this.persistAddress();
-              if (res.netopia_payment_url) {
-                this.checkoutFlowCompleted = true;
-                window.location.assign(res.netopia_payment_url);
-                return;
-              }
-              this.placing = false;
-              this.errorMessage = this.translate.instant('checkout.paymentNotReady');
-              this.announceAssertive(this.errorMessage);
-              this.focusGlobalError();
-              this.detectChangesSafe();
-              return;
-            }
-            if (this.paymentMethod === 'cod') {
-              this.persistSuccessSummary(
-                this.buildSuccessSummary(res.order_id, res.reference_code ?? null, method)
-              );
-              if (this.saveAddress) this.persistAddress();
-              this.cart.clear();
-              this.checkoutFlowCompleted = true;
-              void this.router.navigate(['/checkout/success']);
-              return;
-            }
-            this.placing = false;
-            this.errorMessage = this.translate.instant('checkout.paymentNotReady');
-            this.announceAssertive(this.errorMessage);
-            this.focusGlobalError();
-            this.detectChangesSafe();
-          });
-        },
-        error: (err) => {
-          this.zone.run(() => {
+	      )
+	      .subscribe({
+	        next: (res) => {
+	          this.zone.run(() => {
+	            settled = true;
+	            this.handleCheckoutStartResponse(res);
+	          });
+	        },
+	        error: (err) => {
+	          this.zone.run(() => {
             settled = true;
             this.placing = false;
             const isTimeout = String((err as any)?.name || '').toLowerCase().includes('timeout');
