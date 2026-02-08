@@ -4,6 +4,27 @@
     "tagline": "artă. meșteșug",
     "brandMarkAlt": "logo cu floare momentstudio"
   },
+  "errors": {
+    "signInRequired": "Te rugăm să te autentifici pentru a continua.",
+    "staffRequired": "Este necesar acces de personal.",
+    "sectionDenied": "Nu ai acces la această secțiune.",
+    "network": {
+      "title": "Eroare de rețea",
+      "body": "Verifică conexiunea și încearcă din nou."
+    },
+    "unauthorized": {
+      "title": "Neautorizat",
+      "body": "Te rugăm să te autentifici pentru a continua."
+    },
+    "server": {
+      "title": "Eroare de server",
+      "body": "Ceva nu a mers bine. Încearcă din nou."
+    },
+    "unexpected": {
+      "title": "Eroare neașteptată",
+      "body": "Încearcă din nou."
+    }
+  },
   "meta": {
     "titles": {
       "home": "momentstudio",
@@ -1482,12 +1503,14 @@
     "back": "Înapoi",
     "resetLink": "Trimite link-ul de resetare",
     "resetLinkSent": "Link de resetare trimis",
+    "resetLinkSentBody": "Dacă există un cont pentru {{email}}, vei primi în scurt timp un link de resetare.",
     "setPassword": "Setează parola",
     "backToLogin": "Înapoi la autentificare",
     "remembered": "Ți-ai amintit parola?",
     "haveAccount": "Ai deja un cont?",
     "successLogin": "Bine ai revenit",
     "successRegister": "Cont creat",
+    "successRegisterBody": "Bun venit, {{email}}",
     "successReset": "Parolă actualizată",
     "invalidCredentials": "Email/utilizator sau parola sunt incorecte.",
     "completeForm": "Te rugăm să completezi formularul.",

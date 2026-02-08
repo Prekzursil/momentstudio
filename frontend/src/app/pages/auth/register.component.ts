@@ -596,7 +596,10 @@ export class RegisterComponent implements OnInit, OnDestroy {
       .subscribe({
 	        next: (res) => {
 	          this.error = '';
-	          this.toast.success(this.translate.instant('auth.successRegister'), `Welcome, ${res.user.email}`);
+	          this.toast.success(
+              this.translate.instant('auth.successRegister'),
+              this.translate.instant('auth.successRegisterBody', { email: res.user.email })
+            );
 	          void this.router.navigateByUrl('/account');
 	        },
 	        error: (err) => {
