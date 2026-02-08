@@ -1355,6 +1355,62 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     }
   }
 
+  private handleCheckoutFinalize(settled: boolean): void {
+    if (!this.checkoutFlowCompleted) {
+      this.placing = false;
+    }
+    this.detectChangesSafe();
+    if (settled || this.checkoutFlowCompleted) return;
+    // Defensive fallback: ensure we never leave the user stuck in a "placing order" state.
+    if (!this.errorMessage) {
+      this.errorMessage = this.translate.instant('checkout.checkoutFailed');
+    }
+    this.announceAssertive(this.errorMessage);
+    this.focusGlobalError();
+    this.detectChangesSafe();
+  }
+
+  private handleCheckoutRequestError(err: any): void {
+    this.placing = false;
+    const isTimeout = String(err?.name || '').toLowerCase().includes('timeout');
+    this.errorMessage = isTimeout
+      ? this.translate.instant('checkout.checkoutFailed')
+      : err?.error?.detail || this.translate.instant('checkout.checkoutFailed');
+    this.announceAssertive(this.errorMessage);
+    this.focusGlobalError();
+    this.detectChangesSafe();
+  }
+
+  private submitCheckoutRequest(endpoint: string, payload: Record<string, unknown>): void {
+    const checkoutTimeoutMs = 20_000;
+    let settled = false;
+
+    this.api
+      .post<CheckoutStartResponse>(endpoint, payload, this.cartApi.headers())
+      .pipe(
+        timeout({ first: checkoutTimeoutMs }),
+        finalize(() => {
+          this.zone.run(() => {
+            this.handleCheckoutFinalize(settled);
+          });
+        })
+      )
+      .subscribe({
+        next: (res) => {
+          this.zone.run(() => {
+            settled = true;
+            this.handleCheckoutStartResponse(res);
+          });
+        },
+        error: (err) => {
+          this.zone.run(() => {
+            settled = true;
+            this.handleCheckoutRequestError(err);
+          });
+        },
+      });
+  }
+
   private hydrateCartAndQuote(res: CartResponse): void {
     this.cart.hydrateFromBackend(res);
     this.setQuote(res);
@@ -2162,9 +2218,6 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
   }
 
   private submitCheckout(): void {
-    const checkoutTimeoutMs = 20_000;
-    let settled = false;
-
     const body: Record<string, unknown> = {
       phone: this.effectivePhoneE164(),
       invoice_company: this.invoiceEnabled ? (this.invoiceCompany || '').trim() || null : null,
@@ -2178,6 +2231,9 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       shipping_method_id: null,
       promo_code: this.promo || null,
       save_address: this.saveAddress,
+      payment_method: this.paymentMethod,
+      accept_terms: this.acceptTerms,
+      accept_privacy: this.acceptPrivacy,
       courier: this.courier,
       delivery_type: this.deliveryType,
       locker_id: this.deliveryType === 'locker' ? this.locker?.id ?? null : null,
@@ -2197,62 +2253,12 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       body['billing_region'] = this.billing.region || null;
       body['billing_postal_code'] = this.billing.postal;
       body['billing_country'] = this.billing.country || this.address.country || 'RO';
-	    }
-		    body['payment_method'] = this.paymentMethod;
-	      body['accept_terms'] = this.acceptTerms;
-	      body['accept_privacy'] = this.acceptPrivacy;
-		    this.api
-		      .post<CheckoutStartResponse>(
-	        '/orders/checkout',
-	        body,
-	        this.cartApi.headers()
-	      )
-      .pipe(
-        timeout({ first: checkoutTimeoutMs }),
-        finalize(() => {
-          this.zone.run(() => {
-            if (!this.checkoutFlowCompleted) {
-              this.placing = false;
-            }
-            this.detectChangesSafe();
-            if (settled || this.checkoutFlowCompleted) return;
-            // Defensive fallback: ensure we never leave the user stuck in a "placing order" state.
-            if (!this.errorMessage) {
-              this.errorMessage = this.translate.instant('checkout.checkoutFailed');
-            }
-            this.announceAssertive(this.errorMessage);
-            this.focusGlobalError();
-            this.detectChangesSafe();
-          });
-        })
-	      )
-	      .subscribe({
-	        next: (res) => {
-	          this.zone.run(() => {
-	            settled = true;
-	            this.handleCheckoutStartResponse(res);
-	          });
-	        },
-	        error: (err) => {
-	          this.zone.run(() => {
-            settled = true;
-            this.placing = false;
-            const isTimeout = String((err as any)?.name || '').toLowerCase().includes('timeout');
-            this.errorMessage = isTimeout
-              ? this.translate.instant('checkout.checkoutFailed')
-              : err?.error?.detail || this.translate.instant('checkout.checkoutFailed');
-            this.announceAssertive(this.errorMessage);
-            this.focusGlobalError();
-            this.detectChangesSafe();
-          });
-        }
-      });
+    }
+
+    this.submitCheckoutRequest('/orders/checkout', body);
   }
 
   private submitGuestCheckout(): void {
-    const checkoutTimeoutMs = 20_000;
-    let settled = false;
-
     const preferredLanguage = (this.translate.currentLang || 'en') === 'ro' ? 'ro' : 'en';
     const payload: Record<string, unknown> = {
       name: this.address.name,
@@ -2295,53 +2301,9 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       payload['last_name'] = this.guestLastName;
       payload['date_of_birth'] = this.guestDob;
       payload['preferred_language'] = preferredLanguage;
-	    }
-	
-	    this.api
-	      .post<CheckoutStartResponse>(
-	        '/orders/guest-checkout',
-	        payload,
-	        this.cartApi.headers()
-	      )
-      .pipe(
-        timeout({ first: checkoutTimeoutMs }),
-        finalize(() => {
-          this.zone.run(() => {
-            if (!this.checkoutFlowCompleted) {
-              this.placing = false;
-            }
-            this.detectChangesSafe();
-            if (settled || this.checkoutFlowCompleted) return;
-            if (!this.errorMessage) {
-              this.errorMessage = this.translate.instant('checkout.checkoutFailed');
-            }
-            this.announceAssertive(this.errorMessage);
-            this.focusGlobalError();
-            this.detectChangesSafe();
-          });
-        })
-	      )
-	      .subscribe({
-	        next: (res) => {
-	          this.zone.run(() => {
-	            settled = true;
-	            this.handleCheckoutStartResponse(res);
-	          });
-	        },
-	        error: (err) => {
-	          this.zone.run(() => {
-            settled = true;
-            this.placing = false;
-            const isTimeout = String((err as any)?.name || '').toLowerCase().includes('timeout');
-            this.errorMessage = isTimeout
-              ? this.translate.instant('checkout.checkoutFailed')
-              : err?.error?.detail || this.translate.instant('checkout.checkoutFailed');
-            this.announceAssertive(this.errorMessage);
-            this.focusGlobalError();
-            this.detectChangesSafe();
-          });
-        }
-      });
+    }
+
+    this.submitCheckoutRequest('/orders/guest-checkout', payload);
   }
 
   private clearGuestResendCooldown(): void {
