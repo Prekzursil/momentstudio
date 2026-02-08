@@ -147,7 +147,7 @@ export class VerifyEmailComponent implements OnInit {
       void this.router.navigateByUrl(fallback);
       return;
     }
-    if (!target.startsWith('/')) {
+    if (!target.startsWith('/') || target.startsWith('//')) {
       void this.router.navigateByUrl(fallback);
       return;
     }

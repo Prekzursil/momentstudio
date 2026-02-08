@@ -1304,6 +1304,17 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     this.detectChangesSafe();
   }
 
+  private isAllowedPaymentRedirectUrl(url: string, allowedHosts: string[]): boolean {
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== 'https:') return false;
+      const host = parsed.hostname.toLowerCase();
+      return allowedHosts.some((allowed) => host === allowed || host.endsWith(`.${allowed}`));
+    } catch {
+      return false;
+    }
+  }
+
   private handleCheckoutStartResponse(res: CheckoutStartResponse): void {
     const method = (res.payment_method as CheckoutPaymentMethod | undefined) ?? this.paymentMethod;
     const summary = this.buildSuccessSummary(res.order_id, res.reference_code ?? null, method);
@@ -1313,6 +1324,10 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
         this.persistPayPalPendingSummary(summary);
         this.persistAddressIfRequested();
         if (res.paypal_approval_url) {
+          if (!this.isAllowedPaymentRedirectUrl(res.paypal_approval_url, ['paypal.com'])) {
+            this.showPaymentNotReadyError();
+            return;
+          }
           this.checkoutFlowCompleted = true;
           window.location.assign(res.paypal_approval_url);
           return;
@@ -1324,6 +1339,10 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
         this.persistStripePendingSummary(summary);
         this.persistAddressIfRequested();
         if (res.stripe_checkout_url) {
+          if (!this.isAllowedPaymentRedirectUrl(res.stripe_checkout_url, ['checkout.stripe.com'])) {
+            this.showPaymentNotReadyError();
+            return;
+          }
           this.checkoutFlowCompleted = true;
           window.location.assign(res.stripe_checkout_url);
           return;
@@ -1335,6 +1354,10 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
         this.persistNetopiaPendingSummary(summary);
         this.persistAddressIfRequested();
         if (res.netopia_payment_url) {
+          if (!this.isAllowedPaymentRedirectUrl(res.netopia_payment_url, ['mobilpay.ro', 'netopia-payments.com'])) {
+            this.showPaymentNotReadyError();
+            return;
+          }
           this.checkoutFlowCompleted = true;
           window.location.assign(res.netopia_payment_url);
           return;
