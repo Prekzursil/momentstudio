@@ -96,11 +96,9 @@ export const authAndErrorInterceptor: HttpInterceptorFn = (req, next) => {
     catchError((err) => {
       const isRefresh = req.url === `${apiBase}/auth/refresh`;
       const isLogin = req.url === `${apiBase}/auth/login`;
-      const isTwoFactor = req.url === `${apiBase}/auth/login/2fa`;
       const isRegister = req.url === `${apiBase}/auth/register`;
       const isLogout = req.url === `${apiBase}/auth/logout`;
       const isGoogleFlow = req.url.startsWith(`${apiBase}/auth/google/`);
-      const isPasswordReset = req.url.startsWith(`${apiBase}/auth/password-reset`);
       const isStepUp = req.url === `${apiBase}/auth/step-up`;
 
       if (
