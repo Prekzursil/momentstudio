@@ -37,9 +37,12 @@ def save_upload(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload destination")
 
     admin_ceiling = int(getattr(settings, "admin_upload_max_bytes", 0) or 0)
-    effective_max_bytes = max_bytes
-    if effective_max_bytes is None and admin_ceiling > 0:
-        effective_max_bytes = admin_ceiling
+    if max_bytes is None:
+        # Admin-only endpoints may pass max_bytes=None. We still enforce a ceiling to avoid
+        # unbounded uploads that can exhaust disk/memory under abuse.
+        effective_max_bytes = admin_ceiling if admin_ceiling > 0 else 512 * 1024 * 1024
+    else:
+        effective_max_bytes = int(max_bytes)
 
     safe_name = Path(filename or "").name if filename else ""
     original_suffix = Path(file.filename or "").suffix.lower()
@@ -68,13 +71,13 @@ def save_upload(
                 if not chunk:
                     break
                 written += len(chunk)
-                if effective_max_bytes is not None and written > effective_max_bytes:
+                if written > effective_max_bytes:
                     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File too large")
                 out.write(chunk)
         return written
 
     try:
-        _stream_copy(destination)
+        written = _stream_copy(destination)
 
         sniff_mime: str | None = None
         if allowed_content_types:
@@ -86,6 +89,8 @@ def save_upload(
 
         is_svg = sniff_mime == "image/svg+xml"
         if is_svg:
+            if written > _SVG_MAX_BYTES:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="SVG file too large")
             raw = destination.read_bytes()
             sanitized = _sanitize_svg(raw)
             destination.write_bytes(sanitized)

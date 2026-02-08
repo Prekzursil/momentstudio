@@ -11,13 +11,14 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 _CHUNK_SIZE = 1024 * 1024
+_DEFAULT_ADMIN_UPLOAD_CEILING = 512 * 1024 * 1024
 
 
-def _effective_max_bytes(max_bytes: int | None) -> int | None:
+def _effective_max_bytes(max_bytes: int | None) -> int:
     if max_bytes is not None:
-        return max_bytes
+        return int(max_bytes)
     admin_ceiling = int(getattr(settings, "admin_upload_max_bytes", 0) or 0)
-    return admin_ceiling if admin_ceiling > 0 else None
+    return admin_ceiling if admin_ceiling > 0 else _DEFAULT_ADMIN_UPLOAD_CEILING
 
 
 def _cleanup_upload(path: Path) -> None:
@@ -28,7 +29,7 @@ def _cleanup_upload(path: Path) -> None:
         logger.warning("private_upload_cleanup_failed", extra={"path": str(path)})
 
 
-def _stream_copy(file: UploadFile, dest: Path, *, max_bytes: int | None) -> int:
+def _stream_copy(file: UploadFile, dest: Path, *, max_bytes: int) -> int:
     written = 0
     with dest.open("wb") as out:
         while True:
@@ -36,7 +37,7 @@ def _stream_copy(file: UploadFile, dest: Path, *, max_bytes: int | None) -> int:
             if not chunk:
                 break
             written += len(chunk)
-            if max_bytes is not None and written > max_bytes:
+            if written > max_bytes:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File too large")
             out.write(chunk)
     return written

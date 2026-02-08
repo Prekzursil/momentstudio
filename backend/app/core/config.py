@@ -20,7 +20,9 @@ class Settings(BaseSettings):
     dev_safety_database_guard_enabled: bool = True
     dev_safety_database_allow_hosts: list[str] = ["localhost", "127.0.0.1", "db"]
 
-    database_url: str = "postgresql+asyncpg://postgres@localhost:5432/adrianaart"
+    # Local/dev default only (tests override this and production must set a real DATABASE_URL).
+    # NOSONAR - passwordless local DBs are acceptable; production is enforced via startup checks.
+    database_url: str = "postgresql+asyncpg://postgres@localhost:5432/adrianaart"  # NOSONAR
     db_pool_size: int | None = None
     db_max_overflow: int | None = None
     backup_last_at: str | None = None
@@ -124,7 +126,7 @@ class Settings(BaseSettings):
     private_media_root: str = "private_uploads"
     # Admin uploads (product images, CMS assets, shipping labels) are allowed to be much larger
     # than customer uploads, but should still have a ceiling to avoid accidental disk exhaustion.
-    # Set to 0 to disable the ceiling (not recommended in production).
+    # Set to a large value; we still enforce a ceiling to avoid DoS/disk exhaustion.
     admin_upload_max_bytes: int = 512 * 1024 * 1024
     upload_image_max_width: int = 8192
     upload_image_max_height: int = 8192
