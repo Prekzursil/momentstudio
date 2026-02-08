@@ -1,5 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
+import { uniqueSessionId } from './checkout-helpers';
+
 async function acceptLegalModal(page: Page): Promise<void> {
   const dialog = page.locator('div[role="dialog"][aria-modal="true"]').last();
   const acceptButton = dialog.getByRole('button', { name: 'Accept' });
@@ -34,15 +36,16 @@ test.beforeEach(async ({ page }) => {
 test('registration requires reading legal docs in a scroll-to-accept modal', async ({ page }) => {
   await page.goto('/register');
 
-  const unique = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const unique = uniqueSessionId('e2e-register').replace(/[^a-z0-9]/gi, '').slice(0, 16);
   const username = `e2e_${unique}`.slice(0, 25);
   const email = `e2e_${unique}@example.com`;
+  const password = uniqueSessionId('e2e-pass').slice(0, 24);
 
   await page.locator('input[name="displayName"]').fill('E2E Tester');
   await page.locator('input[name="username"]').fill(username);
   await page.locator('input[name="email"]').fill(email);
-  await page.locator('input[name="password"]').fill('secret123');
-  await page.locator('input[name="confirm"]').fill('secret123');
+  await page.locator('input[name="password"]').fill(password);
+  await page.locator('input[name="confirm"]').fill(password);
   await page.getByRole('button', { name: 'Next' }).click();
 
   await page.locator('input[name="firstName"]').fill('E2E');

@@ -142,3 +142,48 @@ export async function fillShippingAddress(page: Page, email: string): Promise<vo
   }
 }
 
+export async function openCheckoutWithSeededCart(
+  page: Page,
+  request: APIRequestContext,
+  sessionPrefix: string
+): Promise<{ product: { name: string }; sessionId: string } | null> {
+  const sessionId = uniqueSessionId(sessionPrefix);
+  await page.addInitScript((sid) => {
+    localStorage.setItem('cart_session_id', sid);
+    localStorage.removeItem('cart_cache');
+  }, sessionId);
+
+  const product = await seedCartWithFirstProduct(request, sessionId);
+  if (!product) return null;
+
+  await loginUi(page);
+
+  const cartLoad = page.waitForResponse(
+    (res) => res.url().includes('/api/v1/cart') && res.request().method() === 'GET' && res.status() === 200
+  );
+  await page.goto('/cart');
+  await cartLoad;
+
+  await expect(page.getByText(product.name)).toBeVisible();
+
+  await page.getByRole('link', { name: 'Proceed to checkout' }).click();
+  await expect(page).toHaveURL(/\/checkout$/);
+
+  return { product, sessionId };
+}
+
+export async function prepareCodCheckout(page: Page, email: string): Promise<Locator> {
+  await fillShippingAddress(page, email);
+
+  const codOption = page.getByRole('button', { name: 'Cash on delivery' });
+  if (await codOption.isVisible()) {
+    await codOption.click();
+  }
+
+  const placeOrder = page.getByRole('button', { name: 'Place order' });
+  if (await placeOrder.isDisabled()) {
+    await acceptCheckoutConsents(page);
+  }
+  await expect(placeOrder).toBeEnabled();
+  return placeOrder;
+}
