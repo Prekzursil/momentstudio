@@ -3,13 +3,22 @@ import { test, expect, type Page } from '@playwright/test';
 async function acceptLegalModal(page: Page): Promise<void> {
   const dialog = page.locator('div[role="dialog"][aria-modal="true"]').last();
   const acceptButton = dialog.getByRole('button', { name: 'Accept' });
+  const body = dialog.locator('div.overflow-y-auto').first();
   await expect(acceptButton).toBeVisible();
-  if (await acceptButton.isDisabled()) {
-    const body = dialog.locator('div.overflow-y-auto').first();
+  const { scrollHeight, clientHeight } = await body.evaluate((el) => ({
+    scrollHeight: el.scrollHeight,
+    clientHeight: el.clientHeight
+  }));
+  const isScrollable = scrollHeight > clientHeight + 8;
+
+  if (isScrollable) {
+    expect(await acceptButton.isDisabled()).toBe(true);
     await body.evaluate((el) => {
       el.scrollTop = el.scrollHeight;
       el.dispatchEvent(new Event('scroll'));
     });
+    await expect(acceptButton).toBeEnabled();
+  } else {
     await expect(acceptButton).toBeEnabled();
   }
   await acceptButton.click();

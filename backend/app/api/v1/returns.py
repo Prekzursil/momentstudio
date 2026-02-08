@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import mimetypes
 from datetime import datetime, timezone
+from functools import partial
 from pathlib import Path
 from uuid import UUID
 
+import anyio
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -235,11 +237,14 @@ async def admin_upload_return_label(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Return request not found")
 
     old_path = getattr(record, "return_label_path", None)
-    rel_path, original_name = private_storage.save_private_upload(
-        file,
-        subdir=f"return-labels/{return_id}",
-        allowed_content_types=("application/pdf", "image/png", "image/jpeg", "image/webp"),
-        max_bytes=10 * 1024 * 1024,
+    rel_path, original_name = await anyio.to_thread.run_sync(
+        partial(
+            private_storage.save_private_upload,
+            file,
+            subdir=f"return-labels/{return_id}",
+            allowed_content_types=("application/pdf", "image/png", "image/jpeg", "image/webp"),
+            max_bytes=10 * 1024 * 1024,
+        )
     )
     now = datetime.now(timezone.utc)
     record.return_label_path = rel_path

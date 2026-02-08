@@ -91,11 +91,13 @@ test('guest checkout prompts for email verification', async ({ page, request: ap
   const emailRequest = page.waitForResponse((res) =>
     res.url().includes('/api/v1/orders/guest-checkout/email/request')
   );
-  await page.getByRole('button', { name: 'Send code' }).click();
+  const sendLink = page.getByRole('button', { name: 'Send verification link' });
+  await expect(sendLink).toBeVisible();
+  await sendLink.click();
   const response = await emailRequest;
   expect([200, 204]).toContain(response.status());
 
-  await expect(page.locator('input[name="guestEmailToken"]')).toBeVisible();
+  await expect(page.getByText('We sent a verification link to your email. Open it to continue.')).toBeVisible();
 });
 
 test('owner can sign in and reach admin dashboard', async ({ page }) => {

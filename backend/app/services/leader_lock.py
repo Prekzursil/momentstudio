@@ -7,12 +7,15 @@ from collections.abc import Awaitable, Callable
 from contextlib import suppress
 
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
+from app.core.config import settings
 from app.db.session import engine
 
 logger = logging.getLogger(__name__)
 
 _RETRY_SECONDS = 15
+_LEADER_ENGINE: AsyncEngine | None = None
 
 
 def _is_postgres() -> bool:
@@ -27,6 +30,29 @@ def _lock_id(name: str) -> int:
     value = int.from_bytes(digest, "big", signed=False)
     # Fit within signed BIGINT range.
     return int(value % (2**63 - 1))
+
+
+def _leader_engine() -> AsyncEngine:
+    """Dedicated engine for leader locks to avoid starving the request DB pool.
+
+    Advisory locks are session-scoped, so the leader holds a connection for the duration of the loop.
+    Using a small dedicated pool avoids consuming connections from the main API engine under load.
+    """
+    global _LEADER_ENGINE
+    if _LEADER_ENGINE is not None:
+        return _LEADER_ENGINE
+
+    connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
+    _LEADER_ENGINE = create_async_engine(
+        settings.database_url,
+        future=True,
+        echo=False,
+        connect_args=connect_args,
+        pool_size=1,
+        max_overflow=0,
+        pool_pre_ping=True,
+    )
+    return _LEADER_ENGINE
 
 
 async def run_as_leader(
@@ -51,7 +77,7 @@ async def run_as_leader(
 
     while not stop.is_set():
         try:
-            async with engine.connect() as conn:
+            async with _leader_engine().connect() as conn:
                 acquired = bool(
                     (await conn.execute(text("SELECT pg_try_advisory_lock(:id)"), {"id": lock_id})).scalar()
                 )

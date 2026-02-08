@@ -5,11 +5,13 @@ import secrets
 import zipfile
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
+from functools import partial
 from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import quote_plus
 from uuid import UUID
 
+import anyio
 from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks, UploadFile, File, Body, Response, Request
 from fastapi.responses import StreamingResponse, FileResponse
 from sqlalchemy import func
@@ -25,7 +27,8 @@ from app.core.dependencies import (
     require_verified_email,
 )
 from app.core.config import settings
-from app.core.security import create_receipt_token, decode_receipt_token
+from app.core.security import create_receipt_token, decode_receipt_token, decode_token
+from app.core.rate_limit import per_identifier_limiter
 from app.db.session import get_session
 from app.models.address import Address
 from app.models.cart import Cart
@@ -78,39 +81,73 @@ from app.services import payments
 from app.services import netopia as netopia_service
 from app.services import paypal as paypal_service
 from app.services import address as address_service
+
 from app.api.v1 import cart as cart_api
+from app.models.legal import LegalConsentContext
 from app.schemas.order_admin import (
+    AdminOrderEmailEventRead,
+    AdminOrderIdsRequest,
     AdminOrderListItem,
     AdminOrderListResponse,
-    AdminOrderEmailEventRead,
     AdminOrderRead,
     AdminPaginationMeta,
     AdminOrderEmailResendRequest,
-    AdminOrderIdsRequest,
 )
-from app.schemas.order_admin_note import OrderAdminNoteCreate
 from app.schemas.order_admin_address import AdminOrderAddressesUpdate
+from app.schemas.order_admin_note import OrderAdminNoteCreate
+from app.schemas.order_exports_admin import AdminOrderDocumentExportListResponse, AdminOrderDocumentExportRead
+from app.schemas.order_fraud_review import OrderFraudReviewRequest
+from app.schemas.order_refund import AdminOrderRefundCreate, AdminOrderRefundRequest
 from app.schemas.order_shipment import OrderShipmentCreate, OrderShipmentUpdate, OrderShipmentRead
 from app.schemas.order_tag import (
     OrderTagCreate,
+    OrderTagRenameRequest,
+    OrderTagRenameResponse,
     OrderTagsResponse,
     OrderTagStatRead,
     OrderTagStatsResponse,
-    OrderTagRenameRequest,
-    OrderTagRenameResponse,
 )
-from app.schemas.order_refund import AdminOrderRefundCreate, AdminOrderRefundRequest
-from app.schemas.order_fraud_review import OrderFraudReviewRequest
-from app.schemas.order_exports_admin import AdminOrderDocumentExportListResponse, AdminOrderDocumentExportRead
 from app.schemas.receipt import ReceiptRead, ReceiptShareTokenRead
-from app.services import notifications as notification_service
-from app.services import promo_usage
-from app.services import pricing
-from app.services import pii as pii_service
-from app.services import step_up as step_up_service
 from app.services import legal_consents as legal_consents_service
+from app.services import notifications as notification_service
+from app.services import pii as pii_service
+from app.services import pricing
+from app.services import promo_usage
+from app.services import step_up as step_up_service
 from app.services.payment_provider import is_mock_payments
-from app.models.legal import LegalConsentContext
+
+
+def _user_or_session_or_ip_identifier(request: Request) -> str:
+    auth_header = request.headers.get("authorization") or ""
+    if auth_header.lower().startswith("bearer "):
+        token = auth_header.split(" ", 1)[1]
+        decoded = decode_token(token)
+        if decoded and decoded.get("sub"):
+            return f"user:{decoded['sub']}"
+    session_id = (request.headers.get("X-Session-Id") or "").strip()
+    if session_id:
+        return f"sid:{session_id}"
+    return f"ip:{request.client.host if request.client else 'anon'}"
+
+
+checkout_rate_limit = per_identifier_limiter(
+    _user_or_session_or_ip_identifier,
+    settings.orders_rate_limit_checkout,
+    60 * 10,
+    key="orders:checkout",
+)
+guest_checkout_rate_limit = per_identifier_limiter(
+    _user_or_session_or_ip_identifier,
+    settings.orders_rate_limit_guest_checkout,
+    60 * 10,
+    key="orders:guest_checkout",
+)
+guest_email_request_rate_limit = per_identifier_limiter(
+    _user_or_session_or_ip_identifier,
+    settings.orders_rate_limit_guest_email_request,
+    60 * 10,
+    key="orders:guest_email_request",
+)
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -465,6 +502,7 @@ async def checkout(
     request: Request,
     response: Response,
     background_tasks: BackgroundTasks,
+    _: None = Depends(checkout_rate_limit),
     session: AsyncSession = Depends(get_session),
     current_user=Depends(require_verified_email),
     session_id: str | None = Depends(cart_api.session_header),
@@ -1695,6 +1733,7 @@ async def admin_list_order_email_events(
 async def request_guest_email_verification(
     payload: GuestEmailVerificationRequest,
     background_tasks: BackgroundTasks,
+    _: None = Depends(guest_email_request_rate_limit),
     session: AsyncSession = Depends(get_session),
     session_id: str | None = Depends(cart_api.session_header),
     lang: str | None = Query(default=None, pattern="^(en|ro)$"),
@@ -1722,7 +1761,7 @@ async def request_guest_email_verification(
     session.add(cart)
     await session.commit()
 
-    background_tasks.add_task(email_service.send_verification_email, email, token, lang)
+    background_tasks.add_task(email_service.send_verification_email, email, token, lang, "guest")
     return GuestEmailVerificationRequestResponse(sent=True)
 
 
@@ -1788,6 +1827,7 @@ async def guest_checkout(
     request: Request,
     response: Response,
     background_tasks: BackgroundTasks,
+    _: None = Depends(guest_checkout_rate_limit),
     session: AsyncSession = Depends(get_session),
     session_id: str | None = Depends(cart_api.session_header),
 ):
@@ -2445,11 +2485,14 @@ async def admin_upload_shipping_label(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
 
     old_path = getattr(order, "shipping_label_path", None)
-    rel_path, original_name = private_storage.save_private_upload(
-        file,
-        subdir=f"shipping-labels/{order_id}",
-        allowed_content_types=("application/pdf", "image/png", "image/jpeg", "image/webp"),
-        max_bytes=10 * 1024 * 1024,
+    rel_path, original_name = await anyio.to_thread.run_sync(
+        partial(
+            private_storage.save_private_upload,
+            file,
+            subdir=f"shipping-labels/{order_id}",
+            allowed_content_types=("application/pdf", "image/png", "image/jpeg", "image/webp"),
+            max_bytes=10 * 1024 * 1024,
+        )
     )
     now = datetime.now(timezone.utc)
     order.shipping_label_path = rel_path
@@ -2837,7 +2880,7 @@ async def admin_packing_slip(
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
-    pdf = packing_slips_service.render_packing_slip_pdf(order)
+    pdf = await anyio.to_thread.run_sync(partial(packing_slips_service.render_packing_slip_pdf, order))
     ref = getattr(order, "reference_code", None) or str(order.id)
     await order_exports_service.create_pdf_export(
         session,
@@ -2884,7 +2927,9 @@ async def admin_batch_packing_slips(
 
     order_by_id = {o.id: o for o in orders}
     ordered = [order_by_id[order_id] for order_id in ids if order_id in order_by_id]
-    pdf = packing_slips_service.render_batch_packing_slips_pdf(ordered)
+    pdf = await anyio.to_thread.run_sync(
+        partial(packing_slips_service.render_batch_packing_slips_pdf, ordered)
+    )
     await order_exports_service.create_pdf_export(
         session,
         kind=OrderDocumentExportKind.packing_slips_batch,
@@ -3069,7 +3114,9 @@ async def admin_download_receipt_pdf(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
     ref = getattr(order, "reference_code", None) or str(order.id)
     filename = f"receipt-{ref}.pdf"
-    pdf = receipt_service.render_order_receipt_pdf(order, order.items)
+    pdf = await anyio.to_thread.run_sync(
+        partial(receipt_service.render_order_receipt_pdf, order, order.items)
+    )
     await order_exports_service.create_pdf_export(
         session,
         kind=OrderDocumentExportKind.receipt,
@@ -3242,7 +3289,9 @@ async def download_receipt_by_token(
     ref = order.reference_code or str(order.id)
     filename = f"receipt-{ref}.pdf"
     headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
-    pdf = receipt_service.render_order_receipt_pdf(order, order.items, redacted=not allow_full)
+    pdf = await anyio.to_thread.run_sync(
+        partial(receipt_service.render_order_receipt_pdf, order, order.items, redacted=not allow_full)
+    )
     return StreamingResponse(io.BytesIO(pdf), media_type="application/pdf", headers=headers)
 
 

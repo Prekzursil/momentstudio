@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,7 +13,14 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     environment: str = "local"
 
+    # Dev safety: guard against accidentally pointing a local environment at production databases
+    # when someone copies a production `.env` locally.
+    dev_safety_database_guard_enabled: bool = True
+    dev_safety_database_allow_hosts: list[str] = ["localhost", "127.0.0.1", "db"]
+
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/adrianaart"
+    db_pool_size: int | None = None
+    db_max_overflow: int | None = None
     backup_last_at: str | None = None
     secret_key: str = "dev-secret-key"
     # Payments provider mode used by our API endpoints.
@@ -140,6 +148,16 @@ class Settings(BaseSettings):
     auth_rate_limit_reset_request: int = 30
     auth_rate_limit_reset_confirm: int = 60
     auth_rate_limit_google: int = 20
+    auth_rate_limit_verify_request: int = 10
+
+    # Anti-abuse limits for checkout and email-trigger endpoints.
+    # These are best-effort app-level controls; production deployments should also enforce limits at the edge (CDN/WAF/proxy).
+    orders_rate_limit_checkout: int = 50
+    orders_rate_limit_guest_checkout: int = 50
+    orders_rate_limit_guest_email_request: int = 20
+    payments_rate_limit_intent: int = 120
+    support_rate_limit_contact: int = 20
+    newsletter_rate_limit_subscribe: int = 30
 
     frontend_origin: str = "http://localhost:4200"
     content_preview_token: str = "preview-token"
@@ -199,11 +217,68 @@ class Settings(BaseSettings):
     # Admin order SLAs (used for warning badges/filters in the admin orders UI)
     order_sla_accept_hours: int = 24
     order_sla_ship_hours: int = 48
+    # Pending payment orders can reserve stock; expire them after a TTL to free inventory.
+    order_pending_payment_expiry_enabled: bool = True
+    order_pending_payment_expiry_minutes: int = 60 * 2
+    order_pending_payment_expiry_poll_interval_seconds: int = 60 * 10
+    order_pending_payment_expiry_batch_limit: int = 200
+
+    @field_validator("db_pool_size", "db_max_overflow", mode="before")
+    @classmethod
+    def _empty_string_to_none(cls, value: object) -> object | None:
+        if value is None:
+            return None
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    settings = Settings()
+    _validate_dev_safety(settings)
+    return settings
+
+
+def _database_url_host(database_url: str) -> str | None:
+    url = str(database_url or "").strip()
+    if not url:
+        return None
+    try:
+        from sqlalchemy.engine.url import make_url
+
+        parsed = make_url(url)
+    except Exception:
+        return None
+    host = getattr(parsed, "host", None)
+    host_str = str(host or "").strip()
+    return host_str or None
+
+
+def _validate_dev_safety(settings: Settings) -> None:
+    if not bool(getattr(settings, "dev_safety_database_guard_enabled", True)):
+        return
+    env = str(getattr(settings, "environment", "") or "").strip().lower()
+    if env not in {"local", "development", "dev"}:
+        return
+    host = _database_url_host(str(getattr(settings, "database_url", "") or ""))
+    if not host:
+        return
+    allow_hosts = {
+        str(h or "").strip().lower()
+        for h in (getattr(settings, "dev_safety_database_allow_hosts", None) or [])
+        if str(h or "").strip()
+    }
+    if host.strip().lower() in allow_hosts:
+        return
+    raise RuntimeError(
+        "Refusing to start with ENVIRONMENT=local while DATABASE_URL points to a non-local host "
+        f"({host!r}).\n\n"
+        "This is a safety guard to prevent accidentally connecting to production.\n"
+        "To override, either:\n"
+        "- set DEV_SAFETY_DATABASE_ALLOW_HOSTS to include this host, or\n"
+        "- disable the guard with DEV_SAFETY_DATABASE_GUARD_ENABLED=0.\n"
+    )
 
 
 settings = get_settings()

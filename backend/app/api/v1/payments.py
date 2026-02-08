@@ -11,6 +11,8 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
 from app.core.dependencies import get_current_user_optional
+from app.core.rate_limit import per_identifier_limiter
+from app.core.security import decode_token
 from app.db.session import get_session
 from app.models.cart import Cart
 from app.models.order import Order, OrderItem, OrderStatus, OrderEvent
@@ -32,6 +34,27 @@ from app.services.payment_provider import is_mock_payments
 router = APIRouter(prefix="/payments", tags=["payments"])
 
 
+def _user_or_session_or_ip_identifier(request: Request) -> str:
+    auth_header = request.headers.get("authorization") or ""
+    if auth_header.lower().startswith("bearer "):
+        token = auth_header.split(" ", 1)[1]
+        decoded = decode_token(token)
+        if decoded and decoded.get("sub"):
+            return f"user:{decoded['sub']}"
+    session_id = (request.headers.get("X-Session-Id") or "").strip()
+    if session_id:
+        return f"sid:{session_id}"
+    return f"ip:{request.client.host if request.client else 'anon'}"
+
+
+payment_intent_rate_limit = per_identifier_limiter(
+    _user_or_session_or_ip_identifier,
+    settings.payments_rate_limit_intent,
+    60,
+    key="payments:intent",
+)
+
+
 def _account_orders_url(order: Order) -> str:
     token = str(order.reference_code or order.id)
     return f"/account/orders?q={quote_plus(token)}"
@@ -44,21 +67,26 @@ async def payment_capabilities() -> PaymentsCapabilitiesResponse:
     stripe_configured = payments.is_stripe_configured()
     stripe_enabled = bool(mock_mode or stripe_configured)
     stripe_reason = None if stripe_enabled else "Stripe is not configured"
+    stripe_reason_code = None if stripe_enabled else "missing_credentials"
 
     paypal_configured = paypal_service.is_paypal_configured()
     paypal_enabled = bool(mock_mode or paypal_configured)
     paypal_reason = None if paypal_enabled else "PayPal is not configured"
+    paypal_reason_code = None if paypal_enabled else "missing_credentials"
 
     netopia_configured, netopia_config_reason = netopia_service.netopia_configuration_status()
     netopia_supported = True
     netopia_enabled = False
     if not settings.netopia_enabled:
         netopia_reason = "Netopia is disabled"
+        netopia_reason_code = "disabled_in_env"
     elif not netopia_configured:
         netopia_reason = netopia_config_reason or "Netopia is not configured"
+        netopia_reason_code = "missing_credentials"
     else:
         netopia_enabled = True
         netopia_reason = None
+        netopia_reason_code = None
 
     return PaymentsCapabilitiesResponse(
         payments_provider=str(getattr(settings, "payments_provider", "") or "real"),
@@ -66,18 +94,21 @@ async def payment_capabilities() -> PaymentsCapabilitiesResponse:
             supported=True,
             configured=stripe_configured,
             enabled=stripe_enabled,
+            reason_code=stripe_reason_code,
             reason=stripe_reason,
         ),
         paypal=PaymentMethodCapability(
             supported=True,
             configured=paypal_configured,
             enabled=paypal_enabled,
+            reason_code=paypal_reason_code,
             reason=paypal_reason,
         ),
         netopia=PaymentMethodCapability(
             supported=netopia_supported,
             configured=netopia_configured,
             enabled=netopia_enabled,
+            reason_code=netopia_reason_code,
             reason=netopia_reason,
         ),
         cod=PaymentMethodCapability(supported=True, configured=True, enabled=True, reason=None),
@@ -86,6 +117,7 @@ async def payment_capabilities() -> PaymentsCapabilitiesResponse:
 
 @router.post("/intent", status_code=status.HTTP_200_OK)
 async def create_payment_intent(
+    _: None = Depends(payment_intent_rate_limit),
     session: AsyncSession = Depends(get_session),
     current_user=Depends(get_current_user_optional),
     session_id: str | None = Depends(cart_api.session_header),

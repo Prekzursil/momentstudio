@@ -3,6 +3,12 @@
 Below is a structured checklist you can turn into issues.
 
 ## High priority (next)
+- [x] Inventory: prevent oversell under concurrency by treating open orders as stock reservations (lock + recheck) and expiring stale `pending_payment` orders after a TTL.
+- [x] Backend Jobs: add a leader-locked scheduler to auto-cancel expired `pending_payment` orders (frees reserved stock without manual cleanup).
+- [x] Email: make email rendering deterministic (Jinja2 dependency + template render tests) and remove unsafe “dump context” fallbacks.
+- [x] Maintenance: do not block payment webhooks/IPNs when maintenance mode is enabled (Stripe/PayPal/Netopia callbacks must keep working).
+- [x] Performance: offload heavy synchronous work (uploads + PDF rendering) off the event loop to keep API latency stable under load.
+- [x] Content: fix missing Romanian translations for the seeded homepage hero banner (headline/subheadline/CTA) so RO doesn’t fall back to EN.
 - [x] Payments: support dual Netopia credentials (`*_SANDBOX` + `*_LIVE`) and improve disabled/config-missing diagnostics.
 - [x] Admin Users: require password confirmation for role changes, owner transfer, and admin-driven account deletion.
 - [x] Auth: normalize verification/reset tokens (strip whitespace/zero-width chars) to prevent “verified but not activated” cases.
@@ -14,8 +20,13 @@ Below is a structured checklist you can turn into issues.
 - [x] Frontend: include missing `favicon.ico` so production matches local dev.
 - [x] Inventory: confirm desired stock behavior on cancellations vs refunds/returns; implement physical stock adjustments if needed.
 - [x] Payments: surface backend payment capability “reason” in checkout UI when a method is disabled.
-- [ ] Dev safety: prevent accidental use of production `DATABASE_URL` when `ENVIRONMENT=local` (configurable allowlist/opt-out).
-- [ ] Payments UX: return payment capability `reason_code` values so checkout can localize disabled-method messages (keep `reason` as fallback).
+- [x] Consent UX: prevent early “Accept” click in scroll-to-accept modals (disable until bottom; handle dynamic content/layout).
+- [x] Auth UX: replace manual email verification code entry with clickable verification links (primary + secondary + guest checkout).
+- [x] Security: add app-level rate limits for checkout/payment intent/support/newsletter/verification resend endpoints.
+- [x] Edge security: enforce rate limits at CDN/WAF/proxy for checkout + verification endpoints and configure trusted proxy headers for real client IPs.
+- [x] Auth UX: support optional `next=` redirect in verification emails (return user to checkout/account after confirming).
+- [x] Dev safety: prevent accidental use of production `DATABASE_URL` when `ENVIRONMENT=local` (configurable allowlist/opt-out).
+- [x] Payments UX: return payment capability `reason_code` values so checkout can localize disabled-method messages (keep `reason` as fallback).
 - [x] Admin Orders: prevent 400s on status/tracking updates (guide allowed transitions + clearer errors).
 - [x] Backend Email: prevent SMTP blocking the event loop (wrap `smtplib` send in `anyio.to_thread.run_sync` or switch to async SMTP).
 - [x] Backend Jobs: avoid duplicate scheduled loops when running multiple workers/replicas (move schedulers to worker service or add Postgres advisory-lock leader election).

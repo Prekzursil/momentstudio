@@ -7,11 +7,13 @@ import pytest
 from httpx import AsyncClient
 
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.db.session import SessionLocal, engine as app_engine
 from app.main import app
 from app.models.cart import Cart
+from app.models.cart import CartItem
 from app.models.catalog import Category, Product, ProductStatus
 from app.models.content import ContentBlock, ContentBlockTranslation, ContentStatus
 
@@ -256,6 +258,79 @@ async def test_postgres_coupon_global_cap_reservation_race() -> None:
     status_code, detail = await task
     assert status_code == 400
     assert detail == "Coupon usage limit reached"
+
+
+@pytest.mark.anyio
+async def test_postgres_stock_reservation_prevents_oversell() -> None:
+    """Two concurrent order creations for the last unit must not both succeed."""
+    from app.services import order as order_service
+
+    category_slug = f"cat-stock-{uuid.uuid4().hex[:6]}"
+    product_slug = f"prod-stock-{uuid.uuid4().hex[:6]}"
+
+    async with SessionLocal() as session:
+        category = Category(slug=category_slug, name="Stock Category")
+        product = Product(
+            category=category,
+            slug=product_slug,
+            name="Stock Product",
+            base_price=12.5,
+            currency="RON",
+            stock_quantity=1,
+            allow_backorder=False,
+            status=ProductStatus.published,
+        )
+        session.add_all([category, product])
+        await session.commit()
+        await session.refresh(product)
+        product_id = product.id
+
+        cart1 = Cart(session_id=f"stock-guest-{uuid.uuid4().hex}")
+        cart2 = Cart(session_id=f"stock-guest-{uuid.uuid4().hex}")
+        session.add_all([cart1, cart2])
+        await session.flush()
+        session.add_all(
+            [
+                CartItem(cart_id=cart1.id, product_id=product_id, variant_id=None, quantity=1, unit_price_at_add=product.base_price),
+                CartItem(cart_id=cart2.id, product_id=product_id, variant_id=None, quantity=1, unit_price_at_add=product.base_price),
+            ]
+        )
+        await session.commit()
+        cart1_id = cart1.id
+        cart2_id = cart2.id
+
+    async def _create_order(cart_id) -> str:
+        async with SessionLocal() as session:
+            cart = (
+                (
+                    await session.execute(
+                        select(Cart).options(selectinload(Cart.items)).where(Cart.id == cart_id)
+                    )
+                )
+                .scalars()
+                .first()
+            )
+            assert cart is not None
+            order = await order_service.build_order_from_cart(
+                session,
+                None,
+                customer_email=f"{uuid.uuid4().hex[:8]}@example.com",
+                customer_name="Stock Buyer",
+                cart=cart,
+                shipping_address_id=None,
+                billing_address_id=None,
+                payment_method="stripe",
+            )
+            return str(order.id)
+
+    results = await asyncio.gather(_create_order(cart1_id), _create_order(cart2_id), return_exceptions=True)
+
+    successes = [r for r in results if isinstance(r, str)]
+    failures = [r for r in results if not isinstance(r, str)]
+    assert len(successes) == 1, f"expected exactly one success, got {results!r}"
+    assert len(failures) == 1, f"expected exactly one failure, got {results!r}"
+    assert getattr(failures[0], "status_code", None) == 400
+    assert getattr(failures[0], "detail", None) == "Insufficient stock"
 
 
 @pytest.mark.anyio

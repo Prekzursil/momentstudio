@@ -6,15 +6,14 @@ from decimal import Decimal
 from email.message import EmailMessage
 from pathlib import Path
 from typing import Sequence
+from urllib.parse import urlencode
 
 import anyio
 
 try:
-    from jinja2 import Environment, FileSystemLoader, select_autoescape
-except ImportError:
-    Environment = None  # type: ignore
-    FileSystemLoader = None  # type: ignore
-    select_autoescape = None  # type: ignore
+    import jinja2
+except ImportError:  # pragma: no cover
+    jinja2 = None  # type: ignore[assignment]
 
 from app.core.config import settings
 from app.core.security import create_receipt_token
@@ -27,11 +26,12 @@ from app.services import newsletter_tokens
 logger = logging.getLogger(__name__)
 
 TEMPLATE_PATH = Path(__file__).parent.parent / "templates" / "emails"
-env = (
-    Environment(loader=FileSystemLoader(TEMPLATE_PATH), autoescape=select_autoescape(["html", "xml"]))
-    if Environment
-    else None
-)
+env = None
+if jinja2 is not None:
+    env = jinja2.Environment(
+        loader=jinja2.FileSystemLoader(TEMPLATE_PATH),
+        autoescape=jinja2.select_autoescape(["html", "xml"]),
+    )
 _rate_global: list[float] = []
 _rate_per_recipient: dict[str, list[float]] = {}
 
@@ -239,8 +239,8 @@ def _bilingual_sections(
 
 def render_bilingual_template(template_name: str, context: dict, *, preferred_language: str | None = None) -> tuple[str, str]:
     if env is None:
-        body = str(context)
-        return body, f"<p>{body}</p>"
+        body = f"Email template engine is not available (template={template_name})."
+        return body, _html_pre(body)
 
     body_ro_text = env.get_template(template_name).render(**{**context, "lang": "ro"})
     body_ro_html = env.get_template(template_name.replace(".txt.j2", ".html.j2")).render(**{**context, "lang": "ro"})
@@ -416,7 +416,7 @@ async def send_order_confirmation(
         html_en=_html_pre(text_en),
         preferred_language=lang,
     )
-    pdf = receipt_service.render_order_receipt_pdf(order, items or [])
+    pdf = await anyio.to_thread.run_sync(receipt_service.render_order_receipt_pdf, order, items or [])
     return await send_email(
         to_email,
         subject,
@@ -720,10 +720,39 @@ async def send_password_reset(to_email: str, token: str, lang: str | None = None
     return await send_email(to_email, subject, text_body, html_body)
 
 
-async def send_verification_email(to_email: str, token: str, lang: str | None = None) -> bool:
+def _sanitize_next_path(next_path: str | None) -> str | None:
+    raw = str(next_path or "").strip()
+    if not raw:
+        return None
+    if not raw.startswith("/") or raw.startswith("//") or "://" in raw:
+        return None
+    return raw
+
+
+async def send_verification_email(
+    to_email: str, token: str, lang: str | None = None, kind: str = "primary", next_path: str | None = None
+) -> bool:
     subject = _bilingual_subject("Verifică-ți emailul", "Verify your email", preferred_language=lang)
-    text_ro = f"Folosește acest cod pentru a verifica emailul: {token}"
-    text_en = f"Use this token to verify your email: {token}"
+    kind_norm = (kind or "primary").strip().lower()
+    params: dict[str, str] = {"token": token}
+    if kind_norm and kind_norm != "primary":
+        params["kind"] = kind_norm
+    next_norm = _sanitize_next_path(next_path)
+    if kind_norm == "guest":
+        params["email"] = to_email
+        params["next"] = next_norm or "/checkout"
+    elif next_norm:
+        params["next"] = next_norm
+    verify_url = f"{settings.frontend_origin.rstrip('/')}/verify-email?{urlencode(params)}"
+
+    text_ro = (
+        f"Apasă pe acest link pentru a verifica emailul: {verify_url}\n\n"
+        f"Sau folosește acest cod: {token}"
+    )
+    text_en = (
+        f"Click this link to verify your email: {verify_url}\n\n"
+        f"Or use this token: {token}"
+    )
     text_body, html_body = _bilingual_sections(
         text_ro=text_ro,
         text_en=text_en,
@@ -1470,8 +1499,8 @@ async def send_return_request_status_update(
 
 def render_template(template_name: str, context: dict) -> tuple[str, str]:
     if env is None:
-        body = str(context)
-        return body, f"<p>{body}</p>"
+        body = f"Email template engine is not available (template={template_name})."
+        return body, _html_pre(body)
     base_text = env.get_template("base.txt.j2")
     base_html = env.get_template("base.html.j2")
     body_text = env.get_template(template_name).render(**context)

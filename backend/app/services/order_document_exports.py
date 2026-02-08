@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timedelta, timezone
+from functools import partial
 from uuid import UUID
 
+import anyio
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,10 +33,13 @@ async def create_pdf_export(
     created_by_user_id: UUID | None = None,
 ) -> OrderDocumentExport:
     export_id = uuid.uuid4()
-    rel_path = private_storage.save_private_bytes(
-        content,
-        subdir="exports/orders",
-        filename=f"{export_id}.pdf",
+    rel_path = await anyio.to_thread.run_sync(
+        partial(
+            private_storage.save_private_bytes,
+            content,
+            subdir="exports/orders",
+            filename=f"{export_id}.pdf",
+        )
     )
     now = datetime.now(timezone.utc)
     export = OrderDocumentExport(
@@ -119,4 +124,3 @@ async def get_export(session: AsyncSession, export_id: UUID) -> tuple[OrderDocum
         return None, None
     export, ref = row[0]
     return export, ref
-

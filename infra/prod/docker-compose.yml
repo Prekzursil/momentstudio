@@ -87,7 +87,7 @@ services:
         "8000",
         "--proxy-headers",
         "--forwarded-allow-ips",
-        "*",
+        "${FORWARDED_ALLOW_IPS:-*}",
       ]
     logging: *default_logging
 

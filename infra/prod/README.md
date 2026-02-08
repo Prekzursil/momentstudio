@@ -164,3 +164,38 @@ To move your current local dev DB + uploads to the VPS:
 - This stack mounts `uploads/` + `private_uploads/` from the repo directory so media persists across restarts/rebuilds.
 - `restart: unless-stopped` keeps the app running after reboots.
 - Docker log rotation is enabled (json-file `max-size`/`max-file`) to reduce the risk of filling disk.
+
+## 7) Edge rate limiting + real client IP (recommended)
+
+The backend includes best-effort app-level rate limiting, but you should still enforce limits at the edge (CDN/WAF/proxy)
+to protect against bursts, bot abuse, and volumetric traffic.
+
+### Recommended edge rate limits (Cloudflare / CDN / WAF)
+
+Apply rate limiting (or bot protection / managed challenge) to:
+
+- `POST /api/v1/orders/checkout`
+- `POST /api/v1/orders/guest-checkout`
+- `POST /api/v1/orders/guest-checkout/email/request`
+- `POST /api/v1/payments/intent`
+- `POST /api/v1/auth/verify/request`
+- `POST /api/v1/support/contact`
+- `POST /api/v1/newsletter/subscribe`
+
+Suggested starting point (adjust to your traffic):
+
+- Checkout endpoints: 10/min per IP + additional per-session/user throttles
+- Verification resend: 5/min per IP
+- Newsletter/contact: 5–10/min per IP
+
+### Ensure the backend sees the real client IP
+
+If the backend is behind a reverse proxy, enable proxy headers and restrict which upstreams are trusted.
+
+In this repo’s `infra/prod/docker-compose.yml`, Uvicorn is started with:
+
+- `--proxy-headers`
+- `--forwarded-allow-ips ${FORWARDED_ALLOW_IPS:-*}`
+
+Because the backend container is not exposed publicly in this compose stack, `FORWARDED_ALLOW_IPS=*` is acceptable.
+If you expose the backend port publicly, set `FORWARDED_ALLOW_IPS` to the IPs/CIDRs of your proxy layer (Caddy/Nginx/CDN).

@@ -442,8 +442,9 @@ export class AuthService {
     return this.api.get<UserCooldownsResponse>('/auth/me/cooldowns');
   }
 
-  requestEmailVerification(): Observable<{ detail: string }> {
-    return this.api.post<{ detail: string }>('/auth/verify/request', {});
+  requestEmailVerification(next?: string): Observable<{ detail: string }> {
+    const normalized = typeof next === 'string' ? next.trim() : '';
+    return this.api.post<{ detail: string }>('/auth/verify/request', {}, undefined, normalized ? { next: normalized } : undefined);
   }
 
   confirmEmailVerification(token: string): Observable<{ detail: string; email_verified: boolean }> {
@@ -458,8 +459,14 @@ export class AuthService {
     return this.api.post<SecondaryEmail>('/auth/me/emails', { email });
   }
 
-  requestSecondaryEmailVerification(secondaryEmailId: string): Observable<{ detail: string }> {
-    return this.api.post<{ detail: string }>(`/auth/me/emails/${secondaryEmailId}/verify/request`, {});
+  requestSecondaryEmailVerification(secondaryEmailId: string, next?: string): Observable<{ detail: string }> {
+    const normalized = typeof next === 'string' ? next.trim() : '';
+    return this.api.post<{ detail: string }>(
+      `/auth/me/emails/${secondaryEmailId}/verify/request`,
+      {},
+      undefined,
+      normalized ? { next: normalized } : undefined
+    );
   }
 
   confirmSecondaryEmailVerification(token: string): Observable<SecondaryEmail> {

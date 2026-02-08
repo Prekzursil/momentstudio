@@ -1,10 +1,12 @@
-from pathlib import Path
 import logging
 import re
 from datetime import datetime, timedelta, timezone, date
+from functools import partial
+from pathlib import Path
 from urllib.parse import urlencode
 from uuid import UUID
 
+import anyio
 from jose import jwt
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
@@ -100,6 +102,24 @@ google_rate_limit = per_identifier_limiter(
     settings.auth_rate_limit_google,
     60,
     key="auth:google",
+)
+
+
+def _user_or_ip_identifier(request: Request) -> str:
+    auth_header = request.headers.get("authorization") or ""
+    if auth_header.lower().startswith("bearer "):
+        token = auth_header.split(" ", 1)[1]
+        decoded = decode_token(token)
+        if decoded and decoded.get("sub"):
+            return f"user:{decoded['sub']}"
+    return f"ip:{request.client.host if request.client else 'anon'}"
+
+
+verify_request_rate_limit = per_identifier_limiter(
+    _user_or_ip_identifier,
+    settings.auth_rate_limit_verify_request,
+    60,
+    key="auth:verify_request",
 )
 
 _REQUIRED_REGISTRATION_CONSENT_KEYS = ("page.terms-and-conditions", "page.privacy-policy")
@@ -1178,6 +1198,8 @@ async def change_password(
 @router.post("/verify/request", status_code=status.HTTP_202_ACCEPTED)
 async def request_email_verification(
     background_tasks: BackgroundTasks,
+    next: str | None = None,
+    _: None = Depends(verify_request_rate_limit),
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
@@ -1187,6 +1209,7 @@ async def request_email_verification(
         current_user.email,
         record.token,
         current_user.preferred_language,
+        next_path=next,
     )
     return {"detail": "Verification email sent"}
 
@@ -1467,7 +1490,14 @@ async def add_my_secondary_email(
     session: AsyncSession = Depends(get_session),
 ) -> SecondaryEmailResponse:
     secondary, token = await auth_service.add_secondary_email(session, current_user, str(payload.email))
-    background_tasks.add_task(email_service.send_verification_email, secondary.email, token.token, current_user.preferred_language)
+    background_tasks.add_task(
+        email_service.send_verification_email,
+        secondary.email,
+        token.token,
+        current_user.preferred_language,
+        "secondary",
+        next_path="/account",
+    )
     return SecondaryEmailResponse.model_validate(secondary)
 
 
@@ -1479,13 +1509,21 @@ async def add_my_secondary_email(
 async def request_secondary_email_verification(
     secondary_email_id: UUID,
     background_tasks: BackgroundTasks,
+    next: str | None = None,
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     token = await auth_service.request_secondary_email_verification(session, current_user, secondary_email_id)
     secondary = await session.get(UserSecondaryEmail, secondary_email_id)
     if secondary:
-        background_tasks.add_task(email_service.send_verification_email, secondary.email, token.token, current_user.preferred_language)
+        background_tasks.add_task(
+            email_service.send_verification_email,
+            secondary.email,
+            token.token,
+            current_user.preferred_language,
+            "secondary",
+            next_path=next or "/account",
+        )
     return {"detail": "Verification email sent"}
 
 
@@ -1949,12 +1987,15 @@ async def upload_avatar(
     avatars_root = Path(settings.media_root) / "avatars"
     extension = Path(file.filename or "").suffix.lower() or ".png"
     filename = f"avatar-{current_user.id}{extension}"
-    url_path, saved_name = storage.save_upload(
-        file,
-        root=avatars_root,
-        filename=filename,
-        allowed_content_types=("image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"),
-        max_bytes=5 * 1024 * 1024,
+    url_path, saved_name = await anyio.to_thread.run_sync(
+        partial(
+            storage.save_upload,
+            file,
+            root=avatars_root,
+            filename=filename,
+            allowed_content_types=("image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"),
+            max_bytes=5 * 1024 * 1024,
+        )
     )
     current_user.avatar_url = url_path
     session.add(current_user)

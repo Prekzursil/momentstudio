@@ -151,6 +151,11 @@ export const routes: Routes = [
     title: 'meta.titles.password_reset_confirm'
   },
   {
+    path: 'verify-email',
+    loadComponent: () => import('./pages/auth/verify-email.component').then((m) => m.VerifyEmailComponent),
+    title: 'meta.titles.verify_email'
+  },
+  {
     path: 'newsletter/confirm',
     loadComponent: () => import('./pages/newsletter/newsletter-confirm.component').then((m) => m.NewsletterConfirmComponent),
     title: 'meta.titles.newsletter'
