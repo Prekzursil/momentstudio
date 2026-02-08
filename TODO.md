@@ -16,7 +16,7 @@ showing what is already implemented.
     - `npm -C frontend run lint && npm -C frontend run build`
 
 ### PR1 — Email is deterministic + non-blocking
-- [ ] Remove remaining float/PII fallbacks and keep template tests green.
+- [x] Remove remaining float/PII fallbacks and keep template tests green.
   - Evidence (deps): `backend/requirements.txt` (`jinja2==3.1.4`)
   - Evidence (off-thread send): `backend/app/services/email.py` (`anyio.to_thread.run_sync(...)`)
   - Evidence (tests): `backend/tests/test_email_templates.py`, `backend/tests/test_email_service.py`
@@ -39,12 +39,13 @@ showing what is already implemented.
   - Evidence: `backend/app/services/content.py`, `backend/app/services/email.py`, `backend/app/api/v1/orders.py`
 
 ### PR7 — Proxy trust + rate limiting correctness
-- [ ] Restrict `FORWARDED_ALLOW_IPS` defaults in prod configs/docs (avoid `*`).
-  - Evidence (needs update): `infra/prod/.env.example`, `infra/prod/docker-compose.yml`, `infra/prod/README.md`
+- [x] Restrict `FORWARDED_ALLOW_IPS` defaults in prod configs/docs (avoid `*`).
+  - Evidence: `infra/prod/.env.example`, `infra/prod/docker-compose.yml`, `infra/prod/README.md`
 
 ### PR9 — Money representation: remove floats, standardize boundaries
-- [ ] Remove remaining float conversions in payment/email boundaries (Netopia + email formatting).
-  - Evidence (needs update): `backend/app/services/netopia.py` (`order.amount`), `backend/app/services/email.py` (`_money_str`)
+- [x] Remove remaining float conversions in payment/email boundaries (Netopia + email formatting).
+  - Evidence: `backend/app/services/netopia.py` (`order.amount`), `backend/tests/test_netopia_start_payment_decimal.py`
+  - Evidence: `backend/app/services/email.py` (`_money_str`), `backend/tests/test_email_service.py`
 
 ### PR10 — Frontend UX polish sweep (i18n, loading states, error codes)
 - [ ] Verify i18n coverage and remove remaining hardcoded user strings in critical flows.
