@@ -21,6 +21,7 @@ import httpx
 from app.models.content import ContentRedirect
 from app.models.catalog import Category, Product, ProductStatus
 from app.core import security
+from app.core.config import settings
 
 
 @pytest.fixture
@@ -263,7 +264,7 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     assert missing.status_code == 404
 
     # Preview token works for draft
-    preview = client.get("/api/v1/content/admin/page.about/preview", params={"token": "preview-token"})
+    preview = client.get("/api/v1/content/admin/page.about/preview", params={"token": settings.content_preview_token})
     assert preview.status_code == 200
 
     # Shareable preview token works for draft page

@@ -1,6 +1,8 @@
 from functools import lru_cache
 
-from pydantic import field_validator
+import secrets
+
+from pydantic import ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,16 +20,16 @@ class Settings(BaseSettings):
     dev_safety_database_guard_enabled: bool = True
     dev_safety_database_allow_hosts: list[str] = ["localhost", "127.0.0.1", "db"]
 
-    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/adrianaart"
+    database_url: str = "postgresql+asyncpg://postgres@localhost:5432/adrianaart"
     db_pool_size: int | None = None
     db_max_overflow: int | None = None
     backup_last_at: str | None = None
-    secret_key: str = "dev-secret-key"
+    secret_key: str = ""
     # Payments provider mode used by our API endpoints.
     # - real: use Stripe/PayPal APIs (default)
     # - mock: deterministic local-only provider for CI/E2E (never use in production)
     payments_provider: str = "real"
-    stripe_secret_key: str = "sk_test_placeholder"
+    stripe_secret_key: str = ""
     stripe_publishable_key: str | None = None
     stripe_webhook_secret: str | None = None
     # Stripe env toggle (similar to PayPal). Prefer *_SANDBOX/*_LIVE, with *_TEST as legacy aliases.
@@ -103,7 +105,7 @@ class Settings(BaseSettings):
     secure_cookies: bool = False
     cookie_samesite: str = "lax"
     maintenance_mode: bool = False
-    maintenance_bypass_token: str = "bypass-token"
+    maintenance_bypass_token: str = ""
     # Enforce 2FA/passkeys for owner/admin access to admin APIs.
     # In production, keep this enabled. For local dev/CI smoke tests, you can disable it.
     admin_mfa_required: bool = True
@@ -164,7 +166,7 @@ class Settings(BaseSettings):
     newsletter_rate_limit_subscribe: int = 30
 
     frontend_origin: str = "http://localhost:4200"
-    content_preview_token: str = "preview-token"
+    content_preview_token: str = ""
     error_alert_email: str | None = None
     admin_alert_email: str | None = None
     log_json: bool = False
@@ -235,6 +237,30 @@ class Settings(BaseSettings):
         if isinstance(value, str) and not value.strip():
             return None
         return value
+
+    @field_validator("secret_key", mode="after")
+    @classmethod
+    def _default_secret_key(cls, value: str, info: ValidationInfo) -> str:
+        raw = str(value or "").strip()
+        if raw:
+            return raw
+        env = str((info.data or {}).get("environment", "") or "").strip().lower()
+        if env in {"prod", "production"}:
+            return ""
+        # Provide a per-process strong default for local/dev to avoid hardcoding secrets in code.
+        return secrets.token_hex(32)
+
+    @field_validator("content_preview_token", mode="after")
+    @classmethod
+    def _default_content_preview_token(cls, value: str, info: ValidationInfo) -> str:
+        raw = str(value or "").strip()
+        if raw:
+            return raw
+        env = str((info.data or {}).get("environment", "") or "").strip().lower()
+        if env in {"prod", "production"}:
+            return ""
+        # Provide a random default for local/dev so the preview endpoint is not unintentionally open.
+        return secrets.token_urlsafe(32)
 
 
 @lru_cache
