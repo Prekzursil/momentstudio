@@ -3,12 +3,43 @@ import uuid
 from io import BytesIO
 from pathlib import Path
 
-from PIL import Image, UnidentifiedImageError
+from PIL import Image
 from fastapi import HTTPException, UploadFile, status
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+_CHUNK_SIZE = 1024 * 1024
+
+
+def _effective_max_bytes(max_bytes: int | None) -> int | None:
+    if max_bytes is not None:
+        return max_bytes
+    admin_ceiling = int(getattr(settings, "admin_upload_max_bytes", 0) or 0)
+    return admin_ceiling if admin_ceiling > 0 else None
+
+
+def _cleanup_upload(path: Path) -> None:
+    try:
+        if path.exists():
+            path.unlink()
+    except Exception:  # pragma: no cover
+        logger.warning("private_upload_cleanup_failed", extra={"path": str(path)})
+
+
+def _stream_copy(file: UploadFile, dest: Path, *, max_bytes: int | None) -> int:
+    written = 0
+    with dest.open("wb") as out:
+        while True:
+            chunk = file.file.read(_CHUNK_SIZE)
+            if not chunk:
+                break
+            written += len(chunk)
+            if max_bytes is not None and written > max_bytes:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File too large")
+            out.write(chunk)
+    return written
 
 
 def ensure_private_root(root: str | Path | None = None) -> Path:
@@ -35,39 +66,16 @@ def save_private_upload(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload destination")
     dest_dir.mkdir(parents=True, exist_ok=True)
 
-    admin_ceiling = int(getattr(settings, "admin_upload_max_bytes", 0) or 0)
-    effective_max_bytes = max_bytes
-    if effective_max_bytes is None and admin_ceiling > 0:
-        effective_max_bytes = admin_ceiling
+    effective_max_bytes = _effective_max_bytes(max_bytes)
 
     original_name = Path(file.filename or "").name or "shipping-label"
     original_suffix = Path(original_name).suffix.lower() or ".bin"
     temp_name = f"{uuid.uuid4().hex}{original_suffix}"
     destination = dest_dir / temp_name
-
-    def _cleanup(path: Path) -> None:
-        try:
-            if path.exists():
-                path.unlink()
-        except Exception:  # pragma: no cover
-            logger.warning("private_upload_cleanup_failed", extra={"path": str(path)})
-
-    def _stream_copy(dest: Path) -> int:
-        chunk_size = 1024 * 1024
-        written = 0
-        with dest.open("wb") as out:
-            while True:
-                chunk = file.file.read(chunk_size)
-                if not chunk:
-                    break
-                written += len(chunk)
-                if effective_max_bytes is not None and written > effective_max_bytes:
-                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File too large")
-                out.write(chunk)
-        return written
+    final_path = destination
 
     try:
-        _stream_copy(destination)
+        _stream_copy(file, destination, max_bytes=effective_max_bytes)
 
         if not file.content_type or file.content_type not in allowed_content_types:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
@@ -77,7 +85,6 @@ def save_private_upload(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
 
         suffix = _suffix_for_mime(sniff, original_name)
-        final_path = destination
         if suffix and destination.suffix.lower() != suffix.lower():
             final_path = destination.with_name(f"{destination.stem}{suffix}")
             destination.rename(final_path)
@@ -85,10 +92,10 @@ def save_private_upload(
         rel_path = final_path.relative_to(private_root).as_posix()
         return rel_path, original_name
     except HTTPException:
-        _cleanup(destination)
+        _cleanup_upload(final_path)
         raise
     except Exception as exc:
-        _cleanup(destination)
+        _cleanup_upload(final_path)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Upload failed") from exc
 
 
@@ -159,7 +166,7 @@ def _detect_mime_path(path: Path) -> str | None:
         with Image.open(path) as img:
             image_format = img.format
             img.verify()
-    except (UnidentifiedImageError, OSError, ValueError):
+    except (OSError, ValueError):
         return None
 
     if not image_format:
@@ -180,7 +187,7 @@ def _detect_image_mime(content: bytes) -> str | None:
         with Image.open(BytesIO(content)) as img:
             image_format = img.format
             img.verify()
-    except (UnidentifiedImageError, OSError, ValueError):
+    except (OSError, ValueError):
         return None
 
     if not image_format:

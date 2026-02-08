@@ -4,7 +4,7 @@ from io import BytesIO
 from pathlib import Path
 from typing import Tuple
 
-from PIL import Image, UnidentifiedImageError
+from PIL import Image
 from fastapi import HTTPException, UploadFile, status
 
 from app.core.config import settings
@@ -130,7 +130,7 @@ def _detect_image_mime_path(path: Path) -> str | None:
         raise
     except Image.DecompressionBombError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image too large")
-    except (UnidentifiedImageError, OSError, ValueError):
+    except (OSError, ValueError):
         return None
 
     if not image_format:
@@ -247,7 +247,7 @@ def _detect_image_mime(content: bytes) -> str | None:
         raise
     except Image.DecompressionBombError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image too large")
-    except (UnidentifiedImageError, OSError, ValueError):
+    except (OSError, ValueError):
         return None
 
     if not image_format:
