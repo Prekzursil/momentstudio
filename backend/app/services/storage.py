@@ -122,30 +122,13 @@ def _detect_image_mime_path(path: Path) -> str | None:
 
     try:
         with Image.open(path) as img:
-            width, height = img.size
-            _validate_raster_dimensions(width=int(width), height=int(height))
-            image_format = img.format
-            img.verify()
+            return _detect_raster_mime(img)
     except HTTPException:
         raise
     except Image.DecompressionBombError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image too large")
     except (OSError, ValueError):
         return None
-
-    if not image_format:
-        return None
-
-    normalized = image_format.upper()
-    if normalized == "JPEG":
-        return "image/jpeg"
-    if normalized == "PNG":
-        return "image/png"
-    if normalized == "WEBP":
-        return "image/webp"
-    if normalized == "GIF":
-        return "image/gif"
-    return None
 
 
 def delete_file(filepath: str) -> None:
@@ -239,10 +222,7 @@ def _detect_image_mime(content: bytes) -> str | None:
         return svg
     try:
         with Image.open(BytesIO(content)) as img:
-            width, height = img.size
-            _validate_raster_dimensions(width=int(width), height=int(height))
-            image_format = img.format
-            img.verify()
+            return _detect_raster_mime(img)
     except HTTPException:
         raise
     except Image.DecompressionBombError:
@@ -250,6 +230,8 @@ def _detect_image_mime(content: bytes) -> str | None:
     except (OSError, ValueError):
         return None
 
+
+def _mime_for_image_format(image_format: str | None) -> str | None:
     if not image_format:
         return None
 
@@ -263,6 +245,14 @@ def _detect_image_mime(content: bytes) -> str | None:
     if normalized == "GIF":
         return "image/gif"
     return None
+
+
+def _detect_raster_mime(img: Image.Image) -> str | None:
+    width, height = img.size
+    _validate_raster_dimensions(width=int(width), height=int(height))
+    image_format = img.format
+    img.verify()
+    return _mime_for_image_format(image_format)
 
 
 def _detect_svg_mime(content: bytes) -> str | None:
