@@ -48,7 +48,10 @@ showing what is already implemented.
   - Evidence: `backend/app/services/email.py` (`_money_str`), `backend/tests/test_email_service.py`
 
 ### PR10 — Frontend UX polish sweep (i18n, loading states, error codes)
-- [ ] Verify i18n coverage and remove remaining hardcoded user strings in critical flows.
+- [x] Verify i18n coverage and remove remaining hardcoded user strings in critical flows.
+  - Evidence (guards/toasts): `frontend/src/app/core/auth.guard.ts`, `frontend/src/app/shared/error-handler.service.ts`
+  - Evidence (auth UX): `frontend/src/app/pages/auth/password-reset-request.component.ts`, `frontend/src/app/pages/auth/password-reset.component.ts`, `frontend/src/app/pages/auth/register.component.ts`
+  - Evidence (i18n keys): `frontend/src/assets/i18n/en.json`, `frontend/src/assets/i18n/ro.json`
   - Verify locally: `npm -C frontend run i18n:check`
 
 ## High priority (next)
