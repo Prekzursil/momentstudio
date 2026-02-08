@@ -96,7 +96,7 @@ async def _commit_stock_for_order(session: AsyncSession, order: Order) -> None:
             for p in (
                 (
                     await session.execute(
-                        select(Product).where(Product.id.in_(product_ids)).with_for_update()
+                        select(Product).where(Product.id.in_(product_ids)).with_for_update(of=Product)
                     )
                 )
                 .scalars()
@@ -111,7 +111,7 @@ async def _commit_stock_for_order(session: AsyncSession, order: Order) -> None:
             for v in (
                 (
                     await session.execute(
-                        select(ProductVariant).where(ProductVariant.id.in_(variant_ids)).with_for_update()
+                        select(ProductVariant).where(ProductVariant.id.in_(variant_ids)).with_for_update(of=ProductVariant)
                     )
                 )
                 .scalars()
@@ -253,7 +253,7 @@ async def _restore_stock_for_order(session: AsyncSession, order: Order) -> None:
             for p in (
                 (
                     await session.execute(
-                        select(Product).where(Product.id.in_(product_ids)).with_for_update()
+                        select(Product).where(Product.id.in_(product_ids)).with_for_update(of=Product)
                     )
                 )
                 .scalars()
@@ -268,7 +268,7 @@ async def _restore_stock_for_order(session: AsyncSession, order: Order) -> None:
             for v in (
                 (
                     await session.execute(
-                        select(ProductVariant).where(ProductVariant.id.in_(variant_ids)).with_for_update()
+                        select(ProductVariant).where(ProductVariant.id.in_(variant_ids)).with_for_update(of=ProductVariant)
                     )
                 )
                 .scalars()
@@ -386,7 +386,7 @@ async def build_order_from_cart(
                     select(Product)
                     .where(Product.id.in_(product_ids))
                     .order_by(Product.id)
-                    .with_for_update()
+                    .with_for_update(of=Product)
                 )
             )
             .scalars()
@@ -412,7 +412,7 @@ async def build_order_from_cart(
                     select(ProductVariant)
                     .where(ProductVariant.id.in_(variant_ids))
                     .order_by(ProductVariant.id)
-                    .with_for_update()
+                    .with_for_update(of=ProductVariant)
                 )
             )
             .scalars()

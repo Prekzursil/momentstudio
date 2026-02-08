@@ -2597,6 +2597,7 @@ export class AccountState implements OnInit, OnDestroy {
         const message = err?.error?.detail || this.t('account.security.emails.addError');
         this.secondaryEmailMessage = message;
         this.toast.error(message);
+        this.addingSecondaryEmail = false;
       },
       complete: () => {
         this.addingSecondaryEmail = false;
@@ -2652,6 +2653,7 @@ export class AccountState implements OnInit, OnDestroy {
         const message = err?.error?.detail || this.t('account.security.emails.verifyError');
         this.secondaryVerificationStatus = message;
         this.toast.error(message);
+        this.verifyingSecondaryEmail = false;
       },
       complete: () => {
         this.verifyingSecondaryEmail = false;
@@ -2704,6 +2706,7 @@ export class AccountState implements OnInit, OnDestroy {
         const message = err?.error?.detail || this.t('account.security.emails.removeError');
         this.secondaryEmailMessage = message;
         this.toast.error(message);
+        this.removingSecondaryEmail = false;
       },
       complete: () => {
         this.removingSecondaryEmail = false;

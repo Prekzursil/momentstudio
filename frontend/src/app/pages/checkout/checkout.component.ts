@@ -688,6 +688,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       },
       error: () => {
         this.primaryEmailVerificationStatus = this.translate.instant('account.verification.sendError');
+        this.primaryEmailVerificationBusy = false;
       },
       complete: () => {
         this.primaryEmailVerificationBusy = false;

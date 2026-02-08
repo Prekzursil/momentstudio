@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -221,6 +222,15 @@ class Settings(BaseSettings):
     order_pending_payment_expiry_minutes: int = 60 * 2
     order_pending_payment_expiry_poll_interval_seconds: int = 60 * 10
     order_pending_payment_expiry_batch_limit: int = 200
+
+    @field_validator("db_pool_size", "db_max_overflow", mode="before")
+    @classmethod
+    def _empty_string_to_none(cls, value: object) -> object | None:
+        if value is None:
+            return None
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
 
 @lru_cache
