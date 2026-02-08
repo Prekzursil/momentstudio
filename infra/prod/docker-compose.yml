@@ -76,7 +76,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 30
-    # Trust reverse proxy headers (Caddy). Backend is not exposed publicly in this compose.
+    # Trust reverse proxy headers (Caddy). Restrict forwarded header trust to known proxy networks.
     command:
       [
         "uvicorn",
@@ -87,7 +87,7 @@ services:
         "8000",
         "--proxy-headers",
         "--forwarded-allow-ips",
-        "${FORWARDED_ALLOW_IPS:-*}",
+        "${FORWARDED_ALLOW_IPS:-127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}",
       ]
     logging: *default_logging
 
