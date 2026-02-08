@@ -1304,15 +1304,26 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     this.detectChangesSafe();
   }
 
-  private isAllowedPaymentRedirectUrl(url: string, allowedHosts: string[]): boolean {
+  private normalizePaymentRedirectUrl(url: string, allowedHosts: string[]): string | null {
     try {
       const parsed = new URL(url);
-      if (parsed.protocol !== 'https:') return false;
+      if (parsed.protocol !== 'https:') return null;
       const host = parsed.hostname.toLowerCase();
-      return allowedHosts.some((allowed) => host === allowed || host.endsWith(`.${allowed}`));
+      const allowed = allowedHosts.some((allowedHost) => host === allowedHost || host.endsWith(`.${allowedHost}`));
+      return allowed ? parsed.toString() : null;
     } catch {
-      return false;
+      return null;
     }
+  }
+
+  private redirectToPaymentUrl(url: string | null | undefined, allowedHosts: string[]): void {
+    const target = url ? this.normalizePaymentRedirectUrl(url, allowedHosts) : null;
+    if (!target) {
+      this.showPaymentNotReadyError();
+      return;
+    }
+    this.checkoutFlowCompleted = true;
+    window.location.assign(target);
   }
 
   private handleCheckoutStartResponse(res: CheckoutStartResponse): void {
@@ -1323,46 +1334,19 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       case 'paypal': {
         this.persistPayPalPendingSummary(summary);
         this.persistAddressIfRequested();
-        if (res.paypal_approval_url) {
-          if (!this.isAllowedPaymentRedirectUrl(res.paypal_approval_url, ['paypal.com'])) {
-            this.showPaymentNotReadyError();
-            return;
-          }
-          this.checkoutFlowCompleted = true;
-          window.location.assign(res.paypal_approval_url);
-          return;
-        }
-        this.showPaymentNotReadyError();
+        this.redirectToPaymentUrl(res.paypal_approval_url, ['paypal.com']);
         return;
       }
       case 'stripe': {
         this.persistStripePendingSummary(summary);
         this.persistAddressIfRequested();
-        if (res.stripe_checkout_url) {
-          if (!this.isAllowedPaymentRedirectUrl(res.stripe_checkout_url, ['checkout.stripe.com'])) {
-            this.showPaymentNotReadyError();
-            return;
-          }
-          this.checkoutFlowCompleted = true;
-          window.location.assign(res.stripe_checkout_url);
-          return;
-        }
-        this.showPaymentNotReadyError();
+        this.redirectToPaymentUrl(res.stripe_checkout_url, ['checkout.stripe.com']);
         return;
       }
       case 'netopia': {
         this.persistNetopiaPendingSummary(summary);
         this.persistAddressIfRequested();
-        if (res.netopia_payment_url) {
-          if (!this.isAllowedPaymentRedirectUrl(res.netopia_payment_url, ['mobilpay.ro', 'netopia-payments.com'])) {
-            this.showPaymentNotReadyError();
-            return;
-          }
-          this.checkoutFlowCompleted = true;
-          window.location.assign(res.netopia_payment_url);
-          return;
-        }
-        this.showPaymentNotReadyError();
+        this.redirectToPaymentUrl(res.netopia_payment_url, ['mobilpay.ro', 'netopia-payments.com']);
         return;
       }
       case 'cod': {
