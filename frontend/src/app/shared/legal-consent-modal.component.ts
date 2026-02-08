@@ -31,6 +31,7 @@ interface ContentBlock {
       [open]="open"
       [title]="title || ('legal.modal.title' | translate)"
       [subtitle]="subtitle"
+      [showActions]="!loading && !error"
       [closeLabel]="'legal.modal.close' | translate"
       [cancelLabel]="'legal.modal.close' | translate"
       [confirmLabel]="'legal.modal.accept' | translate"
