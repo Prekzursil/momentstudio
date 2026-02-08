@@ -2,7 +2,6 @@ import { inject } from '@angular/core';
 import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { catchError, map, switchMap } from 'rxjs/operators';
 import { from, of, throwError } from 'rxjs';
-import { ErrorHandlerService } from '../shared/error-handler.service';
 import { AuthService } from './auth.service';
 import { appConfig } from './app-config';
 
@@ -57,13 +56,16 @@ function extractErrorCodeFromBinary(err: HttpErrorResponse) {
 }
 
 export const authAndErrorInterceptor: HttpInterceptorFn = (req, next) => {
-  const handler = inject(ErrorHandlerService);
   const apiBase = getApiBaseUrl();
   const absoluteApiBase =
     apiBase.startsWith('/') && typeof location !== 'undefined' ? `${location.origin}${apiBase}` : apiBase;
   const isApiRequest = req.url.startsWith(apiBase) || req.url.startsWith(absoluteApiBase);
   const silent = req.headers.has('X-Silent');
 
+  // IMPORTANT: do not inject AuthService for non-API requests.
+  // The i18n loader requests translation JSON via HttpClient during app bootstrap, and
+  // injecting services that depend on HttpClient can create a DI cycle that prevents
+  // translations from loading (UI shows raw translation keys) and can throw NG0200.
   // Avoid injecting AuthService for non-API requests (e.g. i18n JSON, assets).
   // AuthService depends on HttpClient → interceptors, so injecting it here would create
   // a cyclic dependency during app bootstrap when TranslateHttpLoader makes its first request.
@@ -117,9 +119,6 @@ export const authAndErrorInterceptor: HttpInterceptorFn = (req, next) => {
           switchMap((tokens) => {
             if (!tokens) {
               auth.expireSession();
-              if (!silent) {
-                handler.handle(err);
-              }
               return throwError(() => err);
             }
             const nextToken = auth.getAccessToken();
@@ -142,7 +141,6 @@ export const authAndErrorInterceptor: HttpInterceptorFn = (req, next) => {
         return code$.pipe(
           switchMap((errorCode) => {
             if (String(errorCode || '').toLowerCase() !== 'step_up_required') {
-              handler.handle(err);
               return throwError(() => err);
             }
 
@@ -150,7 +148,6 @@ export const authAndErrorInterceptor: HttpInterceptorFn = (req, next) => {
             return auth.ensureStepUp({ silent: true }).pipe(
               switchMap((nextStepUp) => {
                 if (!nextStepUp) {
-                  handler.handle(err);
                   return throwError(() => err);
                 }
                 const nextToken = auth.getAccessToken();
@@ -170,10 +167,6 @@ export const authAndErrorInterceptor: HttpInterceptorFn = (req, next) => {
         );
       }
 
-      const suppressGlobalToast = silent || isLogin || isTwoFactor || isRegister || isRefresh || isLogout || isGoogleFlow || isPasswordReset;
-      if (!suppressGlobalToast) {
-        handler.handle(err);
-      }
       return throwError(() => err);
     })
   );
