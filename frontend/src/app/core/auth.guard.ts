@@ -9,14 +9,15 @@ export const authGuard: CanActivateFn = () => {
   const router = inject(Router);
   const toast = inject(ToastService);
   const auth = inject(AuthService);
+  const translate = inject(TranslateService);
   return auth.ensureAuthenticated({ silent: true }).pipe(
     map((ok) => {
       if (ok && auth.isAuthenticated()) return true;
-      toast.error('Please sign in to continue.');
+      toast.error(translate.instant('errors.signInRequired'));
       return router.parseUrl('/login');
     }),
     catchError(() => {
-      toast.error('Please sign in to continue.');
+      toast.error(translate.instant('errors.signInRequired'));
       return of(router.parseUrl('/login'));
     })
   );
@@ -26,14 +27,15 @@ export const adminGuard: CanActivateFn = () => {
   const router = inject(Router);
   const toast = inject(ToastService);
   const auth = inject(AuthService);
+  const translate = inject(TranslateService);
   return auth.ensureAuthenticated({ silent: true }).pipe(
     map((ok) => {
       if (ok && auth.isAuthenticated() && auth.isStaff()) return true;
-      toast.error(ok ? 'Staff access required.' : 'Please sign in to continue.');
+      toast.error(translate.instant(ok ? 'errors.staffRequired' : 'errors.signInRequired'));
       return router.parseUrl('/');
     }),
     catchError(() => {
-      toast.error('Staff access required.');
+      toast.error(translate.instant('errors.staffRequired'));
       return of(router.parseUrl('/'));
     })
   );
@@ -49,11 +51,11 @@ export const adminSectionGuard =
     return auth.ensureAuthenticated({ silent: true }).pipe(
       switchMap((ok) => {
         if (!ok || !auth.isAuthenticated() || !auth.isStaff()) {
-          toast.error(ok ? 'Staff access required.' : 'Please sign in to continue.');
+          toast.error(translate.instant(ok ? 'errors.staffRequired' : 'errors.signInRequired'));
           return of(router.parseUrl('/'));
         }
         if (!auth.canAccessAdminSection(section)) {
-          toast.error('You do not have access to this section.');
+          toast.error(translate.instant('errors.sectionDenied'));
           return of(router.parseUrl('/admin/dashboard'));
         }
         return auth.checkAdminAccess({ silent: true }).pipe(
@@ -79,14 +81,14 @@ export const adminSectionGuard =
               toast.error(translate.instant('adminUi.trainingMode.hint'));
               return of(router.parseUrl('/admin/dashboard'));
             }
-            toast.error(detail || 'You do not have access to this section.');
+            toast.error(detail || translate.instant('errors.sectionDenied'));
             return of(router.parseUrl('/'));
           })
         );
       })
       ,
       catchError(() => {
-        toast.error('You do not have access to this section.');
+        toast.error(translate.instant('errors.sectionDenied'));
         return of(router.parseUrl('/'));
       })
     );

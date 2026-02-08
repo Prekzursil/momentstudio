@@ -13,6 +13,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import types as asymmetric_types
 from fastapi import HTTPException, status
 import httpx
+import simplejson
 from jose import jwt
 from jose.exceptions import JWTError
 
@@ -263,7 +264,7 @@ async def start_payment(
             "dateTime": datetime.now(timezone.utc).isoformat(),
             "orderID": str(order_id),
             "description": (description or "").strip() or str(order_id),
-            "amount": float(amount_value),
+            "amount": amount_value,
             "currency": "RON",
             "billing": billing,
             "shipping": shipping,
@@ -274,8 +275,9 @@ async def start_payment(
     }
 
     try:
+        body = simplejson.dumps(payload, use_decimal=True).encode("utf-8")
         async with httpx.AsyncClient(timeout=30) as client:
-            resp = await client.post(url, headers=_netopia_headers(), json=payload)
+            resp = await client.post(url, headers=_netopia_headers(), content=body)
     except httpx.RequestError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Netopia request failed") from exc
 

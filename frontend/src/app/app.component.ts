@@ -12,6 +12,7 @@ import { LanguageService } from './core/language.service';
 import { AuthService } from './core/auth.service';
 import { AnalyticsService } from './core/analytics.service';
 import { Subscription } from 'rxjs';
+import { HttpErrorBusService, HttpErrorEvent } from './core/http-error-bus.service';
 
 @Component({
   selector: 'app-root',
@@ -41,6 +42,9 @@ export class AppComponent implements OnDestroy {
   preference = this.theme.preference();
   language = this.lang.language;
   private querySub?: Subscription;
+  private httpErrorSub?: Subscription;
+  private lastGlobalNetworkToastAt = 0;
+  private lastGlobalServerToastAt = 0;
 
   constructor(
     private toast: ToastService,
@@ -49,7 +53,8 @@ export class AppComponent implements OnDestroy {
     private lang: LanguageService,
     private auth: AuthService,
     private route: ActivatedRoute,
-    private analytics: AnalyticsService
+    private analytics: AnalyticsService,
+    private httpErrors: HttpErrorBusService
   ) {
     // Language is handled by LanguageService (localStorage + preferred_language + browser fallback).
     // Revalidate any persisted session on startup to avoid "logged in but unauthorized" UI states.
@@ -67,10 +72,15 @@ export class AppComponent implements OnDestroy {
         this.theme.setPreference(theme, false);
       }
     });
+
+    // A DI-safe global fallback: surface only offline + 5xx errors.
+    // Keep this out of the HTTP interceptor to avoid circular dependencies during i18n bootstrap.
+    this.httpErrorSub = this.httpErrors.events$.subscribe((event) => this.onGlobalHttpError(event));
   }
 
   ngOnDestroy(): void {
     this.querySub?.unsubscribe();
+    this.httpErrorSub?.unsubscribe();
   }
 
   onThemeChange(pref: ThemePreference): void {
@@ -82,6 +92,31 @@ export class AppComponent implements OnDestroy {
   onLanguageChange(lang: string): void {
     if (lang === 'en' || lang === 'ro') {
       this.lang.setLanguage(lang);
+    }
+  }
+
+  private onGlobalHttpError(event: HttpErrorEvent): void {
+    const status = event?.status ?? 0;
+    const now = Date.now();
+
+    // Throttle to avoid spamming the user when multiple calls fail at once.
+    if (status === 0) {
+      if (now - this.lastGlobalNetworkToastAt < 10_000) return;
+      this.lastGlobalNetworkToastAt = now;
+      this.toast.error(
+        this.translate.instant('errors.network.title'),
+        this.translate.instant('errors.network.body')
+      );
+      return;
+    }
+
+    if (status >= 500 && status < 600) {
+      if (now - this.lastGlobalServerToastAt < 10_000) return;
+      this.lastGlobalServerToastAt = now;
+      this.toast.error(
+        this.translate.instant('errors.server.title'),
+        this.translate.instant('errors.server.body')
+      );
     }
   }
 }

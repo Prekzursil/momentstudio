@@ -2,9 +2,9 @@ import { inject } from '@angular/core';
 import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { catchError, map, switchMap } from 'rxjs/operators';
 import { from, of, throwError } from 'rxjs';
-import { ErrorHandlerService } from '../shared/error-handler.service';
 import { AuthService } from './auth.service';
 import { appConfig } from './app-config';
+import { HttpErrorBusService } from './http-error-bus.service';
 
 function getApiBaseUrl(): string {
   return appConfig.apiBaseUrl.replace(/\/$/, '');
@@ -57,13 +57,16 @@ function extractErrorCodeFromBinary(err: HttpErrorResponse) {
 }
 
 export const authAndErrorInterceptor: HttpInterceptorFn = (req, next) => {
-  const handler = inject(ErrorHandlerService);
   const apiBase = getApiBaseUrl();
   const absoluteApiBase =
     apiBase.startsWith('/') && typeof location !== 'undefined' ? `${location.origin}${apiBase}` : apiBase;
   const isApiRequest = req.url.startsWith(apiBase) || req.url.startsWith(absoluteApiBase);
   const silent = req.headers.has('X-Silent');
 
+  // IMPORTANT: do not inject AuthService for non-API requests.
+  // The i18n loader requests translation JSON via HttpClient during app bootstrap, and
+  // injecting services that depend on HttpClient can create a DI cycle that prevents
+  // translations from loading (UI shows raw translation keys) and can throw NG0200.
   // Avoid injecting AuthService for non-API requests (e.g. i18n JSON, assets).
   // AuthService depends on HttpClient → interceptors, so injecting it here would create
   // a cyclic dependency during app bootstrap when TranslateHttpLoader makes its first request.
@@ -72,6 +75,7 @@ export const authAndErrorInterceptor: HttpInterceptorFn = (req, next) => {
   }
 
   const auth = inject(AuthService);
+  const errors = inject(HttpErrorBusService);
   const token = auth.getAccessToken();
   const stepUpToken = auth.getStepUpToken();
   const hasAuthHeader = req.headers.has('Authorization');
@@ -94,11 +98,9 @@ export const authAndErrorInterceptor: HttpInterceptorFn = (req, next) => {
     catchError((err) => {
       const isRefresh = req.url === `${apiBase}/auth/refresh`;
       const isLogin = req.url === `${apiBase}/auth/login`;
-      const isTwoFactor = req.url === `${apiBase}/auth/login/2fa`;
       const isRegister = req.url === `${apiBase}/auth/register`;
       const isLogout = req.url === `${apiBase}/auth/logout`;
       const isGoogleFlow = req.url.startsWith(`${apiBase}/auth/google/`);
-      const isPasswordReset = req.url.startsWith(`${apiBase}/auth/password-reset`);
       const isStepUp = req.url === `${apiBase}/auth/step-up`;
 
       if (
@@ -117,16 +119,13 @@ export const authAndErrorInterceptor: HttpInterceptorFn = (req, next) => {
           switchMap((tokens) => {
             if (!tokens) {
               auth.expireSession();
-              if (!silent) {
-                handler.handle(err);
-              }
               return throwError(() => err);
             }
             const nextToken = auth.getAccessToken();
             const retryReq = req.clone({
               withCredentials: true,
               setHeaders: nextToken ? { Authorization: `Bearer ${nextToken}` } : {}
-            });
+              });
             return next(retryReq);
           }),
           catchError(() => throwError(() => err))
@@ -142,7 +141,6 @@ export const authAndErrorInterceptor: HttpInterceptorFn = (req, next) => {
         return code$.pipe(
           switchMap((errorCode) => {
             if (String(errorCode || '').toLowerCase() !== 'step_up_required') {
-              handler.handle(err);
               return throwError(() => err);
             }
 
@@ -150,7 +148,6 @@ export const authAndErrorInterceptor: HttpInterceptorFn = (req, next) => {
             return auth.ensureStepUp({ silent: true }).pipe(
               switchMap((nextStepUp) => {
                 if (!nextStepUp) {
-                  handler.handle(err);
                   return throwError(() => err);
                 }
                 const nextToken = auth.getAccessToken();
@@ -170,10 +167,16 @@ export const authAndErrorInterceptor: HttpInterceptorFn = (req, next) => {
         );
       }
 
-      const suppressGlobalToast = silent || isLogin || isTwoFactor || isRegister || isRefresh || isLogout || isGoogleFlow || isPasswordReset;
-      if (!suppressGlobalToast) {
-        handler.handle(err);
+      // Global, low-noise error surface:
+      // - only network failures (status 0) and 5xx
+      // - honor X-Silent to avoid spamming background calls
+      if (!silent && err instanceof HttpErrorResponse) {
+        const status = err.status ?? 0;
+        if (status === 0 || (status >= 500 && status < 600)) {
+          errors.emit({ status, method: req.method, url: req.url });
+        }
       }
+
       return throwError(() => err);
     })
   );

@@ -195,7 +195,10 @@ If the backend is behind a reverse proxy, enable proxy headers and restrict whic
 In this repo’s `infra/prod/docker-compose.yml`, Uvicorn is started with:
 
 - `--proxy-headers`
-- `--forwarded-allow-ips ${FORWARDED_ALLOW_IPS:-*}`
+- `--forwarded-allow-ips ${FORWARDED_ALLOW_IPS:-127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}`
 
-Because the backend container is not exposed publicly in this compose stack, `FORWARDED_ALLOW_IPS=*` is acceptable.
-If you expose the backend port publicly, set `FORWARDED_ALLOW_IPS` to the IPs/CIDRs of your proxy layer (Caddy/Nginx/CDN).
+Never use `FORWARDED_ALLOW_IPS=*` unless you are 100% sure the backend port is not reachable from untrusted networks.
+If the backend is reachable directly, trusting `*` allows spoofing `X-Forwarded-For` and breaks IP-based protections.
+
+If your proxy sits behind a public IP (or runs outside RFC1918 networks), set `FORWARDED_ALLOW_IPS` to the exact
+IPs/CIDRs of your proxy layer (Caddy/Nginx/CDN) so the backend sees real client IPs without accepting spoofed headers.

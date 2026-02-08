@@ -24,7 +24,7 @@ import { finalize } from 'rxjs';
           {{ 'auth.email' | translate }}
           <input name="email" type="email" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400" required [(ngModel)]="email" />
         </label>
-        <app-button [label]="'auth.resetLink' | translate" type="submit"></app-button>
+        <app-button [label]="'auth.resetLink' | translate" type="submit" [disabled]="loading"></app-button>
         <a routerLink="/login" class="text-sm text-indigo-600 dark:text-indigo-300 font-medium">{{ 'auth.backToLogin' | translate }}</a>
       </form>
     </app-container>
@@ -51,7 +51,11 @@ export class PasswordResetRequestComponent {
         })
       )
       .subscribe({
-        next: () => this.toast.success(this.translate.instant('auth.resetLinkSent'), `Check ${this.email}`),
+        next: () =>
+          this.toast.success(
+            this.translate.instant('auth.resetLinkSent'),
+            this.translate.instant('auth.resetLinkSentBody', { email: this.email })
+          ),
         error: (err) => {
           const message = err?.error?.detail || this.translate.instant('auth.errorReset');
           this.toast.error(message);

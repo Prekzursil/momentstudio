@@ -93,10 +93,11 @@ def _money_str(value: object, currency: str) -> str:
         dec = value if isinstance(value, Decimal) else Decimal(str(value))
         return f"{dec.quantize(Decimal('0.01'))} {currency}"
     except Exception:
-        try:
-            return f"{float(str(value)):.2f} {currency}"
-        except Exception:
-            return f"{value} {currency}"
+        cleaned = str(value)
+        if len(cleaned) > 64:
+            cleaned = cleaned[:61] + "..."
+        cleaned = cleaned.strip() or "0"
+        return f"{cleaned} {currency}"
 
 
 async def send_email(
@@ -113,7 +114,7 @@ async def send_email(
     now = __import__("time").time()
     _prune(now)
     if not _allow_send(now, to_email):
-        logger.warning("Email rate limit reached for %s", to_email)
+        logger.warning("email_rate_limited")
         return False
     msg = _build_message(to_email, subject, text_body, html_body, attachments=attachments, headers=headers)
     try:

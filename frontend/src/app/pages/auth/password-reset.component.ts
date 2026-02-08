@@ -78,7 +78,7 @@ import { finalize } from 'rxjs';
           </div>
         </label>
         <p *ngIf="error" class="text-sm text-amber-700 dark:text-amber-300">{{ error }}</p>
-        <app-button [label]="'auth.setPassword' | translate" type="submit"></app-button>
+        <app-button [label]="'auth.setPassword' | translate" type="submit" [disabled]="loading"></app-button>
         <a routerLink="/login" class="text-sm text-indigo-600 dark:text-indigo-300 font-medium">{{ 'auth.backToLogin' | translate }}</a>
       </form>
     </app-container>

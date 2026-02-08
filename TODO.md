@@ -2,6 +2,58 @@
 
 Below is a structured checklist you can turn into issues.
 
+## v1.0.0 Release Gates (tracked across PRs)
+
+This section mirrors the “PR 0..PR 10” release-gate checklist and records *evidence* (paths + commands)
+showing what is already implemented.
+
+### PR0 — Release plumbing + guardrails (CI + startup validation)
+- [x] CI gates exist and block merge.
+  - Evidence (CI): `.github/workflows/backend.yml`, `.github/workflows/frontend.yml`, `.github/workflows/compose-smoke.yml`
+  - Evidence (startup checks): `backend/app/core/startup_checks.py`, `backend/app/main.py`
+  - Verify locally:
+    - `PYTHONPATH=backend pytest backend/tests`
+    - `npm -C frontend run lint && npm -C frontend run build`
+
+### PR1 — Email is deterministic + non-blocking
+- [x] Remove remaining float/PII fallbacks and keep template tests green.
+  - Evidence (deps): `backend/requirements.txt` (`jinja2==3.1.4`)
+  - Evidence (off-thread send): `backend/app/services/email.py` (`anyio.to_thread.run_sync(...)`)
+  - Evidence (tests): `backend/tests/test_email_templates.py`, `backend/tests/test_email_service.py`
+
+### PR2 — Background schedulers: single leader + avoid DB pool starvation
+- [x] Leader-locked schedulers with a dedicated lock DB pool.
+  - Evidence: `backend/app/services/leader_lock.py`, `backend/app/services/*_scheduler.py`, `backend/app/main.py`
+
+### PR3 — Maintenance mode must not break payment webhooks
+- [x] Maintenance allowlist includes Stripe/PayPal/Netopia callbacks + health.
+  - Evidence: `backend/app/middleware/backpressure.py`, `backend/tests/test_backpressure_maintenance.py`
+
+### PR4 — Inventory correctness: prevent oversell under concurrency
+- [x] Treat open orders as reservations (lock + recheck) + TTL auto-cancel for `pending_payment`.
+  - Evidence (service): `backend/app/services/order.py`, `backend/app/services/order_expiration_scheduler.py`
+  - Evidence (integration test): `backend/tests/test_integration_postgres.py`
+
+### PR5 — Remove sync heavy work from the event loop (uploads + PDFs)
+- [x] Offload uploads/image processing and PDF rendering off-thread.
+  - Evidence: `backend/app/services/content.py`, `backend/app/services/email.py`, `backend/app/api/v1/orders.py`
+
+### PR7 — Proxy trust + rate limiting correctness
+- [x] Restrict `FORWARDED_ALLOW_IPS` defaults in prod configs/docs (avoid `*`).
+  - Evidence: `infra/prod/.env.example`, `infra/prod/docker-compose.yml`, `infra/prod/README.md`
+
+### PR9 — Money representation: remove floats, standardize boundaries
+- [x] Remove remaining float conversions in payment/email boundaries (Netopia + email formatting).
+  - Evidence: `backend/app/services/netopia.py` (`order.amount`), `backend/tests/test_netopia_start_payment_decimal.py`
+  - Evidence: `backend/app/services/email.py` (`_money_str`), `backend/tests/test_email_service.py`
+
+### PR10 — Frontend UX polish sweep (i18n, loading states, error codes)
+- [x] Verify i18n coverage and remove remaining hardcoded user strings in critical flows.
+  - Evidence (guards/toasts): `frontend/src/app/core/auth.guard.ts`, `frontend/src/app/shared/error-handler.service.ts`
+  - Evidence (auth UX): `frontend/src/app/pages/auth/password-reset-request.component.ts`, `frontend/src/app/pages/auth/password-reset.component.ts`, `frontend/src/app/pages/auth/register.component.ts`
+  - Evidence (i18n keys): `frontend/src/assets/i18n/en.json`, `frontend/src/assets/i18n/ro.json`
+  - Verify locally: `npm -C frontend run i18n:check`
+
 ## High priority (next)
 - [x] Inventory: prevent oversell under concurrency by treating open orders as stock reservations (lock + recheck) and expiring stale `pending_payment` orders after a TTL.
 - [x] Backend Jobs: add a leader-locked scheduler to auto-cancel expired `pending_payment` orders (frees reserved stock without manual cleanup).

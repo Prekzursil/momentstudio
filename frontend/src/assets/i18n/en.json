@@ -4,6 +4,27 @@
     "tagline": "art. handcrafted",
     "brandMarkAlt": "momentstudio flower logo"
   },
+  "errors": {
+    "signInRequired": "Please sign in to continue.",
+    "staffRequired": "Staff access required.",
+    "sectionDenied": "You do not have access to this section.",
+    "network": {
+      "title": "Network error",
+      "body": "Please check your connection and try again."
+    },
+    "unauthorized": {
+      "title": "Unauthorized",
+      "body": "Please sign in to continue."
+    },
+    "server": {
+      "title": "Server error",
+      "body": "Something went wrong. Please try again."
+    },
+    "unexpected": {
+      "title": "Unexpected error",
+      "body": "Please try again."
+    }
+  },
   "meta": {
     "titles": {
       "home": "momentstudio",
@@ -1482,12 +1503,14 @@
     "back": "Back",
     "resetLink": "Send reset link",
     "resetLinkSent": "Reset link sent",
+    "resetLinkSentBody": "If an account exists for {{email}}, you'll receive a reset link shortly.",
     "setPassword": "Set password",
     "backToLogin": "Back to login",
     "remembered": "Remembered it?",
     "haveAccount": "Already have an account?",
     "successLogin": "Welcome back",
     "successRegister": "Account created",
+    "successRegisterBody": "Welcome, {{email}}",
     "successReset": "Password updated",
     "invalidCredentials": "Email/username or password is incorrect.",
     "completeForm": "Please complete the form.",
