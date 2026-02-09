@@ -12,6 +12,7 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 _SVG_MAX_BYTES = 1024 * 1024  # avoid expensive parsing for huge SVGs
+_MEDIA_URL_PREFIX = "/media/"
 
 
 def ensure_media_root(root: str | Path | None = None) -> Path:
@@ -137,7 +138,7 @@ def _detect_image_mime_path(path: Path) -> str | None:
 
 
 def delete_file(media_url: str) -> None:
-    if not isinstance(media_url, str) or not media_url.startswith("/media/"):
+    if not isinstance(media_url, str) or not media_url.startswith(_MEDIA_URL_PREFIX):
         return
     try:
         path = _media_url_to_path(media_url)
@@ -196,11 +197,11 @@ def generate_thumbnails(path: str | Path) -> None:
 
 
 def _media_url_to_path(url: str) -> Path:
-    if not url.startswith("/media/"):
+    if not url.startswith(_MEDIA_URL_PREFIX):
         raise ValueError("Invalid media URL")
 
     base_root = Path(settings.media_root).resolve()
-    rel = url.removeprefix("/media/")
+    rel = url.removeprefix(_MEDIA_URL_PREFIX)
     path = (base_root / rel).resolve()
     try:
         path.relative_to(base_root)
