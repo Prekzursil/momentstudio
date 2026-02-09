@@ -28,7 +28,7 @@
     "@ngx-translate/core": "^17.0.0",
     "@ngx-translate/http-loader": "^16.0.0",
     "@nuintun/qrcode": "^5.0.2",
-    "@sentry/browser": "^10.32.1",
+    "@sentry/browser": "^10.35.0",
     "@toast-ui/editor": "^3.2.2",
     "diff": "^8.0.2",
     "dompurify": "^3.3.1",
