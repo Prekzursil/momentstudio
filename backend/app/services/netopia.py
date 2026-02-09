@@ -107,71 +107,78 @@ def _public_key_pem() -> str:
         settings.netopia_public_key_path_live if env == "live" else settings.netopia_public_key_path_sandbox
     )
     path = (preferred_path or settings.netopia_public_key_path or "").strip()
-    if path:
-        try:
-            key_bytes = _read_netopia_key_bytes(path)
-        except OSError as exc:
+    if not path:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Netopia public key not configured",
+        )
+
+    try:
+        key_bytes = _read_netopia_key_bytes(path)
+    except OSError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Netopia public key could not be read (check NETOPIA_PUBLIC_KEY_PATH_*)",
+        ) from exc
+
+    if not key_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Netopia public key file is empty",
+        )
+
+    # Common case: PEM certificate/public key.
+    if key_bytes.lstrip().startswith(b"-----BEGIN "):
+        header = key_bytes.lstrip().splitlines()[0]
+        if b"PRIVATE KEY" in header:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Netopia public key could not be read (check NETOPIA_PUBLIC_KEY_PATH_*)",
-            ) from exc
+                detail="Netopia public key path points to a private key; provide the public certificate/key instead",
+            )
 
-        if not key_bytes:
-            return ""
-
-        # Common case: PEM certificate/public key.
-        if key_bytes.lstrip().startswith(b"-----BEGIN "):
-            header = key_bytes.lstrip().splitlines()[0]
-            if b"PRIVATE KEY" in header:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Netopia public key path points to a private key; provide the public certificate/key instead",
-                )
-
-            if b"BEGIN CERTIFICATE" in header:
-                try:
-                    cert = x509.load_pem_x509_certificate(key_bytes)
-                    return _to_subject_public_key_pem(cert.public_key())
-                except Exception as exc:
-                    raise HTTPException(
-                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        detail="Netopia public certificate could not be parsed",
-                    ) from exc
-
-            if b"BEGIN PUBLIC KEY" in header:
-                try:
-                    loaded_key = serialization.load_pem_public_key(key_bytes)
-                    return _to_subject_public_key_pem(cast(asymmetric_types.PublicKeyTypes, loaded_key))
-                except Exception as exc:
-                    raise HTTPException(
-                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        detail="Netopia public key could not be parsed",
-                    ) from exc
-
-            # Fall back to returning the PEM text verbatim.
+        if b"BEGIN CERTIFICATE" in header:
             try:
-                return key_bytes.decode("utf-8").strip()
-            except UnicodeDecodeError as exc:
+                cert = x509.load_pem_x509_certificate(key_bytes)
+                return _to_subject_public_key_pem(cert.public_key())
+            except Exception as exc:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Netopia public key could not be decoded",
+                    detail="Netopia public certificate could not be parsed",
                 ) from exc
 
-        # DER certificate/public key (some .cer downloads are DER).
-        try:
-            cert = x509.load_der_x509_certificate(key_bytes)
-        except Exception:
+        if b"BEGIN PUBLIC KEY" in header:
             try:
-                loaded_key = serialization.load_der_public_key(key_bytes)
+                loaded_key = serialization.load_pem_public_key(key_bytes)
+                return _to_subject_public_key_pem(cast(asymmetric_types.PublicKeyTypes, loaded_key))
             except Exception as exc:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="Netopia public key could not be parsed",
                 ) from exc
-            return _to_subject_public_key_pem(cast(asymmetric_types.PublicKeyTypes, loaded_key))
-        else:
-            return _to_subject_public_key_pem(cert.public_key())
-    return ""
+
+        # Fall back to returning the PEM text verbatim.
+        try:
+            return key_bytes.decode("utf-8").strip()
+        except UnicodeDecodeError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Netopia public key could not be decoded",
+            ) from exc
+
+    # DER certificate/public key (some .cer downloads are DER).
+    try:
+        cert = x509.load_der_x509_certificate(key_bytes)
+    except Exception:
+        try:
+            loaded_key = serialization.load_der_public_key(key_bytes)
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Netopia public key could not be parsed",
+            ) from exc
+        return _to_subject_public_key_pem(cast(asymmetric_types.PublicKeyTypes, loaded_key))
+    else:
+        return _to_subject_public_key_pem(cert.public_key())
 
 
 def is_netopia_configured() -> bool:
@@ -191,15 +198,21 @@ def netopia_configuration_status() -> tuple[bool, str | None]:
     if not pos_signature:
         missing.append(f"NETOPIA_POS_SIGNATURE_{env.upper()} (or NETOPIA_POS_SIGNATURE)")
 
-    try:
-        public_key = _public_key_pem()
-    except HTTPException as exc:
-        return False, str(getattr(exc, "detail", "") or "Netopia public key could not be loaded")
-
-    if not public_key:
+    preferred_pem = settings.netopia_public_key_pem_live if env == "live" else settings.netopia_public_key_pem_sandbox
+    pem = (preferred_pem or settings.netopia_public_key_pem or "").strip()
+    preferred_path = (
+        settings.netopia_public_key_path_live if env == "live" else settings.netopia_public_key_path_sandbox
+    )
+    path = (preferred_path or settings.netopia_public_key_path or "").strip()
+    if not (pem or path):
         missing.append(
             f"NETOPIA_PUBLIC_KEY_PEM_{env.upper()} / NETOPIA_PUBLIC_KEY_PATH_{env.upper()} (or NETOPIA_PUBLIC_KEY_PEM / NETOPIA_PUBLIC_KEY_PATH)"
         )
+    else:
+        try:
+            _public_key_pem()
+        except HTTPException as exc:
+            return False, str(getattr(exc, "detail", "") or "Netopia public key could not be loaded")
 
     if missing:
         return False, "Missing Netopia configuration: " + ", ".join(missing)
@@ -351,9 +364,10 @@ def verify_ipn(*, verification_token: str, payload: bytes) -> dict[str, Any]:
     if not pos_signature:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Netopia not configured")
 
-    public_key = _public_key_pem()
-    if not public_key:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Netopia not configured")
+    try:
+        public_key = _public_key_pem()
+    except HTTPException as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Netopia not configured") from exc
 
     alg = (settings.netopia_jwt_alg or "RS512").strip().upper() or "RS512"
 
