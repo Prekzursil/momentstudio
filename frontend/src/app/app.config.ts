@@ -4,17 +4,12 @@ import { provideAnimations } from '@angular/platform-browser/animations';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { routes } from './app.routes';
 import { authAndErrorInterceptor } from './core/http.interceptor';
-import { TranslateLoader, TranslateModule } from '@ngx-translate/core';
-import { TranslateHttpLoader } from '@ngx-translate/http-loader';
-import { HttpClient } from '@angular/common/http';
+import { TranslateModule } from '@ngx-translate/core';
+import { provideTranslateHttpLoader } from '@ngx-translate/http-loader';
 import { AdminClientErrorLoggerService } from './core/admin-client-error-logger.service';
 import { provideServiceWorker } from '@angular/service-worker';
 import { appConfig as runtimeConfig } from './core/app-config';
 import { TranslatedTitleStrategy } from './core/translated-title.strategy';
-
-export function httpLoaderFactory(http: HttpClient) {
-  return new TranslateHttpLoader(http, 'assets/i18n/', '.json');
-}
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -24,7 +19,7 @@ export const appConfig: ApplicationConfig = {
     { provide: TitleStrategy, useClass: TranslatedTitleStrategy },
     provideServiceWorker('ngsw-worker.js', {
       enabled: !isDevMode() && runtimeConfig.appEnv === 'production',
-      registrationStrategy: 'registerWhenStable:30000'
+      registrationStrategy: 'registerWhenStable:30000',
     }),
     {
       provide: APP_INITIALIZER,
@@ -36,13 +31,12 @@ export const appConfig: ApplicationConfig = {
     },
     importProvidersFrom(
       TranslateModule.forRoot({
-        defaultLanguage: 'en',
-        loader: {
-          provide: TranslateLoader,
-          useFactory: httpLoaderFactory,
-          deps: [HttpClient]
-        }
+        defaultLanguage: 'en'
       })
-    )
+    ),
+    ...provideTranslateHttpLoader({
+      prefix: '/assets/i18n/',
+      suffix: '.json',
+    }),
   ]
 };
