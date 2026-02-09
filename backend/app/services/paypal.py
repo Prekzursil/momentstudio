@@ -331,10 +331,30 @@ async def create_order_itemized(
     return paypal_order_id, approval_url
 
 
+def _sanitize_paypal_id(paypal_id: str) -> str:
+    """
+    Validate a PayPal identifier to ensure it is safe to use in a URL path segment.
+
+    PayPal order and capture IDs are opaque, but in practice they are short strings consisting
+    of letters, digits, and hyphens. Reject anything that contains other characters to prevent
+    path manipulation.
+    """
+    if not isinstance(paypal_id, str):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid PayPal order id")
+    value = paypal_id.strip()
+    if not value:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid PayPal order id")
+    # Allow only alphanumerics and hyphens; disallow '/', '?', '#', etc.
+    if not value.replace("-", "").isalnum():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid PayPal order id")
+    return value
+
+
 async def capture_order(*, paypal_order_id: str) -> str:
     """Capture an approved PayPal order and return the PayPal capture id (if available)."""
     token = await _get_access_token()
-    capture_url = f"{_base_url()}/v2/checkout/orders/{paypal_order_id}/capture"
+    safe_order_id = _sanitize_paypal_id(paypal_order_id)
+    capture_url = f"{_base_url()}/v2/checkout/orders/{safe_order_id}/capture"
     try:
         async with httpx.AsyncClient(timeout=20) as client:
             resp = await client.post(
