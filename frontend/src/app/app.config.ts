@@ -19,7 +19,7 @@ export const appConfig: ApplicationConfig = {
     { provide: TitleStrategy, useClass: TranslatedTitleStrategy },
     provideServiceWorker('ngsw-worker.js', {
       enabled: !isDevMode() && runtimeConfig.appEnv === 'production',
-      registrationStrategy: 'registerWhenStable:30000'
+      registrationStrategy: 'registerWhenStable:30000',
     }),
     {
       provide: APP_INITIALIZER,
@@ -36,7 +36,7 @@ export const appConfig: ApplicationConfig = {
     ),
     ...provideTranslateHttpLoader({
       prefix: '/assets/i18n/',
-      suffix: '.json'
-    })
+      suffix: '.json',
+    }),
   ]
 };
