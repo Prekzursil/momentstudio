@@ -136,16 +136,12 @@ def _detect_image_mime_path(path: Path) -> str | None:
         return None
 
 
-def delete_file(filepath: str) -> None:
-    base_root = Path(settings.media_root).resolve()
+def delete_file(media_url: str) -> None:
+    if not isinstance(media_url, str) or not media_url.startswith("/media/"):
+        return
     try:
-        if filepath.startswith("/media/"):
-            path = _media_url_to_path(filepath)
-        else:
-            path = Path(filepath).resolve()
-            path.relative_to(base_root)
+        path = _media_url_to_path(media_url)
     except Exception:
-        # Best-effort cleanup: never delete outside MEDIA_ROOT.
         return
     if path.exists():
         path.unlink()

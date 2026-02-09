@@ -130,7 +130,11 @@ def save_private_bytes(
 def resolve_private_path(rel_path: str, *, root: str | Path | None = None) -> Path:
     private_root = Path(root or settings.private_media_root).resolve()
     private_root.mkdir(parents=True, exist_ok=True)
-    candidate = (private_root / rel_path).resolve()
+    cleaned = str(rel_path or "").strip()
+    if not cleaned or cleaned.startswith(("/", "\\")) or "\\" in cleaned:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file path")
+
+    candidate = (private_root / cleaned).resolve()
     try:
         candidate.relative_to(private_root)
     except ValueError:
