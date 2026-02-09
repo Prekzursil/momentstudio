@@ -7,6 +7,9 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   compose-smoke:
     runs-on: ubuntu-latest
@@ -60,19 +63,28 @@ jobs:
           done
           curl -fsS http://localhost:4201 >/dev/null
 
+      - name: Generate E2E owner credentials
+        run: |
+          set -euo pipefail
+          echo "E2E_OWNER_IDENTIFIER=owner" >> "$GITHUB_ENV"
+          echo "E2E_OWNER_EMAIL=owner@example.com" >> "$GITHUB_ENV"
+          pw="$(openssl rand -hex 16)"
+          echo "::add-mask::$pw"
+          echo "E2E_OWNER_PASSWORD=$pw" >> "$GITHUB_ENV"
+
       - name: Prepare DB (migrations + seeds + owner)
         run: |
           set -euo pipefail
           docker compose -f infra/docker-compose.yml exec -T backend alembic upgrade head
           docker compose -f infra/docker-compose.yml exec -T backend python -m app.seeds
-          docker compose -f infra/docker-compose.yml exec -T backend python -m app.cli bootstrap-owner --email owner@example.com --password Password123 --username owner --display-name Owner
+          docker compose -f infra/docker-compose.yml exec -T backend python -m app.cli bootstrap-owner --email "$E2E_OWNER_EMAIL" --password "$E2E_OWNER_PASSWORD" --username "$E2E_OWNER_IDENTIFIER" --display-name Owner
 
       - name: Playwright E2E (smoke)
         run: |
           cd frontend
           # Keep the PR gate fast and stable: run only the smoke suite here.
           # Full E2E coverage can be run via `npm run e2e` locally or in a separate workflow.
-          E2E_BASE_URL=http://localhost:4201 E2E_OWNER_IDENTIFIER=owner E2E_OWNER_PASSWORD=Password123 npm run e2e -- e2e/smoke.spec.ts --workers=1
+          E2E_BASE_URL=http://localhost:4201 E2E_OWNER_IDENTIFIER="$E2E_OWNER_IDENTIFIER" E2E_OWNER_PASSWORD="$E2E_OWNER_PASSWORD" npm run e2e -- e2e/smoke.spec.ts --workers=1
 
       - name: Logs (on failure)
         if: failure()
