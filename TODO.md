@@ -55,6 +55,12 @@ showing what is already implemented.
   - Verify locally: `npm -C frontend run i18n:check`
 
 ## High priority (next)
+- [ ] Infra: bump frontend Nginx runtime image to `nginx:1.29.5-alpine`.
+  - Evidence: `frontend/Dockerfile`
+- [ ] Snyk: Netopia JWT verification must not fall back to an empty/placeholder public key.
+  - Evidence: `backend/app/services/netopia.py` (`_public_key_pem`, `verify_ipn`)
+- [ ] Snyk: rename cart session localStorage identifier constant to avoid “hardcoded secret” false positives.
+  - Evidence: `frontend/src/app/core/cart.api.ts`
 - [x] Inventory: prevent oversell under concurrency by treating open orders as stock reservations (lock + recheck) and expiring stale `pending_payment` orders after a TTL.
 - [x] Backend Jobs: add a leader-locked scheduler to auto-cancel expired `pending_payment` orders (frees reserved stock without manual cleanup).
 - [x] Email: make email rendering deterministic (Jinja2 dependency + template render tests) and remove unsafe “dump context” fallbacks.
