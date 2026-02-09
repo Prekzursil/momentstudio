@@ -15,6 +15,7 @@ import {
   WebhookEventRead,
   WebhookEventDetail
 } from '../../../core/ops.service';
+import { appConfig } from '../../../core/app-config';
 import { HealthService } from '../../../core/health.service';
 import { ToastService } from '../../../core/toast.service';
 import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
@@ -134,6 +135,10 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
 	              <div>
 	                {{ 'adminUi.ops.diagnostics.environment' | translate }}:
 	                <span class="font-mono text-slate-700 dark:text-slate-200">{{ diag.environment }}</span>
+	                · {{ 'adminUi.ops.diagnostics.backendBuild' | translate }}:
+	                <span class="font-mono text-slate-700 dark:text-slate-200">{{ diag.app_version || 'n/a' }}</span>
+	                · {{ 'adminUi.ops.diagnostics.frontendBuild' | translate }}:
+	                <span class="font-mono text-slate-700 dark:text-slate-200">{{ frontendBuildVersion }}</span>
 	                · {{ 'adminUi.ops.diagnostics.paymentsProvider' | translate }}:
 	                <span class="font-mono text-slate-700 dark:text-slate-200">{{ diag.payments_provider }}</span>
 	              </div>
@@ -748,6 +753,7 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
 	  `
 })
 export class AdminOpsComponent implements OnInit {
+  readonly frontendBuildVersion = (appConfig.appVersion || '').trim() || 'n/a';
   healthLoading = signal(true);
   healthError = signal<string | null>(null);
   backendReady = signal(false);

@@ -241,6 +241,7 @@ def test_ops_diagnostics(test_app: Dict[str, object]) -> None:
     assert resp.status_code == 200, resp.text
     data = resp.json()
     assert data["environment"]
+    assert isinstance(data["app_version"], str)
     assert data["payments_provider"]
 
     for key in ("smtp", "redis", "storage", "stripe", "paypal", "netopia"):

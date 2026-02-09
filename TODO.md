@@ -54,6 +54,23 @@ showing what is already implemented.
   - Evidence (i18n keys): `frontend/src/assets/i18n/en.json`, `frontend/src/assets/i18n/ro.json`
   - Verify locally: `npm -C frontend run i18n:check`
 
+## Pre-sync production audit roadmap (current batch)
+- [ ] Post-sync: verify live deployment version, header deduplication, and manifest MIME (`application/manifest+json`).
+  - Evidence (script): `infra/prod/verify-live.sh`
+  - Run: `./infra/prod/verify-live.sh`
+- [x] Checkout reliability: add timeout + guaranteed busy-state reset for PayPal/Netopia/Stripe return confirmation flows.
+  - Evidence: `frontend/src/app/pages/checkout/paypal-return.component.ts`, `frontend/src/app/pages/checkout/netopia-return.component.ts`, `frontend/src/app/pages/checkout/stripe-return.component.ts`
+- [x] Checkout UX: standardize inline error card for all payment-return failures with retry/back links.
+  - Evidence: `frontend/src/app/pages/checkout/checkout-return-error-card.component.ts`
+- [x] Infra: enforce single source of truth for security headers (Caddy only in prod) and add curl assertion in smoke checks.
+  - Evidence: `infra/prod/Caddyfile`, `frontend/nginx/default.conf`, `.github/workflows/compose-smoke.yml`
+- [x] Observability: inject build/deploy version into frontend runtime config and expose in admin diagnostics.
+  - Evidence: `infra/prod/deploy.sh`, `infra/prod/docker-compose.yml`, `frontend/nginx/99-runtime-config.sh`, `frontend/src/app/pages/admin/ops/admin-ops.component.ts`, `backend/app/services/ops.py`
+- [ ] Frontend perf: reduce oversized main/admin bundles via lazy-loading and library deferral.
+- [ ] i18n maintenance: prune unused translation keys with a documented dynamic-key allowlist.
+- [ ] Backend tests: fix aiosqlite teardown warnings to keep async test output clean.
+- [ ] Dependency hygiene: add scheduled patch/minor upgrade cadence and verification checklist.
+
 ## High priority (next)
 - [x] Infra: bump frontend Nginx runtime image to `nginx:1.29.5-alpine`.
   - Evidence: `frontend/Dockerfile`
