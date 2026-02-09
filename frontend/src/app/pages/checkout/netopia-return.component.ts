@@ -1,20 +1,29 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { Component, OnDestroy, OnInit } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { finalize, Subscription, TimeoutError, timeout } from 'rxjs';
 import { ApiService } from '../../core/api.service';
+import { AnalyticsService } from '../../core/analytics.service';
 import { CartStore } from '../../core/cart.store';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
-import { ButtonComponent } from '../../shared/button.component';
 import { ContainerComponent } from '../../layout/container.component';
+import { CheckoutReturnErrorCardComponent } from './checkout-return-error-card.component';
 
 const CHECKOUT_SUCCESS_KEY = 'checkout_last_order';
 const CHECKOUT_NETOPIA_PENDING_KEY = 'checkout_netopia_pending';
+const RETURN_CONFIRM_TIMEOUT_MS = 30_000;
 
 @Component({
   selector: 'app-netopia-return',
   standalone: true,
-  imports: [CommonModule, RouterLink, TranslateModule, ContainerComponent, BreadcrumbComponent, ButtonComponent],
+  imports: [
+    CommonModule,
+    TranslateModule,
+    ContainerComponent,
+    BreadcrumbComponent,
+    CheckoutReturnErrorCardComponent
+  ],
   template: `
     <app-container classes="py-10 grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
@@ -29,22 +38,16 @@ const CHECKOUT_NETOPIA_PENDING_KEY = 'checkout_netopia_pending';
         <p class="mt-3 text-sm text-slate-700 dark:text-slate-200">{{ 'checkout.netopiaConfirming' | translate }}</p>
       </div>
 
-      <div
+      <app-checkout-return-error-card
         *ngIf="!loading && errorMessage"
-        class="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
-      >
-        <p class="text-sm font-semibold tracking-[0.2em] uppercase">{{ 'checkout.netopiaReturnTitle' | translate }}</p>
-        <p class="mt-3 text-sm">{{ errorMessage }}</p>
-        <div class="mt-5 flex flex-wrap gap-3">
-          <app-button [label]="'checkout.retry' | translate" (action)="retry()"></app-button>
-          <app-button routerLink="/checkout" variant="ghost" [label]="'checkout.backToCheckout' | translate"></app-button>
-          <app-button routerLink="/contact" variant="ghost" [label]="'nav.contact' | translate"></app-button>
-        </div>
-      </div>
+        [titleKey]="'checkout.netopiaReturnTitle'"
+        [message]="errorMessage"
+        (retry)="retry()"
+      ></app-checkout-return-error-card>
     </app-container>
   `
 })
-export class NetopiaReturnComponent implements OnInit {
+export class NetopiaReturnComponent implements OnInit, OnDestroy {
   crumbs = [
     { label: 'nav.home', url: '/' },
     { label: 'checkout.title', url: '/checkout' },
@@ -55,13 +58,15 @@ export class NetopiaReturnComponent implements OnInit {
   errorMessage = '';
   private orderId = '';
   private ntpId: string | null = null;
+  private confirmSubscription: Subscription | null = null;
 
   constructor(
     private route: ActivatedRoute,
     private api: ApiService,
     private router: Router,
     private translate: TranslateService,
-    private cart: CartStore
+    private cart: CartStore,
+    private analytics: AnalyticsService
   ) {}
 
   private promotePendingSummary(): void {
@@ -91,6 +96,11 @@ export class NetopiaReturnComponent implements OnInit {
     this.confirmPayment();
   }
 
+  ngOnDestroy(): void {
+    this.confirmSubscription?.unsubscribe();
+    this.confirmSubscription = null;
+  }
+
   retry(): void {
     if (this.loading) return;
     if (!this.orderId) return;
@@ -104,18 +114,46 @@ export class NetopiaReturnComponent implements OnInit {
     const payload: { order_id: string; ntp_id?: string } = { order_id: this.orderId };
     if (this.ntpId) payload.ntp_id = this.ntpId;
 
-    this.api.post<{ order_id: string; reference_code?: string; status: string }>('/orders/netopia/confirm', payload).subscribe({
-      next: () => {
-        this.loading = false;
-        this.promotePendingSummary();
-        this.cart.clear();
-        void this.router.navigate(['/checkout/success']);
-      },
-      error: (err) => {
-        this.loading = false;
-        this.errorMessage = err?.error?.detail || this.translate.instant('checkout.netopiaConfirmFailed');
-      }
-    });
+    const startedAt = Date.now();
+    this.confirmSubscription?.unsubscribe();
+    this.confirmSubscription = this.api
+      .post<{ order_id: string; reference_code?: string; status: string }>('/orders/netopia/confirm', payload)
+      .pipe(
+        timeout({ first: RETURN_CONFIRM_TIMEOUT_MS }),
+        finalize(() => {
+          this.loading = false;
+          this.confirmSubscription = null;
+        })
+      )
+      .subscribe({
+        next: () => {
+          this.promotePendingSummary();
+          this.cart.clear();
+          void this.router.navigate(['/checkout/success']);
+        },
+        error: (err) => {
+          if (err instanceof TimeoutError) {
+            this.errorMessage = this.translate.instant('checkout.paymentConfirmTimeout');
+            this.analytics.track('confirm_stuck_timeout', {
+              provider: 'netopia',
+              route: 'checkout/netopia/return',
+              timeout_ms: RETURN_CONFIRM_TIMEOUT_MS,
+              elapsed_ms: Date.now() - startedAt
+            });
+            return;
+          }
+          this.errorMessage = this.resolveErrorMessage(err, 'checkout.netopiaConfirmFailed');
+        }
+      });
+  }
+
+  private resolveErrorMessage(err: any, fallbackKey: string): string {
+    const detail = typeof err?.error?.detail === 'string' ? err.error.detail.trim() : '';
+    if (detail) return detail;
+
+    const message = typeof err?.message === 'string' ? err.message.trim() : '';
+    if (message && !message.toLowerCase().includes('http failure response')) return message;
+
+    return this.translate.instant(fallbackKey);
   }
 }
-

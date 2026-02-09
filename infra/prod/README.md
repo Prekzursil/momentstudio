@@ -72,6 +72,8 @@ Notes:
 
 - `deploy.sh` runs `docker compose up -d --build`. It **does not wipe** your database or uploads (volumes are preserved).
 - After a VPS reboot, the stack starts automatically (`restart: unless-stopped`). You usually **do not** need to run `deploy.sh` again.
+- By default, `deploy.sh` exports `APP_VERSION=$(git rev-parse --short HEAD)` before recreating containers so backend/frontend diagnostics show the deployed revision.
+- `deploy.sh` runs `infra/prod/verify-live.sh` after startup. Set `RUN_POST_SYNC_VERIFY=0` to skip that step.
 
 Useful helpers:
 
@@ -80,6 +82,7 @@ Useful helpers:
 - Apply `.env` changes without rebuilding images: `./infra/prod/reload-env.sh` (defaults to `backend frontend caddy`)
 - View logs: `./infra/prod/logs.sh` (optionally pass service names)
 - List services: `./infra/prod/ps.sh`
+- Verify live endpoints/headers manually: `./infra/prod/verify-live.sh`
 
 View logs manually:
 
@@ -164,6 +167,11 @@ To move your current local dev DB + uploads to the VPS:
 - This stack mounts `uploads/` + `private_uploads/` from the repo directory so media persists across restarts/rebuilds.
 - `restart: unless-stopped` keeps the app running after reboots.
 - Docker log rotation is enabled (json-file `max-size`/`max-file`) to reduce the risk of filling disk.
+- `APP_VERSION` can be overridden explicitly when needed:
+
+  ```bash
+  APP_VERSION=v1.0.0 ./infra/prod/deploy.sh
+  ```
 
 ## 7) Edge rate limiting + real client IP (recommended)
 

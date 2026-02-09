@@ -677,6 +677,7 @@ async def get_diagnostics() -> OpsDiagnosticsRead:
     return OpsDiagnosticsRead(
         checked_at=now,
         environment=env,
+        app_version=str(getattr(settings, "app_version", "") or "").strip(),
         payments_provider=provider,
         smtp=smtp_check,
         redis=redis_check,

@@ -37,6 +37,12 @@ fi
 
 mkdir -p "${repo_root}/uploads" "${repo_root}/private_uploads"
 
+# Stamp backend/frontend runtime config with the deployed git revision unless overridden.
+if [[ -z "${APP_VERSION:-}" ]]; then
+  APP_VERSION="$(git rev-parse --short HEAD)"
+  export APP_VERSION
+fi
+
 echo "Starting (or updating) momentstudio production stack..."
 docker compose --env-file "${env_file}" -f "${compose_file}" up -d --build
 
@@ -44,6 +50,11 @@ echo
 echo "Services:"
 docker compose --env-file "${env_file}" -f "${compose_file}" ps
 
+if [[ "${RUN_POST_SYNC_VERIFY:-1}" == "1" ]]; then
+  echo
+  echo "Running post-sync verification checks..."
+  EXPECTED_APP_VERSION="${APP_VERSION}" "${repo_root}/infra/prod/verify-live.sh"
+fi
+
 echo
 echo "Tip: first-time deploy requires DNS + ports 80/443 open for TLS issuance."
-

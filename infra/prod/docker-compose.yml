@@ -58,6 +58,7 @@ services:
       redis:
         condition: service_healthy
     environment:
+      APP_VERSION: ${APP_VERSION:-}
       ENVIRONMENT: ${ENVIRONMENT:-production}
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-adrianaart}
       FRONTEND_ORIGIN: https://${PUBLIC_DOMAIN:-momentstudio.ro}
@@ -98,6 +99,8 @@ services:
     restart: unless-stopped
     env_file:
       - ../../frontend/.env
+    environment:
+      APP_VERSION: ${APP_VERSION:-}
     depends_on:
       backend:
         condition: service_healthy

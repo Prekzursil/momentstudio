@@ -143,6 +143,7 @@ export interface OpsDiagnosticsCheck {
 export interface OpsDiagnosticsRead {
   checked_at: string;
   environment: string;
+  app_version: string;
   payments_provider: string;
   smtp: OpsDiagnosticsCheck;
   redis: OpsDiagnosticsCheck;

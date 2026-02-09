@@ -160,6 +160,7 @@ class OpsDiagnosticsCheck(BaseModel):
 class OpsDiagnosticsRead(BaseModel):
     checked_at: datetime
     environment: str
+    app_version: str
     payments_provider: str
     smtp: OpsDiagnosticsCheck
     redis: OpsDiagnosticsCheck

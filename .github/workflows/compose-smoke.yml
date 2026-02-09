@@ -63,6 +63,28 @@ jobs:
           done
           curl -fsS http://localhost:4201 >/dev/null
 
+          manifest_headers="$(mktemp)"
+          curl -fsSI http://localhost:4201/manifest.webmanifest > "$manifest_headers"
+          manifest_mime="$(
+            awk -F': *' 'tolower($1) == "content-type" { print tolower($2) }' "$manifest_headers" \
+              | tr -d '\r' \
+              | head -n 1
+          )"
+          if [[ "${manifest_mime}" != application/manifest+json* ]]; then
+            echo "Unexpected manifest content-type: ${manifest_mime:-<missing>}" >&2
+            exit 1
+          fi
+
+          headers_file="$(mktemp)"
+          curl -fsSI http://localhost:4201/ > "$headers_file"
+          for header in content-security-policy permissions-policy referrer-policy x-frame-options x-content-type-options; do
+            count="$(grep -i -c "^${header}:" "$headers_file" || true)"
+            if [[ "$count" -gt 1 ]]; then
+              echo "Duplicate header '${header}' detected (${count})" >&2
+              exit 1
+            fi
+          done
+
       - name: Generate E2E owner credentials
         run: |
           set -euo pipefail
