@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import csv
 import io
 import json
-import random
+import secrets
 import string
 import uuid
 
@@ -441,7 +441,7 @@ async def _ensure_sku_unique(session: AsyncSession, sku: str, exclude_id: uuid.U
 async def _generate_unique_sku(session: AsyncSession, base: str) -> str:
     slug_part = base.replace("-", "").upper()[:8] or "SKU"
     while True:
-        suffix = "".join(random.choices(string.digits, k=4))
+        suffix = "".join(secrets.choice(string.digits) for _ in range(4))
         candidate = f"{slug_part}-{suffix}"
         if not await _get_product_by_sku(session, candidate):
             return candidate
