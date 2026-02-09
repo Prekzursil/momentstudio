@@ -1323,7 +1323,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       return;
     }
     this.checkoutFlowCompleted = true;
-    window.location.assign(target);
+    globalThis.location.assign(target);
   }
 
   private handleCheckoutStartResponse(res: CheckoutStartResponse): void {
