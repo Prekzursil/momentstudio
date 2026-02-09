@@ -10,7 +10,7 @@ RUN npm ci --loglevel=error
 COPY frontend/ ./
 RUN npm run build
 
-FROM nginx:1.27-alpine
+FROM nginx:1.29.5-alpine
 
 COPY frontend/nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY frontend/nginx/99-runtime-config.sh /docker-entrypoint.d/99-runtime-config.sh
