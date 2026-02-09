@@ -21,8 +21,9 @@ class Settings(BaseSettings):
     dev_safety_database_allow_hosts: list[str] = ["localhost", "127.0.0.1", "db"]
 
     # Local/dev default only (tests override this and production must set a real DATABASE_URL).
-    # NOSONAR - passwordless local DBs are acceptable; production is enforced via startup checks.
-    database_url: str = "postgresql+asyncpg://postgres@localhost:5432/adrianaart"  # NOSONAR
+    # Use a non-secret default password that matches `infra/docker-compose.yml` so security scanners
+    # don't flag a passwordless database URL in source.
+    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/adrianaart"
     db_pool_size: int | None = None
     db_max_overflow: int | None = None
     backup_last_at: str | None = None
