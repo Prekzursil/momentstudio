@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 _SVG_MAX_BYTES = 1024 * 1024  # avoid expensive parsing for huge SVGs
 _MEDIA_URL_PREFIX = "/media/"
+_INVALID_MEDIA_URL = "Invalid media URL"
 
 
 def ensure_media_root(root: str | Path | None = None) -> Path:
@@ -202,20 +203,20 @@ def generate_thumbnails(path: str | Path) -> None:
 
 def _media_url_to_path(url: str) -> Path:
     if not url.startswith(_MEDIA_URL_PREFIX):
-        raise ValueError("Invalid media URL")
+        raise ValueError(_INVALID_MEDIA_URL)
 
     base_root = Path(settings.media_root).resolve()
     rel = url.removeprefix(_MEDIA_URL_PREFIX)
     if not rel or rel.startswith(("/", "\\")) or "\\" in rel or "\x00" in rel:
-        raise ValueError("Invalid media URL")
+        raise ValueError(_INVALID_MEDIA_URL)
     pure = PurePosixPath(rel)
     if pure.is_absolute() or any(part in {".", ".."} for part in pure.parts):
-        raise ValueError("Invalid media URL")
+        raise ValueError(_INVALID_MEDIA_URL)
     path = (base_root / rel).resolve()
     try:
         path.relative_to(base_root)
     except ValueError:
-        raise ValueError("Invalid media URL")
+        raise ValueError(_INVALID_MEDIA_URL)
     return path
 
 

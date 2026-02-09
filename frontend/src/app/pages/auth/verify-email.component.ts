@@ -145,19 +145,25 @@ export class VerifyEmailComponent implements OnInit {
   private safeNavigateNext(next: string, fallback: string): void {
     const target = (next || '').trim();
     if (!target) {
-      void this.router.navigateByUrl(fallback);
+      this.navigateSilently(fallback);
       return;
     }
     if (!target.startsWith('/') || target.startsWith('//') || target.includes('\\')) {
-      void this.router.navigateByUrl(fallback);
+      this.navigateSilently(fallback);
       return;
     }
     const allowed = this.allowedNextPrefixes.some((prefix) => target === prefix || target.startsWith(`${prefix}/`) || target.startsWith(`${prefix}?`));
     if (!allowed) {
-      void this.router.navigateByUrl(fallback);
+      this.navigateSilently(fallback);
       return;
     }
-    void this.router.navigateByUrl(target);
+    this.navigateSilently(target);
+  }
+
+  private navigateSilently(url: string): void {
+    this.router.navigateByUrl(url).catch(() => {
+      // Best-effort navigation; ignore failures (e.g. navigation cancelled by guard).
+    });
   }
 
   private succeed(message: string): void {

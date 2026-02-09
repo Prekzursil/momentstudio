@@ -23,7 +23,11 @@ class Settings(BaseSettings):
     # Local/dev default only (tests override this and production must set a real DATABASE_URL).
     # NOTE: We intentionally do not hardcode credentials in source. Local development should
     # provide DATABASE_URL via `backend/.env` or Docker Compose env overrides.
-    database_url: str = "postgresql+asyncpg://postgres@localhost:5432/adrianaart"
+    #
+    # Use a safe, passwordless local default to avoid encouraging credential-less Postgres URLs
+    # in source code (security scanners flag these) and to reduce the chance of accidentally
+    # connecting to the wrong database when a local `.env` is missing.
+    database_url: str = "sqlite+aiosqlite:///./adrianaart.db"
     db_pool_size: int | None = None
     db_max_overflow: int | None = None
     backup_last_at: str | None = None
