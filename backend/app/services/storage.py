@@ -1,7 +1,7 @@
 import logging
 import uuid
 from io import BytesIO
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Tuple
 
 from PIL import Image
@@ -54,7 +54,11 @@ def save_upload(
         initial_stem = uuid.uuid4().hex
         initial_suffix = original_suffix or ".bin"
 
-    destination = dest_root / f"{initial_stem}{initial_suffix}"
+    destination = (dest_root / f"{initial_stem}{initial_suffix}").resolve()
+    try:
+        destination.relative_to(dest_root)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload destination")
 
     def _cleanup(path: Path) -> None:
         try:
@@ -202,6 +206,11 @@ def _media_url_to_path(url: str) -> Path:
 
     base_root = Path(settings.media_root).resolve()
     rel = url.removeprefix(_MEDIA_URL_PREFIX)
+    if not rel or rel.startswith(("/", "\\")) or "\\" in rel or "\x00" in rel:
+        raise ValueError("Invalid media URL")
+    pure = PurePosixPath(rel)
+    if pure.is_absolute() or any(part in {".", ".."} for part in pure.parts):
+        raise ValueError("Invalid media URL")
     path = (base_root / rel).resolve()
     try:
         path.relative_to(base_root)
