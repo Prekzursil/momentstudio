@@ -3,12 +3,44 @@ import uuid
 from io import BytesIO
 from pathlib import Path
 
-from PIL import Image, UnidentifiedImageError
+from PIL import Image
 from fastapi import HTTPException, UploadFile, status
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+_CHUNK_SIZE = 1024 * 1024
+_DEFAULT_ADMIN_UPLOAD_CEILING = 512 * 1024 * 1024
+
+
+def _effective_max_bytes(max_bytes: int | None) -> int:
+    if max_bytes is not None:
+        return int(max_bytes)
+    admin_ceiling = int(getattr(settings, "admin_upload_max_bytes", 0) or 0)
+    return admin_ceiling if admin_ceiling > 0 else _DEFAULT_ADMIN_UPLOAD_CEILING
+
+
+def _cleanup_upload(path: Path) -> None:
+    try:
+        if path.exists():
+            path.unlink()
+    except Exception:  # pragma: no cover
+        logger.warning("private_upload_cleanup_failed", extra={"path": str(path)})
+
+
+def _stream_copy(file: UploadFile, dest: Path, *, max_bytes: int) -> int:
+    written = 0
+    with dest.open("wb") as out:
+        while True:
+            chunk = file.file.read(_CHUNK_SIZE)
+            if not chunk:
+                break
+            written += len(chunk)
+            if written > max_bytes:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File too large")
+            out.write(chunk)
+    return written
 
 
 def ensure_private_root(root: str | Path | None = None) -> Path:
@@ -23,7 +55,7 @@ def save_private_upload(
     subdir: str,
     root: str | Path | None = None,
     allowed_content_types: tuple[str, ...] = ("application/pdf", "image/png", "image/jpeg", "image/webp"),
-    max_bytes: int = 10 * 1024 * 1024,
+    max_bytes: int | None = 10 * 1024 * 1024,
 ) -> tuple[str, str]:
     private_root = Path(root or settings.private_media_root).resolve()
     private_root.mkdir(parents=True, exist_ok=True)
@@ -35,25 +67,37 @@ def save_private_upload(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload destination")
     dest_dir.mkdir(parents=True, exist_ok=True)
 
-    content = file.file.read(max_bytes + 1)
-    if len(content) > max_bytes:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File too large")
-
-    if not file.content_type or file.content_type not in allowed_content_types:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
-
-    sniff = _detect_mime(content)
-    if not sniff or sniff not in allowed_content_types:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
+    effective_max_bytes = _effective_max_bytes(max_bytes)
 
     original_name = Path(file.filename or "").name or "shipping-label"
-    suffix = _suffix_for_mime(sniff, original_name)
-    filename = f"{uuid.uuid4().hex}{suffix}"
-    destination = dest_dir / filename
-    destination.write_bytes(content)
+    original_suffix = Path(original_name).suffix.lower() or ".bin"
+    temp_name = f"{uuid.uuid4().hex}{original_suffix}"
+    destination = dest_dir / temp_name
+    final_path = destination
 
-    rel_path = destination.relative_to(private_root).as_posix()
-    return rel_path, original_name
+    try:
+        _stream_copy(file, destination, max_bytes=effective_max_bytes)
+
+        if not file.content_type or file.content_type not in allowed_content_types:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
+
+        sniff = _detect_mime_path(destination)
+        if not sniff or sniff not in allowed_content_types:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
+
+        suffix = _suffix_for_mime(sniff, original_name)
+        if suffix and destination.suffix.lower() != suffix.lower():
+            final_path = destination.with_name(f"{destination.stem}{suffix}")
+            destination.rename(final_path)
+
+        rel_path = final_path.relative_to(private_root).as_posix()
+        return rel_path, original_name
+    except HTTPException:
+        _cleanup_upload(final_path)
+        raise
+    except Exception as exc:
+        _cleanup_upload(final_path)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Upload failed") from exc
 
 
 def save_private_bytes(
@@ -86,7 +130,11 @@ def save_private_bytes(
 def resolve_private_path(rel_path: str, *, root: str | Path | None = None) -> Path:
     private_root = Path(root or settings.private_media_root).resolve()
     private_root.mkdir(parents=True, exist_ok=True)
-    candidate = (private_root / rel_path).resolve()
+    cleaned = str(rel_path or "").strip()
+    if not cleaned or cleaned.startswith(("/", "\\")) or "\\" in cleaned:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file path")
+
+    candidate = (private_root / cleaned).resolve()
     try:
         candidate.relative_to(private_root)
     except ValueError:
@@ -110,12 +158,41 @@ def _detect_mime(content: bytes) -> str | None:
     return _detect_image_mime(content)
 
 
+def _detect_mime_path(path: Path) -> str | None:
+    try:
+        with path.open("rb") as fp:
+            head = fp.read(2048)
+    except OSError:
+        return None
+    if head.startswith(b"%PDF"):
+        return "application/pdf"
+
+    try:
+        with Image.open(path) as img:
+            image_format = img.format
+            img.verify()
+    except (OSError, ValueError):
+        return None
+
+    if not image_format:
+        return None
+
+    normalized = image_format.upper()
+    if normalized == "JPEG":
+        return "image/jpeg"
+    if normalized == "PNG":
+        return "image/png"
+    if normalized == "WEBP":
+        return "image/webp"
+    return None
+
+
 def _detect_image_mime(content: bytes) -> str | None:
     try:
         with Image.open(BytesIO(content)) as img:
             image_format = img.format
             img.verify()
-    except (UnidentifiedImageError, OSError, ValueError):
+    except (OSError, ValueError):
         return None
 
     if not image_format:

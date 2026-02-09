@@ -1,7 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const OWNER_IDENTIFIER = process.env.E2E_OWNER_IDENTIFIER || 'owner';
-const OWNER_PASSWORD = process.env.E2E_OWNER_PASSWORD || 'Password123';
+import { loginUi, seedCartWithFirstProduct, uniqueSessionId } from './checkout-helpers';
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -37,43 +36,16 @@ test('shop loads (products grid or empty state)', async ({ page }) => {
 test('guest checkout prompts for email verification', async ({ page, request: apiRequest }) => {
   // This flow only validates that the guest email verification UI is reachable.
   // Avoid depending on a seeded product page to reduce flakiness in CI.
-  const sessionId = `guest-e2e-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const sessionId = uniqueSessionId('guest-e2e');
   await page.addInitScript((sid) => {
     localStorage.setItem('cart_session_id', sid);
     localStorage.removeItem('cart_cache');
   }, sessionId);
 
-  const listRes = await apiRequest.get('/api/v1/catalog/products?sort=newest&page=1&limit=25');
-  expect(listRes.ok()).toBeTruthy();
-  const listPayload = (await listRes.json()) as any;
-
-  const items = Array.isArray(listPayload?.items) ? listPayload.items : [];
-  const candidates = items
-    .filter((p: any) => typeof p?.id === 'string' && p.id.length > 0)
-    .filter((p: any) => {
-      const stock = typeof p?.stock_quantity === 'number' ? p.stock_quantity : 0;
-      return stock > 0 || !!p?.allow_backorder;
-    });
-
-  if (!candidates.length) {
-    test.skip(true, 'No in-stock products available for guest checkout e2e.');
-    return;
-  }
-
-  const product = candidates[0];
-  const syncRes = await apiRequest.post('/api/v1/cart/sync', {
-    headers: { 'X-Session-Id': sessionId },
-    data: {
-      items: [
-        {
-          product_id: product.id,
-          variant_id: null,
-          quantity: 1
-        }
-      ]
-    }
+  const seeded = await seedCartWithFirstProduct(apiRequest, sessionId, {
+    skipMessage: 'No in-stock products available for guest checkout e2e.',
   });
-  expect(syncRes.ok()).toBeTruthy();
+  if (!seeded) return;
 
   const cartLoad = page.waitForResponse(
     (res) => res.url().includes('/api/v1/cart') && res.request().method() === 'GET' && res.status() === 200
@@ -101,12 +73,7 @@ test('guest checkout prompts for email verification', async ({ page, request: ap
 });
 
 test('owner can sign in and reach admin dashboard', async ({ page }) => {
-  await page.goto('/login');
-  await page.getByLabel('Email or username').fill(OWNER_IDENTIFIER);
-  await page.getByRole('textbox', { name: 'Password' }).fill(OWNER_PASSWORD);
-  await page.getByRole('button', { name: 'Login' }).click();
-
-  await expect(page).toHaveURL(/\/account(\/overview)?$/);
+  await loginUi(page);
 
   const viewAdmin = page.getByRole('link', { name: 'View admin' });
   await expect(viewAdmin).toBeVisible();

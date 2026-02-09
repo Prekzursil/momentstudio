@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { ChangeDetectorRef, Component, ElementRef, NgZone, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ContainerComponent } from '../../layout/container.component';
@@ -27,6 +27,7 @@ import { LegalConsentModalComponent } from '../../shared/legal-consent-modal.com
 import { CheckoutPaymentStepComponent } from './checkout-payment-step.component';
 import { CheckoutPromoStepComponent } from './checkout-promo-step.component';
 import { CheckoutShippingStepComponent } from './checkout-shipping-step.component';
+import { finalize, timeout } from 'rxjs/operators';
 
 type CheckoutShippingAddress = {
   name: string;
@@ -64,6 +65,18 @@ type SavedCheckout = {
 
 type CheckoutPaymentMethod = 'cod' | 'netopia' | 'paypal' | 'stripe';
 type PaymentMethodCapability = { enabled?: boolean; reason?: string | null; reason_code?: string | null };
+
+type CheckoutStartResponse = {
+  order_id: string;
+  reference_code?: string;
+  paypal_order_id?: string | null;
+  paypal_approval_url?: string | null;
+  netopia_ntp_id?: string | null;
+  netopia_payment_url?: string | null;
+  stripe_session_id?: string | null;
+  stripe_checkout_url?: string | null;
+  payment_method?: string;
+};
 
 type CheckoutQuote = {
   subtotal: number;
@@ -440,7 +453,9 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     private translate: TranslateService,
     private checkoutPrefs: CheckoutPrefsService,
     private analytics: AnalyticsService,
-    public auth: AuthService
+    public auth: AuthService,
+    private zone: NgZone,
+    private cdr: ChangeDetectorRef
   ) {
     const saved = this.loadSavedCheckout();
     if (saved) {
@@ -558,6 +573,14 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
         if (!el) return;
         this.scrollAndFocus(el);
       });
+    }
+
+    private detectChangesSafe(): void {
+      try {
+        this.cdr.detectChanges();
+      } catch {
+        // ignore - view might already be destroyed or in the middle of change detection
+      }
     }
 
     private findFirstInvalidField(container: HTMLElement): HTMLElement | null {
@@ -1267,6 +1290,132 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
   private persistNetopiaPendingSummary(summary: CheckoutSuccessSummary): void {
     if (typeof localStorage === 'undefined') return;
     localStorage.setItem(CHECKOUT_NETOPIA_PENDING_KEY, JSON.stringify(summary));
+  }
+
+  private persistAddressIfRequested(): void {
+    if (this.saveAddress) this.persistAddress();
+  }
+
+  private showPaymentNotReadyError(): void {
+    this.placing = false;
+    this.errorMessage = this.translate.instant('checkout.paymentNotReady');
+    this.announceAssertive(this.errorMessage);
+    this.focusGlobalError();
+    this.detectChangesSafe();
+  }
+
+  private normalizePaymentRedirectUrl(url: string, allowedHosts: string[]): string | null {
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== 'https:') return null;
+      const host = parsed.hostname.toLowerCase();
+      const allowed = allowedHosts.some((allowedHost) => host === allowedHost || host.endsWith(`.${allowedHost}`));
+      return allowed ? parsed.toString() : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private redirectToPaymentUrl(url: string | null | undefined, allowedHosts: string[]): void {
+    const target = url ? this.normalizePaymentRedirectUrl(url, allowedHosts) : null;
+    if (!target) {
+      this.showPaymentNotReadyError();
+      return;
+    }
+    this.checkoutFlowCompleted = true;
+    globalThis.location.assign(target);
+  }
+
+  private handleCheckoutStartResponse(res: CheckoutStartResponse): void {
+    const method = (res.payment_method as CheckoutPaymentMethod | undefined) ?? this.paymentMethod;
+    const summary = this.buildSuccessSummary(res.order_id, res.reference_code ?? null, method);
+
+    switch (this.paymentMethod) {
+      case 'paypal': {
+        this.persistPayPalPendingSummary(summary);
+        this.persistAddressIfRequested();
+        this.redirectToPaymentUrl(res.paypal_approval_url, ['paypal.com']);
+        return;
+      }
+      case 'stripe': {
+        this.persistStripePendingSummary(summary);
+        this.persistAddressIfRequested();
+        this.redirectToPaymentUrl(res.stripe_checkout_url, ['checkout.stripe.com']);
+        return;
+      }
+      case 'netopia': {
+        this.persistNetopiaPendingSummary(summary);
+        this.persistAddressIfRequested();
+        this.redirectToPaymentUrl(res.netopia_payment_url, ['mobilpay.ro', 'netopia-payments.com']);
+        return;
+      }
+      case 'cod': {
+        this.persistSuccessSummary(summary);
+        this.persistAddressIfRequested();
+        this.cart.clear();
+        this.checkoutFlowCompleted = true;
+        void this.router.navigate(['/checkout/success']);
+        return;
+      }
+      default:
+        this.showPaymentNotReadyError();
+    }
+  }
+
+  private handleCheckoutFinalize(settled: boolean): void {
+    if (!this.checkoutFlowCompleted) {
+      this.placing = false;
+    }
+    this.detectChangesSafe();
+    if (settled || this.checkoutFlowCompleted) return;
+    // Defensive fallback: ensure we never leave the user stuck in a "placing order" state.
+    if (!this.errorMessage) {
+      this.errorMessage = this.translate.instant('checkout.checkoutFailed');
+    }
+    this.announceAssertive(this.errorMessage);
+    this.focusGlobalError();
+    this.detectChangesSafe();
+  }
+
+  private handleCheckoutRequestError(err: any): void {
+    this.placing = false;
+    const isTimeout = String(err?.name || '').toLowerCase().includes('timeout');
+    this.errorMessage = isTimeout
+      ? this.translate.instant('checkout.checkoutFailed')
+      : err?.error?.detail || this.translate.instant('checkout.checkoutFailed');
+    this.announceAssertive(this.errorMessage);
+    this.focusGlobalError();
+    this.detectChangesSafe();
+  }
+
+  private submitCheckoutRequest(endpoint: string, payload: Record<string, unknown>): void {
+    const checkoutTimeoutMs = 20_000;
+    let settled = false;
+
+    this.api
+      .post<CheckoutStartResponse>(endpoint, payload, this.cartApi.headers())
+      .pipe(
+        timeout({ first: checkoutTimeoutMs }),
+        finalize(() => {
+          this.zone.run(() => {
+            this.handleCheckoutFinalize(settled);
+          });
+        })
+      )
+      .subscribe({
+        next: (res) => {
+          this.zone.run(() => {
+            settled = true;
+            this.handleCheckoutStartResponse(res);
+          });
+        },
+        error: (err) => {
+          this.zone.run(() => {
+            settled = true;
+            this.handleCheckoutRequestError(err);
+          });
+        },
+      });
   }
 
   private hydrateCartAndQuote(res: CartResponse): void {
@@ -2089,6 +2238,9 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       shipping_method_id: null,
       promo_code: this.promo || null,
       save_address: this.saveAddress,
+      payment_method: this.paymentMethod,
+      accept_terms: this.acceptTerms,
+      accept_privacy: this.acceptPrivacy,
       courier: this.courier,
       delivery_type: this.deliveryType,
       locker_id: this.deliveryType === 'locker' ? this.locker?.id ?? null : null,
@@ -2108,86 +2260,57 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       body['billing_region'] = this.billing.region || null;
       body['billing_postal_code'] = this.billing.postal;
       body['billing_country'] = this.billing.country || this.address.country || 'RO';
-	    }
-	    body['payment_method'] = this.paymentMethod;
-      body['accept_terms'] = this.acceptTerms;
-      body['accept_privacy'] = this.acceptPrivacy;
-	    this.api
-	      .post<{
-	        order_id: string;
-	        reference_code?: string;
-        paypal_order_id?: string | null;
-        paypal_approval_url?: string | null;
-        netopia_ntp_id?: string | null;
-        netopia_payment_url?: string | null;
-        stripe_session_id?: string | null;
-        stripe_checkout_url?: string | null;
-        payment_method?: string;
-      }>(
-        '/orders/checkout',
-        body,
-        this.cartApi.headers()
-      )
-      .subscribe({
-        next: (res) => {
-          const method = (res.payment_method as CheckoutPaymentMethod | undefined) ?? this.paymentMethod;
-          if (this.paymentMethod === 'paypal') {
-            this.persistPayPalPendingSummary(
-              this.buildSuccessSummary(res.order_id, res.reference_code ?? null, method)
-            );
-            if (this.saveAddress) this.persistAddress();
-            this.placing = false;
-            if (res.paypal_approval_url) {
-              this.checkoutFlowCompleted = true;
-              window.location.assign(res.paypal_approval_url);
-              return;
-            }
-            this.errorMessage = this.translate.instant('checkout.paymentNotReady');
-            return;
-          }
-          if (this.paymentMethod === 'stripe') {
-            this.persistStripePendingSummary(this.buildSuccessSummary(res.order_id, res.reference_code ?? null, method));
-            if (this.saveAddress) this.persistAddress();
-            this.placing = false;
-            if (res.stripe_checkout_url) {
-              this.checkoutFlowCompleted = true;
-              window.location.assign(res.stripe_checkout_url);
-              return;
-            }
-            this.errorMessage = this.translate.instant('checkout.paymentNotReady');
-            return;
-          }
-          if (this.paymentMethod === 'netopia') {
-            this.persistNetopiaPendingSummary(this.buildSuccessSummary(res.order_id, res.reference_code ?? null, method));
-            if (this.saveAddress) this.persistAddress();
-            this.placing = false;
-            if (res.netopia_payment_url) {
-              this.checkoutFlowCompleted = true;
-              window.location.assign(res.netopia_payment_url);
-              return;
-            }
-            this.errorMessage = this.translate.instant('checkout.paymentNotReady');
-            return;
-          }
-          if (this.paymentMethod === 'cod') {
-            this.persistSuccessSummary(
-              this.buildSuccessSummary(res.order_id, res.reference_code ?? null, method)
-            );
-            if (this.saveAddress) this.persistAddress();
-            this.cart.clear();
-            this.placing = false;
-            this.checkoutFlowCompleted = true;
-            void this.router.navigate(['/checkout/success']);
-            return;
-          }
-          this.errorMessage = this.translate.instant('checkout.paymentNotReady');
-          this.placing = false;
-        },
-        error: (err) => {
-          this.errorMessage = err?.error?.detail || this.translate.instant('checkout.checkoutFailed');
-          this.placing = false;
-        }
-      });
+    }
+
+    this.submitCheckoutRequest('/orders/checkout', body);
+  }
+
+  private submitGuestCheckout(): void {
+    const preferredLanguage = (this.translate.currentLang || 'en') === 'ro' ? 'ro' : 'en';
+    const payload: Record<string, unknown> = {
+      name: this.address.name,
+      email: this.address.email,
+      phone: this.effectivePhoneE164(),
+      invoice_company: this.invoiceEnabled ? (this.invoiceCompany || '').trim() || null : null,
+      invoice_vat_id: this.invoiceEnabled ? (this.invoiceVatId || '').trim() || null : null,
+      line1: this.address.line1,
+      line2: this.address.line2 || null,
+      city: this.address.city,
+      region: this.address.region || null,
+      postal_code: this.address.postal,
+      country: this.address.country || 'RO',
+      billing_line1: this.billingSameAsShipping ? null : this.billing.line1,
+      billing_line2: this.billingSameAsShipping ? null : this.billing.line2 || null,
+      billing_city: this.billingSameAsShipping ? null : this.billing.city,
+      billing_region: this.billingSameAsShipping ? null : this.billing.region || null,
+      billing_postal_code: this.billingSameAsShipping ? null : this.billing.postal,
+      billing_country: this.billingSameAsShipping ? null : this.billing.country || this.address.country || 'RO',
+      shipping_method_id: null,
+      save_address: this.saveAddress,
+      payment_method: this.paymentMethod,
+      accept_terms: this.acceptTerms,
+      accept_privacy: this.acceptPrivacy,
+      create_account: this.guestCreateAccount,
+      courier: this.courier,
+      delivery_type: this.deliveryType,
+      locker_id: this.deliveryType === 'locker' ? this.locker?.id ?? null : null,
+      locker_name: this.deliveryType === 'locker' ? this.locker?.name ?? null : null,
+      locker_address: this.deliveryType === 'locker' ? this.locker?.address ?? null : null,
+      locker_lat: this.deliveryType === 'locker' ? this.locker?.lat ?? null : null,
+      locker_lng: this.deliveryType === 'locker' ? this.locker?.lng ?? null : null,
+    };
+
+    if (this.guestCreateAccount) {
+      payload['username'] = this.guestUsername;
+      payload['password'] = this.guestPassword;
+      payload['first_name'] = this.guestFirstName;
+      payload['middle_name'] = this.guestMiddleName || null;
+      payload['last_name'] = this.guestLastName;
+      payload['date_of_birth'] = this.guestDob;
+      payload['preferred_language'] = preferredLanguage;
+    }
+
+    this.submitCheckoutRequest('/orders/guest-checkout', payload);
   }
 
   private clearGuestResendCooldown(): void {
@@ -2390,128 +2513,5 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     this.consentModalOpen = false;
     this.consentModalSlug = '';
     this.consentModalTarget = null;
-  }
-
-  private submitGuestCheckout(): void {
-    const preferredLanguage = (this.translate.currentLang || 'en') === 'ro' ? 'ro' : 'en';
-    const payload: Record<string, unknown> = {
-      name: this.address.name,
-      email: this.address.email,
-      phone: this.effectivePhoneE164(),
-      invoice_company: this.invoiceEnabled ? (this.invoiceCompany || '').trim() || null : null,
-      invoice_vat_id: this.invoiceEnabled ? (this.invoiceVatId || '').trim() || null : null,
-      line1: this.address.line1,
-      line2: this.address.line2 || null,
-      city: this.address.city,
-      region: this.address.region || null,
-      postal_code: this.address.postal,
-      country: this.address.country || 'RO',
-      billing_line1: this.billingSameAsShipping ? null : this.billing.line1,
-      billing_line2: this.billingSameAsShipping ? null : this.billing.line2 || null,
-      billing_city: this.billingSameAsShipping ? null : this.billing.city,
-      billing_region: this.billingSameAsShipping ? null : this.billing.region || null,
-      billing_postal_code: this.billingSameAsShipping ? null : this.billing.postal,
-      billing_country: this.billingSameAsShipping ? null : this.billing.country || this.address.country || 'RO',
-      shipping_method_id: null,
-      save_address: this.saveAddress,
-      payment_method: this.paymentMethod,
-      accept_terms: this.acceptTerms,
-      accept_privacy: this.acceptPrivacy,
-      create_account: this.guestCreateAccount,
-      courier: this.courier,
-      delivery_type: this.deliveryType,
-      locker_id: this.deliveryType === 'locker' ? this.locker?.id ?? null : null,
-      locker_name: this.deliveryType === 'locker' ? this.locker?.name ?? null : null,
-      locker_address: this.deliveryType === 'locker' ? this.locker?.address ?? null : null,
-      locker_lat: this.deliveryType === 'locker' ? this.locker?.lat ?? null : null,
-      locker_lng: this.deliveryType === 'locker' ? this.locker?.lng ?? null : null,
-    };
-
-    if (this.guestCreateAccount) {
-      payload['username'] = this.guestUsername;
-      payload['password'] = this.guestPassword;
-      payload['first_name'] = this.guestFirstName;
-      payload['middle_name'] = this.guestMiddleName || null;
-      payload['last_name'] = this.guestLastName;
-      payload['date_of_birth'] = this.guestDob;
-      payload['preferred_language'] = preferredLanguage;
-    }
-
-    this.api
-      .post<{
-        order_id: string;
-        reference_code?: string;
-        paypal_order_id?: string | null;
-        paypal_approval_url?: string | null;
-        netopia_ntp_id?: string | null;
-        netopia_payment_url?: string | null;
-        stripe_session_id?: string | null;
-        stripe_checkout_url?: string | null;
-        payment_method?: string;
-      }>(
-        '/orders/guest-checkout',
-        payload,
-        this.cartApi.headers()
-      )
-      .subscribe({
-        next: (res) => {
-          const method = (res.payment_method as CheckoutPaymentMethod | undefined) ?? this.paymentMethod;
-          if (this.paymentMethod === 'paypal') {
-            this.persistPayPalPendingSummary(
-              this.buildSuccessSummary(res.order_id, res.reference_code ?? null, method)
-            );
-            if (this.saveAddress) this.persistAddress();
-            this.placing = false;
-            if (res.paypal_approval_url) {
-              this.checkoutFlowCompleted = true;
-              window.location.assign(res.paypal_approval_url);
-              return;
-            }
-            this.errorMessage = this.translate.instant('checkout.paymentNotReady');
-            return;
-          }
-          if (this.paymentMethod === 'stripe') {
-            this.persistStripePendingSummary(this.buildSuccessSummary(res.order_id, res.reference_code ?? null, method));
-            if (this.saveAddress) this.persistAddress();
-            this.placing = false;
-            if (res.stripe_checkout_url) {
-              this.checkoutFlowCompleted = true;
-              window.location.assign(res.stripe_checkout_url);
-              return;
-            }
-            this.errorMessage = this.translate.instant('checkout.paymentNotReady');
-            return;
-          }
-          if (this.paymentMethod === 'netopia') {
-            this.persistNetopiaPendingSummary(this.buildSuccessSummary(res.order_id, res.reference_code ?? null, method));
-            if (this.saveAddress) this.persistAddress();
-            this.placing = false;
-            if (res.netopia_payment_url) {
-              this.checkoutFlowCompleted = true;
-              window.location.assign(res.netopia_payment_url);
-              return;
-            }
-            this.errorMessage = this.translate.instant('checkout.paymentNotReady');
-            return;
-          }
-          if (this.paymentMethod === 'cod') {
-            this.persistSuccessSummary(
-              this.buildSuccessSummary(res.order_id, res.reference_code ?? null, method)
-            );
-            if (this.saveAddress) this.persistAddress();
-            this.placing = false;
-            this.cart.clear();
-            this.checkoutFlowCompleted = true;
-            void this.router.navigate(['/checkout/success']);
-            return;
-          }
-          this.errorMessage = this.translate.instant('checkout.paymentNotReady');
-          this.placing = false;
-        },
-        error: (err) => {
-          this.errorMessage = err?.error?.detail || this.translate.instant('checkout.checkoutFailed');
-          this.placing = false;
-        }
-      });
   }
 }

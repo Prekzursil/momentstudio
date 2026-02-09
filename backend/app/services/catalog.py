@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import csv
 import io
 import json
-import random
+import secrets
 import string
 import uuid
 
@@ -441,7 +441,7 @@ async def _ensure_sku_unique(session: AsyncSession, sku: str, exclude_id: uuid.U
 async def _generate_unique_sku(session: AsyncSession, base: str) -> str:
     slug_part = base.replace("-", "").upper()[:8] or "SKU"
     while True:
-        suffix = "".join(random.choices(string.digits, k=4))
+        suffix = "".join(secrets.choice(string.digits) for _ in range(4))
         candidate = f"{slug_part}-{suffix}"
         if not await _get_product_by_sku(session, candidate):
             return candidate
@@ -538,7 +538,7 @@ async def auto_publish_due_sales(session: AsyncSession, *, now: datetime | None 
         .where(clause)
         .values(status=ProductStatus.published, publish_at=func.coalesce(Product.publish_at, now_dt))
     )
-    updated = int(res.rowcount or 0)
+    updated = int(getattr(res, "rowcount", 0) or 0)
     if updated:
         await session.commit()
     return updated
@@ -563,7 +563,7 @@ async def apply_due_product_schedules(session: AsyncSession, *, now: datetime | 
             publish_scheduled_for=None,
         )
     )
-    updated += int(res.rowcount or 0)
+    updated += int(getattr(res, "rowcount", 0) or 0)
 
     unpublish_clause = and_(
         Product.is_deleted.is_(False),
@@ -576,7 +576,7 @@ async def apply_due_product_schedules(session: AsyncSession, *, now: datetime | 
         .where(unpublish_clause)
         .values(status=ProductStatus.archived, unpublish_scheduled_for=None)
     )
-    updated += int(res.rowcount or 0)
+    updated += int(getattr(res, "rowcount", 0) or 0)
 
     if updated:
         await session.commit()

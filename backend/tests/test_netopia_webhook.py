@@ -2,6 +2,7 @@ import asyncio
 import base64
 import hashlib
 import json
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Callable, Dict
 from uuid import UUID, uuid4
@@ -10,8 +11,8 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi.testclient import TestClient
-from jose import jwt
-from jose.exceptions import JWTError
+import jwt
+from jwt.exceptions import PyJWTError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import selectinload
@@ -65,6 +66,7 @@ def _sign_verification_token(*, private_pem: str, pos_signature: str, payload: b
         "iss": "NETOPIA Payments",
         "aud": [pos_signature],
         "sub": payload_hash,
+        "iat": int(datetime.now(timezone.utc).timestamp()),
     }
     return jwt.encode(claims, private_pem, algorithm="RS512")
 
@@ -202,7 +204,7 @@ def test_netopia_webhook_uses_env_specific_keys(monkeypatch: pytest.MonkeyPatch,
     assert body["errorType"] == 0
 
     # Sanity check: the legacy keypair would not validate the token we signed above.
-    with pytest.raises(JWTError):
+    with pytest.raises(PyJWTError):
         jwt.decode(token, public_legacy, algorithms=["RS512"], options={"verify_aud": False})
 
 

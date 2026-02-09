@@ -14,8 +14,8 @@ from cryptography.hazmat.primitives.asymmetric import types as asymmetric_types
 from fastapi import HTTPException, status
 import httpx
 import simplejson
-from jose import jwt
-from jose.exceptions import JWTError
+import jwt
+from jwt.exceptions import PyJWTError
 
 from app.core.config import settings
 
@@ -357,23 +357,22 @@ def verify_ipn(*, verification_token: str, payload: bytes) -> dict[str, Any]:
 
     alg = (settings.netopia_jwt_alg or "RS512").strip().upper() or "RS512"
 
+    max_age_seconds = max(60, int(getattr(settings, "netopia_ipn_max_age_seconds", 60 * 60 * 24)))
+    skew_seconds = 5 * 60
+
     try:
         claims = jwt.decode(
             verification_token,
             public_key,
             algorithms=[alg],
-            options={
-                "verify_aud": False,
-                "verify_exp": False,
-                "verify_nbf": False,
-                "verify_iat": False,
-            },
+            audience=pos_signature,
+            issuer="NETOPIA Payments",
+            leeway=skew_seconds,
+            options={"require": ["sub", "aud", "iss", "iat"]},
         )
-    except JWTError as exc:
+    except PyJWTError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Netopia signature") from exc
 
-    max_age_seconds = max(60, int(getattr(settings, "netopia_ipn_max_age_seconds", 60 * 60 * 24)))
-    skew_seconds = 5 * 60
     now_ts = datetime.now(timezone.utc).timestamp()
     for key in ("iat", "nbf", "exp"):
         value = claims.get(key)

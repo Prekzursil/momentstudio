@@ -59,6 +59,9 @@ def _is_exempt(request: Request, bypass_token: str | None) -> bool:
     path = request.url.path
     if path.startswith("/api/v1/health"):
         return True
+    # Allow admins to manage the system (including disabling maintenance mode) while maintenance is enabled.
+    if path.startswith("/api/v1/admin/"):
+        return True
     # Maintenance mode must not block payment webhooks/IPNs. Gate storefront traffic, but keep
     # gateway callbacks reachable so order state stays consistent.
     if path in {
