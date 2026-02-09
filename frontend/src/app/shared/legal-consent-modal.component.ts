@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, OnChanges, OnDestroy, Output, SimpleChanges, ViewChild } from '@angular/core';
+import { Component, EventEmitter, Input, OnChanges, OnDestroy, Output, SecurityContext, SimpleChanges, ViewChild } from '@angular/core';
+import { DomSanitizer } from '@angular/platform-browser';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Subscription } from 'rxjs';
 import { ApiService } from '../core/api.service';
@@ -57,7 +58,10 @@ interface ContentBlock {
                 <ng-container [ngSwitch]="b.type">
                   <div *ngSwitchCase="'text'" class="grid gap-2">
                     <h2 *ngIf="b.title" class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ b.title }}</h2>
-                    <div class="markdown text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="b.body_html"></div>
+                    <div
+                      class="markdown text-slate-700 leading-relaxed dark:text-slate-200"
+                      [innerHTML]="sanitizeHtml(b.body_html)"
+                    ></div>
                   </div>
 
                   <div *ngSwitchCase="'image'" class="grid gap-2">
@@ -113,7 +117,7 @@ interface ContentBlock {
             [style.object-position]="firstImageFocal()"
             loading="lazy"
           />
-          <div class="markdown text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="bodyHtml"></div>
+          <div class="markdown text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="sanitizeHtml(bodyHtml)"></div>
         </ng-template>
       </div>
     </app-modal>
@@ -138,7 +142,12 @@ export class LegalConsentModalComponent implements OnChanges, OnDestroy {
   private needsScroll = false;
   private langSub?: Subscription;
 
-  constructor(private api: ApiService, private translate: TranslateService, private markdown: MarkdownService) {
+  constructor(
+    private api: ApiService,
+    private translate: TranslateService,
+    private markdown: MarkdownService,
+    private sanitizer: DomSanitizer
+  ) {
     this.langSub = this.translate.onLangChange.subscribe(() => {
       if (this.open) this.load();
     });
@@ -180,6 +189,10 @@ export class LegalConsentModalComponent implements OnChanges, OnDestroy {
 
   confirmDisabled(): boolean {
     return this.loading || Boolean(this.error);
+  }
+
+  sanitizeHtml(value: string | null | undefined): string {
+    return this.sanitizer.sanitize(SecurityContext.HTML, value ?? '') || '';
   }
 
   handleAccept(): void {
