@@ -57,6 +57,7 @@ export class VerifyEmailComponent implements OnInit {
   kind: VerifyKind = 'primary';
   subtitle = '';
   errorMessage = '';
+  private readonly allowedNextPrefixes = ['/checkout', '/account'];
 
   constructor(
     private route: ActivatedRoute,
@@ -147,7 +148,12 @@ export class VerifyEmailComponent implements OnInit {
       void this.router.navigateByUrl(fallback);
       return;
     }
-    if (!target.startsWith('/') || target.startsWith('//')) {
+    if (!target.startsWith('/') || target.startsWith('//') || target.includes('\\')) {
+      void this.router.navigateByUrl(fallback);
+      return;
+    }
+    const allowed = this.allowedNextPrefixes.some((prefix) => target === prefix || target.startsWith(`${prefix}/`) || target.startsWith(`${prefix}?`));
+    if (!allowed) {
       void this.router.navigateByUrl(fallback);
       return;
     }

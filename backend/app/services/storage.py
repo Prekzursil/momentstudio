@@ -311,9 +311,9 @@ def _sanitize_svg(content: bytes) -> bytes:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported SVG content")
 
     try:
-        from defusedxml import ElementTree as ET
+        from defusedxml import ElementTree
 
-        root = ET.fromstring(raw.decode("utf-8", errors="replace"))
+        root = ElementTree.fromstring(raw.decode("utf-8", errors="replace"))
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid SVG") from exc
 
@@ -393,7 +393,7 @@ def _sanitize_svg(content: bytes) -> bytes:
         el.text = cleaned
 
     try:
-        sanitized = ET.tostring(root, encoding="utf-8", method="xml")
+        sanitized = ElementTree.tostring(root, encoding="utf-8", method="xml")
     except Exception as exc:  # pragma: no cover
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid SVG") from exc
     return sanitized
