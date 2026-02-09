@@ -2491,7 +2491,7 @@ async def admin_upload_shipping_label(
             file,
             subdir=f"shipping-labels/{order_id}",
             allowed_content_types=("application/pdf", "image/png", "image/jpeg", "image/webp"),
-            max_bytes=10 * 1024 * 1024,
+            max_bytes=None,
         )
     )
     now = datetime.now(timezone.utc)

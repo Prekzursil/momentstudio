@@ -4,7 +4,7 @@ import asyncio
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from typing import Final
-import xml.etree.ElementTree as ET
+from defusedxml.ElementTree import fromstring
 
 import httpx
 
@@ -30,7 +30,7 @@ _LOCK = asyncio.Lock()
 
 
 def _parse_bnr_rates(xml_text: str) -> FxRates:
-    root = ET.fromstring(xml_text)
+    root = fromstring(xml_text)
     cube = root.find(".//{*}Cube")
     if cube is None:
         raise ValueError("Missing Cube element")

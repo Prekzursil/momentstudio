@@ -2,7 +2,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 import bcrypt
-from jose import JWTError, jwt
+import jwt
+from jwt.exceptions import PyJWTError
 
 from app.core.config import settings
 
@@ -116,7 +117,7 @@ def create_webauthn_token(
 def decode_token(token: str) -> Optional[dict[str, Any]]:
     try:
         return jwt.decode(token, settings.secret_key, algorithms=[settings.jwt_algorithm])
-    except JWTError:
+    except PyJWTError:
         return None
 
 

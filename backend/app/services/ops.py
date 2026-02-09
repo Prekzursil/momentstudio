@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from contextlib import suppress
 from pathlib import Path
+from typing import Awaitable, cast
 from uuid import UUID
 
 from fastapi import BackgroundTasks, HTTPException, status
@@ -605,7 +606,7 @@ async def get_diagnostics() -> OpsDiagnosticsRead:
             )
         else:
             try:
-                pong = await asyncio.wait_for(client.ping(), timeout=0.5)
+                pong = await asyncio.wait_for(cast(Awaitable[bool], client.ping()), timeout=0.5)
                 ok = bool(pong)
                 redis_check = OpsDiagnosticsCheck(status="ok", configured=True, healthy=ok, message=None if ok else "Redis PING failed.")
             except Exception as exc:

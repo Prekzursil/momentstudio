@@ -93,7 +93,7 @@ showing what is already implemented.
 - [x] Netopia: use `Decimal` for amounts and add basic IPN time/max-age validation to reduce replay risk.
 - [x] Prod safety: refuse to start with default secrets/bypass tokens or insecure cookie settings when `ENVIRONMENT=production`.
 - [x] Frontend security: prep for strict CSP (move inline theme bootstrap script to external file) and set CSP headers at edge.
-- [x] Infra: set `client_max_body_size` in `frontend/nginx/default.conf` (align with backend upload limit).
+- [x] Infra: set `client_max_body_size` defaults in `frontend/nginx/default.conf` (cap customer uploads; allow large admin uploads).
 - [x] Frontend: stop relying on backend error `detail` strings in guards; use error `code` and translate to UX.
 - [x] Auth UX: include a reset link in password reset emails and auto-fill the token from URL query param.
 - [x] Ops: restrict `/api/v1/metrics` to admin/internal network (or disable in prod).
@@ -105,6 +105,10 @@ showing what is already implemented.
 - [x] Coupons v2: validate marketing opt-in before committing coupon changes when `send_email=true` (avoid partial success).
 - [x] Email: add RFC 8058 one-click unsubscribe headers (`List-Unsubscribe-Post`).
 - [x] Newsletter: auto-unsubscribe landing page on load and return HTML on API GET (fallback UX when clients open the unsubscribe URL).
+- [x] Checkout: prevent stuck “Placing order…” after backend errors (reset busy state + show inline error card).
+- [x] Frontend infra: serve `manifest.webmanifest` with the correct MIME type and avoid duplicate security headers between layers.
+- [x] Backend deps: upgrade core packages to clear `pip-audit` CVEs and migrate JWT from `python-jose` → `PyJWT`.
+- [x] Admin uploads: remove strict file size caps (stream uploads to disk; allow large admin uploads in local nginx).
 ### Admin Dashboard & Subpages — Curated Improvements (50)
 - [x] Admin Products: cleanup pending timers on destroy – Clear debounce/poll timeouts and cancel in-flight searches to prevent stale UI updates.
 - [x] Admin Tables: translate selection a11y labels – Replace hard-coded admin `aria-label`s (select all/row/base price/stock qty) with RO/EN i18n keys.

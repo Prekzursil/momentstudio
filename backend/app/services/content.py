@@ -530,7 +530,7 @@ async def add_image(session: AsyncSession, block: ContentBlock, file, actor_id: 
             storage.save_upload,
             file,
             allowed_content_types=("image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"),
-            max_bytes=5 * 1024 * 1024,
+            max_bytes=None,
             generate_thumbnails=True,
         )
     )

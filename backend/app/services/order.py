@@ -3,7 +3,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from collections import defaultdict
 from typing import Sequence
 from uuid import UUID
-import random
+import secrets
 import string
 import re
 
@@ -1827,7 +1827,7 @@ async def delete_order_shipment(
 async def _generate_reference_code(session: AsyncSession, length: int = 10) -> str:
     chars = string.ascii_uppercase + string.digits
     while True:
-        candidate = "".join(random.choices(chars, k=length))
+        candidate = "".join(secrets.choice(chars) for _ in range(length))
         result = await session.execute(select(Order).where(Order.reference_code == candidate))
         if not result.scalar_one_or_none():
             return candidate

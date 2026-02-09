@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from jose import jwt
+import jwt
 
 from app.core.config import settings
 from app.core.security import decode_token
@@ -24,4 +24,3 @@ def validate_analytics_token(*, token: str, session_id: str) -> bool:
         return False
     cleaned_session_id = (session_id or "").strip()[:100]
     return str(payload.get("session_id") or "").strip()[:100] == cleaned_session_id
-

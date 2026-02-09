@@ -957,7 +957,7 @@ async def resolve_comment_flags(session: AsyncSession, *, comment_id: UUID, acto
         .values(resolved_at=now, resolved_by=actor.id)
     )
     await session.commit()
-    return int(result.rowcount or 0)
+    return int(getattr(result, "rowcount", 0) or 0)
 
 
 async def list_comment_subscription_recipients(
