@@ -49,7 +49,7 @@ export interface CartItemAddRequest {
   quantity: number;
 }
 
-const SESSION_KEY = 'cart_session_id';
+const CART_SESSION_ID_STORAGE_ITEM = 'cart_session_id';
 
 @Injectable({ providedIn: 'root' })
 export class CartApi {
@@ -57,10 +57,10 @@ export class CartApi {
 
   getSessionId(): string {
     if (typeof localStorage === 'undefined') return '';
-    const existing = localStorage.getItem(SESSION_KEY);
+    const existing = localStorage.getItem(CART_SESSION_ID_STORAGE_ITEM);
     if (existing) return existing;
     const newId = `guest-${crypto.randomUUID?.() || Date.now()}`;
-    localStorage.setItem(SESSION_KEY, newId);
+    localStorage.setItem(CART_SESSION_ID_STORAGE_ITEM, newId);
     return newId;
   }
 
