@@ -18,7 +18,11 @@ export type PageHeaderCrumb = {
 
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div class="grid gap-1 min-w-0">
-          <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">
+          <h1
+            class="text-2xl font-semibold text-slate-900 dark:text-slate-50"
+            data-route-heading="true"
+            tabindex="-1"
+          >
             {{ title || (titleKey ? (titleKey | translate) : '') }}
           </h1>
           <p *ngIf="subtitle || subtitleKey" class="text-sm text-slate-600 dark:text-slate-300">
@@ -40,4 +44,3 @@ export class PageHeaderComponent {
   @Input() subtitleKey = '';
   @Input() crumbs: PageHeaderCrumb[] = [];
 }
-

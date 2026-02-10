@@ -9,7 +9,11 @@ import { TranslateModule } from '@ngx-translate/core';
   template: `
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div class="grid gap-1 min-w-0">
-        <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">
+        <h1
+          class="text-2xl font-semibold text-slate-900 dark:text-slate-50"
+          data-route-heading="true"
+          tabindex="-1"
+        >
           {{ titleKey | translate }}
         </h1>
         <p *ngIf="hintKey" class="text-sm text-slate-600 dark:text-slate-300">
@@ -59,4 +63,3 @@ export class AdminPageHeaderComponent {
     details.open = false;
   }
 }
-

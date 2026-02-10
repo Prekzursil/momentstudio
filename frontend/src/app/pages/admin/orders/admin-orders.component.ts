@@ -14,6 +14,8 @@ import { extractRequestId } from '../../../shared/http-error';
 import { InputComponent } from '../../../shared/input.component';
 import { HelpPanelComponent } from '../../../shared/help-panel.component';
 import { SkeletonComponent } from '../../../shared/skeleton.component';
+import { ActionBarComponent } from '../../../shared/action-bar.component';
+import { FormSectionComponent } from '../../../shared/form-section.component';
 import { ToastService } from '../../../core/toast.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 import { AdminOrderListItem, AdminOrderListResponse, AdminOrderTagStat, AdminOrdersService } from '../../../core/admin-orders.service';
@@ -132,6 +134,8 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
 	    InputComponent,
 	    HelpPanelComponent,
 	    SkeletonComponent,
+      ActionBarComponent,
+      FormSectionComponent,
 	    LocalizedCurrencyPipe,
 	    TableLayoutModalComponent,
       AdminPageHeaderComponent
@@ -182,6 +186,7 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
           </ul>
         </app-help-panel>
 
+          <app-form-section [titleKey]="'adminUi.orders.filtersTitle'" [descriptionKey]="'adminUi.orders.filtersHint'">
 	        <div class="grid gap-3 lg:grid-cols-[1fr_220px_220px_220px_220px_auto] items-end">
 	          <app-input [label]="'adminUi.orders.search' | translate" [(value)]="q"></app-input>
 
@@ -271,7 +276,7 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
             />
           </label>
 
-	          <div class="flex items-center gap-2">
+	          <div class="hidden sm:flex items-center gap-2">
 	            <app-button size="sm" [label]="'adminUi.actions.refresh' | translate" (action)="applyFilters()"></app-button>
 	            <app-button
 	              size="sm"
@@ -281,6 +286,16 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
 	            ></app-button>
 	          </div>
 	        </div>
+
+          <app-action-bar class="sm:hidden" [stickyOnMobile]="false">
+            <app-button size="sm" [label]="'adminUi.actions.refresh' | translate" (action)="applyFilters()"></app-button>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.actions.reset' | translate"
+              (action)="resetFilters()"
+            ></app-button>
+          </app-action-bar>
 
           <div class="flex flex-wrap items-end justify-between gap-3">
             <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 w-full sm:w-auto">
@@ -335,6 +350,7 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
               ></app-button>
             </div>
           </div>
+          </app-form-section>
 
 	        <app-error-state
             *ngIf="error()"
@@ -603,7 +619,66 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
               </div>
             </div>
 
-          <div *ngIf="orders().length > 0" class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+          <div *ngIf="orders().length > 0" class="grid gap-3 md:hidden">
+            <article
+              *ngFor="let order of orders(); trackBy: trackOrderId"
+              class="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <h3 class="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">
+                    {{ order.reference_code || (order.id | slice: 0:8) }}
+                  </h3>
+                  <div class="text-xs text-slate-600 dark:text-slate-300 truncate">{{ customerLabel(order) }}</div>
+                  <div class="mt-1 flex flex-wrap gap-1">
+                    <ng-container *ngFor="let tagValue of order.tags || []">
+                      <span
+                        class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] border"
+                        [ngClass]="tagChipColorClass(tagValue)"
+                      >
+                        {{ tagLabel(tagValue) }}
+                      </span>
+                    </ng-container>
+                  </div>
+                </div>
+
+                <span
+                  [ngClass]="statusPillClass(order.status)"
+                  class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
+                >
+                  {{ ('adminUi.orders.' + order.status) | translate }}
+                </span>
+              </div>
+
+              <div class="mt-3 grid gap-1 text-xs text-slate-600 dark:text-slate-300">
+                <div>
+                  <span class="font-semibold">{{ 'adminUi.orders.table.total' | translate }}:</span>
+                  {{ order.total_amount | localizedCurrency : order.currency }}
+                </div>
+                <div>
+                  <span class="font-semibold">{{ 'adminUi.orders.table.created' | translate }}:</span>
+                  {{ order.created_at | date: 'short' }}
+                </div>
+              </div>
+
+              <app-action-bar class="mt-3" [stickyOnMobile]="false">
+                <label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                  <input
+                    type="checkbox"
+                    [checked]="selectedIds.has(order.id)"
+                    (change)="toggleSelected(order.id, $any($event.target).checked)"
+                    [disabled]="bulkBusy"
+                    [attr.aria-label]="'adminUi.orders.a11y.selectOrder' | translate: { ref: order.reference_code || (order.id | slice: 0:8) }"
+                  />
+                  {{ 'adminUi.actions.bulkActions' | translate }}
+                </label>
+
+                <app-button size="sm" variant="ghost" [label]="'adminUi.orders.view' | translate" (action)="open(order.id)"></app-button>
+              </app-action-bar>
+            </article>
+          </div>
+
+          <div *ngIf="orders().length > 0" class="hidden md:block overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
             <ng-template #ordersTableHeader>
               <tr>
                 <ng-container *ngFor="let colId of visibleColumnIds(); trackBy: trackColumnId" [ngSwitch]="colId">

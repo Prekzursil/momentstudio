@@ -2,7 +2,8 @@ import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
-import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
+import { PageHeaderComponent } from '../../../shared/page-header.component';
+import { FormSectionComponent } from '../../../shared/form-section.component';
 import { CmsEditorPrefsService } from '../shared/cms-editor-prefs.service';
 
 type ContentNavItem = {
@@ -13,14 +14,12 @@ type ContentNavItem = {
 @Component({
   selector: 'app-admin-content-layout',
   standalone: true,
-  imports: [CommonModule, RouterLink, RouterLinkActive, RouterOutlet, TranslateModule, BreadcrumbComponent],
+  imports: [CommonModule, RouterLink, RouterLinkActive, RouterOutlet, TranslateModule, PageHeaderComponent, FormSectionComponent],
   template: `
     <div class="grid gap-6">
-      <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
+      <app-page-header [crumbs]="crumbs" [titleKey]="'adminUi.content.title'" [subtitleKey]="'adminUi.content.subtitle'"></app-page-header>
 
-      <div class="grid gap-2">
-        <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.content.title' | translate }}</h1>
-        <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.content.subtitle' | translate }}</p>
+      <app-form-section [titleKey]="'adminUi.content.workspace.title'" [descriptionKey]="'adminUi.content.workspace.hint'">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <nav class="flex flex-wrap gap-2" aria-label="Content sections">
             <a
@@ -194,7 +193,7 @@ type ContentNavItem = {
               : 'adminUi.content.editorMode.advancedHint') | translate
           }}
         </p>
-      </div>
+      </app-form-section>
 
       <router-outlet></router-outlet>
     </div>

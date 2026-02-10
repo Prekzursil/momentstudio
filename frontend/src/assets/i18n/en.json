@@ -3691,6 +3691,8 @@
         "deleted": "Deleted"
       },
       "form": {
+        "workflowTitle": "Product workflow",
+        "workflowHint": "Keep the essentials together: naming, pricing, stock, and publish readiness.",
         "slug": "Product URL",
         "slugAutoHint": "Auto-generated after save.",
         "slugHelp": "Auto-generated from the name. Used in the product link.",
@@ -4268,6 +4270,8 @@
         "updated_at": "Updated at"
       },
       "search": "Search",
+      "filtersTitle": "Order filters",
+      "filtersHint": "Use filters and saved views to narrow large order sets quickly.",
       "statusFilter": "Status",
       "sla": {
         "filter": "SLA",
@@ -4361,6 +4365,10 @@
       "detailTitle": "Order",
       "backToList": "Back to orders",
       "tracking": "Tracking",
+      "workflow": {
+        "title": "Order workflow",
+        "hint": "Update status, tracking, and shipping assets from one place."
+      },
       "updateStatus": "Update status",
       "trackingNumber": "Tracking number",
       "trackingUrl": "Tracking URL",
@@ -5009,6 +5017,10 @@
     "content": {
       "title": "Content",
       "subtitle": "Edit the homepage, pages, blog, and site settings.",
+      "workspace": {
+        "title": "Content workspace",
+        "hint": "Switch section, preview mode, and language without losing editor context."
+      },
       "editorMode": {
         "label": "Editor mode",
         "simple": "Simple",

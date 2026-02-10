@@ -3691,6 +3691,8 @@
         "deleted": "Șterse"
       },
       "form": {
+        "workflowTitle": "Flux produs",
+        "workflowHint": "Păstrează împreună elementele esențiale: denumire, preț, stoc și publicare.",
         "slug": "URL produs",
         "slugAutoHint": "Generat automat după salvare.",
         "slugHelp": "Se generează automat din nume. Folosit în linkul produsului.",
@@ -4268,6 +4270,8 @@
         "updated_at": "Actualizată la"
       },
       "search": "Caută",
+      "filtersTitle": "Filtre comenzi",
+      "filtersHint": "Folosește filtrele și vizualizările salvate pentru a restrânge rapid listele mari.",
       "statusFilter": "Status",
       "sla": {
         "filter": "SLA",
@@ -4361,6 +4365,10 @@
       "detailTitle": "Comandă",
       "backToList": "Înapoi la comenzi",
       "tracking": "Tracking",
+      "workflow": {
+        "title": "Flux comandă",
+        "hint": "Actualizează statusul, tracking-ul și documentele de livrare dintr-un singur loc."
+      },
       "updateStatus": "Actualizează status",
       "trackingNumber": "Număr tracking",
       "trackingUrl": "Link tracking",
@@ -5009,6 +5017,10 @@
     "content": {
       "title": "Conținut",
       "subtitle": "Editează pagina de acasă, paginile, blogul și setările.",
+      "workspace": {
+        "title": "Spațiu de lucru conținut",
+        "hint": "Schimbă secțiunea, modul de previzualizare și limba fără să pierzi contextul de editare."
+      },
       "editorMode": {
         "label": "Mod editor",
         "simple": "Simplu",

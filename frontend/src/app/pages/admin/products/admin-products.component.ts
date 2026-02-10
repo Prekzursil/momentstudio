@@ -14,6 +14,8 @@ import { InputComponent } from '../../../shared/input.component';
 import { HelpPanelComponent } from '../../../shared/help-panel.component';
 import { ModalComponent } from '../../../shared/modal.component';
 import { SkeletonComponent } from '../../../shared/skeleton.component';
+import { ActionBarComponent } from '../../../shared/action-bar.component';
+import { FormSectionComponent } from '../../../shared/form-section.component';
 import {
   AdminProductDuplicateCheckResponse,
   AdminProductListItem,
@@ -254,6 +256,8 @@ type PriceHistoryChart = {
 	    HelpPanelComponent,
 	    ModalComponent,
 	    SkeletonComponent,
+      ActionBarComponent,
+      FormSectionComponent,
     LocalizedCurrencyPipe,
 	    TableLayoutModalComponent,
 	    AdminPageHeaderComponent,
@@ -970,11 +974,16 @@ type PriceHistoryChart = {
             </select>
           </label>
 
-	          <div class="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
+	          <div class="hidden sm:flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
 	            <app-button size="sm" [label]="'adminUi.actions.refresh' | translate" (action)="applyFilters()"></app-button>
 	            <app-button size="sm" variant="ghost" [label]="'adminUi.actions.reset' | translate" (action)="resetFilters()"></app-button>
 	          </div>
 	        </div>
+
+          <app-action-bar class="sm:hidden" [stickyOnMobile]="false">
+            <app-button size="sm" [label]="'adminUi.actions.refresh' | translate" (action)="applyFilters()"></app-button>
+            <app-button size="sm" variant="ghost" [label]="'adminUi.actions.reset' | translate" (action)="resetFilters()"></app-button>
+          </app-action-bar>
 
           <div class="flex flex-wrap items-end justify-between gap-3">
             <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 w-full sm:w-auto">
@@ -1053,7 +1062,105 @@ type PriceHistoryChart = {
             {{ 'adminUi.products.empty' | translate }}
           </div>
 
-          <div *ngIf="products().length > 0" class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+          <div *ngIf="products().length > 0" class="grid gap-3 md:hidden">
+            <article
+              *ngFor="let product of products(); trackBy: trackProductId"
+              class="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <h3 class="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">{{ product.name }}</h3>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ product.deleted_slug || product.slug }} · {{ product.sku }}
+                  </div>
+                  <div *ngIf="(product.missing_translations || []).length" class="mt-1 flex flex-wrap items-center gap-1">
+                    <span class="text-[10px] font-semibold text-amber-700 dark:text-amber-200">
+                      {{ 'adminUi.products.translations.missing' | translate }}
+                    </span>
+                    <span
+                      *ngFor="let lang of product.missing_translations || []"
+                      class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-900 dark:bg-amber-900/30 dark:text-amber-100"
+                    >
+                      {{ (lang || '').toUpperCase() }}
+                    </span>
+                  </div>
+                </div>
+
+                <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold" [ngClass]="statusPillClass(product.status)">
+                  {{ ('adminUi.status.' + product.status) | translate }}
+                </span>
+              </div>
+
+              <div class="mt-3 grid gap-1 text-xs text-slate-600 dark:text-slate-300">
+                <div>
+                  <span class="font-semibold">{{ 'adminUi.products.table.price' | translate }}:</span>
+                  {{ product.base_price | localizedCurrency : product.currency }}
+                </div>
+                <div>
+                  <span class="font-semibold">{{ 'adminUi.products.table.stock' | translate }}:</span>
+                  {{ product.stock_quantity }}
+                </div>
+                <div>
+                  <span class="font-semibold">{{ 'adminUi.products.table.category' | translate }}:</span>
+                  {{ product.category_name || '—' }}
+                </div>
+                <div>
+                  <span class="font-semibold">
+                    {{ view === 'deleted' ? ('adminUi.products.table.deletedAt' | translate) : ('adminUi.products.table.updated' | translate) }}:
+                  </span>
+                  {{ (view === 'deleted' ? (product.deleted_at || product.updated_at) : product.updated_at) | date: 'short' }}
+                </div>
+              </div>
+
+              <app-action-bar class="mt-3" [stickyOnMobile]="false">
+                <label
+                  *ngIf="view === 'active'"
+                  class="inline-flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200"
+                >
+                  <input
+                    type="checkbox"
+                    [checked]="selected.has(product.id)"
+                    (change)="toggleSelected(product.id, $event)"
+                    [disabled]="bulkBusy() || inlineBusy()"
+                    [attr.aria-label]="'adminUi.products.a11y.selectProduct' | translate: { name: product.name || product.slug }"
+                  />
+                  {{ 'adminUi.actions.bulkActions' | translate }}
+                </label>
+
+                <app-button
+                  *ngIf="view === 'deleted'"
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.actions.restore' | translate"
+                  (action)="restoreProduct(product)"
+                  [disabled]="restoringProductId() === product.id"
+                ></app-button>
+
+                <ng-container *ngIf="view === 'active'">
+                  <app-button
+                    *ngIf="product.status !== 'archived'"
+                    size="sm"
+                    variant="ghost"
+                    [label]="
+                      product.status === 'published'
+                        ? ('adminUi.products.quickStatus.unpublish' | translate)
+                        : ('adminUi.products.quickStatus.publish' | translate)
+                    "
+                    (action)="quickSetStatus(product, product.status === 'published' ? 'draft' : 'published')"
+                    [disabled]="bulkBusy() || inlineBusy() || quickStatusBusyId()"
+                  ></app-button>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.products.edit' | translate"
+                    (action)="edit(product.slug)"
+                  ></app-button>
+                </ng-container>
+              </app-action-bar>
+            </article>
+          </div>
+
+          <div *ngIf="products().length > 0" class="hidden md:block overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
             <ng-template #productsTableHeader>
               <tr>
                 <ng-container *ngFor="let colId of visibleColumnIds(); trackBy: trackColumnId" [ngSwitch]="colId">
@@ -1448,7 +1555,7 @@ type PriceHistoryChart = {
               </div>
             </div>
 
-            <div class="flex flex-wrap items-end justify-end gap-2">
+            <div class="hidden md:flex flex-wrap items-end justify-end gap-2">
               <label class="grid gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
                 {{ 'adminUi.products.table.status' | translate }}
                 <select
@@ -1489,6 +1596,45 @@ type PriceHistoryChart = {
           </div>
         </div>
 
+        <app-action-bar class="md:hidden" [stickyOnMobile]="true">
+          <label class="grid gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+            {{ 'adminUi.products.table.status' | translate }}
+            <select
+              class="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              [(ngModel)]="form.status"
+              [disabled]="editorSaving()"
+            >
+              <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
+              <option value="published">{{ 'adminUi.status.published' | translate }}</option>
+              <option value="archived">{{ 'adminUi.status.archived' | translate }}</option>
+            </select>
+          </label>
+
+          <app-button
+            size="sm"
+            [label]="editorSaving() ? ('adminUi.common.saving' | translate) : ('adminUi.products.form.save' | translate)"
+            (action)="save()"
+            [disabled]="editorSaving()"
+          ></app-button>
+
+          <app-button
+            *ngIf="editingSlug()"
+            size="sm"
+            variant="ghost"
+            [label]="'adminUi.products.wizard.publish' | translate"
+            (action)="startPublishWizard()"
+            [disabled]="editorSaving()"
+          ></app-button>
+
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="'adminUi.products.actions.cancel' | translate"
+            (action)="closeEditor()"
+            [disabled]="editorSaving()"
+          ></app-button>
+        </app-action-bar>
+
         <div *ngIf="editorError()" class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
           {{ editorError() }}
         </div>
@@ -1511,7 +1657,12 @@ type PriceHistoryChart = {
           (publishNow)="wizardPublishNow()"
         ></app-admin-products-editor-wizard>
 
-	        <div class="grid gap-3 md:grid-cols-2">
+	        <app-form-section
+            id="product-wizard-content"
+            [titleKey]="'adminUi.products.form.workflowTitle'"
+            [descriptionKey]="'adminUi.products.form.workflowHint'"
+          >
+            <div class="grid gap-3 md:grid-cols-2">
 	          <app-input
               [label]="'adminUi.products.table.name' | translate"
               [value]="form.name"
@@ -1957,6 +2108,7 @@ type PriceHistoryChart = {
             </div>
           </details>
 	        </div>
+          </app-form-section>
 
 	        <details
             data-ignore-dirty
