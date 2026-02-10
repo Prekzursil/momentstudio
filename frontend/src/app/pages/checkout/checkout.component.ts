@@ -4,7 +4,6 @@ import { FormsModule, NgForm } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ContainerComponent } from '../../layout/container.component';
 import { ButtonComponent } from '../../shared/button.component';
-import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
 import { CartStore, CartItem } from '../../core/cart.store';
 import { CartApi, CartResponse } from '../../core/cart.api';
@@ -27,6 +26,8 @@ import { LegalConsentModalComponent } from '../../shared/legal-consent-modal.com
 import { CheckoutPaymentStepComponent } from './checkout-payment-step.component';
 import { CheckoutPromoStepComponent } from './checkout-promo-step.component';
 import { CheckoutShippingStepComponent } from './checkout-shipping-step.component';
+import { PageHeaderComponent } from '../../shared/page-header.component';
+import { InlineErrorCardComponent } from '../../shared/inline-error-card.component';
 import { finalize, timeout } from 'rxjs/operators';
 
 type CheckoutShippingAddress = {
@@ -147,7 +148,6 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
 		    RouterLink,
 		    ContainerComponent,
 		    ButtonComponent,
-		    BreadcrumbComponent,
 		    LocalizedCurrencyPipe,
 		    TranslateModule,
 		    ModalComponent,
@@ -156,33 +156,40 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
         CheckoutShippingStepComponent,
         CheckoutPromoStepComponent,
         CheckoutPaymentStepComponent,
-		    ImgFallbackDirective
+		    ImgFallbackDirective,
+        PageHeaderComponent,
+        InlineErrorCardComponent
 		  ],
 	  template: `
 	      <app-container classes="py-10 grid gap-6">
-	        <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
+	        <app-page-header [crumbs]="crumbs" [titleKey]="'checkout.title'">
+            <span pageHeaderActions *ngIf="cartSyncPending()" class="text-xs text-slate-500 dark:text-slate-400">
+              {{ 'checkout.syncing' | translate }}
+            </span>
+          </app-page-header>
           <div class="sr-only" aria-live="assertive" aria-atomic="true">{{ liveAssertive }}</div>
 		        <div class="grid lg:grid-cols-[2fr_1fr] gap-6 items-start">
 		          <section class="grid gap-4">
-		            <div class="flex items-center justify-between gap-3">
-		              <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'checkout.title' | translate }}</h1>
-		              <span *ngIf="cartSyncPending()" class="text-xs text-slate-500 dark:text-slate-400">{{ 'checkout.syncing' | translate }}</span>
-	            </div>
 	            <div
 	              *ngIf="syncNotice"
 	              class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-800 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
 	            >
 	              {{ syncNotice }}
 	            </div>
-		            <div
-		              *ngIf="errorMessage"
-                  id="checkout-global-error"
-                  tabindex="-1"
-		            class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 flex items-start justify-between gap-3 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
-		            >
-	              <span>{{ errorMessage }}</span>
-	              <app-button size="sm" variant="ghost" [label]="'checkout.retry' | translate" (action)="retryValidation()"></app-button>
-	            </div>
+	            <div
+                *ngIf="errorMessage"
+                id="checkout-global-error"
+                tabindex="-1"
+              >
+                <app-inline-error-card
+                  [titleKey]="'errors.unexpected.title'"
+                  [message]="errorMessage"
+                  [retryLabelKey]="'checkout.retry'"
+                  [showContact]="false"
+                  [backToUrl]="null"
+                  (retry)="retryValidation()"
+                ></app-inline-error-card>
+              </div>
             <div
               *ngIf="!auth.isAuthenticated()"
               class="rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-800 flex flex-wrap items-center justify-between gap-3 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"

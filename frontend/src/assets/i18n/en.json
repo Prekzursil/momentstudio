@@ -1712,6 +1712,7 @@
     },
     "nav": {
       "title": "Admin",
+      "openMenu": "Open admin menu",
       "searchPlaceholder": "Search admin…",
       "searchEmpty": "No matches.",
       "preferences": "Preferences",
@@ -1726,6 +1727,15 @@
       "support": "Support",
       "ops": "Ops",
       "content": "Content"
+    },
+    "navGroup": {
+      "overview": "Overview",
+      "ordersFulfillment": "Orders & fulfillment",
+      "catalog": "Catalog",
+      "content": "Content",
+      "customersSupport": "Customers & support",
+      "marketing": "Marketing",
+      "operationsSecurity": "Operations & security"
     },
     "uiMode": {
       "title": "Admin mode",

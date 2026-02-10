@@ -6,9 +6,10 @@ import { finalize, Subscription, TimeoutError, timeout } from 'rxjs';
 import { ApiService } from '../../core/api.service';
 import { AnalyticsService } from '../../core/analytics.service';
 import { CartStore } from '../../core/cart.store';
-import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { ContainerComponent } from '../../layout/container.component';
 import { CheckoutReturnErrorCardComponent } from './checkout-return-error-card.component';
+import { PageHeaderComponent } from '../../shared/page-header.component';
+import { LoadingStateComponent } from '../../shared/loading-state.component';
 
 const CHECKOUT_SUCCESS_KEY = 'checkout_last_order';
 const CHECKOUT_PAYPAL_PENDING_KEY = 'checkout_paypal_pending';
@@ -23,12 +24,13 @@ type MockOutcome = 'success' | 'decline';
     CommonModule,
     TranslateModule,
     ContainerComponent,
-    BreadcrumbComponent,
-    CheckoutReturnErrorCardComponent
+    CheckoutReturnErrorCardComponent,
+    PageHeaderComponent,
+    LoadingStateComponent
   ],
   template: `
     <app-container classes="py-10 grid gap-6">
-      <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
+      <app-page-header [crumbs]="crumbs" [titleKey]="'checkout.paypalReturnTitle'"></app-page-header>
       <div
         *ngIf="loading"
         class="rounded-2xl border border-slate-200 bg-white p-6 text-slate-800 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
@@ -37,6 +39,9 @@ type MockOutcome = 'success' | 'decline';
           {{ 'checkout.paypalReturnTitle' | translate }}
         </p>
         <p class="mt-3 text-sm text-slate-700 dark:text-slate-200">{{ 'checkout.paypalCapturing' | translate }}</p>
+        <div class="mt-4">
+          <app-loading-state [rows]="1"></app-loading-state>
+        </div>
       </div>
 
       <app-checkout-return-error-card

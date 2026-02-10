@@ -71,6 +71,21 @@ showing what is already implemented.
 - [ ] Backend tests: fix aiosqlite teardown warnings to keep async test output clean.
 - [ ] Dependency hygiene: add scheduled patch/minor upgrade cadence and verification checklist.
 
+## UI/UX Mid-Scale Refactor (single big release)
+- [x] UX foundation: implement shared `PageHeader`, `InlineErrorCard`, `LoadingState`, `EmptyState`, `ActionBar`, `FormSection`, and `StatusBadge` primitives.
+  - Evidence: `frontend/src/app/shared/page-header.component.ts`, `frontend/src/app/shared/inline-error-card.component.ts`, `frontend/src/app/shared/loading-state.component.ts`, `frontend/src/app/shared/empty-state.component.ts`, `frontend/src/app/shared/action-bar.component.ts`, `frontend/src/app/shared/form-section.component.ts`, `frontend/src/app/shared/status-badge.component.ts`
+- [x] Storefront UX: apply shared primitives to critical conversion pages (`shop`, `cart`, `checkout`).
+  - Evidence: `frontend/src/app/pages/shop/shop.component.ts`, `frontend/src/app/pages/cart/cart.component.ts`, `frontend/src/app/pages/checkout/checkout.component.ts`, `frontend/src/app/pages/checkout/checkout-payment-step.component.ts`
+- [x] Payment returns UX: keep timeout + guaranteed busy reset and standardize retry/back inline error card.
+  - Evidence: `frontend/src/app/pages/checkout/paypal-return.component.ts`, `frontend/src/app/pages/checkout/netopia-return.component.ts`, `frontend/src/app/pages/checkout/stripe-return.component.ts`, `frontend/src/app/pages/checkout/checkout-return-error-card.component.ts`
+- [x] Admin IA: group admin navigation by workflow domains and add mobile drawer behavior.
+  - Evidence: `frontend/src/app/pages/admin/admin-layout.component.ts`, `frontend/src/assets/i18n/en.json`, `frontend/src/assets/i18n/ro.json`
+- [x] i18n runtime resilience: add missing-translation fallback handler to avoid raw keys in runtime.
+  - Evidence: `frontend/src/app/core/missing-translation.handler.ts`, `frontend/src/app/app.config.ts`, `frontend/src/app/core/language.service.ts`
+- [ ] Admin workflows: redesign product/content/order editors with consistent `ActionBar` + `FormSection` layouts.
+- [ ] Admin mobile parity: table-to-card adaptive views and sticky mobile actions for all key admin tables/forms.
+- [ ] Accessibility pass: route-heading focus management, modal focus trap verification, and keyboard smoke tests for shopper/admin.
+
 ## High priority (next)
 - [x] Infra: bump frontend Nginx runtime image to `nginx:1.29.5-alpine`.
   - Evidence: `frontend/Dockerfile`

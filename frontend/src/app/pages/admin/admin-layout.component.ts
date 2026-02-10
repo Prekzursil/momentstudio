@@ -23,16 +23,56 @@ type AdminNavItem = {
   exact?: boolean;
 };
 
+type AdminNavGroupKey =
+  | 'overview'
+  | 'ordersFulfillment'
+  | 'catalog'
+  | 'content'
+  | 'customersSupport'
+  | 'marketing'
+  | 'operationsSecurity';
+
+type AdminNavGroup = {
+  key: AdminNavGroupKey;
+  labelKey: string;
+  items: AdminNavItem[];
+};
+
 @Component({
   selector: 'app-admin-layout',
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink, RouterLinkActive, RouterOutlet, TranslateModule, ContainerComponent, ModalComponent],
-  template: `
+	  template: `
 	    <app-container classes="py-8">
+        <div class="mb-3 flex lg:hidden items-center justify-between gap-3">
+          <button
+            type="button"
+            class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+            (click)="toggleMobileSidebar()"
+            [attr.aria-expanded]="mobileSidebarOpen"
+            [attr.aria-label]="'adminUi.nav.openMenu' | translate"
+          >
+            ☰
+            <span>{{ 'adminUi.nav.title' | translate }}</span>
+          </button>
+        </div>
+
+        <button
+          *ngIf="!isDesktop && mobileSidebarOpen"
+          type="button"
+          class="fixed inset-0 z-[130] bg-slate-950/40 backdrop-blur-[1px] lg:hidden"
+          [attr.aria-label]="'adminUi.actions.cancel' | translate"
+          (click)="closeMobileSidebar()"
+        ></button>
+
 	      <div class="grid lg:grid-cols-[260px_1fr] gap-6">
 	        <aside
 	          class="rounded-2xl border border-slate-200 bg-white grid text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 lg:self-start lg:sticky lg:top-24 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto"
-            [ngClass]="uiPrefs.sidebarCompact() ? 'p-3 gap-0.5 text-xs' : 'p-4 gap-1 text-sm'"
+            [ngClass]="[
+              uiPrefs.sidebarCompact() ? 'p-3 gap-0.5 text-xs' : 'p-4 gap-1 text-sm',
+              !isDesktop && !mobileSidebarOpen ? 'hidden' : '',
+              !isDesktop && mobileSidebarOpen ? 'fixed inset-y-0 left-0 z-[140] w-[86vw] max-w-xs max-h-none overflow-y-auto shadow-2xl' : ''
+            ]"
 	        >
           <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400 pb-2">
             {{ 'adminUi.nav.title' | translate }}
@@ -251,6 +291,7 @@ type AdminNavItem = {
                 [routerLinkActiveOptions]="{ exact: item.exact ?? false }"
                 class="rounded-lg hover:bg-slate-50 hover:text-slate-900 dark:hover:bg-slate-800/60 dark:hover:text-white"
                 [ngClass]="uiPrefs.sidebarCompact() ? 'px-2.5 py-1.5' : 'px-3 py-2'"
+                (click)="handleNavSelection()"
               >
                 {{ item.labelKey | translate }}
               </a>
@@ -258,41 +299,51 @@ type AdminNavItem = {
             <div class="my-2 h-px bg-slate-200 dark:bg-slate-800/70"></div>
           </div>
 
-          <div *ngFor="let item of filteredNavItems()" class="flex items-center gap-1">
-            <a
-              [routerLink]="item.path"
-              routerLinkActive="bg-slate-100 text-slate-900 dark:bg-slate-800/70 dark:text-white"
-              [routerLinkActiveOptions]="{ exact: item.exact ?? false }"
-              class="flex-1 min-w-0 rounded-lg hover:bg-slate-50 hover:text-slate-900 dark:hover:bg-slate-800/60 dark:hover:text-white"
-              [ngClass]="uiPrefs.sidebarCompact() ? 'px-2.5 py-1.5' : 'px-3 py-2'"
+          <ng-container *ngFor="let group of groupedFilteredNavItems()">
+            <div
+              *ngIf="!navQuery.trim()"
+              class="px-3 pb-1 pt-2 text-[11px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
             >
-              <ng-container *ngIf="navQuery.trim(); else fullLabel">
-                <ng-container *ngIf="navLabelParts(item) as parts">
-                  <span>{{ parts.before }}</span>
-                  <span class="font-semibold text-slate-900 dark:text-slate-50">{{ parts.match }}</span>
-                  <span>{{ parts.after }}</span>
+              {{ group.labelKey | translate }}
+            </div>
+
+            <div *ngFor="let item of group.items" class="flex items-center gap-1">
+              <a
+                [routerLink]="item.path"
+                routerLinkActive="bg-slate-100 text-slate-900 dark:bg-slate-800/70 dark:text-white"
+                [routerLinkActiveOptions]="{ exact: item.exact ?? false }"
+                class="flex-1 min-w-0 rounded-lg hover:bg-slate-50 hover:text-slate-900 dark:hover:bg-slate-800/60 dark:hover:text-white"
+                [ngClass]="uiPrefs.sidebarCompact() ? 'px-2.5 py-1.5' : 'px-3 py-2'"
+                (click)="handleNavSelection()"
+              >
+                <ng-container *ngIf="navQuery.trim(); else fullLabel">
+                  <ng-container *ngIf="navLabelParts(item) as parts">
+                    <span>{{ parts.before }}</span>
+                    <span class="font-semibold text-slate-900 dark:text-slate-50">{{ parts.match }}</span>
+                    <span>{{ parts.after }}</span>
+                  </ng-container>
                 </ng-container>
-              </ng-container>
-              <ng-template #fullLabel>{{ item.labelKey | translate }}</ng-template>
-            </a>
-	            <button
-	              type="button"
-	              class="h-9 w-9 rounded-lg border border-transparent text-slate-400 hover:bg-slate-50 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-slate-800/60 dark:hover:text-slate-200"
-	              [attr.aria-label]="(isNavFavorite(item) ? 'adminUi.favorites.unpin' : 'adminUi.favorites.pin') | translate"
-	              (click)="toggleNavFavorite(item, $event)"
-	            >
-	              <span aria-hidden="true" class="text-base leading-none" [class.text-amber-500]="isNavFavorite(item)">
-	                {{ isNavFavorite(item) ? '★' : '☆' }}
-	              </span>
-	            </button>
-	          </div>
+                <ng-template #fullLabel>{{ item.labelKey | translate }}</ng-template>
+              </a>
+              <button
+                type="button"
+                class="h-9 w-9 rounded-lg border border-transparent text-slate-400 hover:bg-slate-50 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-slate-800/60 dark:hover:text-slate-200"
+                [attr.aria-label]="(isNavFavorite(item) ? 'adminUi.favorites.unpin' : 'adminUi.favorites.pin') | translate"
+                (click)="toggleNavFavorite(item, $event)"
+              >
+                <span aria-hidden="true" class="text-base leading-none" [class.text-amber-500]="isNavFavorite(item)">
+                  {{ isNavFavorite(item) ? '★' : '☆' }}
+                </span>
+              </button>
+            </div>
+          </ng-container>
 
             <div class="mt-2 pt-2 border-t border-slate-200 dark:border-slate-800">
               <button
                 type="button"
                 class="w-full rounded-lg hover:bg-slate-50 hover:text-slate-900 dark:hover:bg-slate-800/60 dark:hover:text-white"
                 [ngClass]="uiPrefs.sidebarCompact() ? 'px-2.5 py-1.5 text-xs font-semibold' : 'px-3 py-2 text-sm font-semibold'"
-                (click)="openFeedback()"
+                (click)="openFeedback(); handleNavSelection()"
               >
                 {{ 'adminUi.feedback.open' | translate }}
               </button>
@@ -365,6 +416,8 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
   ) {}
 
   private pendingGoAt: number | null = null;
+  isDesktop = typeof window !== 'undefined' ? window.innerWidth >= 1024 : true;
+  mobileSidebarOpen = false;
   navQuery = '';
   private navSub?: Subscription;
   private alertsIntervalId: number | null = null;
@@ -398,6 +451,36 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
     { path: '/admin/ops', labelKey: 'adminUi.nav.ops', section: 'ops' }
   ];
   private readonly ownerBasicSections = new Set(['dashboard', 'content', 'products', 'orders', 'returns', 'support']);
+  private readonly sectionGroupMap: Record<string, AdminNavGroupKey> = {
+    dashboard: 'overview',
+    orders: 'ordersFulfillment',
+    returns: 'ordersFulfillment',
+    inventory: 'ordersFulfillment',
+    products: 'catalog',
+    content: 'content',
+    users: 'customersSupport',
+    support: 'customersSupport',
+    coupons: 'marketing',
+    ops: 'operationsSecurity'
+  };
+  private readonly groupOrder: AdminNavGroupKey[] = [
+    'overview',
+    'ordersFulfillment',
+    'catalog',
+    'content',
+    'customersSupport',
+    'marketing',
+    'operationsSecurity'
+  ];
+  private readonly groupLabelKey: Record<AdminNavGroupKey, string> = {
+    overview: 'adminUi.navGroup.overview',
+    ordersFulfillment: 'adminUi.navGroup.ordersFulfillment',
+    catalog: 'adminUi.navGroup.catalog',
+    content: 'adminUi.navGroup.content',
+    customersSupport: 'adminUi.navGroup.customersSupport',
+    marketing: 'adminUi.navGroup.marketing',
+    operationsSecurity: 'adminUi.navGroup.operationsSecurity'
+  };
 
   get navItems(): AdminNavItem[] {
     return this.allNavItems.filter((item) => this.auth.canAccessAdminSection(item.section));
@@ -410,7 +493,10 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
     this.alertsIntervalId = window.setInterval(() => this.loadAlerts(), 5 * 60 * 1000);
     this.navSub = this.router.events
       .pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd))
-      .subscribe((event) => this.recordRecent(event.urlAfterRedirects || event.url));
+      .subscribe((event) => {
+        this.recordRecent(event.urlAfterRedirects || event.url);
+        this.mobileSidebarOpen = false;
+      });
   }
 
   ngOnDestroy(): void {
@@ -420,6 +506,41 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
       window.clearInterval(this.alertsIntervalId);
       this.alertsIntervalId = null;
     }
+  }
+
+  @HostListener('window:resize')
+  onWindowResize(): void {
+    this.isDesktop = window.innerWidth >= 1024;
+    if (this.isDesktop) this.mobileSidebarOpen = false;
+  }
+
+  toggleMobileSidebar(): void {
+    if (this.isDesktop) return;
+    this.mobileSidebarOpen = !this.mobileSidebarOpen;
+  }
+
+  closeMobileSidebar(): void {
+    this.mobileSidebarOpen = false;
+  }
+
+  handleNavSelection(): void {
+    if (!this.isDesktop) this.mobileSidebarOpen = false;
+  }
+
+  groupedFilteredNavItems(): AdminNavGroup[] {
+    const grouped = new Map<AdminNavGroupKey, AdminNavItem[]>();
+    for (const key of this.groupOrder) grouped.set(key, []);
+    for (const item of this.filteredNavItems()) {
+      const groupKey = this.sectionGroupMap[item.section] ?? 'operationsSecurity';
+      grouped.get(groupKey)?.push(item);
+    }
+    return this.groupOrder
+      .map((key) => ({
+        key,
+        labelKey: this.groupLabelKey[key],
+        items: grouped.get(key) ?? []
+      }))
+      .filter((group) => group.items.length > 0);
   }
 
   openFeedback(): void {
@@ -579,6 +700,10 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
 
   @HostListener('document:keydown', ['$event'])
   onDocumentKeydown(event: KeyboardEvent): void {
+    if (!this.isDesktop && event.key === 'Escape' && this.mobileSidebarOpen) {
+      this.mobileSidebarOpen = false;
+      return;
+    }
     if (this.shouldIgnoreShortcut(event)) return;
 
     const key = (event.key || '').toLowerCase();

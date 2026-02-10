@@ -1712,6 +1712,7 @@
     },
     "nav": {
       "title": "Administrare",
+      "openMenu": "Deschide meniul de administrare",
       "searchPlaceholder": "Caută în admin…",
       "searchEmpty": "Niciun rezultat.",
       "preferences": "Preferințe",
@@ -1726,6 +1727,15 @@
       "support": "Suport",
       "ops": "Operațiuni",
       "content": "Conținut"
+    },
+    "navGroup": {
+      "overview": "Privire generală",
+      "ordersFulfillment": "Comenzi & livrare",
+      "catalog": "Catalog",
+      "content": "Conținut",
+      "customersSupport": "Clienți & suport",
+      "marketing": "Marketing",
+      "operationsSecurity": "Operațiuni & securitate"
     },
     "uiMode": {
       "title": "Mod administrare",
