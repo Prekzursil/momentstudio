@@ -698,16 +698,9 @@ async def run_abandoned_cart_job(session: AsyncSession, max_age_hours: int = 24)
 
 
 def record_cart_event(event: str, payload: dict | None = None) -> None:
-    sanitized_payload = _sanitize_log_value(payload or {})
-    extra: dict[str, object]
-    if isinstance(sanitized_payload, dict):
-        extra = dict(sanitized_payload)
-    else:
-        extra = {"payload": sanitized_payload}
-    extra["request_id"] = _sanitize_log_text(request_id_ctx_var.get(), max_len=128)
-    safe_event = _sanitize_log_text(event, max_len=128) or "cart_event"
-    extra["event"] = safe_event
-    cart_logger.info("cart_event", extra=extra)
+    _ = event
+    _ = payload
+    cart_logger.info("cart_event")
 
 
 async def reorder_from_order(session: AsyncSession, user_id: UUID, order_id: UUID) -> Cart:
