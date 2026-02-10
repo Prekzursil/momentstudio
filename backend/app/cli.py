@@ -20,21 +20,20 @@ from app.models.order import Order, OrderItem, ShippingMethod
 USERNAME_MAX_LEN = 30
 USERNAME_MIN_LEN = 3
 USERNAME_ALLOWED_RE = re.compile(r"[^A-Za-z0-9._-]+")
+SAFE_JSON_FILENAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*\.json$")
 
 
 def _resolve_json_path(raw_path: str, *, must_exist: bool) -> Path:
-    candidate = Path((raw_path or "").strip()).expanduser()
-    if not candidate.name:
+    raw = (raw_path or "").strip()
+    if not raw:
         raise SystemExit("Path is required")
-    if candidate.suffix.lower() != ".json":
-        raise SystemExit("Only .json files are allowed for import/export")
-
-    resolved = candidate.resolve(strict=False)
     base_dir = Path.cwd().resolve()
-    try:
-        resolved.relative_to(base_dir)
-    except ValueError as exc:
-        raise SystemExit("Path must stay inside the current working directory") from exc
+    if Path(raw).name != raw:
+        raise SystemExit("Only JSON file names are allowed (no directories)")
+    if not SAFE_JSON_FILENAME_RE.fullmatch(raw):
+        raise SystemExit("Invalid JSON file name")
+
+    resolved = (base_dir / raw).resolve(strict=False)
 
     if must_exist and not resolved.is_file():
         raise SystemExit(f"Input file not found: {resolved}")

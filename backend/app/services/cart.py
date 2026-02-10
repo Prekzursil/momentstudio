@@ -706,7 +706,8 @@ def record_cart_event(event: str, payload: dict | None = None) -> None:
         extra = {"payload": sanitized_payload}
     extra["request_id"] = _sanitize_log_text(request_id_ctx_var.get(), max_len=128)
     safe_event = _sanitize_log_text(event, max_len=128) or "cart_event"
-    cart_logger.info(safe_event, extra=extra)
+    extra["event"] = safe_event
+    cart_logger.info("cart_event", extra=extra)
 
 
 async def reorder_from_order(session: AsyncSession, user_id: UUID, order_id: UUID) -> Cart:

@@ -29,15 +29,31 @@ function parseDotEnv(contents) {
     }
     switch (key) {
       case 'API_BASE_URL':
+        result.API_BASE_URL = value;
+        break;
       case 'APP_ENV':
+        result.APP_ENV = value;
+        break;
       case 'APP_VERSION':
+        result.APP_VERSION = value;
+        break;
       case 'STRIPE_ENABLED':
+        result.STRIPE_ENABLED = value;
+        break;
       case 'PAYPAL_ENABLED':
+        result.PAYPAL_ENABLED = value;
+        break;
       case 'NETOPIA_ENABLED':
+        result.NETOPIA_ENABLED = value;
+        break;
       case 'ADDRESS_AUTOCOMPLETE_ENABLED':
+        result.ADDRESS_AUTOCOMPLETE_ENABLED = value;
+        break;
       case 'SENTRY_DSN':
+        result.SENTRY_DSN = value;
+        break;
       case 'CAPTCHA_SITE_KEY':
-        result[key] = value;
+        result.CAPTCHA_SITE_KEY = value;
         break;
       default:
         break;
