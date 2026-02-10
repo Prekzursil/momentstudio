@@ -19,6 +19,9 @@ export class LanguageService {
     private auth: AuthService,
     private toast: ToastService
   ) {
+    this.translate.addLangs(['en', 'ro']);
+    this.translate.setDefaultLang('en');
+
     const savedLang = typeof localStorage !== 'undefined' ? localStorage.getItem('lang') : null;
     const userLang = this.auth.user()?.preferred_language;
     const browserLang = this.translate.getBrowserLang();

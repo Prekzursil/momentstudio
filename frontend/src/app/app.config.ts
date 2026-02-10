@@ -4,12 +4,13 @@ import { provideAnimations } from '@angular/platform-browser/animations';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { routes } from './app.routes';
 import { authAndErrorInterceptor } from './core/http.interceptor';
-import { TranslateModule } from '@ngx-translate/core';
+import { MissingTranslationHandler, TranslateModule } from '@ngx-translate/core';
 import { provideTranslateHttpLoader } from '@ngx-translate/http-loader';
 import { AdminClientErrorLoggerService } from './core/admin-client-error-logger.service';
 import { provideServiceWorker } from '@angular/service-worker';
 import { appConfig as runtimeConfig } from './core/app-config';
 import { TranslatedTitleStrategy } from './core/translated-title.strategy';
+import { AppMissingTranslationHandler } from './core/missing-translation.handler';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -31,7 +32,12 @@ export const appConfig: ApplicationConfig = {
     },
     importProvidersFrom(
       TranslateModule.forRoot({
-        defaultLanguage: 'en'
+        defaultLanguage: 'en',
+        useDefaultLang: true,
+        missingTranslationHandler: {
+          provide: MissingTranslationHandler,
+          useClass: AppMissingTranslationHandler
+        }
       })
     ),
     ...provideTranslateHttpLoader({
