@@ -3,7 +3,17 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 function parseDotEnv(contents) {
-  const result = {};
+  const result = {
+    API_BASE_URL: undefined,
+    APP_ENV: undefined,
+    APP_VERSION: undefined,
+    STRIPE_ENABLED: undefined,
+    PAYPAL_ENABLED: undefined,
+    NETOPIA_ENABLED: undefined,
+    ADDRESS_AUTOCOMPLETE_ENABLED: undefined,
+    SENTRY_DSN: undefined,
+    CAPTCHA_SITE_KEY: undefined
+  };
   for (const line of contents.split(/\r?\n/)) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
@@ -17,7 +27,21 @@ function parseDotEnv(contents) {
     ) {
       value = value.slice(1, -1);
     }
-    result[key] = value;
+    switch (key) {
+      case 'API_BASE_URL':
+      case 'APP_ENV':
+      case 'APP_VERSION':
+      case 'STRIPE_ENABLED':
+      case 'PAYPAL_ENABLED':
+      case 'NETOPIA_ENABLED':
+      case 'ADDRESS_AUTOCOMPLETE_ENABLED':
+      case 'SENTRY_DSN':
+      case 'CAPTCHA_SITE_KEY':
+        result[key] = value;
+        break;
+      default:
+        break;
+    }
   }
   return result;
 }

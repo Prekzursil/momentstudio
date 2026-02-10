@@ -978,8 +978,25 @@ def _sanitize_markdown(body: str) -> None:
     forbidden = ["<script", "<iframe", "<object", "<embed", "javascript:"]
     if any(tok in lower for tok in forbidden):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Disallowed markup")
-    if re.search(r"on\w+=", lower):
+    if _contains_inline_event_handler(lower):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Disallowed event handlers")
+
+
+def _contains_inline_event_handler(text: str) -> bool:
+    idx = text.find("on")
+    while idx >= 0:
+        prev = text[idx - 1] if idx > 0 else " "
+        if not (prev.isalnum() or prev in {"_", "-"}):
+            cursor = idx + 2
+            while cursor < len(text) and (text[cursor].isalnum() or text[cursor] == "_"):
+                cursor += 1
+            if cursor > idx + 2:
+                while cursor < len(text) and text[cursor].isspace():
+                    cursor += 1
+                if cursor < len(text) and text[cursor] == "=":
+                    return True
+        idx = text.find("on", idx + 2)
+    return False
 
 
 def _find_replace_subn(text: str, find: str, replace: str, *, case_sensitive: bool) -> tuple[str, int]:
@@ -1249,10 +1266,6 @@ async def apply_find_replace(
     return updated_blocks, updated_translations, total_replacements, errors
 
 
-_MD_LINK_RE = re.compile(r"(?<!!)\[[^\]]+\]\(([^)]+)\)")
-_MD_IMAGE_RE = re.compile(r"!\[[^\]]*\]\(([^)]+)\)")
-
-
 def _normalize_md_url(raw: str) -> str:
     value = (raw or "").strip()
     if not value:
@@ -1266,22 +1279,53 @@ def _normalize_md_url(raw: str) -> str:
     if value.startswith("#"):
         return ""
     # Links may include an optional title: url "title"
-    if " " in value or "\t" in value:
-        value = re.split(r"\s+", value, maxsplit=1)[0]
+    if any(ch.isspace() for ch in value):
+        value = value.split(maxsplit=1)[0]
     return value.strip()
 
 
 def _extract_markdown_refs(body: str) -> list[tuple[str, str, str, str]]:
     refs: list[tuple[str, str, str, str]] = []
-    for match in _MD_IMAGE_RE.finditer(body or ""):
-        url = _normalize_md_url(match.group(1))
-        if url:
-            refs.append(("image", "markdown", "body_markdown", url))
-    for match in _MD_LINK_RE.finditer(body or ""):
-        url = _normalize_md_url(match.group(1))
-        if url:
-            refs.append(("link", "markdown", "body_markdown", url))
+    for url in _extract_markdown_target_urls(body, image_only=True):
+        refs.append(("image", "markdown", "body_markdown", url))
+    for url in _extract_markdown_target_urls(body, image_only=False):
+        refs.append(("link", "markdown", "body_markdown", url))
     return refs
+
+
+def _extract_markdown_target_urls(body: str, *, image_only: bool) -> list[str]:
+    text = body or ""
+    if not text:
+        return []
+
+    marker = "![" if image_only else "["
+    urls: list[str] = []
+    cursor = 0
+    while cursor < len(text):
+        idx = text.find(marker, cursor)
+        if idx < 0:
+            break
+        if not image_only and idx > 0 and text[idx - 1] == "!":
+            cursor = idx + 1
+            continue
+        close_bracket = text.find("]", idx + len(marker))
+        if close_bracket < 0:
+            break
+        open_paren = close_bracket + 1
+        while open_paren < len(text) and text[open_paren].isspace():
+            open_paren += 1
+        if open_paren >= len(text) or text[open_paren] != "(":
+            cursor = close_bracket + 1
+            continue
+        close_paren = text.find(")", open_paren + 1)
+        if close_paren < 0:
+            break
+        raw = text[open_paren + 1 : close_paren]
+        url = _normalize_md_url(raw)
+        if url:
+            urls.append(url)
+        cursor = close_paren + 1
+    return urls
 
 
 def _extract_block_refs(meta: dict | None) -> list[tuple[str, str, str, str]]:

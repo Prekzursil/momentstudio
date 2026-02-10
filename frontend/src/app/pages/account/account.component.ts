@@ -12,6 +12,7 @@ import { LanguageService } from '../../core/language.service';
 import { NotificationsService } from '../../core/notifications.service';
 import { AccountService } from '../../core/account.service';
 import { CouponsService } from '../../core/coupons.service';
+import { GoogleLinkPendingService } from '../../core/google-link-pending.service';
 import { ThemeService } from '../../core/theme.service';
 import { ToastService } from '../../core/toast.service';
 import { TicketsService } from '../../core/tickets.service';
@@ -237,10 +238,28 @@ export class AccountComponent extends AccountState {
     notifications: NotificationsService,
     tickets: TicketsService,
     coupons: CouponsService,
+    googleLinkPendingService: GoogleLinkPendingService,
     theme: ThemeService,
     lang: LanguageService,
     translate: TranslateService
   ) {
-    super(toast, auth, account, blog, cart, router, route, api, wishlist, notifications, tickets, coupons, theme, lang, translate);
+    super(
+      toast,
+      auth,
+      account,
+      blog,
+      cart,
+      router,
+      route,
+      api,
+      wishlist,
+      notifications,
+      tickets,
+      coupons,
+      theme,
+      lang,
+      translate,
+      googleLinkPendingService
+    );
   }
 }

@@ -30,8 +30,6 @@ type CheckoutSuccessSummary = {
   created_at: string;
 };
 
-const CHECKOUT_SUCCESS_KEY = 'checkout_last_order';
-
 @Component({
   selector: 'app-success',
   standalone: true,
@@ -140,17 +138,11 @@ export class SuccessComponent {
   }
 
   private loadSummary(): CheckoutSuccessSummary | null {
-    if (typeof localStorage === 'undefined') return null;
-    try {
-      const raw = localStorage.getItem(CHECKOUT_SUCCESS_KEY);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw) as CheckoutSuccessSummary;
-      if (!parsed || typeof parsed !== 'object') return null;
-      if (!parsed.order_id) return null;
-      return parsed;
-    } catch {
-      return null;
-    }
+    const state = history.state as { checkoutSummary?: CheckoutSuccessSummary } | null;
+    const summary = state?.checkoutSummary;
+    if (!summary || typeof summary !== 'object') return null;
+    if (!summary.order_id) return null;
+    return summary;
   }
 
   private trackCheckoutSuccess(): void {

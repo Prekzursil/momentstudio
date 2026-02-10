@@ -2,8 +2,11 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
+import { GoogleLinkPendingService } from '../../core/google-link-pending.service';
 import { ToastService } from '../../core/toast.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+
+const GOOGLE_FLOW_KEY = 'google_flow';
 
 @Component({
   selector: 'app-google-callback',
@@ -27,6 +30,7 @@ export class GoogleCallbackComponent implements OnInit {
     private route: ActivatedRoute,
     private router: Router,
     private auth: AuthService,
+    private googleLinkPending: GoogleLinkPendingService,
     private toast: ToastService,
     private translate: TranslateService
   ) {}
@@ -34,7 +38,7 @@ export class GoogleCallbackComponent implements OnInit {
   ngOnInit(): void {
     const code = this.route.snapshot.queryParamMap.get('code');
     const state = this.route.snapshot.queryParamMap.get('state');
-    const flow = (localStorage.getItem('google_flow') as 'login' | 'link' | null) || 'login';
+    const flow = (localStorage.getItem(GOOGLE_FLOW_KEY) as 'login' | 'link' | null) || 'login';
     if (!code || !state) {
       this.error.set(this.translate.instant('auth.googleMissingCode'));
       this.toast.error(this.translate.instant('auth.googleMissingCode'));
@@ -43,14 +47,7 @@ export class GoogleCallbackComponent implements OnInit {
     }
 
     if (flow === 'link') {
-      const password = sessionStorage.getItem('google_link_password');
-      if (!password) {
-        this.error.set(this.translate.instant('auth.googleLinkPasswordMissing'));
-        this.toast.error(this.translate.instant('auth.googleLinkPasswordMissing'));
-        void this.router.navigateByUrl('/account');
-        return;
-      }
-      this.handleLink(code, state, password);
+      this.handleLink(code, state);
     } else {
       this.handleLogin(code, state);
     }
@@ -60,7 +57,7 @@ export class GoogleCallbackComponent implements OnInit {
     this.message.set(this.translate.instant('auth.googleSigningIn'));
     this.auth.completeGoogleLogin(code, state).subscribe({
       next: (res) => {
-        localStorage.removeItem('google_flow');
+        localStorage.removeItem(GOOGLE_FLOW_KEY);
         if (res.requires_completion || res.completion_token) {
           if (typeof sessionStorage !== 'undefined' && res.completion_token) {
             sessionStorage.setItem('google_completion_token', res.completion_token);
@@ -87,7 +84,7 @@ export class GoogleCallbackComponent implements OnInit {
         void this.router.navigateByUrl('/account');
       },
       error: (err) => {
-        localStorage.removeItem('google_flow');
+        localStorage.removeItem(GOOGLE_FLOW_KEY);
         if (typeof sessionStorage !== 'undefined') {
           sessionStorage.removeItem('google_completion_token');
           sessionStorage.removeItem('google_completion_user');
@@ -100,23 +97,11 @@ export class GoogleCallbackComponent implements OnInit {
     });
   }
 
-  private handleLink(code: string, state: string, password: string): void {
+  private handleLink(code: string, state: string): void {
     this.message.set(this.translate.instant('auth.googleLinking'));
-    this.auth.completeGoogleLink(code, state, password).subscribe({
-      next: (user) => {
-        localStorage.removeItem('google_flow');
-        sessionStorage.removeItem('google_link_password');
-        this.toast.success(this.translate.instant('auth.googleLinkSuccess'), user.email);
-        void this.router.navigateByUrl('/account');
-      },
-      error: (err) => {
-        localStorage.removeItem('google_flow');
-        sessionStorage.removeItem('google_link_password');
-        const message = err?.error?.detail || this.translate.instant('auth.googleError');
-        this.error.set(message);
-        this.toast.error(message);
-        void this.router.navigateByUrl('/account');
-      }
-    });
+    this.googleLinkPending.setPending({ code, state });
+    localStorage.removeItem(GOOGLE_FLOW_KEY);
+    this.toast.info(this.translate.instant('auth.googleLinkContinueInAccount'));
+    void this.router.navigateByUrl('/account/security');
   }
 }

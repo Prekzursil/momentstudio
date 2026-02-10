@@ -42,6 +42,7 @@ import { ToastService } from '../../core/toast.service';
 import { TicketListItem, TicketsService } from '../../core/tickets.service';
 import { WishlistService } from '../../core/wishlist.service';
 import { CouponsService, type CouponRead } from '../../core/coupons.service';
+import { GoogleLinkPendingService, PendingGoogleLink } from '../../core/google-link-pending.service';
 import { orderStatusChipClass } from '../../shared/order-status';
 import { missingRequiredProfileFields as computeMissingRequiredProfileFields, type RequiredProfileField } from '../../shared/profile-requirements';
   import {
@@ -88,6 +89,8 @@ type NotificationPrefsSnapshot = {
   notifyBlogCommentReplies: boolean;
   notifyMarketing: boolean;
 };
+
+const GOOGLE_FLOW_KEY = 'google_flow';
 
 @Directive()
 export class AccountState implements OnInit, OnDestroy {
@@ -198,6 +201,7 @@ export class AccountState implements OnInit, OnDestroy {
   googlePassword = '';
   googleBusy = false;
   googleError: string | null = null;
+  googleLinkPending = false;
 
   secondaryEmails = signal<SecondaryEmail[]>([]);
   secondaryEmailsLoaded = signal<boolean>(false);
@@ -308,7 +312,8 @@ export class AccountState implements OnInit, OnDestroy {
     private couponsService: CouponsService,
     private theme: ThemeService,
     private lang: LanguageService,
-    private translate: TranslateService
+    private translate: TranslateService,
+    private googleLinkPendingService: GoogleLinkPendingService
   ) {
     this.phoneCountriesEffect = effect(() => {
       this.phoneCountries = listPhoneCountries(this.lang.language());
@@ -318,6 +323,7 @@ export class AccountState implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.nowInterval = setInterval(() => this.now.set(Date.now()), 1_000);
     this.forceProfileCompletion = this.route.snapshot.queryParamMap.get('complete') === '1';
+    this.googleLinkPending = Boolean(this.readPendingGoogleLinkContext());
     this.loadProfile();
     this.routerEventsSub = this.router.events
       .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
@@ -2728,6 +2734,15 @@ export class AccountState implements OnInit, OnDestroy {
     this.makePrimaryError = null;
   }
 
+  private readPendingGoogleLinkContext(): PendingGoogleLink | null {
+    return this.googleLinkPendingService.getPending();
+  }
+
+  private clearPendingGoogleLinkContext(): void {
+    this.googleLinkPendingService.clear();
+    this.googleLinkPending = false;
+  }
+
   confirmMakePrimary(): void {
     if (this.makingPrimaryEmail) return;
     const id = this.makePrimarySecondaryEmailId;
@@ -2761,21 +2776,52 @@ export class AccountState implements OnInit, OnDestroy {
   }
 
   linkGoogle(): void {
-    const password = this.googlePassword.trim();
     this.googleError = null;
-    if (!password) {
-      this.googleError = this.t('account.security.google.passwordRequiredLink');
+    const pendingContext = this.readPendingGoogleLinkContext();
+    if (pendingContext) {
+      const password = this.googlePassword.trim();
+      if (!password) {
+        this.googleError = this.t('account.security.google.passwordRequiredLink');
+        return;
+      }
+      this.googleBusy = true;
+      this.auth.completeGoogleLink(pendingContext.code, pendingContext.state, password).subscribe({
+        next: (user) => {
+          this.googleEmail.set(user.google_email ?? null);
+          this.googlePicture.set(user.google_picture_url ?? null);
+          this.profile.set(user);
+          this.googlePassword = '';
+          this.clearPendingGoogleLinkContext();
+          if (typeof localStorage !== 'undefined') {
+            localStorage.removeItem(GOOGLE_FLOW_KEY);
+          }
+          this.toast.success(this.t('auth.googleLinkSuccess'), user.email);
+        },
+        error: (err) => {
+          const message = err?.error?.detail || this.t('auth.googleError');
+          this.googleError = message;
+          this.toast.error(message);
+        },
+        complete: () => {
+          this.googleBusy = false;
+        }
+      });
       return;
     }
+
     this.googleBusy = true;
-    sessionStorage.setItem('google_link_password', password);
-    localStorage.setItem('google_flow', 'link');
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(GOOGLE_FLOW_KEY, 'link');
+    }
     this.auth.startGoogleLink().subscribe({
       next: (url) => {
         window.location.href = url;
       },
       error: (err) => {
-        sessionStorage.removeItem('google_link_password');
+        this.clearPendingGoogleLinkContext();
+        if (typeof localStorage !== 'undefined') {
+          localStorage.removeItem(GOOGLE_FLOW_KEY);
+        }
         const message = err?.error?.detail || this.t('account.security.google.startLinkError');
         this.googleError = message;
         this.toast.error(message);

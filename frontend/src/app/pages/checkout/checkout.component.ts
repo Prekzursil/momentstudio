@@ -51,19 +51,6 @@ type CheckoutBillingAddress = {
   country: string;
 };
 
-type SavedCheckout = {
-  address: CheckoutShippingAddress;
-  billingSameAsShipping: boolean;
-  billing: CheckoutBillingAddress;
-  courier?: LockerProvider;
-  deliveryType?: 'home' | 'locker';
-  locker?: LockerRead | null;
-  phone?: string | null;
-  invoice_company?: string | null;
-  invoice_vat_id?: string | null;
-  invoice_enabled?: boolean;
-};
-
 type CheckoutPaymentMethod = 'cod' | 'netopia' | 'paypal' | 'stripe';
 type PaymentMethodCapability = { enabled?: boolean; reason?: string | null; reason_code?: string | null };
 
@@ -122,10 +109,6 @@ type LegalConsentStatusResponse = {
   satisfied: boolean;
 };
 
-const CHECKOUT_SUCCESS_KEY = 'checkout_last_order';
-const CHECKOUT_PAYPAL_PENDING_KEY = 'checkout_paypal_pending';
-const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
-const CHECKOUT_NETOPIA_PENDING_KEY = 'checkout_netopia_pending';
 const CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY = 'checkout_auto_apply_best_coupon';
 
 const parseBool = (value: unknown, fallback: boolean): boolean => {
@@ -464,24 +447,6 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     private zone: NgZone,
     private cdr: ChangeDetectorRef
   ) {
-    const saved = this.loadSavedCheckout();
-    if (saved) {
-      this.address = saved.address;
-      this.billingSameAsShipping = saved.billingSameAsShipping;
-      this.billing = saved.billing;
-      this.courier = saved.courier ?? 'sameday';
-      this.deliveryType = saved.deliveryType ?? 'home';
-      this.locker = saved.locker ?? null;
-      const savedPhone = (saved.phone || '').trim();
-      if (savedPhone) {
-        const split = splitE164(savedPhone);
-        if (split.country) this.shippingPhoneCountry = split.country;
-        this.shippingPhoneNational = split.nationalNumber;
-      }
-      this.invoiceCompany = String(saved.invoice_company || '').trim();
-      this.invoiceVatId = String(saved.invoice_vat_id || '').trim();
-      this.invoiceEnabled = Boolean(saved.invoice_enabled) || Boolean(this.invoiceCompany || this.invoiceVatId);
-    }
     const prefs = this.checkoutPrefs.tryLoadDeliveryPrefs();
     if (prefs) {
       this.courier = prefs.courier;
@@ -1279,28 +1244,17 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     };
   }
 
-  private persistSuccessSummary(summary: CheckoutSuccessSummary): void {
-    if (typeof localStorage === 'undefined') return;
-    localStorage.setItem(CHECKOUT_SUCCESS_KEY, JSON.stringify(summary));
-  }
-
-  private persistPayPalPendingSummary(summary: CheckoutSuccessSummary): void {
-    if (typeof localStorage === 'undefined') return;
-    localStorage.setItem(CHECKOUT_PAYPAL_PENDING_KEY, JSON.stringify(summary));
-  }
-
-  private persistStripePendingSummary(summary: CheckoutSuccessSummary): void {
-    if (typeof localStorage === 'undefined') return;
-    localStorage.setItem(CHECKOUT_STRIPE_PENDING_KEY, JSON.stringify(summary));
-  }
-
-  private persistNetopiaPendingSummary(summary: CheckoutSuccessSummary): void {
-    if (typeof localStorage === 'undefined') return;
-    localStorage.setItem(CHECKOUT_NETOPIA_PENDING_KEY, JSON.stringify(summary));
-  }
-
   private persistAddressIfRequested(): void {
-    if (this.saveAddress) this.persistAddress();
+    if (this.saveAddress) {
+      this.checkoutPrefs.saveDeliveryPrefs({ courier: this.courier, deliveryType: this.deliveryType });
+    }
+  }
+
+  private goToSuccess(summary: CheckoutSuccessSummary | null): void {
+    this.checkoutFlowCompleted = true;
+    void this.router.navigate(['/checkout/success'], {
+      state: summary ? { checkoutSummary: summary } : undefined,
+    });
   }
 
   private showPaymentNotReadyError(): void {
@@ -1339,29 +1293,24 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
 
     switch (this.paymentMethod) {
       case 'paypal': {
-        this.persistPayPalPendingSummary(summary);
         this.persistAddressIfRequested();
         this.redirectToPaymentUrl(res.paypal_approval_url, ['paypal.com']);
         return;
       }
       case 'stripe': {
-        this.persistStripePendingSummary(summary);
         this.persistAddressIfRequested();
         this.redirectToPaymentUrl(res.stripe_checkout_url, ['checkout.stripe.com']);
         return;
       }
       case 'netopia': {
-        this.persistNetopiaPendingSummary(summary);
         this.persistAddressIfRequested();
         this.redirectToPaymentUrl(res.netopia_payment_url, ['mobilpay.ro', 'netopia-payments.com']);
         return;
       }
       case 'cod': {
-        this.persistSuccessSummary(summary);
         this.persistAddressIfRequested();
         this.cart.clear();
-        this.checkoutFlowCompleted = true;
-        void this.router.navigate(['/checkout/success']);
+        this.goToSuccess(summary);
         return;
       }
       default:
@@ -1757,126 +1706,6 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       return null;
     }
     return null;
-  }
-
-  private persistAddress(): void {
-    if (typeof localStorage === 'undefined') return;
-    const billing = this.billingSameAsShipping
-      ? { line1: this.address.line1, line2: this.address.line2, city: this.address.city, region: this.address.region, postal: this.address.postal, country: this.address.country }
-      : this.billing;
-    localStorage.setItem(
-      'checkout_address',
-      JSON.stringify({
-        phone: this.effectivePhoneE164(),
-        invoice_company: (this.invoiceCompany || '').trim() || null,
-        invoice_vat_id: (this.invoiceVatId || '').trim() || null,
-        invoice_enabled: Boolean(this.invoiceEnabled),
-        address: {
-          name: this.address.name,
-          email: this.address.email,
-          line1: this.address.line1,
-          line2: this.address.line2 || '',
-          city: this.address.city,
-          region: this.address.region || '',
-          postal: this.address.postal,
-          country: this.address.country || '',
-        },
-        billingSameAsShipping: this.billingSameAsShipping,
-        billing: {
-          line1: billing.line1,
-          line2: billing.line2 || '',
-          city: billing.city,
-          region: billing.region || '',
-          postal: billing.postal,
-          country: billing.country || '',
-        },
-        courier: this.courier,
-        deliveryType: this.deliveryType,
-        locker: this.locker ? { ...this.locker } : null
-      })
-    );
-  }
-
-  private loadSavedCheckout(): SavedCheckout | null {
-    if (typeof localStorage === 'undefined') return null;
-    try {
-      const raw = localStorage.getItem('checkout_address');
-      if (!raw) return null;
-      const parsed = JSON.parse(raw) as any;
-      if (parsed && typeof parsed === 'object' && parsed.address) {
-        const addr = parsed.address as any;
-        const billing = (parsed.billing as any) || null;
-        const billingSame = Boolean(parsed.billingSameAsShipping);
-        const phoneRaw = typeof parsed.phone === 'string' ? parsed.phone.trim() : '';
-        const phone = /^\+[1-9]\d{1,14}$/.test(phoneRaw) ? phoneRaw : null;
-        const invoiceCompany = typeof parsed.invoice_company === 'string' ? parsed.invoice_company.trim() : '';
-        const invoiceVatId = typeof parsed.invoice_vat_id === 'string' ? parsed.invoice_vat_id.trim() : '';
-        const invoiceEnabled = Boolean(parsed.invoice_enabled);
-        return {
-          phone,
-          invoice_company: invoiceCompany || null,
-          invoice_vat_id: invoiceVatId || null,
-          invoice_enabled: invoiceEnabled,
-          address: {
-            name: String(addr.name || ''),
-            email: String(addr.email || ''),
-            line1: String(addr.line1 || ''),
-            line2: String(addr.line2 || ''),
-            city: String(addr.city || ''),
-            region: String(addr.region || ''),
-            postal: String(addr.postal || ''),
-            country: String(addr.country || ''),
-            password: ''
-          },
-          billingSameAsShipping: billingSame,
-          billing: {
-            line1: String(billing?.line1 || ''),
-            line2: String(billing?.line2 || ''),
-            city: String(billing?.city || ''),
-            region: String(billing?.region || ''),
-            postal: String(billing?.postal || ''),
-            country: String(billing?.country || '')
-          },
-          courier: parsed.courier === 'fan_courier' ? 'fan_courier' : 'sameday',
-          deliveryType: parsed.deliveryType === 'locker' ? 'locker' : 'home',
-          locker: parsed.locker && typeof parsed.locker === 'object' ? (parsed.locker as LockerRead) : null
-        };
-      }
-      // legacy shape: the stored value was the flat address object
-      const legacy = parsed as any;
-      const addr = {
-        name: String(legacy.name || ''),
-        email: String(legacy.email || ''),
-        line1: String(legacy.line1 || ''),
-        line2: String(legacy.line2 || ''),
-        city: String(legacy.city || ''),
-        region: String(legacy.region || ''),
-        postal: String(legacy.postal || ''),
-        country: String(legacy.country || ''),
-        password: ''
-      };
-      return {
-        phone: null,
-        invoice_company: null,
-        invoice_vat_id: null,
-        invoice_enabled: false,
-        address: addr,
-        billingSameAsShipping: true,
-        billing: {
-          line1: addr.line1,
-          line2: addr.line2,
-          city: addr.city,
-          region: addr.region,
-          postal: addr.postal,
-          country: addr.country
-        },
-        courier: 'sameday',
-        deliveryType: 'home',
-        locker: null
-      };
-    } catch {
-      return null;
-    }
   }
 
   setDeliveryType(value: 'home' | 'locker'): void {

@@ -99,12 +99,11 @@ async def _get_access_token() -> str:
 
     client_id = _effective_client_id()
     client_secret = _effective_client_secret()
-    token_url = f"{_base_url()}/v1/oauth2/token"
 
     try:
-        async with httpx.AsyncClient(timeout=10) as client:
+        async with httpx.AsyncClient(base_url=_base_url(), timeout=10) as client:
             resp = await client.post(
-                token_url,
+                "/v1/oauth2/token",
                 data={"grant_type": "client_credentials"},
                 auth=(client_id, client_secret),
                 headers={"Accept": "application/json", "Accept-Language": "en_US"},
@@ -191,8 +190,6 @@ async def create_order_itemized(
     products, shipping, taxes, fees and discounts on PayPal checkout.
     """
     token = await _get_access_token()
-    orders_url = f"{_base_url()}/v2/checkout/orders"
-
     currency = _paypal_currency(currency_code)
     fx_per_ron = await _fx_per_ron(currency, fx_eur_per_ron=fx_eur_per_ron, fx_usd_per_ron=fx_usd_per_ron)
 
@@ -303,9 +300,9 @@ async def create_order_itemized(
         payload["purchase_units"][0]["items"] = converted_items
 
     try:
-        async with httpx.AsyncClient(timeout=15) as client:
+        async with httpx.AsyncClient(base_url=_base_url(), timeout=15) as client:
             resp = await client.post(
-                orders_url,
+                "/v2/checkout/orders",
                 json=payload,
                 headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
             )
@@ -354,11 +351,10 @@ async def capture_order(*, paypal_order_id: str) -> str:
     """Capture an approved PayPal order and return the PayPal capture id (if available)."""
     token = await _get_access_token()
     safe_order_id = _sanitize_paypal_id(paypal_order_id)
-    capture_url = f"{_base_url()}/v2/checkout/orders/{safe_order_id}/capture"
     try:
-        async with httpx.AsyncClient(timeout=20) as client:
+        async with httpx.AsyncClient(base_url=_base_url(), timeout=20) as client:
             resp = await client.post(
-                capture_url,
+                f"/v2/checkout/orders/{safe_order_id}/capture",
                 headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
             )
             resp.raise_for_status()
@@ -392,7 +388,7 @@ async def refund_capture(
     configured PayPal settlement currency (EUR/USD) using the latest available FX rates.
     """
     token = await _get_access_token()
-    refund_url = f"{_base_url()}/v2/payments/captures/{paypal_capture_id}/refund"
+    safe_capture_id = _sanitize_paypal_id(paypal_capture_id)
     payload: dict = {}
     if amount_ron is not None:
         currency = _paypal_currency(currency_code)
@@ -400,9 +396,9 @@ async def refund_capture(
         amount_converted = _convert_ron(Decimal(amount_ron), fx_per_ron)
         payload = {"amount": {"value": _format_amount(amount_converted), "currency_code": currency}}
     try:
-        async with httpx.AsyncClient(timeout=20) as client:
+        async with httpx.AsyncClient(base_url=_base_url(), timeout=20) as client:
             resp = await client.post(
-                refund_url,
+                f"/v2/payments/captures/{safe_capture_id}/refund",
                 json=payload,
                 headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
             )
@@ -437,7 +433,6 @@ async def verify_webhook_signature(*, headers: dict[str, str], event: dict[str, 
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing PayPal signature headers")
 
     token = await _get_access_token()
-    verify_url = f"{_base_url()}/v1/notifications/verify-webhook-signature"
     payload = {
         "auth_algo": auth_algo,
         "cert_url": cert_url,
@@ -448,9 +443,9 @@ async def verify_webhook_signature(*, headers: dict[str, str], event: dict[str, 
         "webhook_event": event,
     }
     try:
-        async with httpx.AsyncClient(timeout=15) as client:
+        async with httpx.AsyncClient(base_url=_base_url(), timeout=15) as client:
             resp = await client.post(
-                verify_url,
+                "/v1/notifications/verify-webhook-signature",
                 json=payload,
                 headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
             )

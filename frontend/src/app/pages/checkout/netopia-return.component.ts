@@ -11,8 +11,6 @@ import { CheckoutReturnErrorCardComponent } from './checkout-return-error-card.c
 import { PageHeaderComponent } from '../../shared/page-header.component';
 import { LoadingStateComponent } from '../../shared/loading-state.component';
 
-const CHECKOUT_SUCCESS_KEY = 'checkout_last_order';
-const CHECKOUT_NETOPIA_PENDING_KEY = 'checkout_netopia_pending';
 const RETURN_CONFIRM_TIMEOUT_MS = 30_000;
 
 @Component({
@@ -74,18 +72,6 @@ export class NetopiaReturnComponent implements OnInit, OnDestroy {
     private analytics: AnalyticsService
   ) {}
 
-  private promotePendingSummary(): void {
-    if (typeof localStorage === 'undefined') return;
-    const raw = localStorage.getItem(CHECKOUT_NETOPIA_PENDING_KEY);
-    if (!raw) return;
-    try {
-      localStorage.setItem(CHECKOUT_SUCCESS_KEY, raw);
-      localStorage.removeItem(CHECKOUT_NETOPIA_PENDING_KEY);
-    } catch {
-      // best-effort only
-    }
-  }
-
   ngOnInit(): void {
     this.orderId = this.route.snapshot.queryParamMap.get('order_id') || '';
     this.ntpId =
@@ -132,7 +118,6 @@ export class NetopiaReturnComponent implements OnInit, OnDestroy {
       )
       .subscribe({
         next: () => {
-          this.promotePendingSummary();
           this.cart.clear();
           void this.router.navigate(['/checkout/success']);
         },

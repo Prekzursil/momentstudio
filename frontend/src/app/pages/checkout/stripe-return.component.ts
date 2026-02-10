@@ -11,8 +11,6 @@ import { CheckoutReturnErrorCardComponent } from './checkout-return-error-card.c
 import { PageHeaderComponent } from '../../shared/page-header.component';
 import { LoadingStateComponent } from '../../shared/loading-state.component';
 
-const CHECKOUT_SUCCESS_KEY = 'checkout_last_order';
-const CHECKOUT_STRIPE_PENDING_KEY = 'checkout_stripe_pending';
 const RETURN_CONFIRM_TIMEOUT_MS = 30_000;
 
 type MockOutcome = 'success' | 'decline';
@@ -76,30 +74,6 @@ export class StripeReturnComponent implements OnInit, OnDestroy {
     private analytics: AnalyticsService
   ) {}
 
-  private promotePendingSummary(): void {
-    if (typeof localStorage === 'undefined') return;
-    const raw = localStorage.getItem(CHECKOUT_STRIPE_PENDING_KEY);
-    if (!raw) return;
-    try {
-      localStorage.setItem(CHECKOUT_SUCCESS_KEY, raw);
-      localStorage.removeItem(CHECKOUT_STRIPE_PENDING_KEY);
-    } catch {
-      // best-effort only
-    }
-  }
-
-  private pendingOrderId(): string | null {
-    if (typeof localStorage === 'undefined') return null;
-    const raw = localStorage.getItem(CHECKOUT_STRIPE_PENDING_KEY);
-    if (!raw) return null;
-    try {
-      const parsed = JSON.parse(raw) as { order_id?: unknown } | null;
-      return typeof parsed?.order_id === 'string' ? parsed.order_id : null;
-    } catch {
-      return null;
-    }
-  }
-
   ngOnInit(): void {
     this.sessionId = this.route.snapshot.queryParamMap.get('session_id') || '';
     const mockRaw = (this.route.snapshot.queryParamMap.get('mock') || '').toLowerCase();
@@ -130,9 +104,7 @@ export class StripeReturnComponent implements OnInit, OnDestroy {
     this.loading = true;
     this.errorMessage = '';
 
-    const orderId = this.pendingOrderId();
-    const payload: { session_id: string; order_id?: string; mock?: MockOutcome } = { session_id: sessionId };
-    if (orderId) payload.order_id = orderId;
+    const payload: { session_id: string; mock?: MockOutcome } = { session_id: sessionId };
     if (this.mock) payload.mock = this.mock;
 
     const startedAt = Date.now();
@@ -148,7 +120,6 @@ export class StripeReturnComponent implements OnInit, OnDestroy {
       )
       .subscribe({
         next: () => {
-          this.promotePendingSummary();
           this.cart.clear();
           void this.router.navigate(['/checkout/success']);
         },
