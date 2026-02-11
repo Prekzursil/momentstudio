@@ -5,6 +5,7 @@ import { parseMoney } from '../shared/money';
 import { map } from 'rxjs/operators';
 
 export type SortOption = 'recommended' | 'newest' | 'price_asc' | 'price_desc' | 'name_asc' | 'name_desc';
+export type CatalogLang = 'en' | 'ro';
 
 export interface Category {
   id: string;
@@ -104,6 +105,7 @@ export interface ProductFilterParams {
   sort?: SortOption;
   page?: number;
   limit?: number;
+  lang?: CatalogLang;
 }
 
 export interface BackInStockRequest {
@@ -132,7 +134,7 @@ export class CatalogService {
     } as Product;
   }
 
-  listCategories(lang?: 'en' | 'ro', opts?: { include_hidden?: boolean }): Observable<Category[]> {
+  listCategories(lang?: CatalogLang, opts?: { include_hidden?: boolean }): Observable<Category[]> {
     return this.api.get<Category[]>('/catalog/categories', { lang, include_hidden: opts?.include_hidden });
   }
 
@@ -146,6 +148,7 @@ export class CatalogService {
       max_price: params.max_price,
       is_featured: params.is_featured,
       include_unpublished: params.include_unpublished,
+      lang: params.lang,
       tags: params.tags?.length ? params.tags : undefined,
       sort: params.sort,
       page: params.page ?? 1,
@@ -159,16 +162,20 @@ export class CatalogService {
       );
   }
 
-  getProduct(slug: string): Observable<Product> {
-    return this.api.get<Product>(`/catalog/products/${slug}`).pipe(map((p: any) => this.normalizeProduct(p)));
+  getProduct(slug: string, lang?: CatalogLang): Observable<Product> {
+    return this.api.get<Product>(`/catalog/products/${slug}`, { lang }).pipe(map((p: any) => this.normalizeProduct(p)));
   }
 
-  getRelatedProducts(slug: string): Observable<Product[]> {
-    return this.api.get<Product[]>(`/catalog/products/${slug}/related`).pipe(map((rows: any) => (rows ?? []).map((p: any) => this.normalizeProduct(p))));
+  getRelatedProducts(slug: string, lang?: CatalogLang): Observable<Product[]> {
+    return this.api
+      .get<Product[]>(`/catalog/products/${slug}/related`, { lang })
+      .pipe(map((rows: any) => (rows ?? []).map((p: any) => this.normalizeProduct(p))));
   }
 
-  getUpsellProducts(slug: string): Observable<Product[]> {
-    return this.api.get<Product[]>(`/catalog/products/${slug}/upsells`).pipe(map((rows: any) => (rows ?? []).map((p: any) => this.normalizeProduct(p))));
+  getUpsellProducts(slug: string, lang?: CatalogLang): Observable<Product[]> {
+    return this.api
+      .get<Product[]>(`/catalog/products/${slug}/upsells`, { lang })
+      .pipe(map((rows: any) => (rows ?? []).map((p: any) => this.normalizeProduct(p))));
   }
 
   getBackInStockStatus(slug: string): Observable<BackInStockStatus> {
@@ -195,8 +202,8 @@ export class CatalogService {
     });
   }
 
-  listFeaturedCollections(): Observable<FeaturedCollection[]> {
-    return this.api.get<FeaturedCollection[]>('/catalog/collections/featured').pipe(
+  listFeaturedCollections(lang?: CatalogLang): Observable<FeaturedCollection[]> {
+    return this.api.get<FeaturedCollection[]>('/catalog/collections/featured', { lang }).pipe(
       map((rows: any) =>
         (rows ?? []).map((c: any) => ({
           ...(c ?? {}),

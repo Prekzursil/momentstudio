@@ -482,9 +482,7 @@ export class ProductComponent implements OnInit, OnDestroy {
       this.load();
     });
     this.langSub = this.translate.onLangChange.subscribe(() => {
-      if (this.product) {
-        this.updateMeta(this.product);
-      }
+      this.load();
     });
   }
 
@@ -576,7 +574,8 @@ export class ProductComponent implements OnInit, OnDestroy {
       this.loading = false;
       return;
     }
-    this.productLoadSub = this.catalog.getProduct(slug).subscribe({
+    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
+    this.productLoadSub = this.catalog.getProduct(slug, lang).subscribe({
       next: (product) => {
         if (this.slug !== slug) return;
         if (Array.isArray(product.images)) {
@@ -606,8 +605,8 @@ export class ProductComponent implements OnInit, OnDestroy {
 	          })
 	          .slice(0, 8);
 	        this.loadBackInStockStatus();
-	        this.loadUpsells(product.slug);
-	        this.loadRelated(product.slug);
+	        this.loadUpsells(product.slug, lang);
+	        this.loadRelated(product.slug, lang);
 	      },
       error: (err) => {
         if (this.slug !== slug) return;
@@ -620,9 +619,9 @@ export class ProductComponent implements OnInit, OnDestroy {
     });
   }
 
-  private loadUpsells(slug: string): void {
+  private loadUpsells(slug: string, lang: 'en' | 'ro'): void {
     this.upsellsLoadSub?.unsubscribe();
-    this.upsellsLoadSub = this.catalog.getUpsellProducts(slug).subscribe({
+    this.upsellsLoadSub = this.catalog.getUpsellProducts(slug, lang).subscribe({
       next: (items) => {
         if (!this.product || this.product.slug !== slug) return;
         this.upsellProducts = (items || []).filter((p) => p.slug !== slug).slice(0, 8);
@@ -634,9 +633,9 @@ export class ProductComponent implements OnInit, OnDestroy {
     });
   }
 
-  private loadRelated(slug: string): void {
+  private loadRelated(slug: string, lang: 'en' | 'ro'): void {
     this.relatedLoadSub?.unsubscribe();
-    this.relatedLoadSub = this.catalog.getRelatedProducts(slug).subscribe({
+    this.relatedLoadSub = this.catalog.getRelatedProducts(slug, lang).subscribe({
       next: (items) => {
         if (!this.product || this.product.slug !== slug) return;
         this.relatedProducts = (items || []).filter((p) => p.slug !== slug).slice(0, 8);
