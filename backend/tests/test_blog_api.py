@@ -1,4 +1,6 @@
 import asyncio
+import base64
+import json
 from datetime import datetime, timedelta, timezone
 from typing import Dict
 
@@ -653,6 +655,11 @@ def test_blog_view_count_deduped_per_session_and_skips_bots(test_app: Dict[str, 
     assert first.status_code == 200, first.text
     assert get_view_count() == 1
     assert client.cookies.get("blog_viewed"), "Expected de-dupe cookie to be set"
+    cookie_payload_raw = base64.urlsafe_b64decode(client.cookies["blog_viewed"].encode("utf-8")).decode("utf-8")
+    cookie_payload = json.loads(cookie_payload_raw)
+    assert isinstance(cookie_payload, list) and cookie_payload
+    assert "pid" in cookie_payload[0]
+    assert "slug" not in cookie_payload[0]
 
     second = client.get("/api/v1/blog/posts/view-post", params={"lang": "en"})
     assert second.status_code == 200, second.text
