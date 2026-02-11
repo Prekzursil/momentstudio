@@ -1,6 +1,5 @@
 import base64
 import json
-import re
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -50,8 +49,6 @@ router = APIRouter(prefix="/blog", tags=["blog"])
 
 BLOG_VIEW_COOKIE = "blog_viewed"
 BLOG_VIEW_COOKIE_TTL_SECONDS = 6 * 60 * 60
-BLOG_VIEW_COOKIE_MAX_ITEMS = 30
-_COOKIE_SLUG_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,117}[a-z0-9])?$")
 
 
 def _is_probable_bot(user_agent: str) -> bool:
@@ -87,32 +84,33 @@ def _decode_view_cookie(value: str) -> list[tuple[str, int]]:
     for item in data:
         if not isinstance(item, dict):
             continue
-        slug = _sanitize_cookie_slug(item.get("slug"))
+        post_id = _normalize_cookie_post_id(item.get("pid"))
         ts = item.get("ts")
-        if not slug:
+        if not post_id:
             continue
         if not isinstance(ts, int):
             try:
                 ts = int(ts)
             except Exception:
                 continue
-        out.append((slug, ts))
+        out.append((post_id, ts))
     return out
 
 
 def _encode_view_cookie(entries: list[tuple[str, int]]) -> str:
-    payload = [{"slug": slug, "ts": ts} for slug, ts in entries if slug and isinstance(ts, int)]
+    payload = [{"pid": post_id, "ts": ts} for post_id, ts in entries if post_id and isinstance(ts, int)]
     raw = json.dumps(payload, separators=(",", ":"))
     return base64.urlsafe_b64encode(raw.encode("utf-8")).decode("utf-8")
 
 
-def _sanitize_cookie_slug(value: object) -> str:
-    candidate = str(value or "").strip().lower()
+def _normalize_cookie_post_id(value: object) -> str:
+    candidate = str(value or "").strip()
     if not candidate:
         return ""
-    if not _COOKIE_SLUG_RE.fullmatch(candidate):
+    try:
+        return str(uuid.UUID(candidate))
+    except Exception:
         return ""
-    return candidate
 
 
 class BlogCommentSubscriptionRequest(BaseModel):
@@ -276,35 +274,22 @@ async def get_blog_post(
     cookie_needs_update = False
     ua = request.headers.get("user-agent") or ""
     if not _is_probable_bot(ua):
-        safe_slug = _sanitize_cookie_slug(payload.get("slug") if isinstance(payload, dict) else "")
-        if not safe_slug:
+        post_cookie_id = _normalize_cookie_post_id(block.id)
+        if not post_cookie_id:
             return BlogPostRead.model_validate(payload)
         now = int(time.time())
         existing = _decode_view_cookie(request.cookies.get(BLOG_VIEW_COOKIE) or "")
-        fresh = [(s, ts) for s, ts in existing if now - ts < BLOG_VIEW_COOKIE_TTL_SECONDS]
+        fresh = [(post_id, ts) for post_id, ts in existing if now - ts < BLOG_VIEW_COOKIE_TTL_SECONDS]
         if len(fresh) != len(existing):
             cookie_needs_update = True
-        seen = any(s == safe_slug for s, _ in fresh)
+        seen = any(post_id == post_cookie_id for post_id, _ in fresh)
         if not seen:
             should_count_view = True
             cookie_needs_update = True
-            fresh = [(s, ts) for s, ts in fresh if s != safe_slug]
-            fresh.insert(0, (safe_slug, now))
-        # De-dupe and cap size
-        deduped: list[tuple[str, int]] = []
-        seen_slugs: set[str] = set()
-        for s, ts in fresh:
-            if s in seen_slugs:
-                cookie_needs_update = True
-                continue
-            seen_slugs.add(s)
-            deduped.append((s, ts))
-            if len(deduped) >= BLOG_VIEW_COOKIE_MAX_ITEMS:
-                break
         if cookie_needs_update:
             response.set_cookie(
                 BLOG_VIEW_COOKIE,
-                _encode_view_cookie(deduped),
+                _encode_view_cookie([(post_cookie_id, now)]),
                 httponly=True,
                 secure=settings.secure_cookies,
                 samesite=settings.cookie_samesite.lower(),
