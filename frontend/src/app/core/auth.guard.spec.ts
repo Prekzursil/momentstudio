@@ -24,6 +24,13 @@ describe('adminSectionGuard', () => {
     checkAdminAccess: jasmine.createSpy('checkAdminAccess'),
   };
 
+  async function resolveGuardResult(result: unknown): Promise<unknown> {
+    if (isObservable(result)) {
+      return firstValueFrom(result);
+    }
+    return await Promise.resolve(result);
+  }
+
   beforeEach(() => {
     toast.error.calls.reset();
     Object.values(authMock).forEach((spy) => {
@@ -77,9 +84,3 @@ describe('adminSectionGuard', () => {
     expect(result).toBeTrue();
   });
 });
-  async function resolveGuardResult(result: unknown): Promise<unknown> {
-    if (isObservable(result)) {
-      return firstValueFrom(result);
-    }
-    return await Promise.resolve(result);
-  }
