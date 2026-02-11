@@ -99,15 +99,14 @@ def test_admin_client_error_logs_metadata_only(
     assert captured["message"] == "admin_client_error"
     extra = captured.get("extra")
     assert isinstance(extra, dict)
-    assert extra.get("kind") == "window_error"
-    assert extra.get("message_len") == len(payload["message"])
-    assert extra.get("stack_len") == len(payload["stack"])
-    assert extra.get("context_key_count") == len(payload["context"])
-    assert isinstance(extra.get("error_fingerprint"), str)
-    assert len(str(extra.get("error_fingerprint"))) == 24
+    assert extra.get("source") == "admin_observability"
+    assert extra.get("user_id")
+    assert "admin" in str(extra.get("user_role"))
     assert "message" not in extra
     assert "stack" not in extra
     assert "url" not in extra
     assert "route" not in extra
     assert "user_agent" not in extra
     assert "context" not in extra
+    assert "kind" not in extra
+    assert "error_fingerprint" not in extra
