@@ -772,14 +772,19 @@ async def update_product_variants(
 
 
 @router.get("/collections/featured", response_model=list[FeaturedCollectionRead])
-async def list_featured_collections(session: AsyncSession = Depends(get_session)) -> list[FeaturedCollectionRead]:
+async def list_featured_collections(
+    session: AsyncSession = Depends(get_session),
+    lang: str | None = Query(default=None, pattern="^(en|ro)$"),
+) -> list[FeaturedCollectionRead]:
     await catalog_service.auto_publish_due_sales(session)
     await catalog_service.apply_due_product_schedules(session)
-    collections = await catalog_service.list_featured_collections(session)
+    collections = await catalog_service.list_featured_collections(session, lang=lang)
     payload: list[FeaturedCollectionRead] = []
     for collection in collections:
         products = []
         for product in getattr(collection, "products", []) or []:
+            if lang:
+                catalog_service.apply_product_translation(product, lang)
             model = ProductReadBrief.model_validate(product)
             if not catalog_service.is_sale_active(product):
                 model.sale_price = None
@@ -1194,6 +1199,7 @@ async def approve_review(
 @router.get("/products/{slug}/related", response_model=list[ProductRead])
 async def related_products(
     slug: str,
+    lang: str | None = Query(default=None, pattern="^(en|ro)$"),
     session: AsyncSession = Depends(get_session),
     current_user=Depends(get_current_user_optional),
 ) -> list[Product]:
@@ -1217,6 +1223,8 @@ async def related_products(
     related = curated or await catalog_service.get_related_products(session, product, limit=4)
     payload_items = []
     for p in related:
+        if lang:
+            catalog_service.apply_product_translation(p, lang)
         model = ProductRead.model_validate(p)
         if not catalog_service.is_sale_active(p):
             model.sale_price = None
@@ -1227,6 +1235,7 @@ async def related_products(
 @router.get("/products/{slug}/upsells", response_model=list[ProductRead])
 async def upsell_products(
     slug: str,
+    lang: str | None = Query(default=None, pattern="^(en|ro)$"),
     session: AsyncSession = Depends(get_session),
     current_user=Depends(get_current_user_optional),
 ) -> list[Product]:
@@ -1250,6 +1259,8 @@ async def upsell_products(
     )
     payload_items = []
     for p in upsells:
+        if lang:
+            catalog_service.apply_product_translation(p, lang)
         model = ProductRead.model_validate(p)
         if not catalog_service.is_sale_active(p):
             model.sale_price = None

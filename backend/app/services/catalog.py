@@ -1521,18 +1521,23 @@ async def get_featured_collection_by_slug(session: AsyncSession, slug: str) -> F
     return result.scalar_one_or_none()
 
 
-async def list_featured_collections(session: AsyncSession) -> list[FeaturedCollection]:
+async def list_featured_collections(session: AsyncSession, lang: str | None = None) -> list[FeaturedCollection]:
+    products_loader = selectinload(
+        FeaturedCollection.products.and_(
+            Product.is_deleted.is_(False),
+            Product.is_active.is_(True),
+            Product.status == ProductStatus.published,
+        )
+    )
+    if lang:
+        products_loader = products_loader.options(
+            selectinload(Product.translations),
+            selectinload(Product.category).selectinload(Category.translations),
+        )
+
     result = await session.execute(
         select(FeaturedCollection)
-        .options(
-            selectinload(
-                FeaturedCollection.products.and_(
-                    Product.is_deleted.is_(False),
-                    Product.is_active.is_(True),
-                    Product.status == ProductStatus.published,
-                )
-            )
-        )
+        .options(products_loader)
         .order_by(FeaturedCollection.created_at.desc())
     )
     return list(result.scalars().unique())

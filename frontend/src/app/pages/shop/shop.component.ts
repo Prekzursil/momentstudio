@@ -972,12 +972,13 @@ export class ShopComponent implements OnInit, OnDestroy {
 
 	  ngOnInit(): void {
 	    this.setMetaTags();
-		    this.langSub = this.translate.onLangChange.subscribe(() => {
-		      this.setMetaTags();
-		      this.cancelCreateCategory();
-		      this.cancelRenameCategory();
-		      this.fetchCategories();
-		    });
+	    this.langSub = this.translate.onLangChange.subscribe(() => {
+	      this.setMetaTags();
+	      this.cancelCreateCategory();
+	      this.cancelRenameCategory();
+	      this.fetchCategories();
+	      this.loadProducts(false);
+	    });
 	    this.initScrollRestoreFromSession();
 	    const dataCategories = (this.route.snapshot.data['categories'] as Category[]) ?? [];
     if (dataCategories.length) {
@@ -2024,12 +2025,14 @@ export class ShopComponent implements OnInit, OnDestroy {
 	    const isSale = this.activeCategorySlug === 'sale';
 	    const categorySlug = isSale ? undefined : (this.activeSubcategorySlug || this.activeCategorySlug || undefined);
 	    const includeUnpublished = this.canEditProducts();
+      const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
 	    this.catalog
 	      .listProducts({
 	        search: this.filters.search || undefined,
 	        category_slug: categorySlug,
 	        on_sale: isSale ? true : undefined,
 	        include_unpublished: includeUnpublished ? true : undefined,
+          lang,
 	        min_price: this.filters.min_price > this.priceMinBound ? this.filters.min_price : undefined,
 	        max_price: this.filters.max_price < this.priceMaxBound ? this.filters.max_price : undefined,
 	        tags: Array.from(this.filters.tags),

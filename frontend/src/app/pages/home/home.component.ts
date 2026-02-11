@@ -1069,12 +1069,14 @@ export class HomeComponent implements OnInit, OnDestroy {
   loadFeatured(): void {
     this.featuredLoading.set(true);
     this.featuredError.set(false);
+    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     this.catalog
       .listProducts({
         is_featured: true,
         limit: 6,
         sort: 'newest',
-        page: 1
+        page: 1,
+        lang
       })
       .subscribe({
         next: (resp) => {
@@ -1092,12 +1094,14 @@ export class HomeComponent implements OnInit, OnDestroy {
 	  loadSaleProducts(): void {
 	    this.saleLoading.set(true);
 	    this.saleError.set(false);
+      const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
 	    this.catalog
 	      .listProducts({
 	        on_sale: true,
 	        limit: 6,
 	        sort: 'newest',
-	        page: 1
+	        page: 1,
+          lang
 	      })
       .subscribe({
         next: (resp) => {
@@ -1115,11 +1119,13 @@ export class HomeComponent implements OnInit, OnDestroy {
   loadNewArrivals(): void {
     this.newArrivalsLoading.set(true);
     this.newArrivalsError.set(false);
+    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     this.catalog
       .listProducts({
         limit: 6,
         sort: 'newest',
-        page: 1
+        page: 1,
+        lang
       })
       .subscribe({
         next: (resp) => {
@@ -1137,7 +1143,8 @@ export class HomeComponent implements OnInit, OnDestroy {
   loadCollections(): void {
     this.collectionsLoading.set(true);
     this.collectionsError.set(false);
-    this.catalog.listFeaturedCollections().subscribe({
+    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
+    this.catalog.listFeaturedCollections(lang).subscribe({
       next: (cols) => {
         this.featuredCollections = cols;
         this.collectionsLoading.set(false);
