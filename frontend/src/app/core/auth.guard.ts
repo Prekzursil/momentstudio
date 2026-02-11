@@ -56,6 +56,10 @@ export const adminSectionGuard =
         }
         if (!auth.canAccessAdminSection(section)) {
           toast.error(translate.instant('errors.sectionDenied'));
+          const currentPath = (state.url || '').split('?')[0];
+          if (currentPath === '/admin/dashboard') {
+            return of(router.parseUrl('/'));
+          }
           return of(router.parseUrl('/admin/dashboard'));
         }
         return auth.checkAdminAccess({ silent: true }).pipe(
@@ -79,6 +83,10 @@ export const adminSectionGuard =
             }
             if (code === 'training_readonly') {
               toast.error(translate.instant('adminUi.trainingMode.hint'));
+              const currentPath = (state.url || '').split('?')[0];
+              if (section === 'dashboard' || currentPath === '/admin/dashboard') {
+                return of(true);
+              }
               return of(router.parseUrl('/admin/dashboard'));
             }
             toast.error(detail || translate.instant('errors.sectionDenied'));
