@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ContainerComponent } from '../../layout/container.component';
 import { ButtonComponent } from '../../shared/button.component';
-import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
+import { PageHeaderComponent } from '../../shared/page-header.component';
 import { CartItem, CartStore } from '../../core/cart.store';
 import { CartApi } from '../../core/cart.api';
 import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
@@ -21,6 +21,8 @@ import { ProductCardComponent } from '../../shared/product-card.component';
 import { LockerProvider } from '../../core/shipping.service';
 import { CheckoutDeliveryType, CheckoutPrefsService } from '../../core/checkout-prefs.service';
 import { AnalyticsService } from '../../core/analytics.service';
+import { LoadingStateComponent } from '../../shared/loading-state.component';
+import { ActionBarComponent } from '../../shared/action-bar.component';
 
 type SavedForLaterItem = {
   product_id: string;
@@ -39,42 +41,25 @@ const SAVED_FOR_LATER_KEY = 'cart_saved_for_later';
 @Component({
   selector: 'app-cart',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, ContainerComponent, ButtonComponent, BreadcrumbComponent, LocalizedCurrencyPipe, TranslateModule, ImgFallbackDirective, ProductCardComponent],
+  imports: [CommonModule, FormsModule, RouterLink, ContainerComponent, ButtonComponent, PageHeaderComponent, LocalizedCurrencyPipe, TranslateModule, ImgFallbackDirective, ProductCardComponent, LoadingStateComponent, ActionBarComponent],
   template: `
     <app-container classes="py-10 grid gap-6">
-      <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
+      <app-page-header [crumbs]="crumbs" [titleKey]="'cart.title'">
+        <div pageHeaderActions class="flex items-center gap-3">
+          <span class="text-sm text-slate-600 dark:text-slate-300">{{ 'cart.items' | translate : { count: items().length } }}</span>
+          <span *ngIf="syncing()" class="text-xs text-slate-500 dark:text-slate-400">{{ 'cart.syncing' | translate }}</span>
+          <app-button
+            *ngIf="items().length"
+            size="sm"
+            variant="ghost"
+            [label]="'cart.clear' | translate"
+            (action)="clearCart()"
+          ></app-button>
+        </div>
+      </app-page-header>
       <div class="grid lg:grid-cols-[2fr_1fr] gap-6 items-start">
         <section class="grid gap-4">
-          <div class="flex items-center justify-between">
-            <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'cart.title' | translate }}</h1>
-            <div class="flex items-center gap-3">
-              <span class="text-sm text-slate-600 dark:text-slate-300">{{ 'cart.items' | translate : { count: items().length } }}</span>
-              <span *ngIf="syncing()" class="text-xs text-slate-500 dark:text-slate-400">{{ 'cart.syncing' | translate }}</span>
-              <app-button
-                *ngIf="items().length"
-                size="sm"
-                variant="ghost"
-                [label]="'cart.clear' | translate"
-                (action)="clearCart()"
-              ></app-button>
-            </div>
-          </div>
-
-          <div *ngIf="syncing() && !items().length" class="grid gap-3">
-            <div
-              *ngFor="let _ of skeletonRows"
-              class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 animate-pulse dark:border-slate-800 dark:bg-slate-900"
-            >
-              <div class="flex gap-4">
-                <div class="h-24 w-24 rounded-xl bg-slate-100 dark:bg-slate-800"></div>
-                <div class="flex-1 grid gap-2">
-                  <div class="h-4 w-1/3 rounded bg-slate-100 dark:bg-slate-800"></div>
-                  <div class="h-3 w-1/4 rounded bg-slate-100 dark:bg-slate-800"></div>
-                  <div class="h-8 w-56 rounded bg-slate-100 dark:bg-slate-800"></div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <app-loading-state *ngIf="syncing() && !items().length" [rows]="3"></app-loading-state>
 
           <div *ngIf="!syncing() && !items().length" class="border border-dashed border-slate-200 rounded-2xl p-10 text-center grid gap-3 dark:border-slate-800">
             <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'cart.emptyTitle' | translate }}</p>
@@ -336,12 +321,14 @@ const SAVED_FOR_LATER_KEY = 'cart_saved_for_later';
               {{ promoMessage }}
             </p>
           </div>
-          <app-button
-            [label]="'cart.checkout' | translate"
-            [routerLink]="['/checkout']"
-            [disabled]="!items().length"
-          ></app-button>
-          <app-button variant="ghost" [label]="'cart.continue' | translate" [routerLink]="['/shop']"></app-button>
+          <app-action-bar [stickyOnMobile]="true">
+            <app-button
+              [label]="'cart.checkout' | translate"
+              [routerLink]="['/checkout']"
+              [disabled]="!items().length"
+            ></app-button>
+            <app-button variant="ghost" [label]="'cart.continue' | translate" [routerLink]="['/shop']"></app-button>
+          </app-action-bar>
 	        </aside>
 	      </div>
 

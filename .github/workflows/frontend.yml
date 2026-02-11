@@ -7,11 +7,14 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Detect frontend
         id: detect
@@ -21,7 +24,7 @@ jobs:
             echo "No frontend package.json found; skipping npm steps."
           fi
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         if: steps.detect.outputs.missing != 'true'
         with:
           node-version: '24'
@@ -35,7 +38,7 @@ jobs:
       - name: Set up Chrome
         if: steps.detect.outputs.missing != 'true'
         id: chrome
-        uses: browser-actions/setup-chrome@v1
+        uses: browser-actions/setup-chrome@c785b87e244131f27c9f19c1a33e2ead956ab7ce # v1
 
       - name: Install dependencies
         if: steps.detect.outputs.missing != 'true'

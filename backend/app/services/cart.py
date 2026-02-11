@@ -31,6 +31,31 @@ from app.core.logging_config import request_id_ctx_var
 cart_logger = logging.getLogger("app.cart")
 
 
+def _sanitize_log_text(value: str | None, *, max_len: int = 256) -> str | None:
+    if value is None:
+        return None
+    cleaned = value.replace("\r", "\\r").replace("\n", "\\n")
+    if len(cleaned) > max_len:
+        return f"{cleaned[:max_len]}…"
+    return cleaned
+
+
+def _sanitize_log_value(value: object) -> object:
+    if isinstance(value, dict):
+        out: dict[str, object] = {}
+        for raw_key, raw_value in value.items():
+            safe_key = _sanitize_log_text(str(raw_key), max_len=128) or "key"
+            out[safe_key] = _sanitize_log_value(raw_value)
+        return out
+    if isinstance(value, list):
+        return [_sanitize_log_value(item) for item in value[:50]]
+    if isinstance(value, str):
+        return _sanitize_log_text(value, max_len=1024) or ""
+    if isinstance(value, (int, float, bool)) or value is None:
+        return value
+    return _sanitize_log_text(str(value), max_len=1024) or ""
+
+
 def _log_cart(event: str, cart: Cart, user_id: UUID | None = None) -> None:
     cart_id = getattr(cart, "id", None)
     cart_logger.info(
@@ -673,9 +698,9 @@ async def run_abandoned_cart_job(session: AsyncSession, max_age_hours: int = 24)
 
 
 def record_cart_event(event: str, payload: dict | None = None) -> None:
-    extra = payload.copy() if payload else {}
-    extra["request_id"] = request_id_ctx_var.get()
-    cart_logger.info(event, extra=extra)
+    _ = event
+    _ = payload
+    cart_logger.info("cart_event")
 
 
 async def reorder_from_order(session: AsyncSession, user_id: UUID, order_id: UUID) -> Cart:

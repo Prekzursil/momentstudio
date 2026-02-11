@@ -3,11 +3,13 @@ import { Component, Input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
 import { ButtonComponent } from '../../shared/button.component';
+import { ActionBarComponent } from '../../shared/action-bar.component';
+import { StatusBadgeComponent } from '../../shared/status-badge.component';
 
 @Component({
   selector: 'app-checkout-payment-step',
   standalone: true,
-  imports: [CommonModule, RouterLink, TranslateModule, ButtonComponent],
+  imports: [CommonModule, RouterLink, TranslateModule, ButtonComponent, ActionBarComponent, StatusBadgeComponent],
   template: `
     <div id="checkout-step-4" class="scroll-mt-24 grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
       <p class="text-sm font-semibold text-slate-800 uppercase tracking-[0.2em] dark:text-slate-200">{{ 'checkout.step4' | translate }}</p>
@@ -132,7 +134,7 @@ import { ButtonComponent } from '../../shared/button.component';
       </p>
 
       <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-300">
-        <span class="uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{{ 'checkout.acceptedCards' | translate }}</span>
+        <app-status-badge value="accepted" [labelKey]="'checkout.acceptedCards'"></app-status-badge>
         <div class="rounded-lg bg-white px-2 py-1 shadow-sm ring-1 ring-slate-200 dark:bg-slate-50 dark:ring-slate-200">
           <img
             src="assets/payments/netopia-visa-mastercard.png"
@@ -201,7 +203,7 @@ import { ButtonComponent } from '../../shared/button.component';
       </div>
     </div>
 
-    <div class="flex gap-3">
+    <app-action-bar [stickyOnMobile]="true">
       <app-button
         [label]="vm.placing ? ('checkout.placingOrder' | translate) : ('checkout.placeOrder' | translate)"
         type="submit"
@@ -213,7 +215,7 @@ import { ButtonComponent } from '../../shared/button.component';
         ></span>
       </app-button>
       <app-button variant="ghost" [label]="'checkout.backToCart' | translate" routerLink="/cart"></app-button>
-    </div>
+    </app-action-bar>
   `
 })
 export class CheckoutPaymentStepComponent {

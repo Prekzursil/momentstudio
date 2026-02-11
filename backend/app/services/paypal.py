@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
+import re
 from typing import Any
+from urllib.parse import quote
 from uuid import uuid4
 
 import httpx
@@ -14,6 +16,7 @@ from app.services.payment_provider import is_mock_payments
 
 _token_cache: dict[str, dict[str, object]] = {}
 _SUPPORTED_CURRENCIES = {"EUR", "USD", "RON"}
+_PAYPAL_ID_RE = re.compile(r"^[A-Z0-9-]{8,64}$")
 
 
 def _paypal_env() -> str:
@@ -99,12 +102,11 @@ async def _get_access_token() -> str:
 
     client_id = _effective_client_id()
     client_secret = _effective_client_secret()
-    token_url = f"{_base_url()}/v1/oauth2/token"
 
     try:
-        async with httpx.AsyncClient(timeout=10) as client:
+        async with httpx.AsyncClient(base_url=_base_url(), timeout=10) as client:
             resp = await client.post(
-                token_url,
+                "/v1/oauth2/token",
                 data={"grant_type": "client_credentials"},
                 auth=(client_id, client_secret),
                 headers={"Accept": "application/json", "Accept-Language": "en_US"},
@@ -191,8 +193,6 @@ async def create_order_itemized(
     products, shipping, taxes, fees and discounts on PayPal checkout.
     """
     token = await _get_access_token()
-    orders_url = f"{_base_url()}/v2/checkout/orders"
-
     currency = _paypal_currency(currency_code)
     fx_per_ron = await _fx_per_ron(currency, fx_eur_per_ron=fx_eur_per_ron, fx_usd_per_ron=fx_usd_per_ron)
 
@@ -303,9 +303,9 @@ async def create_order_itemized(
         payload["purchase_units"][0]["items"] = converted_items
 
     try:
-        async with httpx.AsyncClient(timeout=15) as client:
+        async with httpx.AsyncClient(base_url=_base_url(), timeout=15) as client:
             resp = await client.post(
-                orders_url,
+                "/v2/checkout/orders",
                 json=payload,
                 headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
             )
@@ -341,24 +341,33 @@ def _sanitize_paypal_id(paypal_id: str) -> str:
     """
     if not isinstance(paypal_id, str):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid PayPal order id")
-    value = paypal_id.strip()
+    value = paypal_id.strip().upper()
     if not value:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid PayPal order id")
-    # Allow only alphanumerics and hyphens; disallow '/', '?', '#', etc.
-    if not value.replace("-", "").isalnum():
+    # PayPal IDs are uppercase letters/digits with optional hyphen separators.
+    if not _PAYPAL_ID_RE.fullmatch(value):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid PayPal order id")
     return value
+
+
+def _capture_path(paypal_order_id: str) -> str:
+    order_id = quote(_sanitize_paypal_id(paypal_order_id), safe="")
+    return f"/v2/checkout/orders/{order_id}/capture"
+
+
+def _refund_path(paypal_capture_id: str) -> str:
+    capture_id = quote(_sanitize_paypal_id(paypal_capture_id), safe="")
+    return f"/v2/payments/captures/{capture_id}/refund"
 
 
 async def capture_order(*, paypal_order_id: str) -> str:
     """Capture an approved PayPal order and return the PayPal capture id (if available)."""
     token = await _get_access_token()
-    safe_order_id = _sanitize_paypal_id(paypal_order_id)
-    capture_url = f"{_base_url()}/v2/checkout/orders/{safe_order_id}/capture"
+    capture_path = _capture_path(paypal_order_id)
     try:
-        async with httpx.AsyncClient(timeout=20) as client:
+        async with httpx.AsyncClient(base_url=_base_url(), timeout=20) as client:
             resp = await client.post(
-                capture_url,
+                capture_path,
                 headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
             )
             resp.raise_for_status()
@@ -392,7 +401,7 @@ async def refund_capture(
     configured PayPal settlement currency (EUR/USD) using the latest available FX rates.
     """
     token = await _get_access_token()
-    refund_url = f"{_base_url()}/v2/payments/captures/{paypal_capture_id}/refund"
+    refund_path = _refund_path(paypal_capture_id)
     payload: dict = {}
     if amount_ron is not None:
         currency = _paypal_currency(currency_code)
@@ -400,9 +409,9 @@ async def refund_capture(
         amount_converted = _convert_ron(Decimal(amount_ron), fx_per_ron)
         payload = {"amount": {"value": _format_amount(amount_converted), "currency_code": currency}}
     try:
-        async with httpx.AsyncClient(timeout=20) as client:
+        async with httpx.AsyncClient(base_url=_base_url(), timeout=20) as client:
             resp = await client.post(
-                refund_url,
+                refund_path,
                 json=payload,
                 headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
             )
@@ -437,7 +446,6 @@ async def verify_webhook_signature(*, headers: dict[str, str], event: dict[str, 
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing PayPal signature headers")
 
     token = await _get_access_token()
-    verify_url = f"{_base_url()}/v1/notifications/verify-webhook-signature"
     payload = {
         "auth_algo": auth_algo,
         "cert_url": cert_url,
@@ -448,9 +456,9 @@ async def verify_webhook_signature(*, headers: dict[str, str], event: dict[str, 
         "webhook_event": event,
     }
     try:
-        async with httpx.AsyncClient(timeout=15) as client:
+        async with httpx.AsyncClient(base_url=_base_url(), timeout=15) as client:
             resp = await client.post(
-                verify_url,
+                "/v1/notifications/verify-webhook-signature",
                 json=payload,
                 headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
             )

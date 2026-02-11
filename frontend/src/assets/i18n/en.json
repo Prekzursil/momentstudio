@@ -539,6 +539,7 @@
         "link": "Link Google",
         "unlink": "Unlink",
         "copy": "Linking Google lets you sign in faster. We never post without permission.",
+        "pendingLinkCopy": "Google authorization is ready. Enter your password and press “Link Google” to complete.",
         "passwordRequiredLink": "Enter your password to link Google.",
         "startLinkError": "Could not start Google link flow.",
         "passwordRequiredUnlink": "Enter your password to unlink Google.",
@@ -1532,6 +1533,7 @@
     "completeProfileRequiredCopy": "Please provide a few required details in your account before continuing.",
     "googleLinking": "Linking your Google account...",
     "googleLinkSuccess": "Google account linked",
+    "googleLinkContinueInAccount": "Return to Account → Security and confirm your password to finish linking Google.",
     "googleMissingCode": "Missing Google authorization code.",
     "googleLinkPasswordMissing": "Password required to link Google account.",
     "languageNotSaved": "Language not saved",
@@ -1712,6 +1714,7 @@
     },
     "nav": {
       "title": "Admin",
+      "openMenu": "Open admin menu",
       "searchPlaceholder": "Search admin…",
       "searchEmpty": "No matches.",
       "preferences": "Preferences",
@@ -1726,6 +1729,15 @@
       "support": "Support",
       "ops": "Ops",
       "content": "Content"
+    },
+    "navGroup": {
+      "overview": "Overview",
+      "ordersFulfillment": "Orders & fulfillment",
+      "catalog": "Catalog",
+      "content": "Content",
+      "customersSupport": "Customers & support",
+      "marketing": "Marketing",
+      "operationsSecurity": "Operations & security"
     },
     "uiMode": {
       "title": "Admin mode",
@@ -3681,6 +3693,8 @@
         "deleted": "Deleted"
       },
       "form": {
+        "workflowTitle": "Product workflow",
+        "workflowHint": "Keep the essentials together: naming, pricing, stock, and publish readiness.",
         "slug": "Product URL",
         "slugAutoHint": "Auto-generated after save.",
         "slugHelp": "Auto-generated from the name. Used in the product link.",
@@ -4258,6 +4272,8 @@
         "updated_at": "Updated at"
       },
       "search": "Search",
+      "filtersTitle": "Order filters",
+      "filtersHint": "Use filters and saved views to narrow large order sets quickly.",
       "statusFilter": "Status",
       "sla": {
         "filter": "SLA",
@@ -4351,6 +4367,10 @@
       "detailTitle": "Order",
       "backToList": "Back to orders",
       "tracking": "Tracking",
+      "workflow": {
+        "title": "Order workflow",
+        "hint": "Update status, tracking, and shipping assets from one place."
+      },
       "updateStatus": "Update status",
       "trackingNumber": "Tracking number",
       "trackingUrl": "Tracking URL",
@@ -4999,6 +5019,10 @@
     "content": {
       "title": "Content",
       "subtitle": "Edit the homepage, pages, blog, and site settings.",
+      "workspace": {
+        "title": "Content workspace",
+        "hint": "Switch section, preview mode, and language without losing editor context."
+      },
       "editorMode": {
         "label": "Editor mode",
         "simple": "Simple",

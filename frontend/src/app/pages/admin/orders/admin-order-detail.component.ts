@@ -10,6 +10,8 @@ import { ErrorStateComponent } from '../../../shared/error-state.component';
 import { extractRequestId } from '../../../shared/http-error';
 import { InputComponent } from '../../../shared/input.component';
 import { SkeletonComponent } from '../../../shared/skeleton.component';
+import { ActionBarComponent } from '../../../shared/action-bar.component';
+import { FormSectionComponent } from '../../../shared/form-section.component';
 import { ToastService } from '../../../core/toast.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
 import { Address, ReceiptShareToken } from '../../../core/account.service';
@@ -75,6 +77,8 @@ type OrderAction =
     ErrorStateComponent,
     InputComponent,
     SkeletonComponent,
+    ActionBarComponent,
+    FormSectionComponent,
     LocalizedCurrencyPipe,
     CustomerTimelineComponent
   ],
@@ -405,6 +409,7 @@ type OrderAction =
               </div>
             </div>
 
+            <app-form-section [titleKey]="'adminUi.orders.workflow.title'" [descriptionKey]="'adminUi.orders.workflow.hint'">
 	            <div class="grid gap-3 md:grid-cols-2">
 	              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
 	                {{ 'adminUi.orders.updateStatus' | translate }}
@@ -521,7 +526,7 @@ type OrderAction =
               </div>
             </div>
 
-            <div class="flex items-center gap-2">
+            <app-action-bar [stickyOnMobile]="true">
               <app-button
                 size="sm"
                 [label]="'adminUi.orders.save' | translate"
@@ -529,7 +534,8 @@ type OrderAction =
                 (action)="save()"
               ></app-button>
               <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.saveHint' | translate }}</span>
-            </div>
+            </app-action-bar>
+            </app-form-section>
 
             <div class="grid gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
               <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.actionsTitle' | translate }}</div>

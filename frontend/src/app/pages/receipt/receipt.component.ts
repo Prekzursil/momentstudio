@@ -2,7 +2,6 @@ import { CommonModule, DatePipe } from '@angular/common';
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { Subscription } from 'rxjs';
-import { AuthService } from '../../core/auth.service';
 import { ReceiptRead, ReceiptService } from '../../core/receipt.service';
 import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
 
@@ -38,7 +37,7 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
               Download PDF
             </a>
             <button
-              *ngIf="token && receipt && auth.isAuthenticated()"
+              *ngIf="token && receipt?.pii_redacted"
               type="button"
               class="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900"
               [disabled]="loading"
@@ -68,7 +67,7 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
             <div class="grid gap-1">
               <p>This shared receipt hides personal details by default.</p>
               <p>Această chitanță partajată ascunde datele personale în mod implicit.</p>
-              <p class="text-xs text-slate-500 dark:text-slate-400" *ngIf="auth.isAuthenticated() && reveal">
+              <p class="text-xs text-slate-500 dark:text-slate-400" *ngIf="reveal">
                 Full details are available only to the order owner or an admin.
               </p>
             </div>
@@ -240,7 +239,7 @@ export class ReceiptComponent implements OnInit, OnDestroy {
 
   private sub?: Subscription;
 
-  constructor(private route: ActivatedRoute, private receipts: ReceiptService, public auth: AuthService) {}
+  constructor(private route: ActivatedRoute, private receipts: ReceiptService) {}
 
   paymentMethodLabel(): string {
     const method = (this.receipt?.payment_method ?? '').trim().toLowerCase();

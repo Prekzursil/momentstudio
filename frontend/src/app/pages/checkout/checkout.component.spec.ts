@@ -118,6 +118,15 @@ describe('CheckoutComponent', () => {
     expect(payload.accept_terms).toBeTrue();
     expect(payload.accept_privacy).toBeTrue();
     expect(payload.billing_line1).toBeUndefined();
-    expect(router.navigate).toHaveBeenCalledWith(['/checkout/success']);
+    expect(router.navigate).toHaveBeenCalledWith(
+      ['/checkout/success'],
+      jasmine.objectContaining({
+        state: jasmine.objectContaining({
+          checkoutSummary: jasmine.objectContaining({
+            order_id: 'order1',
+          }),
+        }),
+      }),
+    );
   }));
 });

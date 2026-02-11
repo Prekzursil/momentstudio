@@ -710,7 +710,7 @@ import { AccountComponent } from './account.component';
                 variant="ghost"
                 [label]="'account.security.google.link' | translate"
                 *ngIf="!account.googleEmail()"
-                [disabled]="account.googleBusy || !account.googlePassword"
+                [disabled]="account.googleBusy || (account.googleLinkPending && !account.googlePassword)"
                 (action)="account.linkGoogle()"
               ></app-button>
               <app-button
@@ -724,6 +724,9 @@ import { AccountComponent } from './account.component';
             </div>
           </div>
           <p *ngIf="account.googleError" class="text-xs text-rose-700 dark:text-rose-300">{{ account.googleError }}</p>
+          <p *ngIf="account.googleLinkPending" class="text-xs text-amber-700 dark:text-amber-300">
+            {{ 'account.security.google.pendingLinkCopy' | translate }}
+          </p>
           <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'account.security.google.copy' | translate }}</p>
         </div>
 

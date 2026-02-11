@@ -3,7 +3,17 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 function parseDotEnv(contents) {
-  const result = {};
+  const result = {
+    API_BASE_URL: undefined,
+    APP_ENV: undefined,
+    APP_VERSION: undefined,
+    STRIPE_ENABLED: undefined,
+    PAYPAL_ENABLED: undefined,
+    NETOPIA_ENABLED: undefined,
+    ADDRESS_AUTOCOMPLETE_ENABLED: undefined,
+    SENTRY_DSN: undefined,
+    CAPTCHA_SITE_KEY: undefined
+  };
   for (const line of contents.split(/\r?\n/)) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
@@ -17,7 +27,37 @@ function parseDotEnv(contents) {
     ) {
       value = value.slice(1, -1);
     }
-    result[key] = value;
+    switch (key) {
+      case 'API_BASE_URL':
+        result.API_BASE_URL = value;
+        break;
+      case 'APP_ENV':
+        result.APP_ENV = value;
+        break;
+      case 'APP_VERSION':
+        result.APP_VERSION = value;
+        break;
+      case 'STRIPE_ENABLED':
+        result.STRIPE_ENABLED = value;
+        break;
+      case 'PAYPAL_ENABLED':
+        result.PAYPAL_ENABLED = value;
+        break;
+      case 'NETOPIA_ENABLED':
+        result.NETOPIA_ENABLED = value;
+        break;
+      case 'ADDRESS_AUTOCOMPLETE_ENABLED':
+        result.ADDRESS_AUTOCOMPLETE_ENABLED = value;
+        break;
+      case 'SENTRY_DSN':
+        result.SENTRY_DSN = value;
+        break;
+      case 'CAPTCHA_SITE_KEY':
+        result.CAPTCHA_SITE_KEY = value;
+        break;
+      default:
+        break;
+    }
   }
   return result;
 }

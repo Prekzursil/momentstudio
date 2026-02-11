@@ -1,18 +1,20 @@
 import { CommonModule } from '@angular/common';
 import { Component, EffectRef, OnDestroy, OnInit, computed, effect, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Params, Router } from '@angular/router';
 import { CatalogService, Category, PaginationMeta, Product, SortOption } from '../../core/catalog.service';
 import { ContainerComponent } from '../../layout/container.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { InputComponent } from '../../shared/input.component';
 import { ProductCardComponent } from '../../shared/product-card.component';
 import { ProductQuickViewModalComponent } from '../../shared/product-quick-view-modal.component';
-import { SkeletonComponent } from '../../shared/skeleton.component';
 import { AdminCategoryDeletePreview, AdminCategoryMergePreview, AdminService } from '../../core/admin.service';
 import { StorefrontAdminModeService } from '../../core/storefront-admin-mode.service';
 import { ToastService } from '../../core/toast.service';
-import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
+import { PageHeaderComponent } from '../../shared/page-header.component';
+import { InlineErrorCardComponent } from '../../shared/inline-error-card.component';
+import { EmptyStateComponent } from '../../shared/empty-state.component';
+import { LoadingStateComponent } from '../../shared/loading-state.component';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Subscription, combineLatest, forkJoin, map, switchMap } from 'rxjs';
 import { Meta, Title } from '@angular/platform-browser';
@@ -32,19 +34,20 @@ interface ShopFilterChip {
   imports: [
     CommonModule,
     FormsModule,
-    RouterLink,
     ContainerComponent,
     ButtonComponent,
     InputComponent,
     ProductCardComponent,
     ProductQuickViewModalComponent,
-    SkeletonComponent,
-    BreadcrumbComponent,
+    PageHeaderComponent,
+    InlineErrorCardComponent,
+    EmptyStateComponent,
+    LoadingStateComponent,
     TranslateModule
   ],
   template: `
 	    <app-container classes="pt-10 pb-24 lg:pb-10 grid gap-6">
-      <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
+      <app-page-header [crumbs]="crumbs" [titleKey]="'nav.shop'"></app-page-header>
       <div class="grid gap-8 lg:grid-cols-[280px_1fr]">
         <aside id="shop-filters" class="border border-slate-200 rounded-2xl p-4 bg-white h-fit space-y-6 scroll-mt-24 dark:border-slate-800 dark:bg-slate-900">
           <div class="space-y-3">
@@ -649,37 +652,37 @@ interface ShopFilterChip {
             {{ 'adminUi.storefront.products.reorderHint' | translate }}
           </p>
 
-          <div *ngIf="loading()" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-4">
-            <div
-              *ngFor="let i of placeholders"
-              class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:bg-slate-900 dark:border-slate-800 dark:shadow-none"
-            >
-              <app-skeleton height="200px"></app-skeleton>
-              <div class="grid gap-2">
-                <app-skeleton height="16px" width="80%"></app-skeleton>
-                <app-skeleton height="16px" width="55%"></app-skeleton>
-                <app-skeleton height="14px" width="92%"></app-skeleton>
-              </div>
-            </div>
-          </div>
+          <app-loading-state *ngIf="loading()" [rows]="3"></app-loading-state>
 
-          <div *ngIf="hasError()" class="border border-amber-200 bg-amber-50 rounded-2xl p-6 text-center grid gap-3 dark:border-amber-900/40 dark:bg-amber-950/30">
-            <p class="text-lg font-semibold text-amber-900 dark:text-amber-100">{{ 'shop.errorTitle' | translate }}</p>
-            <p class="text-sm text-amber-800 dark:text-amber-200">{{ 'shop.errorCopy' | translate }}</p>
-            <div class="flex justify-center gap-3">
-              <app-button [label]="'shop.retry' | translate" size="sm" (action)="loadProducts()"></app-button>
+          <div *ngIf="hasError()" class="grid gap-3">
+            <app-inline-error-card
+              [titleKey]="'shop.errorTitle'"
+              [messageKey]="'shop.errorCopy'"
+              [retryLabelKey]="'shop.retry'"
+              [showContact]="false"
+              [backToUrl]="null"
+              (retry)="loadProducts()"
+            ></app-inline-error-card>
+            <div class="flex justify-center">
               <app-button [label]="'shop.reset' | translate" size="sm" variant="ghost" (action)="resetFilters()"></app-button>
             </div>
           </div>
 
-          <div *ngIf="!loading() && !hasError() && products.length === 0" class="border border-dashed border-slate-200 rounded-2xl p-10 text-center grid gap-2 dark:border-slate-800">
-            <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'shop.noResults' | translate }}</p>
-            <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'shop.tryAdjust' | translate }}</p>
-            <div *ngIf="rootCategories.length" class="mt-4 grid gap-2">
+          <div *ngIf="!loading() && !hasError() && products.length === 0" class="grid gap-4">
+            <app-empty-state
+              icon="🧭"
+              [titleKey]="'shop.noResults'"
+              [copyKey]="'shop.tryAdjust'"
+              [primaryActionLabelKey]="'shop.reset'"
+              [secondaryActionLabelKey]="'shop.backHome'"
+              [secondaryActionUrl]="'/'"
+              (primaryAction)="resetFilters()"
+            ></app-empty-state>
+            <div *ngIf="rootCategories.length" class="mt-1 grid gap-2">
               <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
                 {{ 'shop.suggestedCategories' | translate }}
               </p>
-              <div class="flex flex-wrap justify-center gap-2">
+              <div class="flex flex-wrap gap-2">
                 <button
                   type="button"
                   class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-800 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-800"
@@ -696,10 +699,6 @@ interface ShopFilterChip {
                   {{ category.name }}
                 </button>
               </div>
-            </div>
-            <div class="flex justify-center gap-3">
-              <app-button [label]="'shop.reset' | translate" size="sm" variant="ghost" (action)="resetFilters()"></app-button>
-              <app-button [label]="'shop.backHome' | translate" size="sm" variant="ghost" routerLink="/"></app-button>
             </div>
           </div>
 
@@ -839,7 +838,6 @@ export class ShopComponent implements OnInit, OnDestroy {
   allTags: { slug: string; name: string }[] = [];
   loading = signal<boolean>(true);
   hasError = signal<boolean>(false);
-  placeholders = Array.from({ length: 6 });
   crumbs = [
     { label: 'nav.home', url: '/' },
     { label: 'nav.shop' }

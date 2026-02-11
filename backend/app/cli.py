@@ -20,6 +20,26 @@ from app.models.order import Order, OrderItem, ShippingMethod
 USERNAME_MAX_LEN = 30
 USERNAME_MIN_LEN = 3
 USERNAME_ALLOWED_RE = re.compile(r"[^A-Za-z0-9._-]+")
+SAFE_JSON_FILENAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*\.json$")
+
+
+def _resolve_json_path(raw_path: str, *, must_exist: bool) -> Path:
+    raw = (raw_path or "").strip()
+    if not raw:
+        raise SystemExit("Path is required")
+    base_dir = Path.cwd().resolve()
+    if Path(raw).name != raw:
+        raise SystemExit("Only JSON file names are allowed (no directories)")
+    if not SAFE_JSON_FILENAME_RE.fullmatch(raw):
+        raise SystemExit("Invalid JSON file name")
+
+    resolved = (base_dir / raw).resolve(strict=False)
+
+    if must_exist and not resolved.is_file():
+        raise SystemExit(f"Input file not found: {resolved}")
+    if not must_exist and resolved.exists() and resolved.is_dir():
+        raise SystemExit(f"Output path points to a directory: {resolved}")
+    return resolved
 
 
 def _sanitize_username(raw: str) -> str:
@@ -581,9 +601,11 @@ def main():
     args = parser.parse_args()
 
     if args.command == "export-data":
-        asyncio.run(export_data(Path(args.output)))
+        output_path = _resolve_json_path(args.output, must_exist=False)
+        asyncio.run(export_data(output_path))
     elif args.command == "import-data":
-        asyncio.run(import_data(Path(args.input)))
+        input_path = _resolve_json_path(args.input, must_exist=True)
+        asyncio.run(import_data(input_path))
     elif args.command == "bootstrap-owner":
         asyncio.run(
             bootstrap_owner(

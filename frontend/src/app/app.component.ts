@@ -13,6 +13,7 @@ import { AuthService } from './core/auth.service';
 import { AnalyticsService } from './core/analytics.service';
 import { Subscription } from 'rxjs';
 import { HttpErrorBusService, HttpErrorEvent } from './core/http-error-bus.service';
+import { RouteHeadingFocusService } from './core/route-heading-focus.service';
 
 @Component({
   selector: 'app-root',
@@ -54,7 +55,8 @@ export class AppComponent implements OnDestroy {
     private auth: AuthService,
     private route: ActivatedRoute,
     private analytics: AnalyticsService,
-    private httpErrors: HttpErrorBusService
+    private httpErrors: HttpErrorBusService,
+    private routeHeadingFocus: RouteHeadingFocusService
   ) {
     // Language is handled by LanguageService (localStorage + preferred_language + browser fallback).
     // Revalidate any persisted session on startup to avoid "logged in but unauthorized" UI states.
@@ -76,6 +78,7 @@ export class AppComponent implements OnDestroy {
     // A DI-safe global fallback: surface only offline + 5xx errors.
     // Keep this out of the HTTP interceptor to avoid circular dependencies during i18n bootstrap.
     this.httpErrorSub = this.httpErrors.events$.subscribe((event) => this.onGlobalHttpError(event));
+    this.routeHeadingFocus.focusCurrentRouteHeading();
   }
 
   ngOnDestroy(): void {

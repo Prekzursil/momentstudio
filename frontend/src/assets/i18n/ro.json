@@ -539,6 +539,7 @@
         "link": "Conectează Google",
         "unlink": "Deconectează",
         "copy": "Conectarea Google îți permite să te autentifici mai rapid. Nu postăm niciodată fără permisiune.",
+        "pendingLinkCopy": "Autorizarea Google este pregătită. Introdu parola și apasă „Conectează Google” pentru finalizare.",
         "passwordRequiredLink": "Introdu parola pentru a conecta Google.",
         "startLinkError": "Nu am putut porni conectarea Google.",
         "passwordRequiredUnlink": "Introdu parola pentru a deconecta Google.",
@@ -1532,6 +1533,7 @@
     "completeProfileRequiredCopy": "Te rugăm să completezi câteva detalii obligatorii în cont înainte de a continua.",
     "googleLinking": "Asociem contul Google...",
     "googleLinkSuccess": "Contul Google a fost asociat",
+    "googleLinkContinueInAccount": "Revenți în Cont → Securitate și confirmați parola pentru a finaliza asocierea Google.",
     "googleMissingCode": "Lipsește codul de autorizare Google.",
     "googleLinkPasswordMissing": "Este necesară parola pentru a asocia contul Google.",
     "languageNotSaved": "Limbajul nu a fost salvat",
@@ -1712,6 +1714,7 @@
     },
     "nav": {
       "title": "Administrare",
+      "openMenu": "Deschide meniul de administrare",
       "searchPlaceholder": "Caută în admin…",
       "searchEmpty": "Niciun rezultat.",
       "preferences": "Preferințe",
@@ -1726,6 +1729,15 @@
       "support": "Suport",
       "ops": "Operațiuni",
       "content": "Conținut"
+    },
+    "navGroup": {
+      "overview": "Privire generală",
+      "ordersFulfillment": "Comenzi & livrare",
+      "catalog": "Catalog",
+      "content": "Conținut",
+      "customersSupport": "Clienți & suport",
+      "marketing": "Marketing",
+      "operationsSecurity": "Operațiuni & securitate"
     },
     "uiMode": {
       "title": "Mod administrare",
@@ -3681,6 +3693,8 @@
         "deleted": "Șterse"
       },
       "form": {
+        "workflowTitle": "Flux produs",
+        "workflowHint": "Păstrează împreună elementele esențiale: denumire, preț, stoc și publicare.",
         "slug": "URL produs",
         "slugAutoHint": "Generat automat după salvare.",
         "slugHelp": "Se generează automat din nume. Folosit în linkul produsului.",
@@ -4258,6 +4272,8 @@
         "updated_at": "Actualizată la"
       },
       "search": "Caută",
+      "filtersTitle": "Filtre comenzi",
+      "filtersHint": "Folosește filtrele și vizualizările salvate pentru a restrânge rapid listele mari.",
       "statusFilter": "Status",
       "sla": {
         "filter": "SLA",
@@ -4351,6 +4367,10 @@
       "detailTitle": "Comandă",
       "backToList": "Înapoi la comenzi",
       "tracking": "Tracking",
+      "workflow": {
+        "title": "Flux comandă",
+        "hint": "Actualizează statusul, tracking-ul și documentele de livrare dintr-un singur loc."
+      },
       "updateStatus": "Actualizează status",
       "trackingNumber": "Număr tracking",
       "trackingUrl": "Link tracking",
@@ -4999,6 +5019,10 @@
     "content": {
       "title": "Conținut",
       "subtitle": "Editează pagina de acasă, paginile, blogul și setările.",
+      "workspace": {
+        "title": "Spațiu de lucru conținut",
+        "hint": "Schimbă secțiunea, modul de previzualizare și limba fără să pierzi contextul de editare."
+      },
       "editorMode": {
         "label": "Mod editor",
         "simple": "Simplu",
