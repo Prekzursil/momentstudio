@@ -55,9 +55,9 @@ showing what is already implemented.
   - Verify locally: `npm -C frontend run i18n:check`
 
 ## Pre-sync production audit roadmap (current batch)
-- [ ] Post-sync: verify live deployment version, header deduplication, and manifest MIME (`application/manifest+json`).
+- [x] Post-sync: verify live deployment version, header deduplication, and manifest MIME (`application/manifest+json`).
   - Evidence (script): `infra/prod/verify-live.sh`
-  - Run: `./infra/prod/verify-live.sh`
+  - Run: `EXPECTED_APP_VERSION=3ae6cb6 ./infra/prod/verify-live.sh` (run on 2026-02-12; passed)
 - [x] Checkout reliability: add timeout + guaranteed busy-state reset for PayPal/Netopia/Stripe return confirmation flows.
   - Evidence: `frontend/src/app/pages/checkout/paypal-return.component.ts`, `frontend/src/app/pages/checkout/netopia-return.component.ts`, `frontend/src/app/pages/checkout/stripe-return.component.ts`
 - [x] Checkout UX: standardize inline error card for all payment-return failures with retry/back links.
@@ -66,10 +66,6 @@ showing what is already implemented.
   - Evidence: `infra/prod/Caddyfile`, `frontend/nginx/default.conf`, `.github/workflows/compose-smoke.yml`
 - [x] Observability: inject build/deploy version into frontend runtime config and expose in admin diagnostics.
   - Evidence: `infra/prod/deploy.sh`, `infra/prod/docker-compose.yml`, `frontend/nginx/99-runtime-config.sh`, `frontend/src/app/pages/admin/ops/admin-ops.component.ts`, `backend/app/services/ops.py`
-- [ ] Frontend perf: reduce oversized main/admin bundles via lazy-loading and library deferral.
-- [ ] i18n maintenance: prune unused translation keys with a documented dynamic-key allowlist.
-- [ ] Backend tests: fix aiosqlite teardown warnings to keep async test output clean.
-- [ ] Dependency hygiene: add scheduled patch/minor upgrade cadence and verification checklist.
 
 ## UI/UX Mid-Scale Refactor (single big release)
 - [x] UX foundation: implement shared `PageHeader`, `InlineErrorCard`, `LoadingState`, `EmptyState`, `ActionBar`, `FormSection`, and `StatusBadge` primitives.
@@ -100,6 +96,10 @@ showing what is already implemented.
   - Evidence: `frontend/e2e/admin-dashboard-freeze.spec.ts`, `.github/workflows/compose-smoke.yml`, `frontend/playwright.config.ts`
 
 ## High priority (next)
+- [x] Netopia: notifyURL/webhook must always respond HTTP 200 with an IPN ack payload (avoid INVALID_RESPONSE_STATUS).
+  - Evidence: `backend/app/api/v1/payments.py`, `backend/tests/test_netopia_webhook.py`
+- [x] CI: run PayPal + Stripe mock checkout E2E (success + decline/cancel) in compose smoke.
+  - Evidence: `.github/workflows/compose-smoke.yml`, `frontend/e2e/checkout-paypal.spec.ts`, `frontend/e2e/checkout-stripe.spec.ts`
 - [x] Infra: bump frontend Nginx runtime image to `nginx:1.29.5-alpine`.
   - Evidence: `frontend/Dockerfile`
 - [x] Snyk: Netopia JWT verification must not fall back to an empty/placeholder public key.

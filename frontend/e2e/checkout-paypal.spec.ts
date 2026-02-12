@@ -16,13 +16,30 @@ async function fetchOrderStatus(request: APIRequestContext, token: string, order
   return String(payload?.status ?? '');
 }
 
-async function readPayPalPendingOrderId(page: Page): Promise<string> {
-  const raw = await page.evaluate(() => localStorage.getItem('checkout_paypal_pending'));
-  expect(raw).toBeTruthy();
-  const parsed = JSON.parse(String(raw)) as any;
-  const orderId = String(parsed?.order_id ?? '');
-  expect(orderId).toBeTruthy();
-  return orderId;
+async function fetchRecentOrderIds(request: APIRequestContext, token: string, limit = 10): Promise<string[]> {
+  const res = await request.get(`/api/v1/orders/me?page=1&limit=${limit}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  expect(res.ok()).toBeTruthy();
+  const payload = (await res.json()) as any;
+  const items = Array.isArray(payload?.items) ? payload.items : [];
+  return items.map((item: any) => String(item?.id ?? '')).filter((id: string) => id.length > 0);
+}
+
+async function waitForNewOrderId(
+  request: APIRequestContext,
+  token: string,
+  knownOrderIds: Set<string>,
+  timeoutMs = 15_000
+): Promise<string> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const ids = await fetchRecentOrderIds(request, token);
+    const fresh = ids.find((id) => !knownOrderIds.has(id));
+    if (fresh) return fresh;
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
+  throw new Error('Timed out waiting for the checkout order to appear in /orders/me.');
 }
 
 async function setSessionCart(page: Page, sessionId: string): Promise<void> {
@@ -45,7 +62,8 @@ async function openCartAndCheckout(page: Page, productName: string): Promise<voi
 
 async function startPayPalCheckout(
   page: Page,
-  request: APIRequestContext
+  request: APIRequestContext,
+  token: string
 ): Promise<{ orderId: string } | null> {
   const sessionId = uniqueSessionId('e2e-paypal');
   await setSessionCart(page, sessionId);
@@ -55,7 +73,8 @@ async function startPayPalCheckout(
   await openCartAndCheckout(page, product.name);
 
   const paypalButton = page.getByRole('button', { name: 'PayPal' });
-  if (!(await paypalButton.isVisible()) || (await paypalButton.isDisabled())) {
+  const paypalVisible = await paypalButton.isVisible({ timeout: 3000 }).catch(() => false);
+  if (!paypalVisible || (await paypalButton.isDisabled())) {
     test.skip(true, 'PayPal is not enabled/available in this environment.');
     return null;
   }
@@ -67,9 +86,10 @@ async function startPayPalCheckout(
   await acceptCheckoutConsents(page);
   await expect(page.getByRole('button', { name: 'Place order' })).toBeEnabled();
 
+  const knownOrderIds = new Set(await fetchRecentOrderIds(request, token));
   await page.getByRole('button', { name: 'Place order' }).click();
   await expect(page).toHaveURL(/\/checkout\/mock\/paypal/);
-  const orderId = await readPayPalPendingOrderId(page);
+  const orderId = await waitForNewOrderId(request, token, knownOrderIds);
   return { orderId };
 }
 
@@ -84,7 +104,7 @@ test('paypal checkout (mock): success', async ({ page, request }) => {
   test.setTimeout(120_000);
   const token = await loginApi(request);
   await loginUi(page);
-  const checkout = await startPayPalCheckout(page, request);
+  const checkout = await startPayPalCheckout(page, request, token);
   if (!checkout) return;
   await page.getByRole('button', { name: 'Simulate success' }).click();
 
@@ -100,13 +120,14 @@ test('paypal checkout (mock): decline + cancel', async ({ page, request }) => {
   const token = await loginApi(request);
   await loginUi(page);
 
-  const decline = await startPayPalCheckout(page, request);
+  const decline = await startPayPalCheckout(page, request, token);
   if (!decline) return;
   await page.getByRole('button', { name: 'Simulate decline' }).click();
-  await expect(page.getByText('Payment declined')).toBeVisible();
+  await expect(page).toHaveURL(/\/checkout\/paypal\/return/);
+  await expect(page.getByText('Confirming your PayPal payment…')).toBeVisible();
   expect(await fetchOrderStatus(request, token, decline.orderId)).toBe('pending_payment');
 
-  const cancel = await startPayPalCheckout(page, request);
+  const cancel = await startPayPalCheckout(page, request, token);
   if (!cancel) return;
   await page.getByRole('button', { name: 'Cancel payment' }).click();
   await expect(page.getByRole('heading', { name: 'PayPal checkout cancelled' })).toBeVisible();

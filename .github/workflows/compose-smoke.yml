@@ -101,6 +101,11 @@ jobs:
           docker compose -f infra/docker-compose.yml exec -T backend python -m app.seeds
           docker compose -f infra/docker-compose.yml exec -T backend python -m app.cli bootstrap-owner --email "$E2E_OWNER_EMAIL" --password "$E2E_OWNER_PASSWORD" --username "$E2E_OWNER_IDENTIFIER" --display-name Owner
 
+      - name: Playwright E2E (payments, chromium)
+        run: |
+          cd frontend
+          E2E_BASE_URL=http://localhost:4201 E2E_OWNER_IDENTIFIER="$E2E_OWNER_IDENTIFIER" E2E_OWNER_PASSWORD="$E2E_OWNER_PASSWORD" npm run e2e -- e2e/checkout-stripe.spec.ts e2e/checkout-paypal.spec.ts --workers=1 --project=chromium
+
       - name: Playwright E2E (smoke)
         run: |
           cd frontend

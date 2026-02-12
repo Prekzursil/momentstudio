@@ -1267,8 +1267,14 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
 
   private normalizePaymentRedirectUrl(url: string, allowedHosts: string[]): string | null {
     try {
-      const parsed = new URL(url);
-      if (parsed.protocol !== 'https:') return null;
+      const currentOrigin = globalThis.location?.origin;
+      const parsed = new URL(url, currentOrigin);
+      const protocol = parsed.protocol.toLowerCase();
+      const sameOrigin = Boolean(currentOrigin && parsed.origin === currentOrigin);
+      if (sameOrigin && parsed.pathname.startsWith('/checkout/mock/') && (protocol === 'http:' || protocol === 'https:')) {
+        return parsed.toString();
+      }
+      if (protocol !== 'https:') return null;
       const host = parsed.hostname.toLowerCase();
       const allowed = allowedHosts.some((allowedHost) => host === allowedHost || host.endsWith(`.${allowedHost}`));
       return allowed ? parsed.toString() : null;

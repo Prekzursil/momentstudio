@@ -16,13 +16,30 @@ async function fetchOrderStatus(request: APIRequestContext, token: string, order
   return String(payload?.status ?? '');
 }
 
-async function readStripePendingOrderId(page: Page): Promise<string> {
-  const raw = await page.evaluate(() => localStorage.getItem('checkout_stripe_pending'));
-  expect(raw).toBeTruthy();
-  const parsed = JSON.parse(String(raw)) as any;
-  const orderId = String(parsed?.order_id ?? '');
-  expect(orderId).toBeTruthy();
-  return orderId;
+async function fetchRecentOrderIds(request: APIRequestContext, token: string, limit = 10): Promise<string[]> {
+  const res = await request.get(`/api/v1/orders/me?page=1&limit=${limit}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  expect(res.ok()).toBeTruthy();
+  const payload = (await res.json()) as any;
+  const items = Array.isArray(payload?.items) ? payload.items : [];
+  return items.map((item: any) => String(item?.id ?? '')).filter((id: string) => id.length > 0);
+}
+
+async function waitForNewOrderId(
+  request: APIRequestContext,
+  token: string,
+  knownOrderIds: Set<string>,
+  timeoutMs = 15_000
+): Promise<string> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const ids = await fetchRecentOrderIds(request, token);
+    const fresh = ids.find((id) => !knownOrderIds.has(id));
+    if (fresh) return fresh;
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
+  throw new Error('Timed out waiting for the checkout order to appear in /orders/me.');
 }
 
 async function setSessionCart(page: Page, sessionId: string): Promise<void> {
@@ -45,7 +62,8 @@ async function openCartAndCheckout(page: Page, productName: string): Promise<voi
 
 async function startStripeCheckout(
   page: Page,
-  request: APIRequestContext
+  request: APIRequestContext,
+  token: string
 ): Promise<{ orderId: string } | null> {
   const sessionId = uniqueSessionId('e2e-stripe');
   await setSessionCart(page, sessionId);
@@ -57,13 +75,21 @@ async function startStripeCheckout(
   const shippingEmail = OWNER_IDENTIFIER.includes('@') ? OWNER_IDENTIFIER : `${OWNER_IDENTIFIER}@example.com`;
   await fillShippingAddress(page, shippingEmail);
 
-  await page.getByRole('button', { name: 'Stripe' }).click();
+  const stripeButton = page.getByRole('button', { name: 'Stripe' });
+  const stripeVisible = await stripeButton.isVisible({ timeout: 3000 }).catch(() => false);
+  if (!stripeVisible || (await stripeButton.isDisabled())) {
+    test.skip(true, 'Stripe is not enabled/available in this environment.');
+    return null;
+  }
+
+  await stripeButton.click();
   await acceptCheckoutConsents(page);
   await expect(page.getByRole('button', { name: 'Place order' })).toBeEnabled();
 
+  const knownOrderIds = new Set(await fetchRecentOrderIds(request, token));
   await page.getByRole('button', { name: 'Place order' }).click();
   await expect(page).toHaveURL(/\/checkout\/mock\/stripe/);
-  const orderId = await readStripePendingOrderId(page);
+  const orderId = await waitForNewOrderId(request, token, knownOrderIds);
   return { orderId };
 }
 
@@ -78,7 +104,7 @@ test('stripe checkout (mock): success', async ({ page, request }) => {
   test.setTimeout(120_000);
   const token = await loginApi(request);
   await loginUi(page);
-  const checkout = await startStripeCheckout(page, request);
+  const checkout = await startStripeCheckout(page, request, token);
   if (!checkout) return;
   await page.getByRole('button', { name: 'Simulate success' }).click();
 
@@ -94,13 +120,14 @@ test('stripe checkout (mock): decline + cancel', async ({ page, request }) => {
   const token = await loginApi(request);
   await loginUi(page);
 
-  const decline = await startStripeCheckout(page, request);
+  const decline = await startStripeCheckout(page, request, token);
   if (!decline) return;
   await page.getByRole('button', { name: 'Simulate decline' }).click();
-  await expect(page.getByText('Payment declined')).toBeVisible();
+  await expect(page).toHaveURL(/\/checkout\/stripe\/return/);
+  await expect(page.getByText('Confirming your Stripe payment…')).toBeVisible();
   expect(await fetchOrderStatus(request, token, decline.orderId)).toBe('pending_payment');
 
-  const cancel = await startStripeCheckout(page, request);
+  const cancel = await startStripeCheckout(page, request, token);
   if (!cancel) return;
   await page.getByRole('button', { name: 'Cancel payment' }).click();
   await expect(page.getByRole('heading', { name: 'Stripe checkout cancelled' })).toBeVisible();

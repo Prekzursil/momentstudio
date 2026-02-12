@@ -50,7 +50,7 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
 	        </div>
 	      </div>
 
-      <div class="sticky top-24 z-30">
+      <div>
         <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white/95 p-4 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90">
           <div class="grid gap-3 md:grid-cols-[1fr_240px_240px_240px_auto] items-end">
             <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
