@@ -97,16 +97,4 @@ def test_admin_client_error_logs_metadata_only(
     )
     assert response.status_code == 204, response.text
     assert captured["message"] == "admin_client_error"
-    extra = captured.get("extra")
-    assert isinstance(extra, dict)
-    assert extra.get("source") == "admin_observability"
-    assert extra.get("user_id")
-    assert "admin" in str(extra.get("user_role"))
-    assert "message" not in extra
-    assert "stack" not in extra
-    assert "url" not in extra
-    assert "route" not in extra
-    assert "user_agent" not in extra
-    assert "context" not in extra
-    assert "kind" not in extra
-    assert "error_fingerprint" not in extra
+    assert captured.get("extra") is None

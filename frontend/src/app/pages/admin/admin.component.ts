@@ -70,6 +70,7 @@ type AdminContentSection = 'home' | 'pages' | 'blog' | 'settings';
 type UiLang = 'en' | 'ro';
 type ContentStatusUi = 'draft' | 'review' | 'published';
 type LegalPageKey = 'page.terms' | 'page.terms-and-conditions' | 'page.privacy-policy' | 'page.anpc';
+const CMS_DRAFT_POLL_INTERVAL_MS = 1200;
 
 type HomeSectionId =
   | 'featured_products'
@@ -7927,18 +7928,13 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.onPageBlocksKeyChange(normalized as PageBuilderKey);
       }
     });
-    if (typeof window !== 'undefined') {
-      this.cmsDraftPoller = window.setInterval(() => this.observeCmsDrafts(), 250);
-    }
+    this.syncCmsDraftPoller(this.section());
   }
 
   ngOnDestroy(): void {
     this.routeSub?.unsubscribe();
     this.routeSub = undefined;
-    if (this.cmsDraftPoller !== null) {
-      window.clearInterval(this.cmsDraftPoller);
-      this.cmsDraftPoller = null;
-    }
+    this.stopCmsDraftPoller();
     this.cmsHomeDraft.dispose();
     for (const manager of this.cmsPageDrafts.values()) manager.dispose();
     for (const manager of this.cmsBlogDrafts.values()) manager.dispose();
@@ -7983,6 +7979,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   private applySection(next: AdminContentSection): void {
     if (this.section() === next) {
       this.loadForSection(next);
+      this.syncCmsDraftPoller(next);
       return;
     }
     this.section.set(next);
@@ -7992,6 +7989,27 @@ export class AdminComponent implements OnInit, OnDestroy {
     ];
     this.resetSectionState(next);
     this.loadForSection(next);
+    this.syncCmsDraftPoller(next);
+  }
+
+  private syncCmsDraftPoller(section: AdminContentSection): void {
+    const shouldPoll = section === 'home' || section === 'pages' || section === 'blog';
+    if (!shouldPoll) {
+      this.stopCmsDraftPoller();
+      return;
+    }
+    if (typeof window === 'undefined' || this.cmsDraftPoller !== null) return;
+    this.observeCmsDrafts();
+    this.cmsDraftPoller = window.setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      this.observeCmsDrafts();
+    }, CMS_DRAFT_POLL_INTERVAL_MS);
+  }
+
+  private stopCmsDraftPoller(): void {
+    if (this.cmsDraftPoller === null || typeof window === 'undefined') return;
+    window.clearInterval(this.cmsDraftPoller);
+    this.cmsDraftPoller = null;
   }
 
   private resetSectionState(next: AdminContentSection): void {

@@ -11,6 +11,7 @@ export class RouteHeadingFocusService implements OnDestroy {
   private readonly destroyed$ = new Subject<void>();
   private readonly document = inject(DOCUMENT);
   private focusTimer: ReturnType<typeof setTimeout> | null = null;
+  private focusRunId = 0;
 
   constructor(private readonly router: Router) {
     this.router.events
@@ -18,27 +19,35 @@ export class RouteHeadingFocusService implements OnDestroy {
         filter((event): event is NavigationEnd => event instanceof NavigationEnd),
         takeUntil(this.destroyed$)
       )
-      .subscribe(() => this.focusCurrentRouteHeading());
+      .subscribe(() => {
+        this.focusRunId += 1;
+        this.focusCurrentRouteHeading(this.focusRunId);
+      });
   }
 
-  focusCurrentRouteHeading(): void {
+  focusCurrentRouteHeading(runId = ++this.focusRunId): void {
     if (this.focusTimer) {
       clearTimeout(this.focusTimer);
       this.focusTimer = null;
     }
-    this.focusWithRetries(0);
+    this.focusWithRetries(runId, 0);
   }
 
-  private focusWithRetries(retryIndex: number): void {
+  private focusWithRetries(runId: number, retryIndex: number): void {
     this.focusTimer = setTimeout(() => {
+      if (runId !== this.focusRunId) return;
       const heading = this.findCurrentRouteHeading();
       if (!heading) {
         if (retryIndex < FOCUS_MAX_RETRIES) {
-          this.focusWithRetries(retryIndex + 1);
+          this.focusWithRetries(runId, retryIndex + 1);
         }
         return;
       }
       if (!this.document.contains(heading)) return;
+      if (this.document.activeElement === heading) {
+        this.focusTimer = null;
+        return;
+      }
       this.focusTimer = null;
       heading.focus();
     }, retryIndex === 0 ? 0 : FOCUS_RETRY_DELAY_MS);
@@ -62,7 +71,7 @@ export class RouteHeadingFocusService implements OnDestroy {
   private collectCandidates(): HTMLElement[] {
     const fromMain = Array.from(
       this.document.querySelectorAll<HTMLElement>(
-        '#main-content [data-route-heading="true"], main [data-route-heading="true"], [role="main"] [data-route-heading="true"]'
+        'app-admin-layout main [data-route-heading="true"], #main-content [data-route-heading="true"], main [data-route-heading="true"], [role="main"] [data-route-heading="true"]'
       )
     );
     if (fromMain.length) return fromMain;
