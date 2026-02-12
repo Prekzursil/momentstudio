@@ -74,8 +74,11 @@ def _sign_verification_token(*, private_pem: str, pos_signature: str, payload: b
 def test_netopia_webhook_rejects_missing_header(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     res = client.post("/api/v1/payments/netopia/webhook", json={"order": {"orderID": "x"}, "payment": {"status": 3}})
-    assert res.status_code == 400, res.text
-    assert res.json()["detail"] == "Missing Netopia verification token"
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["errorType"] == 2
+    assert body["errorCode"] == "MISSING_VERIFICATION_TOKEN"
+    assert body["errorMessage"] == "Missing Netopia verification token"
 
 
 def test_netopia_webhook_marks_order_captured(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]) -> None:
@@ -228,5 +231,8 @@ def test_netopia_webhook_rejects_payload_hash_mismatch(monkeypatch: pytest.Monke
         content=tampered,
         headers={"Verification-token": token, "Content-Type": "application/json"},
     )
-    assert res.status_code == 400, res.text
-    assert res.json()["detail"] == "Netopia payload hash mismatch"
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["errorType"] == 2
+    assert body["errorCode"] == "INVALID_IPN"
+    assert body["errorMessage"] == "Netopia payload hash mismatch"

@@ -1,3 +1,4 @@
+import logging
 import json
 from datetime import datetime, timezone
 from urllib.parse import quote_plus
@@ -32,6 +33,7 @@ from app.schemas.payment_capabilities import PaymentsCapabilitiesResponse, Payme
 from app.services.payment_provider import is_mock_payments
 
 router = APIRouter(prefix="/payments", tags=["payments"])
+logger = logging.getLogger(__name__)
 
 
 def _user_or_session_or_ip_identifier(request: Request) -> str:
@@ -269,28 +271,6 @@ async def netopia_webhook(
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     payload = await request.body()
-    if not verification_token:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing Netopia verification token")
-
-    netopia_service.verify_ipn(verification_token=verification_token, payload=payload)
-
-    try:
-        event = json.loads(payload)
-    except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid payload") from exc
-    if not isinstance(event, dict):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid payload")
-
-    order_info = event.get("order") if isinstance(event.get("order"), dict) else {}
-    payment_info = event.get("payment") if isinstance(event.get("payment"), dict) else {}
-    order_id_raw = str(order_info.get("orderID") or "").strip()
-    ntp_id = str(payment_info.get("ntpID") or "").strip() or None
-    payment_message = str(payment_info.get("message") or "").strip() or None
-    payment_status_raw = payment_info.get("status")
-    try:
-        payment_status = int(payment_status_raw) if payment_status_raw is not None else None
-    except Exception:
-        payment_status = None
 
     def _ack(error_type: int, error_code: str | int | None, message: str) -> dict:
         return {
@@ -299,139 +279,198 @@ async def netopia_webhook(
             "errorMessage": message,
         }
 
-    if not order_id_raw:
-        return _ack(2, "MISSING_ORDER_ID", "Missing order id")
+    client_ip = request.client.host if request.client else None
+    log_context = {
+        "provider": "netopia",
+        "path": request.url.path,
+        "client_ip": client_ip,
+        "payload_bytes": len(payload),
+    }
 
-    def _try_uuid(value: str) -> UUID | None:
-        cleaned = (value or "").strip()
-        if not cleaned:
-            return None
-        try:
-            return UUID(cleaned)
-        except Exception:
-            return None
-
-    candidate = order_id_raw.split("_", 1)[0].strip() if order_id_raw else ""
-    order_uuid = _try_uuid(order_id_raw) or _try_uuid(candidate)
-
-    query = (
-        select(Order)
-        .options(
-            selectinload(Order.user),
-            selectinload(Order.items).selectinload(OrderItem.product),
-            selectinload(Order.events),
-            selectinload(Order.shipping_address),
-            selectinload(Order.billing_address),
+    def _warn_and_ack(error_type: int, error_code: str, message: str, reason: str, *, exc_info: bool = False) -> dict:
+        logger.warning(
+            "Netopia webhook acknowledged with error: %s",
+            reason,
+            extra={
+                **log_context,
+                "error_type": int(error_type),
+                "error_code": error_code,
+            },
+            exc_info=exc_info,
         )
-    )
-    if order_uuid:
-        query = query.where(Order.id == order_uuid)
-    else:
-        query = query.where(Order.reference_code == candidate)
+        return _ack(error_type, error_code, message)
 
-    order = (await session.execute(query)).scalars().first()
-    if not order:
-        return _ack(2, "ORDER_NOT_FOUND", "Order not found")
+    if not verification_token:
+        return _warn_and_ack(
+            2,
+            "MISSING_VERIFICATION_TOKEN",
+            "Missing Netopia verification token",
+            "missing verification header",
+        )
 
-    if (order.payment_method or "").strip().lower() != "netopia":
-        return _ack(2, "ORDER_NOT_NETOPIA", "Order is not a Netopia order")
+    try:
+        netopia_service.verify_ipn(verification_token=verification_token, payload=payload)
+    except HTTPException as exc:
+        detail = str(exc.detail) if getattr(exc, "detail", None) else "Invalid Netopia signature"
+        return _warn_and_ack(2, "INVALID_IPN", detail, "IPN verification failed")
+    except Exception:
+        return _warn_and_ack(2, "INVALID_IPN", "Invalid Netopia signature", "IPN verification crashed", exc_info=True)
 
-    # Status codes based on Netopia IPN docs / official examples.
-    paid_statuses = {3, 5}  # STATUS_PAID / STATUS_CONFIRMED
-    if payment_status in paid_statuses:
-        already_captured = any(getattr(evt, "event", None) == "payment_captured" for evt in (order.events or []))
-        if not already_captured and order.status in {
-            OrderStatus.pending_payment,
-            OrderStatus.pending_acceptance,
-            OrderStatus.paid,
-        }:
-            note = f"Netopia {ntp_id}".strip() if ntp_id else "Netopia"
-            if payment_message:
-                note = f"{note} — {payment_message}"
+    try:
+        event = json.loads(payload)
+    except Exception:
+        return _warn_and_ack(2, "INVALID_PAYLOAD", "Invalid payload", "payload is not valid JSON")
+    if not isinstance(event, dict):
+        return _warn_and_ack(2, "INVALID_PAYLOAD", "Invalid payload", "payload root is not an object")
 
-            if order.status == OrderStatus.pending_payment:
-                order.status = OrderStatus.pending_acceptance
-                session.add(
-                    OrderEvent(
-                        order_id=order.id,
-                        event="status_change",
-                        note="pending_payment -> pending_acceptance",
-                    )
-                )
-            session.add(OrderEvent(order_id=order.id, event="payment_captured", note=note))
-            await promo_usage.record_promo_usage(session, order=order, note=note)
-            session.add(order)
-            await session.commit()
-            await session.refresh(order)
-            await coupons_service.redeem_coupon_for_order(session, order=order, note=note)
+    try:
+        order_info = event.get("order") if isinstance(event.get("order"), dict) else {}
+        payment_info = event.get("payment") if isinstance(event.get("payment"), dict) else {}
+        order_id_raw = str(order_info.get("orderID") or "").strip()
+        ntp_id = str(payment_info.get("ntpID") or "").strip() or None
+        payment_message = str(payment_info.get("message") or "").strip() or None
+        payment_status_raw = payment_info.get("status")
+        try:
+            payment_status = int(payment_status_raw) if payment_status_raw is not None else None
+        except Exception:
+            payment_status = None
 
-            if order.user and order.user.id:
-                await notification_service.create_notification(
-                    session,
-                    user_id=order.user.id,
-                    type="order",
-                    title="Payment received"
-                    if (order.user.preferred_language or "en") != "ro"
-                    else "Plată confirmată",
-                    body=f"Reference {order.reference_code}" if order.reference_code else None,
-                    url=_account_orders_url(order),
-                )
+        if not order_id_raw:
+            return _ack(2, "MISSING_ORDER_ID", "Missing order id")
 
-            checkout_settings = await checkout_settings_service.get_checkout_settings(session)
-            customer_to = (order.user.email if order.user and order.user.email else None) or getattr(
-                order, "customer_email", None
+        def _try_uuid(value: str) -> UUID | None:
+            cleaned = (value or "").strip()
+            if not cleaned:
+                return None
+            try:
+                return UUID(cleaned)
+            except Exception:
+                return None
+
+        candidate = order_id_raw.split("_", 1)[0].strip() if order_id_raw else ""
+        order_uuid = _try_uuid(order_id_raw) or _try_uuid(candidate)
+
+        query = (
+            select(Order)
+            .options(
+                selectinload(Order.user),
+                selectinload(Order.items).selectinload(OrderItem.product),
+                selectinload(Order.events),
+                selectinload(Order.shipping_address),
+                selectinload(Order.billing_address),
             )
-            customer_lang = order.user.preferred_language if order.user else None
-            if customer_to:
-                background_tasks.add_task(
-                    email_service.send_order_confirmation,
-                    customer_to,
-                    order,
-                    order.items,
-                    customer_lang,
-                    receipt_share_days=checkout_settings.receipt_share_days,
+        )
+        if order_uuid:
+            query = query.where(Order.id == order_uuid)
+        else:
+            query = query.where(Order.reference_code == candidate)
+
+        order = (await session.execute(query)).scalars().first()
+        if not order:
+            return _ack(2, "ORDER_NOT_FOUND", "Order not found")
+
+        if (order.payment_method or "").strip().lower() != "netopia":
+            return _ack(2, "ORDER_NOT_NETOPIA", "Order is not a Netopia order")
+
+        # Status codes based on Netopia IPN docs / official examples.
+        paid_statuses = {3, 5}  # STATUS_PAID / STATUS_CONFIRMED
+        if payment_status in paid_statuses:
+            already_captured = any(getattr(evt, "event", None) == "payment_captured" for evt in (order.events or []))
+            if not already_captured and order.status in {
+                OrderStatus.pending_payment,
+                OrderStatus.pending_acceptance,
+                OrderStatus.paid,
+            }:
+                note = f"Netopia {ntp_id}".strip() if ntp_id else "Netopia"
+                if payment_message:
+                    note = f"{note} — {payment_message}"
+
+                if order.status == OrderStatus.pending_payment:
+                    order.status = OrderStatus.pending_acceptance
+                    session.add(
+                        OrderEvent(
+                            order_id=order.id,
+                            event="status_change",
+                            note="pending_payment -> pending_acceptance",
+                        )
+                    )
+                session.add(OrderEvent(order_id=order.id, event="payment_captured", note=note))
+                await promo_usage.record_promo_usage(session, order=order, note=note)
+                session.add(order)
+                await session.commit()
+                await session.refresh(order)
+                await coupons_service.redeem_coupon_for_order(session, order=order, note=note)
+
+                if order.user and order.user.id:
+                    await notification_service.create_notification(
+                        session,
+                        user_id=order.user.id,
+                        type="order",
+                        title="Payment received"
+                        if (order.user.preferred_language or "en") != "ro"
+                        else "Plată confirmată",
+                        body=f"Reference {order.reference_code}" if order.reference_code else None,
+                        url=_account_orders_url(order),
+                    )
+
+                checkout_settings = await checkout_settings_service.get_checkout_settings(session)
+                customer_to = (order.user.email if order.user and order.user.email else None) or getattr(
+                    order, "customer_email", None
                 )
-            owner = await auth_service.get_owner_user(session)
-            admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
-            if admin_to:
-                background_tasks.add_task(
-                    email_service.send_new_order_notification,
-                    admin_to,
-                    order,
-                    customer_to,
-                    owner.preferred_language if owner else None,
-                )
+                customer_lang = order.user.preferred_language if order.user else None
+                if customer_to:
+                    background_tasks.add_task(
+                        email_service.send_order_confirmation,
+                        customer_to,
+                        order,
+                        order.items,
+                        customer_lang,
+                        receipt_share_days=checkout_settings.receipt_share_days,
+                    )
+                owner = await auth_service.get_owner_user(session)
+                admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+                if admin_to:
+                    background_tasks.add_task(
+                        email_service.send_new_order_notification,
+                        admin_to,
+                        order,
+                        customer_to,
+                        owner.preferred_language if owner else None,
+                    )
 
-        msg = "payment was paid; deliver goods"
-        if payment_message:
-            msg = f"{msg}. {payment_message}"
-        return _ack(0, None, msg)
+            msg = "payment was paid; deliver goods"
+            if payment_message:
+                msg = f"{msg}. {payment_message}"
+            return _ack(0, None, msg)
 
-    if payment_status is None:
-        return _ack(1, "UNKNOWN", "Unknown payment status")
+        if payment_status is None:
+            return _ack(1, "UNKNOWN", "Unknown payment status")
 
-    if payment_status == 4:
-        msg = "payment was cancelled; do not deliver goods"
+        if payment_status == 4:
+            msg = "payment was cancelled; do not deliver goods"
+            if payment_message:
+                msg = f"{msg}. {payment_message}"
+            return _ack(1, payment_status, msg)
+        if payment_status == 12:
+            msg = "Payment is DECLINED"
+            if payment_message:
+                msg = f"{msg}. {payment_message}"
+            return _ack(1, payment_status, msg)
+        if payment_status == 13:
+            msg = "Payment in reviewing"
+            if payment_message:
+                msg = f"{msg}. {payment_message}"
+            return _ack(1, payment_status, msg)
+        if payment_status == 15:
+            msg = "3D AUTH required"
+            if payment_message:
+                msg = f"{msg}. {payment_message}"
+            return _ack(1, payment_status, msg)
+
+        msg = "Unknown"
         if payment_message:
             msg = f"{msg}. {payment_message}"
         return _ack(1, payment_status, msg)
-    if payment_status == 12:
-        msg = "Payment is DECLINED"
-        if payment_message:
-            msg = f"{msg}. {payment_message}"
-        return _ack(1, payment_status, msg)
-    if payment_status == 13:
-        msg = "Payment in reviewing"
-        if payment_message:
-            msg = f"{msg}. {payment_message}"
-        return _ack(1, payment_status, msg)
-    if payment_status == 15:
-        msg = "3D AUTH required"
-        if payment_message:
-            msg = f"{msg}. {payment_message}"
-        return _ack(1, payment_status, msg)
-
-    msg = "Unknown"
-    if payment_message:
-        msg = f"{msg}. {payment_message}"
-    return _ack(1, payment_status, msg)
+    except Exception:
+        await session.rollback()
+        return _warn_and_ack(2, "INTERNAL_ERROR", "Internal processing error", "unhandled processing error", exc_info=True)
