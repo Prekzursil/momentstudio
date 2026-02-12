@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, HostListener, OnDestroy, OnInit } from '@angular/core';
+import { Component, EffectRef, HostListener, Injector, OnDestroy, OnInit, effect, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -35,7 +35,15 @@ type AdminNavGroupKey =
 type AdminNavGroup = {
   key: AdminNavGroupKey;
   labelKey: string;
-  items: AdminNavItem[];
+  items: AdminNavItemView[];
+};
+
+type AdminNavItemView = AdminNavItem & {
+  label: string;
+  highlightBefore: string;
+  highlightMatch: string;
+  highlightAfter: string;
+  isFavorite: boolean;
 };
 
 @Component({
@@ -83,7 +91,8 @@ type AdminNavGroup = {
             <div class="relative">
               <input
                 class="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 pr-10 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                [(ngModel)]="navQuery"
+                [ngModel]="navQuery"
+                (ngModelChange)="onNavQueryChange($event)"
                 [placeholder]="'adminUi.nav.searchPlaceholder' | translate"
                 autocomplete="off"
                 spellcheck="false"
@@ -100,7 +109,7 @@ type AdminNavGroup = {
             </div>
           </label>
 
-          <div *ngIf="navQuery.trim() && filteredNavItems().length === 0" class="px-3 pb-2 text-xs text-slate-500 dark:text-slate-400">
+          <div *ngIf="navQuery.trim() && filteredNavItemsView.length === 0" class="px-3 pb-2 text-xs text-slate-500 dark:text-slate-400">
             {{ 'adminUi.nav.searchEmpty' | translate }}
           </div>
 
@@ -279,13 +288,13 @@ type AdminNavGroup = {
             <div class="my-2 h-px bg-slate-200 dark:bg-slate-800/70"></div>
           </div>
 
-          <div *ngIf="!navQuery.trim() && favoriteNavItems().length" class="pb-2">
+          <div *ngIf="!navQuery.trim() && favoriteNavItemsView.length" class="pb-2">
             <div class="px-3 pb-1 text-[11px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
               {{ 'adminUi.favorites.title' | translate }}
             </div>
             <div class="grid gap-1">
               <a
-                *ngFor="let item of favoriteNavItems()"
+                *ngFor="let item of favoriteNavItemsView; trackBy: trackByNavPath"
                 [routerLink]="item.path"
                 routerLinkActive="bg-slate-100 text-slate-900 dark:bg-slate-800/70 dark:text-white"
                 [routerLinkActiveOptions]="{ exact: item.exact ?? false }"
@@ -293,13 +302,13 @@ type AdminNavGroup = {
                 [ngClass]="uiPrefs.sidebarCompact() ? 'px-2.5 py-1.5' : 'px-3 py-2'"
                 (click)="handleNavSelection()"
               >
-                {{ item.labelKey | translate }}
+                {{ item.label }}
               </a>
             </div>
             <div class="my-2 h-px bg-slate-200 dark:bg-slate-800/70"></div>
           </div>
 
-          <ng-container *ngFor="let group of groupedFilteredNavItems()">
+          <ng-container *ngFor="let group of groupedFilteredNavItemsView; trackBy: trackByGroupKey">
             <div
               *ngIf="!navQuery.trim()"
               class="px-3 pb-1 pt-2 text-[11px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
@@ -307,7 +316,7 @@ type AdminNavGroup = {
               {{ group.labelKey | translate }}
             </div>
 
-            <div *ngFor="let item of group.items" class="flex items-center gap-1">
+            <div *ngFor="let item of group.items; trackBy: trackByNavPath" class="flex items-center gap-1">
               <a
                 [routerLink]="item.path"
                 routerLinkActive="bg-slate-100 text-slate-900 dark:bg-slate-800/70 dark:text-white"
@@ -317,22 +326,20 @@ type AdminNavGroup = {
                 (click)="handleNavSelection()"
               >
                 <ng-container *ngIf="navQuery.trim(); else fullLabel">
-                  <ng-container *ngIf="navLabelParts(item) as parts">
-                    <span>{{ parts.before }}</span>
-                    <span class="font-semibold text-slate-900 dark:text-slate-50">{{ parts.match }}</span>
-                    <span>{{ parts.after }}</span>
-                  </ng-container>
+                  <span>{{ item.highlightBefore }}</span>
+                  <span class="font-semibold text-slate-900 dark:text-slate-50">{{ item.highlightMatch }}</span>
+                  <span>{{ item.highlightAfter }}</span>
                 </ng-container>
-                <ng-template #fullLabel>{{ item.labelKey | translate }}</ng-template>
+                <ng-template #fullLabel>{{ item.label }}</ng-template>
               </a>
               <button
                 type="button"
                 class="h-9 w-9 rounded-lg border border-transparent text-slate-400 hover:bg-slate-50 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-slate-800/60 dark:hover:text-slate-200"
-                [attr.aria-label]="(isNavFavorite(item) ? 'adminUi.favorites.unpin' : 'adminUi.favorites.pin') | translate"
+                [attr.aria-label]="(item.isFavorite ? 'adminUi.favorites.unpin' : 'adminUi.favorites.pin') | translate"
                 (click)="toggleNavFavorite(item, $event)"
               >
-                <span aria-hidden="true" class="text-base leading-none" [class.text-amber-500]="isNavFavorite(item)">
-                  {{ isNavFavorite(item) ? '★' : '☆' }}
+                <span aria-hidden="true" class="text-base leading-none" [class.text-amber-500]="item.isFavorite">
+                  {{ item.isFavorite ? '★' : '☆' }}
                 </span>
               </button>
             </div>
@@ -415,11 +422,14 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
     private toast: ToastService
   ) {}
 
+  private readonly injector = inject(Injector);
   private pendingGoAt: number | null = null;
   isDesktop = typeof window !== 'undefined' ? window.innerWidth >= 1024 : true;
   mobileSidebarOpen = false;
   navQuery = '';
   private navSub?: Subscription;
+  private langSub?: Subscription;
+  private navViewEffect?: EffectRef;
   private alertsIntervalId: number | null = null;
   private feedbackSub?: Subscription;
 
@@ -437,6 +447,9 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
   feedbackIncludePage = true;
   feedbackSending = false;
   feedbackError: string | null = null;
+  filteredNavItemsView: AdminNavItemView[] = [];
+  favoriteNavItemsView: AdminNavItemView[] = [];
+  groupedFilteredNavItemsView: AdminNavGroup[] = [];
 
   private readonly allNavItems: AdminNavItem[] = [
     { path: '/admin/dashboard', labelKey: 'adminUi.nav.dashboard', section: 'dashboard', exact: true },
@@ -488,6 +501,19 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.favorites.init();
+    this.navViewEffect = effect(
+      () => {
+        this.favorites.items();
+        this.uiPrefs.preset();
+        this.uiPrefs.mode();
+        this.auth.role();
+        this.auth.user();
+        this.recomputeNavViews();
+      },
+      { injector: this.injector }
+    );
+    this.langSub = this.translate.onLangChange.subscribe(() => this.recomputeNavViews());
+    this.recomputeNavViews();
     this.recordRecent(this.router.url);
     this.loadAlerts();
     this.alertsIntervalId = window.setInterval(() => this.loadAlerts(), 5 * 60 * 1000);
@@ -501,6 +527,8 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.navSub?.unsubscribe();
+    this.langSub?.unsubscribe();
+    this.navViewEffect?.destroy();
     this.feedbackSub?.unsubscribe();
     if (this.alertsIntervalId !== null) {
       window.clearInterval(this.alertsIntervalId);
@@ -527,20 +555,14 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
     if (!this.isDesktop) this.mobileSidebarOpen = false;
   }
 
-  groupedFilteredNavItems(): AdminNavGroup[] {
-    const grouped = new Map<AdminNavGroupKey, AdminNavItem[]>();
-    for (const key of this.groupOrder) grouped.set(key, []);
-    for (const item of this.filteredNavItems()) {
-      const groupKey = this.sectionGroupMap[item.section] ?? 'operationsSecurity';
-      grouped.get(groupKey)?.push(item);
-    }
-    return this.groupOrder
-      .map((key) => ({
-        key,
-        labelKey: this.groupLabelKey[key],
-        items: grouped.get(key) ?? []
-      }))
-      .filter((group) => group.items.length > 0);
+  trackByNavPath(index: number, item: AdminNavItemView): string {
+    void index;
+    return item.path;
+  }
+
+  trackByGroupKey(index: number, group: AdminNavGroup): string {
+    void index;
+    return group.key;
   }
 
   openFeedback(): void {
@@ -585,22 +607,6 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
     });
   }
 
-  filteredNavItems(): AdminNavItem[] {
-    const items = this.navItems;
-    const query = this.navQuery.trim().toLowerCase();
-    const isOwnerBasic = this.uiPrefs.preset() === 'owner_basic';
-    if (!query) {
-      if (this.uiPrefs.mode() === 'advanced' && !isOwnerBasic) return items;
-      return items.filter((item) => this.ownerBasicSections.has(item.section));
-    }
-
-    const haystack = isOwnerBasic ? items.filter((item) => this.ownerBasicSections.has(item.section)) : items;
-    return haystack.filter((item) => {
-      const label = this.navLabel(item).toLowerCase();
-      return label.includes(query) || item.section.includes(query);
-    });
-  }
-
   isTrainingMode(): boolean {
     return Boolean(this.auth.user()?.admin_training_mode);
   }
@@ -627,24 +633,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
     this.uiPrefs.setSidebarCompact(Boolean(target?.checked));
   }
 
-  favoriteNavItems(): AdminNavItem[] {
-    const urls = this.favorites.items()
-      .filter((item) => item?.type === 'page')
-      .map((item) => (item?.url || '').trim())
-      .filter(Boolean);
-    const items =
-      this.uiPrefs.preset() === 'owner_basic'
-        ? this.navItems.filter((item) => this.ownerBasicSections.has(item.section))
-        : this.navItems;
-    const byPath = new Map(items.map((item) => [item.path, item]));
-    return urls.map((url) => byPath.get(url)).filter((item): item is AdminNavItem => Boolean(item));
-  }
-
-  isNavFavorite(item: AdminNavItem): boolean {
-    return this.favorites.isFavorite(this.favoriteKey(item));
-  }
-
-  toggleNavFavorite(item: AdminNavItem, event: MouseEvent): void {
+  toggleNavFavorite(item: AdminNavItemView, event: MouseEvent): void {
     event.preventDefault();
     event.stopPropagation();
     const key = this.favoriteKey(item);
@@ -657,10 +646,11 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
       url: item.path,
       state: null
     });
+    this.recomputeNavViews();
   }
 
   clearNavQuery(): void {
-    this.navQuery = '';
+    this.onNavQueryChange('');
   }
 
   refreshAlerts(): void {
@@ -685,17 +675,9 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
     return false;
   }
 
-  navLabelParts(item: AdminNavItem): { before: string; match: string; after: string } {
-    const label = this.navLabel(item);
-    const query = this.navQuery.trim().toLowerCase();
-    if (!query) return { before: label, match: '', after: '' };
-    const idx = label.toLowerCase().indexOf(query);
-    if (idx === -1) return { before: label, match: '', after: '' };
-    return {
-      before: label.slice(0, idx),
-      match: label.slice(idx, idx + query.length),
-      after: label.slice(idx + query.length),
-    };
+  onNavQueryChange(value: string): void {
+    this.navQuery = typeof value === 'string' ? value : '';
+    this.recomputeNavViews();
   }
 
   @HostListener('document:keydown', ['$event'])
@@ -775,6 +757,67 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
   private navLabel(item: AdminNavItem): string {
     const value = this.translate.instant(item.labelKey);
     return typeof value === 'string' && value.trim() ? value : item.labelKey;
+  }
+
+  private recomputeNavViews(): void {
+    const query = this.navQuery.trim().toLowerCase();
+    const isOwnerBasic = this.uiPrefs.preset() === 'owner_basic';
+    const allowAdvanced = this.uiPrefs.mode() === 'advanced' && !isOwnerBasic;
+    const visibleBaseItems = allowAdvanced ? this.navItems : this.navItems.filter((item) => this.ownerBasicSections.has(item.section));
+
+    const favoritePaths = new Set(
+      this.favorites
+        .items()
+        .filter((item) => item?.type === 'page')
+        .map((item) => (item?.url || '').trim())
+        .filter(Boolean)
+    );
+
+    const toView = (item: AdminNavItem): AdminNavItemView => {
+      const label = this.navLabel(item);
+      const lowerLabel = label.toLowerCase();
+      const idx = query ? lowerLabel.indexOf(query) : -1;
+      const highlightBefore = idx >= 0 ? label.slice(0, idx) : label;
+      const highlightMatch = idx >= 0 ? label.slice(idx, idx + query.length) : '';
+      const highlightAfter = idx >= 0 ? label.slice(idx + query.length) : '';
+      return {
+        ...item,
+        label,
+        highlightBefore,
+        highlightMatch,
+        highlightAfter,
+        isFavorite: favoritePaths.has(item.path)
+      };
+    };
+
+    let filtered = visibleBaseItems;
+    if (query) {
+      filtered = visibleBaseItems.filter((item) => {
+        const label = this.navLabel(item).toLowerCase();
+        return label.includes(query) || item.section.includes(query);
+      });
+    }
+
+    this.filteredNavItemsView = filtered.map(toView);
+
+    const filteredByPath = new Map(this.filteredNavItemsView.map((item) => [item.path, item]));
+    this.favoriteNavItemsView = Array.from(favoritePaths)
+      .map((path) => filteredByPath.get(path))
+      .filter((item): item is AdminNavItemView => Boolean(item));
+
+    const grouped = new Map<AdminNavGroupKey, AdminNavItemView[]>();
+    for (const key of this.groupOrder) grouped.set(key, []);
+    for (const item of this.filteredNavItemsView) {
+      const groupKey = this.sectionGroupMap[item.section] ?? 'operationsSecurity';
+      grouped.get(groupKey)?.push(item);
+    }
+    this.groupedFilteredNavItemsView = this.groupOrder
+      .map((key) => ({
+        key,
+        labelKey: this.groupLabelKey[key],
+        items: grouped.get(key) ?? []
+      }))
+      .filter((group) => group.items.length > 0);
   }
 
   private favoriteKey(item: AdminNavItem): string {

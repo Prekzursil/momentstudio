@@ -29,7 +29,7 @@ jobs:
         run: |
           cd frontend
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm ci
-          npx playwright install --with-deps chromium
+          npx playwright install --with-deps chromium firefox
 
       - name: Build and start stack
         env:
@@ -107,6 +107,11 @@ jobs:
           # Keep the PR gate fast and stable: run only the smoke suite here.
           # Full E2E coverage can be run via `npm run e2e` locally or in a separate workflow.
           E2E_BASE_URL=http://localhost:4201 E2E_OWNER_IDENTIFIER="$E2E_OWNER_IDENTIFIER" E2E_OWNER_PASSWORD="$E2E_OWNER_PASSWORD" npm run e2e -- e2e/smoke.spec.ts --workers=1
+
+      - name: Playwright E2E (admin freeze guard, firefox)
+        run: |
+          cd frontend
+          E2E_BASE_URL=http://localhost:4201 E2E_OWNER_IDENTIFIER="$E2E_OWNER_IDENTIFIER" E2E_OWNER_PASSWORD="$E2E_OWNER_PASSWORD" npm run e2e -- e2e/admin-dashboard-freeze.spec.ts --workers=1 --project=firefox
 
       - name: Logs (on failure)
         if: failure()

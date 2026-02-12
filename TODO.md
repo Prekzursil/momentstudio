@@ -90,6 +90,14 @@ showing what is already implemented.
   - Evidence: `frontend/src/app/core/route-heading-focus.service.ts`, `frontend/src/app/shared/modal.component.spec.ts`, `frontend/src/app/core/route-heading-focus.service.spec.ts`, `frontend/src/app/shared/page-header.component.ts`, `frontend/src/app/pages/admin/shared/admin-page-header.component.ts`
 - [x] Accessibility pass (phase 2): shopper/admin keyboard smoke tests (manual + Playwright evidence).
   - Evidence: `frontend/e2e/accessibility-keyboard.spec.ts`, `docs/UI_UX_KEYBOARD_SMOKE.md` (run `E2E_BASE_URL=https://momentstudio.ro npm -C frontend run e2e -- frontend/e2e/accessibility-keyboard.spec.ts`; admin smoke runs when `E2E_OWNER_PASSWORD` is set)
+- [x] Admin stability: remove template-bound nav recomputation in admin layout and precompute filtered/grouped/favorites nav view-models.
+  - Evidence: `frontend/src/app/pages/admin/admin-layout.component.ts`
+- [x] Admin stability: harden route-heading focus retries to active navigation runs and main-content scoped candidates.
+  - Evidence: `frontend/src/app/core/route-heading-focus.service.ts`
+- [x] Admin stability: reduce CMS draft observer churn (slower polling + only content sections + tab visibility guard).
+  - Evidence: `frontend/src/app/pages/admin/admin.component.ts`
+- [x] Admin regression guard: add Playwright spec to detect `/admin/dashboard` main-thread lock after clicking `View admin`.
+  - Evidence: `frontend/e2e/admin-dashboard-freeze.spec.ts`, `.github/workflows/compose-smoke.yml`, `frontend/playwright.config.ts`
 
 ## High priority (next)
 - [x] Infra: bump frontend Nginx runtime image to `nginx:1.29.5-alpine`.
