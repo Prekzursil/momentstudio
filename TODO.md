@@ -100,6 +100,10 @@ showing what is already implemented.
   - Evidence: `frontend/e2e/admin-dashboard-freeze.spec.ts`, `.github/workflows/compose-smoke.yml`, `frontend/playwright.config.ts`
 
 ## High priority (next)
+- [x] Netopia: notifyURL/webhook must always respond HTTP 200 with an IPN ack payload (avoid INVALID_RESPONSE_STATUS).
+  - Evidence: `backend/app/api/v1/payments.py`, `backend/tests/test_netopia_webhook.py`
+- [x] CI: run PayPal + Stripe mock checkout E2E (success + decline/cancel) in compose smoke.
+  - Evidence: `.github/workflows/compose-smoke.yml`, `frontend/e2e/checkout-paypal.spec.ts`, `frontend/e2e/checkout-stripe.spec.ts`
 - [x] Infra: bump frontend Nginx runtime image to `nginx:1.29.5-alpine`.
   - Evidence: `frontend/Dockerfile`
 - [x] Snyk: Netopia JWT verification must not fall back to an empty/placeholder public key.
