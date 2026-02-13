@@ -96,6 +96,14 @@ showing what is already implemented.
   - Evidence: `frontend/e2e/admin-dashboard-freeze.spec.ts`, `.github/workflows/compose-smoke.yml`, `frontend/playwright.config.ts`
 
 ## High priority (next)
+- [x] Search: make storefront/blog queries diacritics-insensitive (e.g. `brosa` matches `broșă`).
+  - Evidence: `backend/app/services/catalog.py`, `backend/app/services/blog.py`
+  - Evidence (tests): `backend/tests/test_search_normalization.py`
+- [x] SEO/social preview: add baseline OG/Twitter tags in the static entry HTML and use OpenGraph `property=` tags across key pages.
+  - Evidence: `frontend/src/index.html`, `frontend/src/app/pages/about/about.component.ts`, `frontend/src/app/pages/contact/contact.component.ts`, `frontend/src/app/pages/shop/shop.component.ts`, `frontend/src/app/pages/page/page.component.ts`
+  - Evidence (tests): `frontend/src/app/pages/about/about.component.spec.ts`, `frontend/src/app/pages/contact/contact.component.spec.ts`
+- [ ] SEO: add `hreflang` + canonical alternates for EN/RO route variants to reduce duplicate indexing between localized URLs.
+- [ ] SEO: add Organization/WebSite JSON-LD defaults at app entry and validate in Search Console rich results.
 - [x] Netopia: notifyURL/webhook must always respond HTTP 200 with an IPN ack payload (avoid INVALID_RESPONSE_STATUS).
   - Evidence: `backend/app/api/v1/payments.py`, `backend/tests/test_netopia_webhook.py`
 - [x] CI: run PayPal + Stripe mock checkout E2E (success + decline/cancel) in compose smoke.

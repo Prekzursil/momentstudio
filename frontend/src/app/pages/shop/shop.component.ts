@@ -2211,8 +2211,8 @@ export class ShopComponent implements OnInit, OnDestroy {
     const title = this.translate.instant('shop.metaTitle');
     const description = this.translate.instant('shop.metaDescription');
     this.title.setTitle(title);
-    this.metaService.updateTag({ name: 'og:title', content: title });
-    this.metaService.updateTag({ name: 'og:description', content: description });
+    this.metaService.updateTag({ property: 'og:title', content: title });
+    this.metaService.updateTag({ property: 'og:description', content: description });
     this.metaService.updateTag({ name: 'description', content: description });
   }
 
