@@ -60,4 +60,31 @@ describe('BlogListComponent SEO', () => {
     expect(canonical).toBeTruthy();
     expect(canonical?.getAttribute('href')).toContain('/blog?lang=en');
   });
+
+  it('ignores stale list responses when multiple loads overlap', () => {
+    const fixture = TestBed.createComponent(BlogListComponent);
+    const cmp = fixture.componentInstance as any;
+
+    // First call returns empty list, second returns a post.
+    blog.listPosts.and.returnValues(
+      of({ items: [], meta: { total_items: 0, total_pages: 1, page: 1, limit: 9 } }),
+      of({
+        items: [
+          {
+            slug: 'post-1',
+            title: 'Post 1',
+            excerpt: 'Excerpt',
+            tags: []
+          }
+        ],
+        meta: { total_items: 1, total_pages: 1, page: 1, limit: 9 }
+      })
+    );
+
+    cmp.load(1);
+    cmp.load(1);
+
+    expect(cmp.posts.length).toBe(1);
+    expect(cmp.posts[0].slug).toBe('post-1');
+  });
 });
