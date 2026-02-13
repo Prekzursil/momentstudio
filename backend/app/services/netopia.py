@@ -370,6 +370,17 @@ def verify_ipn(*, verification_token: str, payload: bytes) -> dict[str, Any]:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Netopia not configured") from exc
 
     alg = (settings.netopia_jwt_alg or "RS512").strip().upper() or "RS512"
+    allowed_algs = {"RS256", "RS384", "RS512"}
+    algs: list[str] = [alg] if alg in allowed_algs else ["RS512"]
+
+    try:
+        header = jwt.get_unverified_header(verification_token)
+        header_alg = str((header or {}).get("alg") or "").strip().upper()
+        if header_alg in allowed_algs and header_alg not in algs:
+            algs.append(header_alg)
+    except Exception:
+        # Ignore invalid tokens; decode() below will raise a proper error.
+        pass
 
     max_age_seconds = max(60, int(getattr(settings, "netopia_ipn_max_age_seconds", 60 * 60 * 24)))
     skew_seconds = 5 * 60
@@ -378,11 +389,13 @@ def verify_ipn(*, verification_token: str, payload: bytes) -> dict[str, Any]:
         claims = jwt.decode(
             verification_token,
             public_key,
-            algorithms=[alg],
-            audience=pos_signature,
-            issuer="NETOPIA Payments",
+            algorithms=algs,
             leeway=skew_seconds,
-            options={"require": ["sub", "aud", "iss", "iat"]},
+            options={
+                "require": ["sub", "aud", "iss", "iat"],
+                "verify_aud": False,
+                "verify_iss": False,
+            },
         )
     except PyJWTError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Netopia signature") from exc
@@ -404,25 +417,42 @@ def verify_ipn(*, verification_token: str, payload: bytes) -> dict[str, Any]:
     if isinstance(exp, (int, float)) and float(exp) + skew_seconds < now_ts:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Expired Netopia token")
 
-    issuer = str(claims.get("iss") or "")
+    issuer = str(claims.get("iss") or "").strip()
     if issuer != "NETOPIA Payments":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Netopia issuer")
 
     aud = claims.get("aud")
     aud_values: list[str] = []
     if isinstance(aud, str):
-        aud_values = [aud]
+        aud_values = [aud.strip()]
     elif isinstance(aud, list):
-        aud_values = [str(item) for item in aud if item]
+        aud_values = [str(item).strip() for item in aud if item]
     else:
-        aud_values = [str(aud)] if aud else []
+        aud_values = [str(aud).strip()] if aud else []
 
-    if pos_signature not in aud_values:
+    if pos_signature.strip() not in aud_values:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Netopia audience")
 
-    expected_sub = _payload_hash_b64(payload)
-    token_sub = str(claims.get("sub") or "")
-    if not token_sub or token_sub != expected_sub:
+    def _digest_variants(payload_bytes: bytes) -> set[str]:
+        digest = hashlib.sha512(payload_bytes).digest()
+        std = base64.b64encode(digest).decode("ascii")
+        url = base64.urlsafe_b64encode(digest).decode("ascii")
+        return {std, std.rstrip("="), url, url.rstrip("=")}
+
+    token_sub = str(claims.get("sub") or "").strip()
+    if not token_sub:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Netopia payload hash mismatch")
+
+    if token_sub not in _digest_variants(payload):
+        # Some gateways canonicalize JSON before hashing (key sorting/minified JSON) and/or use
+        # URL-safe base64 without padding. Attempt a canonical JSON re-encode fallback.
+        try:
+            parsed = simplejson.loads(payload)
+            canonical = simplejson.dumps(parsed, use_decimal=True, separators=(",", ":"), sort_keys=True).encode("utf-8")
+        except Exception:
+            canonical = b""
+
+        if not canonical or token_sub not in _digest_variants(canonical):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Netopia payload hash mismatch")
 
     return claims

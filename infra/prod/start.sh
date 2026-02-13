@@ -22,9 +22,14 @@ if [[ ! -f "${env_file}" ]]; then
   exit 1
 fi
 
+# Stamp runtime config with the deployed git revision unless overridden.
+if [[ -z "${APP_VERSION:-}" ]]; then
+  APP_VERSION="$(git rev-parse --short HEAD)"
+  export APP_VERSION
+fi
+
 echo "Starting momentstudio production stack (no rebuild)..."
 docker compose --env-file "${env_file}" -f "${compose_file}" up -d --no-build "$@"
 
 echo
 docker compose --env-file "${env_file}" -f "${compose_file}" ps
-

@@ -27,6 +27,12 @@ if [[ "${#services[@]}" -eq 0 ]]; then
   services=(backend frontend caddy)
 fi
 
+# Stamp runtime config with the deployed git revision unless overridden.
+if [[ -z "${APP_VERSION:-}" ]]; then
+  APP_VERSION="$(git rev-parse --short HEAD)"
+  export APP_VERSION
+fi
+
 echo "Recreating containers to apply updated env files:"
 printf -- "- %s\n" "${services[@]}"
 
@@ -34,4 +40,3 @@ docker compose --env-file "${env_file}" -f "${compose_file}" up -d --no-build --
 
 echo
 docker compose --env-file "${env_file}" -f "${compose_file}" ps
-

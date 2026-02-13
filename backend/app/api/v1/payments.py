@@ -289,8 +289,9 @@ async def netopia_webhook(
 
     def _warn_and_ack(error_type: int, error_code: str, message: str, reason: str, *, exc_info: bool = False) -> dict:
         logger.warning(
-            "Netopia webhook acknowledged with error: %s",
+            "Netopia webhook acknowledged with error: %s (%s)",
             reason,
+            message,
             extra={
                 **log_context,
                 "error_type": int(error_type),
