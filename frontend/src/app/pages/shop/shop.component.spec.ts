@@ -2,11 +2,10 @@ import { TestBed } from '@angular/core/testing';
 import { ShopComponent } from './shop.component';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Title, Meta } from '@angular/platform-browser';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
 import { CatalogService } from '../../core/catalog.service';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { ToastService } from '../../core/toast.service';
-import { type Observable } from 'rxjs';
 
 describe('ShopComponent i18n meta', () => {
   let meta: jasmine.SpyObj<Meta>;
@@ -58,19 +57,12 @@ describe('ShopComponent i18n meta', () => {
   });
 
   it('ignores stale product list responses when multiple loads overlap', () => {
+    const first$ = new Subject<any>();
+    const second$ = new Subject<any>();
+    const listProducts = jasmine.createSpy('listProducts').and.returnValues(first$.asObservable(), second$.asObservable());
     const catalog = {
       listCategories: () => of([]),
-      listProducts: (() => {
-        let call = 0;
-        return () => {
-          call += 1;
-          const payload =
-            call === 1
-              ? { items: [{ id: 'old', slug: 'old', name: 'Old', base_price: 1, currency: 'RON' }], meta: { total_items: 1, total_pages: 1, page: 1, limit: 20 } }
-              : { items: [{ id: 'new', slug: 'new', name: 'New', base_price: 1, currency: 'RON' }], meta: { total_items: 1, total_pages: 1, page: 1, limit: 20 } };
-          return of(payload);
-        };
-      })() as unknown as (params: any) => Observable<any>
+      listProducts
     };
 
     TestBed.resetTestingModule();
@@ -92,6 +84,21 @@ describe('ShopComponent i18n meta', () => {
     // Force two sequential loads; only the last should win.
     cmp.loadProducts(false);
     cmp.loadProducts(false);
+
+    second$.next({
+      items: [{ id: 'new', slug: 'new', name: 'New', base_price: 1, currency: 'RON', tags: [] }],
+      meta: { total_items: 1, total_pages: 1, page: 1, limit: 20 }
+    });
+    second$.complete();
+
+    expect(cmp.products.length).toBe(1);
+    expect(cmp.products[0].id).toBe('new');
+
+    first$.next({
+      items: [{ id: 'old', slug: 'old', name: 'Old', base_price: 1, currency: 'RON', tags: [] }],
+      meta: { total_items: 1, total_pages: 1, page: 1, limit: 20 }
+    });
+    first$.complete();
 
     expect(cmp.products.length).toBe(1);
     expect(cmp.products[0].id).toBe('new');
