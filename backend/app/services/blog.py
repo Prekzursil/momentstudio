@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import re
+import unicodedata
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
@@ -180,6 +181,15 @@ def _normalize_blog_sort(raw: str | None) -> str:
     return value if value in _BLOG_SORT_VALUES else "newest"
 
 
+def _normalize_search_text(value: str | None) -> str:
+    raw = (value or "").strip()
+    if not raw:
+        return ""
+    normalized = unicodedata.normalize("NFKD", raw)
+    without_marks = "".join(ch for ch in normalized if not unicodedata.combining(ch))
+    return without_marks.lower()
+
+
 async def list_published_posts(
     session: AsyncSession,
     *,
@@ -252,9 +262,9 @@ async def list_published_posts(
             ContentBlock.published_at.desc().nullslast(),
             ContentBlock.updated_at.desc(),
         ]
-    query_text = (q or "").strip().lower()
-    tag_text = (tag or "").strip().lower()
-    series_text = (series or "").strip().lower()
+    query_text = _normalize_search_text(q)
+    tag_text = _normalize_search_text(tag)
+    series_text = _normalize_search_text(series)
 
     if not query_text and not tag_text and not series_text:
         offset = (page - 1) * limit
@@ -298,14 +308,14 @@ async def list_published_posts(
             meta = getattr(block, "meta", None) or {}
             if tag_text:
                 tags = _normalize_tags(meta.get("tags"))
-                if tag_text not in {t.lower() for t in tags}:
+                if tag_text not in {_normalize_search_text(t) for t in tags}:
                     continue
             if series_text:
                 series_value = meta.get("series")
-                if not isinstance(series_value, str) or series_text != series_value.strip().lower():
+                if not isinstance(series_value, str) or series_text != _normalize_search_text(series_value):
                     continue
             if query_text:
-                haystack = f"{block.title}\n{_plain_text_from_markdown(block.body_markdown)}".lower()
+                haystack = _normalize_search_text(f"{block.title}\n{_plain_text_from_markdown(block.body_markdown)}")
                 if query_text not in haystack:
                     continue
             filtered.append(block)

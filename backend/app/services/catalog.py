@@ -5,6 +5,7 @@ import io
 import json
 import secrets
 import string
+import unicodedata
 import uuid
 
 from fastapi import HTTPException, status
@@ -66,6 +67,16 @@ from app.services import notifications as notifications_service
 from app.services import pricing
 from app.core.config import settings
 from app.models.user import User
+
+_SEARCH_CHAR_MAP: tuple[tuple[str, str], ...] = (
+    ("ă", "a"),
+    ("â", "a"),
+    ("î", "i"),
+    ("ș", "s"),
+    ("ş", "s"),
+    ("ț", "t"),
+    ("ţ", "t"),
+)
 
 
 async def get_category_by_slug(session: AsyncSession, slug: str) -> Category | None:
@@ -1644,6 +1655,22 @@ def slugify(value: str) -> str:
     return "-".join(filter(None, cleaned.split("-")))
 
 
+def _normalize_search_text(value: str | None) -> str:
+    raw = (value or "").strip()
+    if not raw:
+        return ""
+    normalized = unicodedata.normalize("NFKD", raw)
+    without_marks = "".join(ch for ch in normalized if not unicodedata.combining(ch))
+    return without_marks.lower()
+
+
+def _normalized_search_expr(column):
+    expr = func.lower(func.coalesce(column, ""))
+    for source, target in _SEARCH_CHAR_MAP:
+        expr = func.replace(expr, source, target)
+    return expr
+
+
 async def get_product_price_bounds(
     session: AsyncSession,
     category_slug: str | None,
@@ -1682,10 +1709,13 @@ async def get_product_price_bounds(
         query = query.where(sale_active if on_sale else ~sale_active)
     if is_featured is not None:
         query = query.where(Product.is_featured == is_featured)
-    if search:
-        like = f"%{search.lower()}%"
+    normalized_search = _normalize_search_text(search)
+    if normalized_search:
+        like = f"%{normalized_search}%"
         query = query.where(
-            (Product.name.ilike(like)) | (Product.short_description.ilike(like)) | (Product.long_description.ilike(like))
+            _normalized_search_expr(Product.name).like(like)
+            | _normalized_search_expr(Product.short_description).like(like)
+            | _normalized_search_expr(Product.long_description).like(like)
         )
     if tags:
         query = query.join(Product.tags).where(Tag.slug.in_(tags))
@@ -1753,10 +1783,13 @@ async def list_products_with_filters(
         base_query = base_query.where(sale_active if on_sale else ~sale_active)
     if is_featured is not None:
         base_query = base_query.where(Product.is_featured == is_featured)
-    if search:
-        like = f"%{search.lower()}%"
+    normalized_search = _normalize_search_text(search)
+    if normalized_search:
+        like = f"%{normalized_search}%"
         base_query = base_query.where(
-            (Product.name.ilike(like)) | (Product.short_description.ilike(like)) | (Product.long_description.ilike(like))
+            _normalized_search_expr(Product.name).like(like)
+            | _normalized_search_expr(Product.short_description).like(like)
+            | _normalized_search_expr(Product.long_description).like(like)
         )
     if min_price is not None:
         base_query = base_query.where(effective_price >= min_price)
