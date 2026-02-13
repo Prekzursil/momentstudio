@@ -96,6 +96,9 @@ showing what is already implemented.
   - Evidence: `frontend/e2e/admin-dashboard-freeze.spec.ts`, `.github/workflows/compose-smoke.yml`, `frontend/playwright.config.ts`
 
 ## High priority (next)
+- [x] Search consistency: avoid stale/out-of-order responses overwriting latest results (blog + shop).
+  - Evidence: `frontend/src/app/pages/blog/blog-list.component.ts`, `frontend/src/app/pages/shop/shop.component.ts`
+  - Evidence (tests): `frontend/src/app/pages/blog/blog-list.component.spec.ts`, `frontend/src/app/pages/shop/shop.component.spec.ts`
 - [x] Netopia: notifyURL/webhook must always respond HTTP 200 with an IPN ack payload (avoid INVALID_RESPONSE_STATUS).
   - Evidence: `backend/app/api/v1/payments.py`, `backend/tests/test_netopia_webhook.py`
 - [x] CI: run PayPal + Stripe mock checkout E2E (success + decline/cancel) in compose smoke.
