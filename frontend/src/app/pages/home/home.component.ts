@@ -179,6 +179,7 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
   ],
   template: `
     <section class="grid gap-10">
+      <h1 class="sr-only">{{ 'app.name' | translate }}</h1>
       <ng-container *ngFor="let block of enabledBlocks()">
         <ng-container [ngSwitch]="block.type">
           <ng-container *ngSwitchCase="'banner'">

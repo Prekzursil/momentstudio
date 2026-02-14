@@ -11,6 +11,8 @@ import { shopCategoriesResolver } from './core/shop.resolver';
 import { checkoutPricingSettingsResolver } from './core/checkout.resolver';
 import { appConfig } from './core/app-config';
 
+const NOINDEX_ROBOTS = 'noindex,nofollow';
+
 const mockCheckoutRoutes: Routes =
   appConfig.appEnv === 'production'
     ? []
@@ -18,12 +20,14 @@ const mockCheckoutRoutes: Routes =
         {
           path: 'checkout/mock/paypal',
           loadComponent: () => import('./pages/checkout/paypal-mock.component').then((m) => m.PayPalMockComponent),
-          title: 'meta.titles.checkout_paypal_mock'
+          title: 'meta.titles.checkout_paypal_mock',
+          data: { robots: NOINDEX_ROBOTS }
         },
         {
           path: 'checkout/mock/stripe',
           loadComponent: () => import('./pages/checkout/stripe-mock.component').then((m) => m.StripeMockComponent),
-          title: 'meta.titles.checkout_stripe_mock'
+          title: 'meta.titles.checkout_stripe_mock',
+          data: { robots: NOINDEX_ROBOTS }
         }
       ];
 
@@ -79,6 +83,7 @@ export const routes: Routes = [
     path: 'checkout',
     loadComponent: () => import('./pages/checkout/checkout.component').then((m) => m.CheckoutComponent),
     title: 'meta.titles.checkout',
+    data: { robots: NOINDEX_ROBOTS },
     resolve: {
       checkoutPricingSettings: checkoutPricingSettingsResolver
     }
@@ -87,87 +92,109 @@ export const routes: Routes = [
   {
     path: 'checkout/paypal/return',
     loadComponent: () => import('./pages/checkout/paypal-return.component').then((m) => m.PayPalReturnComponent),
-    title: 'meta.titles.checkout_paypal'
+    title: 'meta.titles.checkout_paypal',
+    data: { robots: NOINDEX_ROBOTS }
   },
   {
     path: 'checkout/stripe/return',
     loadComponent: () => import('./pages/checkout/stripe-return.component').then((m) => m.StripeReturnComponent),
-    title: 'meta.titles.checkout_stripe'
+    title: 'meta.titles.checkout_stripe',
+    data: { robots: NOINDEX_ROBOTS }
   },
   {
     path: 'checkout/netopia/return',
     loadComponent: () => import('./pages/checkout/netopia-return.component').then((m) => m.NetopiaReturnComponent),
-    title: 'meta.titles.checkout_netopia'
+    title: 'meta.titles.checkout_netopia',
+    data: { robots: NOINDEX_ROBOTS }
   },
   {
     path: 'checkout/paypal/cancel',
     loadComponent: () => import('./pages/checkout/paypal-cancel.component').then((m) => m.PayPalCancelComponent),
-    title: 'meta.titles.checkout'
+    title: 'meta.titles.checkout',
+    data: { robots: NOINDEX_ROBOTS }
   },
   {
     path: 'checkout/stripe/cancel',
     loadComponent: () => import('./pages/checkout/stripe-cancel.component').then((m) => m.StripeCancelComponent),
-    title: 'meta.titles.checkout'
+    title: 'meta.titles.checkout',
+    data: { robots: NOINDEX_ROBOTS }
   },
   {
     path: 'checkout/netopia/cancel',
     loadComponent: () => import('./pages/checkout/netopia-cancel.component').then((m) => m.NetopiaCancelComponent),
-    title: 'meta.titles.checkout'
+    title: 'meta.titles.checkout',
+    data: { robots: NOINDEX_ROBOTS }
   },
   {
     path: 'checkout/success',
     loadComponent: () => import('./pages/checkout/success.component').then((m) => m.SuccessComponent),
-    title: 'meta.titles.checkout_success'
+    title: 'meta.titles.checkout_success',
+    data: { robots: NOINDEX_ROBOTS }
   },
   {
     path: 'receipt/:token',
     loadComponent: () => import('./pages/receipt/receipt.component').then((m) => m.ReceiptComponent),
-    title: 'meta.titles.receipt'
+    title: 'meta.titles.receipt',
+    data: { robots: NOINDEX_ROBOTS }
   },
-  { path: 'login', loadComponent: () => import('./pages/auth/login.component').then((m) => m.LoginComponent), title: 'meta.titles.login' },
+  {
+    path: 'login',
+    loadComponent: () => import('./pages/auth/login.component').then((m) => m.LoginComponent),
+    title: 'meta.titles.login',
+    data: { robots: NOINDEX_ROBOTS }
+  },
   {
     path: 'login/2fa',
     loadComponent: () => import('./pages/auth/two-factor.component').then((m) => m.TwoFactorComponent),
-    title: 'meta.titles.two_factor'
+    title: 'meta.titles.two_factor',
+    data: { robots: NOINDEX_ROBOTS }
   },
   {
     path: 'register',
     loadComponent: () => import('./pages/auth/register.component').then((m) => m.RegisterComponent),
-    title: 'meta.titles.register'
+    title: 'meta.titles.register',
+    data: { robots: NOINDEX_ROBOTS }
   },
   {
     path: 'auth/google/callback',
     loadComponent: () => import('./pages/auth/google-callback.component').then((m) => m.GoogleCallbackComponent),
-    title: 'meta.titles.google_signin'
+    title: 'meta.titles.google_signin',
+    data: { robots: NOINDEX_ROBOTS }
   },
   {
     path: 'password-reset',
     loadComponent: () => import('./pages/auth/password-reset-request.component').then((m) => m.PasswordResetRequestComponent),
-    title: 'meta.titles.password_reset'
+    title: 'meta.titles.password_reset',
+    data: { robots: NOINDEX_ROBOTS }
   },
   {
     path: 'password-reset/confirm',
     loadComponent: () => import('./pages/auth/password-reset.component').then((m) => m.PasswordResetComponent),
-    title: 'meta.titles.password_reset_confirm'
+    title: 'meta.titles.password_reset_confirm',
+    data: { robots: NOINDEX_ROBOTS }
   },
   {
     path: 'verify-email',
     loadComponent: () => import('./pages/auth/verify-email.component').then((m) => m.VerifyEmailComponent),
-    title: 'meta.titles.verify_email'
+    title: 'meta.titles.verify_email',
+    data: { robots: NOINDEX_ROBOTS }
   },
   {
     path: 'newsletter/confirm',
     loadComponent: () => import('./pages/newsletter/newsletter-confirm.component').then((m) => m.NewsletterConfirmComponent),
-    title: 'meta.titles.newsletter'
+    title: 'meta.titles.newsletter',
+    data: { robots: NOINDEX_ROBOTS }
   },
   {
     path: 'newsletter/unsubscribe',
     loadComponent: () => import('./pages/newsletter/newsletter-unsubscribe.component').then((m) => m.NewsletterUnsubscribeComponent),
-    title: 'meta.titles.unsubscribe'
+    title: 'meta.titles.unsubscribe',
+    data: { robots: NOINDEX_ROBOTS }
   },
   {
     path: 'account',
     canActivate: [authGuard],
+    data: { robots: NOINDEX_ROBOTS },
     loadComponent: () => import('./pages/account/account.component').then((m) => m.AccountComponent),
     children: [
       { path: '', loadComponent: () => import('./pages/account/account-overview.component').then((m) => m.AccountOverviewComponent) },
@@ -213,11 +240,13 @@ export const routes: Routes = [
     path: 'tickets',
     canActivate: [authGuard],
     loadComponent: () => import('./pages/tickets/tickets.component').then((m) => m.TicketsComponent),
-    title: 'meta.titles.help_center'
+    title: 'meta.titles.help_center',
+    data: { robots: NOINDEX_ROBOTS }
   },
   {
     path: 'admin',
     canActivate: [adminGuard],
+    data: { robots: NOINDEX_ROBOTS },
     loadComponent: () => import('./pages/admin/admin-layout.component').then((m) => m.AdminLayoutComponent),
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
@@ -358,8 +387,9 @@ export const routes: Routes = [
   {
     path: 'offline',
     loadComponent: () => import('./pages/offline/offline.component').then((m) => m.OfflineComponent),
-    title: 'meta.titles.offline'
+    title: 'meta.titles.offline',
+    data: { robots: NOINDEX_ROBOTS }
   },
-  { path: 'error', component: ErrorComponent, title: 'meta.titles.error' },
-  { path: '**', component: NotFoundComponent, title: 'meta.titles.not_found' }
+  { path: 'error', component: ErrorComponent, title: 'meta.titles.error', data: { robots: NOINDEX_ROBOTS } },
+  { path: '**', component: NotFoundComponent, title: 'meta.titles.not_found', data: { robots: NOINDEX_ROBOTS } }
 ];

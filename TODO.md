@@ -114,7 +114,19 @@ showing what is already implemented.
   - Evidence: `frontend/src/app/app.component.ts`, `frontend/src/app/app.component.spec.ts`, `frontend/src/index.html`
 - [x] Auth diagnostics: silent startup refresh probe should not emit expected anonymous 401 errors in browser diagnostics.
   - Evidence: `backend/app/api/v1/auth.py`, `backend/tests/test_auth.py`
-- [ ] CLS phase 2: reserve layout space for dynamic footer/global CMS blocks to reduce app-footer shifts without changing typography.
+- [x] CLS phase 2: reserve layout space for dynamic footer/global CMS blocks to reduce app-footer shifts without changing typography.
+  - Evidence: `frontend/src/app/shared/cms-global-section-blocks.component.ts`, `frontend/src/app/layout/footer.component.ts`, `frontend/src/app/app.component.ts`
+  - Evidence (tests): `frontend/src/app/shared/cms-global-section-blocks.component.spec.ts`, `frontend/src/app/layout/footer.component.spec.ts`
+- [x] Social: make Instagram/Facebook thumbnail fetch persistent by storing local media URLs (stable until manual refetch).
+  - Evidence: `backend/app/services/social_thumbnails.py`, `backend/app/services/storage.py`, `backend/app/api/v1/content.py`
+  - Evidence (tests): `backend/tests/test_content_api.py`
+- [x] SEO sweep: enforce route-level robots policy and resolve key public crawlability issues (home H1 + utility-page outlinks).
+  - Evidence: `frontend/src/app/core/route-robots.service.ts`, `frontend/src/app/app.routes.ts`, `frontend/src/app/app.component.ts`, `frontend/src/app/pages/home/home.component.ts`, `frontend/src/app/pages/error/error.component.ts`, `frontend/src/app/pages/not-found/not-found.component.ts`, `frontend/src/app/pages/offline/offline.component.ts`
+  - Evidence (tests): `frontend/src/app/core/route-robots.service.spec.ts`, `frontend/src/app/pages/home/home.component.spec.ts`
+- [x] SEO phase 3: automated public-route crawl audit (title/description/H1/canonical/robots) as CI guard.
+  - Evidence: `frontend/e2e/seo-public-routes.spec.ts`, `.github/workflows/compose-smoke.yml`
+- [x] Observability: add FullStory browser SDK integration behind runtime env toggle and analytics consent gating.
+  - Evidence: `frontend/src/app/core/fullstory.ts`, `frontend/src/app/core/analytics.service.ts`, `frontend/src/app/core/app-config.ts`, `frontend/scripts/generate-config.mjs`, `frontend/nginx/99-runtime-config.sh`, `frontend/.env.example`
 - [x] Netopia: notifyURL/webhook must always respond HTTP 200 with an IPN ack payload (avoid INVALID_RESPONSE_STATUS).
   - Evidence: `backend/app/api/v1/payments.py`, `backend/tests/test_netopia_webhook.py`
 - [x] CI: run PayPal + Stripe mock checkout E2E (success + decline/cancel) in compose smoke.

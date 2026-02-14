@@ -105,6 +105,7 @@ describe('HomeComponent', () => {
     const fixture = TestBed.createComponent(HomeComponent);
     fixture.detectChanges();
 
+    expect(fixture.nativeElement.querySelectorAll('h1').length).toBe(1);
     const h2s = Array.from(fixture.nativeElement.querySelectorAll('h2') as NodeListOf<HTMLElement>).map((el) =>
       (el.textContent || '').trim()
     );
