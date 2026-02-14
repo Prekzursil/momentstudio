@@ -85,6 +85,42 @@ jobs:
             fi
           done
 
+          home_html="$(mktemp)"
+          curl -fsS http://localhost:4201/ > "$home_html"
+          bundle_path="$(
+            grep -Eo "/[^\"[:space:]]+\.[0-9a-f]{8,}\.js" "$home_html" \
+              | head -n 1 \
+              || true
+          )"
+          if [[ -z "${bundle_path}" ]]; then
+            echo "Unable to find hashed JS bundle in homepage HTML" >&2
+            exit 1
+          fi
+
+          bundle_headers="$(mktemp)"
+          curl -fsSI "http://localhost:4201${bundle_path}" > "$bundle_headers"
+          bundle_cache="$(
+            awk -F': *' 'tolower($1) == "cache-control" { print tolower($2) }' "$bundle_headers" \
+              | tr -d '\r' \
+              | head -n 1
+          )"
+          if [[ "${bundle_cache}" != *immutable* ]]; then
+            echo "Unexpected bundle cache-control: ${bundle_cache:-<missing>}" >&2
+            exit 1
+          fi
+
+          app_config_headers="$(mktemp)"
+          curl -fsSI http://localhost:4201/assets/app-config.js > "$app_config_headers"
+          app_config_cache="$(
+            awk -F': *' 'tolower($1) == "cache-control" { print tolower($2) }' "$app_config_headers" \
+              | tr -d '\r' \
+              | head -n 1
+          )"
+          if [[ "${app_config_cache}" != *no-store* ]]; then
+            echo "Unexpected app-config cache-control: ${app_config_cache:-<missing>}" >&2
+            exit 1
+          fi
+
       - name: Generate E2E owner credentials
         run: |
           set -euo pipefail

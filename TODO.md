@@ -108,6 +108,13 @@ showing what is already implemented.
   - Evidence: `frontend/src/index.html`, `frontend/src/app/core/structured-data.service.ts`, `frontend/src/app/pages/home/home.component.ts`, `frontend/src/app/pages/shop/shop.component.ts`, `frontend/src/app/pages/blog/blog-list.component.ts`, `frontend/src/app/pages/blog/blog-post.component.ts`
 - [x] SEO ops: add post-deploy Search Console indexing checklist for key URLs (home/shop/blog/product) and wire it into prod deploy output.
   - Evidence: `infra/prod/request-indexing-checklist.sh`, `infra/prod/deploy.sh`, `infra/prod/.env.example`, `infra/prod/README.md`, `docs/PRODUCTION.md`
+- [x] Performance: add balanced cache headers for frontend static bundles/assets and media responses (hashed immutable + runtime config uncached).
+  - Evidence: `frontend/nginx/default.conf`, `infra/prod/Caddyfile`, `infra/prod/verify-live.sh`, `.github/workflows/compose-smoke.yml`
+- [x] Lighthouse quick wins: add semantic main landmark in app shell and preload default homepage hero image for better LCP discovery.
+  - Evidence: `frontend/src/app/app.component.ts`, `frontend/src/app/app.component.spec.ts`, `frontend/src/index.html`
+- [x] Auth diagnostics: silent startup refresh probe should not emit expected anonymous 401 errors in browser diagnostics.
+  - Evidence: `backend/app/api/v1/auth.py`, `backend/tests/test_auth.py`
+- [ ] CLS phase 2: reserve layout space for dynamic footer/global CMS blocks to reduce app-footer shifts without changing typography.
 - [x] Netopia: notifyURL/webhook must always respond HTTP 200 with an IPN ack payload (avoid INVALID_RESPONSE_STATUS).
   - Evidence: `backend/app/api/v1/payments.py`, `backend/tests/test_netopia_webhook.py`
 - [x] CI: run PayPal + Stripe mock checkout E2E (success + decline/cancel) in compose smoke.

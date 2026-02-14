@@ -553,6 +553,21 @@ def test_invalid_login_and_refresh(test_app: Dict[str, object]) -> None:
     assert res.status_code == 401
 
 
+def test_silent_refresh_probe_returns_204_for_missing_or_invalid_token(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+
+    missing = client.post("/api/v1/auth/refresh", json={}, headers={"X-Silent": "1"})
+    assert missing.status_code == 204
+    assert missing.text == ""
+
+    invalid = client.post("/api/v1/auth/refresh", json={"refresh_token": "not-a-token"}, headers={"X-Silent": "1"})
+    assert invalid.status_code == 204
+    assert invalid.text == ""
+
+    non_silent_invalid = client.post("/api/v1/auth/refresh", json={"refresh_token": "not-a-token"})
+    assert non_silent_invalid.status_code == 401
+
+
 def test_admin_guard(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal: Callable = test_app["session_factory"]  # type: ignore[assignment]

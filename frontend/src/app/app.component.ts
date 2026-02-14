@@ -29,9 +29,11 @@ import { RouteHeadingFocusService } from './core/route-heading-focus.service';
         (languageChange)="onLanguageChange($event)"
       ></app-header>
       <app-cms-global-section-blocks contentKey="site.header-banners" containerClasses="py-6"></app-cms-global-section-blocks>
-      <app-container id="main-content" class="flex-1 py-8">
-        <router-outlet></router-outlet>
-      </app-container>
+      <main id="main-content" class="flex-1 py-8">
+        <app-container>
+          <router-outlet></router-outlet>
+        </app-container>
+      </main>
       <app-cms-global-section-blocks contentKey="site.footer-promo" containerClasses="py-8"></app-cms-global-section-blocks>
       <app-footer></app-footer>
     </div>

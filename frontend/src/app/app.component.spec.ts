@@ -16,9 +16,14 @@ describe('AppComponent', () => {
           useValue: {
             user: () => null,
             isAuthenticated: () => false,
+            isStaff: () => false,
+            isAdmin: () => false,
+            isImpersonating: () => false,
             ensureAuthenticated: () => of(false),
             loadCurrentUser: () => of(null),
-            updatePreferredLanguage: () => of(null)
+            updatePreferredLanguage: () => of(null),
+            checkAdminAccess: () => of(null),
+            logout: () => of(null)
           }
         }
       ]
@@ -29,5 +34,12 @@ describe('AppComponent', () => {
     const fixture = TestBed.createComponent(AppComponent);
     const app = fixture.componentInstance;
     expect(app).toBeTruthy();
+  });
+
+  it('renders a semantic main landmark', () => {
+    const fixture = TestBed.createComponent(AppComponent);
+    fixture.detectChanges();
+    const main = fixture.nativeElement.querySelector('main#main-content');
+    expect(main).toBeTruthy();
   });
 });
