@@ -4,6 +4,7 @@ from decimal import Decimal
 from io import BytesIO
 from pathlib import Path
 from typing import Dict
+from urllib.parse import urlparse
 
 import pytest
 from fastapi.testclient import TestClient
@@ -667,10 +668,10 @@ def test_admin_fetch_social_thumbnail(monkeypatch: pytest.MonkeyPatch, test_app:
     image_bytes = _jpeg_bytes()
 
     async def handler(request: httpx.Request) -> httpx.Response:
-        host = (request.url.host or "").lower()
-        if host.endswith("cdninstagram.com") or host.endswith("fbcdn.net"):
+        host = (request.url.host or "").lower().rstrip(".")
+        if host in {"scontent.cdninstagram.com", "scontent.fbcdn.net"}:
             return httpx.Response(200, content=image_bytes, headers={"content-type": "image/jpeg"}, request=request)
-        if host.endswith("facebook.com"):
+        if host == "www.facebook.com":
             return httpx.Response(200, text=facebook_html, request=request)
         return httpx.Response(200, text=instagram_html, request=request)
 
@@ -763,7 +764,9 @@ def test_public_site_social_hydrates_stale_remote_thumbnail_without_db_mutation(
         force_refresh: bool = False,
         allow_remote_fallback: bool = True,
     ) -> str | None:
-        assert "instagram.com" in url
+        parsed = urlparse(url)
+        host = (parsed.hostname or "").lower().rstrip(".")
+        assert host == "www.instagram.com"
         assert persist_local is True
         return "/media/social/hydrated.jpg"
 
