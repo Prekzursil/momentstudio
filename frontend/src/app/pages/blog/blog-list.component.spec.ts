@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Meta, Title } from '@angular/platform-browser';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
 
 import { BlogListComponent } from './blog-list.component';
 import { BlogService } from '../../core/blog.service';
@@ -59,5 +59,51 @@ describe('BlogListComponent SEO', () => {
     const canonical = doc.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
     expect(canonical).toBeTruthy();
     expect(canonical?.getAttribute('href')).toContain('/blog?lang=en');
+  });
+
+  it('ignores stale list responses when multiple loads overlap', () => {
+    const fixture = TestBed.createComponent(BlogListComponent);
+    const cmp = fixture.componentInstance as any;
+
+    const first$ = new Subject<any>();
+    const second$ = new Subject<any>();
+    blog.listPosts.and.returnValues(first$.asObservable(), second$.asObservable());
+
+    cmp.load(1);
+    cmp.load(1);
+
+    // Newer response lands first.
+    second$.next({
+      items: [
+        {
+          slug: 'new-post',
+          title: 'New Post',
+          excerpt: 'Excerpt',
+          tags: []
+        }
+      ],
+      meta: { total_items: 1, total_pages: 1, page: 1, limit: 9 }
+    });
+    second$.complete();
+
+    expect(cmp.posts.length).toBe(1);
+    expect(cmp.posts[0].slug).toBe('new-post');
+
+    // Stale response arrives later and must be ignored.
+    first$.next({
+      items: [
+        {
+          slug: 'old-post',
+          title: 'Old Post',
+          excerpt: 'Excerpt',
+          tags: []
+        }
+      ],
+      meta: { total_items: 1, total_pages: 1, page: 1, limit: 9 }
+    });
+    first$.complete();
+
+    expect(cmp.posts.length).toBe(1);
+    expect(cmp.posts[0].slug).toBe('new-post');
   });
 });
