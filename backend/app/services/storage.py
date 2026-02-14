@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 _SVG_MAX_BYTES = 1024 * 1024  # avoid expensive parsing for huge SVGs
 _MEDIA_URL_PREFIX = "/media/"
 _INVALID_MEDIA_URL = "Invalid media URL"
+_DEFAULT_PERSIST_IMAGE_MIMES = ("image/jpeg", "image/png", "image/webp", "image/gif")
 
 
 def ensure_media_root(root: str | Path | None = None) -> Path:
@@ -118,6 +119,64 @@ def save_upload(
     except Exception as exc:
         _cleanup(destination)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Upload failed") from exc
+
+
+def save_image_bytes(
+    content: bytes,
+    *,
+    relative_path: str,
+    root: str | Path | None = None,
+    max_bytes: int = 5 * 1024 * 1024,
+    allowed_content_types: tuple[str, ...] = _DEFAULT_PERSIST_IMAGE_MIMES,
+) -> str:
+    if not isinstance(content, (bytes, bytearray)):
+        raise ValueError("Invalid image payload")
+    payload = bytes(content)
+    if not payload:
+        raise ValueError("Empty image payload")
+    if len(payload) > max_bytes:
+        raise ValueError("Image payload too large")
+
+    detected_mime = _detect_image_mime(payload)
+    if not detected_mime or detected_mime not in allowed_content_types:
+        raise ValueError("Unsupported image type")
+
+    suffix = _suffix_for_mime(detected_mime)
+    if not suffix:
+        raise ValueError("Unsupported image type")
+
+    pure = PurePosixPath((relative_path or "").strip())
+    if not str(pure) or pure.is_absolute() or any(part in {"", ".", ".."} for part in pure.parts):
+        raise ValueError("Invalid relative path")
+
+    # Callers provide an extension-less deterministic key (e.g. social/<hash>).
+    normalized_rel = pure.with_suffix("")
+    final_rel = normalized_rel.with_suffix(suffix)
+
+    base_root = ensure_media_root(root or settings.media_root).resolve()
+    destination = (base_root / final_rel.as_posix()).resolve()
+    try:
+        destination.relative_to(base_root)
+    except ValueError as exc:
+        raise ValueError("Invalid relative path") from exc
+    destination.parent.mkdir(parents=True, exist_ok=True)
+
+    temp = destination.with_name(f".{destination.name}.{uuid.uuid4().hex}.tmp")
+    temp.write_bytes(payload)
+    temp.replace(destination)
+
+    # If mime type changed between refreshes, keep only the canonical extension.
+    for ext in (".jpg", ".jpeg", ".png", ".webp", ".gif"):
+        if ext == suffix:
+            continue
+        other = destination.with_suffix(ext)
+        if other.exists():
+            try:
+                other.unlink()
+            except OSError:  # pragma: no cover
+                logger.warning("persisted_image_cleanup_failed", extra={"path": str(other)})
+
+    return f"{_MEDIA_URL_PREFIX}{final_rel.as_posix()}"
 
 
 def _detect_image_mime_path(path: Path) -> str | None:

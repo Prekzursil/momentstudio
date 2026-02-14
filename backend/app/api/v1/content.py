@@ -206,6 +206,11 @@ async def get_content(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
     if getattr(block, "key", "").startswith("page.") and _requires_auth(block) and not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    if getattr(block, "key", "") == "site.social":
+        hydrated_meta = await social_thumbnails.hydrate_site_social_meta(block.meta if isinstance(block.meta, dict) else None)
+        out = ContentBlockRead.model_validate(block)
+        out.meta = hydrated_meta
+        return out
     return block
 
 
@@ -254,11 +259,18 @@ async def admin_fetch_social_thumbnail(
     _: User = Depends(require_admin_section("content")),
 ) -> SocialThumbnailResponse:
     try:
-        thumbnail_url = await social_thumbnails.fetch_social_thumbnail_url(payload.url)
+        thumbnail_url = await social_thumbnails.fetch_social_thumbnail_url(
+            payload.url,
+            persist_local=True,
+            force_refresh=True,
+            allow_remote_fallback=False,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Could not fetch thumbnail") from exc
+    if not thumbnail_url:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Could not persist thumbnail")
     return SocialThumbnailResponse(thumbnail_url=thumbnail_url)
 
 
