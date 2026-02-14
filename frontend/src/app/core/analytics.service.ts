@@ -1,6 +1,7 @@
 import { Injectable, signal } from '@angular/core';
 import { ApiService } from './api.service';
 import { Observable, catchError, finalize, map, of, shareReplay, tap } from 'rxjs';
+import { disableFullStory, enableFullStory } from './fullstory';
 
 declare global {
   interface Window {
@@ -36,12 +37,16 @@ export class AnalyticsService {
     this.enabledState.set(Boolean(value));
     this.persistEnabled(this.enabledState());
     if (this.enabledState()) {
+      enableFullStory();
       this.startSession();
+      return;
     }
+    disableFullStory();
   }
 
   startSession(): void {
     if (!this.enabledState()) return;
+    enableFullStory();
     if (this.sessionStarted) return;
     this.sessionStarted = true;
     this.persistSessionStarted(true);

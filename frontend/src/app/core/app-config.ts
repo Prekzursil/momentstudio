@@ -8,6 +8,7 @@ export interface AppConfig {
   addressAutocompleteEnabled: boolean;
   sentryDsn: string;
   captchaSiteKey: string;
+  fullstoryOrgId: string;
 }
 
 declare global {
@@ -25,7 +26,8 @@ const defaults: AppConfig = {
   netopiaEnabled: false,
   addressAutocompleteEnabled: false,
   sentryDsn: '',
-  captchaSiteKey: ''
+  captchaSiteKey: '',
+  fullstoryOrgId: ''
 };
 
 export const appConfig: AppConfig = (() => {
