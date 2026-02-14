@@ -927,6 +927,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   draggingProductId: string | null = null;
   dragOverProductId: string | null = null;
   productReorderSaving = signal<boolean>(false);
+  private productsLoadSeq = 0;
 
   sortOptions: { label: string; value: SortOption }[] = [
     { label: 'shop.sortRecommended', value: 'recommended' },
@@ -2027,6 +2028,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   }
 
   private fetchProducts(append = false): void {
+	    const loadSeq = ++this.productsLoadSeq;
 	    const isSale = this.activeCategorySlug === 'sale';
 	    const categorySlug = isSale ? undefined : (this.activeSubcategorySlug || this.activeCategorySlug || undefined);
 	    const includeUnpublished = this.canEditProducts();
@@ -2047,6 +2049,7 @@ export class ShopComponent implements OnInit, OnDestroy {
       })
       .subscribe({
         next: (response) => {
+	        if (loadSeq !== this.productsLoadSeq) return;
           const incoming = response.items ?? [];
           this.products = append && this.products.length ? [...this.products, ...incoming] : incoming;
           if (!append) {
@@ -2101,6 +2104,7 @@ export class ShopComponent implements OnInit, OnDestroy {
           if (!append) this.restoreScrollIfNeeded();
         },
         error: () => {
+	        if (loadSeq !== this.productsLoadSeq) return;
           this.loading.set(false);
           this.loadingMore.set(false);
           if (append) {

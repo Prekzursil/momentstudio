@@ -99,6 +99,9 @@ showing what is already implemented.
 - [x] Search: make storefront/blog queries diacritics-insensitive (e.g. `brosa` matches `broșă`).
   - Evidence: `backend/app/services/catalog.py`, `backend/app/services/blog.py`
   - Evidence (tests): `backend/tests/test_search_normalization.py`
+- [x] Search consistency: avoid stale/out-of-order responses overwriting latest results (blog + shop).
+  - Evidence: `frontend/src/app/pages/blog/blog-list.component.ts`, `frontend/src/app/pages/shop/shop.component.ts`
+  - Evidence (tests): `frontend/src/app/pages/blog/blog-list.component.spec.ts`, `frontend/src/app/pages/shop/shop.component.spec.ts`
 - [x] SEO/social preview: add baseline OG/Twitter tags in the static entry HTML and use OpenGraph `property=` tags across key pages.
   - Evidence: `frontend/src/index.html`, `frontend/src/app/pages/about/about.component.ts`, `frontend/src/app/pages/contact/contact.component.ts`, `frontend/src/app/pages/shop/shop.component.ts`, `frontend/src/app/pages/page/page.component.ts`
   - Evidence (tests): `frontend/src/app/pages/about/about.component.spec.ts`, `frontend/src/app/pages/contact/contact.component.spec.ts`

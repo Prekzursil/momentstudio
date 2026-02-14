@@ -397,6 +397,7 @@ export class BlogListComponent implements OnInit, OnDestroy {
   sort: BlogSort = 'newest';
   private readonly loadedImages = new Set<string>();
   private readonly failedThumbs = new Set<string>();
+  private loadSeq = 0;
 
   private sub?: Subscription;
   private langSub?: Subscription;
@@ -516,6 +517,7 @@ export class BlogListComponent implements OnInit, OnDestroy {
   }
 
   load(page = 1): void {
+    const loadSeq = ++this.loadSeq;
     this.loading.set(true);
     this.hasError.set(false);
     this.heroPost = null;
@@ -534,6 +536,7 @@ export class BlogListComponent implements OnInit, OnDestroy {
       })
       .subscribe({
       next: (resp) => {
+        if (loadSeq !== this.loadSeq) return;
         this.posts = resp.items;
         const hasFilters = Boolean(this.searchQuery.trim() || this.tagQuery.trim() || this.seriesQuery.trim());
         const canShowHero = !hasFilters && resp.meta.page === 1 && this.sort === 'newest' && resp.items.length > 0;
@@ -550,6 +553,7 @@ export class BlogListComponent implements OnInit, OnDestroy {
         this.setMetaTags(resp.meta.page);
       },
       error: () => {
+        if (loadSeq !== this.loadSeq) return;
         this.posts = [];
         this.heroPost = null;
         this.gridPosts = [];
