@@ -36,7 +36,7 @@ describe('BlogListComponent SEO', () => {
         { provide: Title, useValue: title },
         { provide: Meta, useValue: meta },
         { provide: BlogService, useValue: blog },
-        { provide: ActivatedRoute, useValue: { queryParams: of({}) } },
+        { provide: ActivatedRoute, useValue: { params: of({}), queryParams: of({}) } },
         { provide: Router, useValue: router },
         { provide: StorefrontAdminModeService, useValue: { enabled: () => false } },
         { provide: DOCUMENT, useValue: doc }
@@ -59,5 +59,11 @@ describe('BlogListComponent SEO', () => {
     const canonical = doc.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
     expect(canonical).toBeTruthy();
     expect(canonical?.getAttribute('href')).toContain('/blog?lang=en');
+
+    const alternates = Array.from(doc.querySelectorAll('link[rel="alternate"][data-seo-managed="true"]'));
+    expect(alternates.length).toBe(3);
+
+    const routeSchema = doc.querySelector('script#seo-route-schema-1');
+    expect(routeSchema?.textContent || '').toContain('"CollectionPage"');
   });
 });

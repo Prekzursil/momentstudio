@@ -18,6 +18,8 @@ import { LoadingStateComponent } from '../../shared/loading-state.component';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Subscription, combineLatest, forkJoin, map, switchMap } from 'rxjs';
 import { Meta, Title } from '@angular/platform-browser';
+import { SeoHeadLinksService } from '../../core/seo-head-links.service';
+import { StructuredDataService } from '../../core/structured-data.service';
 
 type ShopFilterChipType = 'category' | 'subcategory' | 'price' | 'tag' | 'search';
 
@@ -948,7 +950,9 @@ export class ShopComponent implements OnInit, OnDestroy {
     private toast: ToastService,
     private translate: TranslateService,
     private title: Title,
-    private metaService: Meta
+    private metaService: Meta,
+    private seoHeadLinks: SeoHeadLinksService,
+    private structuredData: StructuredDataService
   ) {
     this.storefrontEditModeEffect = effect(() => {
       const enabled = this.storefrontAdminMode.enabled();
@@ -1005,6 +1009,7 @@ export class ShopComponent implements OnInit, OnDestroy {
 	    this.langSub?.unsubscribe();
 	    this.storefrontEditModeEffect?.destroy();
 	    this.cancelFilterDebounce();
+      this.structuredData.clearRouteSchemas();
 	  }
 
   openQuickView(slug: string): void {
@@ -2208,12 +2213,39 @@ export class ShopComponent implements OnInit, OnDestroy {
   }
 
   setMetaTags(): void {
+    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     const title = this.translate.instant('shop.metaTitle');
     const description = this.translate.instant('shop.metaDescription');
     this.title.setTitle(title);
     this.metaService.updateTag({ property: 'og:title', content: title });
     this.metaService.updateTag({ property: 'og:description', content: description });
     this.metaService.updateTag({ name: 'description', content: description });
+    const path = this.activeCategorySlug ? `/shop/${encodeURIComponent(this.activeCategorySlug)}` : '/shop';
+    const canonical = this.seoHeadLinks.setLocalizedCanonical(path, lang, {
+      lang,
+      sub: this.shouldKeepSubcategoryInCanonical() ? this.activeSubcategorySlug : undefined
+    });
+    this.metaService.updateTag({ property: 'og:url', content: canonical });
+    this.structuredData.setRouteSchemas([
+      {
+        '@context': 'https://schema.org',
+        '@type': 'CollectionPage',
+        name: title,
+        description,
+        url: canonical,
+        inLanguage: lang
+      }
+    ]);
+  }
+
+  private shouldKeepSubcategoryInCanonical(): boolean {
+    if (!this.activeCategorySlug || this.activeCategorySlug === 'sale') return false;
+    const subSlug = (this.activeSubcategorySlug || '').trim();
+    if (!subSlug) return false;
+    const parent = this.categoriesBySlug.get(this.activeCategorySlug);
+    const child = this.categoriesBySlug.get(subSlug);
+    if (!parent || !child) return false;
+    return child.parent_id === parent.id;
   }
 
   onCategorySelected(): void {

@@ -31,6 +31,8 @@ import { CardComponent } from '../../shared/card.component';
 import { SkeletonComponent } from '../../shared/skeleton.component';
 import { formatIdentity } from '../../shared/user-identity';
 import { catchError } from 'rxjs/operators';
+import { SeoHeadLinksService } from '../../core/seo-head-links.service';
+import { StructuredDataService } from '../../core/structured-data.service';
 
 hljs.registerLanguage('bash', bash);
 hljs.registerLanguage('css', css);
@@ -907,7 +909,6 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   private previewToken = '';
   private langSub?: Subscription;
   private routeSub?: Subscription;
-  private canonicalEl?: HTMLLinkElement;
   private document: Document = inject(DOCUMENT);
   private scrollStartY = 0;
   private scrollEndY = 1;
@@ -943,6 +944,8 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     private translate: TranslateService,
     private title: Title,
     private meta: Meta,
+    private seoHeadLinks: SeoHeadLinksService,
+    private structuredData: StructuredDataService,
     private newsletter: NewsletterService,
     private toast: ToastService,
     private markdown: MarkdownService,
@@ -975,6 +978,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       w.removeEventListener('resize', this.resizeListener);
     }
     this.closeLightbox();
+    this.structuredData.clearRouteSchemas();
   }
 
   load(): void {
@@ -1907,6 +1911,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   private setMetaTags(post: BlogPost): void {
     const pageTitle = `${post.title} | momentstudio`;
     const description = (post.summary || post.body_markdown || '').replace(/\s+/g, ' ').trim().slice(0, 160);
+    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     this.title.setTitle(pageTitle);
     if (description) {
       this.meta.updateTag({ name: 'description', content: description });
@@ -1917,7 +1922,6 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     this.meta.updateTag({ property: 'og:type', content: 'article' });
     this.meta.updateTag({ property: 'og:site_name', content: 'momentstudio' });
 
-    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     const apiBaseUrl = (appConfig.apiBaseUrl || '/api/v1').replace(/\/$/, '');
     const ogPath = `${apiBaseUrl}/blog/posts/${this.slug}/og.png?lang=${lang}`;
     const ogImage =
@@ -1928,32 +1932,57 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     this.meta.updateTag({ name: 'twitter:card', content: 'summary_large_image' });
     this.meta.updateTag({ name: 'twitter:title', content: pageTitle });
     this.meta.updateTag({ name: 'twitter:image', content: ogImage });
-    this.setCanonical();
+    const canonical = this.setCanonical();
+    this.structuredData.setRouteSchemas([
+      {
+        '@context': 'https://schema.org',
+        '@type': 'BlogPosting',
+        headline: post.title,
+        description: description || undefined,
+        image: post.cover_image_url || undefined,
+        datePublished: post.published_at || post.created_at,
+        dateModified: post.updated_at || post.created_at,
+        author: {
+          '@type': 'Person',
+          name: post.author_name || post.author?.name || post.author?.username || 'momentstudio'
+        },
+        mainEntityOfPage: {
+          '@type': 'WebPage',
+          '@id': canonical
+        },
+        url: canonical,
+        inLanguage: lang
+      }
+    ]);
   }
 
   private setErrorMetaTags(): void {
+    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     const title = this.translate.instant('blog.post.metaTitle');
     const description = this.translate.instant('blog.post.metaDescription');
     this.title.setTitle(title);
     this.meta.updateTag({ name: 'description', content: description });
     this.meta.updateTag({ property: 'og:title', content: title });
     this.meta.updateTag({ property: 'og:description', content: description });
-    this.setCanonical();
+    const canonical = this.setCanonical();
+    this.structuredData.setRouteSchemas([
+      {
+        '@context': 'https://schema.org',
+        '@type': 'WebPage',
+        name: title,
+        description,
+        url: canonical,
+        inLanguage: lang
+      }
+    ]);
   }
 
-  private setCanonical(): void {
-    if (!this.slug || typeof window === 'undefined' || !this.document) return;
+  private setCanonical(): string {
+    if (!this.slug) return '';
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
-    const href = `${window.location.origin}/blog/${this.slug}?lang=${lang}`;
-    let link: HTMLLinkElement | null = this.document.querySelector('link[rel="canonical"]');
-    if (!link) {
-      link = this.document.createElement('link');
-      link.setAttribute('rel', 'canonical');
-      this.document.head.appendChild(link);
-    }
-    link.setAttribute('href', href);
-    this.canonicalEl = link;
+    const href = this.seoHeadLinks.setLocalizedCanonical(`/blog/${encodeURIComponent(this.slug)}`, lang, { lang });
     this.meta.updateTag({ property: 'og:url', content: href });
+    return href;
   }
 
   private measureReadingProgressSoon(): void {

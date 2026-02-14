@@ -182,3 +182,18 @@ If you deploy from GHCR images (see `.github/workflows/release.yml`), the typica
 3) Verify health:
    - backend: `/api/v1/health` and `/api/v1/health/ready`
    - frontend: load `/` and admin area
+
+## 8) Search Console indexing checklist (post-deploy)
+
+For the VPS stack (`infra/prod/`), `./infra/prod/deploy.sh` can print a ready-to-run URL Inspection checklist after verification.
+
+- Enabled by default: `RUN_GSC_INDEXING_CHECKLIST=1` (set in `infra/prod/.env`).
+- Disable when needed: `RUN_GSC_INDEXING_CHECKLIST=0`.
+- Run manually anytime:
+
+```bash
+./infra/prod/request-indexing-checklist.sh
+```
+
+The checklist prints key URLs for EN/RO (`home`, `shop`, `blog`) and a representative product URL discovered from `/sitemap.xml`,
+plus direct URL Inspection links for quick “Request indexing” actions.

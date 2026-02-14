@@ -1,5 +1,5 @@
-import { CommonModule, NgOptimizedImage, DOCUMENT } from '@angular/common';
-import { ChangeDetectorRef, Component, OnDestroy, OnInit, inject } from '@angular/core';
+import { CommonModule, NgOptimizedImage } from '@angular/common';
+import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { BackInStockRequest, CatalogService, Product, ProductVariant } from '../../core/catalog.service';
@@ -22,6 +22,7 @@ import { MarkdownService } from '../../core/markdown.service';
 import { StorefrontAdminModeService } from '../../core/storefront-admin-mode.service';
 import { AdminService } from '../../core/admin.service';
 import { ProductImageManagerModalComponent } from '../../shared/product-image-manager-modal.component';
+import { SeoHeadLinksService } from '../../core/seo-head-links.service';
 
 @Component({
   selector: 'app-product-detail',
@@ -425,8 +426,6 @@ export class ProductComponent implements OnInit, OnDestroy {
   private productLoadSub?: Subscription;
   private upsellsLoadSub?: Subscription;
   private relatedLoadSub?: Subscription;
-  private canonicalEl?: HTMLLinkElement;
-  private document: Document = inject(DOCUMENT);
   private slug: string | null = null;
   private shopReturnUrl: string | null = null;
   crumbs = [
@@ -449,7 +448,8 @@ export class ProductComponent implements OnInit, OnDestroy {
     private router: Router,
     private cdr: ChangeDetectorRef,
     private storefrontAdminMode: StorefrontAdminModeService,
-    private admin: AdminService
+    private admin: AdminService,
+    private seoHeadLinks: SeoHeadLinksService
   ) {}
 
   ngOnDestroy(): void {
@@ -790,17 +790,9 @@ export class ProductComponent implements OnInit, OnDestroy {
   }
 
   private setCanonical(product: Product): void {
-    if (typeof window === 'undefined' || !this.document) return;
-    const lang = this.translate.currentLang || this.translate.getDefaultLang() || 'en';
-    const href = `${window.location.origin}/products/${product.slug}?lang=${lang}`;
-    let link: HTMLLinkElement | null = this.document.querySelector('link[rel="canonical"]');
-    if (!link) {
-      link = this.document.createElement('link');
-      link.setAttribute('rel', 'canonical');
-      this.document.head.appendChild(link);
-    }
-    link.setAttribute('href', href);
-    this.canonicalEl = link;
+    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
+    const href = this.seoHeadLinks.setLocalizedCanonical(`/products/${encodeURIComponent(product.slug)}`, lang, { lang });
+    this.meta.updateTag({ property: 'og:url', content: href });
   }
 
   isOutOfStock(): boolean {

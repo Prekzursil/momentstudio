@@ -102,8 +102,12 @@ showing what is already implemented.
 - [x] SEO/social preview: add baseline OG/Twitter tags in the static entry HTML and use OpenGraph `property=` tags across key pages.
   - Evidence: `frontend/src/index.html`, `frontend/src/app/pages/about/about.component.ts`, `frontend/src/app/pages/contact/contact.component.ts`, `frontend/src/app/pages/shop/shop.component.ts`, `frontend/src/app/pages/page/page.component.ts`
   - Evidence (tests): `frontend/src/app/pages/about/about.component.spec.ts`, `frontend/src/app/pages/contact/contact.component.spec.ts`
-- [ ] SEO: add `hreflang` + canonical alternates for EN/RO route variants to reduce duplicate indexing between localized URLs.
-- [ ] SEO: add Organization/WebSite JSON-LD defaults at app entry and validate in Search Console rich results.
+- [x] SEO: add `hreflang` + canonical alternates for EN/RO route variants to reduce duplicate indexing between localized URLs.
+  - Evidence: `frontend/src/app/core/seo-head-links.service.ts`, `frontend/src/app/pages/home/home.component.ts`, `frontend/src/app/pages/shop/shop.component.ts`, `frontend/src/app/pages/blog/blog-list.component.ts`, `frontend/src/app/pages/blog/blog-post.component.ts`, `frontend/src/app/pages/product/product.component.ts`
+- [x] SEO: add Organization/WebSite JSON-LD defaults at app entry and validate in Search Console rich results.
+  - Evidence: `frontend/src/index.html`, `frontend/src/app/core/structured-data.service.ts`, `frontend/src/app/pages/home/home.component.ts`, `frontend/src/app/pages/shop/shop.component.ts`, `frontend/src/app/pages/blog/blog-list.component.ts`, `frontend/src/app/pages/blog/blog-post.component.ts`
+- [x] SEO ops: add post-deploy Search Console indexing checklist for key URLs (home/shop/blog/product) and wire it into prod deploy output.
+  - Evidence: `infra/prod/request-indexing-checklist.sh`, `infra/prod/deploy.sh`, `infra/prod/.env.example`, `infra/prod/README.md`, `docs/PRODUCTION.md`
 - [x] Netopia: notifyURL/webhook must always respond HTTP 200 with an IPN ack payload (avoid INVALID_RESPONSE_STATUS).
   - Evidence: `backend/app/api/v1/payments.py`, `backend/tests/test_netopia_webhook.py`
 - [x] CI: run PayPal + Stripe mock checkout E2E (success + decline/cancel) in compose smoke.

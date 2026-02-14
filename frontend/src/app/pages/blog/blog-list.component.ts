@@ -13,6 +13,8 @@ import { ButtonComponent } from '../../shared/button.component';
 import { CardComponent } from '../../shared/card.component';
 import { ContainerComponent } from '../../layout/container.component';
 import { SkeletonComponent } from '../../shared/skeleton.component';
+import { SeoHeadLinksService } from '../../core/seo-head-links.service';
+import { StructuredDataService } from '../../core/structured-data.service';
 
 @Component({
   selector: 'app-blog-list',
@@ -398,7 +400,6 @@ export class BlogListComponent implements OnInit, OnDestroy {
 
   private sub?: Subscription;
   private langSub?: Subscription;
-  private canonicalEl?: HTMLLinkElement;
   private document: Document = inject(DOCUMENT);
 
   constructor(
@@ -408,7 +409,9 @@ export class BlogListComponent implements OnInit, OnDestroy {
     private storefrontAdminMode: StorefrontAdminModeService,
     private translate: TranslateService,
     private title: Title,
-    private meta: Meta
+    private meta: Meta,
+    private seoHeadLinks: SeoHeadLinksService,
+    private structuredData: StructuredDataService
   ) {}
 
   ngOnInit(): void {
@@ -416,15 +419,16 @@ export class BlogListComponent implements OnInit, OnDestroy {
       this.loadFromRoute(routeParams, queryParams)
     );
     this.langSub = this.translate.onLangChange.subscribe(() => this.load());
-    this.setMetaTags();
+    this.setMetaTags(1);
   }
 
   ngOnDestroy(): void {
     this.sub?.unsubscribe();
     this.langSub?.unsubscribe();
+    this.structuredData.clearRouteSchemas();
   }
 
-  private setMetaTags(): void {
+  private setMetaTags(page: number): void {
     const title = this.routeSeries
       ? this.translate.instant('blog.seriesMetaTitle', { series: this.routeSeries })
       : this.routeTag
@@ -439,6 +443,26 @@ export class BlogListComponent implements OnInit, OnDestroy {
     this.meta.updateTag({ name: 'description', content: description });
     this.meta.updateTag({ property: 'og:title', content: title });
     this.meta.updateTag({ property: 'og:description', content: description });
+
+    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
+    const safePage = Number.isFinite(page) && page > 1 ? Math.floor(page) : undefined;
+    const path = this.routeSeries
+      ? `/blog/series/${encodeURIComponent(this.routeSeries)}`
+      : this.routeTag
+        ? `/blog/tag/${encodeURIComponent(this.routeTag)}`
+        : '/blog';
+    const canonical = this.seoHeadLinks.setLocalizedCanonical(path, lang, { lang, page: safePage });
+    this.meta.updateTag({ property: 'og:url', content: canonical });
+    this.structuredData.setRouteSchemas([
+      {
+        '@context': 'https://schema.org',
+        '@type': 'CollectionPage',
+        name: title,
+        description,
+        url: canonical,
+        inLanguage: lang
+      }
+    ]);
   }
 
   private loadFromRoute(routeParams: Params, queryParams: Params): void {
@@ -496,7 +520,7 @@ export class BlogListComponent implements OnInit, OnDestroy {
     this.hasError.set(false);
     this.heroPost = null;
     this.gridPosts = [];
-    this.setCanonical(page);
+    this.setMetaTags(page);
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     this.blog
       .listPosts({
@@ -523,7 +547,7 @@ export class BlogListComponent implements OnInit, OnDestroy {
         this.pageMeta = resp.meta;
         this.loading.set(false);
         this.hasError.set(false);
-        this.setMetaTags();
+        this.setMetaTags(resp.meta.page);
       },
       error: () => {
         this.posts = [];
@@ -532,7 +556,7 @@ export class BlogListComponent implements OnInit, OnDestroy {
         this.pageMeta = null;
         this.loading.set(false);
         this.hasError.set(true);
-        this.setMetaTags();
+        this.setMetaTags(page);
       }
     });
   }
@@ -625,36 +649,6 @@ export class BlogListComponent implements OnInit, OnDestroy {
     if (!cleaned) return;
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     this.blog.prefetchPost(cleaned, lang);
-  }
-
-  private setCanonical(page: number): void {
-    if (typeof window === 'undefined' || !this.document) return;
-    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
-    const qs = new URLSearchParams({ lang });
-    if (page > 1) qs.set('page', String(page));
-    const q = this.searchQuery.trim();
-    const tag = this.tagQuery.trim();
-    const series = this.seriesQuery.trim();
-    const sort = this.sort;
-    if (q) qs.set('q', q);
-    if (!this.routeTag && !this.routeSeries && tag) qs.set('tag', tag);
-    if (!this.routeTag && !this.routeSeries && series) qs.set('series', series);
-    if (sort && sort !== 'newest') qs.set('sort', sort);
-    const base = this.routeSeries
-      ? `/blog/series/${encodeURIComponent(this.routeSeries)}`
-      : this.routeTag
-        ? `/blog/tag/${encodeURIComponent(this.routeTag)}`
-        : '/blog';
-    const href = `${window.location.origin}${base}?${qs.toString()}`;
-    let link: HTMLLinkElement | null = this.document.querySelector('link[rel="canonical"]');
-    if (!link) {
-      link = this.document.createElement('link');
-      link.setAttribute('rel', 'canonical');
-      this.document.head.appendChild(link);
-    }
-    link.setAttribute('href', href);
-    this.canonicalEl = link;
-    this.meta.updateTag({ property: 'og:url', content: href });
   }
 
   private normalizeSort(value: unknown): BlogSort | null {

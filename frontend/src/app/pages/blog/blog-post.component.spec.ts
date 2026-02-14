@@ -106,6 +106,12 @@ describe('BlogPostComponent', () => {
     const canonical = doc.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
     expect(canonical).toBeTruthy();
     expect(canonical?.getAttribute('href')).toContain('/blog/first-post?lang=en');
+
+    const alternates = Array.from(doc.querySelectorAll('link[rel="alternate"][data-seo-managed="true"]'));
+    expect(alternates.length).toBe(3);
+
+    const routeSchema = doc.querySelector('script#seo-route-schema-1');
+    expect(routeSchema?.textContent || '').toContain('"BlogPosting"');
   });
 
   it('uses preview endpoint when preview token is present', () => {

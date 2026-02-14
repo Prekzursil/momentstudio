@@ -56,5 +56,11 @@ if [[ "${RUN_POST_SYNC_VERIFY:-1}" == "1" ]]; then
   EXPECTED_APP_VERSION="${APP_VERSION}" "${repo_root}/infra/prod/verify-live.sh"
 fi
 
+if [[ "${RUN_GSC_INDEXING_CHECKLIST:-1}" != "0" ]]; then
+  echo
+  echo "Printing Search Console indexing checklist..."
+  "${repo_root}/infra/prod/request-indexing-checklist.sh"
+fi
+
 echo
 echo "Tip: first-time deploy requires DNS + ports 80/443 open for TLS issuance."

@@ -74,6 +74,7 @@ Notes:
 - After a VPS reboot, the stack starts automatically (`restart: unless-stopped`). You usually **do not** need to run `deploy.sh` again.
 - By default, `deploy.sh` exports `APP_VERSION=$(git rev-parse --short HEAD)` before recreating containers so backend/frontend diagnostics show the deployed revision.
 - `deploy.sh` runs `infra/prod/verify-live.sh` after startup. Set `RUN_POST_SYNC_VERIFY=0` to skip that step.
+- `deploy.sh` can print a Search Console URL Inspection checklist for key URLs (home/shop/blog/product). Set `RUN_GSC_INDEXING_CHECKLIST=0` to skip it.
 
 Useful helpers:
 
@@ -83,6 +84,7 @@ Useful helpers:
 - View logs: `./infra/prod/logs.sh` (optionally pass service names)
 - List services: `./infra/prod/ps.sh`
 - Verify live endpoints/headers manually: `./infra/prod/verify-live.sh`
+- Print Search Console indexing checklist manually: `./infra/prod/request-indexing-checklist.sh`
 
 View logs manually:
 
