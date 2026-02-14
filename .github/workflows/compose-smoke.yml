@@ -149,6 +149,11 @@ jobs:
           # Full E2E coverage can be run via `npm run e2e` locally or in a separate workflow.
           E2E_BASE_URL=http://localhost:4201 E2E_OWNER_IDENTIFIER="$E2E_OWNER_IDENTIFIER" E2E_OWNER_PASSWORD="$E2E_OWNER_PASSWORD" npm run e2e -- e2e/smoke.spec.ts --workers=1
 
+      - name: Playwright E2E (SEO crawl guard, chromium)
+        run: |
+          cd frontend
+          E2E_BASE_URL=http://localhost:4201 npm run e2e -- e2e/seo-public-routes.spec.ts --workers=1 --project=chromium
+
       - name: Playwright E2E (admin freeze guard, firefox)
         run: |
           cd frontend
