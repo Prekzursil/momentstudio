@@ -5,6 +5,7 @@ import { AppComponent } from './app.component';
 import { TranslateModule } from '@ngx-translate/core';
 import { of } from 'rxjs';
 import { AuthService } from './core/auth.service';
+import { RouteRobotsService } from './core/route-robots.service';
 
 describe('AppComponent', () => {
   beforeEach(async () => {
@@ -25,7 +26,11 @@ describe('AppComponent', () => {
             checkAdminAccess: () => of(null),
             logout: () => of(null)
           }
-        }
+        },
+        {
+          provide: RouteRobotsService,
+          useValue: { start: () => void 0 }
+        },
       ]
     }).compileComponents();
   });

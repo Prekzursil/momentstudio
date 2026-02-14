@@ -14,6 +14,7 @@ import { AnalyticsService } from './core/analytics.service';
 import { Subscription } from 'rxjs';
 import { HttpErrorBusService, HttpErrorEvent } from './core/http-error-bus.service';
 import { RouteHeadingFocusService } from './core/route-heading-focus.service';
+import { RouteRobotsService } from './core/route-robots.service';
 
 @Component({
   selector: 'app-root',
@@ -28,13 +29,23 @@ import { RouteHeadingFocusService } from './core/route-heading-focus.service';
         (themeChange)="onThemeChange($event)"
         (languageChange)="onLanguageChange($event)"
       ></app-header>
-      <app-cms-global-section-blocks contentKey="site.header-banners" containerClasses="py-6"></app-cms-global-section-blocks>
+      <app-cms-global-section-blocks
+        contentKey="site.header-banners"
+        containerClasses="py-6"
+        reserveLoadingHeightClass="min-h-[5rem]"
+        [loadingSkeletonCount]="2"
+      ></app-cms-global-section-blocks>
       <main id="main-content" class="flex-1 py-8">
         <app-container>
           <router-outlet></router-outlet>
         </app-container>
       </main>
-      <app-cms-global-section-blocks contentKey="site.footer-promo" containerClasses="py-8"></app-cms-global-section-blocks>
+      <app-cms-global-section-blocks
+        contentKey="site.footer-promo"
+        containerClasses="py-8"
+        reserveLoadingHeightClass="min-h-[7rem]"
+        [loadingSkeletonCount]="3"
+      ></app-cms-global-section-blocks>
       <app-footer></app-footer>
     </div>
     <app-toast [messages]="toasts()"></app-toast>
@@ -58,7 +69,8 @@ export class AppComponent implements OnDestroy {
     private route: ActivatedRoute,
     private analytics: AnalyticsService,
     private httpErrors: HttpErrorBusService,
-    private routeHeadingFocus: RouteHeadingFocusService
+    private routeHeadingFocus: RouteHeadingFocusService,
+    private routeRobots: RouteRobotsService
   ) {
     // Language is handled by LanguageService (localStorage + preferred_language + browser fallback).
     // Revalidate any persisted session on startup to avoid "logged in but unauthorized" UI states.
@@ -81,6 +93,7 @@ export class AppComponent implements OnDestroy {
     // Keep this out of the HTTP interceptor to avoid circular dependencies during i18n bootstrap.
     this.httpErrorSub = this.httpErrors.events$.subscribe((event) => this.onGlobalHttpError(event));
     this.routeHeadingFocus.focusCurrentRouteHeading();
+    this.routeRobots.start();
   }
 
   ngOnDestroy(): void {
