@@ -119,7 +119,9 @@ showing what is already implemented.
   - Evidence: `backend/app/services/media_dam.py`, `backend/app/services/media_usage_reconcile_scheduler.py`, `backend/app/main.py`, `backend/app/models/media.py`, `backend/app/schemas/media.py`, `backend/alembic/versions/0153_add_media_usage_reconcile_job_type.py`
 - [x] DAM phase 2: enforce private-asset delivery via authenticated/signed access path (keep public `/media/*` only for approved public assets).
   - Evidence: `backend/app/services/media_dam.py`, `backend/app/api/v1/content.py`, `frontend/src/app/core/admin.service.ts`, `frontend/src/app/pages/admin/shared/dam-asset-library.component.ts`, `frontend/nginx/default.conf`, `infra/prod/Caddyfile`
-- [ ] DAM phase 3: add media-job retries with exponential backoff and dead-letter triage UI.
+- [x] DAM phase 3: add media-job retries with exponential backoff and dead-letter triage UI.
+  - Evidence: `backend/alembic/versions/0154_media_job_retry_dead_letter_v2.py`, `backend/app/models/media.py`, `backend/app/services/media_dam.py`, `backend/app/api/v1/content.py`, `backend/app/workers/media_worker.py`, `backend/app/schemas/media.py`, `frontend/src/app/core/admin.service.ts`, `frontend/src/app/pages/admin/shared/dam-asset-library.component.ts`, `frontend/src/app/pages/admin/ops/admin-ops.component.ts`
+- [ ] DAM phase 3.1: introduce jittered backoff and per-job-type retry policy overrides.
 - [x] Admin Content IA: add a dedicated `/admin/content/media` workspace between Scheduling and Settings for site-wide media operations.
   - Evidence: `frontend/src/app/app.routes.ts`, `frontend/src/app/pages/admin/content/admin-content-layout.component.ts`, `frontend/src/app/pages/admin/content/admin-content-media.component.ts`
 - [x] Media library: add sorting/date filters, asset details drawer, and rename action for uploaded images.
