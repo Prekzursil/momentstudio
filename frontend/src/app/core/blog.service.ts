@@ -18,6 +18,7 @@ export interface BlogPostListItem {
   cover_image_url?: string | null;
   cover_focal_x?: number | null;
   cover_focal_y?: number | null;
+  cover_fit?: 'cover' | 'contain' | null;
   tags: string[];
   series?: string | null;
   author_name?: string | null;
@@ -60,6 +61,7 @@ export interface BlogPost {
   cover_image_url?: string | null;
   cover_focal_x?: number | null;
   cover_focal_y?: number | null;
+  cover_fit?: 'cover' | 'contain' | null;
   tags?: string[];
   series?: string | null;
   author?: BlogCommentAuthor | null;

@@ -159,6 +159,17 @@ def _meta_cover_image_url(meta: dict | None) -> str | None:
     return None
 
 
+def _meta_cover_fit(meta: dict | None) -> str:
+    if not meta:
+        return "cover"
+    raw = meta.get("cover_fit")
+    if isinstance(raw, str):
+        value = raw.strip().lower()
+        if value in {"cover", "contain"}:
+            return value
+    return "cover"
+
+
 def _meta_summary(meta: dict | None, *, lang: str | None, base_lang: str | None) -> str | None:
     if not meta:
         return None
@@ -431,6 +442,7 @@ def to_list_item(block: ContentBlock, *, lang: str | None = None) -> dict:
         "cover_image_url": cover,
         "cover_focal_x": getattr(cover_image, "focal_x", None) if cover_image else None,
         "cover_focal_y": getattr(cover_image, "focal_y", None) if cover_image else None,
+        "cover_fit": _meta_cover_fit(meta),
         "tags": _normalize_tags(meta.get("tags")),
         "series": series.strip() if isinstance(series, str) and series.strip() else None,
         "author_name": author_name,
@@ -462,6 +474,7 @@ def to_read(block: ContentBlock, *, lang: str | None = None) -> dict:
         "cover_image_url": cover,
         "cover_focal_x": getattr(cover_image, "focal_x", None) if cover_image else None,
         "cover_focal_y": getattr(cover_image, "focal_y", None) if cover_image else None,
+        "cover_fit": _meta_cover_fit(meta),
         "tags": _normalize_tags(meta.get("tags")),
         "series": series.strip() if isinstance(series, str) and series.strip() else None,
         "author_name": author_name,
