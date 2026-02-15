@@ -1,0 +1,47 @@
+name: Ops / Incident Report
+description: Track production incidents, regressions, and postmortems
+title: "[Ops] "
+labels:
+  - area:infra
+  - priority:p1
+body:
+  - type: input
+    id: detected_at
+    attributes:
+      label: Incident detected at (UTC)
+      placeholder: 2026-02-15T22:30:00Z
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: User impact
+      description: What users were affected and how?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Technical scope
+      description: Affected components/services/routes.
+    validations:
+      required: true
+  - type: textarea
+    id: mitigation
+    attributes:
+      label: Mitigation applied
+      description: Immediate actions taken.
+    validations:
+      required: true
+  - type: textarea
+    id: rollback
+    attributes:
+      label: Rollback plan
+      description: If not rolled back yet, include exact rollback commands/steps.
+    validations:
+      required: true
+  - type: textarea
+    id: followups
+    attributes:
+      label: Follow-up actions
+      description: Include TODO entries and owner.

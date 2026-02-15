@@ -1,0 +1,68 @@
+area:backend:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "backend/**"
+
+area:frontend:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "frontend/**"
+
+area:infra:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "infra/**"
+          - "Dockerfile"
+          - "**/Dockerfile"
+          - "docker-compose*.yml"
+
+area:docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "docs/**"
+          - "*.md"
+
+area:ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/**"
+          - "scripts/compose-smoke.sh"
+
+area:payments:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "backend/app/api/v1/payments.py"
+          - "backend/app/services/paypal.py"
+          - "backend/app/services/netopia.py"
+          - "backend/app/services/payments.py"
+          - "frontend/src/app/pages/checkout/**"
+
+area:seo:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "frontend/src/app/core/seo-*.ts"
+          - "frontend/src/app/core/structured-data.service.ts"
+          - "frontend/src/app/core/route-robots.service.ts"
+          - "frontend/src/app/pages/blog/**"
+          - "frontend/src/index.html"
+          - "frontend/e2e/seo-public-routes.spec.ts"
+
+area:dam:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "backend/app/models/media.py"
+          - "backend/app/services/media_dam.py"
+          - "backend/app/services/media_usage_reconcile_scheduler.py"
+          - "backend/app/workers/media_worker.py"
+          - "backend/app/api/v1/content.py"
+          - "backend/app/schemas/media.py"
+          - "frontend/src/app/pages/admin/content/admin-content-media.component.ts"
+          - "frontend/src/app/pages/admin/shared/dam-asset-library.component.ts"
+
+dependencies:
+  - head-branch:
+      - "^dependabot/.+"
+
+type:chore:
+  - head-branch:
+      - "^dependabot/.+"
