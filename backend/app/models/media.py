@@ -36,6 +36,7 @@ class MediaJobType(str, enum.Enum):
     edit = "edit"
     ai_tag = "ai_tag"
     duplicate_scan = "duplicate_scan"
+    usage_reconcile = "usage_reconcile"
 
 
 class MediaJobStatus(str, enum.Enum):

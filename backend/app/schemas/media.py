@@ -11,7 +11,7 @@ MediaAssetTypeLiteral = Literal["image", "video", "document"]
 MediaAssetStatusLiteral = Literal["draft", "approved", "rejected", "archived", "trashed"]
 MediaVisibilityLiteral = Literal["public", "private"]
 MediaJobStatusLiteral = Literal["queued", "processing", "completed", "failed"]
-MediaJobTypeLiteral = Literal["ingest", "variant", "edit", "ai_tag", "duplicate_scan"]
+MediaJobTypeLiteral = Literal["ingest", "variant", "edit", "ai_tag", "duplicate_scan", "usage_reconcile"]
 
 
 class MediaAssetI18nRead(BaseModel):
@@ -48,6 +48,7 @@ class MediaAssetRead(BaseModel):
     source_ref: str | None = None
     storage_key: str
     public_url: str
+    preview_url: str | None = None
     original_filename: str | None = None
     mime_type: str | None = None
     size_bytes: int | None = None
@@ -154,6 +155,31 @@ class MediaJobRead(BaseModel):
     completed_at: datetime | None = None
 
 
+class MediaJobListResponse(BaseModel):
+    items: list[MediaJobRead]
+    meta: dict[str, int]
+
+
+class MediaTelemetryWorkerRead(BaseModel):
+    worker_id: str
+    hostname: str | None = None
+    pid: int | None = None
+    app_version: str | None = None
+    last_seen_at: datetime
+    lag_seconds: int
+
+
+class MediaTelemetryResponse(BaseModel):
+    queue_depth: int
+    online_workers: int
+    workers: list[MediaTelemetryWorkerRead]
+    stale_processing_count: int
+    oldest_queued_age_seconds: int | None = None
+    avg_processing_seconds: int | None = None
+    status_counts: dict[str, int] = Field(default_factory=dict)
+    type_counts: dict[str, int] = Field(default_factory=dict)
+
+
 class MediaCollectionRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -174,4 +200,3 @@ class MediaCollectionUpsertRequest(BaseModel):
 
 class MediaCollectionItemsRequest(BaseModel):
     asset_ids: list[UUID] = Field(default_factory=list)
-

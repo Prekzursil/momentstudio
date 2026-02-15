@@ -4,7 +4,8 @@ from datetime import datetime, timedelta, timezone
 from io import StringIO
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, File, UploadFile, Query, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy import select, func, or_, and_, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -62,7 +63,9 @@ from app.schemas.media import (
     MediaEditRequest,
     MediaFinalizeRequest,
     MediaJobRead,
+    MediaJobListResponse,
     MediaRejectRequest,
+    MediaTelemetryResponse,
     MediaUsageResponse,
     MediaVariantRequest,
 )
@@ -1295,6 +1298,32 @@ async def admin_media_asset_usage(
     return await media_dam.rebuild_usage_edges(session, asset)
 
 
+@router.get("/admin/media/assets/{asset_id}/preview")
+async def admin_media_asset_preview(
+    asset_id: UUID,
+    exp: int = Query(..., description="Unix expiry timestamp"),
+    sig: str = Query(..., min_length=16, description="HMAC signature"),
+    variant_profile: str | None = Query(default=None),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    try:
+        asset = await media_dam.get_asset_or_404(session, asset_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asset not found")
+
+    if not media_dam.verify_preview_signature(asset.id, exp=exp, sig=sig, variant_profile=variant_profile):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid media preview signature")
+
+    try:
+        path = media_dam.resolve_asset_preview_path(asset, variant_profile=variant_profile)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Variant not found")
+    except FileNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Media file missing")
+
+    return FileResponse(path, headers={"Cache-Control": "private, no-store"})
+
+
 @router.post("/admin/media/assets/{asset_id}/variants", response_model=MediaJobRead)
 async def admin_media_asset_variants(
     asset_id: UUID,
@@ -1338,6 +1367,77 @@ async def admin_media_asset_edit(
     )
     await session.commit()
     await media_dam.process_job_inline(session, job)
+    return media_dam.job_to_read(job)
+
+
+@router.get("/admin/media/jobs", response_model=MediaJobListResponse)
+async def admin_list_media_jobs(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=24, ge=1, le=200),
+    status_filter: str = Query(default="", alias="status"),
+    job_type: str = Query(default=""),
+    asset_id: UUID | None = Query(default=None),
+    created_from: str | None = Query(default=None),
+    created_to: str | None = Query(default=None),
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> MediaJobListResponse:
+    parsed_from = None
+    parsed_to = None
+    try:
+        if created_from:
+            parsed_from = datetime.fromisoformat(created_from)
+        if created_to:
+            parsed_to = datetime.fromisoformat(created_to)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date filters")
+    if parsed_from and parsed_to and parsed_from > parsed_to:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date range")
+
+    try:
+        rows, meta = await media_dam.list_jobs(
+            session,
+            media_dam.MediaJobListFilters(
+                page=page,
+                limit=limit,
+                status=status_filter,
+                job_type=job_type,
+                asset_id=asset_id,
+                created_from=parsed_from,
+                created_to=parsed_to,
+            ),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return MediaJobListResponse(items=[media_dam.job_to_read(row) for row in rows], meta=meta)
+
+
+@router.get("/admin/media/telemetry", response_model=MediaTelemetryResponse)
+async def admin_media_telemetry(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> MediaTelemetryResponse:
+    return await media_dam.get_telemetry(session)
+
+
+@router.post("/admin/media/usage/reconcile", response_model=MediaJobRead)
+async def admin_media_usage_reconcile(
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> MediaJobRead:
+    limit = max(1, int(getattr(settings, "media_usage_reconcile_batch_size", 200) or 200))
+    job = await media_dam.enqueue_job(
+        session,
+        asset_id=None,
+        job_type=MediaJobType.usage_reconcile,
+        payload={"limit": limit, "reason": "manual_reconcile"},
+        created_by_user_id=admin.id,
+    )
+    await session.commit()
+    await media_dam.queue_job(job.id)
+    if media_dam.get_redis() is None:
+        background_tasks.add_task(_run_media_job_in_background, job.id)
     return media_dam.job_to_read(job)
 
 

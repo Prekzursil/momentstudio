@@ -131,6 +131,14 @@ class Settings(BaseSettings):
     private_media_root: str = "private_uploads"
     media_dam_queue_key: str = "media:jobs:queue"
     media_dam_trash_retention_days: int = 30
+    media_private_preview_ttl_seconds: int = 600
+    media_dam_worker_heartbeat_prefix: str = "media:workers:heartbeat"
+    media_dam_worker_heartbeat_ttl_seconds: int = 30
+    media_dam_worker_heartbeat_file: str = "/tmp/media-worker-heartbeat.json"
+    media_dam_processing_stale_seconds: int = 600
+    media_usage_reconcile_enabled: bool = True
+    media_usage_reconcile_interval_seconds: int = 60 * 60 * 24
+    media_usage_reconcile_batch_size: int = 200
     # Admin uploads (product images, CMS assets, shipping labels) are allowed to be much larger
     # than customer uploads, but should still have a ceiling to avoid accidental disk exhaustion.
     # Set to a large value; we still enforce a ceiling to avoid DoS/disk exhaustion.

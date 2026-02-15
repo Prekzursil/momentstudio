@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import inspect
 import json
 import mimetypes
 import re
+import shutil
 from collections.abc import Awaitable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -14,13 +16,15 @@ from uuid import UUID, uuid4
 
 import anyio
 from PIL import Image
-from sqlalchemy import and_, delete, func, or_, select
+from sqlalchemy import String, and_, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.elements import ColumnElement
 
 from app.core.config import settings
-from app.core.redis_client import get_redis
+from app.core.redis_client import get_redis, json_loads
+from app.models.catalog import Product, ProductImage
+from app.models.content import ContentBlock, ContentBlockTranslation, ContentImage
 from app.models.media import (
     MediaApprovalEvent,
     MediaAsset,
@@ -48,16 +52,20 @@ from app.schemas.media import (
     MediaCollectionRead,
     MediaCollectionUpsertRequest,
     MediaJobRead,
+    MediaTelemetryResponse,
+    MediaTelemetryWorkerRead,
     MediaUsageEdgeRead,
     MediaUsageResponse,
     MediaVariantRead,
 )
 from app.services import content as content_service
+from app.services import private_storage
 from app.services import storage
 
 
 QUEUE_KEY = str(getattr(settings, "media_dam_queue_key", "media:jobs:queue") or "media:jobs:queue")
 TRASH_RETENTION_DAYS = int(getattr(settings, "media_dam_trash_retention_days", 30) or 30)
+HEARTBEAT_PREFIX = str(getattr(settings, "media_dam_worker_heartbeat_prefix", "media:workers:heartbeat") or "media:workers:heartbeat")
 
 PROFILE_DIMENSIONS: dict[str, tuple[int, int]] = {
     "thumb-320": (320, 320),
@@ -82,6 +90,17 @@ class MediaListFilters:
     page: int = 1
     limit: int = 24
     sort: str = "newest"
+
+
+@dataclass(slots=True)
+class MediaJobListFilters:
+    page: int = 1
+    limit: int = 24
+    status: str = ""
+    job_type: str = ""
+    asset_id: UUID | None = None
+    created_from: datetime | None = None
+    created_to: datetime | None = None
 
 
 def _now() -> datetime:
@@ -117,6 +136,126 @@ def _asset_base_folder(asset_id: UUID) -> str:
     return str(asset_id)
 
 
+def _public_media_root() -> Path:
+    return storage.ensure_media_root(settings.media_root)
+
+
+def _private_media_root() -> Path:
+    return private_storage.ensure_private_root(settings.private_media_root)
+
+
+def _is_publicly_servable(asset: MediaAsset) -> bool:
+    return (
+        asset.visibility == MediaVisibility.public
+        and asset.status == MediaAssetStatus.approved
+        and asset.status != MediaAssetStatus.trashed
+    )
+
+
+def _storage_path_for_key(storage_key: str, *, public_root: bool) -> Path:
+    root = _public_media_root() if public_root else _private_media_root()
+    return (root / str(storage_key or "").lstrip("/")).resolve()
+
+
+def _find_existing_storage_path(storage_key: str) -> Path | None:
+    rel = str(storage_key or "").lstrip("/")
+    if not rel:
+        return None
+    public_path = _storage_path_for_key(rel, public_root=True)
+    if public_path.exists():
+        return public_path
+    private_path = _storage_path_for_key(rel, public_root=False)
+    if private_path.exists():
+        return private_path
+    return None
+
+
+def _asset_file_path(asset: MediaAsset) -> Path:
+    if asset.storage_key:
+        preferred = _storage_path_for_key(asset.storage_key, public_root=_is_publicly_servable(asset))
+        if preferred.exists():
+            return preferred
+        alternate = _storage_path_for_key(asset.storage_key, public_root=not _is_publicly_servable(asset))
+        if alternate.exists():
+            return alternate
+    existing_from_url = _find_existing_storage_path(str(asset.public_url or "").removeprefix("/media/"))
+    if existing_from_url is not None:
+        return existing_from_url
+    expected = _storage_path_for_key(asset.storage_key, public_root=_is_publicly_servable(asset))
+    return expected
+
+
+def _move_asset_file_roots(asset: MediaAsset, *, to_public: bool) -> None:
+    if not asset.storage_key:
+        return
+    source = _find_existing_storage_path(asset.storage_key)
+    if source is None:
+        return
+    destination = _storage_path_for_key(asset.storage_key, public_root=to_public)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if source == destination:
+        return
+    _move_file(source, destination)
+
+
+def _move_variant_file_roots(asset: MediaAsset, *, to_public: bool) -> None:
+    for variant in asset.variants or []:
+        if not variant.storage_key:
+            continue
+        source = _find_existing_storage_path(variant.storage_key)
+        if source is None:
+            continue
+        destination = _storage_path_for_key(variant.storage_key, public_root=to_public)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        if source == destination:
+            continue
+        _move_file(source, destination)
+
+
+def _move_file(source: Path, destination: Path) -> None:
+    try:
+        source.replace(destination)
+    except OSError:
+        shutil.move(str(source), str(destination))
+
+
+def _ensure_asset_storage_placement(asset: MediaAsset) -> None:
+    target_public = _is_publicly_servable(asset)
+    try:
+        _move_asset_file_roots(asset, to_public=target_public)
+        _move_variant_file_roots(asset, to_public=target_public)
+    except Exception:
+        # Read paths should not fail if storage moves are temporarily blocked.
+        return
+
+
+def _sign_preview(asset_id: UUID, *, exp: int, variant_profile: str | None = None) -> str:
+    base = f"{asset_id}:{exp}:{(variant_profile or '').strip().lower()}"
+    key = str(getattr(settings, "secret_key", "") or "").encode("utf-8")
+    return hmac.new(key, base.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def build_preview_url(asset_id: UUID, *, variant_profile: str | None = None, ttl_seconds: int | None = None) -> str:
+    ttl = int(ttl_seconds or int(getattr(settings, "media_private_preview_ttl_seconds", 600) or 600))
+    ttl = max(30, ttl)
+    exp = int(_now().timestamp()) + ttl
+    sig = _sign_preview(asset_id, exp=exp, variant_profile=variant_profile)
+    base = f"/api/v1/content/admin/media/assets/{asset_id}/preview?exp={exp}&sig={sig}"
+    if variant_profile:
+        base += f"&variant_profile={variant_profile}"
+    return base
+
+
+def verify_preview_signature(asset_id: UUID, *, exp: int, sig: str, variant_profile: str | None = None) -> bool:
+    try:
+        exp_ts = int(exp)
+    except Exception:
+        return False
+    if exp_ts < int(_now().timestamp()):
+        return False
+    expected = _sign_preview(asset_id, exp=exp_ts, variant_profile=variant_profile)
+    return hmac.compare_digest(expected, str(sig or ""))
+
 async def create_asset_from_upload(
     session: AsyncSession,
     *,
@@ -136,12 +275,12 @@ async def create_asset_from_upload(
         max_bytes=int(getattr(settings, "admin_upload_max_bytes", 512 * 1024 * 1024)),
         generate_thumbnails=False,
     )
-    media_root = storage.ensure_media_root(settings.media_root)
-    target_path = media_root / storage_key
+    target_root = _private_media_root()
+    target_path = target_root / storage_key
     target_path.parent.mkdir(parents=True, exist_ok=True)
     temp_path = storage.media_url_to_path(temp_url)
     if temp_path != target_path:
-        temp_path.replace(target_path)
+        _move_file(temp_path, target_path)
     media_url = _public_url_from_storage_key(storage_key)
     asset = MediaAsset(
         id=asset_id,
@@ -199,6 +338,10 @@ async def _maybe_queue_job(job_id: UUID) -> None:
     if redis is None:
         return
     await _await_if_needed(redis.rpush(QUEUE_KEY, str(job_id)))
+
+
+async def queue_job(job_id: UUID) -> None:
+    await _maybe_queue_job(job_id)
 
 
 async def _await_if_needed(result: Awaitable[T] | T) -> T:
@@ -276,7 +419,131 @@ async def list_assets(session: AsyncSession, filters: MediaListFilters) -> tuple
     return list(rows), {"total_items": total_items, "total_pages": total_pages, "page": filters.page, "limit": filters.limit}
 
 
+async def list_jobs(session: AsyncSession, filters: MediaJobListFilters) -> tuple[list[MediaJob], dict[str, int]]:
+    clauses: list[ColumnElement[bool]] = []
+    if filters.status:
+        clauses.append(MediaJob.status == MediaJobStatus(filters.status))
+    if filters.job_type:
+        clauses.append(MediaJob.job_type == MediaJobType(filters.job_type))
+    if filters.asset_id:
+        clauses.append(MediaJob.asset_id == filters.asset_id)
+    if filters.created_from:
+        clauses.append(MediaJob.created_at >= filters.created_from)
+    if filters.created_to:
+        clauses.append(MediaJob.created_at <= filters.created_to)
+
+    stmt = select(MediaJob)
+    count_stmt = select(func.count()).select_from(MediaJob)
+    if clauses:
+        stmt = stmt.where(and_(*clauses))
+        count_stmt = count_stmt.where(and_(*clauses))
+
+    stmt = stmt.order_by(MediaJob.created_at.desc(), MediaJob.id.desc()).offset((filters.page - 1) * filters.limit).limit(filters.limit)
+    total_items = int((await session.scalar(count_stmt)) or 0)
+    total_pages = max(1, (total_items + filters.limit - 1) // filters.limit) if total_items else 1
+    rows = (await session.execute(stmt)).scalars().all()
+    return list(rows), {"total_items": total_items, "total_pages": total_pages, "page": filters.page, "limit": filters.limit}
+
+
+async def get_telemetry(session: AsyncSession) -> MediaTelemetryResponse:
+    redis = get_redis()
+    queue_depth = 0
+    workers: list[MediaTelemetryWorkerRead] = []
+    now = _now()
+    prefix = str(getattr(settings, "media_dam_worker_heartbeat_prefix", HEARTBEAT_PREFIX) or HEARTBEAT_PREFIX)
+
+    if redis is not None:
+        try:
+            queue_depth = int(await _await_if_needed(redis.llen(QUEUE_KEY)) or 0)
+        except Exception:
+            queue_depth = 0
+
+        try:
+            keys = await _await_if_needed(redis.keys(f"{prefix}:*"))
+            for key in keys or []:
+                raw = await _await_if_needed(redis.get(str(key)))
+                if not raw:
+                    continue
+                payload = json_loads(raw)
+                last_seen_raw = payload.get("last_seen_at")
+                try:
+                    last_seen = datetime.fromisoformat(str(last_seen_raw))
+                    if last_seen.tzinfo is None:
+                        last_seen = last_seen.replace(tzinfo=timezone.utc)
+                except Exception:
+                    continue
+                lag = max(0, int((now - last_seen).total_seconds()))
+                workers.append(
+                    MediaTelemetryWorkerRead(
+                        worker_id=str(payload.get("worker_id") or str(key).split(":")[-1]),
+                        hostname=str(payload.get("hostname") or "") or None,
+                        pid=int(payload["pid"]) if str(payload.get("pid") or "").isdigit() else None,
+                        app_version=str(payload.get("app_version") or "") or None,
+                        last_seen_at=last_seen,
+                        lag_seconds=lag,
+                    )
+                )
+        except Exception:
+            workers = []
+
+    stale_seconds = max(60, int(getattr(settings, "media_dam_processing_stale_seconds", 600) or 600))
+    stale_cutoff = now - timedelta(seconds=stale_seconds)
+    stale_processing_count = int(
+        (await session.scalar(select(func.count()).select_from(MediaJob).where(MediaJob.status == MediaJobStatus.processing, MediaJob.started_at < stale_cutoff)))
+        or 0
+    )
+
+    oldest_queued_at = await session.scalar(
+        select(func.min(MediaJob.created_at)).where(MediaJob.status == MediaJobStatus.queued)
+    )
+    oldest_queued_age_seconds: int | None = None
+    if oldest_queued_at:
+        oldest_queued_age_seconds = max(0, int((now - oldest_queued_at).total_seconds()))
+
+    status_counts_rows = (
+        await session.execute(select(MediaJob.status, func.count()).group_by(MediaJob.status))
+    ).all()
+    status_counts = {row[0].value if hasattr(row[0], "value") else str(row[0]): int(row[1] or 0) for row in status_counts_rows}
+
+    type_counts_rows = (
+        await session.execute(select(MediaJob.job_type, func.count()).group_by(MediaJob.job_type))
+    ).all()
+    type_counts = {row[0].value if hasattr(row[0], "value") else str(row[0]): int(row[1] or 0) for row in type_counts_rows}
+
+    completed_rows = (
+        await session.execute(
+            select(MediaJob.started_at, MediaJob.completed_at)
+            .where(
+                MediaJob.status == MediaJobStatus.completed,
+                MediaJob.started_at.is_not(None),
+                MediaJob.completed_at.is_not(None),
+                MediaJob.completed_at >= now - timedelta(hours=24),
+            )
+            .order_by(MediaJob.completed_at.desc())
+            .limit(200)
+        )
+    ).all()
+    processing_seconds: list[int] = []
+    for started_at, completed_at in completed_rows:
+        if not started_at or not completed_at:
+            continue
+        processing_seconds.append(max(0, int((completed_at - started_at).total_seconds())))
+    avg_processing_seconds = int(sum(processing_seconds) / len(processing_seconds)) if processing_seconds else None
+
+    workers.sort(key=lambda row: row.last_seen_at, reverse=True)
+    return MediaTelemetryResponse(
+        queue_depth=queue_depth,
+        online_workers=len(workers),
+        workers=workers,
+        stale_processing_count=stale_processing_count,
+        oldest_queued_age_seconds=oldest_queued_age_seconds,
+        avg_processing_seconds=avg_processing_seconds,
+        status_counts=status_counts,
+        type_counts=type_counts,
+    )
+
 def asset_to_read(asset: MediaAsset) -> MediaAssetRead:
+    _ensure_asset_storage_placement(asset)
     tags = sorted({tag_rel.tag.value for tag_rel in (asset.tags or []) if getattr(tag_rel, "tag", None)})
     i18n: list[MediaAssetI18nRead] = []
     for i18n_row in sorted(asset.i18n or [], key=lambda x: x.lang):
@@ -304,6 +571,7 @@ def asset_to_read(asset: MediaAsset) -> MediaAssetRead:
                 created_at=variant_row.created_at,
             )
         )
+    preview_url = asset.public_url if _is_publicly_servable(asset) else build_preview_url(asset.id)
     return MediaAssetRead(
         id=asset.id,
         asset_type=asset.asset_type.value,
@@ -313,6 +581,7 @@ def asset_to_read(asset: MediaAsset) -> MediaAssetRead:
         source_ref=asset.source_ref,
         storage_key=asset.storage_key,
         public_url=asset.public_url,
+        preview_url=preview_url,
         original_filename=asset.original_filename,
         mime_type=asset.mime_type,
         size_bytes=asset.size_bytes,
@@ -352,6 +621,7 @@ async def get_asset_or_404(session: AsyncSession, asset_id: UUID) -> MediaAsset:
 
 
 async def apply_asset_update(session: AsyncSession, asset: MediaAsset, payload: MediaAssetUpdateRequest) -> None:
+    before_public = _is_publicly_servable(asset)
     if payload.status:
         asset.status = MediaAssetStatus(payload.status)
     if payload.visibility:
@@ -368,6 +638,11 @@ async def apply_asset_update(session: AsyncSession, asset: MediaAsset, payload: 
         await _replace_asset_tags(session, asset, payload.tags)
     if payload.i18n is not None:
         await _replace_asset_i18n(session, asset, payload.i18n)
+
+    after_public = _is_publicly_servable(asset)
+    if before_public != after_public:
+        _move_asset_file_roots(asset, to_public=after_public)
+        _move_variant_file_roots(asset, to_public=after_public)
 
 
 async def _replace_asset_i18n(session: AsyncSession, asset: MediaAsset, entries: list[MediaAssetUpdateI18nItem]) -> None:
@@ -427,6 +702,7 @@ async def change_status(
     set_approved_actor: bool = False,
 ) -> MediaAsset:
     from_status = asset.status
+    before_public = _is_publicly_servable(asset)
     asset.status = to_status
     if to_status == MediaAssetStatus.approved:
         asset.approved_at = _now()
@@ -434,6 +710,10 @@ async def change_status(
             asset.approved_by_user_id = actor_id
     if to_status != MediaAssetStatus.trashed:
         asset.trashed_at = None
+    after_public = _is_publicly_servable(asset)
+    if before_public != after_public:
+        _move_asset_file_roots(asset, to_public=after_public)
+        _move_variant_file_roots(asset, to_public=after_public)
     session.add(asset)
     session.add(
         MediaApprovalEvent(
@@ -455,15 +735,16 @@ async def soft_delete_asset(session: AsyncSession, asset: MediaAsset, actor_id: 
     asset.trashed_at = _now()
     trash_key = f"trash/{asset.id}/{Path(asset.storage_key).name}"
     try:
-        old_path = storage.media_url_to_path(asset.public_url)
-        new_path = storage.ensure_media_root() / trash_key
+        old_path = _asset_file_path(asset)
+        new_path = _private_media_root() / trash_key
         new_path.parent.mkdir(parents=True, exist_ok=True)
         if old_path.exists():
-            old_path.replace(new_path)
+            _move_file(old_path, new_path)
             asset.storage_key = trash_key
             asset.public_url = _public_url_from_storage_key(trash_key)
     except Exception:
         pass
+    _move_variant_file_roots(asset, to_public=False)
     session.add(asset)
     session.add(
         MediaApprovalEvent(
@@ -485,17 +766,18 @@ async def restore_asset(session: AsyncSession, asset: MediaAsset, actor_id: UUID
     prev_status = asset.status
     restore_key = f"originals/{asset.id}/{Path(asset.storage_key).name}"
     try:
-        old_path = storage.media_url_to_path(asset.public_url)
-        new_path = storage.ensure_media_root() / restore_key
+        old_path = _asset_file_path(asset)
+        new_path = _private_media_root() / restore_key
         new_path.parent.mkdir(parents=True, exist_ok=True)
         if old_path.exists():
-            old_path.replace(new_path)
+            _move_file(old_path, new_path)
             asset.storage_key = restore_key
             asset.public_url = _public_url_from_storage_key(restore_key)
     except Exception:
         pass
     asset.status = MediaAssetStatus.draft
     asset.trashed_at = None
+    _move_variant_file_roots(asset, to_public=False)
     session.add(asset)
     session.add(
         MediaApprovalEvent(
@@ -514,12 +796,16 @@ async def restore_asset(session: AsyncSession, asset: MediaAsset, actor_id: UUID
 async def purge_asset(session: AsyncSession, asset: MediaAsset) -> None:
     paths: list[Path] = []
     try:
-        paths.append(storage.media_url_to_path(asset.public_url))
+        path = _find_existing_storage_path(asset.storage_key)
+        if path is not None:
+            paths.append(path)
     except Exception:
         pass
     for variant in asset.variants or []:
         try:
-            paths.append(storage.media_url_to_path(variant.public_url))
+            path = _find_existing_storage_path(variant.storage_key)
+            if path is not None:
+                paths.append(path)
         except Exception:
             continue
     for p in paths:
@@ -546,23 +832,36 @@ async def purge_expired_trash(session: AsyncSession) -> int:
     return count
 
 
-async def rebuild_usage_edges(session: AsyncSession, asset: MediaAsset) -> MediaUsageResponse:
+async def rebuild_usage_edges(
+    session: AsyncSession,
+    asset: MediaAsset,
+    *,
+    commit: bool = True,
+) -> MediaUsageResponse:
     await session.execute(delete(MediaUsageEdge).where(MediaUsageEdge.asset_id == asset.id))
-    keys = await content_service.get_asset_usage_keys(session, url=asset.public_url)
     now = _now()
-    for key in keys:
+    refs = await _collect_usage_refs(session, asset)
+    seen: set[tuple[str, str, str | None, str, str | None]] = set()
+    for source_type, source_key, source_id, field_path, lang in refs:
+        key = (source_type, source_key, source_id, field_path, lang)
+        if key in seen:
+            continue
+        seen.add(key)
         session.add(
             MediaUsageEdge(
                 asset_id=asset.id,
-                source_type="content_block",
-                source_key=key,
-                source_id=None,
-                field_path="auto_scan",
-                lang=None,
+                source_type=source_type,
+                source_key=source_key,
+                source_id=source_id,
+                field_path=field_path,
+                lang=lang,
                 last_seen_at=now,
             )
         )
-    await session.commit()
+    if commit:
+        await session.commit()
+    else:
+        await session.flush()
     rows = (
         await session.execute(select(MediaUsageEdge).where(MediaUsageEdge.asset_id == asset.id).order_by(MediaUsageEdge.source_key.asc()))
     ).scalars().all()
@@ -581,6 +880,65 @@ async def rebuild_usage_edges(session: AsyncSession, asset: MediaAsset) -> Media
             for row in rows
         ],
     )
+
+
+async def _collect_usage_refs(
+    session: AsyncSession,
+    asset: MediaAsset,
+) -> list[tuple[str, str, str | None, str, str | None]]:
+    refs: list[tuple[str, str, str | None, str, str | None]] = []
+    urls = [asset.public_url]
+    for url in urls:
+        keys = await content_service.get_asset_usage_keys(session, url=url)
+        refs.extend([("content_block", key, None, "auto_scan", None) for key in keys])
+
+        content_rows = (
+            await session.execute(
+                select(ContentImage.id, ContentBlock.key)
+                .join(ContentBlock, ContentBlock.id == ContentImage.content_block_id)
+                .where(ContentImage.url == url)
+            )
+        ).all()
+        for image_id, block_key in content_rows:
+            refs.append(("content_image", block_key, str(image_id), "content_images.url", None))
+
+        product_rows = (
+            await session.execute(
+                select(ProductImage.id, Product.slug)
+                .join(Product, Product.id == ProductImage.product_id)
+                .where(ProductImage.url == url, ProductImage.is_deleted.is_(False))
+            )
+        ).all()
+        for image_id, slug in product_rows:
+            refs.append(("product_image", slug, str(image_id), "product_images.url", None))
+
+        like = f"%{url}%"
+        tr_rows = (
+            await session.execute(
+                select(ContentBlock.key, ContentBlockTranslation.lang)
+                .join(ContentBlock, ContentBlock.id == ContentBlockTranslation.content_block_id)
+                .where(ContentBlockTranslation.body_markdown.ilike(like))
+            )
+        ).all()
+        for block_key, lang in tr_rows:
+            refs.append(("content_translation", block_key, None, "translations.body_markdown", str(lang or "")))
+
+        social_rows = (
+            await session.execute(
+                select(ContentBlock.key)
+                .where(
+                    ContentBlock.key == "site.social",
+                    or_(
+                        ContentBlock.body_markdown.ilike(like),
+                        func.cast(ContentBlock.meta, String).ilike(like),
+                    ),
+                )
+            )
+        ).all()
+        for (block_key,) in social_rows:
+            refs.append(("site_social", block_key, None, "site.social", None))
+
+    return refs
 
 
 def _sha256_for_path(path: Path) -> str:
@@ -620,6 +978,8 @@ async def process_job_inline(session: AsyncSession, job: MediaJob) -> MediaJob:
             await _process_ai_tag_job(session, job)
         elif job.job_type == MediaJobType.duplicate_scan:
             await _process_duplicate_scan_job(session, job)
+        elif job.job_type == MediaJobType.usage_reconcile:
+            await _process_usage_reconcile_job(session, job)
         job.status = MediaJobStatus.completed
         job.progress_pct = 100
         job.completed_at = _now()
@@ -649,7 +1009,7 @@ async def _process_ingest_job(session: AsyncSession, job: MediaJob) -> None:
     asset = await session.scalar(select(MediaAsset).where(MediaAsset.id == job.asset_id))
     if asset is None:
         return
-    path = storage.media_url_to_path(asset.public_url)
+    path = _asset_file_path(asset)
     if not path.exists():
         raise FileNotFoundError(f"Missing media file for {asset.public_url}")
     checksum = await anyio.to_thread.run_sync(_sha256_for_path, path)
@@ -674,12 +1034,12 @@ async def _process_variant_job(session: AsyncSession, job: MediaJob) -> None:
     asset = await session.scalar(select(MediaAsset).where(MediaAsset.id == job.asset_id))
     if asset is None or asset.asset_type != MediaAssetType.image:
         return
-    src_path = storage.media_url_to_path(asset.public_url)
+    src_path = _asset_file_path(asset)
     if not src_path.exists():
         raise FileNotFoundError(f"Missing media file for {asset.public_url}")
     dimensions = PROFILE_DIMENSIONS.get(profile, PROFILE_DIMENSIONS["web-1280"])
     variant_key = f"variants/{asset.id}/{profile}.jpg"
-    variant_path = storage.ensure_media_root() / variant_key
+    variant_path = _storage_path_for_key(variant_key, public_root=_is_publicly_servable(asset))
     variant_path.parent.mkdir(parents=True, exist_ok=True)
 
     def _render_variant() -> tuple[int, int]:
@@ -714,7 +1074,7 @@ async def _process_edit_job(session: AsyncSession, job: MediaJob) -> None:
     asset = await session.scalar(select(MediaAsset).where(MediaAsset.id == job.asset_id))
     if asset is None or asset.asset_type != MediaAssetType.image:
         return
-    src_path = storage.media_url_to_path(asset.public_url)
+    src_path = _asset_file_path(asset)
     if not src_path.exists():
         raise FileNotFoundError(f"Missing media file for {asset.public_url}")
 
@@ -724,7 +1084,7 @@ async def _process_edit_job(session: AsyncSession, job: MediaJob) -> None:
     max_w = payload.get("resize_max_width")
     max_h = payload.get("resize_max_height")
     edited_key = f"variants/{asset.id}/edit-{job.id}.jpg"
-    edited_path = storage.ensure_media_root() / edited_key
+    edited_path = _storage_path_for_key(edited_key, public_root=_is_publicly_servable(asset))
     edited_path.parent.mkdir(parents=True, exist_ok=True)
 
     def _render_edit() -> tuple[int, int]:
@@ -803,11 +1163,52 @@ async def _process_duplicate_scan_job(session: AsyncSession, job: MediaJob) -> N
         session.add(row)
 
 
+async def _process_usage_reconcile_job(session: AsyncSession, job: MediaJob) -> None:
+    payload = _job_payload(job)
+    limit = int(payload.get("limit") or int(getattr(settings, "media_usage_reconcile_batch_size", 200) or 200))
+    limit = max(1, min(limit, 5000))
+
+    stmt = (
+        select(MediaAsset)
+        .options(
+            selectinload(MediaAsset.tags).selectinload(MediaAssetTag.tag),
+            selectinload(MediaAsset.i18n),
+            selectinload(MediaAsset.variants),
+        )
+        .order_by(MediaAsset.updated_at.desc(), MediaAsset.id.desc())
+        .limit(limit)
+    )
+    rows = (await session.execute(stmt)).scalars().all()
+    total = len(rows) or 1
+    for idx, asset in enumerate(rows, start=1):
+        await rebuild_usage_edges(session, asset, commit=False)
+        job.progress_pct = int(min(99, round((idx / total) * 100)))
+        session.add(job)
+        await session.flush()
+    job.progress_pct = 100
+    session.add(job)
+
+
 async def get_job_or_404(session: AsyncSession, job_id: UUID) -> MediaJob:
     row = await session.scalar(select(MediaJob).where(MediaJob.id == job_id))
     if row is None:
         raise ValueError("Job not found")
     return row
+
+
+def resolve_asset_preview_path(asset: MediaAsset, *, variant_profile: str | None = None) -> Path:
+    if variant_profile:
+        variant = next((row for row in (asset.variants or []) if row.profile == variant_profile), None)
+        if variant is None:
+            raise ValueError("Variant not found")
+        path = _find_existing_storage_path(variant.storage_key)
+        if path is None:
+            raise FileNotFoundError("Variant file missing")
+        return path
+    path = _asset_file_path(asset)
+    if not path.exists():
+        raise FileNotFoundError("Asset file missing")
+    return path
 
 
 def job_to_read(job: MediaJob) -> MediaJobRead:
