@@ -106,6 +106,7 @@ showing what is already implemented.
   - Evidence: `backend/alembic/versions/0152_create_media_dam_foundation.py`
 - [ ] DAM phase 2: add persistent job list/telemetry dashboard and worker process supervision hooks in production compose/deploy scripts.
 - [ ] DAM phase 2: extend deterministic usage graph beyond content blocks (catalog/blog/social) with field-level pointers and nightly reconciliation job.
+- [ ] DAM phase 2: enforce private-asset delivery via authenticated/signed access path (keep public `/media/*` only for approved public assets).
 - [x] Admin Content IA: add a dedicated `/admin/content/media` workspace between Scheduling and Settings for site-wide media operations.
   - Evidence: `frontend/src/app/app.routes.ts`, `frontend/src/app/pages/admin/content/admin-content-layout.component.ts`, `frontend/src/app/pages/admin/content/admin-content-media.component.ts`
 - [x] Media library: add sorting/date filters, asset details drawer, and rename action for uploaded images.
