@@ -11,7 +11,9 @@ import {
   MediaAssetVisibility,
   MediaCollection,
   MediaJob,
+  MediaJobEvent,
   MediaJobStatus,
+  MediaJobTriageState,
   MediaJobType,
   MediaTelemetryResponse
 } from '../../../core/admin.service';
@@ -20,6 +22,7 @@ import { ErrorStateComponent } from '../../../shared/error-state.component';
 import { extractRequestId } from '../../../shared/http-error';
 
 type DamTab = 'library' | 'review' | 'collections' | 'trash' | 'queue';
+type QueueMode = 'pipeline' | 'dead_letter';
 
 @Component({
   selector: 'app-dam-asset-library',
@@ -212,6 +215,32 @@ type DamTab = 'library' | 'review' | 'collections' | 'trash' | 'queue';
         </div>
 
         <div *ngIf="tab() === 'queue'" class="grid gap-3">
+          <div class="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              class="rounded-full border px-3 py-1.5 text-xs font-semibold"
+              [class.border-indigo-600]="queueMode === 'pipeline'"
+              [class.bg-indigo-50]="queueMode === 'pipeline'"
+              [class.text-indigo-700]="queueMode === 'pipeline'"
+              [class.border-slate-300]="queueMode !== 'pipeline'"
+              [class.text-slate-700]="queueMode !== 'pipeline'"
+              (click)="setQueueMode('pipeline')"
+            >
+              Pipeline
+            </button>
+            <button
+              type="button"
+              class="rounded-full border px-3 py-1.5 text-xs font-semibold"
+              [class.border-rose-600]="queueMode === 'dead_letter'"
+              [class.bg-rose-50]="queueMode === 'dead_letter'"
+              [class.text-rose-700]="queueMode === 'dead_letter'"
+              [class.border-slate-300]="queueMode !== 'dead_letter'"
+              [class.text-slate-700]="queueMode !== 'dead_letter'"
+              (click)="setQueueMode('dead_letter')"
+            >
+              Dead-letter
+            </button>
+          </div>
           <div class="flex flex-wrap items-end gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2 dark:border-slate-800 dark:bg-slate-950/30">
             <label class="grid gap-1">
               <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">Status</span>
@@ -225,6 +254,7 @@ type DamTab = 'library' | 'review' | 'collections' | 'trash' | 'queue';
                 <option value="processing">Processing</option>
                 <option value="completed">Completed</option>
                 <option value="failed">Failed</option>
+                <option value="dead_letter">Dead letter</option>
               </select>
             </label>
             <label class="grid gap-1">
@@ -242,6 +272,38 @@ type DamTab = 'library' | 'review' | 'collections' | 'trash' | 'queue';
                 <option value="duplicate_scan">Duplicate scan</option>
                 <option value="usage_reconcile">Usage reconcile</option>
               </select>
+            </label>
+            <label class="grid gap-1">
+              <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">Triage</span>
+              <select
+                class="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-800"
+                [(ngModel)]="queueTriageState"
+                (change)="loadJobs(true)"
+              >
+                <option value="">Any</option>
+                <option value="open">Open</option>
+                <option value="retrying">Retrying</option>
+                <option value="ignored">Ignored</option>
+                <option value="resolved">Resolved</option>
+              </select>
+            </label>
+            <label class="grid gap-1">
+              <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">Assignee</span>
+              <input
+                class="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-800"
+                [(ngModel)]="queueAssignedToUserId"
+                placeholder="user uuid"
+                (keyup.enter)="loadJobs(true)"
+              />
+            </label>
+            <label class="grid gap-1">
+              <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">Tag</span>
+              <input
+                class="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-800"
+                [(ngModel)]="queueTag"
+                placeholder="timeout"
+                (keyup.enter)="loadJobs(true)"
+              />
             </label>
             <label class="grid gap-1">
               <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">Asset ID</span>
@@ -270,6 +332,10 @@ type DamTab = 'library' | 'review' | 'collections' | 'trash' | 'queue';
                 (change)="loadJobs(true)"
               />
             </label>
+            <label class="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+              <input type="checkbox" [(ngModel)]="queueSlaBreachedOnly" (change)="loadJobs(true)" />
+              SLA breached
+            </label>
             <button
               type="button"
               class="h-10 rounded-lg border border-slate-300 bg-white px-4 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
@@ -293,6 +359,16 @@ type DamTab = 'library' | 'review' | 'collections' | 'trash' | 'queue';
             </button>
           </div>
 
+          <div *ngIf="selectedQueueJobCount() > 0" class="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-2 text-xs dark:border-slate-800 dark:bg-slate-900">
+            <span class="font-semibold text-slate-700 dark:text-slate-100">{{ selectedQueueJobCount() }} selected</span>
+            <button type="button" class="rounded border border-slate-300 px-2 py-1 font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100" (click)="bulkRetrySelectedJobs()">Retry selected</button>
+            <button type="button" class="rounded border border-slate-300 px-2 py-1 font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100" (click)="bulkAssignSelectedJobs()">Assign</button>
+            <button type="button" class="rounded border border-slate-300 px-2 py-1 font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100" (click)="bulkMarkSelectedJobs('ignored')">Mark ignored</button>
+            <button type="button" class="rounded border border-slate-300 px-2 py-1 font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100" (click)="bulkMarkSelectedJobs('resolved')">Mark resolved</button>
+            <button type="button" class="rounded border border-slate-300 px-2 py-1 font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100" (click)="bulkAddTagToSelectedJobs()">Add tag</button>
+            <button type="button" class="rounded border border-slate-300 px-2 py-1 font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100" (click)="bulkRemoveTagFromSelectedJobs()">Remove tag</button>
+          </div>
+
           <div *ngIf="queueError()" class="text-sm text-rose-700 dark:text-rose-300">{{ queueError() }}</div>
           <div *ngIf="queueLoading()" class="text-sm text-slate-600 dark:text-slate-300">Loading job queue…</div>
           <div *ngIf="!queueLoading() && jobs().length === 0" class="text-sm text-slate-500 dark:text-slate-400">No jobs found.</div>
@@ -300,10 +376,39 @@ type DamTab = 'library' | 'review' | 'collections' | 'trash' | 'queue';
             *ngFor="let job of jobs()"
             class="rounded-lg border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900"
           >
-            <p class="font-semibold text-slate-900 dark:text-slate-50">{{ job.job_type }} · {{ job.status }}</p>
-            <p class="text-xs text-slate-500 dark:text-slate-400">Asset {{ job.asset_id || 'n/a' }} · {{ job.progress_pct }}% · attempt {{ job.attempt }}</p>
-            <p class="text-xs text-slate-500 dark:text-slate-400">{{ job.created_at | date: 'short' }}</p>
-            <p *ngIf="job.error_message" class="text-xs text-rose-600 dark:text-rose-300">{{ job.error_message }}</p>
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <p class="font-semibold text-slate-900 dark:text-slate-50">{{ job.job_type }} · {{ job.status }}</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Asset {{ job.asset_id || 'n/a' }} · {{ job.progress_pct }}% · attempt {{ job.attempt }}/{{ job.max_attempts }}</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Triage: {{ job.triage_state }} · Created {{ job.created_at | date: 'short' }}</p>
+                <p *ngIf="job.next_retry_at" class="text-xs text-indigo-700 dark:text-indigo-300">Next retry: {{ job.next_retry_at | date: 'short' }}</p>
+                <p *ngIf="job.sla_due_at" class="text-xs text-amber-700 dark:text-amber-300">SLA: {{ job.sla_due_at | date: 'short' }}</p>
+                <p *ngIf="job.incident_url" class="truncate text-xs text-slate-500 dark:text-slate-400">Incident: {{ job.incident_url }}</p>
+              </div>
+              <input type="checkbox" [checked]="selectedQueueJobIds().has(job.id)" (change)="toggleQueueJobSelected(job.id, $event)" />
+            </div>
+            <div *ngIf="job.tags?.length" class="mt-2 flex flex-wrap gap-1">
+              <span
+                *ngFor="let t of job.tags"
+                class="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-700 dark:border-slate-700 dark:bg-slate-950/20 dark:text-slate-200"
+              >
+                {{ t }}
+              </span>
+            </div>
+            <p *ngIf="job.error_message" class="mt-2 text-xs text-rose-600 dark:text-rose-300">{{ job.error_message }}</p>
+            <div class="mt-2 flex flex-wrap gap-2 text-xs">
+              <button type="button" class="text-indigo-700 underline dark:text-indigo-300" (click)="retryJob(job)">Retry now</button>
+              <button type="button" class="text-slate-700 underline dark:text-slate-200" (click)="assignJob(job)">Assign</button>
+              <button type="button" class="text-slate-700 underline dark:text-slate-200" (click)="setSla(job)">Set SLA</button>
+              <button type="button" class="text-slate-700 underline dark:text-slate-200" (click)="setIncident(job)">Set incident</button>
+              <button type="button" class="text-slate-700 underline dark:text-slate-200" (click)="setTriageState(job, 'open')">Open</button>
+              <button type="button" class="text-slate-700 underline dark:text-slate-200" (click)="setTriageState(job, 'ignored')">Ignore</button>
+              <button type="button" class="text-slate-700 underline dark:text-slate-200" (click)="setTriageState(job, 'resolved')">Resolve</button>
+              <button type="button" class="text-slate-700 underline dark:text-slate-200" (click)="addJobTag(job)">Add tag</button>
+              <button type="button" class="text-slate-700 underline dark:text-slate-200" (click)="removeJobTag(job)">Remove tag</button>
+              <button type="button" class="text-slate-700 underline dark:text-slate-200" (click)="addTriageNote(job)">Add note</button>
+              <button type="button" class="text-slate-700 underline dark:text-slate-200" (click)="openJobEvents(job)">Events</button>
+            </div>
           </div>
 
           <div *ngIf="jobsMetaTotalPages() > 1" class="flex items-center justify-between">
@@ -455,6 +560,28 @@ type DamTab = 'library' | 'review' | 'collections' | 'trash' | 'queue';
           </div>
         </div>
       </div>
+
+      <div *ngIf="activeJobEventsFor()" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div class="w-full max-w-3xl rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">Job events</p>
+              <p class="text-xs text-slate-500 dark:text-slate-400">{{ activeJobEventsFor()?.job_type }} · {{ activeJobEventsFor()?.id }}</p>
+            </div>
+            <button type="button" class="text-xs font-semibold text-slate-700 underline dark:text-slate-200" (click)="closeJobEvents()">Close</button>
+          </div>
+          <div *ngIf="jobEventsLoading()" class="mt-3 text-sm text-slate-600 dark:text-slate-300">Loading events…</div>
+          <div *ngIf="!jobEventsLoading() && !jobEvents().length" class="mt-3 text-sm text-slate-500 dark:text-slate-400">No events recorded.</div>
+          <div *ngIf="jobEvents().length" class="mt-3 max-h-[55vh] space-y-2 overflow-auto pr-1">
+            <div *ngFor="let evt of jobEvents()" class="rounded-lg border border-slate-200 bg-slate-50 p-2 dark:border-slate-800 dark:bg-slate-900">
+              <p class="text-xs font-semibold text-slate-900 dark:text-slate-50">{{ evt.action }}</p>
+              <p class="text-[11px] text-slate-500 dark:text-slate-400">{{ evt.created_at | date: 'short' }} · actor {{ evt.actor_user_id || 'system' }}</p>
+              <p *ngIf="evt.note" class="text-xs text-slate-700 dark:text-slate-200">{{ evt.note }}</p>
+              <pre *ngIf="evt.meta_json" class="mt-1 overflow-auto rounded border border-slate-200 bg-white p-2 text-[11px] text-slate-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">{{ evt.meta_json }}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
   `
 })
@@ -476,6 +603,10 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
   readonly assets = signal<MediaAsset[]>([]);
   readonly collections = signal<MediaCollection[]>([]);
   readonly jobs = signal<MediaJob[]>([]);
+  readonly selectedQueueJobIds = signal<Set<string>>(new Set());
+  readonly activeJobEventsFor = signal<MediaJob | null>(null);
+  readonly jobEvents = signal<MediaJobEvent[]>([]);
+  readonly jobEventsLoading = signal(false);
   readonly telemetry = signal<MediaTelemetryResponse | null>(null);
   readonly loading = signal(false);
   readonly queueLoading = signal(false);
@@ -499,6 +630,7 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
 
   readonly metaTotalPages = computed(() => Math.max(1, this.meta().total_pages || 1));
   readonly selectedCount = computed(() => this.selectedIds().size);
+  readonly selectedQueueJobCount = computed(() => this.selectedQueueJobIds().size);
   readonly jobsMetaTotalPages = computed(() => Math.max(1, this.jobsMeta().total_pages || 1));
   readonly oldestQueuedLabel = computed(() => {
     const ageSeconds = this.telemetry()?.oldest_queued_age_seconds ?? null;
@@ -518,6 +650,11 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
   queuePage = 1;
   queueStatus: MediaJobStatus | '' = '';
   queueJobType: MediaJobType | '' = '';
+  queueTriageState: MediaJobTriageState | '' = '';
+  queueAssignedToUserId = '';
+  queueTag = '';
+  queueSlaBreachedOnly = false;
+  queueMode: QueueMode = 'pipeline';
   queueAssetId = '';
   queueCreatedFrom = '';
   queueCreatedTo = '';
@@ -568,6 +705,16 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
     } else if (tab === 'collections') {
       void this.loadCollections();
     }
+  }
+
+  setQueueMode(mode: QueueMode): void {
+    if (this.queueMode === mode) return;
+    this.queueMode = mode;
+    if (mode === 'dead_letter') {
+      this.queueStatus = '';
+      this.queueTriageState = this.queueTriageState || 'open';
+    }
+    this.loadJobs(true);
   }
 
   resetFilters(): void {
@@ -634,6 +781,11 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
         limit: 20,
         status: this.queueStatus || undefined,
         job_type: this.queueJobType || undefined,
+        triage_state: this.queueTriageState || undefined,
+        assigned_to_user_id: this.queueAssignedToUserId.trim() || undefined,
+        tag: this.queueTag.trim() || undefined,
+        sla_breached: this.queueSlaBreachedOnly || undefined,
+        dead_letter_only: this.queueMode === 'dead_letter',
         asset_id: this.queueAssetId.trim() || undefined,
         created_from: this.queueCreatedFrom ? `${this.queueCreatedFrom}T00:00:00+00:00` : undefined,
         created_to: this.queueCreatedTo ? `${this.queueCreatedTo}T23:59:59+00:00` : undefined
@@ -641,6 +793,7 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (res) => {
           this.jobs.set(res.items || []);
+          this.selectedQueueJobIds.set(new Set());
           this.jobsMeta.set(res.meta || { total_items: 0, total_pages: 1, page: this.queuePage, limit: 20 });
           this.queueLoading.set(false);
           this.loadTelemetry();
@@ -667,6 +820,10 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
   resetQueueFilters(): void {
     this.queueStatus = '';
     this.queueJobType = '';
+    this.queueTriageState = '';
+    this.queueAssignedToUserId = '';
+    this.queueTag = '';
+    this.queueSlaBreachedOnly = false;
     this.queueAssetId = '';
     this.queueCreatedFrom = '';
     this.queueCreatedTo = '';
@@ -684,6 +841,181 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
     } catch (err) {
       this.toast.error((err as any)?.error?.detail || 'Failed to queue usage reconciliation.');
     }
+  }
+
+  toggleQueueJobSelected(jobId: string, event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const next = new Set(this.selectedQueueJobIds());
+    if (input.checked) next.add(jobId);
+    else next.delete(jobId);
+    this.selectedQueueJobIds.set(next);
+  }
+
+  async bulkRetrySelectedJobs(): Promise<void> {
+    const ids = Array.from(this.selectedQueueJobIds());
+    if (!ids.length) return;
+    try {
+      const res = await firstValueFrom(this.admin.retryMediaJobsBulk(ids));
+      const updated = new Map((res.items || []).map((row) => [row.id, row]));
+      this.jobs.set(this.jobs().map((row) => updated.get(row.id) ?? row));
+      this.selectedQueueJobIds.set(new Set());
+      this.toast.success(`Queued ${res.items.length} jobs for retry.`);
+      this.loadTelemetry();
+    } catch (err) {
+      this.toast.error((err as any)?.error?.detail || 'Bulk retry failed.');
+    }
+  }
+
+  async bulkAssignSelectedJobs(): Promise<void> {
+    const ids = Array.from(this.selectedQueueJobIds());
+    if (!ids.length) return;
+    const value = window.prompt('Assign selected jobs to user id (blank clears assignee)', '');
+    if (value === null) return;
+    try {
+      await Promise.all(
+        ids.map((jobId) =>
+          firstValueFrom(
+            this.admin.updateMediaJobTriage(jobId, value.trim() ? { assigned_to_user_id: value.trim() } : { clear_assignee: true })
+          )
+        )
+      );
+      this.toast.success('Assignment updated for selected jobs.');
+      this.loadJobs();
+    } catch (err) {
+      this.toast.error((err as any)?.error?.detail || 'Bulk assignment failed.');
+    }
+  }
+
+  async bulkMarkSelectedJobs(state: MediaJobTriageState): Promise<void> {
+    const ids = Array.from(this.selectedQueueJobIds());
+    if (!ids.length) return;
+    try {
+      await Promise.all(ids.map((jobId) => firstValueFrom(this.admin.updateMediaJobTriage(jobId, { triage_state: state }))));
+      this.toast.success(`Marked selected jobs as ${state}.`);
+      this.loadJobs();
+    } catch (err) {
+      this.toast.error((err as any)?.error?.detail || 'Bulk triage update failed.');
+    }
+  }
+
+  async bulkAddTagToSelectedJobs(): Promise<void> {
+    const ids = Array.from(this.selectedQueueJobIds());
+    if (!ids.length) return;
+    const value = window.prompt('Tag to add to selected jobs', '');
+    if (!value || !value.trim()) return;
+    try {
+      await Promise.all(
+        ids.map((jobId) => firstValueFrom(this.admin.updateMediaJobTriage(jobId, { add_tags: [value.trim()] })))
+      );
+      this.toast.success('Tag added to selected jobs.');
+      this.loadJobs();
+    } catch (err) {
+      this.toast.error((err as any)?.error?.detail || 'Bulk tag update failed.');
+    }
+  }
+
+  async bulkRemoveTagFromSelectedJobs(): Promise<void> {
+    const ids = Array.from(this.selectedQueueJobIds());
+    if (!ids.length) return;
+    const value = window.prompt('Tag to remove from selected jobs', '');
+    if (!value || !value.trim()) return;
+    try {
+      await Promise.all(
+        ids.map((jobId) => firstValueFrom(this.admin.updateMediaJobTriage(jobId, { remove_tags: [value.trim()] })))
+      );
+      this.toast.success('Tag removed from selected jobs.');
+      this.loadJobs();
+    } catch (err) {
+      this.toast.error((err as any)?.error?.detail || 'Bulk tag removal failed.');
+    }
+  }
+
+  async retryJob(job: MediaJob): Promise<void> {
+    try {
+      const updated = await firstValueFrom(this.admin.retryMediaJob(job.id));
+      this.replaceJob(updated);
+      this.toast.success('Job queued for retry.');
+      this.loadTelemetry();
+    } catch (err) {
+      this.toast.error((err as any)?.error?.detail || 'Retry failed.');
+    }
+  }
+
+  async assignJob(job: MediaJob): Promise<void> {
+    const value = window.prompt('Assign user id (blank clears assignee)', job.assigned_to_user_id || '');
+    if (value === null) return;
+    await this.patchJobTriage(
+      job,
+      value.trim() ? { assigned_to_user_id: value.trim() } : { clear_assignee: true },
+      'Assignment updated.'
+    );
+  }
+
+  async setSla(job: MediaJob): Promise<void> {
+    const value = window.prompt(
+      'SLA due at (ISO 8601, blank to clear)',
+      (job.sla_due_at || '').replace('Z', '')
+    );
+    if (value === null) return;
+    await this.patchJobTriage(
+      job,
+      value.trim() ? { sla_due_at: value.trim() } : { clear_sla_due_at: true },
+      'SLA updated.'
+    );
+  }
+
+  async setIncident(job: MediaJob): Promise<void> {
+    const value = window.prompt('Incident URL (blank to clear)', job.incident_url || '');
+    if (value === null) return;
+    await this.patchJobTriage(
+      job,
+      value.trim() ? { incident_url: value.trim() } : { clear_incident_url: true },
+      'Incident link updated.'
+    );
+  }
+
+  async setTriageState(job: MediaJob, state: MediaJobTriageState): Promise<void> {
+    await this.patchJobTriage(job, { triage_state: state }, `Marked as ${state}.`);
+  }
+
+  async addJobTag(job: MediaJob): Promise<void> {
+    const value = window.prompt('Tag to add', '');
+    if (!value || !value.trim()) return;
+    await this.patchJobTriage(job, { add_tags: [value.trim()] }, 'Tag added.');
+  }
+
+  async removeJobTag(job: MediaJob): Promise<void> {
+    const value = window.prompt('Tag to remove', '');
+    if (!value || !value.trim()) return;
+    await this.patchJobTriage(job, { remove_tags: [value.trim()] }, 'Tag removed.');
+  }
+
+  async addTriageNote(job: MediaJob): Promise<void> {
+    const value = window.prompt('Triage note', '');
+    if (value === null) return;
+    await this.patchJobTriage(job, { note: value.trim() || null }, 'Triage note saved.');
+  }
+
+  openJobEvents(job: MediaJob): void {
+    this.activeJobEventsFor.set(job);
+    this.jobEvents.set([]);
+    this.jobEventsLoading.set(true);
+    this.admin.listMediaJobEvents(job.id, { limit: 200 }).subscribe({
+      next: (res) => {
+        this.jobEvents.set(res.items || []);
+        this.jobEventsLoading.set(false);
+      },
+      error: (err) => {
+        this.jobEventsLoading.set(false);
+        this.toast.error(err?.error?.detail || 'Failed to load job events.');
+      }
+    });
+  }
+
+  closeJobEvents(): void {
+    this.activeJobEventsFor.set(null);
+    this.jobEvents.set([]);
+    this.jobEventsLoading.set(false);
   }
 
   toggleSelected(assetId: string, event: Event): void {
@@ -918,6 +1250,25 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
       await this.loadCollections();
     } catch (err) {
       this.toast.error((err as any)?.error?.detail || 'Failed to update collection items.');
+    }
+  }
+
+  private async patchJobTriage(job: MediaJob, payload: any, successMessage: string): Promise<void> {
+    try {
+      const updated = await firstValueFrom(this.admin.updateMediaJobTriage(job.id, payload));
+      this.replaceJob(updated);
+      this.toast.success(successMessage);
+      this.loadTelemetry();
+    } catch (err) {
+      this.toast.error((err as any)?.error?.detail || 'Failed to update job triage.');
+    }
+  }
+
+  private replaceJob(updated: MediaJob): void {
+    this.jobs.set(this.jobs().map((row) => (row.id === updated.id ? updated : row)));
+    if (this.activeJobEventsFor()?.id === updated.id) {
+      this.activeJobEventsFor.set(updated);
+      this.openJobEvents(updated);
     }
   }
 

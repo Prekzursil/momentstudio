@@ -114,7 +114,7 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
             </div>
             <div *ngIf="damTelemetryLoading()" class="text-xs text-slate-500 dark:text-slate-400">Loading DAM telemetry…</div>
             <div *ngIf="damTelemetryError()" class="text-xs text-rose-700 dark:text-rose-300">{{ damTelemetryError() }}</div>
-            <div *ngIf="damTelemetry() as dam" class="grid gap-2 sm:grid-cols-4">
+            <div *ngIf="damTelemetry() as dam" class="grid gap-2 sm:grid-cols-3 lg:grid-cols-7">
               <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
                 <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Queue</p>
                 <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ dam.queue_depth }}</p>
@@ -130,6 +130,18 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
               <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
                 <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Oldest queued</p>
                 <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ formatDamAge(dam.oldest_queued_age_seconds) }}</p>
+              </div>
+              <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
+                <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Dead-letter</p>
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ dam.dead_letter_count }}</p>
+              </div>
+              <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
+                <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">SLA breaches</p>
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ dam.sla_breached_count }}</p>
+              </div>
+              <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
+                <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Retry scheduled</p>
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ dam.retry_scheduled_count }}</p>
               </div>
             </div>
           </div>

@@ -893,7 +893,8 @@ export type MediaAssetType = 'image' | 'video' | 'document';
 export type MediaAssetStatus = 'draft' | 'approved' | 'rejected' | 'archived' | 'trashed';
 export type MediaAssetVisibility = 'public' | 'private';
 export type MediaJobType = 'ingest' | 'variant' | 'edit' | 'ai_tag' | 'duplicate_scan' | 'usage_reconcile';
-export type MediaJobStatus = 'queued' | 'processing' | 'completed' | 'failed';
+export type MediaJobStatus = 'queued' | 'processing' | 'completed' | 'failed' | 'dead_letter';
+export type MediaJobTriageState = 'open' | 'retrying' | 'ignored' | 'resolved';
 
 export interface MediaAssetI18n {
   lang: 'en' | 'ro';
@@ -1000,6 +1001,15 @@ export interface MediaJob {
   status: MediaJobStatus;
   progress_pct: number;
   attempt: number;
+  max_attempts: number;
+  next_retry_at?: string | null;
+  last_error_at?: string | null;
+  dead_lettered_at?: string | null;
+  triage_state: MediaJobTriageState;
+  assigned_to_user_id?: string | null;
+  sla_due_at?: string | null;
+  incident_url?: string | null;
+  tags: string[];
   error_code?: string | null;
   error_message?: string | null;
   created_at: string;
@@ -1010,6 +1020,33 @@ export interface MediaJob {
 export interface MediaJobListResponse {
   items: MediaJob[];
   meta: { total_items: number; total_pages: number; page: number; limit: number };
+}
+
+export interface MediaJobEvent {
+  id: string;
+  job_id: string;
+  actor_user_id?: string | null;
+  action: string;
+  note?: string | null;
+  meta_json?: string | null;
+  created_at: string;
+}
+
+export interface MediaJobEventsResponse {
+  items: MediaJobEvent[];
+}
+
+export interface MediaJobTriageUpdateRequest {
+  triage_state?: MediaJobTriageState;
+  assigned_to_user_id?: string | null;
+  clear_assignee?: boolean;
+  sla_due_at?: string | null;
+  clear_sla_due_at?: boolean;
+  incident_url?: string | null;
+  clear_incident_url?: boolean;
+  add_tags?: string[];
+  remove_tags?: string[];
+  note?: string | null;
 }
 
 export interface MediaTelemetryWorker {
@@ -1026,6 +1063,9 @@ export interface MediaTelemetryResponse {
   online_workers: number;
   workers: MediaTelemetryWorker[];
   stale_processing_count: number;
+  dead_letter_count: number;
+  sla_breached_count: number;
+  retry_scheduled_count: number;
   oldest_queued_age_seconds?: number | null;
   avg_processing_seconds?: number | null;
   status_counts: Record<string, number>;
@@ -1739,10 +1779,31 @@ export class AdminService {
     status?: MediaJobStatus | '';
     job_type?: MediaJobType | '';
     asset_id?: string;
+    triage_state?: MediaJobTriageState | '';
+    assigned_to_user_id?: string;
+    tag?: string;
+    sla_breached?: boolean;
+    dead_letter_only?: boolean;
     created_from?: string;
     created_to?: string;
   }): Observable<MediaJobListResponse> {
     return this.api.get<MediaJobListResponse>('/content/admin/media/jobs', params as any);
+  }
+
+  retryMediaJob(jobId: string): Observable<MediaJob> {
+    return this.api.post<MediaJob>(`/content/admin/media/jobs/${encodeURIComponent(jobId)}/retry`, {});
+  }
+
+  retryMediaJobsBulk(jobIds: string[]): Observable<MediaJobListResponse> {
+    return this.api.post<MediaJobListResponse>('/content/admin/media/jobs/retry-bulk', { job_ids: jobIds });
+  }
+
+  updateMediaJobTriage(jobId: string, payload: MediaJobTriageUpdateRequest): Observable<MediaJob> {
+    return this.api.patch<MediaJob>(`/content/admin/media/jobs/${encodeURIComponent(jobId)}/triage`, payload);
+  }
+
+  listMediaJobEvents(jobId: string, params?: { limit?: number }): Observable<MediaJobEventsResponse> {
+    return this.api.get<MediaJobEventsResponse>(`/content/admin/media/jobs/${encodeURIComponent(jobId)}/events`, params as any);
   }
 
   getMediaTelemetry(): Observable<MediaTelemetryResponse> {

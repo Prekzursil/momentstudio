@@ -51,6 +51,10 @@ describe('DamAssetLibraryComponent', () => {
       'requestMediaVariant',
       'editMediaAsset',
       'listMediaJobs',
+      'retryMediaJob',
+      'retryMediaJobsBulk',
+      'updateMediaJobTriage',
+      'listMediaJobEvents',
       'getMediaTelemetry',
       'requestMediaUsageReconcile',
       'approveMediaAsset',
@@ -83,6 +87,9 @@ describe('DamAssetLibraryComponent', () => {
         online_workers: 0,
         workers: [],
         stale_processing_count: 0,
+        dead_letter_count: 0,
+        sla_breached_count: 0,
+        retry_scheduled_count: 0,
         oldest_queued_age_seconds: null,
         avg_processing_seconds: null,
         status_counts: {},
@@ -97,13 +104,77 @@ describe('DamAssetLibraryComponent', () => {
         status: 'queued',
         progress_pct: 0,
         attempt: 0,
+        max_attempts: 5,
+        triage_state: 'open',
+        tags: [],
         error_code: null,
         error_message: null,
         created_at: '2026-02-16T00:00:00Z',
+        next_retry_at: null,
+        dead_lettered_at: null,
+        last_error_at: null,
+        assigned_to_user_id: null,
+        sla_due_at: null,
+        incident_url: null,
         started_at: null,
         completed_at: null
       })
     );
+    admin.retryMediaJob.and.returnValue(
+      of({
+        id: 'job-2',
+        asset_id: 'asset-1',
+        job_type: 'ingest',
+        status: 'queued',
+        progress_pct: 0,
+        attempt: 1,
+        max_attempts: 5,
+        triage_state: 'retrying',
+        tags: ['timeout'],
+        error_code: null,
+        error_message: null,
+        created_at: '2026-02-16T00:00:00Z',
+        next_retry_at: null,
+        dead_lettered_at: null,
+        last_error_at: null,
+        assigned_to_user_id: null,
+        sla_due_at: null,
+        incident_url: null,
+        started_at: null,
+        completed_at: null
+      })
+    );
+    admin.retryMediaJobsBulk.and.returnValue(
+      of({
+        items: [],
+        meta: { total_items: 0, total_pages: 1, page: 1, limit: 1 }
+      })
+    );
+    admin.updateMediaJobTriage.and.returnValue(
+      of({
+        id: 'job-2',
+        asset_id: 'asset-1',
+        job_type: 'ingest',
+        status: 'dead_letter',
+        progress_pct: 100,
+        attempt: 5,
+        max_attempts: 5,
+        triage_state: 'open',
+        tags: ['timeout'],
+        error_code: 'processing_failed',
+        error_message: 'boom',
+        created_at: '2026-02-16T00:00:00Z',
+        next_retry_at: null,
+        dead_lettered_at: '2026-02-16T00:00:00Z',
+        last_error_at: '2026-02-16T00:00:00Z',
+        assigned_to_user_id: null,
+        sla_due_at: null,
+        incident_url: null,
+        started_at: null,
+        completed_at: '2026-02-16T00:00:00Z'
+      })
+    );
+    admin.listMediaJobEvents.and.returnValue(of({ items: [] }));
 
     TestBed.configureTestingModule({
       imports: [DamAssetLibraryComponent],
@@ -161,7 +232,24 @@ describe('DamAssetLibraryComponent', () => {
     expect(admin.listMediaJobs).toHaveBeenCalledWith(
       jasmine.objectContaining({
         page: 1,
-        limit: 20
+        limit: 20,
+        dead_letter_only: false
+      })
+    );
+  });
+
+  it('switches queue mode to dead-letter and requests dead-letter-only list', () => {
+    const fixture = TestBed.createComponent(DamAssetLibraryComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.switchTab('queue');
+    admin.listMediaJobs.calls.reset();
+
+    component.setQueueMode('dead_letter');
+
+    expect(admin.listMediaJobs).toHaveBeenCalledWith(
+      jasmine.objectContaining({
+        dead_letter_only: true
       })
     );
   });

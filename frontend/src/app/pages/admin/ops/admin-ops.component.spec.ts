@@ -43,6 +43,9 @@ describe('AdminOpsComponent', () => {
         online_workers: 1,
         workers: [],
         stale_processing_count: 0,
+        dead_letter_count: 1,
+        sla_breached_count: 1,
+        retry_scheduled_count: 2,
         oldest_queued_age_seconds: 45,
         avg_processing_seconds: null,
         status_counts: { queued: 2 },
@@ -99,5 +102,6 @@ describe('AdminOpsComponent', () => {
     const text = (fixture.nativeElement.textContent || '').replace(/\s+/g, ' ');
     expect(text).toContain('DAM telemetry');
     expect(text).toContain('Queue');
+    expect(text).toContain('Dead-letter');
   });
 });
