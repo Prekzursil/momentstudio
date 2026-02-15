@@ -23,11 +23,34 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: Sequence[str] | None = None
 
 
-media_asset_type = sa.Enum("image", "video", "document", name="mediaassettype")
-media_asset_status = sa.Enum("draft", "approved", "rejected", "archived", "trashed", name="mediaassetstatus")
-media_visibility = sa.Enum("public", "private", name="mediavisibility")
-media_job_type = sa.Enum("ingest", "variant", "edit", "ai_tag", "duplicate_scan", name="mediajobtype")
-media_job_status = sa.Enum("queued", "processing", "completed", "failed", name="mediajobstatus")
+media_asset_type = postgresql.ENUM("image", "video", "document", name="mediaassettype", create_type=False)
+media_asset_status = postgresql.ENUM(
+    "draft",
+    "approved",
+    "rejected",
+    "archived",
+    "trashed",
+    name="mediaassetstatus",
+    create_type=False,
+)
+media_visibility = postgresql.ENUM("public", "private", name="mediavisibility", create_type=False)
+media_job_type = postgresql.ENUM(
+    "ingest",
+    "variant",
+    "edit",
+    "ai_tag",
+    "duplicate_scan",
+    name="mediajobtype",
+    create_type=False,
+)
+media_job_status = postgresql.ENUM(
+    "queued",
+    "processing",
+    "completed",
+    "failed",
+    name="mediajobstatus",
+    create_type=False,
+)
 
 
 def _now() -> datetime:

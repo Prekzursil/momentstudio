@@ -388,7 +388,7 @@ export class DamAssetLibraryComponent implements OnInit {
 
   ngOnInit(): void {
     this.reload();
-    this.loadCollections();
+    void this.loadCollections();
   }
 
   switchTab(tab: DamTab): void {
@@ -407,7 +407,7 @@ export class DamAssetLibraryComponent implements OnInit {
       }
       this.reload(true);
     } else if (tab === 'collections') {
-      this.loadCollections();
+      void this.loadCollections();
     }
   }
 
@@ -487,7 +487,7 @@ export class DamAssetLibraryComponent implements OnInit {
     }
   }
 
-  async openDetails(asset: MediaAsset): Promise<void> {
+  openDetails(asset: MediaAsset): void {
     this.detailAsset.set(asset);
     const en = (asset.i18n || []).find((row) => row.lang === 'en');
     const ro = (asset.i18n || []).find((row) => row.lang === 'ro');
@@ -703,4 +703,3 @@ export class DamAssetLibraryComponent implements OnInit {
     this.jobs.set([job, ...this.jobs()].slice(0, 20));
   }
 }
-
