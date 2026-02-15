@@ -889,6 +889,133 @@ export interface ContentImageAssetUsageResponse {
   keys: string[];
 }
 
+export type MediaAssetType = 'image' | 'video' | 'document';
+export type MediaAssetStatus = 'draft' | 'approved' | 'rejected' | 'archived' | 'trashed';
+export type MediaAssetVisibility = 'public' | 'private';
+export type MediaJobType = 'ingest' | 'variant' | 'edit' | 'ai_tag' | 'duplicate_scan';
+export type MediaJobStatus = 'queued' | 'processing' | 'completed' | 'failed';
+
+export interface MediaAssetI18n {
+  lang: 'en' | 'ro';
+  title?: string | null;
+  alt_text?: string | null;
+  caption?: string | null;
+  description?: string | null;
+}
+
+export interface MediaVariant {
+  id: string;
+  profile: string;
+  format?: string | null;
+  width?: number | null;
+  height?: number | null;
+  public_url: string;
+  size_bytes?: number | null;
+  created_at: string;
+}
+
+export interface MediaAsset {
+  id: string;
+  asset_type: MediaAssetType;
+  status: MediaAssetStatus;
+  visibility: MediaAssetVisibility;
+  source_kind: string;
+  source_ref?: string | null;
+  storage_key: string;
+  public_url: string;
+  original_filename?: string | null;
+  mime_type?: string | null;
+  size_bytes?: number | null;
+  width?: number | null;
+  height?: number | null;
+  duration_ms?: number | null;
+  page_count?: number | null;
+  checksum_sha256?: string | null;
+  perceptual_hash?: string | null;
+  dedupe_group?: string | null;
+  rights_license?: string | null;
+  rights_owner?: string | null;
+  rights_notes?: string | null;
+  approved_at?: string | null;
+  trashed_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  tags: string[];
+  i18n: MediaAssetI18n[];
+  variants: MediaVariant[];
+}
+
+export interface MediaAssetListResponse {
+  items: MediaAsset[];
+  meta: { total_items: number; total_pages: number; page: number; limit: number };
+}
+
+export interface MediaAssetUpdateRequest {
+  status?: MediaAssetStatus;
+  visibility?: MediaAssetVisibility;
+  rights_license?: string | null;
+  rights_owner?: string | null;
+  rights_notes?: string | null;
+  tags?: string[];
+  i18n?: MediaAssetI18n[];
+}
+
+export interface MediaFinalizeRequest {
+  run_ai_tagging?: boolean;
+  run_duplicate_scan?: boolean;
+}
+
+export interface MediaVariantRequest {
+  profile: string;
+}
+
+export interface MediaEditRequest {
+  rotate_cw?: 0 | 90 | 180 | 270;
+  crop_aspect_w?: number;
+  crop_aspect_h?: number;
+  resize_max_width?: number;
+  resize_max_height?: number;
+}
+
+export interface MediaUsageEdge {
+  source_type: string;
+  source_key: string;
+  source_id?: string | null;
+  field_path: string;
+  lang?: string | null;
+  last_seen_at: string;
+}
+
+export interface MediaUsageResponse {
+  asset_id: string;
+  public_url: string;
+  items: MediaUsageEdge[];
+}
+
+export interface MediaJob {
+  id: string;
+  asset_id?: string | null;
+  job_type: MediaJobType;
+  status: MediaJobStatus;
+  progress_pct: number;
+  attempt: number;
+  error_code?: string | null;
+  error_message?: string | null;
+  created_at: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+}
+
+export interface MediaCollection {
+  id: string;
+  name: string;
+  slug: string;
+  visibility: MediaAssetVisibility;
+  created_at: string;
+  updated_at: string;
+  item_count: number;
+}
+
 export interface ContentLinkCheckIssue {
   key: string;
   kind: 'link' | 'image';
@@ -1509,6 +1636,96 @@ export class AdminService {
 
   deleteContentImage(imageId: string, params?: { delete_versions?: boolean }): Observable<void> {
     return this.api.delete<void>(`/content/admin/assets/images/${encodeURIComponent(imageId)}`, undefined, params as any);
+  }
+
+  listMediaAssets(params?: {
+    q?: string;
+    tag?: string;
+    asset_type?: MediaAssetType | '';
+    status?: MediaAssetStatus | '';
+    visibility?: MediaAssetVisibility | '';
+    include_trashed?: boolean;
+    created_from?: string;
+    created_to?: string;
+    page?: number;
+    limit?: number;
+    sort?: 'newest' | 'oldest' | 'name_asc' | 'name_desc';
+  }): Observable<MediaAssetListResponse> {
+    return this.api.get<MediaAssetListResponse>('/content/admin/media/assets', params as any);
+  }
+
+  uploadMediaAsset(
+    file: File,
+    params?: { visibility?: MediaAssetVisibility; auto_finalize?: boolean }
+  ): Observable<MediaAsset> {
+    const form = new FormData();
+    form.append('file', file);
+    return this.api.post<MediaAsset>('/content/admin/media/assets/upload', form, undefined, params as any);
+  }
+
+  finalizeMediaAsset(assetId: string, payload?: MediaFinalizeRequest): Observable<MediaJob> {
+    return this.api.post<MediaJob>(`/content/admin/media/assets/${encodeURIComponent(assetId)}/finalize`, payload || {});
+  }
+
+  updateMediaAsset(assetId: string, payload: MediaAssetUpdateRequest): Observable<MediaAsset> {
+    return this.api.patch<MediaAsset>(`/content/admin/media/assets/${encodeURIComponent(assetId)}`, payload);
+  }
+
+  approveMediaAsset(assetId: string, note?: string): Observable<MediaAsset> {
+    return this.api.post<MediaAsset>(`/content/admin/media/assets/${encodeURIComponent(assetId)}/approve`, { note: note || null });
+  }
+
+  rejectMediaAsset(assetId: string, note?: string): Observable<MediaAsset> {
+    return this.api.post<MediaAsset>(`/content/admin/media/assets/${encodeURIComponent(assetId)}/reject`, { note: note || null });
+  }
+
+  softDeleteMediaAsset(assetId: string): Observable<void> {
+    return this.api.delete<void>(`/content/admin/media/assets/${encodeURIComponent(assetId)}`);
+  }
+
+  restoreMediaAsset(assetId: string): Observable<MediaAsset> {
+    return this.api.post<MediaAsset>(`/content/admin/media/assets/${encodeURIComponent(assetId)}/restore`, {});
+  }
+
+  purgeMediaAsset(assetId: string): Observable<void> {
+    return this.api.post<void>(`/content/admin/media/assets/${encodeURIComponent(assetId)}/purge`, {});
+  }
+
+  getMediaAssetUsage(assetId: string): Observable<MediaUsageResponse> {
+    return this.api.get<MediaUsageResponse>(`/content/admin/media/assets/${encodeURIComponent(assetId)}/usage`);
+  }
+
+  requestMediaVariant(assetId: string, profile: string): Observable<MediaJob> {
+    return this.api.post<MediaJob>(`/content/admin/media/assets/${encodeURIComponent(assetId)}/variants`, { profile });
+  }
+
+  editMediaAsset(assetId: string, payload: MediaEditRequest): Observable<MediaJob> {
+    return this.api.post<MediaJob>(`/content/admin/media/assets/${encodeURIComponent(assetId)}/edit`, payload);
+  }
+
+  getMediaJob(jobId: string): Observable<MediaJob> {
+    return this.api.get<MediaJob>(`/content/admin/media/jobs/${encodeURIComponent(jobId)}`);
+  }
+
+  listMediaCollections(): Observable<MediaCollection[]> {
+    return this.api.get<MediaCollection[]>('/content/admin/media/collections');
+  }
+
+  createMediaCollection(payload: { name: string; slug: string; visibility?: MediaAssetVisibility }): Observable<MediaCollection> {
+    return this.api.post<MediaCollection>('/content/admin/media/collections', payload);
+  }
+
+  updateMediaCollection(
+    collectionId: string,
+    payload: { name: string; slug: string; visibility?: MediaAssetVisibility }
+  ): Observable<MediaCollection> {
+    return this.api.patch<MediaCollection>(`/content/admin/media/collections/${encodeURIComponent(collectionId)}`, payload);
+  }
+
+  replaceMediaCollectionItems(collectionId: string, assetIds: string[]): Observable<void> {
+    return this.api.post<void>(`/content/admin/media/collections/${encodeURIComponent(collectionId)}/items`, {
+      asset_ids: assetIds
+    });
   }
 
   linkCheckContent(key: string): Observable<ContentLinkCheckResponse> {

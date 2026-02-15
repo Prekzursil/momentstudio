@@ -5166,7 +5166,7 @@
       },
       "media": {
         "title": "Media library",
-        "hint": "Upload, search, sort, rename, inspect usage, and edit storefront images in one place.",
+        "hint": "Manage DAM assets in one place: uploads, review queue, collections, trash, usage, variants, and metadata for images/videos/documents.",
         "libraryTitle": "All media assets"
       },
       "scheduling": {

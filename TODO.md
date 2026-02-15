@@ -96,6 +96,16 @@ showing what is already implemented.
   - Evidence: `frontend/e2e/admin-dashboard-freeze.spec.ts`, `.github/workflows/compose-smoke.yml`, `frontend/playwright.config.ts`
 
 ## High priority (next)
+- [x] DAM (local-only): add first-party media domain models + local-volume storage layout + Redis job queue primitives (no S3/cloud adapters).
+  - Evidence: `backend/app/models/media.py`, `backend/alembic/versions/0152_create_media_dam_foundation.py`, `backend/app/services/media_dam.py`, `backend/app/workers/media_worker.py`, `backend/app/core/config.py`
+- [x] DAM APIs: ship `/content/admin/media/*` endpoints for upload/finalize/list/update/approve/reject/trash/restore/purge/usage/variants/edit/jobs/collections while keeping legacy image APIs compatible.
+  - Evidence: `backend/app/api/v1/content.py`, `backend/app/schemas/media.py`, `backend/tests/test_media_dam_api.py`
+- [x] Admin Content Media: replace utility-only view with dedicated DAM workspace modules (library/review/collections/trash/jobs) and wire to new DAM endpoints.
+  - Evidence: `frontend/src/app/pages/admin/content/admin-content-media.component.ts`, `frontend/src/app/pages/admin/shared/dam-asset-library.component.ts`, `frontend/src/app/core/admin.service.ts`, `frontend/src/app/pages/admin/shared/dam-asset-library.component.spec.ts`
+- [x] DAM migration: backfill legacy `content_images` into `media_assets` and preserve stable `/media/...` URLs during transition.
+  - Evidence: `backend/alembic/versions/0152_create_media_dam_foundation.py`
+- [ ] DAM phase 2: add persistent job list/telemetry dashboard and worker process supervision hooks in production compose/deploy scripts.
+- [ ] DAM phase 2: extend deterministic usage graph beyond content blocks (catalog/blog/social) with field-level pointers and nightly reconciliation job.
 - [x] Admin Content IA: add a dedicated `/admin/content/media` workspace between Scheduling and Settings for site-wide media operations.
   - Evidence: `frontend/src/app/app.routes.ts`, `frontend/src/app/pages/admin/content/admin-content-layout.component.ts`, `frontend/src/app/pages/admin/content/admin-content-media.component.ts`
 - [x] Media library: add sorting/date filters, asset details drawer, and rename action for uploaded images.

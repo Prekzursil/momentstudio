@@ -5166,7 +5166,7 @@
       },
       "media": {
         "title": "Bibliotecă media",
-        "hint": "Încarcă, caută, sortează, redenumește, verifică utilizarea și editează imaginile site-ului dintr-un singur loc.",
+        "hint": "Gestionează DAM-ul într-un singur loc: încărcări, coadă de review, colecții, coș de gunoi, utilizare, variante și metadate pentru imagini/video/documente.",
         "libraryTitle": "Toate resursele media"
       },
       "scheduling": {

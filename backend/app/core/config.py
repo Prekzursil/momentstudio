@@ -129,6 +129,8 @@ class Settings(BaseSettings):
 
     media_root: str = "uploads"
     private_media_root: str = "private_uploads"
+    media_dam_queue_key: str = "media:jobs:queue"
+    media_dam_trash_retention_days: int = 30
     # Admin uploads (product images, CMS assets, shipping labels) are allowed to be much larger
     # than customer uploads, but should still have a ceiling to avoid accidental disk exhaustion.
     # Set to a large value; we still enforce a ceiling to avoid DoS/disk exhaustion.

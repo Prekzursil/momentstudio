@@ -5,6 +5,7 @@ This folder contains a production-oriented Docker Compose stack for **momentstud
 - Caddy (TLS termination, reverse proxy)
 - Frontend (Angular build served by nginx)
 - Backend (FastAPI + Alembic migrations at startup)
+- Media worker (Redis-backed DAM job processor)
 - Postgres
 - Redis (shared rate limiting/caches; recommended for multi-replica)
 
@@ -147,6 +148,28 @@ Restore from a backup:
 ```bash
 ./infra/prod/restore.sh infra/prod/backups/backup-<timestamp>.tar.gz
 ```
+
+### DAM local storage snapshot policy (local-only, no cloud/object storage)
+
+The DAM stack is local-volume only. Keep these subpaths on the same persistent volume:
+
+- `uploads/originals/`
+- `uploads/variants/`
+- `uploads/previews/`
+- `uploads/trash/`
+
+Recommended policy:
+
+- daily incremental snapshot
+- weekly full snapshot
+- retention aligned with DAM trash retention (`30 days` by default)
+
+Restore drill (monthly):
+
+1. Restore latest DB + uploads archive to staging.
+2. Verify `/api/v1/content/admin/media/assets` listing and random sample renders from `/media/*`.
+3. Verify trash/restore/purge actions on staging.
+4. Record restore duration and any gaps in ops notes.
 
 ### One-time migration: local dev → VPS
 

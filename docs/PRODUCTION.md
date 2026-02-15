@@ -175,6 +175,22 @@ Recommended practice:
 3) Run migrations (`alembic upgrade head`).
 4) Re-import JSON (`python -m app.cli import-data --input export-*.json`).
 
+### DAM local-volume backup baseline
+
+Media DAM is intentionally local-only (no S3/object storage). Treat these folders as critical data:
+
+- `uploads/originals/`
+- `uploads/variants/`
+- `uploads/previews/`
+- `uploads/trash/`
+
+Operational baseline:
+
+- daily incremental filesystem snapshot
+- weekly full snapshot
+- retention >= 30 days
+- monthly restore drill to staging validating `/media/*` and DAM admin endpoints
+
 ## 7) Updating the app
 
 If you deploy from GHCR images (see `.github/workflows/release.yml`), the typical upgrade flow is:

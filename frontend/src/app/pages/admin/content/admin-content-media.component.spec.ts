@@ -3,20 +3,16 @@ import { By } from '@angular/platform-browser';
 import { TestBed } from '@angular/core/testing';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
-import { AssetLibraryComponent } from '../shared/asset-library.component';
+import { DamAssetLibraryComponent } from '../shared/dam-asset-library.component';
 import { AdminContentMediaComponent } from './admin-content-media.component';
 
 @Component({
-  selector: 'app-asset-library',
+  selector: 'app-dam-asset-library',
   standalone: true,
   template: ''
 })
-class AssetLibraryStubComponent {
-  @Input() titleKey = '';
-  @Input() allowUpload = false;
-  @Input() allowSelect = false;
-  @Input() uploadKey = '';
-  @Input() scopedKeys: string[] = [];
+class DamAssetLibraryStubComponent {
+  @Input() mode = '';
 }
 
 describe('AdminContentMediaComponent', () => {
@@ -25,8 +21,8 @@ describe('AdminContentMediaComponent', () => {
       imports: [TranslateModule.forRoot(), AdminContentMediaComponent]
     })
       .overrideComponent(AdminContentMediaComponent, {
-        remove: { imports: [AssetLibraryComponent] },
-        add: { imports: [AssetLibraryStubComponent] }
+        remove: { imports: [DamAssetLibraryComponent] },
+        add: { imports: [DamAssetLibraryStubComponent] }
       })
       .compileComponents();
 
@@ -49,7 +45,7 @@ describe('AdminContentMediaComponent', () => {
     translate.use('en');
   });
 
-  it('renders media workspace heading and wires asset-library inputs', () => {
+  it('renders media workspace heading and includes DAM asset library', () => {
     const fixture = TestBed.createComponent(AdminContentMediaComponent);
     fixture.detectChanges();
 
@@ -57,15 +53,7 @@ describe('AdminContentMediaComponent', () => {
     expect(text).toContain('Media library');
     expect(text).toContain('Manage all site images');
 
-    const libraryDebug = fixture.debugElement.query(By.directive(AssetLibraryStubComponent));
+    const libraryDebug = fixture.debugElement.query(By.directive(DamAssetLibraryStubComponent));
     expect(libraryDebug).toBeTruthy();
-    const library = libraryDebug.componentInstance as AssetLibraryStubComponent;
-    expect(library.titleKey).toBe('adminUi.content.media.libraryTitle');
-    expect(library.allowUpload).toBeTrue();
-    expect(library.allowSelect).toBeFalse();
-    expect(library.uploadKey).toBe('site.assets');
-    expect(library.scopedKeys).toEqual(
-      jasmine.arrayContaining(['site.assets', 'site.social', 'site.company', 'home.hero', 'home.story', 'home.sections'])
-    );
   });
 });

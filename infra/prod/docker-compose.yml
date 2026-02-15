@@ -92,6 +92,30 @@ services:
       ]
     logging: *default_logging
 
+  media-worker:
+    build:
+      context: ../..
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ../../backend/.env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      APP_VERSION: ${APP_VERSION:-}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-adrianaart}
+      FRONTEND_ORIGIN: https://${PUBLIC_DOMAIN:-momentstudio.ro}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+    volumes:
+      - ../../uploads:/app/uploads
+      - ../../private_uploads:/app/private_uploads
+    command: ["python", "-m", "app.workers.media_worker"]
+    logging: *default_logging
+
   frontend:
     build:
       context: ../..
