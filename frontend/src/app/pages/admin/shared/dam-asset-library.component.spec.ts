@@ -18,6 +18,7 @@ describe('DamAssetLibraryComponent', () => {
     source_ref: null,
     storage_key: 'originals/asset-1/pic.jpg',
     public_url: '/media/originals/asset-1/pic.jpg',
+    preview_url: '/api/v1/content/admin/media/assets/asset-1/preview?exp=123&sig=abc',
     original_filename: 'pic.jpg',
     mime_type: 'image/jpeg',
     size_bytes: 1024,
@@ -49,6 +50,9 @@ describe('DamAssetLibraryComponent', () => {
       'getMediaAssetUsage',
       'requestMediaVariant',
       'editMediaAsset',
+      'listMediaJobs',
+      'getMediaTelemetry',
+      'requestMediaUsageReconcile',
       'approveMediaAsset',
       'rejectMediaAsset',
       'softDeleteMediaAsset',
@@ -67,6 +71,39 @@ describe('DamAssetLibraryComponent', () => {
       })
     );
     admin.listMediaCollections.and.returnValue(of([]));
+    admin.listMediaJobs.and.returnValue(
+      of({
+        items: [],
+        meta: { total_items: 0, total_pages: 1, page: 1, limit: 20 }
+      })
+    );
+    admin.getMediaTelemetry.and.returnValue(
+      of({
+        queue_depth: 0,
+        online_workers: 0,
+        workers: [],
+        stale_processing_count: 0,
+        oldest_queued_age_seconds: null,
+        avg_processing_seconds: null,
+        status_counts: {},
+        type_counts: {}
+      })
+    );
+    admin.requestMediaUsageReconcile.and.returnValue(
+      of({
+        id: 'job-1',
+        asset_id: null,
+        job_type: 'usage_reconcile',
+        status: 'queued',
+        progress_pct: 0,
+        attempt: 0,
+        error_code: null,
+        error_message: null,
+        created_at: '2026-02-16T00:00:00Z',
+        started_at: null,
+        completed_at: null
+      })
+    );
 
     TestBed.configureTestingModule({
       imports: [DamAssetLibraryComponent],
@@ -103,5 +140,29 @@ describe('DamAssetLibraryComponent', () => {
     expect(component.statusFilter).toBe('draft');
     expect(admin.listMediaAssets).toHaveBeenCalledWith(jasmine.objectContaining({ status: 'draft' }));
   });
-});
 
+  it('uses preview_url for image rendering when available', () => {
+    const fixture = TestBed.createComponent(DamAssetLibraryComponent);
+    fixture.detectChanges();
+
+    const image: HTMLImageElement | null = fixture.nativeElement.querySelector('img');
+    expect(image).toBeTruthy();
+    expect(image?.getAttribute('src')).toContain('/api/v1/content/admin/media/assets/asset-1/preview');
+  });
+
+  it('loads persistent job list when switching to queue tab', () => {
+    const fixture = TestBed.createComponent(DamAssetLibraryComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    admin.listMediaJobs.calls.reset();
+
+    component.switchTab('queue');
+
+    expect(admin.listMediaJobs).toHaveBeenCalledWith(
+      jasmine.objectContaining({
+        page: 1,
+        limit: 20
+      })
+    );
+  });
+});

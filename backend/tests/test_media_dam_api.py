@@ -2,6 +2,7 @@ import asyncio
 from io import BytesIO
 from pathlib import Path
 from typing import Dict
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 from fastapi.testclient import TestClient
@@ -82,7 +83,8 @@ def test_media_dam_upload_finalize_and_lifecycle(test_app: Dict[str, object], tm
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
     admin_token = create_staff_token(SessionLocal, email="dam-admin@example.com", role=UserRole.admin)
-    monkeypatch.setattr(settings, "media_root", str(tmp_path))
+    monkeypatch.setattr(settings, "media_root", str(tmp_path / "uploads"))
+    monkeypatch.setattr(settings, "private_media_root", str(tmp_path / "private_uploads"))
 
     upload = client.post(
         "/api/v1/content/admin/media/assets/upload",
@@ -148,7 +150,8 @@ def test_media_dam_owner_admin_restrictions(test_app: Dict[str, object], tmp_pat
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
     admin_token = create_staff_token(SessionLocal, email="dam-admin-2@example.com", role=UserRole.admin)
     content_token = create_staff_token(SessionLocal, email="dam-content@example.com", role=UserRole.content)
-    monkeypatch.setattr(settings, "media_root", str(tmp_path))
+    monkeypatch.setattr(settings, "media_root", str(tmp_path / "uploads"))
+    monkeypatch.setattr(settings, "private_media_root", str(tmp_path / "private_uploads"))
 
     upload = client.post(
         "/api/v1/content/admin/media/assets/upload",
@@ -171,3 +174,116 @@ def test_media_dam_owner_admin_restrictions(test_app: Dict[str, object], tmp_pat
     )
     assert purge_forbidden.status_code == 403, purge_forbidden.text
 
+
+def test_media_dam_jobs_telemetry_and_reconcile(test_app: Dict[str, object], tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_staff_token(SessionLocal, email="dam-admin-telemetry@example.com", role=UserRole.admin)
+    monkeypatch.setattr(settings, "media_root", str(tmp_path / "uploads"))
+    monkeypatch.setattr(settings, "private_media_root", str(tmp_path / "private_uploads"))
+
+    upload = client.post(
+        "/api/v1/content/admin/media/assets/upload",
+        files={"file": ("dam-telemetry.jpg", _jpeg_bytes(), "image/jpeg")},
+        params={"visibility": "private", "auto_finalize": "true"},
+        headers=auth_headers(admin_token),
+    )
+    assert upload.status_code == 201, upload.text
+    asset_id = upload.json()["id"]
+
+    list_jobs = client.get("/api/v1/content/admin/media/jobs?limit=10", headers=auth_headers(admin_token))
+    assert list_jobs.status_code == 200, list_jobs.text
+    payload = list_jobs.json()
+    assert payload["meta"]["total_items"] >= 1
+    assert any(item["asset_id"] == asset_id for item in payload["items"])
+
+    telemetry = client.get("/api/v1/content/admin/media/telemetry", headers=auth_headers(admin_token))
+    assert telemetry.status_code == 200, telemetry.text
+    telemetry_payload = telemetry.json()
+    assert "queue_depth" in telemetry_payload
+    assert "online_workers" in telemetry_payload
+    assert "status_counts" in telemetry_payload
+    assert "type_counts" in telemetry_payload
+
+    queued = client.post("/api/v1/content/admin/media/usage/reconcile", headers=auth_headers(admin_token))
+    assert queued.status_code == 200, queued.text
+    queued_payload = queued.json()
+    assert queued_payload["job_type"] == "usage_reconcile"
+
+    filtered = client.get(
+        "/api/v1/content/admin/media/jobs?job_type=usage_reconcile&limit=10",
+        headers=auth_headers(admin_token),
+    )
+    assert filtered.status_code == 200, filtered.text
+    assert any(item["id"] == queued_payload["id"] for item in filtered.json()["items"])
+
+    invalid_range = client.get(
+        "/api/v1/content/admin/media/jobs?created_from=2026-02-20T00:00:00&created_to=2026-02-01T00:00:00",
+        headers=auth_headers(admin_token),
+    )
+    assert invalid_range.status_code == 400, invalid_range.text
+
+
+def test_media_dam_private_preview_and_public_serving_gate(test_app: Dict[str, object], tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_staff_token(SessionLocal, email="dam-admin-preview@example.com", role=UserRole.admin)
+    monkeypatch.setattr(settings, "media_private_preview_ttl_seconds", 600)
+
+    private_upload = client.post(
+        "/api/v1/content/admin/media/assets/upload",
+        files={"file": ("dam-private.jpg", _jpeg_bytes(), "image/jpeg")},
+        params={"visibility": "private", "auto_finalize": "true"},
+        headers=auth_headers(admin_token),
+    )
+    assert private_upload.status_code == 201, private_upload.text
+    private_asset = private_upload.json()
+
+    # Private/non-approved assets should not be retrievable from the public /media mount.
+    private_public_fetch = client.get(private_asset["public_url"])
+    assert private_public_fetch.status_code == 404
+
+    preview_url = private_asset["preview_url"]
+    parsed_preview = urlparse(preview_url)
+    params = parse_qs(parsed_preview.query)
+    assert params.get("exp")
+    assert params.get("sig")
+
+    private_preview_fetch = client.get(preview_url)
+    assert private_preview_fetch.status_code == 200
+    assert private_preview_fetch.headers.get("Cache-Control") == "private, no-store"
+
+    bad_sig_fetch = client.get(
+        f"{parsed_preview.path}?exp={params['exp'][0]}&sig={'0' * 64}",
+    )
+    assert bad_sig_fetch.status_code == 403
+
+    public_upload = client.post(
+        "/api/v1/content/admin/media/assets/upload",
+        files={"file": ("dam-public.jpg", _jpeg_bytes(), "image/jpeg")},
+        params={"visibility": "public", "auto_finalize": "true"},
+        headers=auth_headers(admin_token),
+    )
+    assert public_upload.status_code == 201, public_upload.text
+    public_asset = public_upload.json()
+    public_asset_id = public_asset["id"]
+
+    before_approve = client.get(public_asset["public_url"])
+    assert before_approve.status_code == 404
+
+    approve = client.post(
+        f"/api/v1/content/admin/media/assets/{public_asset_id}/approve",
+        json={"note": "publish"},
+        headers=auth_headers(admin_token),
+    )
+    assert approve.status_code == 200, approve.text
+    assert approve.json()["status"] == "approved"
+
+    listed_after = client.get("/api/v1/content/admin/media/assets", headers=auth_headers(admin_token))
+    assert listed_after.status_code == 200, listed_after.text
+    listed_asset = next((row for row in listed_after.json()["items"] if row["id"] == public_asset_id), None)
+    assert listed_asset is not None
+    assert listed_asset["preview_url"] == listed_asset["public_url"]
+
+    after_approve = client.get(public_asset["public_url"])
+    assert after_approve.status_code == 200
