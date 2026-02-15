@@ -161,8 +161,22 @@ The `Release` GitHub Actions workflow builds/pushes images when you push a tag l
 
 - `ARCHITECTURE.md` — high-level design notes
 - `CONTRIBUTING.md` — conventions and workflows
+- `SECURITY.md` — security disclosure policy
+- `docs/REPOSITORY_POLICY.md` — branch protection, labels, CI gates, and merge policy
 - `docs/PRODUCTION.md` — production deployment guide
 - `docs/ENVIRONMENT_PROFILES.md` — local dev/prod profile switching guide
 - `docs/GOOGLE_OAUTH.md` — Google OAuth setup (origins + redirect URIs)
 - `docs/DEV_PORTS.md` — dev ports + proxy/CORS expectations
 - `backend/README.md`, `frontend/README.md`, `infra/README.md`
+
+## Repository governance
+
+This repository uses a lightweight governance pack to keep collaboration predictable:
+
+- PR template with test/risk/backlog evidence sections.
+- Structured issue templates (bug, feature, ops incident).
+- Dependabot for grouped weekly patch/minor updates (backend/frontend/actions).
+- PR auto-labeling by changed paths and branch patterns.
+- Dependency review checks on pull requests.
+
+See `docs/REPOSITORY_POLICY.md` for required CI checks and merge expectations.

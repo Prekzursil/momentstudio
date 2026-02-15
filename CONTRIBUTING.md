@@ -86,3 +86,23 @@ If you have `make` available, common workflows are:
 - Include tests or a short note when skipping them.
 - Update docs/config when behavior changes (README, `.env.example`, `ARCHITECTURE.md`, `TODO.md`).
 - Note any breaking changes, data migrations, or manual steps in the PR description.
+
+## PR template, labels, and dependency policy
+
+- PRs use `.github/pull_request_template.md`; keep its validation/risk/backlog sections filled.
+- Labels are auto-applied from `.github/labeler.yml` via PR labeler workflow.
+  - Common labels: `type:*`, `area:*`, `priority:*`.
+- Dependabot opens weekly grouped patch/minor updates for:
+  - `backend` (pip)
+  - `frontend` (npm)
+  - GitHub Actions
+- Major dependency upgrades are intentionally deferred and handled manually in focused PRs.
+
+## Required checks for `main`
+
+Branch protection should enforce the checks defined in `docs/REPOSITORY_POLICY.md`:
+
+- `Backend CI / backend (pull_request)`
+- `Backend CI / backend-postgres (pull_request)`
+- `Frontend CI / frontend (pull_request)`
+- `Docker Compose Smoke / compose-smoke (pull_request)`

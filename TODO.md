@@ -96,6 +96,13 @@ showing what is already implemented.
   - Evidence: `frontend/e2e/admin-dashboard-freeze.spec.ts`, `.github/workflows/compose-smoke.yml`, `frontend/playwright.config.ts`
 
 ## High priority (next)
+- [x] Repository governance: add license/security/codeowners/code-of-conduct baseline files.
+  - Evidence: `LICENSE`, `SECURITY.md`, `CODEOWNERS`, `CODE_OF_CONDUCT.md`, `.editorconfig`, `.gitattributes`
+- [x] GitHub automation: add dependabot, dependency-review, PR labeler, and templates.
+  - Evidence: `.github/dependabot.yml`, `.github/workflows/dependency-review.yml`, `.github/workflows/pr-labeler.yml`, `.github/labeler.yml`, `.github/pull_request_template.md`, `.github/ISSUE_TEMPLATE/*`
+- [x] Protect main with checks-only required CI gates.
+  - Evidence: GitHub branch protection on `main` requires `backend`, `backend-postgres`, `frontend`, `compose-smoke` checks with strict up-to-date enabled.
+- [ ] Repo policy phase 2: evaluate enabling required review approvals once contributor cadence grows.
 - [x] DAM (local-only): add first-party media domain models + local-volume storage layout + Redis job queue primitives (no S3/cloud adapters).
   - Evidence: `backend/app/models/media.py`, `backend/alembic/versions/0152_create_media_dam_foundation.py`, `backend/app/services/media_dam.py`, `backend/app/workers/media_worker.py`, `backend/app/core/config.py`
 - [x] DAM APIs: ship `/content/admin/media/*` endpoints for upload/finalize/list/update/approve/reject/trash/restore/purge/usage/variants/edit/jobs/collections while keeping legacy image APIs compatible.
