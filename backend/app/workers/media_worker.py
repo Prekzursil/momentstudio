@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
+from collections.abc import Awaitable
+from typing import TypeVar, cast
 from uuid import UUID
 
 from app.core.redis_client import get_redis
@@ -11,6 +14,7 @@ from app.services import media_dam
 
 logger = logging.getLogger(__name__)
 QUEUE_KEY = media_dam.QUEUE_KEY
+T = TypeVar("T")
 
 
 async def _process_job_id(raw_job_id: str) -> None:
@@ -35,7 +39,7 @@ async def run_media_worker(poll_interval_seconds: float = 2.0) -> None:
     logger.info("media_worker_started")
     while True:
         try:
-            result = await redis.blpop(QUEUE_KEY, timeout=max(1, int(poll_interval_seconds)))
+            result = await _await_if_needed(redis.blpop([QUEUE_KEY], timeout=max(1, int(poll_interval_seconds))))
             if not result:
                 continue
             _, raw = result
@@ -47,10 +51,15 @@ async def run_media_worker(poll_interval_seconds: float = 2.0) -> None:
             await asyncio.sleep(max(0.5, poll_interval_seconds))
 
 
+async def _await_if_needed(result: Awaitable[T] | T) -> T:
+    if inspect.isawaitable(result):
+        return await cast(Awaitable[T], result)
+    return cast(T, result)
+
+
 def main() -> None:  # pragma: no cover
     asyncio.run(run_media_worker())
 
 
 if __name__ == "__main__":  # pragma: no cover
     main()
-

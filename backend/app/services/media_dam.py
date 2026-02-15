@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 import mimetypes
 import re
+from collections.abc import Awaitable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, TypeVar, cast
 from uuid import UUID, uuid4
 
 import anyio
@@ -15,6 +17,7 @@ from PIL import Image
 from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.core.config import settings
 from app.core.redis_client import get_redis
@@ -38,6 +41,7 @@ from app.models.media import (
 from app.models.user import UserRole
 from app.schemas.media import (
     MediaAssetRead,
+    MediaAssetI18nRead,
     MediaAssetUpdateRequest,
     MediaAssetUploadResponse,
     MediaAssetUpdateI18nItem,
@@ -61,6 +65,8 @@ PROFILE_DIMENSIONS: dict[str, tuple[int, int]] = {
     "web-1280": (1280, 1280),
     "social-1200": (1200, 1200),
 }
+
+T = TypeVar("T")
 
 
 @dataclass(slots=True)
@@ -192,7 +198,13 @@ async def _maybe_queue_job(job_id: UUID) -> None:
     redis = get_redis()
     if redis is None:
         return
-    await redis.rpush(QUEUE_KEY, str(job_id))
+    await _await_if_needed(redis.rpush(QUEUE_KEY, str(job_id)))
+
+
+async def _await_if_needed(result: Awaitable[T] | T) -> T:
+    if inspect.isawaitable(result):
+        return await cast(Awaitable[T], result)
+    return cast(T, result)
 
 
 async def list_assets(session: AsyncSession, filters: MediaListFilters) -> tuple[list[MediaAsset], dict[str, int]]:
@@ -250,7 +262,7 @@ async def list_assets(session: AsyncSession, filters: MediaListFilters) -> tuple
         stmt = stmt.where(and_(*clauses))
         count_stmt = count_stmt.where(and_(*clauses))
 
-    order_map = {
+    order_map: dict[str, list[ColumnElement[Any]]] = {
         "newest": [MediaAsset.created_at.desc(), MediaAsset.id.desc()],
         "oldest": [MediaAsset.created_at.asc(), MediaAsset.id.asc()],
         "name_asc": [MediaAsset.original_filename.asc().nulls_last(), MediaAsset.created_at.desc()],
@@ -261,34 +273,35 @@ async def list_assets(session: AsyncSession, filters: MediaListFilters) -> tuple
     total_items = int((await session.scalar(count_stmt)) or 0)
     total_pages = max(1, (total_items + filters.limit - 1) // filters.limit) if total_items else 1
     rows = (await session.execute(stmt)).scalars().all()
-    return rows, {"total_items": total_items, "total_pages": total_pages, "page": filters.page, "limit": filters.limit}
+    return list(rows), {"total_items": total_items, "total_pages": total_pages, "page": filters.page, "limit": filters.limit}
 
 
 def asset_to_read(asset: MediaAsset) -> MediaAssetRead:
     tags = sorted({tag_rel.tag.value for tag_rel in (asset.tags or []) if getattr(tag_rel, "tag", None)})
-    i18n = []
-    for row in sorted(asset.i18n or [], key=lambda x: x.lang):
+    i18n: list[MediaAssetI18nRead] = []
+    for i18n_row in sorted(asset.i18n or [], key=lambda x: x.lang):
+        lang = cast(Literal["en", "ro"], i18n_row.lang if i18n_row.lang in {"en", "ro"} else "en")
         i18n.append(
-            {
-                "lang": row.lang,
-                "title": row.title,
-                "alt_text": row.alt_text,
-                "caption": row.caption,
-                "description": row.description,
-            }
+            MediaAssetI18nRead(
+                lang=lang,
+                title=i18n_row.title,
+                alt_text=i18n_row.alt_text,
+                caption=i18n_row.caption,
+                description=i18n_row.description,
+            )
         )
-    variants = []
-    for row in sorted(asset.variants or [], key=lambda x: x.profile):
+    variants: list[MediaVariantRead] = []
+    for variant_row in sorted(asset.variants or [], key=lambda x: x.profile):
         variants.append(
             MediaVariantRead(
-                id=row.id,
-                profile=row.profile,
-                format=row.format,
-                width=row.width,
-                height=row.height,
-                public_url=row.public_url,
-                size_bytes=row.size_bytes,
-                created_at=row.created_at,
+                id=variant_row.id,
+                profile=variant_row.profile,
+                format=variant_row.format,
+                width=variant_row.width,
+                height=variant_row.height,
+                public_url=variant_row.public_url,
+                size_bytes=variant_row.size_bytes,
+                created_at=variant_row.created_at,
             )
         )
     return MediaAssetRead(
