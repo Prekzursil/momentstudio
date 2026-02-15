@@ -47,6 +47,12 @@ cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env
 ```
 
+Important:
+
+- The local profile tooling (`scripts/env/switch.sh`, `make env-dev`, `make env-prod`) is intended for local development machines.
+- Production deployment in this folder continues to use explicit VPS-side `backend/.env` and `frontend/.env` files.
+- Do not sync local development profile files (`*.development.local`) to the VPS.
+
 Edit:
 
 - `infra/prod/.env`

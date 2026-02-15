@@ -30,6 +30,11 @@ backend/uploads/
 private_uploads/
 backend/private_uploads/
 
+# Local environment switching backups and sqlite artifacts
+/.env.backups/
+/adrianaart.db
+/backend/adrianaart.db
+
 # Production backups
 infra/prod/backups/
 

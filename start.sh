@@ -11,6 +11,19 @@ VENV_DIR="${ROOT_DIR}/.venv"
 command -v python3 >/dev/null 2>&1 || { echo "python3 is required"; exit 1; }
 command -v npm >/dev/null 2>&1 || { echo "npm is required"; exit 1; }
 
+ENV_DOCTOR="${ROOT_DIR}/scripts/env/doctor.sh"
+if [ -x "${ENV_DOCTOR}" ]; then
+  if ! "${ENV_DOCTOR}" --require-dev >/dev/null 2>&1; then
+    echo ""
+    echo "Environment profile check failed for local development."
+    "${ENV_DOCTOR}" --require-dev || true
+    echo ""
+    echo "Switch to the local development profile and retry:"
+    echo "  make env-dev"
+    exit 1
+  fi
+fi
+
 UVICORN_HOST="${UVICORN_HOST:-127.0.0.1}"
 UVICORN_PORT="${UVICORN_PORT:-8000}"
 FRONTEND_PORT="${FRONTEND_PORT:-4200}"
@@ -316,4 +329,9 @@ cat >"${PROXY_CONF}" <<EOF
 EOF
 
 (cd "${FRONTEND_DIR}" && node scripts/generate-config.mjs)
+if [ -x "${ROOT_DIR}/scripts/env/status.sh" ]; then
+  echo ""
+  echo "Environment summary:"
+  "${ROOT_DIR}/scripts/env/status.sh" || true
+fi
 (cd "${FRONTEND_DIR}" && exec npx ng serve --proxy-config "${PROXY_CONF}" --port "${FRONTEND_PORT}")

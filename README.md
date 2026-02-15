@@ -26,12 +26,14 @@ This repository is a monorepo:
 ### Option A: one-command dev (recommended)
 
 ```bash
+make env-dev
 make dev
 # or
 ./start.sh
 ```
 
 - Starts the backend + frontend in dev mode and runs `alembic upgrade head`.
+- `make env-dev` activates safe local settings (mock payments, captcha disabled, localhost cookies).
 - Uses an Angular dev proxy so the browser talks to a single origin (avoids CORS in local dev).
 - Defaults to:
   - Frontend: `http://localhost:4200`
@@ -63,14 +65,39 @@ docker compose -f infra/docker-compose.yml exec -T backend python -m app.cli boo
 
 ## Configuration
 
-- Backend: copy `backend/.env.example` → `backend/.env`
-- Frontend: copy `frontend/.env.example` → `frontend/.env`
+- One-time profile bootstrap:
+
+  ```bash
+  ./scripts/env/bootstrap.sh
+  ```
+
+- Switch active local profile:
+
+  ```bash
+  make env-dev    # safe daily local development
+  make env-prod   # local production-like mode
+  make env-status
+  make env-doctor
+  ```
+
+- Backend profile files:
+  - `backend/.env.development.local`
+  - `backend/.env.production.local`
+- Frontend profile files:
+  - `frontend/.env.development.local`
+  - `frontend/.env.production.local`
 - Docker stack: `infra/docker-compose.yml`
+
+See `docs/ENVIRONMENT_PROFILES.md` for full details and troubleshooting.
 
 ## Common commands
 
 ```bash
 make dev
+make env-dev
+make env-prod
+make env-status
+make env-doctor
 make lint
 make test
 make docker-up
@@ -135,6 +162,7 @@ The `Release` GitHub Actions workflow builds/pushes images when you push a tag l
 - `ARCHITECTURE.md` — high-level design notes
 - `CONTRIBUTING.md` — conventions and workflows
 - `docs/PRODUCTION.md` — production deployment guide
+- `docs/ENVIRONMENT_PROFILES.md` — local dev/prod profile switching guide
 - `docs/GOOGLE_OAUTH.md` — Google OAuth setup (origins + redirect URIs)
 - `docs/DEV_PORTS.md` — dev ports + proxy/CORS expectations
 - `backend/README.md`, `frontend/README.md`, `infra/README.md`

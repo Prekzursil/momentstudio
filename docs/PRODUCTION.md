@@ -9,6 +9,12 @@ At a high level:
 - **Frontend**: static Angular build served by nginx (also reverse-proxies `/api/*` and `/media/*` to the backend).
 - **TLS / public ingress**: your reverse proxy (Caddy/nginx/Traefik) in front of the frontend.
 
+Important local-vs-production note:
+
+- The local profile switcher (`scripts/env/switch.sh`, `make env-dev`, `make env-prod`) is for local machines.
+- On VPS, keep managing `backend/.env` and `frontend/.env` directly for production deployment.
+- Do not copy local development profile files to production hosts.
+
 ## 1) Pick a deployment model
 
 ### Model A (recommended): Docker Compose + reverse proxy

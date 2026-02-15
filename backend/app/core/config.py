@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 
 import secrets
 
@@ -9,7 +10,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Application settings loaded from environment variables or a .env file."""
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=False)
+    _backend_root = Path(__file__).resolve().parents[2]
+    _backend_env_file = _backend_root / ".env"
+    _default_sqlite_path = _backend_root / "adrianaart.db"
+    _default_sqlite_url = f"sqlite+aiosqlite:///{_default_sqlite_path.as_posix()}"
+
+    model_config = SettingsConfigDict(env_file=str(_backend_env_file), env_file_encoding="utf-8", case_sensitive=False)
 
     app_name: str = "momentstudio API"
     app_version: str = "0.1.0"
@@ -27,7 +33,7 @@ class Settings(BaseSettings):
     # Use a safe, passwordless local default to avoid encouraging credential-less Postgres URLs
     # in source code (security scanners flag these) and to reduce the chance of accidentally
     # connecting to the wrong database when a local `.env` is missing.
-    database_url: str = "sqlite+aiosqlite:///./adrianaart.db"
+    database_url: str = _default_sqlite_url
     db_pool_size: int | None = None
     db_max_overflow: int | None = None
     backup_last_at: str | None = None
