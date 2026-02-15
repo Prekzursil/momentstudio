@@ -62,6 +62,7 @@
       "admin_content_blog": "Content · Blog | Admin | momentstudio",
       "admin_content_settings": "Content · Settings | Admin | momentstudio",
       "admin_content_scheduling": "Content · Scheduling | Admin | momentstudio",
+      "admin_content_media": "Content · Media | Admin | momentstudio",
       "admin_orders": "Orders | Admin | momentstudio",
       "admin_order_exports": "Order exports | Admin | momentstudio",
       "admin_order": "Order | Admin | momentstudio",
@@ -2740,10 +2741,27 @@
           "scopeAll": "All keys",
           "tagFilter": "Tag",
           "tagFilterPlaceholder": "e.g. hero, homepage",
+          "sort": "Sort",
+          "sortNewest": "Newest first",
+          "sortOldest": "Oldest first",
+          "sortKeyAsc": "Key A → Z",
+          "sortKeyDesc": "Key Z → A",
+          "createdFrom": "Created from",
+          "createdTo": "Created to",
           "tagsEdit": "Tags",
           "tagsPrompt": "Tags (comma-separated)",
           "tagsSaved": "Tags updated.",
           "tagsErrorsSave": "Could not update tags.",
+          "details": "Details",
+          "detailsTitle": "Asset details",
+          "detailsName": "Display name",
+          "detailsContentKey": "Content key",
+          "detailsId": "Asset ID",
+          "detailsCreatedAt": "Created at",
+          "detailsFocal": "Focal point",
+          "detailsTags": "Tags",
+          "rename": "Rename",
+          "renamePrompt": "Display name (alt text)",
           "focalEdit": "Focal",
           "focalPrompt": "Focal point as \"x, y\" percent (0–100). Example: 50, 50",
           "focalLabel": "Focal: {{x}}% {{y}}%",
@@ -2793,7 +2811,8 @@
             "copied": "Copied to clipboard.",
             "selected": "Selected.",
             "edited": "Edited copy created.",
-            "deleted": "Deleted."
+            "deleted": "Deleted.",
+            "renamed": "Asset name updated."
           },
           "errors": {
             "load": "Could not load assets.",
@@ -2801,9 +2820,11 @@
             "copy": "Could not copy to clipboard.",
             "usage": "Could not load usage references.",
             "edit": "Could not create edited copy.",
+            "rename": "Could not update the asset name.",
             "delete": "Could not delete asset.",
             "deleteHasVersions": "Delete edited versions first.",
-            "deleteInUse": "Cannot delete: asset is used."
+            "deleteInUse": "Cannot delete: asset is used.",
+            "invalidDateRange": "Created from date must be before created to date."
           }
         }
       },
@@ -3240,9 +3261,13 @@
       "cover": {
         "title": "Cover image",
         "hint": "If left empty, the first uploaded image will be used as the cover.",
+        "sizeHint": "Recommended for no crop: 1600×900 (16:9). Switch fit mode to “Contain” when keeping the full image is more important than edge-to-edge fill.",
         "choose": "Choose from uploads",
         "upload": "Upload cover",
         "clear": "Clear cover override",
+        "fitModeLabel": "Fit mode",
+        "fitModeCover": "Fill and crop",
+        "fitModeContain": "Contain (no crop)",
         "editFocal": "Edit focal point",
         "focalLabel": "Focal: {{x}}, {{y}}",
         "previewDesktop": "Desktop preview",
@@ -5136,7 +5161,13 @@
         "pages": "Pages",
         "blog": "Blog",
         "scheduling": "Scheduling",
+        "media": "Media",
         "settings": "Settings"
+      },
+      "media": {
+        "title": "Media library",
+        "hint": "Upload, search, sort, rename, inspect usage, and edit storefront images in one place.",
+        "libraryTitle": "All media assets"
       },
       "scheduling": {
         "title": "Scheduling",

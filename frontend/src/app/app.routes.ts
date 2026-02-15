@@ -290,17 +290,23 @@ export const routes: Routes = [
             title: 'meta.titles.admin_content_blog'
           },
           {
+            path: 'scheduling',
+            loadComponent: () =>
+              import('./pages/admin/content/admin-content-scheduling.component').then((m) => m.AdminContentSchedulingComponent),
+            title: 'meta.titles.admin_content_scheduling'
+          },
+          {
+            path: 'media',
+            loadComponent: () =>
+              import('./pages/admin/content/admin-content-media.component').then((m) => m.AdminContentMediaComponent),
+            title: 'meta.titles.admin_content_media'
+          },
+          {
             path: 'settings',
             loadComponent: () => import('./pages/admin/admin.component').then((m) => m.AdminComponent),
             data: { section: 'settings' },
             canDeactivate: [unsavedChangesGuard],
             title: 'meta.titles.admin_content_settings'
-          },
-          {
-            path: 'scheduling',
-            loadComponent: () =>
-              import('./pages/admin/content/admin-content-scheduling.component').then((m) => m.AdminContentSchedulingComponent),
-            title: 'meta.titles.admin_content_scheduling'
           }
         ]
       },

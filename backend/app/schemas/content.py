@@ -202,6 +202,10 @@ class ContentImageTagsUpdate(BaseModel):
     tags: list[str] = Field(default_factory=list)
 
 
+class ContentImageAssetUpdate(BaseModel):
+    alt_text: str | None = Field(default=None, max_length=255)
+
+
 class ContentImageFocalPointUpdate(BaseModel):
     focal_x: int = Field(default=50, ge=0, le=100)
     focal_y: int = Field(default=50, ge=0, le=100)

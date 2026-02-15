@@ -870,6 +870,10 @@ export interface ContentImageAssetListResponse {
   meta: { total_items: number; total_pages: number; page: number; limit: number };
 }
 
+export interface ContentImageAssetUpdateRequest {
+  alt_text?: string | null;
+}
+
 export interface ContentImageEditRequest {
   rotate_cw?: 0 | 90 | 180 | 270;
   crop_aspect_w?: number;
@@ -1470,8 +1474,21 @@ export class AdminService {
     return this.api.patch<ContentBlock>(`/content/admin/${encodeURIComponent(key)}/translation-status`, payload);
   }
 
-  listContentImages(params?: { key?: string; q?: string; tag?: string; page?: number; limit?: number }): Observable<ContentImageAssetListResponse> {
+  listContentImages(params?: {
+    key?: string;
+    q?: string;
+    tag?: string;
+    sort?: 'newest' | 'oldest' | 'key_asc' | 'key_desc';
+    created_from?: string;
+    created_to?: string;
+    page?: number;
+    limit?: number;
+  }): Observable<ContentImageAssetListResponse> {
     return this.api.get<ContentImageAssetListResponse>('/content/admin/assets/images', params as any);
+  }
+
+  updateContentImage(imageId: string, payload: ContentImageAssetUpdateRequest): Observable<ContentImageAssetRead> {
+    return this.api.patch<ContentImageAssetRead>(`/content/admin/assets/images/${encodeURIComponent(imageId)}`, payload);
   }
 
   updateContentImageTags(imageId: string, tags: string[]): Observable<ContentImageAssetRead> {

@@ -18,6 +18,7 @@ from app.schemas.content import (
     ContentBlockCreate,
     ContentBlockRead,
     ContentBlockUpdate,
+    ContentImageAssetUpdate,
     ContentImageAssetListResponse,
     ContentImageAssetRead,
     ContentImageAssetUsageResponse,
@@ -729,6 +730,9 @@ async def admin_list_content_images(
     key: str | None = Query(default=None, description="Filter by content block key"),
     q: str | None = Query(default=None, description="Search content key, URL, or alt text"),
     tag: str | None = Query(default=None, description="Filter by tag"),
+    sort: str = Query(default="newest", pattern="^(newest|oldest|key_asc|key_desc)$"),
+    created_from: datetime | None = Query(default=None, description="Filter images created at or after this ISO datetime"),
+    created_to: datetime | None = Query(default=None, description="Filter images created at or before this ISO datetime"),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=24, ge=1, le=100),
     _: User = Depends(require_admin_section("content")),
@@ -748,6 +752,12 @@ async def admin_list_content_images(
     tag_value = (tag or "").strip().lower()
     if tag_value:
         filters.append(ContentImageTag.tag == tag_value)
+    if created_from:
+        filters.append(ContentImage.created_at >= created_from)
+    if created_to:
+        filters.append(ContentImage.created_at <= created_to)
+    if created_from and created_to and created_from > created_to:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date range")
 
     count_query = select(func.count()).select_from(ContentImage).join(ContentBlock)
     if tag_value:
@@ -759,11 +769,19 @@ async def admin_list_content_images(
     total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
     offset = (page - 1) * limit
 
+    order_map = {
+        "newest": [ContentImage.created_at.desc(), ContentImage.id.desc()],
+        "oldest": [ContentImage.created_at.asc(), ContentImage.id.asc()],
+        "key_asc": [ContentBlock.key.asc(), ContentImage.created_at.desc(), ContentImage.id.desc()],
+        "key_desc": [ContentBlock.key.desc(), ContentImage.created_at.desc(), ContentImage.id.desc()],
+    }
+    order_clauses = order_map.get(sort, order_map["newest"])
+
     query = (
         select(ContentImage, ContentBlock.key)
         .join(ContentBlock)
         .where(*filters)
-        .order_by(ContentImage.created_at.desc(), ContentImage.id.desc())
+        .order_by(*order_clauses)
         .offset(offset)
         .limit(limit)
     )
@@ -801,6 +819,46 @@ async def admin_list_content_images(
     return ContentImageAssetListResponse(
         items=items,
         meta={"total_items": total_items, "total_pages": total_pages, "page": page, "limit": limit},
+    )
+
+
+@router.patch("/admin/assets/images/{image_id}", response_model=ContentImageAssetRead)
+async def admin_update_content_image(
+    image_id: UUID,
+    payload: ContentImageAssetUpdate,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> ContentImageAssetRead:
+    image = await session.scalar(select(ContentImage).where(ContentImage.id == image_id))
+    if not image:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+
+    next_alt = (payload.alt_text or "").strip()
+    image.alt_text = next_alt or None
+    session.add(image)
+    await session.commit()
+
+    tags = (
+        await session.execute(select(ContentImageTag.tag).where(ContentImageTag.content_image_id == image_id))
+    ).scalars().all()
+    tags_sorted = sorted(set(tags))
+
+    content_key = ""
+    if getattr(image, "content_block_id", None):
+        content_key = (await session.scalar(select(ContentBlock.key).where(ContentBlock.id == image.content_block_id))) or ""
+
+    return ContentImageAssetRead(
+        id=image.id,
+        root_image_id=getattr(image, "root_image_id", None),
+        source_image_id=getattr(image, "source_image_id", None),
+        url=image.url,
+        alt_text=image.alt_text,
+        sort_order=image.sort_order,
+        focal_x=getattr(image, "focal_x", 50),
+        focal_y=getattr(image, "focal_y", 50),
+        created_at=image.created_at,
+        content_key=content_key,
+        tags=tags_sorted,
     )
 
 

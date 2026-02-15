@@ -62,6 +62,7 @@
       "admin_content_blog": "Conținut · Blog | Admin | momentstudio",
       "admin_content_settings": "Conținut · Setări | Admin | momentstudio",
       "admin_content_scheduling": "Conținut · Programare | Admin | momentstudio",
+      "admin_content_media": "Conținut · Media | Admin | momentstudio",
       "admin_orders": "Comenzi | Admin | momentstudio",
       "admin_order_exports": "Documente comenzi | Admin | momentstudio",
       "admin_order": "Comandă | Admin | momentstudio",
@@ -2740,10 +2741,27 @@
           "scopeAll": "Toate cheile",
           "tagFilter": "Etichetă",
           "tagFilterPlaceholder": "ex. hero, homepage",
+          "sort": "Sortare",
+          "sortNewest": "Cele mai noi",
+          "sortOldest": "Cele mai vechi",
+          "sortKeyAsc": "Cheie A → Z",
+          "sortKeyDesc": "Cheie Z → A",
+          "createdFrom": "Creat după",
+          "createdTo": "Creat înainte de",
           "tagsEdit": "Etichete",
           "tagsPrompt": "Etichete (separate prin virgulă)",
           "tagsSaved": "Etichetele au fost actualizate.",
           "tagsErrorsSave": "Nu am putut actualiza etichetele.",
+          "details": "Detalii",
+          "detailsTitle": "Detalii resursă",
+          "detailsName": "Nume afișat",
+          "detailsContentKey": "Cheie conținut",
+          "detailsId": "ID resursă",
+          "detailsCreatedAt": "Creat la",
+          "detailsFocal": "Punct focal",
+          "detailsTags": "Etichete",
+          "rename": "Redenumește",
+          "renamePrompt": "Nume afișat (text alternativ)",
           "focalEdit": "Focalizare",
           "focalPrompt": "Punct focal ca procente \"x, y\" (0–100). Exemplu: 50, 50",
           "focalLabel": "Focal: {{x}}% {{y}}%",
@@ -2793,7 +2811,8 @@
             "copied": "Copiat în clipboard.",
             "selected": "Selectată.",
             "edited": "Copia editată a fost creată.",
-            "deleted": "Ștearsă."
+            "deleted": "Ștearsă.",
+            "renamed": "Numele resursei a fost actualizat."
           },
           "errors": {
             "load": "Nu am putut încărca imaginile.",
@@ -2801,9 +2820,11 @@
             "copy": "Nu am putut copia în clipboard.",
             "usage": "Nu am putut încărca referințele de utilizare.",
             "edit": "Nu am putut crea copia editată.",
+            "rename": "Nu am putut actualiza numele resursei.",
             "delete": "Nu am putut șterge imaginea.",
             "deleteHasVersions": "Șterge mai întâi versiunile editate.",
-            "deleteInUse": "Nu poate fi ștearsă: imaginea este utilizată."
+            "deleteInUse": "Nu poate fi ștearsă: imaginea este utilizată.",
+            "invalidDateRange": "Data „creat după” trebuie să fie înainte de data „creat înainte de”."
           }
         }
       },
@@ -3240,9 +3261,13 @@
       "cover": {
         "title": "Imagine copertă",
         "hint": "Dacă e lăsat gol, prima imagine încărcată va fi folosită ca imagine de copertă.",
+        "sizeHint": "Recomandat pentru fără decupare: 1600×900 (16:9). Comută pe modul „Contain” când este mai important să păstrezi imaginea completă.",
         "choose": "Alege din încărcări",
         "upload": "Încarcă copertă",
         "clear": "Șterge coperta setată",
+        "fitModeLabel": "Mod afișare",
+        "fitModeCover": "Umple și decupează",
+        "fitModeContain": "Contain (fără decupare)",
         "editFocal": "Editează punctul de focalizare",
         "focalLabel": "Focal: {{x}}, {{y}}",
         "previewDesktop": "Previzualizare desktop",
@@ -5136,7 +5161,13 @@
         "pages": "Pagini",
         "blog": "Blog",
         "scheduling": "Programare",
+        "media": "Media",
         "settings": "Setări"
+      },
+      "media": {
+        "title": "Bibliotecă media",
+        "hint": "Încarcă, caută, sortează, redenumește, verifică utilizarea și editează imaginile site-ului dintr-un singur loc.",
+        "libraryTitle": "Toate resursele media"
       },
       "scheduling": {
         "title": "Programare",
