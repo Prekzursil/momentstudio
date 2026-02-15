@@ -93,6 +93,7 @@ services:
       REDIS_URL: redis://redis:6379/0
       PAYMENTS_PROVIDER: ${PAYMENTS_PROVIDER:-real}
       NETOPIA_ENABLED: ${NETOPIA_ENABLED:-0}
+      RUN_DB_MIGRATIONS: "0"
     command: ["python", "-m", "app.workers.media_worker"]
 
   frontend:
