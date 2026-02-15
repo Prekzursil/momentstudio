@@ -7,13 +7,19 @@ import argparse
 import datetime as dt
 import json
 import os
+import re
 import subprocess
 import sys
 import urllib.parse
 import urllib.request
 from collections import Counter
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
+
+
+_IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+_OUTPUT_PATH_RE = re.compile(r"^(docs/reports|artifacts/repo-policy)/[A-Za-z0-9._/-]+$")
+_GITHUB_API_BASE = "https://api.github.com"
 
 
 def _iso_now() -> str:
@@ -48,34 +54,40 @@ def _load_token(explicit_token: str | None) -> str:
     raise RuntimeError("Missing GitHub token. Set GITHUB_TOKEN or run `gh auth login`.")
 
 
-def _github_get_json(url: str, token: str) -> tuple[list[dict[str, Any]], str | None]:
-    req = urllib.request.Request(
-        url,
+def _validate_identifier(name: str, value: str) -> str:
+    cleaned = str(value or "").strip()
+    if not cleaned:
+        raise ValueError(f"{name} is required")
+    if not _IDENTIFIER_RE.fullmatch(cleaned):
+        raise ValueError(f"Invalid {name}: {value!r}")
+    return cleaned
+
+
+def _resolve_output_path(raw_path: str) -> Path:
+    candidate = str(raw_path or "").strip().replace("\\", "/")
+    if not _OUTPUT_PATH_RE.fullmatch(candidate):
+        raise ValueError("Output path must be under docs/reports/ or artifacts/repo-policy/ with safe characters")
+    pure = PurePosixPath(candidate)
+    if pure.is_absolute() or ".." in pure.parts:
+        raise ValueError("Output paths must be relative and cannot contain traversal segments")
+    return Path.cwd().joinpath(*pure.parts)
+
+
+def _gh_api_json(endpoint: str, *, token: str, fields: dict[str, str]) -> Any:
+    query = urllib.parse.urlencode(fields, doseq=False, safe="-._~")
+    url = f"{_GITHUB_API_BASE}{endpoint}?{query}" if query else f"{_GITHUB_API_BASE}{endpoint}"
+    request = urllib.request.Request(
+        url=url,
+        method="GET",
         headers={
             "Accept": "application/vnd.github+json",
             "Authorization": f"Bearer {token}",
             "X-GitHub-Api-Version": "2022-11-28",
-            "User-Agent": "adrianaart-repo-policy-evaluator",
+            "User-Agent": "repo-policy-phase2-evaluator",
         },
     )
-    with urllib.request.urlopen(req, timeout=20) as resp:  # nosec B310
-        payload = json.loads(resp.read().decode("utf-8"))
-        link_header = resp.headers.get("Link")
-        return payload, link_header
-
-
-def _next_link(link_header: str | None) -> str | None:
-    if not link_header:
-        return None
-    parts = [part.strip() for part in link_header.split(",")]
-    for part in parts:
-        if 'rel="next"' not in part:
-            continue
-        start = part.find("<")
-        end = part.find(">")
-        if start >= 0 and end > start:
-            return part[start + 1 : end]
-    return None
+    with urllib.request.urlopen(request, timeout=30) as response:  # nosec B310: fixed GitHub API host
+        return json.loads(response.read().decode("utf-8"))
 
 
 def fetch_merged_prs(
@@ -87,24 +99,27 @@ def fetch_merged_prs(
     per_page: int = 100,
 ) -> list[dict[str, Any]]:
     cutoff = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=window_days)
-    base_url = f"https://api.github.com/repos/{owner}/{repo}/pulls"
-    query = urllib.parse.urlencode(
-        {
-            "state": "closed",
-            "base": base,
-            "sort": "updated",
-            "direction": "desc",
-            "per_page": per_page,
-            "page": 1,
-        }
-    )
-    url = f"{base_url}?{query}"
+    owner = _validate_identifier("owner", owner)
+    repo = _validate_identifier("repo", repo)
+    base = _validate_identifier("base branch", base)
+    endpoint = f"/repos/{owner}/{repo}/pulls"
     merged: list[dict[str, Any]] = []
     page = 0
     max_pages = 20
-    while url and page < max_pages:
+    while page < max_pages:
         page += 1
-        rows, link_header = _github_get_json(url, token)
+        rows = _gh_api_json(
+            endpoint,
+            token=token,
+            fields={
+                "state": "closed",
+                "base": base,
+                "sort": "updated",
+                "direction": "desc",
+                "per_page": str(per_page),
+                "page": str(page),
+            },
+        )
         if not rows:
             break
         stop_due_to_age = False
@@ -117,11 +132,10 @@ def fetch_merged_prs(
                 stop_due_to_age = True
                 continue
             merged.append(pr)
-        if stop_due_to_age:
+        if stop_due_to_age or len(rows) < per_page:
             # API sorting is by updated timestamp, so once merged_at falls behind
             # the window for the page, older pages will only be older.
             break
-        url = _next_link(link_header)
     return merged
 
 
@@ -273,11 +287,11 @@ def main() -> int:
     )
 
     if args.json_out:
-        json_path = Path(args.json_out)
+        json_path = _resolve_output_path(args.json_out)
         json_path.parent.mkdir(parents=True, exist_ok=True)
         json_path.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     if args.md_out:
-        md_path = Path(args.md_out)
+        md_path = _resolve_output_path(args.md_out)
         md_path.parent.mkdir(parents=True, exist_ok=True)
         md_path.write_text(markdown, encoding="utf-8")
 
