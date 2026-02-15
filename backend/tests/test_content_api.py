@@ -333,6 +333,14 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     assert first_img["root_image_id"] is None
     assert first_img["source_image_id"] is None
 
+    rename = client.patch(
+        f"/api/v1/content/admin/assets/images/{first_img['id']}",
+        json={"alt_text": "Homepage hero image"},
+        headers=auth_headers(admin_token),
+    )
+    assert rename.status_code == 200, rename.text
+    assert rename.json()["alt_text"] == "Homepage hero image"
+
     # Asset tags: set tags and filter by tag.
     tag_set = client.patch(
         f"/api/v1/content/admin/assets/images/{first_img['id']}/tags",
@@ -388,6 +396,37 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     )
     assert tagged.status_code == 200, tagged.text
     assert any("hero" in (item.get("tags") or []) for item in tagged.json()["items"])
+
+    other_upload = client.post(
+        "/api/v1/content/admin/page.about/images",
+        files={"file": ("about.jpg", _jpeg_bytes(), "image/jpeg")},
+        headers=auth_headers(admin_token),
+    )
+    assert other_upload.status_code == 200, other_upload.text
+
+    sorted_by_key = client.get(
+        "/api/v1/content/admin/assets/images",
+        params={"sort": "key_asc", "limit": 100},
+        headers=auth_headers(admin_token),
+    )
+    assert sorted_by_key.status_code == 200, sorted_by_key.text
+    sort_items = sorted_by_key.json()["items"]
+    assert [item["content_key"] for item in sort_items] == sorted(item["content_key"] for item in sort_items)
+
+    future_only = client.get(
+        "/api/v1/content/admin/assets/images",
+        params={"created_from": "2999-01-01T00:00:00Z"},
+        headers=auth_headers(admin_token),
+    )
+    assert future_only.status_code == 200, future_only.text
+    assert future_only.json()["meta"]["total_items"] == 0
+
+    invalid_range = client.get(
+        "/api/v1/content/admin/assets/images",
+        params={"created_from": "2026-01-02T00:00:00Z", "created_to": "2026-01-01T00:00:00Z"},
+        headers=auth_headers(admin_token),
+    )
+    assert invalid_range.status_code == 400, invalid_range.text
 
     assets_filtered = client.get(
         "/api/v1/content/admin/assets/images",

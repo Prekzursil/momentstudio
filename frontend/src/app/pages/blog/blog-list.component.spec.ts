@@ -1,9 +1,10 @@
 import { DOCUMENT } from '@angular/common';
 import { TestBed } from '@angular/core/testing';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { Meta, Title } from '@angular/platform-browser';
+import { RouterTestingModule } from '@angular/router/testing';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { of, Subject } from 'rxjs';
+import { Observable, of, Subject } from 'rxjs';
 
 import { BlogListComponent } from './blog-list.component';
 import { BlogService } from '../../core/blog.service';
@@ -13,15 +14,27 @@ describe('BlogListComponent SEO', () => {
   let meta: jasmine.SpyObj<Meta>;
   let title: jasmine.SpyObj<Title>;
   let blog: jasmine.SpyObj<BlogService>;
-  let router: jasmine.SpyObj<Router>;
   let doc: Document;
+  let routeParams$: Subject<Record<string, unknown>>;
+  let routeQueryParams$: Subject<Record<string, unknown>>;
+  let routeStub: {
+    snapshot: { params: Record<string, unknown>; queryParams: Record<string, unknown> };
+    params: Observable<Record<string, unknown>>;
+    queryParams: Observable<Record<string, unknown>>;
+  };
 
   beforeEach(() => {
     meta = jasmine.createSpyObj<Meta>('Meta', ['updateTag']);
     title = jasmine.createSpyObj<Title>('Title', ['setTitle']);
     blog = jasmine.createSpyObj<BlogService>('BlogService', ['listPosts']);
-    router = jasmine.createSpyObj<Router>('Router', ['navigate']);
     doc = document.implementation.createHTMLDocument('blog-list-test');
+    routeParams$ = new Subject<Record<string, unknown>>();
+    routeQueryParams$ = new Subject<Record<string, unknown>>();
+    routeStub = {
+      snapshot: { params: {}, queryParams: {} },
+      params: routeParams$.asObservable(),
+      queryParams: routeQueryParams$.asObservable()
+    };
 
     blog.listPosts.and.returnValue(
       of({
@@ -31,13 +44,12 @@ describe('BlogListComponent SEO', () => {
     );
 
     TestBed.configureTestingModule({
-      imports: [BlogListComponent, TranslateModule.forRoot()],
+      imports: [BlogListComponent, TranslateModule.forRoot(), RouterTestingModule.withRoutes([])],
       providers: [
         { provide: Title, useValue: title },
         { provide: Meta, useValue: meta },
         { provide: BlogService, useValue: blog },
-        { provide: ActivatedRoute, useValue: { params: of({}), queryParams: of({}) } },
-        { provide: Router, useValue: router },
+        { provide: ActivatedRoute, useValue: routeStub },
         { provide: StorefrontAdminModeService, useValue: { enabled: () => false } },
         { provide: DOCUMENT, useValue: doc }
       ]
@@ -111,5 +123,47 @@ describe('BlogListComponent SEO', () => {
 
     expect(cmp.posts.length).toBe(1);
     expect(cmp.posts[0].slug).toBe('new-post');
+  });
+
+  it('loads from route snapshot on first paint before route streams emit', () => {
+    routeStub.snapshot.params = { tag: 'featured' };
+    routeStub.snapshot.queryParams = { q: 'brosa', page: '2' };
+    const fixture = TestBed.createComponent(BlogListComponent);
+    fixture.detectChanges();
+
+    expect(blog.listPosts.calls.count()).toBe(1);
+    expect(blog.listPosts).toHaveBeenCalledWith(
+      jasmine.objectContaining({
+        q: 'brosa',
+        tag: 'featured',
+        page: 2
+      })
+    );
+  });
+
+  it('renders blog covers without delayed opacity gating classes', () => {
+    blog.listPosts.and.returnValue(
+      of({
+        items: [
+          {
+            slug: 'hero-post',
+            title: 'Hero post',
+            excerpt: 'Excerpt',
+            cover_image_url: '/media/hero.jpg',
+            cover_fit: 'contain',
+            tags: []
+          }
+        ],
+        meta: { total_items: 1, total_pages: 1, page: 1, limit: 9 }
+      })
+    );
+    const fixture = TestBed.createComponent(BlogListComponent);
+    fixture.detectChanges();
+
+    const heroImage = fixture.nativeElement.querySelector('img[alt="Hero post"]') as HTMLImageElement | null;
+    expect(heroImage).toBeTruthy();
+    expect(heroImage?.className).not.toContain('opacity-0');
+    expect((fixture.componentInstance as any).markImageLoaded).toBeUndefined();
+    expect((fixture.componentInstance as any).isImageLoaded).toBeUndefined();
   });
 });
