@@ -1,0 +1,26 @@
+{
+  "generated_at": "2026-02-15T20:48:47+00:00",
+  "repo": "Prekzursil/AdrianaArt",
+  "base_branch": "main",
+  "window_days": 60,
+  "thresholds": {
+    "min_contributors": 3,
+    "min_total_non_bot_merged_prs": 25,
+    "min_prs_per_contributor": 2,
+    "consecutive_monthly_passes_required": 2
+  },
+  "evaluation": {
+    "merged_all_authors": 91,
+    "merged_non_bot": 86,
+    "unique_non_bot_contributors": 1,
+    "contributors_with_min_merged_prs": 1,
+    "contributors": [
+      {
+        "login": "Prekzursil",
+        "merged_prs": 86
+      }
+    ],
+    "trigger_met_this_window": false
+  },
+  "recommendation": "keep checks-only branch protection; re-evaluate next month"
+}

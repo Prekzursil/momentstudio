@@ -1,0 +1,46 @@
+name: Repo Policy Phase 2 Evaluation
+
+on:
+  schedule:
+    - cron: "20 6 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  evaluate-cadence:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Evaluate review cadence
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p artifacts/repo-policy
+          python scripts/repo/evaluate_review_cadence.py \
+            --owner Prekzursil \
+            --repo AdrianaArt \
+            --base main \
+            --window-days 60 \
+            --min-contributors 3 \
+            --min-total-human-prs 25 \
+            --min-prs-per-contributor 2 \
+            --json-out artifacts/repo-policy/cadence.json \
+            --md-out artifacts/repo-policy/cadence.md
+          cat artifacts/repo-policy/cadence.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload cadence artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: repo-policy-phase2-eval
+          path: artifacts/repo-policy
+          if-no-files-found: error

@@ -102,7 +102,9 @@ showing what is already implemented.
   - Evidence: `.github/dependabot.yml`, `.github/workflows/dependency-review.yml`, `.github/workflows/pr-labeler.yml`, `.github/labeler.yml`, `.github/pull_request_template.md`, `.github/ISSUE_TEMPLATE/*`
 - [x] Protect main with checks-only required CI gates.
   - Evidence: GitHub branch protection on `main` requires `backend`, `backend-postgres`, `frontend`, `compose-smoke` checks with strict up-to-date enabled.
-- [ ] Repo policy phase 2: evaluate enabling required review approvals once contributor cadence grows.
+- [x] Repo policy phase 2: evaluate enabling required review approvals once contributor cadence grows.
+  - Evidence: `.github/workflows/repo-policy-phase2-eval.yml`, `scripts/repo/evaluate_review_cadence.py`, `docs/REPOSITORY_POLICY.md`, `docs/reports/repo-policy-phase2-baseline-2026-02.md`
+- [ ] Repo policy phase 2 rollout: enable 1 required approval when cadence trigger passes in 2 consecutive monthly evaluations.
 - [x] DAM (local-only): add first-party media domain models + local-volume storage layout + Redis job queue primitives (no S3/cloud adapters).
   - Evidence: `backend/app/models/media.py`, `backend/alembic/versions/0152_create_media_dam_foundation.py`, `backend/app/services/media_dam.py`, `backend/app/workers/media_worker.py`, `backend/app/core/config.py`
 - [x] DAM APIs: ship `/content/admin/media/*` endpoints for upload/finalize/list/update/approve/reject/trash/restore/purge/usage/variants/edit/jobs/collections while keeping legacy image APIs compatible.

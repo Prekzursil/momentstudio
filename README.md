@@ -178,5 +178,11 @@ This repository uses a lightweight governance pack to keep collaboration predict
 - Dependabot for grouped weekly patch/minor updates (backend/frontend/actions).
 - PR auto-labeling by changed paths and branch patterns.
 - Dependency review checks on pull requests.
+- Monthly repo-policy cadence evaluation for when to enable required review approvals.
+
+Roadmap board:
+
+- `AdrianaArt Roadmap` — https://github.com/users/Prekzursil/projects/2
+- Structure: `Status` + `Roadmap Lane` (`Now`, `Next`, `Later`) with draft-first roadmap items.
 
 See `docs/REPOSITORY_POLICY.md` for required CI checks and merge expectations.
