@@ -17,6 +17,7 @@ from uuid import UUID, uuid4
 import anyio
 from PIL import Image
 from sqlalchemy import String, and_, delete, func, or_, select
+from sqlalchemy.exc import MissingGreenlet
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.elements import ColumnElement
@@ -35,7 +36,10 @@ from app.models.media import (
     MediaCollection,
     MediaCollectionItem,
     MediaJob,
+    MediaJobEvent,
     MediaJobStatus,
+    MediaJobTag,
+    MediaJobTagLink,
     MediaJobType,
     MediaTag,
     MediaUsageEdge,
@@ -52,6 +56,7 @@ from app.schemas.media import (
     MediaCollectionRead,
     MediaCollectionUpsertRequest,
     MediaJobRead,
+    MediaJobEventRead,
     MediaTelemetryResponse,
     MediaTelemetryWorkerRead,
     MediaUsageEdgeRead,
@@ -66,6 +71,9 @@ from app.services import storage
 QUEUE_KEY = str(getattr(settings, "media_dam_queue_key", "media:jobs:queue") or "media:jobs:queue")
 TRASH_RETENTION_DAYS = int(getattr(settings, "media_dam_trash_retention_days", 30) or 30)
 HEARTBEAT_PREFIX = str(getattr(settings, "media_dam_worker_heartbeat_prefix", "media:workers:heartbeat") or "media:workers:heartbeat")
+RETRY_BACKOFF_SECONDS = (30, 120, 600, 1800)
+DEFAULT_MAX_ATTEMPTS = max(1, int(getattr(settings, "media_dam_retry_max_attempts", 5) or 5))
+TRIAGE_STATES = {"open", "retrying", "ignored", "resolved"}
 
 PROFILE_DIMENSIONS: dict[str, tuple[int, int]] = {
     "thumb-320": (320, 320),
@@ -101,6 +109,11 @@ class MediaJobListFilters:
     asset_id: UUID | None = None
     created_from: datetime | None = None
     created_to: datetime | None = None
+    triage_state: str = ""
+    assigned_to_user_id: UUID | None = None
+    tag: str = ""
+    sla_breached: bool = False
+    dead_letter_only: bool = False
 
 
 def _now() -> datetime:
@@ -110,6 +123,24 @@ def _now() -> datetime:
 def _normalize_tag(value: str) -> str:
     cleaned = re.sub(r"[^a-z0-9_-]+", "-", str(value or "").strip().lower()).strip("-_")
     return cleaned[:64]
+
+
+def _normalize_job_tag(value: str) -> str:
+    return _normalize_tag(value)
+
+
+def _coerce_triage_state(value: str | None, *, fallback: str = "open") -> str:
+    raw = str(value or "").strip().lower()
+    return raw if raw in TRIAGE_STATES else fallback
+
+
+def _retry_delay_seconds(*, attempt: int, max_attempts: int) -> int | None:
+    if attempt >= max_attempts:
+        return None
+    idx = max(1, int(attempt)) - 1
+    if idx < len(RETRY_BACKOFF_SECONDS):
+        return RETRY_BACKOFF_SECONDS[idx]
+    return RETRY_BACKOFF_SECONDS[-1]
 
 
 def _guess_asset_type(content_type: str | None, filename: str | None) -> MediaAssetType:
@@ -317,7 +348,9 @@ async def enqueue_job(
     job_type: MediaJobType,
     payload: dict[str, Any] | None,
     created_by_user_id: UUID | None,
+    max_attempts: int | None = None,
 ) -> MediaJob:
+    attempts = max(1, int(max_attempts or DEFAULT_MAX_ATTEMPTS))
     job = MediaJob(
         id=uuid4(),
         asset_id=asset_id,
@@ -326,10 +359,19 @@ async def enqueue_job(
         payload_json=json.dumps(payload or {}, separators=(",", ":"), ensure_ascii=False),
         progress_pct=0,
         attempt=0,
+        max_attempts=attempts,
+        triage_state="open",
         created_by_user_id=created_by_user_id,
     )
     session.add(job)
     await session.flush()
+    await _record_job_event(
+        session,
+        job=job,
+        actor_user_id=created_by_user_id,
+        action="queued",
+        meta={"job_type": job.job_type.value, "max_attempts": attempts},
+    )
     return job
 
 
@@ -348,6 +390,59 @@ async def _await_if_needed(result: Awaitable[T] | T) -> T:
     if inspect.isawaitable(result):
         return await cast(Awaitable[T], result)
     return cast(T, result)
+
+
+async def _record_job_event(
+    session: AsyncSession,
+    *,
+    job: MediaJob,
+    action: str,
+    actor_user_id: UUID | None = None,
+    note: str | None = None,
+    meta: dict[str, Any] | None = None,
+) -> None:
+    session.add(
+        MediaJobEvent(
+            job_id=job.id,
+            actor_user_id=actor_user_id,
+            action=(action or "").strip()[:80] or "event",
+            note=(note or "").strip() or None,
+            meta_json=(json.dumps(meta, separators=(",", ":"), ensure_ascii=False) if meta else None),
+        )
+    )
+    await session.flush()
+
+
+async def _apply_job_tag_changes(
+    session: AsyncSession,
+    *,
+    job: MediaJob,
+    add_tags: list[str] | None = None,
+    remove_tags: list[str] | None = None,
+) -> None:
+    existing_by_value = {
+        rel.tag.value: rel for rel in (job.tags or []) if getattr(rel, "tag", None) and getattr(rel.tag, "value", None)
+    }
+
+    remove_values = {_normalize_job_tag(raw) for raw in (remove_tags or [])}
+    remove_values = {value for value in remove_values if value}
+    for value in remove_values:
+        relation = existing_by_value.get(value)
+        if relation is not None:
+            await session.delete(relation)
+
+    add_values = {_normalize_job_tag(raw) for raw in (add_tags or [])}
+    add_values = {value for value in add_values if value}
+    for value in add_values:
+        if value in existing_by_value:
+            continue
+        tag = await session.scalar(select(MediaJobTag).where(MediaJobTag.value == value))
+        if tag is None:
+            tag = MediaJobTag(value=value)
+            session.add(tag)
+            await session.flush()
+        session.add(MediaJobTagLink(job_id=job.id, tag_id=tag.id))
+    await session.flush()
 
 
 async def list_assets(session: AsyncSession, filters: MediaListFilters) -> tuple[list[MediaAsset], dict[str, int]]:
@@ -431,8 +526,28 @@ async def list_jobs(session: AsyncSession, filters: MediaJobListFilters) -> tupl
         clauses.append(MediaJob.created_at >= filters.created_from)
     if filters.created_to:
         clauses.append(MediaJob.created_at <= filters.created_to)
+    if filters.triage_state:
+        clauses.append(MediaJob.triage_state == _coerce_triage_state(filters.triage_state, fallback="open"))
+    if filters.assigned_to_user_id:
+        clauses.append(MediaJob.assigned_to_user_id == filters.assigned_to_user_id)
+    if filters.dead_letter_only:
+        clauses.append(MediaJob.status == MediaJobStatus.dead_letter)
+    if filters.sla_breached:
+        clauses.append(MediaJob.sla_due_at.is_not(None))
+        clauses.append(MediaJob.sla_due_at < _now())
+        clauses.append(MediaJob.triage_state != "resolved")
+    if filters.tag:
+        normalized_tag = _normalize_job_tag(filters.tag)
+        if normalized_tag:
+            clauses.append(
+                MediaJob.id.in_(
+                    select(MediaJobTagLink.job_id)
+                    .join(MediaJobTag, MediaJobTag.id == MediaJobTagLink.tag_id)
+                    .where(MediaJobTag.value == normalized_tag)
+                )
+            )
 
-    stmt = select(MediaJob)
+    stmt = select(MediaJob).options(selectinload(MediaJob.tags).selectinload(MediaJobTagLink.tag))
     count_stmt = select(func.count()).select_from(MediaJob)
     if clauses:
         stmt = stmt.where(and_(*clauses))
@@ -492,6 +607,33 @@ async def get_telemetry(session: AsyncSession) -> MediaTelemetryResponse:
         (await session.scalar(select(func.count()).select_from(MediaJob).where(MediaJob.status == MediaJobStatus.processing, MediaJob.started_at < stale_cutoff)))
         or 0
     )
+    dead_letter_count = int(
+        (await session.scalar(select(func.count()).select_from(MediaJob).where(MediaJob.status == MediaJobStatus.dead_letter)))
+        or 0
+    )
+    retry_scheduled_count = int(
+        (
+            await session.scalar(
+                select(func.count()).select_from(MediaJob).where(
+                    MediaJob.status == MediaJobStatus.failed,
+                    MediaJob.next_retry_at.is_not(None),
+                )
+            )
+        )
+        or 0
+    )
+    sla_breached_count = int(
+        (
+            await session.scalar(
+                select(func.count()).select_from(MediaJob).where(
+                    MediaJob.sla_due_at.is_not(None),
+                    MediaJob.sla_due_at < now,
+                    MediaJob.triage_state != "resolved",
+                )
+            )
+        )
+        or 0
+    )
 
     oldest_queued_at = await session.scalar(
         select(func.min(MediaJob.created_at)).where(MediaJob.status == MediaJobStatus.queued)
@@ -536,6 +678,9 @@ async def get_telemetry(session: AsyncSession) -> MediaTelemetryResponse:
         online_workers=len(workers),
         workers=workers,
         stale_processing_count=stale_processing_count,
+        dead_letter_count=dead_letter_count,
+        sla_breached_count=sla_breached_count,
+        retry_scheduled_count=retry_scheduled_count,
         oldest_queued_age_seconds=oldest_queued_age_seconds,
         avg_processing_seconds=avg_processing_seconds,
         status_counts=status_counts,
@@ -963,10 +1108,13 @@ def _detect_image_dimensions(path: Path) -> tuple[int | None, int | None]:
 
 async def process_job_inline(session: AsyncSession, job: MediaJob) -> MediaJob:
     job.status = MediaJobStatus.processing
+    job.triage_state = "retrying" if job.attempt > 0 else _coerce_triage_state(job.triage_state, fallback="open")
     job.started_at = _now()
     job.attempt = int(job.attempt or 0) + 1
+    job.next_retry_at = None
     session.add(job)
     await session.flush()
+    await _record_job_event(session, job=job, action="processing_started", meta={"attempt": int(job.attempt or 0)})
     try:
         if job.job_type == MediaJobType.ingest:
             await _process_ingest_job(session, job)
@@ -983,13 +1131,52 @@ async def process_job_inline(session: AsyncSession, job: MediaJob) -> MediaJob:
         job.status = MediaJobStatus.completed
         job.progress_pct = 100
         job.completed_at = _now()
+        job.next_retry_at = None
+        job.dead_lettered_at = None
+        job.last_error_at = None
+        job.triage_state = "resolved"
         job.error_code = None
         job.error_message = None
+        await _record_job_event(
+            session,
+            job=job,
+            action="completed",
+            meta={"attempt": int(job.attempt or 0), "job_type": job.job_type.value},
+        )
     except Exception as exc:
-        job.status = MediaJobStatus.failed
+        now = _now()
+        delay = _retry_delay_seconds(attempt=int(job.attempt or 0), max_attempts=max(1, int(job.max_attempts or DEFAULT_MAX_ATTEMPTS)))
+        job.last_error_at = now
         job.error_code = "processing_failed"
         job.error_message = str(exc)
-        job.completed_at = _now()
+        job.completed_at = now
+        if delay is None:
+            job.status = MediaJobStatus.dead_letter
+            job.dead_lettered_at = now
+            job.next_retry_at = None
+            job.triage_state = "open"
+            await _record_job_event(
+                session,
+                job=job,
+                action="dead_lettered",
+                note=str(exc),
+                meta={"attempt": int(job.attempt or 0), "max_attempts": int(job.max_attempts or DEFAULT_MAX_ATTEMPTS)},
+            )
+        else:
+            job.status = MediaJobStatus.failed
+            job.next_retry_at = now + timedelta(seconds=delay)
+            job.triage_state = "retrying"
+            await _record_job_event(
+                session,
+                job=job,
+                action="retry_scheduled",
+                note=str(exc),
+                meta={
+                    "attempt": int(job.attempt or 0),
+                    "max_attempts": int(job.max_attempts or DEFAULT_MAX_ATTEMPTS),
+                    "retry_in_seconds": int(delay),
+                },
+            )
     session.add(job)
     await session.commit()
     await session.refresh(job)
@@ -1189,8 +1376,189 @@ async def _process_usage_reconcile_job(session: AsyncSession, job: MediaJob) -> 
     session.add(job)
 
 
+async def enqueue_due_retries(session: AsyncSession, *, limit: int = 50) -> list[UUID]:
+    now = _now()
+    stmt = (
+        select(MediaJob)
+        .where(
+            MediaJob.status == MediaJobStatus.failed,
+            MediaJob.next_retry_at.is_not(None),
+            MediaJob.next_retry_at <= now,
+            MediaJob.attempt < MediaJob.max_attempts,
+        )
+        .order_by(MediaJob.next_retry_at.asc(), MediaJob.created_at.asc())
+        .limit(max(1, min(int(limit or 50), 500)))
+    )
+    rows = (await session.execute(stmt)).scalars().all()
+    queued_ids: list[UUID] = []
+    for job in rows:
+        job.status = MediaJobStatus.queued
+        job.progress_pct = 0
+        job.started_at = None
+        job.completed_at = None
+        job.next_retry_at = None
+        job.triage_state = "retrying"
+        session.add(job)
+        await _record_job_event(
+            session,
+            job=job,
+            action="retry_enqueued",
+            meta={"attempt": int(job.attempt or 0), "max_attempts": int(job.max_attempts or DEFAULT_MAX_ATTEMPTS)},
+        )
+        queued_ids.append(job.id)
+    await session.commit()
+    for job_id in queued_ids:
+        await _maybe_queue_job(job_id)
+    return queued_ids
+
+
+async def manual_retry_job(
+    session: AsyncSession,
+    *,
+    job: MediaJob,
+    actor_user_id: UUID | None = None,
+) -> MediaJob:
+    job.status = MediaJobStatus.queued
+    job.progress_pct = 0
+    job.error_code = None
+    job.error_message = None
+    job.next_retry_at = None
+    job.started_at = None
+    job.completed_at = None
+    job.dead_lettered_at = None
+    if job.triage_state in {"open", "ignored", "resolved"}:
+        job.triage_state = "retrying"
+    session.add(job)
+    await _record_job_event(
+        session,
+        job=job,
+        actor_user_id=actor_user_id,
+        action="manual_retry",
+        meta={"attempt": int(job.attempt or 0), "max_attempts": int(job.max_attempts or DEFAULT_MAX_ATTEMPTS)},
+    )
+    await session.commit()
+    await _maybe_queue_job(job.id)
+    await session.refresh(job)
+    return job
+
+
+async def bulk_retry_jobs(
+    session: AsyncSession,
+    *,
+    job_ids: list[UUID],
+    actor_user_id: UUID | None = None,
+) -> list[MediaJob]:
+    if not job_ids:
+        return []
+    rows = (
+        await session.execute(
+            select(MediaJob).where(MediaJob.id.in_(job_ids)).options(selectinload(MediaJob.tags).selectinload(MediaJobTagLink.tag))
+        )
+    ).scalars().all()
+    retried: list[MediaJob] = []
+    for job in rows:
+        if job.status == MediaJobStatus.processing:
+            continue
+        if int(job.attempt or 0) >= int(job.max_attempts or DEFAULT_MAX_ATTEMPTS) and job.status != MediaJobStatus.dead_letter:
+            continue
+        job.status = MediaJobStatus.queued
+        job.progress_pct = 0
+        job.error_code = None
+        job.error_message = None
+        job.next_retry_at = None
+        job.started_at = None
+        job.completed_at = None
+        job.dead_lettered_at = None
+        if job.triage_state in {"open", "ignored", "resolved"}:
+            job.triage_state = "retrying"
+        session.add(job)
+        await _record_job_event(
+            session,
+            job=job,
+            actor_user_id=actor_user_id,
+            action="bulk_retry",
+            meta={"attempt": int(job.attempt or 0), "max_attempts": int(job.max_attempts or DEFAULT_MAX_ATTEMPTS)},
+        )
+        retried.append(job)
+    await session.commit()
+    for row in retried:
+        await _maybe_queue_job(row.id)
+    for row in retried:
+        await session.refresh(row)
+    return retried
+
+
+async def update_job_triage(
+    session: AsyncSession,
+    *,
+    job: MediaJob,
+    actor_user_id: UUID | None,
+    triage_state: str | None = None,
+    assigned_to_user_id: UUID | None = None,
+    clear_assignee: bool = False,
+    sla_due_at: datetime | None = None,
+    clear_sla_due_at: bool = False,
+    incident_url: str | None = None,
+    clear_incident_url: bool = False,
+    add_tags: list[str] | None = None,
+    remove_tags: list[str] | None = None,
+    note: str | None = None,
+) -> MediaJob:
+    meta: dict[str, Any] = {}
+    if triage_state:
+        job.triage_state = _coerce_triage_state(triage_state, fallback=job.triage_state or "open")
+        meta["triage_state"] = job.triage_state
+    if clear_assignee:
+        job.assigned_to_user_id = None
+        meta["assigned_to_user_id"] = None
+    elif assigned_to_user_id is not None:
+        job.assigned_to_user_id = assigned_to_user_id
+        meta["assigned_to_user_id"] = str(assigned_to_user_id)
+    if clear_sla_due_at:
+        job.sla_due_at = None
+        meta["sla_due_at"] = None
+    elif sla_due_at is not None:
+        job.sla_due_at = sla_due_at
+        meta["sla_due_at"] = sla_due_at.isoformat()
+    if clear_incident_url:
+        job.incident_url = None
+        meta["incident_url"] = None
+    elif incident_url is not None:
+        cleaned = (incident_url or "").strip()
+        job.incident_url = cleaned or None
+        meta["incident_url"] = job.incident_url
+
+    await _apply_job_tag_changes(session, job=job, add_tags=add_tags or [], remove_tags=remove_tags or [])
+    session.add(job)
+    await _record_job_event(
+        session,
+        job=job,
+        actor_user_id=actor_user_id,
+        action="triage_updated",
+        note=note,
+        meta=meta | {"add_tags": add_tags or [], "remove_tags": remove_tags or []},
+    )
+    await session.commit()
+    await session.refresh(job)
+    return job
+
+
+async def list_job_events(session: AsyncSession, *, job_id: UUID, limit: int = 200) -> list[MediaJobEvent]:
+    stmt = (
+        select(MediaJobEvent)
+        .where(MediaJobEvent.job_id == job_id)
+        .order_by(MediaJobEvent.created_at.desc(), MediaJobEvent.id.desc())
+        .limit(max(1, min(int(limit or 200), 500)))
+    )
+    return list((await session.execute(stmt)).scalars().all())
+
+
 async def get_job_or_404(session: AsyncSession, job_id: UUID) -> MediaJob:
-    row = await session.scalar(select(MediaJob).where(MediaJob.id == job_id))
+    row = await session.scalar(
+        select(MediaJob)
+        .options(selectinload(MediaJob.tags).selectinload(MediaJobTagLink.tag))
+        .where(MediaJob.id == job_id)
+    )
     if row is None:
         raise ValueError("Job not found")
     return row
@@ -1212,6 +1580,13 @@ def resolve_asset_preview_path(asset: MediaAsset, *, variant_profile: str | None
 
 
 def job_to_read(job: MediaJob) -> MediaJobRead:
+    try:
+        raw_tags = job.tags or []
+    except MissingGreenlet:
+        raw_tags = []
+    except Exception:
+        raw_tags = []
+    tags = sorted({rel.tag.value for rel in raw_tags if getattr(rel, "tag", None) and rel.tag.value})
     return MediaJobRead(
         id=job.id,
         asset_id=job.asset_id,
@@ -1219,11 +1594,32 @@ def job_to_read(job: MediaJob) -> MediaJobRead:
         status=job.status.value,
         progress_pct=job.progress_pct,
         attempt=job.attempt,
+        max_attempts=int(job.max_attempts or DEFAULT_MAX_ATTEMPTS),
+        next_retry_at=job.next_retry_at,
+        last_error_at=job.last_error_at,
+        dead_lettered_at=job.dead_lettered_at,
+        triage_state=_coerce_triage_state(job.triage_state, fallback="open"),
+        assigned_to_user_id=job.assigned_to_user_id,
+        sla_due_at=job.sla_due_at,
+        incident_url=job.incident_url,
+        tags=tags,
         error_code=job.error_code,
         error_message=job.error_message,
         created_at=job.created_at,
         started_at=job.started_at,
         completed_at=job.completed_at,
+    )
+
+
+def job_event_to_read(event: MediaJobEvent) -> MediaJobEventRead:
+    return MediaJobEventRead(
+        id=event.id,
+        job_id=event.job_id,
+        actor_user_id=event.actor_user_id,
+        action=event.action,
+        note=event.note,
+        meta_json=event.meta_json,
+        created_at=event.created_at,
     )
 
 

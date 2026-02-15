@@ -142,6 +142,8 @@ class Settings(BaseSettings):
     media_dam_worker_heartbeat_ttl_seconds: int = 30
     media_dam_worker_heartbeat_file: str = "/tmp/media-worker-heartbeat.json"
     media_dam_processing_stale_seconds: int = 600
+    media_dam_retry_max_attempts: int = 5
+    media_dam_retry_sweep_seconds: int = 10
     media_usage_reconcile_enabled: bool = True
     media_usage_reconcile_interval_seconds: int = 60 * 60 * 24
     media_usage_reconcile_batch_size: int = 200

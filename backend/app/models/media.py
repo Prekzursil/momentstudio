@@ -44,6 +44,7 @@ class MediaJobStatus(str, enum.Enum):
     processing = "processing"
     completed = "completed"
     failed = "failed"
+    dead_letter = "dead_letter"
 
 
 class MediaAsset(Base):
@@ -221,6 +222,16 @@ class MediaJob(Base):
     payload_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     progress_pct: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    max_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
+    next_retry_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    last_error_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    dead_lettered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    triage_state: Mapped[str] = mapped_column(String(32), nullable=False, default="open", index=True)
+    assigned_to_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    sla_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    incident_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     error_code: Mapped[str | None] = mapped_column(String(120), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -234,6 +245,55 @@ class MediaJob(Base):
     )
 
     asset: Mapped[MediaAsset | None] = relationship("MediaAsset", lazy="selectin")
+    events: Mapped[list["MediaJobEvent"]] = relationship(
+        "MediaJobEvent", back_populates="job", cascade="all, delete-orphan", lazy="selectin"
+    )
+    tags: Mapped[list["MediaJobTagLink"]] = relationship(
+        "MediaJobTagLink", back_populates="job", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+
+class MediaJobEvent(Base):
+    __tablename__ = "media_job_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    job_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("media_jobs.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    actor_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    action: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    meta_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    job: Mapped[MediaJob] = relationship("MediaJob", back_populates="events")
+
+
+class MediaJobTag(Base):
+    __tablename__ = "media_job_tags"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    value: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class MediaJobTagLink(Base):
+    __tablename__ = "media_job_tag_links"
+    __table_args__ = (UniqueConstraint("job_id", "tag_id", name="uq_media_job_tag_links_job_tag"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    job_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("media_jobs.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    tag_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("media_job_tags.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    job: Mapped[MediaJob] = relationship("MediaJob", back_populates="tags")
+    tag: Mapped[MediaJobTag] = relationship("MediaJobTag", lazy="joined")
 
 
 class MediaCollection(Base):

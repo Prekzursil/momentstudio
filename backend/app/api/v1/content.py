@@ -63,9 +63,12 @@ from app.schemas.media import (
     MediaEditRequest,
     MediaFinalizeRequest,
     MediaJobRead,
+    MediaJobEventsResponse,
     MediaJobListResponse,
+    MediaJobRetryBulkRequest,
     MediaRejectRequest,
     MediaTelemetryResponse,
+    MediaJobTriageUpdateRequest,
     MediaUsageResponse,
     MediaVariantRequest,
 )
@@ -1377,6 +1380,11 @@ async def admin_list_media_jobs(
     status_filter: str = Query(default="", alias="status"),
     job_type: str = Query(default=""),
     asset_id: UUID | None = Query(default=None),
+    triage_state: str = Query(default=""),
+    assigned_to_user_id: UUID | None = Query(default=None),
+    tag: str = Query(default=""),
+    sla_breached: bool = Query(default=False),
+    dead_letter_only: bool = Query(default=False),
     created_from: str | None = Query(default=None),
     created_to: str | None = Query(default=None),
     session: AsyncSession = Depends(get_session),
@@ -1403,6 +1411,11 @@ async def admin_list_media_jobs(
                 status=status_filter,
                 job_type=job_type,
                 asset_id=asset_id,
+                triage_state=triage_state,
+                assigned_to_user_id=assigned_to_user_id,
+                tag=tag,
+                sla_breached=sla_breached,
+                dead_letter_only=dead_letter_only,
                 created_from=parsed_from,
                 created_to=parsed_to,
             ),
@@ -1452,6 +1465,77 @@ async def admin_get_media_job(
     except ValueError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
     return media_dam.job_to_read(job)
+
+
+@router.post("/admin/media/jobs/{job_id}/retry", response_model=MediaJobRead)
+async def admin_retry_media_job(
+    job_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> MediaJobRead:
+    try:
+        job = await media_dam.get_job_or_404(session, job_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    retried = await media_dam.manual_retry_job(session, job=job, actor_user_id=admin.id)
+    return media_dam.job_to_read(retried)
+
+
+@router.post("/admin/media/jobs/retry-bulk", response_model=MediaJobListResponse)
+async def admin_retry_media_jobs_bulk(
+    payload: MediaJobRetryBulkRequest,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> MediaJobListResponse:
+    rows = await media_dam.bulk_retry_jobs(session, job_ids=payload.job_ids, actor_user_id=admin.id)
+    return MediaJobListResponse(
+        items=[media_dam.job_to_read(row) for row in rows],
+        meta={"total_items": len(rows), "total_pages": 1, "page": 1, "limit": len(rows)},
+    )
+
+
+@router.patch("/admin/media/jobs/{job_id}/triage", response_model=MediaJobRead)
+async def admin_update_media_job_triage(
+    job_id: UUID,
+    payload: MediaJobTriageUpdateRequest,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> MediaJobRead:
+    try:
+        job = await media_dam.get_job_or_404(session, job_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    updated = await media_dam.update_job_triage(
+        session,
+        job=job,
+        actor_user_id=admin.id,
+        triage_state=payload.triage_state,
+        assigned_to_user_id=payload.assigned_to_user_id,
+        clear_assignee=payload.clear_assignee,
+        sla_due_at=payload.sla_due_at,
+        clear_sla_due_at=payload.clear_sla_due_at,
+        incident_url=payload.incident_url,
+        clear_incident_url=payload.clear_incident_url,
+        add_tags=payload.add_tags,
+        remove_tags=payload.remove_tags,
+        note=payload.note,
+    )
+    return media_dam.job_to_read(updated)
+
+
+@router.get("/admin/media/jobs/{job_id}/events", response_model=MediaJobEventsResponse)
+async def admin_list_media_job_events(
+    job_id: UUID,
+    limit: int = Query(default=200, ge=1, le=500),
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> MediaJobEventsResponse:
+    try:
+        await media_dam.get_job_or_404(session, job_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    rows = await media_dam.list_job_events(session, job_id=job_id, limit=limit)
+    return MediaJobEventsResponse(items=[media_dam.job_event_to_read(row) for row in rows])
 
 
 @router.get("/admin/media/collections", response_model=list[MediaCollectionRead])

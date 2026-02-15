@@ -25,6 +25,7 @@ T = TypeVar("T")
 HEARTBEAT_PREFIX = str(getattr(settings, "media_dam_worker_heartbeat_prefix", "media:workers:heartbeat") or "media:workers:heartbeat")
 HEARTBEAT_TTL_SECONDS = max(10, int(getattr(settings, "media_dam_worker_heartbeat_ttl_seconds", 30) or 30))
 HEARTBEAT_FILE = str(getattr(settings, "media_dam_worker_heartbeat_file", "/tmp/media-worker-heartbeat.json") or "/tmp/media-worker-heartbeat.json")
+RETRY_SWEEP_SECONDS = max(5, int(getattr(settings, "media_dam_retry_sweep_seconds", 10) or 10))
 
 
 async def _process_job_id(raw_job_id: str) -> None:
@@ -38,6 +39,16 @@ async def _process_job_id(raw_job_id: str) -> None:
             await media_dam.process_job_inline(session, job)
         except Exception:
             logger.exception("media_worker_job_failed", extra={"job_id": str(job_id)})
+
+
+async def _enqueue_due_retries_once(limit: int = 50) -> None:
+    async with SessionLocal() as session:
+        try:
+            queued = await media_dam.enqueue_due_retries(session, limit=limit)
+            if queued:
+                logger.info("media_worker_retry_enqueued", extra={"count": len(queued)})
+        except Exception:
+            logger.exception("media_worker_retry_sweep_failed")
 
 
 def _worker_id() -> str:
@@ -85,12 +96,16 @@ async def run_media_worker(poll_interval_seconds: float = 2.0) -> None:
             await asyncio.sleep(max(0.1, poll_interval_seconds))
     logger.info("media_worker_started")
     last_heartbeat = 0.0
+    last_retry_sweep = 0.0
     while True:
         try:
             now = time.monotonic()
             if now - last_heartbeat >= heartbeat_interval:
                 await _publish_heartbeat(redis, worker_id=worker_id)
                 last_heartbeat = now
+            if now - last_retry_sweep >= float(RETRY_SWEEP_SECONDS):
+                await _enqueue_due_retries_once(limit=100)
+                last_retry_sweep = now
             result = await _await_if_needed(redis.blpop([QUEUE_KEY], timeout=max(1, int(poll_interval_seconds))))
             if not result:
                 continue

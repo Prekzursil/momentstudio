@@ -10,8 +10,9 @@ from pydantic import BaseModel, ConfigDict, Field
 MediaAssetTypeLiteral = Literal["image", "video", "document"]
 MediaAssetStatusLiteral = Literal["draft", "approved", "rejected", "archived", "trashed"]
 MediaVisibilityLiteral = Literal["public", "private"]
-MediaJobStatusLiteral = Literal["queued", "processing", "completed", "failed"]
+MediaJobStatusLiteral = Literal["queued", "processing", "completed", "failed", "dead_letter"]
 MediaJobTypeLiteral = Literal["ingest", "variant", "edit", "ai_tag", "duplicate_scan", "usage_reconcile"]
+MediaJobTriageStateLiteral = Literal["open", "retrying", "ignored", "resolved"]
 
 
 class MediaAssetI18nRead(BaseModel):
@@ -148,6 +149,15 @@ class MediaJobRead(BaseModel):
     status: MediaJobStatusLiteral
     progress_pct: int
     attempt: int
+    max_attempts: int = 5
+    next_retry_at: datetime | None = None
+    last_error_at: datetime | None = None
+    dead_lettered_at: datetime | None = None
+    triage_state: MediaJobTriageStateLiteral = "open"
+    assigned_to_user_id: UUID | None = None
+    sla_due_at: datetime | None = None
+    incident_url: str | None = None
+    tags: list[str] = Field(default_factory=list)
     error_code: str | None = None
     error_message: str | None = None
     created_at: datetime
@@ -158,6 +168,39 @@ class MediaJobRead(BaseModel):
 class MediaJobListResponse(BaseModel):
     items: list[MediaJobRead]
     meta: dict[str, int]
+
+
+class MediaJobEventRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    job_id: UUID
+    actor_user_id: UUID | None = None
+    action: str
+    note: str | None = None
+    meta_json: str | None = None
+    created_at: datetime
+
+
+class MediaJobEventsResponse(BaseModel):
+    items: list[MediaJobEventRead]
+
+
+class MediaJobRetryBulkRequest(BaseModel):
+    job_ids: list[UUID] = Field(default_factory=list, min_length=1, max_length=200)
+
+
+class MediaJobTriageUpdateRequest(BaseModel):
+    triage_state: MediaJobTriageStateLiteral | None = None
+    assigned_to_user_id: UUID | None = None
+    clear_assignee: bool = False
+    sla_due_at: datetime | None = None
+    clear_sla_due_at: bool = False
+    incident_url: str | None = Field(default=None, max_length=512)
+    clear_incident_url: bool = False
+    add_tags: list[str] = Field(default_factory=list)
+    remove_tags: list[str] = Field(default_factory=list)
+    note: str | None = None
 
 
 class MediaTelemetryWorkerRead(BaseModel):
@@ -174,6 +217,9 @@ class MediaTelemetryResponse(BaseModel):
     online_workers: int
     workers: list[MediaTelemetryWorkerRead]
     stale_processing_count: int
+    dead_letter_count: int = 0
+    sla_breached_count: int = 0
+    retry_scheduled_count: int = 0
     oldest_queued_age_seconds: int | None = None
     avg_processing_seconds: int | None = None
     status_counts: dict[str, int] = Field(default_factory=dict)

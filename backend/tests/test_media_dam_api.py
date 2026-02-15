@@ -1,8 +1,10 @@
 import asyncio
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from pathlib import Path
 from typing import Dict
 from urllib.parse import parse_qs, urlparse
+from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
@@ -14,10 +16,12 @@ from app.core.config import settings
 from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
+from app.models.media import MediaJobStatus
 from app.models.passkeys import UserPasskey
 from app.models.user import UserRole
 from app.schemas.user import UserCreate
 from app.services.auth import create_user, issue_tokens_for_user
+from app.services import media_dam
 
 
 @pytest.fixture
@@ -287,3 +291,142 @@ def test_media_dam_private_preview_and_public_serving_gate(test_app: Dict[str, o
 
     after_approve = client.get(public_asset["public_url"])
     assert after_approve.status_code == 200
+
+
+def test_media_dam_retry_dead_letter_triage_and_events_v2(
+    test_app: Dict[str, object], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_staff_token(SessionLocal, email="dam-admin-retry@example.com", role=UserRole.admin)
+    monkeypatch.setattr(settings, "media_root", str(tmp_path / "uploads"))
+    monkeypatch.setattr(settings, "private_media_root", str(tmp_path / "private_uploads"))
+
+    async def _fail_variant(*_args, **_kwargs):
+        raise RuntimeError("variant failed on purpose")
+
+    monkeypatch.setattr(media_dam, "_process_variant_job", _fail_variant)
+
+    upload = client.post(
+        "/api/v1/content/admin/media/assets/upload",
+        files={"file": ("dam-retry.jpg", _jpeg_bytes(), "image/jpeg")},
+        params={"visibility": "private", "auto_finalize": "true"},
+        headers=auth_headers(admin_token),
+    )
+    assert upload.status_code == 201, upload.text
+    asset_id = upload.json()["id"]
+
+    first_try = client.post(
+        f"/api/v1/content/admin/media/assets/{asset_id}/variants",
+        json={"profile": "web-640"},
+        headers=auth_headers(admin_token),
+    )
+    assert first_try.status_code == 200, first_try.text
+    job_payload = first_try.json()
+    job_id = job_payload["id"]
+    assert job_payload["status"] == "failed"
+    assert job_payload["attempt"] == 1
+    assert job_payload["max_attempts"] == 5
+    assert job_payload["next_retry_at"] is not None
+    assert job_payload["triage_state"] == "retrying"
+
+    overdue_iso = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
+    triage_update = client.patch(
+        f"/api/v1/content/admin/media/jobs/{job_id}/triage",
+        json={
+            "triage_state": "open",
+            "add_tags": ["timeout", "variant"],
+            "incident_url": "https://example.invalid/incidents/123",
+            "sla_due_at": overdue_iso,
+            "note": "Investigate failing variant profile",
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert triage_update.status_code == 200, triage_update.text
+    triage_payload = triage_update.json()
+    assert triage_payload["triage_state"] == "open"
+    assert "timeout" in triage_payload["tags"]
+    assert triage_payload["sla_due_at"] is not None
+
+    async def _exhaust_attempts() -> None:
+        async with SessionLocal() as session:
+            for _ in range(4):
+                job = await media_dam.get_job_or_404(session, UUID(job_id))
+                await media_dam.manual_retry_job(session, job=job, actor_user_id=None)
+                queued = await media_dam.get_job_or_404(session, UUID(job_id))
+                await media_dam.process_job_inline(session, queued)
+
+    asyncio.run(_exhaust_attempts())
+
+    after_exhaust = client.get(f"/api/v1/content/admin/media/jobs/{job_id}", headers=auth_headers(admin_token))
+    assert after_exhaust.status_code == 200, after_exhaust.text
+    exhausted_payload = after_exhaust.json()
+    assert exhausted_payload["status"] == "dead_letter"
+    assert exhausted_payload["dead_lettered_at"] is not None
+    assert exhausted_payload["triage_state"] == "open"
+    assert exhausted_payload["attempt"] == 5
+
+    filtered = client.get(
+        "/api/v1/content/admin/media/jobs?dead_letter_only=true&triage_state=open&tag=timeout&sla_breached=true&limit=20",
+        headers=auth_headers(admin_token),
+    )
+    assert filtered.status_code == 200, filtered.text
+    assert any(row["id"] == job_id for row in filtered.json()["items"])
+
+    retry_now = client.post(f"/api/v1/content/admin/media/jobs/{job_id}/retry", headers=auth_headers(admin_token))
+    assert retry_now.status_code == 200, retry_now.text
+    assert retry_now.json()["status"] == "queued"
+
+    events = client.get(f"/api/v1/content/admin/media/jobs/{job_id}/events?limit=200", headers=auth_headers(admin_token))
+    assert events.status_code == 200, events.text
+    actions = [row["action"] for row in events.json()["items"]]
+    assert "retry_scheduled" in actions
+    assert "dead_lettered" in actions
+    assert "triage_updated" in actions
+    assert "manual_retry" in actions
+
+
+def test_media_dam_due_retry_sweep_requeues_failed_jobs(
+    test_app: Dict[str, object], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_staff_token(SessionLocal, email="dam-admin-retry-sweep@example.com", role=UserRole.admin)
+    monkeypatch.setattr(settings, "media_root", str(tmp_path / "uploads"))
+    monkeypatch.setattr(settings, "private_media_root", str(tmp_path / "private_uploads"))
+
+    upload = client.post(
+        "/api/v1/content/admin/media/assets/upload",
+        files={"file": ("dam-retry-sweep.jpg", _jpeg_bytes(), "image/jpeg")},
+        params={"visibility": "private", "auto_finalize": "true"},
+        headers=auth_headers(admin_token),
+    )
+    assert upload.status_code == 201, upload.text
+    asset_id = upload.json()["id"]
+
+    queued_job = client.post(
+        f"/api/v1/content/admin/media/assets/{asset_id}/finalize",
+        json={"run_ai_tagging": False, "run_duplicate_scan": False},
+        headers=auth_headers(admin_token),
+    )
+    assert queued_job.status_code == 200, queued_job.text
+    job_id = queued_job.json()["id"]
+
+    async def _mark_failed_and_sweep() -> None:
+        async with SessionLocal() as session:
+            job = await media_dam.get_job_or_404(session, UUID(job_id))
+            job.status = MediaJobStatus.failed
+            job.triage_state = "retrying"
+            job.next_retry_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+            job.error_message = "failed before sweep"
+            job.attempt = 1
+            session.add(job)
+            await session.commit()
+            queued = await media_dam.enqueue_due_retries(session, limit=10)
+            assert UUID(job_id) in queued
+
+    asyncio.run(_mark_failed_and_sweep())
+
+    job_after = client.get(f"/api/v1/content/admin/media/jobs/{job_id}", headers=auth_headers(admin_token))
+    assert job_after.status_code == 200, job_after.text
+    assert job_after.json()["status"] == "queued"
