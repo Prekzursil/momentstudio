@@ -892,7 +892,7 @@ export interface ContentImageAssetUsageResponse {
 export type MediaAssetType = 'image' | 'video' | 'document';
 export type MediaAssetStatus = 'draft' | 'approved' | 'rejected' | 'archived' | 'trashed';
 export type MediaAssetVisibility = 'public' | 'private';
-export type MediaJobType = 'ingest' | 'variant' | 'edit' | 'ai_tag' | 'duplicate_scan';
+export type MediaJobType = 'ingest' | 'variant' | 'edit' | 'ai_tag' | 'duplicate_scan' | 'usage_reconcile';
 export type MediaJobStatus = 'queued' | 'processing' | 'completed' | 'failed';
 
 export interface MediaAssetI18n {
@@ -923,6 +923,7 @@ export interface MediaAsset {
   source_ref?: string | null;
   storage_key: string;
   public_url: string;
+  preview_url?: string | null;
   original_filename?: string | null;
   mime_type?: string | null;
   size_bytes?: number | null;
@@ -1004,6 +1005,31 @@ export interface MediaJob {
   created_at: string;
   started_at?: string | null;
   completed_at?: string | null;
+}
+
+export interface MediaJobListResponse {
+  items: MediaJob[];
+  meta: { total_items: number; total_pages: number; page: number; limit: number };
+}
+
+export interface MediaTelemetryWorker {
+  worker_id: string;
+  hostname?: string | null;
+  pid?: number | null;
+  app_version?: string | null;
+  last_seen_at: string;
+  lag_seconds: number;
+}
+
+export interface MediaTelemetryResponse {
+  queue_depth: number;
+  online_workers: number;
+  workers: MediaTelemetryWorker[];
+  stale_processing_count: number;
+  oldest_queued_age_seconds?: number | null;
+  avg_processing_seconds?: number | null;
+  status_counts: Record<string, number>;
+  type_counts: Record<string, number>;
 }
 
 export interface MediaCollection {
@@ -1705,6 +1731,26 @@ export class AdminService {
 
   getMediaJob(jobId: string): Observable<MediaJob> {
     return this.api.get<MediaJob>(`/content/admin/media/jobs/${encodeURIComponent(jobId)}`);
+  }
+
+  listMediaJobs(params?: {
+    page?: number;
+    limit?: number;
+    status?: MediaJobStatus | '';
+    job_type?: MediaJobType | '';
+    asset_id?: string;
+    created_from?: string;
+    created_to?: string;
+  }): Observable<MediaJobListResponse> {
+    return this.api.get<MediaJobListResponse>('/content/admin/media/jobs', params as any);
+  }
+
+  getMediaTelemetry(): Observable<MediaTelemetryResponse> {
+    return this.api.get<MediaTelemetryResponse>('/content/admin/media/telemetry');
+  }
+
+  requestMediaUsageReconcile(): Observable<MediaJob> {
+    return this.api.post<MediaJob>('/content/admin/media/usage/reconcile', {});
   }
 
   listMediaCollections(): Observable<MediaCollection[]> {

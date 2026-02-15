@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { catchError, forkJoin, of } from 'rxjs';
+import { AdminService, MediaTelemetryResponse } from '../../../core/admin.service';
 import {
   OpsService,
   BannerLevel,
@@ -96,6 +97,40 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
               </p>
               <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ emailFailures24h() }}</p>
               <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">{{ 'adminUi.ops.health.lastHours' | translate: { hours: 24 } }}</p>
+            </div>
+          </div>
+
+          <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20 grid gap-2">
+            <div class="flex items-center justify-between gap-2">
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">DAM telemetry</p>
+              <button
+                type="button"
+                class="rounded border border-slate-300 px-2 py-1 text-[11px] font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200"
+                [disabled]="damTelemetryLoading()"
+                (click)="loadDamTelemetry()"
+              >
+                Refresh
+              </button>
+            </div>
+            <div *ngIf="damTelemetryLoading()" class="text-xs text-slate-500 dark:text-slate-400">Loading DAM telemetry…</div>
+            <div *ngIf="damTelemetryError()" class="text-xs text-rose-700 dark:text-rose-300">{{ damTelemetryError() }}</div>
+            <div *ngIf="damTelemetry() as dam" class="grid gap-2 sm:grid-cols-4">
+              <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
+                <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Queue</p>
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ dam.queue_depth }}</p>
+              </div>
+              <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
+                <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Workers</p>
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ dam.online_workers }}</p>
+              </div>
+              <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
+                <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Stale</p>
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ dam.stale_processing_count }}</p>
+              </div>
+              <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
+                <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Oldest queued</p>
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ formatDamAge(dam.oldest_queued_age_seconds) }}</p>
+              </div>
             </div>
           </div>
 
@@ -766,6 +801,9 @@ export class AdminOpsComponent implements OnInit {
   diagnosticsLoading = signal(true);
   diagnosticsError = signal<string | null>(null);
   diagnostics = signal<OpsDiagnosticsRead | null>(null);
+  damTelemetryLoading = signal(false);
+  damTelemetryError = signal<string | null>(null);
+  damTelemetry = signal<MediaTelemetryResponse | null>(null);
 
   bannersLoading = signal(true);
   bannersError = signal<string | null>(null);
@@ -808,6 +846,7 @@ export class AdminOpsComponent implements OnInit {
   webhookRetrying = signal<string | null>(null);
 
   constructor(
+    private adminService: AdminService,
     private health: HealthService,
     private ops: OpsService,
     private toast: ToastService,
@@ -819,6 +858,7 @@ export class AdminOpsComponent implements OnInit {
     this.resetBannerForm();
     this.loadHealthDashboard();
     this.loadDiagnostics();
+    this.loadDamTelemetry();
     this.loadBanners();
     this.loadShippingMethods();
     this.applyEmailFailuresDeepLink();
@@ -889,6 +929,28 @@ export class AdminOpsComponent implements OnInit {
         this.diagnosticsLoading.set(false);
       }
     });
+  }
+
+  loadDamTelemetry(): void {
+    this.damTelemetryLoading.set(true);
+    this.damTelemetryError.set(null);
+    this.adminService.getMediaTelemetry().subscribe({
+      next: (res) => {
+        this.damTelemetry.set(res);
+        this.damTelemetryLoading.set(false);
+      },
+      error: () => {
+        this.damTelemetryError.set('Failed to load DAM telemetry.');
+        this.damTelemetryLoading.set(false);
+      }
+    });
+  }
+
+  formatDamAge(ageSeconds?: number | null): string {
+    if (ageSeconds == null) return 'n/a';
+    if (ageSeconds < 60) return `${ageSeconds}s`;
+    if (ageSeconds < 3600) return `${Math.floor(ageSeconds / 60)}m`;
+    return `${Math.floor(ageSeconds / 3600)}h`;
   }
 
   diagnosticsBadgeClass(status: string): string {

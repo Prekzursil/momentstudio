@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, computed, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 
@@ -10,7 +10,10 @@ import {
   MediaAssetType,
   MediaAssetVisibility,
   MediaCollection,
-  MediaJob
+  MediaJob,
+  MediaJobStatus,
+  MediaJobType,
+  MediaTelemetryResponse
 } from '../../../core/admin.service';
 import { ToastService } from '../../../core/toast.service';
 import { ErrorStateComponent } from '../../../shared/error-state.component';
@@ -133,6 +136,25 @@ type DamTab = 'library' | 'review' | 'collections' | 'trash' | 'queue';
           </label>
         </div>
 
+        <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Queue depth</p>
+            <p class="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-50">{{ telemetry()?.queue_depth ?? 0 }}</p>
+          </div>
+          <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Online workers</p>
+            <p class="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-50">{{ telemetry()?.online_workers ?? 0 }}</p>
+          </div>
+          <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Stale processing</p>
+            <p class="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-50">{{ telemetry()?.stale_processing_count ?? 0 }}</p>
+          </div>
+          <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Oldest queued</p>
+            <p class="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-50">{{ oldestQueuedLabel() }}</p>
+          </div>
+        </div>
+
         <app-error-state
           *ngIf="error()"
           [message]="error()!"
@@ -189,15 +211,119 @@ type DamTab = 'library' | 'review' | 'collections' | 'trash' | 'queue';
           </div>
         </div>
 
-        <div *ngIf="tab() === 'queue'" class="grid gap-2">
-          <div *ngIf="jobs().length === 0" class="text-sm text-slate-500 dark:text-slate-400">No recent jobs yet.</div>
+        <div *ngIf="tab() === 'queue'" class="grid gap-3">
+          <div class="flex flex-wrap items-end gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2 dark:border-slate-800 dark:bg-slate-950/30">
+            <label class="grid gap-1">
+              <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">Status</span>
+              <select
+                class="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-800"
+                [(ngModel)]="queueStatus"
+                (change)="loadJobs(true)"
+              >
+                <option value="">Any</option>
+                <option value="queued">Queued</option>
+                <option value="processing">Processing</option>
+                <option value="completed">Completed</option>
+                <option value="failed">Failed</option>
+              </select>
+            </label>
+            <label class="grid gap-1">
+              <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">Job type</span>
+              <select
+                class="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-800"
+                [(ngModel)]="queueJobType"
+                (change)="loadJobs(true)"
+              >
+                <option value="">Any</option>
+                <option value="ingest">Ingest</option>
+                <option value="variant">Variant</option>
+                <option value="edit">Edit</option>
+                <option value="ai_tag">AI tag</option>
+                <option value="duplicate_scan">Duplicate scan</option>
+                <option value="usage_reconcile">Usage reconcile</option>
+              </select>
+            </label>
+            <label class="grid gap-1">
+              <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">Asset ID</span>
+              <input
+                class="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-800"
+                [(ngModel)]="queueAssetId"
+                placeholder="asset uuid"
+                (keyup.enter)="loadJobs(true)"
+              />
+            </label>
+            <label class="grid gap-1">
+              <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">From</span>
+              <input
+                type="date"
+                class="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-800"
+                [(ngModel)]="queueCreatedFrom"
+                (change)="loadJobs(true)"
+              />
+            </label>
+            <label class="grid gap-1">
+              <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">To</span>
+              <input
+                type="date"
+                class="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-800"
+                [(ngModel)]="queueCreatedTo"
+                (change)="loadJobs(true)"
+              />
+            </label>
+            <button
+              type="button"
+              class="h-10 rounded-lg border border-slate-300 bg-white px-4 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              (click)="loadJobs(true)"
+            >
+              Apply
+            </button>
+            <button
+              type="button"
+              class="h-10 rounded-lg border border-slate-300 bg-white px-4 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              (click)="resetQueueFilters()"
+            >
+              Reset
+            </button>
+            <button
+              type="button"
+              class="h-10 rounded-lg bg-slate-900 px-4 text-xs font-semibold text-white dark:bg-slate-100 dark:text-slate-900"
+              (click)="runUsageReconcile()"
+            >
+              Reconcile usage
+            </button>
+          </div>
+
+          <div *ngIf="queueError()" class="text-sm text-rose-700 dark:text-rose-300">{{ queueError() }}</div>
+          <div *ngIf="queueLoading()" class="text-sm text-slate-600 dark:text-slate-300">Loading job queue…</div>
+          <div *ngIf="!queueLoading() && jobs().length === 0" class="text-sm text-slate-500 dark:text-slate-400">No jobs found.</div>
           <div
             *ngFor="let job of jobs()"
             class="rounded-lg border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900"
           >
             <p class="font-semibold text-slate-900 dark:text-slate-50">{{ job.job_type }} · {{ job.status }}</p>
-            <p class="text-xs text-slate-500 dark:text-slate-400">Asset {{ job.asset_id || 'n/a' }} · {{ job.progress_pct }}%</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Asset {{ job.asset_id || 'n/a' }} · {{ job.progress_pct }}% · attempt {{ job.attempt }}</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400">{{ job.created_at | date: 'short' }}</p>
             <p *ngIf="job.error_message" class="text-xs text-rose-600 dark:text-rose-300">{{ job.error_message }}</p>
+          </div>
+
+          <div *ngIf="jobsMetaTotalPages() > 1" class="flex items-center justify-between">
+            <button
+              type="button"
+              class="rounded-lg border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100"
+              [disabled]="queuePage <= 1"
+              (click)="prevQueuePage()"
+            >
+              Prev
+            </button>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Page {{ queuePage }} / {{ jobsMetaTotalPages() }}</p>
+            <button
+              type="button"
+              class="rounded-lg border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100"
+              [disabled]="queuePage >= jobsMetaTotalPages()"
+              (click)="nextQueuePage()"
+            >
+              Next
+            </button>
           </div>
         </div>
 
@@ -215,7 +341,7 @@ type DamTab = 'library' | 'review' | 'collections' | 'trash' | 'queue';
             </div>
             <img
               *ngIf="asset.asset_type === 'image'"
-              [src]="asset.public_url"
+              [src]="asset.preview_url || asset.public_url"
               [alt]="asset.original_filename || 'media'"
               class="h-36 w-full rounded-lg border border-slate-200 object-cover dark:border-slate-700"
               loading="lazy"
@@ -332,7 +458,7 @@ type DamTab = 'library' | 'review' | 'collections' | 'trash' | 'queue';
     </section>
   `
 })
-export class DamAssetLibraryComponent implements OnInit {
+export class DamAssetLibraryComponent implements OnInit, OnDestroy {
   constructor(
     private readonly admin: AdminService,
     private readonly toast: ToastService
@@ -350,7 +476,10 @@ export class DamAssetLibraryComponent implements OnInit {
   readonly assets = signal<MediaAsset[]>([]);
   readonly collections = signal<MediaCollection[]>([]);
   readonly jobs = signal<MediaJob[]>([]);
+  readonly telemetry = signal<MediaTelemetryResponse | null>(null);
   readonly loading = signal(false);
+  readonly queueLoading = signal(false);
+  readonly queueError = signal<string | null>(null);
   readonly error = signal<string | null>(null);
   readonly errorRequestId = signal<string | null>(null);
   readonly detailAsset = signal<MediaAsset | null>(null);
@@ -361,9 +490,23 @@ export class DamAssetLibraryComponent implements OnInit {
     page: 1,
     limit: 24
   });
+  readonly jobsMeta = signal<{ total_items: number; total_pages: number; page: number; limit: number }>({
+    total_items: 0,
+    total_pages: 1,
+    page: 1,
+    limit: 20
+  });
 
   readonly metaTotalPages = computed(() => Math.max(1, this.meta().total_pages || 1));
   readonly selectedCount = computed(() => this.selectedIds().size);
+  readonly jobsMetaTotalPages = computed(() => Math.max(1, this.jobsMeta().total_pages || 1));
+  readonly oldestQueuedLabel = computed(() => {
+    const ageSeconds = this.telemetry()?.oldest_queued_age_seconds ?? null;
+    if (ageSeconds == null) return 'n/a';
+    if (ageSeconds < 60) return `${ageSeconds}s`;
+    if (ageSeconds < 3600) return `${Math.floor(ageSeconds / 60)}m`;
+    return `${Math.floor(ageSeconds / 3600)}h`;
+  });
 
   q = '';
   tag = '';
@@ -372,6 +515,12 @@ export class DamAssetLibraryComponent implements OnInit {
   visibility: MediaAssetVisibility | '' = '';
   sort: 'newest' | 'oldest' | 'name_asc' | 'name_desc' = 'newest';
   page = 1;
+  queuePage = 1;
+  queueStatus: MediaJobStatus | '' = '';
+  queueJobType: MediaJobType | '' = '';
+  queueAssetId = '';
+  queueCreatedFrom = '';
+  queueCreatedTo = '';
 
   newCollectionName = '';
   newCollectionSlug = '';
@@ -385,22 +534,32 @@ export class DamAssetLibraryComponent implements OnInit {
   editAltEn = '';
   editTitleRo = '';
   editAltRo = '';
+  private queuePollHandle: ReturnType<typeof setInterval> | null = null;
 
   ngOnInit(): void {
     this.reload();
     void this.loadCollections();
+    this.loadTelemetry();
+  }
+
+  ngOnDestroy(): void {
+    this.stopQueuePolling();
   }
 
   switchTab(tab: DamTab): void {
     this.tab.set(tab);
+    if (tab === 'queue') {
+      this.startQueuePolling();
+      this.loadJobs(true);
+      return;
+    }
+    this.stopQueuePolling();
     if (tab === 'review') {
       this.statusFilter = 'draft';
       this.reload(true);
     } else if (tab === 'trash') {
       this.statusFilter = 'trashed';
       this.reload(true);
-    } else if (tab === 'queue') {
-      // queue is populated from recent actions
     } else if (tab === 'library') {
       if (this.statusFilter === 'draft' || this.statusFilter === 'trashed') {
         this.statusFilter = '';
@@ -443,6 +602,7 @@ export class DamAssetLibraryComponent implements OnInit {
           this.assets.set(res.items || []);
           this.meta.set(res.meta || { total_items: 0, total_pages: 1, page: this.page, limit: 24 });
           this.loading.set(false);
+          this.loadTelemetry();
         },
         error: (err) => {
           this.error.set(err?.error?.detail || 'Failed to load media assets.');
@@ -462,6 +622,68 @@ export class DamAssetLibraryComponent implements OnInit {
     if (this.page >= this.metaTotalPages()) return;
     this.page += 1;
     this.reload();
+  }
+
+  loadJobs(resetPage = false): void {
+    if (resetPage) this.queuePage = 1;
+    this.queueLoading.set(true);
+    this.queueError.set(null);
+    this.admin
+      .listMediaJobs({
+        page: this.queuePage,
+        limit: 20,
+        status: this.queueStatus || undefined,
+        job_type: this.queueJobType || undefined,
+        asset_id: this.queueAssetId.trim() || undefined,
+        created_from: this.queueCreatedFrom ? `${this.queueCreatedFrom}T00:00:00+00:00` : undefined,
+        created_to: this.queueCreatedTo ? `${this.queueCreatedTo}T23:59:59+00:00` : undefined
+      })
+      .subscribe({
+        next: (res) => {
+          this.jobs.set(res.items || []);
+          this.jobsMeta.set(res.meta || { total_items: 0, total_pages: 1, page: this.queuePage, limit: 20 });
+          this.queueLoading.set(false);
+          this.loadTelemetry();
+        },
+        error: (err) => {
+          this.queueError.set(err?.error?.detail || 'Failed to load media jobs.');
+          this.queueLoading.set(false);
+        }
+      });
+  }
+
+  prevQueuePage(): void {
+    if (this.queuePage <= 1) return;
+    this.queuePage -= 1;
+    this.loadJobs();
+  }
+
+  nextQueuePage(): void {
+    if (this.queuePage >= this.jobsMetaTotalPages()) return;
+    this.queuePage += 1;
+    this.loadJobs();
+  }
+
+  resetQueueFilters(): void {
+    this.queueStatus = '';
+    this.queueJobType = '';
+    this.queueAssetId = '';
+    this.queueCreatedFrom = '';
+    this.queueCreatedTo = '';
+    this.loadJobs(true);
+  }
+
+  async runUsageReconcile(): Promise<void> {
+    try {
+      const job = await firstValueFrom(this.admin.requestMediaUsageReconcile());
+      this.pushJob(job);
+      this.toast.success('Usage reconciliation queued.');
+      if (this.tab() === 'queue') {
+        this.loadJobs(true);
+      }
+    } catch (err) {
+      this.toast.error((err as any)?.error?.detail || 'Failed to queue usage reconciliation.');
+    }
   }
 
   toggleSelected(assetId: string, event: Event): void {
@@ -699,7 +921,31 @@ export class DamAssetLibraryComponent implements OnInit {
     }
   }
 
+  private loadTelemetry(): void {
+    this.admin.getMediaTelemetry().subscribe({
+      next: (res) => this.telemetry.set(res),
+      error: () => {
+        // Keep stale telemetry visible if refresh fails.
+      }
+    });
+  }
+
+  private startQueuePolling(): void {
+    if (this.queuePollHandle != null) return;
+    this.queuePollHandle = setInterval(() => {
+      if (this.tab() !== 'queue') return;
+      this.loadJobs();
+    }, 8000);
+  }
+
+  private stopQueuePolling(): void {
+    if (this.queuePollHandle == null) return;
+    clearInterval(this.queuePollHandle);
+    this.queuePollHandle = null;
+  }
+
   private pushJob(job: MediaJob): void {
-    this.jobs.set([job, ...this.jobs()].slice(0, 20));
+    const merged = [job, ...this.jobs().filter((existing) => existing.id !== job.id)];
+    this.jobs.set(merged.slice(0, 20));
   }
 }
