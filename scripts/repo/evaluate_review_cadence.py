@@ -10,13 +10,16 @@ import os
 import re
 import subprocess
 import sys
+import urllib.parse
+import urllib.request
 from collections import Counter
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9._-]+$")
-_DEFAULT_OUTPUT_ROOTS = (Path("docs/reports"), Path("artifacts/repo-policy"))
+_OUTPUT_PATH_RE = re.compile(r"^(docs/reports|artifacts/repo-policy)/[A-Za-z0-9._/-]+$")
+_GITHUB_API_BASE = "https://api.github.com"
 
 
 def _iso_now() -> str:
@@ -60,42 +63,31 @@ def _validate_identifier(name: str, value: str) -> str:
     return cleaned
 
 
-def _allowed_output_roots() -> list[Path]:
-    cwd = Path.cwd().resolve()
-    return [(cwd / root).resolve() for root in _DEFAULT_OUTPUT_ROOTS]
-
-
 def _resolve_output_path(raw_path: str) -> Path:
-    candidate = Path(str(raw_path or "").strip())
-    if candidate.is_absolute():
-        raise ValueError("Output paths must be relative to repository root")
-    resolved = (Path.cwd() / candidate).resolve()
-    for root in _allowed_output_roots():
-        if resolved == root or root in resolved.parents:
-            return resolved
-    allowed = ", ".join(str(root.relative_to(Path.cwd())) for root in _allowed_output_roots())
-    raise ValueError(f"Output path must be under one of: {allowed}")
+    candidate = str(raw_path or "").strip().replace("\\", "/")
+    if not _OUTPUT_PATH_RE.fullmatch(candidate):
+        raise ValueError("Output path must be under docs/reports/ or artifacts/repo-policy/ with safe characters")
+    pure = PurePosixPath(candidate)
+    if pure.is_absolute() or ".." in pure.parts:
+        raise ValueError("Output paths must be relative and cannot contain traversal segments")
+    return Path.cwd().joinpath(*pure.parts)
 
 
 def _gh_api_json(endpoint: str, *, token: str, fields: dict[str, str]) -> Any:
-    cmd = [
-        "gh",
-        "api",
-        "--method",
-        "GET",
-        endpoint,
-        "-H",
-        "Accept: application/vnd.github+json",
-        "-H",
-        "X-GitHub-Api-Version: 2022-11-28",
-    ]
-    for key, value in fields.items():
-        cmd.extend(["-f", f"{key}={value}"])
-    env = os.environ.copy()
-    env["GH_TOKEN"] = token
-    env["GITHUB_TOKEN"] = token
-    out = subprocess.check_output(cmd, text=True, env=env)
-    return json.loads(out)
+    query = urllib.parse.urlencode(fields, doseq=False, safe="-._~")
+    url = f"{_GITHUB_API_BASE}{endpoint}?{query}" if query else f"{_GITHUB_API_BASE}{endpoint}"
+    request = urllib.request.Request(
+        url=url,
+        method="GET",
+        headers={
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {token}",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "repo-policy-phase2-evaluator",
+        },
+    )
+    with urllib.request.urlopen(request, timeout=30) as response:  # nosec B310: fixed GitHub API host
+        return json.loads(response.read().decode("utf-8"))
 
 
 def fetch_merged_prs(
