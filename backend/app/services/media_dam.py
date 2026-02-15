@@ -50,13 +50,14 @@ from app.models.user import UserRole
 from app.schemas.media import (
     MediaAssetRead,
     MediaAssetI18nRead,
+    MediaAssetUpdateI18nItem,
     MediaAssetUpdateRequest,
     MediaAssetUploadResponse,
-    MediaAssetUpdateI18nItem,
     MediaCollectionRead,
     MediaCollectionUpsertRequest,
-    MediaJobRead,
     MediaJobEventRead,
+    MediaJobRead,
+    MediaJobTriageStateLiteral,
     MediaTelemetryResponse,
     MediaTelemetryWorkerRead,
     MediaUsageEdgeRead,
@@ -129,9 +130,15 @@ def _normalize_job_tag(value: str) -> str:
     return _normalize_tag(value)
 
 
-def _coerce_triage_state(value: str | None, *, fallback: str = "open") -> str:
+def _coerce_triage_state(
+    value: str | None,
+    *,
+    fallback: MediaJobTriageStateLiteral = "open",
+) -> MediaJobTriageStateLiteral:
     raw = str(value or "").strip().lower()
-    return raw if raw in TRIAGE_STATES else fallback
+    if raw in TRIAGE_STATES:
+        return cast(MediaJobTriageStateLiteral, raw)
+    return fallback
 
 
 def _retry_delay_seconds(*, attempt: int, max_attempts: int) -> int | None:
@@ -1506,7 +1513,8 @@ async def update_job_triage(
 ) -> MediaJob:
     meta: dict[str, Any] = {}
     if triage_state:
-        job.triage_state = _coerce_triage_state(triage_state, fallback=job.triage_state or "open")
+        current_triage = _coerce_triage_state(job.triage_state, fallback="open")
+        job.triage_state = _coerce_triage_state(triage_state, fallback=current_triage)
         meta["triage_state"] = job.triage_state
     if clear_assignee:
         job.assigned_to_user_id = None
