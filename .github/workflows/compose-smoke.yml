@@ -88,7 +88,7 @@ jobs:
           home_html="$(mktemp)"
           curl -fsS http://localhost:4201/ > "$home_html"
           bundle_path="$(
-            grep -Eo "/[^\"[:space:]]+\.[0-9a-f]{8,}\.js" "$home_html" \
+            grep -Eo "/?[^\"[:space:]]+\.[0-9a-f]{8,}\.js" "$home_html" \
               | head -n 1 \
               || true
           )"
@@ -96,6 +96,7 @@ jobs:
             echo "Unable to find hashed JS bundle in homepage HTML" >&2
             exit 1
           fi
+          bundle_path="/${bundle_path#/}"
 
           bundle_headers="$(mktemp)"
           curl -fsSI "http://localhost:4201${bundle_path}" > "$bundle_headers"
