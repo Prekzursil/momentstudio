@@ -96,6 +96,14 @@ showing what is already implemented.
   - Evidence: `frontend/e2e/admin-dashboard-freeze.spec.ts`, `.github/workflows/compose-smoke.yml`, `frontend/playwright.config.ts`
 
 ## High priority (next)
+- [x] Admin Content IA: add a dedicated `/admin/content/media` workspace between Scheduling and Settings for site-wide media operations.
+  - Evidence: `frontend/src/app/app.routes.ts`, `frontend/src/app/pages/admin/content/admin-content-layout.component.ts`, `frontend/src/app/pages/admin/content/admin-content-media.component.ts`
+- [x] Media library: add sorting/date filters, asset details drawer, and rename action for uploaded images.
+  - Evidence: `backend/app/api/v1/content.py`, `backend/app/schemas/content.py`, `backend/tests/test_content_api.py`, `frontend/src/app/pages/admin/shared/asset-library.component.ts`, `frontend/src/app/core/admin.service.ts`
+- [x] Blog reliability: eliminate delayed first render by initializing blog/admin routes from snapshots and removing delayed image-visibility gating.
+  - Evidence: `frontend/src/app/pages/blog/blog-list.component.ts`, `frontend/src/app/pages/blog/blog-post.component.ts`, `frontend/src/app/pages/admin/admin.component.ts`
+- [x] Blog cover UX: support cover fit mode (`cover` vs `contain`) and document recommended dimensions to avoid unintended cropping.
+  - Evidence: `backend/app/services/blog.py`, `backend/app/schemas/blog.py`, `frontend/src/app/pages/admin/admin.component.ts`, `frontend/src/app/pages/blog/blog-list.component.ts`, `frontend/src/app/pages/blog/blog-post.component.ts`
 - [x] Search: make storefront/blog queries diacritics-insensitive (e.g. `brosa` matches `broșă`).
   - Evidence: `backend/app/services/catalog.py`, `backend/app/services/blog.py`
   - Evidence (tests): `backend/tests/test_search_normalization.py`
