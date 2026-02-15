@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Params } from '@angular/router';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { ErrorStateComponent } from '../../shared/error-state.component';
@@ -234,6 +234,7 @@ type BlogDraftState = {
   tags: string;
   series: string;
   cover_image_url: string;
+  cover_fit: 'cover' | 'contain';
   reading_time_minutes: string;
   pinned: boolean;
   pin_order: string;
@@ -5956,6 +5957,19 @@ class CmsDraftManager<T> {
                           [disabled]="blogEditLang !== blogBaseLang"
                         />
                         <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.blog.cover.hint' | translate }}</span>
+                        <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.blog.cover.sizeHint' | translate }}</span>
+                      </label>
+
+                      <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 sm:max-w-xs">
+                        {{ 'adminUi.blog.cover.fitModeLabel' | translate }}
+                        <select
+                          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                          [(ngModel)]="blogForm.cover_fit"
+                          [disabled]="blogEditLang !== blogBaseLang"
+                        >
+                          <option value="cover">{{ 'adminUi.blog.cover.fitModeCover' | translate }}</option>
+                          <option value="contain">{{ 'adminUi.blog.cover.fitModeContain' | translate }}</option>
+                        </select>
                       </label>
 
                       <div *ngIf="blogCoverPreviewUrl() as coverUrl" class="grid gap-3 sm:grid-cols-2">
@@ -5967,9 +5981,10 @@ class CmsDraftManager<T> {
                             <img
                               [src]="coverUrl"
                               [alt]="blogForm.title || 'cover'"
-                              class="w-full aspect-[16/9] object-cover"
+                              class="w-full aspect-[16/9]"
+                              [ngClass]="blogForm.cover_fit === 'contain' ? 'object-contain bg-slate-50 dark:bg-slate-900' : 'object-cover'"
                               [style.object-position]="blogCoverPreviewFocalPosition()"
-                              loading="lazy"
+                              loading="eager"
                               decoding="async"
                             />
                           </div>
@@ -5982,9 +5997,10 @@ class CmsDraftManager<T> {
                             <img
                               [src]="coverUrl"
                               [alt]="blogForm.title || 'cover'"
-                              class="w-full aspect-[1/1] object-cover"
+                              class="w-full aspect-[1/1]"
+                              [ngClass]="blogForm.cover_fit === 'contain' ? 'object-contain bg-slate-50 dark:bg-slate-900' : 'object-cover'"
                               [style.object-position]="blogCoverPreviewFocalPosition()"
-                              loading="lazy"
+                              loading="eager"
                               decoding="async"
                             />
                           </div>
@@ -7190,6 +7206,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 	    tags: '',
 	    series: '',
 	    cover_image_url: '',
+      cover_fit: 'cover' as 'cover' | 'contain',
 	    reading_time_minutes: '',
 	    pinned: false,
 	    pin_order: '1'
@@ -7607,6 +7624,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 	      tags: this.blogForm.tags,
 	      series: this.blogForm.series,
 	      cover_image_url: this.blogForm.cover_image_url,
+        cover_fit: this.blogForm.cover_fit,
 	      reading_time_minutes: this.blogForm.reading_time_minutes,
 	      pinned: Boolean(this.blogForm.pinned),
 	      pin_order: this.blogForm.pin_order
@@ -7905,30 +7923,15 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    const initialSection = this.normalizeSection(this.route.snapshot.data['section']);
+    this.applySection(initialSection);
+    this.applyContentEditQuery(initialSection, this.route.snapshot.queryParams || {});
+
     this.routeSub = combineLatest([this.route.data, this.route.queryParams]).subscribe(([data, query]) => {
       const next = this.normalizeSection(data['section']);
       this.applySection(next);
-
-      const raw = typeof query['edit'] === 'string' ? query['edit'] : '';
-      const cleaned = raw.trim();
-      if (!cleaned) return;
-
-      if (next === 'blog') {
-        const key = cleaned.startsWith('blog.') ? cleaned : `blog.${cleaned}`;
-        if (this.selectedBlogKey === key) return;
-        this.loadBlogEditor(key);
-        return;
-      }
-
-      if (next === 'pages') {
-        const key = isCmsGlobalSectionKey(cleaned) ? cleaned : cleaned.startsWith('page.') ? cleaned : `page.${cleaned}`;
-        const normalized = key.trim();
-        if (!normalized || normalized === 'page.') return;
-        if (normalized === this.pageBlocksKey) return;
-        this.onPageBlocksKeyChange(normalized as PageBuilderKey);
-      }
+      this.applyContentEditQuery(next, query || {});
     });
-    this.syncCmsDraftPoller(this.section());
   }
 
   ngOnDestroy(): void {
@@ -7990,6 +7993,27 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.resetSectionState(next);
     this.loadForSection(next);
     this.syncCmsDraftPoller(next);
+  }
+
+  private applyContentEditQuery(section: AdminContentSection, query: Params): void {
+    const raw = typeof query['edit'] === 'string' ? query['edit'] : '';
+    const cleaned = raw.trim();
+    if (!cleaned) return;
+
+    if (section === 'blog') {
+      const key = cleaned.startsWith('blog.') ? cleaned : `blog.${cleaned}`;
+      if (this.selectedBlogKey === key) return;
+      this.loadBlogEditor(key);
+      return;
+    }
+
+    if (section === 'pages') {
+      const key = isCmsGlobalSectionKey(cleaned) ? cleaned : cleaned.startsWith('page.') ? cleaned : `page.${cleaned}`;
+      const normalized = key.trim();
+      if (!normalized || normalized === 'page.') return;
+      if (normalized === this.pageBlocksKey) return;
+      this.onPageBlocksKeyChange(normalized as PageBuilderKey);
+    }
   }
 
   private syncCmsDraftPoller(section: AdminContentSection): void {
@@ -10545,6 +10569,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 	          tags: '',
 	          series: '',
 	          cover_image_url: '',
+            cover_fit: 'cover',
 	          reading_time_minutes: '',
 	          pinned: false,
 	          pin_order: '1'
@@ -10562,7 +10587,7 @@ export class AdminComponent implements OnInit, OnDestroy {
             focal_y: img.focal_y ?? 50
           }))
           .sort((a, b) => a.sort_order - b.sort_order);
-        this.blogImages = images;
+        this.blogImages = [...images];
         this.loadBlogVersions();
       },
       error: () => this.toast.error(this.t('adminUi.blog.errors.loadPost'))
@@ -10572,9 +10597,13 @@ export class AdminComponent implements OnInit, OnDestroy {
   private reloadContentBlocks(): void {
     this.admin.content().subscribe({
       next: (c) => {
-        this.contentBlocks = c;
-        this.syncContentVersions(c);
+        const nextBlocks = Array.isArray(c) ? [...c] : [];
+        this.contentBlocks = nextBlocks;
+        this.syncContentVersions(nextBlocks);
         this.pruneBlogBulkSelection();
+      },
+      error: () => {
+        this.contentBlocks = [];
       }
     });
   }
@@ -10590,6 +10619,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 	      tags: '',
 	      series: '',
 	      cover_image_url: '',
+        cover_fit: 'cover',
 	      reading_time_minutes: '',
 	      pinned: false,
 	      pin_order: '1'
@@ -10737,6 +10767,8 @@ export class AdminComponent implements OnInit, OnDestroy {
 
 	    const cover = meta['cover_image_url'] || meta['cover_image'] || '';
 	    this.blogForm.cover_image_url = typeof cover === 'string' ? cover : '';
+    const coverFit = typeof meta['cover_fit'] === 'string' ? String(meta['cover_fit']).trim().toLowerCase() : '';
+    this.blogForm.cover_fit = coverFit === 'contain' ? 'contain' : 'cover';
     const rt = meta['reading_time_minutes'] ?? meta['reading_time'] ?? '';
     this.blogForm.reading_time_minutes = rt ? String(rt) : '';
 
@@ -10768,6 +10800,8 @@ export class AdminComponent implements OnInit, OnDestroy {
 	    const cover = this.blogForm.cover_image_url.trim();
 	    if (cover) meta['cover_image_url'] = cover;
 	    else delete meta['cover_image_url'];
+    if (this.blogForm.cover_fit === 'contain') meta['cover_fit'] = 'contain';
+    else delete meta['cover_fit'];
 
     const rt = Number(String(this.blogForm.reading_time_minutes || '').trim());
     if (Number.isFinite(rt) && rt > 0) meta['reading_time_minutes'] = Math.trunc(rt);

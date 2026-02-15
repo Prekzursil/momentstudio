@@ -208,11 +208,10 @@ import { StructuredDataService } from '../../core/structured-data.service';
             <img
               [src]="heroPost.cover_image_url"
               [alt]="heroPost.title"
-              class="absolute inset-0 h-full w-full object-cover transition-opacity duration-300"
+              class="absolute inset-0 h-full w-full"
+              [ngClass]="coverImageClass(heroPost.cover_fit)"
               [style.object-position]="focalPosition(heroPost.cover_focal_x, heroPost.cover_focal_y)"
-              [class.opacity-0]="!isImageLoaded(heroPost.cover_image_url)"
-              (load)="markImageLoaded(heroPost.cover_image_url)"
-              loading="lazy"
+              loading="eager"
               decoding="async"
             />
           </div>
@@ -293,10 +292,9 @@ import { StructuredDataService } from '../../core/structured-data.service';
                       <img
                         [src]="post.cover_image_url"
                         [alt]="post.title"
-                        class="relative w-full aspect-[16/9] object-cover transition-opacity duration-300"
+                        class="relative w-full aspect-[16/9]"
+                        [ngClass]="coverImageClass(post.cover_fit)"
                         [style.object-position]="focalPosition(post.cover_focal_x, post.cover_focal_y)"
-                        [class.opacity-0]="!isImageLoaded(post.cover_image_url)"
-                        (load)="markImageLoaded(post.cover_image_url)"
                         loading="lazy"
                         decoding="async"
                       />
@@ -395,7 +393,6 @@ export class BlogListComponent implements OnInit, OnDestroy {
   tagQuery = '';
   seriesQuery = '';
   sort: BlogSort = 'newest';
-  private readonly loadedImages = new Set<string>();
   private readonly failedThumbs = new Set<string>();
   private loadSeq = 0;
 
@@ -416,11 +413,11 @@ export class BlogListComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
+    this.loadFromRoute(this.route.snapshot.params || {}, this.route.snapshot.queryParams || {});
     this.sub = combineLatest([this.route.params, this.route.queryParams]).subscribe(([routeParams, queryParams]) =>
       this.loadFromRoute(routeParams, queryParams)
     );
     this.langSub = this.translate.onLangChange.subscribe(() => this.load());
-    this.setMetaTags(1);
   }
 
   ngOnDestroy(): void {
@@ -674,14 +671,8 @@ export class BlogListComponent implements OnInit, OnDestroy {
     w.localStorage.setItem('blog_sort', value);
   }
 
-  markImageLoaded(src: string | null | undefined): void {
-    if (!src) return;
-    this.loadedImages.add(src);
-  }
-
-  isImageLoaded(src: string | null | undefined): boolean {
-    if (!src) return true;
-    return this.loadedImages.has(src);
+  coverImageClass(fit: string | null | undefined): string {
+    return fit === 'contain' ? 'object-contain bg-slate-50 dark:bg-slate-900' : 'object-cover';
   }
 
   thumbUrl(src: string | null | undefined): string | null {

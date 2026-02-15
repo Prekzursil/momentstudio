@@ -254,7 +254,8 @@ hljs.registerLanguage('typescript', typescript);
                 *ngIf="post()!.cover_image_url"
                 [src]="post()!.cover_image_url"
                 [alt]="post()!.title"
-                class="w-full aspect-[16/9] rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
+                class="w-full aspect-[16/9] rounded-2xl border border-slate-200 dark:border-slate-800"
+                [ngClass]="coverImageClass(post()!.cover_fit)"
                 [style.object-position]="focalPosition(post()!.cover_focal_x, post()!.cover_focal_y)"
                 loading="lazy"
               />
@@ -346,7 +347,8 @@ hljs.registerLanguage('typescript', typescript);
                     <img
                       [src]="related.cover_image_url"
                       [alt]="related.title"
-                      class="w-full aspect-[16/9] object-cover"
+                      class="w-full aspect-[16/9]"
+                      [ngClass]="coverImageClass(related.cover_fit)"
                       [style.object-position]="focalPosition(related.cover_focal_x, related.cover_focal_y)"
                       loading="lazy"
                       decoding="async"
@@ -954,6 +956,12 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
+    this.slug = this.route.snapshot.params['slug'];
+    const initialPreview = this.route.snapshot.queryParams?.['preview'];
+    this.previewToken = typeof initialPreview === 'string' ? initialPreview : '';
+    this.isPreview.set(!!this.previewToken);
+    this.load();
+
     this.routeSub = combineLatest([this.route.params, this.route.queryParams]).subscribe(([params, query]) => {
       this.slug = params['slug'];
       this.previewToken = typeof query['preview'] === 'string' ? query['preview'] : '';
@@ -1100,6 +1108,10 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     const x = Math.max(0, Math.min(100, Math.round(Number(focalX ?? 50))));
     const y = Math.max(0, Math.min(100, Math.round(Number(focalY ?? 50))));
     return `${x}% ${y}%`;
+  }
+
+  coverImageClass(fit: string | null | undefined): string {
+    return fit === 'contain' ? 'object-contain bg-slate-50 dark:bg-slate-900' : 'object-cover bg-slate-50 dark:bg-slate-800';
   }
 
   activeLang(): 'en' | 'ro' {
