@@ -104,9 +104,13 @@ showing what is already implemented.
   - Evidence: `frontend/src/app/pages/admin/content/admin-content-media.component.ts`, `frontend/src/app/pages/admin/shared/dam-asset-library.component.ts`, `frontend/src/app/core/admin.service.ts`, `frontend/src/app/pages/admin/shared/dam-asset-library.component.spec.ts`
 - [x] DAM migration: backfill legacy `content_images` into `media_assets` and preserve stable `/media/...` URLs during transition.
   - Evidence: `backend/alembic/versions/0152_create_media_dam_foundation.py`
-- [ ] DAM phase 2: add persistent job list/telemetry dashboard and worker process supervision hooks in production compose/deploy scripts.
-- [ ] DAM phase 2: extend deterministic usage graph beyond content blocks (catalog/blog/social) with field-level pointers and nightly reconciliation job.
-- [ ] DAM phase 2: enforce private-asset delivery via authenticated/signed access path (keep public `/media/*` only for approved public assets).
+- [x] DAM phase 2: add persistent job list/telemetry dashboard and worker process supervision hooks in production compose/deploy scripts.
+  - Evidence: `backend/app/api/v1/content.py`, `backend/app/services/media_dam.py`, `backend/app/workers/media_worker.py`, `frontend/src/app/pages/admin/shared/dam-asset-library.component.ts`, `frontend/src/app/pages/admin/ops/admin-ops.component.ts`, `infra/docker-compose.yml`, `infra/prod/docker-compose.yml`, `infra/prod/deploy.sh`, `infra/prod/README.md`
+- [x] DAM phase 2: extend deterministic usage graph beyond content blocks (catalog/blog/social) with field-level pointers and nightly reconciliation job.
+  - Evidence: `backend/app/services/media_dam.py`, `backend/app/services/media_usage_reconcile_scheduler.py`, `backend/app/main.py`, `backend/app/models/media.py`, `backend/app/schemas/media.py`, `backend/alembic/versions/0153_add_media_usage_reconcile_job_type.py`
+- [x] DAM phase 2: enforce private-asset delivery via authenticated/signed access path (keep public `/media/*` only for approved public assets).
+  - Evidence: `backend/app/services/media_dam.py`, `backend/app/api/v1/content.py`, `frontend/src/app/core/admin.service.ts`, `frontend/src/app/pages/admin/shared/dam-asset-library.component.ts`, `frontend/nginx/default.conf`, `infra/prod/Caddyfile`
+- [ ] DAM phase 3: add media-job retries with exponential backoff and dead-letter triage UI.
 - [x] Admin Content IA: add a dedicated `/admin/content/media` workspace between Scheduling and Settings for site-wide media operations.
   - Evidence: `frontend/src/app/app.routes.ts`, `frontend/src/app/pages/admin/content/admin-content-layout.component.ts`, `frontend/src/app/pages/admin/content/admin-content-media.component.ts`
 - [x] Media library: add sorting/date filters, asset details drawer, and rename action for uploaded images.
