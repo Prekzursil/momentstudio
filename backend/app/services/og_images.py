@@ -3,39 +3,13 @@ from __future__ import annotations
 import io
 from textwrap import wrap
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
+
+from app.services.font_utils import Font, load_font as _load_font
 
 
 OG_WIDTH = 1200
 OG_HEIGHT = 630
-
-
-Font = ImageFont.FreeTypeFont | ImageFont.ImageFont
-
-
-def _load_font(size: int, *, bold: bool = False) -> Font:
-    candidates = []
-    if bold:
-        candidates.extend(
-            [
-                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-            ]
-        )
-    else:
-        candidates.extend(
-            [
-                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-            ]
-        )
-    for path in candidates:
-        try:
-            return ImageFont.truetype(path, size=size)
-        except OSError:
-            continue
-    return ImageFont.load_default()
-
 
 def render_blog_post_og(*, title: str, subtitle: str | None = None, brand: str = "momentstudio") -> bytes:
     title = (title or "").strip() or "Blog"
