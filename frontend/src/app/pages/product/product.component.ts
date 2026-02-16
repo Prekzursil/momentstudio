@@ -43,6 +43,7 @@ import { SeoHeadLinksService } from '../../core/seo-head-links.service';
   ],
   template: `
     <app-container classes="py-10">
+      <h1 *ngIf="!product" class="sr-only">{{ 'product.handmade' | translate }}</h1>
       <ng-container *ngIf="loading; else content">
         <div class="grid gap-6 lg:grid-cols-2">
           <app-skeleton height="420px"></app-skeleton>
