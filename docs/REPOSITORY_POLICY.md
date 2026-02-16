@@ -39,6 +39,27 @@ The recommended labels are:
   - `priority:p1`
   - `priority:p2`
   - `priority:p3`
+- Audit:
+  - `audit:deep`
+  - `audit:ux`
+  - `audit:ia`
+  - `audit:seo`
+  - `audit:correctness`
+- Surface:
+  - `surface:storefront`
+  - `surface:account`
+  - `surface:admin`
+- Severity:
+  - `severity:s1`
+  - `severity:s2`
+  - `severity:s3`
+  - `severity:s4`
+- AI flow:
+  - `ai:ready`
+  - `ai:in-progress`
+  - `ai:automerge`
+  - `ai:blocked`
+  - `ai:done`
 
 Default GitHub labels (`bug`, `enhancement`, etc.) remain for compatibility.
 
@@ -50,6 +71,7 @@ Branch protection should require these checks for pull requests into `main`:
 - `Backend CI / backend-postgres (pull_request)`
 - `Frontend CI / frontend (pull_request)`
 - `Docker Compose Smoke / compose-smoke (pull_request)`
+- `Audit PR Evidence / audit-pr-evidence (pull_request)`
 
 Policy selection for this phase:
 
@@ -60,6 +82,40 @@ Policy selection for this phase:
 - Disallow force pushes/deletions: enabled
 
 Checks-only is the current steady-state policy for this repository. If contributor cadence changes in the future, review this document and explicitly update branch protection in a dedicated governance PR.
+
+## Evidence Pack vs Agent Pass
+
+This repository intentionally separates deterministic data collection from AI judgment:
+
+- Evidence Pack (deterministic CI):
+  - `Audit PR Evidence` and `Audit Weekly Evidence` collect route map, SEO snapshot, console/layout signals, screenshots, and deterministic findings.
+  - No LLM/API calls are used in CI evidence collection.
+- Agent Pass (Copilot issue assignment):
+  - `Audit Weekly Agent` updates the rolling issue `Weekly UX/IA Audit Digest`, upserts severe findings, and assigns `@copilot`.
+  - `Audit PR Deep Agent` is opt-in and only runs for PRs labeled `audit:deep`.
+
+## Workflow Permissions Model
+
+- `audit-pr-evidence.yml`: `contents: read`
+- `audit-weekly-evidence.yml`: `contents: read`
+- `audit-weekly-agent.yml`: `contents: read`, `issues: write`, `pull-requests: read`
+- `audit-pr-deep-agent.yml`: `contents: read`, `issues: write`, `pull-requests: read`
+
+Security constraints:
+
+- PR evidence workflow stays read-only.
+- No privileged `workflow_run` artifact-consumer chain is used for untrusted PR code.
+- Deep agent assignment skips fork PR auto-assignment and posts maintainer-run guidance in the issue.
+
+## Audit Tracking Rules
+
+- Severe findings (`severity:s1/s2`):
+  - upsert as individual issues using deterministic fingerprint dedupe.
+- Lower-severity findings (`severity:s3/s4`):
+  - kept in the rolling digest issue.
+- Deep PR agent pass:
+  - requires `audit:deep` label.
+  - produces/updates one deep-audit issue for that PR.
 
 ## Merge Strategy Guidance
 
@@ -84,21 +140,43 @@ The following commands can be used to apply remote policy directly:
 
 ```bash
 # Branch protection (checks-only)
+cat > /tmp/adrianaart-main-protection.json <<'JSON'
+{
+  "required_status_checks": {
+    "strict": true,
+    "contexts": [
+      "Backend CI / backend (pull_request)",
+      "Backend CI / backend-postgres (pull_request)",
+      "Frontend CI / frontend (pull_request)",
+      "Docker Compose Smoke / compose-smoke (pull_request)",
+      "Audit PR Evidence / audit-pr-evidence (pull_request)"
+    ]
+  },
+  "enforce_admins": false,
+  "required_pull_request_reviews": null,
+  "restrictions": null,
+  "required_linear_history": false,
+  "allow_force_pushes": false,
+  "allow_deletions": false,
+  "block_creations": false,
+  "required_conversation_resolution": false,
+  "lock_branch": false,
+  "allow_fork_syncing": false
+}
+JSON
+
 gh api \
   --method PUT \
   repos/Prekzursil/AdrianaArt/branches/main/protection \
   -H "Accept: application/vnd.github+json" \
-  -f required_status_checks.strict=true \
-  -f required_status_checks.contexts[]="Backend CI / backend (pull_request)" \
-  -f required_status_checks.contexts[]="Backend CI / backend-postgres (pull_request)" \
-  -f required_status_checks.contexts[]="Frontend CI / frontend (pull_request)" \
-  -f required_status_checks.contexts[]="Docker Compose Smoke / compose-smoke (pull_request)" \
-  -F enforce_admins=false \
-  -f required_pull_request_reviews= \
-  -f restrictions= \
-  -F allow_force_pushes=false \
-  -F allow_deletions=false \
-  -F required_conversation_resolution=false
+  --input /tmp/adrianaart-main-protection.json
+
+rm -f /tmp/adrianaart-main-protection.json
+```
+
+```bash
+# Optional helper: apply AI governance labels + required checks
+bash scripts/repo/apply_ai_governance.sh Prekzursil/AdrianaArt
 ```
 
 ```bash
