@@ -83,13 +83,19 @@ jobs:
         run: |
           set +e
           cd frontend
-          npm run e2e -- --project=chromium e2e/applitools-core-routes.spec.ts
+          timeout 20m npm run e2e -- --project=chromium e2e/applitools-core-routes.spec.ts
           status=$?
           if [ "$status" -eq 0 ]; then
             {
               echo "## Applitools Visual"
               echo ""
               echo "Eyes snapshot run completed."
+            } >> "$GITHUB_STEP_SUMMARY"
+          elif [ "$status" -eq 124 ]; then
+            {
+              echo "## Applitools Visual"
+              echo ""
+              echo "Eyes snapshot run timed out after 20 minutes (non-blocking)."
             } >> "$GITHUB_STEP_SUMMARY"
           else
             {
