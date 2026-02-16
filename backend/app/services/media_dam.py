@@ -5,6 +5,7 @@ import hmac
 import inspect
 import json
 import mimetypes
+import random
 import re
 import shutil
 from collections.abc import Awaitable
@@ -37,6 +38,7 @@ from app.models.media import (
     MediaCollectionItem,
     MediaJob,
     MediaJobEvent,
+    MediaJobRetryPolicy,
     MediaJobStatus,
     MediaJobTag,
     MediaJobTagLink,
@@ -57,6 +59,8 @@ from app.schemas.media import (
     MediaCollectionUpsertRequest,
     MediaJobEventRead,
     MediaJobRead,
+    MediaRetryPolicyRead,
+    MediaRetryPolicyUpdateRequest,
     MediaJobTriageStateLiteral,
     MediaTelemetryResponse,
     MediaTelemetryWorkerRead,
@@ -75,6 +79,17 @@ HEARTBEAT_PREFIX = str(getattr(settings, "media_dam_worker_heartbeat_prefix", "m
 RETRY_BACKOFF_SECONDS = (30, 120, 600, 1800)
 DEFAULT_MAX_ATTEMPTS = max(1, int(getattr(settings, "media_dam_retry_max_attempts", 5) or 5))
 TRIAGE_STATES = {"open", "retrying", "ignored", "resolved"}
+RETRY_POLICY_PAYLOAD_KEY = "__retry_policy"
+MAX_RETRY_POLICY_ATTEMPTS = 20
+
+DEFAULT_RETRY_POLICIES: dict[MediaJobType, dict[str, Any]] = {
+    MediaJobType.ingest: {"max_attempts": 5, "schedule": [30, 120, 600, 1800], "jitter_ratio": 0.15, "enabled": True},
+    MediaJobType.variant: {"max_attempts": 5, "schedule": [20, 90, 300, 900], "jitter_ratio": 0.20, "enabled": True},
+    MediaJobType.edit: {"max_attempts": 5, "schedule": [20, 90, 300, 900], "jitter_ratio": 0.20, "enabled": True},
+    MediaJobType.ai_tag: {"max_attempts": 4, "schedule": [60, 300, 900, 1800], "jitter_ratio": 0.20, "enabled": True},
+    MediaJobType.duplicate_scan: {"max_attempts": 4, "schedule": [120, 600, 1800], "jitter_ratio": 0.20, "enabled": True},
+    MediaJobType.usage_reconcile: {"max_attempts": 3, "schedule": [300, 900, 1800], "jitter_ratio": 0.10, "enabled": True},
+}
 
 PROFILE_DIMENSIONS: dict[str, tuple[int, int]] = {
     "thumb-320": (320, 320),
@@ -117,6 +132,15 @@ class MediaJobListFilters:
     dead_letter_only: bool = False
 
 
+@dataclass(slots=True)
+class RetryPolicyResolved:
+    max_attempts: int
+    schedule: list[int]
+    jitter_ratio: float
+    enabled: bool
+    version_ts: str
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -141,13 +165,85 @@ def _coerce_triage_state(
     return fallback
 
 
-def _retry_delay_seconds(*, attempt: int, max_attempts: int) -> int | None:
+def _default_retry_policy(job_type: MediaJobType) -> RetryPolicyResolved:
+    raw = DEFAULT_RETRY_POLICIES.get(job_type, DEFAULT_RETRY_POLICIES[MediaJobType.ingest])
+    schedule = [max(1, int(v)) for v in list(raw.get("schedule") or list(RETRY_BACKOFF_SECONDS))]
+    return RetryPolicyResolved(
+        max_attempts=max(1, min(MAX_RETRY_POLICY_ATTEMPTS, int(raw.get("max_attempts") or DEFAULT_MAX_ATTEMPTS))),
+        schedule=schedule or list(RETRY_BACKOFF_SECONDS),
+        jitter_ratio=max(0.0, min(1.0, float(raw.get("jitter_ratio") or 0.0))),
+        enabled=bool(raw.get("enabled", True)),
+        version_ts="seed",
+    )
+
+
+def _normalize_retry_policy_fields(
+    *,
+    max_attempts: int | None,
+    schedule: list[int] | None,
+    jitter_ratio: float | None,
+    enabled: bool | None,
+    fallback: RetryPolicyResolved,
+) -> RetryPolicyResolved:
+    attempts = fallback.max_attempts if max_attempts is None else int(max_attempts)
+    attempts = max(1, min(MAX_RETRY_POLICY_ATTEMPTS, attempts))
+    if schedule is None:
+        normalized_schedule = list(fallback.schedule)
+    else:
+        normalized_schedule = [int(value) for value in list(schedule)]
+    if not normalized_schedule:
+        normalized_schedule = [30]
+    ratio = fallback.jitter_ratio if jitter_ratio is None else float(jitter_ratio)
+    ratio = max(0.0, min(1.0, ratio))
+    is_enabled = fallback.enabled if enabled is None else bool(enabled)
+    return RetryPolicyResolved(
+        max_attempts=attempts,
+        schedule=normalized_schedule,
+        jitter_ratio=ratio,
+        enabled=is_enabled,
+        version_ts=fallback.version_ts,
+    )
+
+
+def _retry_policy_from_payload(payload: dict[str, Any], *, job_type: MediaJobType) -> RetryPolicyResolved | None:
+    raw = payload.get(RETRY_POLICY_PAYLOAD_KEY)
+    if not isinstance(raw, dict):
+        return None
+    try:
+        schedule = [max(1, int(v)) for v in list(raw.get("schedule") or [])]
+        attempts = int(raw.get("max_attempts") or 0)
+        jitter = float(raw.get("jitter_ratio") or 0.0)
+        if attempts < 1 or not schedule:
+            return None
+        return RetryPolicyResolved(
+            max_attempts=max(1, min(MAX_RETRY_POLICY_ATTEMPTS, attempts)),
+            schedule=schedule,
+            jitter_ratio=max(0.0, min(1.0, jitter)),
+            enabled=bool(raw.get("enabled", True)),
+            version_ts=str(raw.get("version_ts") or "snapshot"),
+        )
+    except Exception:
+        return None
+
+
+def _retry_delay_seconds(
+    *,
+    attempt: int,
+    max_attempts: int,
+    schedule: list[int],
+    jitter_ratio: float,
+) -> int | None:
     if attempt >= max_attempts:
         return None
+    if not schedule:
+        schedule = list(RETRY_BACKOFF_SECONDS)
     idx = max(1, int(attempt)) - 1
-    if idx < len(RETRY_BACKOFF_SECONDS):
-        return RETRY_BACKOFF_SECONDS[idx]
-    return RETRY_BACKOFF_SECONDS[-1]
+    base = schedule[idx] if idx < len(schedule) else schedule[-1]
+    base = max(1, int(base))
+    ratio = max(0.0, min(1.0, float(jitter_ratio)))
+    if ratio <= 0:
+        return base
+    return max(1, int(round(base * (1.0 + random.uniform(-ratio, ratio)))))
 
 
 def _guess_asset_type(content_type: str | None, filename: str | None) -> MediaAssetType:
@@ -357,13 +453,22 @@ async def enqueue_job(
     created_by_user_id: UUID | None,
     max_attempts: int | None = None,
 ) -> MediaJob:
-    attempts = max(1, int(max_attempts or DEFAULT_MAX_ATTEMPTS))
+    payload_data = dict(payload or {})
+    policy_snapshot = _retry_policy_from_payload(payload_data, job_type=job_type)
+    if policy_snapshot is None:
+        resolved_policy = await get_retry_policy_for_job_type(session, job_type)
+    else:
+        resolved_policy = policy_snapshot
+    if max_attempts is not None:
+        resolved_policy.max_attempts = max(1, min(MAX_RETRY_POLICY_ATTEMPTS, int(max_attempts)))
+    payload_data[RETRY_POLICY_PAYLOAD_KEY] = _resolved_policy_to_snapshot(resolved_policy)
+    attempts = max(1, int(resolved_policy.max_attempts or DEFAULT_MAX_ATTEMPTS))
     job = MediaJob(
         id=uuid4(),
         asset_id=asset_id,
         job_type=job_type,
         status=MediaJobStatus.queued,
-        payload_json=json.dumps(payload or {}, separators=(",", ":"), ensure_ascii=False),
+        payload_json=json.dumps(payload_data, separators=(",", ":"), ensure_ascii=False),
         progress_pct=0,
         attempt=0,
         max_attempts=attempts,
@@ -377,7 +482,13 @@ async def enqueue_job(
         job=job,
         actor_user_id=created_by_user_id,
         action="queued",
-        meta={"job_type": job.job_type.value, "max_attempts": attempts},
+        meta={
+            "job_type": job.job_type.value,
+            "max_attempts": attempts,
+            "schedule": resolved_policy.schedule,
+            "jitter_ratio": resolved_policy.jitter_ratio,
+            "policy_version": resolved_policy.version_ts,
+        },
     )
     return job
 
@@ -418,6 +529,192 @@ async def _record_job_event(
         )
     )
     await session.flush()
+
+
+def _parse_schedule_json(value: str | None, *, fallback: list[int]) -> list[int]:
+    try:
+        raw = json.loads(value or "[]")
+    except Exception:
+        raw = []
+    out: list[int] = []
+    for item in raw if isinstance(raw, list) else []:
+        if not isinstance(item, (int, float, str)) or not str(item).strip():
+            continue
+        try:
+            out.append(max(1, int(item)))
+        except Exception:
+            continue
+    return out or list(fallback)
+
+
+def _policy_row_to_resolved(row: MediaJobRetryPolicy | None, *, job_type: MediaJobType) -> RetryPolicyResolved:
+    fallback = _default_retry_policy(job_type)
+    if row is None:
+        return fallback
+    version_ts = (row.updated_at or row.created_at or _now()).isoformat()
+    return _normalize_retry_policy_fields(
+        max_attempts=row.max_attempts,
+        schedule=_parse_schedule_json(row.backoff_schedule_json, fallback=fallback.schedule),
+        jitter_ratio=row.jitter_ratio,
+        enabled=row.enabled,
+        fallback=RetryPolicyResolved(
+            max_attempts=fallback.max_attempts,
+            schedule=fallback.schedule,
+            jitter_ratio=fallback.jitter_ratio,
+            enabled=fallback.enabled,
+            version_ts=version_ts,
+        ),
+    )
+
+
+def _resolved_policy_to_snapshot(policy: RetryPolicyResolved) -> dict[str, Any]:
+    return {
+        "max_attempts": int(policy.max_attempts),
+        "schedule": [int(v) for v in policy.schedule],
+        "jitter_ratio": float(policy.jitter_ratio),
+        "enabled": bool(policy.enabled),
+        "version_ts": str(policy.version_ts),
+    }
+
+
+def _retry_policy_to_read(job_type: MediaJobType, policy: RetryPolicyResolved, row: MediaJobRetryPolicy | None) -> MediaRetryPolicyRead:
+    created_at = row.created_at if row is not None else _now()
+    updated_at = row.updated_at if row is not None else created_at
+    updated_by_user_id = row.updated_by_user_id if row is not None else None
+    return MediaRetryPolicyRead(
+        job_type=job_type.value,
+        max_attempts=int(policy.max_attempts),
+        backoff_schedule_seconds=[int(v) for v in policy.schedule],
+        jitter_ratio=float(policy.jitter_ratio),
+        enabled=bool(policy.enabled),
+        updated_by_user_id=updated_by_user_id,
+        created_at=created_at,
+        updated_at=updated_at,
+    )
+
+
+def _parse_job_type(value: str | MediaJobType) -> MediaJobType:
+    if isinstance(value, MediaJobType):
+        return value
+    try:
+        return MediaJobType(str(value or "").strip())
+    except Exception as exc:
+        raise ValueError("Invalid media job type") from exc
+
+
+def _validate_schedule(values: list[int] | None) -> list[int]:
+    normalized: list[int] = []
+    for raw in list(values or []):
+        value = int(raw)
+        if value <= 0:
+            raise ValueError("Retry schedule values must be positive integers")
+        normalized.append(value)
+    if not normalized:
+        raise ValueError("Retry schedule must include at least one positive delay")
+    if len(normalized) > 20:
+        raise ValueError("Retry schedule cannot exceed 20 entries")
+    return normalized
+
+
+def _validate_policy_payload(payload: MediaRetryPolicyUpdateRequest) -> None:
+    if payload.max_attempts is not None:
+        attempts = int(payload.max_attempts)
+        if attempts < 1 or attempts > MAX_RETRY_POLICY_ATTEMPTS:
+            raise ValueError(f"max_attempts must be between 1 and {MAX_RETRY_POLICY_ATTEMPTS}")
+    if payload.backoff_schedule_seconds is not None:
+        _validate_schedule(payload.backoff_schedule_seconds)
+    if payload.jitter_ratio is not None:
+        ratio = float(payload.jitter_ratio)
+        if ratio < 0.0 or ratio > 1.0:
+            raise ValueError("jitter_ratio must be between 0 and 1")
+
+
+async def get_retry_policy_for_job_type(session: AsyncSession, job_type: MediaJobType) -> RetryPolicyResolved:
+    row = await session.scalar(select(MediaJobRetryPolicy).where(MediaJobRetryPolicy.job_type == job_type))
+    return _policy_row_to_resolved(row, job_type=job_type)
+
+
+async def list_retry_policies(session: AsyncSession) -> list[MediaRetryPolicyRead]:
+    rows = (
+        await session.execute(select(MediaJobRetryPolicy).order_by(MediaJobRetryPolicy.job_type.asc()))
+    ).scalars().all()
+    by_type = {row.job_type: row for row in rows}
+    out: list[MediaRetryPolicyRead] = []
+    for job_type in MediaJobType:
+        row = by_type.get(job_type)
+        resolved = _policy_row_to_resolved(row, job_type=job_type)
+        out.append(_retry_policy_to_read(job_type, resolved, row))
+    return out
+
+
+async def upsert_retry_policy(
+    session: AsyncSession,
+    *,
+    job_type: str | MediaJobType,
+    payload: MediaRetryPolicyUpdateRequest,
+    updated_by_user_id: UUID | None,
+) -> MediaRetryPolicyRead:
+    _validate_policy_payload(payload)
+    parsed_job_type = _parse_job_type(job_type)
+    row = await session.scalar(select(MediaJobRetryPolicy).where(MediaJobRetryPolicy.job_type == parsed_job_type))
+    if row is None:
+        base = _default_retry_policy(parsed_job_type)
+        row = MediaJobRetryPolicy(
+            job_type=parsed_job_type,
+            max_attempts=base.max_attempts,
+            backoff_schedule_json=json.dumps(base.schedule, separators=(",", ":")),
+            jitter_ratio=base.jitter_ratio,
+            enabled=base.enabled,
+            updated_by_user_id=updated_by_user_id,
+        )
+        session.add(row)
+        await session.flush()
+    current = _policy_row_to_resolved(row, job_type=parsed_job_type)
+    resolved = _normalize_retry_policy_fields(
+        max_attempts=payload.max_attempts,
+        schedule=payload.backoff_schedule_seconds,
+        jitter_ratio=payload.jitter_ratio,
+        enabled=payload.enabled,
+        fallback=current,
+    )
+    row.max_attempts = resolved.max_attempts
+    row.backoff_schedule_json = json.dumps(_validate_schedule(resolved.schedule), separators=(",", ":"))
+    row.jitter_ratio = resolved.jitter_ratio
+    row.enabled = resolved.enabled
+    row.updated_by_user_id = updated_by_user_id
+    session.add(row)
+    await session.commit()
+    await session.refresh(row)
+    return _retry_policy_to_read(parsed_job_type, _policy_row_to_resolved(row, job_type=parsed_job_type), row)
+
+
+async def reset_retry_policy(
+    session: AsyncSession,
+    *,
+    job_type: str | MediaJobType,
+    updated_by_user_id: UUID | None,
+) -> MediaRetryPolicyRead:
+    parsed_job_type = _parse_job_type(job_type)
+    fallback = _default_retry_policy(parsed_job_type)
+    row = await session.scalar(select(MediaJobRetryPolicy).where(MediaJobRetryPolicy.job_type == parsed_job_type))
+    if row is None:
+        row = MediaJobRetryPolicy(job_type=parsed_job_type)
+    row.max_attempts = fallback.max_attempts
+    row.backoff_schedule_json = json.dumps(fallback.schedule, separators=(",", ":"))
+    row.jitter_ratio = fallback.jitter_ratio
+    row.enabled = fallback.enabled
+    row.updated_by_user_id = updated_by_user_id
+    session.add(row)
+    await session.commit()
+    await session.refresh(row)
+    return _retry_policy_to_read(parsed_job_type, _policy_row_to_resolved(row, job_type=parsed_job_type), row)
+
+
+async def reset_all_retry_policies(session: AsyncSession, *, updated_by_user_id: UUID | None) -> list[MediaRetryPolicyRead]:
+    out: list[MediaRetryPolicyRead] = []
+    for job_type in MediaJobType:
+        out.append(await reset_retry_policy(session, job_type=job_type, updated_by_user_id=updated_by_user_id))
+    return out
 
 
 async def _apply_job_tag_changes(
@@ -1114,6 +1411,16 @@ def _detect_image_dimensions(path: Path) -> tuple[int | None, int | None]:
 
 
 async def process_job_inline(session: AsyncSession, job: MediaJob) -> MediaJob:
+    payload = _job_payload(job)
+    retry_policy = _retry_policy_from_payload(payload, job_type=job.job_type)
+    if retry_policy is None:
+        retry_policy = await get_retry_policy_for_job_type(session, job.job_type)
+    if RETRY_POLICY_PAYLOAD_KEY not in payload:
+        payload[RETRY_POLICY_PAYLOAD_KEY] = _resolved_policy_to_snapshot(retry_policy)
+        job.payload_json = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
+    if not int(job.max_attempts or 0):
+        job.max_attempts = int(retry_policy.max_attempts)
+
     job.status = MediaJobStatus.processing
     job.triage_state = "retrying" if job.attempt > 0 else _coerce_triage_state(job.triage_state, fallback="open")
     job.started_at = _now()
@@ -1152,7 +1459,17 @@ async def process_job_inline(session: AsyncSession, job: MediaJob) -> MediaJob:
         )
     except Exception as exc:
         now = _now()
-        delay = _retry_delay_seconds(attempt=int(job.attempt or 0), max_attempts=max(1, int(job.max_attempts or DEFAULT_MAX_ATTEMPTS)))
+        effective_max_attempts = max(1, int(job.max_attempts or retry_policy.max_attempts or DEFAULT_MAX_ATTEMPTS))
+        delay = (
+            None
+            if not retry_policy.enabled
+            else _retry_delay_seconds(
+                attempt=int(job.attempt or 0),
+                max_attempts=effective_max_attempts,
+                schedule=list(retry_policy.schedule),
+                jitter_ratio=float(retry_policy.jitter_ratio),
+            )
+        )
         job.last_error_at = now
         job.error_code = "processing_failed"
         job.error_message = str(exc)
@@ -1167,7 +1484,13 @@ async def process_job_inline(session: AsyncSession, job: MediaJob) -> MediaJob:
                 job=job,
                 action="dead_lettered",
                 note=str(exc),
-                meta={"attempt": int(job.attempt or 0), "max_attempts": int(job.max_attempts or DEFAULT_MAX_ATTEMPTS)},
+                meta={
+                    "attempt": int(job.attempt or 0),
+                    "max_attempts": effective_max_attempts,
+                    "schedule": retry_policy.schedule,
+                    "jitter_ratio": retry_policy.jitter_ratio,
+                    "policy_enabled": retry_policy.enabled,
+                },
             )
         else:
             job.status = MediaJobStatus.failed
@@ -1180,8 +1503,10 @@ async def process_job_inline(session: AsyncSession, job: MediaJob) -> MediaJob:
                 note=str(exc),
                 meta={
                     "attempt": int(job.attempt or 0),
-                    "max_attempts": int(job.max_attempts or DEFAULT_MAX_ATTEMPTS),
+                    "max_attempts": effective_max_attempts,
                     "retry_in_seconds": int(delay),
+                    "schedule": retry_policy.schedule,
+                    "jitter_ratio": retry_policy.jitter_ratio,
                 },
             )
     session.add(job)

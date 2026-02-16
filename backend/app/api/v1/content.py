@@ -66,6 +66,9 @@ from app.schemas.media import (
     MediaJobEventsResponse,
     MediaJobListResponse,
     MediaJobRetryBulkRequest,
+    MediaRetryPolicyListResponse,
+    MediaRetryPolicyRead,
+    MediaRetryPolicyUpdateRequest,
     MediaRejectRequest,
     MediaTelemetryResponse,
     MediaJobTriageUpdateRequest,
@@ -112,6 +115,11 @@ def _normalize_image_tags(tags: list[str]) -> list[str]:
         if len(normalized) >= 10:
             break
     return normalized
+
+
+def _require_owner_or_admin(user: User, *, detail: str = "Only owner/admin can perform this action") -> None:
+    if user.role not in (UserRole.owner, UserRole.admin):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=detail)
 
 
 def _redirect_key_to_display_value(key: str) -> str:
@@ -1204,8 +1212,7 @@ async def admin_approve_media_asset(
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("content")),
 ) -> MediaAssetRead:
-    if admin.role not in (UserRole.owner, UserRole.admin):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only owner/admin can approve assets")
+    _require_owner_or_admin(admin, detail="Only owner/admin can approve assets")
     try:
         asset = await media_dam.get_asset_or_404(session, asset_id)
     except ValueError:
@@ -1228,8 +1235,7 @@ async def admin_reject_media_asset(
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("content")),
 ) -> MediaAssetRead:
-    if admin.role not in (UserRole.owner, UserRole.admin):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only owner/admin can reject assets")
+    _require_owner_or_admin(admin, detail="Only owner/admin can reject assets")
     try:
         asset = await media_dam.get_asset_or_404(session, asset_id)
     except ValueError:
@@ -1278,8 +1284,7 @@ async def admin_purge_media_asset(
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("content")),
 ) -> Response:
-    if admin.role not in (UserRole.owner, UserRole.admin):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only owner/admin can purge assets")
+    _require_owner_or_admin(admin, detail="Only owner/admin can purge assets")
     try:
         asset = await media_dam.get_asset_or_404(session, asset_id)
     except ValueError:
@@ -1431,6 +1436,57 @@ async def admin_media_telemetry(
     _: User = Depends(require_admin_section("content")),
 ) -> MediaTelemetryResponse:
     return await media_dam.get_telemetry(session)
+
+
+@router.get("/admin/media/retry-policies", response_model=MediaRetryPolicyListResponse)
+async def admin_media_retry_policies(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> MediaRetryPolicyListResponse:
+    items = await media_dam.list_retry_policies(session)
+    return MediaRetryPolicyListResponse(items=items)
+
+
+@router.patch("/admin/media/retry-policies/{job_type}", response_model=MediaRetryPolicyRead)
+async def admin_update_media_retry_policy(
+    job_type: str,
+    payload: MediaRetryPolicyUpdateRequest,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> MediaRetryPolicyRead:
+    _require_owner_or_admin(admin, detail="Only owner/admin can update retry policies")
+    try:
+        return await media_dam.upsert_retry_policy(
+            session,
+            job_type=job_type,
+            payload=payload,
+            updated_by_user_id=admin.id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@router.post("/admin/media/retry-policies/{job_type}/reset", response_model=MediaRetryPolicyRead)
+async def admin_reset_media_retry_policy(
+    job_type: str,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> MediaRetryPolicyRead:
+    _require_owner_or_admin(admin, detail="Only owner/admin can reset retry policies")
+    try:
+        return await media_dam.reset_retry_policy(session, job_type=job_type, updated_by_user_id=admin.id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@router.post("/admin/media/retry-policies/reset-all", response_model=MediaRetryPolicyListResponse)
+async def admin_reset_all_media_retry_policies(
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> MediaRetryPolicyListResponse:
+    _require_owner_or_admin(admin, detail="Only owner/admin can reset retry policies")
+    items = await media_dam.reset_all_retry_policies(session, updated_by_user_id=admin.id)
+    return MediaRetryPolicyListResponse(items=items)
 
 
 @router.post("/admin/media/usage/reconcile", response_model=MediaJobRead)

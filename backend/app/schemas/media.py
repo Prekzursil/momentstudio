@@ -13,6 +13,7 @@ MediaVisibilityLiteral = Literal["public", "private"]
 MediaJobStatusLiteral = Literal["queued", "processing", "completed", "failed", "dead_letter"]
 MediaJobTypeLiteral = Literal["ingest", "variant", "edit", "ai_tag", "duplicate_scan", "usage_reconcile"]
 MediaJobTriageStateLiteral = Literal["open", "retrying", "ignored", "resolved"]
+MediaRetryPolicyJobTypeLiteral = MediaJobTypeLiteral
 
 
 class MediaAssetI18nRead(BaseModel):
@@ -184,6 +185,30 @@ class MediaJobEventRead(BaseModel):
 
 class MediaJobEventsResponse(BaseModel):
     items: list[MediaJobEventRead]
+
+
+class MediaRetryPolicyRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    job_type: MediaRetryPolicyJobTypeLiteral
+    max_attempts: int
+    backoff_schedule_seconds: list[int] = Field(default_factory=list)
+    jitter_ratio: float
+    enabled: bool = True
+    updated_by_user_id: UUID | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class MediaRetryPolicyListResponse(BaseModel):
+    items: list[MediaRetryPolicyRead]
+
+
+class MediaRetryPolicyUpdateRequest(BaseModel):
+    max_attempts: int | None = Field(default=None, ge=1, le=20)
+    backoff_schedule_seconds: list[int] | None = Field(default=None, min_length=1, max_length=20)
+    jitter_ratio: float | None = Field(default=None, ge=0.0, le=1.0)
+    enabled: bool | None = None
 
 
 class MediaJobRetryBulkRequest(BaseModel):

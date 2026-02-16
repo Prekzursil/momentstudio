@@ -4,7 +4,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -294,6 +294,24 @@ class MediaJobTagLink(Base):
 
     job: Mapped[MediaJob] = relationship("MediaJob", back_populates="tags")
     tag: Mapped[MediaJobTag] = relationship("MediaJobTag", lazy="joined")
+
+
+class MediaJobRetryPolicy(Base):
+    __tablename__ = "media_job_retry_policies"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    job_type: Mapped[MediaJobType] = mapped_column(Enum(MediaJobType), nullable=False, unique=True, index=True)
+    max_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
+    backoff_schedule_json: Mapped[str] = mapped_column(Text, nullable=False, default="[30,120,600,1800]")
+    jitter_ratio: Mapped[float] = mapped_column(Float, nullable=False, default=0.15)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    updated_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
 
 
 class MediaCollection(Base):
