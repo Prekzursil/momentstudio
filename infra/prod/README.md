@@ -64,11 +64,16 @@ Edit:
   - set `ENVIRONMENT=production`
   - set a strong `SECRET_KEY`
   - optional (recommended for multi-replica): set `REDIS_URL=redis://redis:6379/0`
+  - optional backend Sentry: set `SENTRY_DSN=...` and sample rates
+  - `SENTRY_SEND_DEFAULT_PII=1` is the default repository policy
   - optional CAPTCHA (Cloudflare Turnstile): set `CAPTCHA_ENABLED=1` and `TURNSTILE_SECRET_KEY=...`
   - configure Stripe/PayPal/Netopia + SMTP as needed
 - `frontend/.env`
   - set `APP_ENV=production`
   - keep `API_BASE_URL=/api/v1`
+  - optional Clarity: set `FRONTEND_CLARITY_PROJECT_ID=...` and `CLARITY_ENABLED=1`
+  - optional frontend Sentry: set `SENTRY_DSN=...` and replay/trace rates
+  - `SENTRY_SEND_DEFAULT_PII=1` is the default repository policy
   - optional CAPTCHA (Cloudflare Turnstile): set `CAPTCHA_SITE_KEY=...`
 
 ## 3) Deploy / update
@@ -107,6 +112,11 @@ SSR rollback switch (one release window):
    ```bash
    ./infra/prod/reload-env.sh caddy
    ```
+
+Clarity CSP note:
+
+- Production CSP already allows `https://www.clarity.ms` for scripts and `https://www.clarity.ms` / `https://c.clarity.ms` for network connections.
+- Keep Clarity consent-gated and storefront-only; do not initialize on authenticated/admin routes.
 
 Sameday mirror post-deploy check:
 

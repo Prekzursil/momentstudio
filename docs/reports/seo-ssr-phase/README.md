@@ -5,9 +5,11 @@ This folder stores evidence artifacts for the SSR crawlability upgrade.
 ## KPI targets (indexable routes)
 
 - Missing title: `0`
+- Missing description: `0`
 - Missing canonical: `0`
 - Missing primary route heading (`h1[data-route-heading="true"]`): `0`
 - No meaningful initial HTML text: `0`
+- Low internal links: near-zero (allowlist-only exceptions)
 - Duplicate title/description: near-zero (allowlist-only intentional duplicates)
 
 ## Artifact sources
@@ -20,3 +22,4 @@ This folder stores evidence artifacts for the SSR crawlability upgrade.
 
 - Noindex routes are excluded from strict indexed KPI gating.
 - Public route checks remain deterministic and versioned in CI artifacts.
+- Route-level SEO debt issues are automatically upserted weekly for indexable `s1/s2` and indexable SEO `s3` findings.

@@ -54,7 +54,8 @@ async function assertPublicRouteSeo(page, route: string, expectedPathname: strin
   const canonical = new URL(seo.canonicalHref, currentOrigin);
   expect(canonical.origin).toBe(currentOrigin);
   expect(canonical.pathname).toBe(expectedPathname);
-  expect(canonical.searchParams.get('lang')).toBeTruthy();
+  // Canonical policy: clean EN URLs (no `?lang=en`), RO keeps `?lang=ro`.
+  expect(canonical.searchParams.get('lang')).toBeNull();
   expect(canonical.searchParams.get('q')).toBeNull();
   expect(canonical.searchParams.get('sort')).toBeNull();
 }

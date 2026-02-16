@@ -36,6 +36,7 @@ function initSentryAsync(): Promise<SentryModule | null> {
         dsn: appConfig.sentryDsn,
         environment: appConfig.appEnv,
         ...(appConfig.appVersion ? { release: appConfig.appVersion } : {}),
+        sendDefaultPii: appConfig.sentrySendDefaultPii,
         tracesSampleRate,
         replaysSessionSampleRate: replaySessionSampleRate,
         replaysOnErrorSampleRate: replayOnErrorSampleRate,

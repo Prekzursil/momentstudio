@@ -36,13 +36,25 @@ STRIPE_ENABLED_RAW="${STRIPE_ENABLED:-}"
 PAYPAL_ENABLED="${PAYPAL_ENABLED:-}"
 NETOPIA_ENABLED="${NETOPIA_ENABLED:-}"
 ADDRESS_AUTOCOMPLETE_ENABLED="${ADDRESS_AUTOCOMPLETE_ENABLED:-}"
+FRONTEND_CLARITY_PROJECT_ID="${FRONTEND_CLARITY_PROJECT_ID:-}"
+CLARITY_ENABLED="${CLARITY_ENABLED:-}"
 SENTRY_DSN="${SENTRY_DSN:-}"
+SENTRY_SEND_DEFAULT_PII="${SENTRY_SEND_DEFAULT_PII:-1}"
 SENTRY_TRACES_SAMPLE_RATE="${SENTRY_TRACES_SAMPLE_RATE:-0}"
 SENTRY_REPLAY_SESSION_SAMPLE_RATE="${SENTRY_REPLAY_SESSION_SAMPLE_RATE:-0}"
 SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE="${SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE:-0}"
 CAPTCHA_SITE_KEY="${CAPTCHA_SITE_KEY:-}"
 
 stripe_enabled="$(truthy "$STRIPE_ENABLED_RAW")"
+
+clarity_enabled="false"
+trimmed_clarity_enabled="$(printf '%s' "$CLARITY_ENABLED" | sed 's/^ *//; s/ *$//')"
+trimmed_clarity_project_id="$(printf '%s' "$FRONTEND_CLARITY_PROJECT_ID" | sed 's/^ *//; s/ *$//')"
+if [ -n "$trimmed_clarity_enabled" ]; then
+  clarity_enabled="$(truthy "$trimmed_clarity_enabled")"
+elif [ -n "$trimmed_clarity_project_id" ]; then
+  clarity_enabled="true"
+fi
 
 mkdir -p "$(dirname "$CONFIG_PATH")"
 
@@ -56,7 +68,10 @@ window.__APP_CONFIG__ = {
   "paypalEnabled": $(truthy "$PAYPAL_ENABLED"),
   "netopiaEnabled": $(truthy "$NETOPIA_ENABLED"),
   "addressAutocompleteEnabled": $(truthy "$ADDRESS_AUTOCOMPLETE_ENABLED"),
+  "clarityProjectId": "$(escape "$FRONTEND_CLARITY_PROJECT_ID")",
+  "clarityEnabled": ${clarity_enabled},
   "sentryDsn": "$(escape "$SENTRY_DSN")",
+  "sentrySendDefaultPii": $(truthy "$SENTRY_SEND_DEFAULT_PII"),
   "sentryTracesSampleRate": $(decimal_or_default "$SENTRY_TRACES_SAMPLE_RATE" "0"),
   "sentryReplaySessionSampleRate": $(decimal_or_default "$SENTRY_REPLAY_SESSION_SAMPLE_RATE" "0"),
   "sentryReplayOnErrorSampleRate": $(decimal_or_default "$SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE" "0"),

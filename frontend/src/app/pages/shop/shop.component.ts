@@ -20,6 +20,7 @@ import { Subscription, combineLatest, forkJoin, map, switchMap } from 'rxjs';
 import { Meta, Title } from '@angular/platform-browser';
 import { SeoHeadLinksService } from '../../core/seo-head-links.service';
 import { StructuredDataService } from '../../core/structured-data.service';
+import { resolveRouteSeoDescription } from '../../core/route-seo-defaults';
 
 type ShopFilterChipType = 'category' | 'subcategory' | 'price' | 'tag' | 'search';
 
@@ -2225,14 +2226,18 @@ export class ShopComponent implements OnInit, OnDestroy {
   setMetaTags(): void {
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     const title = this.translate.instant('shop.metaTitle');
-    const description = this.translate.instant('shop.metaDescription');
+    const description = resolveRouteSeoDescription(
+      'shop',
+      lang,
+      this.translate.instant('meta.descriptions.shop'),
+      this.translate.instant('shop.metaDescription')
+    );
     this.title.setTitle(title);
     this.metaService.updateTag({ property: 'og:title', content: title });
     this.metaService.updateTag({ property: 'og:description', content: description });
     this.metaService.updateTag({ name: 'description', content: description });
     const path = this.activeCategorySlug ? `/shop/${encodeURIComponent(this.activeCategorySlug)}` : '/shop';
     const canonical = this.seoHeadLinks.setLocalizedCanonical(path, lang, {
-      lang,
       sub: this.shouldKeepSubcategoryInCanonical() ? this.activeSubcategorySlug : undefined
     });
     this.metaService.updateTag({ property: 'og:url', content: canonical });

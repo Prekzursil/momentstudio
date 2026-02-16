@@ -175,6 +175,9 @@ showing what is already implemented.
   - Evidence (tests): `frontend/src/app/core/route-robots.service.spec.ts`, `frontend/src/app/pages/home/home.component.spec.ts`
 - [x] SEO phase 3: automated public-route crawl audit (title/description/H1/canonical/robots) as CI guard.
   - Evidence: `frontend/e2e/seo-public-routes.spec.ts`, `.github/workflows/compose-smoke.yml`
+- [x] SEO content completion: enforce indexable-route description/body-depth/internal-link quality and sync SEO debt issues from weekly audit.
+  - Evidence: `frontend/src/app/core/seo-head-links.service.ts`, `frontend/src/app/core/route-seo-defaults.ts`, `frontend/src/app/core/seo-copy-fallback.service.ts`, `frontend/src/app/pages/home/home.component.ts`, `frontend/src/app/pages/shop/shop.component.ts`, `frontend/src/app/pages/blog/blog-list.component.ts`, `frontend/src/app/pages/blog/blog-post.component.ts`, `frontend/src/app/pages/product/product.component.ts`, `frontend/src/app/pages/page/page.component.ts`, `frontend/src/app/pages/about/about.component.ts`, `frontend/src/app/pages/contact/contact.component.ts`, `scripts/audit/collect_browser_evidence.mjs`, `scripts/audit/collect_audit_evidence.py`, `scripts/seo/generate_content_backlog.py`, `scripts/audit/upsert_audit_issues.py`, `.github/workflows/audit-weekly-agent.yml`
+- [ ] SEO editorial phase: manually refine residual route copy from `seo-content-backlog` (titles/descriptions/body-depth/internal links) after programmatic baseline.
 - [x] Netopia: notifyURL/webhook must always respond HTTP 200 with an IPN ack payload (avoid INVALID_RESPONSE_STATUS).
   - Evidence: `backend/app/api/v1/payments.py`, `backend/tests/test_netopia_webhook.py`
 - [x] CI: run PayPal + Stripe mock checkout E2E (success + decline/cancel) in compose smoke.

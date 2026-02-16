@@ -78,6 +78,16 @@
       "offline": "Offline | momentstudio",
       "error": "A apărut o eroare",
       "not_found": "Pagina nu a fost găsită"
+    },
+    "descriptions": {
+      "home": "Descopera arta ceramica lucrata manual, colectii recomandate si noutati de la momentstudio.",
+      "shop": "Exploreaza produse lucrate manual pe categorii, compara optiuni si gaseste piese create pentru uz zilnic.",
+      "blog": "Citeste povesti practice, ghiduri si noutati din atelierul momentstudio.",
+      "blog_post": "Citeste acest articol momentstudio pentru idei practice si context din atelier.",
+      "page": "Citeste aceasta pagina momentstudio pentru detalii, informatii de politica si linkuri de suport.",
+      "product": "Vezi detalii de produs, materiale si disponibilitate pentru aceasta piesa lucrata manual la momentstudio.",
+      "about": "Afla povestea momentstudio si a creatorilor din spatele artei ceramice lucrate manual.",
+      "contact": "Contacteaza momentstudio pentru cereri personalizate, suport comenzi si colaborari."
     }
   },
   "nav": {
@@ -164,6 +174,8 @@
     "admin": {
       "edit": "Editează această pagină"
     },
+    "exploreMore": "Exploreaza pagini conexe",
+    "exploreMoreCopy": "Continua cu sectiuni utile pentru produse, articole si informatii de suport.",
     "blocks": {
       "productGrid": {
         "errorTitle": "Nu am putut încărca produsele.",
@@ -1209,7 +1221,9 @@
     "addedTitle": "Adăugat în coș",
     "addedBody": "{{qty}} × {{name}} au fost adăugate în coș",
     "metaTitle": "{{name}} | momentstudio",
-    "metaDescriptionFallback": "Descoperă {{name}} — o piesă lucrată manual de momentstudio."
+    "metaDescriptionFallback": "Descoperă {{name}} — o piesă lucrată manual de momentstudio.",
+    "exploreMore": "Exploreaza pagini conexe",
+    "exploreMoreCopy": "Foloseste aceste linkuri pentru a continua catre produse, articole si suport."
   },
   "cart": {
     "title": "Coșul tău",

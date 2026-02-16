@@ -6,7 +6,10 @@ export interface AppConfig {
   paypalEnabled: boolean;
   netopiaEnabled: boolean;
   addressAutocompleteEnabled: boolean;
+  clarityProjectId: string;
+  clarityEnabled: boolean;
   sentryDsn: string;
+  sentrySendDefaultPii: boolean;
   sentryTracesSampleRate: number;
   sentryReplaySessionSampleRate: number;
   sentryReplayOnErrorSampleRate: number;
@@ -27,7 +30,10 @@ const defaults: AppConfig = {
   paypalEnabled: false,
   netopiaEnabled: false,
   addressAutocompleteEnabled: false,
+  clarityProjectId: '',
+  clarityEnabled: false,
   sentryDsn: '',
+  sentrySendDefaultPii: true,
   sentryTracesSampleRate: 0,
   sentryReplaySessionSampleRate: 0,
   sentryReplayOnErrorSampleRate: 0,

@@ -22,6 +22,7 @@ import { CardComponent } from '../../shared/card.component';
 import { CmsPageBlocksComponent } from '../../shared/cms-page-blocks.component';
 import { ImgFallbackDirective } from '../../shared/img-fallback.directive';
 import { PageBlock, pageBlocksToPlainText, parsePageBlocks } from '../../shared/page-blocks';
+import { resolveRouteSeoDescription } from '../../core/route-seo-defaults';
 
 interface ContentBlock {
   title: string;
@@ -392,14 +393,18 @@ export class ContactComponent implements OnInit, OnDestroy {
   private setMetaTags(title: string, body: string): void {
     const baseTitle = (title || '').includes('|') ? title : `${title} | momentstudio`;
     const pageTitle = title ? baseTitle : this.translate.instant('contact.metaTitle');
-    const description = (body || '').replace(/\s+/g, ' ').trim().slice(0, 160) || this.translate.instant('contact.metaDescription');
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
-    const canonical = this.seoHeadLinks.setLocalizedCanonical('/contact', lang, { lang });
+    const description = resolveRouteSeoDescription(
+      'contact',
+      lang,
+      (body || '').replace(/\s+/g, ' ').trim().slice(0, 160),
+      this.translate.instant('meta.descriptions.contact'),
+      this.translate.instant('contact.metaDescription')
+    );
+    const canonical = this.seoHeadLinks.setLocalizedCanonical('/contact', lang, {});
     this.title.setTitle(pageTitle);
-    if (description) {
-      this.meta.updateTag({ name: 'description', content: description });
-      this.meta.updateTag({ property: 'og:description', content: description });
-    }
+    this.meta.updateTag({ name: 'description', content: description });
+    this.meta.updateTag({ property: 'og:description', content: description });
     this.meta.updateTag({ property: 'og:title', content: pageTitle });
     this.meta.updateTag({ property: 'og:url', content: canonical });
   }

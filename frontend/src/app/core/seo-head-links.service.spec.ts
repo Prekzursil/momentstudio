@@ -15,7 +15,7 @@ describe('SeoHeadLinksService', () => {
     service = TestBed.inject(SeoHeadLinksService);
   });
 
-  it('upserts canonical and alternates with lang included', () => {
+  it('upserts canonical and alternates with clean EN + lang=ro policy', () => {
     const href = service.setLocalizedCanonical('/shop/rings', 'ro', { sub: 'silver' });
 
     expect(href).toContain('/shop/rings?lang=ro&sub=silver');
@@ -25,9 +25,9 @@ describe('SeoHeadLinksService', () => {
 
     const alternates = Array.from(doc.querySelectorAll('link[rel="alternate"][data-seo-managed="true"]'));
     expect(alternates.length).toBe(3);
-    expect(doc.querySelector('link[hreflang="en"]')?.getAttribute('href')).toContain('/shop/rings?lang=en&sub=silver');
+    expect(doc.querySelector('link[hreflang="en"]')?.getAttribute('href')).toContain('/shop/rings?sub=silver');
     expect(doc.querySelector('link[hreflang="ro"]')?.getAttribute('href')).toContain('/shop/rings?lang=ro&sub=silver');
-    expect(doc.querySelector('link[hreflang="x-default"]')?.getAttribute('href')).toContain('/shop/rings?lang=en&sub=silver');
+    expect(doc.querySelector('link[hreflang="x-default"]')?.getAttribute('href')).toContain('/shop/rings?sub=silver');
   });
 
   it('replaces managed alternates without duplicates', () => {
@@ -40,5 +40,14 @@ describe('SeoHeadLinksService', () => {
 
     const alternates = Array.from(doc.querySelectorAll('link[rel="alternate"][data-seo-managed="true"]'));
     expect(alternates.length).toBe(3);
+  });
+
+  it('strips lang=en from canonical while keeping extra query params', () => {
+    const href = service.setLocalizedCanonical('/blog', 'en', { lang: 'en', page: 2, q: 'ceramic' });
+    expect(href).toContain('/blog?page=2&q=ceramic');
+    expect(href).not.toContain('lang=en');
+
+    expect(doc.querySelector('link[hreflang="en"]')?.getAttribute('href')).toContain('/blog?page=2&q=ceramic');
+    expect(doc.querySelector('link[hreflang="ro"]')?.getAttribute('href')).toContain('/blog?lang=ro&page=2&q=ceramic');
   });
 });

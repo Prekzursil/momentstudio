@@ -15,6 +15,8 @@ import { ContainerComponent } from '../../layout/container.component';
 import { SkeletonComponent } from '../../shared/skeleton.component';
 import { SeoHeadLinksService } from '../../core/seo-head-links.service';
 import { StructuredDataService } from '../../core/structured-data.service';
+import { resolveRouteSeoDescription } from '../../core/route-seo-defaults';
+import { SeoCopyFallbackService } from '../../core/seo-copy-fallback.service';
 
 @Component({
   selector: 'app-blog-list',
@@ -36,7 +38,9 @@ import { StructuredDataService } from '../../core/structured-data.service';
 
 	      <div class="flex items-center justify-between gap-4">
 	        <div class="flex flex-wrap items-baseline gap-3">
-	          <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'blog.title' | translate }}</h1>
+	          <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50" data-route-heading="true" tabindex="-1">
+              {{ 'blog.title' | translate }}
+            </h1>
 	          <span
 	            *ngIf="routeTag"
 	            class="text-sm font-semibold rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-200"
@@ -51,6 +55,8 @@ import { StructuredDataService } from '../../core/structured-data.service';
 	          </span>
 	        </div>
 	      </div>
+
+      <p class="text-sm text-slate-600 dark:text-slate-300">{{ seoIntro() }}</p>
 
       <div>
         <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white/95 p-4 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90">
@@ -172,6 +178,17 @@ import { StructuredDataService } from '../../core/structured-data.service';
         <ng-template #blogEmptyAllTpl>
           <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'blog.emptyTitle' | translate }}</p>
           <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'blog.emptyCopy' | translate }}</p>
+          <div class="flex flex-wrap justify-center gap-3 pt-2 text-sm">
+            <a class="font-medium text-indigo-600 hover:underline dark:text-indigo-300" [routerLink]="['/shop']">
+              {{ 'nav.shop' | translate }}
+            </a>
+            <a class="font-medium text-indigo-600 hover:underline dark:text-indigo-300" [routerLink]="['/about']">
+              {{ 'nav.about' | translate }}
+            </a>
+            <a class="font-medium text-indigo-600 hover:underline dark:text-indigo-300" [routerLink]="['/contact']">
+              {{ 'nav.contact' | translate }}
+            </a>
+          </div>
         </ng-template>
       </div>
 
@@ -393,6 +410,7 @@ export class BlogListComponent implements OnInit, OnDestroy {
   tagQuery = '';
   seriesQuery = '';
   sort: BlogSort = 'newest';
+  seoIntro = signal<string>('');
   private readonly failedThumbs = new Set<string>();
   private loadSeq = 0;
 
@@ -409,7 +427,8 @@ export class BlogListComponent implements OnInit, OnDestroy {
     private title: Title,
     private meta: Meta,
     private seoHeadLinks: SeoHeadLinksService,
-    private structuredData: StructuredDataService
+    private structuredData: StructuredDataService,
+    private seoCopyFallback: SeoCopyFallbackService
   ) {}
 
   ngOnInit(): void {
@@ -436,7 +455,12 @@ export class BlogListComponent implements OnInit, OnDestroy {
       ? this.translate.instant('blog.seriesMetaDescription', { series: this.routeSeries })
       : this.routeTag
         ? this.translate.instant('blog.tagMetaDescription', { tag: this.routeTag })
-        : this.translate.instant('blog.metaDescription');
+        : resolveRouteSeoDescription(
+            'blog',
+            this.translate.currentLang === 'ro' ? 'ro' : 'en',
+            this.translate.instant('meta.descriptions.blog'),
+            this.translate.instant('blog.metaDescription')
+          );
     this.title.setTitle(title);
     this.meta.updateTag({ name: 'description', content: description });
     this.meta.updateTag({ property: 'og:title', content: title });
@@ -449,7 +473,7 @@ export class BlogListComponent implements OnInit, OnDestroy {
       : this.routeTag
         ? `/blog/tag/${encodeURIComponent(this.routeTag)}`
         : '/blog';
-    const canonical = this.seoHeadLinks.setLocalizedCanonical(path, lang, { lang, page: safePage });
+    const canonical = this.seoHeadLinks.setLocalizedCanonical(path, lang, { page: safePage });
     this.meta.updateTag({ property: 'og:url', content: canonical });
     this.structuredData.setRouteSchemas([
       {
@@ -488,6 +512,8 @@ export class BlogListComponent implements OnInit, OnDestroy {
 
     this.appliedTag = this.tagQuery.trim() ? this.tagQuery.trim() : null;
     this.appliedSeries = this.seriesQuery.trim() ? this.seriesQuery.trim() : null;
+    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
+    this.seoIntro.set(this.seoCopyFallback.blogListIntro(lang, this.appliedTag, this.appliedSeries));
     this.crumbs =
       this.appliedSeries && this.routeSeries
         ? [

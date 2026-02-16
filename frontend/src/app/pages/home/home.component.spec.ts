@@ -111,7 +111,8 @@ describe('HomeComponent', () => {
     );
     expect(h2s).toEqual(['Featured pieces', 'Why this starter']);
     const canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
-    expect(canonical?.getAttribute('href')).toContain('/?lang=en');
+    expect(canonical?.getAttribute('href')).toContain('/');
+    expect(canonical?.getAttribute('href')).not.toContain('lang=en');
     expect(document.querySelectorAll('link[rel="alternate"][data-seo-managed="true"]').length).toBe(3);
     expect((document.querySelector('script#seo-route-schema-1')?.textContent || '')).toContain('"WebPage"');
   });

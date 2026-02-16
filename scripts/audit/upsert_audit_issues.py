@@ -210,8 +210,26 @@ def _safe_create_issue(
         raise
 
 
-def _upsert_severe(ctx: GitHubContext, findings: list[dict[str, Any]], run_url: str | None) -> None:
-    open_issues = _list_open_issues(ctx, labels=["audit:correctness"])
+def _should_upsert_issue(finding: dict[str, Any], *, include_s3_seo: bool) -> bool:
+    severity = str(finding.get("severity") or "").lower()
+    if severity in SEVERE_LEVELS:
+        return True
+    if not include_s3_seo or severity != "s3":
+        return False
+    labels = [str(label).strip().lower() for label in list(finding.get("labels") or [])]
+    is_seo = "audit:seo" in labels
+    is_indexable = bool(finding.get("indexable"))
+    return is_seo and is_indexable
+
+
+def _upsert_issues(
+    ctx: GitHubContext,
+    findings: list[dict[str, Any]],
+    run_url: str | None,
+    *,
+    include_s3_seo: bool,
+) -> tuple[int, int]:
+    open_issues = _list_open_issues(ctx)
     by_marker: dict[str, dict[str, Any]] = {}
     for issue in open_issues:
         body = str(issue.get("body") or "")
@@ -226,7 +244,11 @@ def _upsert_severe(ctx: GitHubContext, findings: list[dict[str, Any]], run_url: 
         if marker:
             by_marker[marker] = issue
 
+    created_count = 0
+    updated_count = 0
     for finding in findings:
+        if not _should_upsert_issue(finding, include_s3_seo=include_s3_seo):
+            continue
         fp = str(finding.get("fingerprint") or "")
         if not fp:
             continue
@@ -235,7 +257,7 @@ def _upsert_severe(ctx: GitHubContext, findings: list[dict[str, Any]], run_url: 
             f"[{finding.get('surface','storefront')}] {finding.get('title','Audit finding')}"
         )
         body = _issue_body_for_finding(finding, run_url)
-        labels = sorted(set(["audit:correctness", "ai:ready", *list(finding.get("labels") or [])]))
+        labels = sorted(set(["ai:ready", *list(finding.get("labels") or [])]))
 
         existing = by_marker.get(fp)
         if existing:
@@ -245,10 +267,19 @@ def _upsert_severe(ctx: GitHubContext, findings: list[dict[str, Any]], run_url: 
                 f"/repos/{ctx.owner}/{ctx.repo}/issues/{existing['number']}",
                 payload={"title": issue_title, "body": body, "state": "open"},
             )
+            updated_count += 1
             continue
 
         created = _safe_create_issue(ctx, title=issue_title, body=body, labels=labels)
         by_marker[fp] = created
+        created_count += 1
+
+    return created_count, updated_count
+
+
+def _upsert_severe(ctx: GitHubContext, findings: list[dict[str, Any]], run_url: str | None) -> None:
+    # Backward-compatible test helper used by existing unit tests.
+    _upsert_issues(ctx, findings, run_url, include_s3_seo=False)
 
 
 def _upsert_digest(
@@ -303,6 +334,11 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="Only upsert severe findings; do not create/update rolling digest issue.",
     )
+    parser.add_argument(
+        "--include-s3-seo",
+        action="store_true",
+        help="Also upsert indexable SEO s3 findings as issues.",
+    )
     return parser.parse_args()
 
 
@@ -316,8 +352,13 @@ def main() -> int:
         raise FileNotFoundError(f"Findings file not found: {findings_path}")
 
     findings = _load_findings(findings_path)
-    severe = [row for row in findings if str(row.get("severity") or "").lower() in SEVERE_LEVELS]
-    low = [row for row in findings if str(row.get("severity") or "").lower() not in SEVERE_LEVELS]
+    issue_candidate_fingerprints = {
+        str(row.get("fingerprint") or "")
+        for row in findings
+        if _should_upsert_issue(row, include_s3_seo=bool(args.include_s3_seo))
+    }
+    issue_candidates = [row for row in findings if str(row.get("fingerprint") or "") in issue_candidate_fingerprints]
+    low = [row for row in findings if str(row.get("fingerprint") or "") not in issue_candidate_fingerprints]
 
     try:
         ctx = _github_context(args.repo)
@@ -326,7 +367,12 @@ def main() -> int:
         return 0
 
     run_url = args.run_url.strip() or None
-    _upsert_severe(ctx, severe, run_url)
+    created, updated = _upsert_issues(
+        ctx,
+        findings,
+        run_url,
+        include_s3_seo=bool(args.include_s3_seo),
+    )
     if not args.skip_digest:
         _upsert_digest(
             ctx,
@@ -335,8 +381,9 @@ def main() -> int:
             run_url=run_url,
         )
     print(
-        f"Audit issue upsert complete: severe={len(severe)} "
-        f"low={len(low)} repo={ctx.owner}/{ctx.repo}"
+        f"Audit issue upsert complete: "
+        f"issue_candidates={len(issue_candidates)} created={created} updated={updated} "
+        f"low={len(low)} include_s3_seo={bool(args.include_s3_seo)} repo={ctx.owner}/{ctx.repo}"
     )
     return 0
 

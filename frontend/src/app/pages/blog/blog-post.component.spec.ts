@@ -119,7 +119,8 @@ describe('BlogPostComponent', () => {
 
     const canonical = doc.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
     expect(canonical).toBeTruthy();
-    expect(canonical?.getAttribute('href')).toContain('/blog/first-post?lang=en');
+    expect(canonical?.getAttribute('href')).toContain('/blog/first-post');
+    expect(canonical?.getAttribute('href')).not.toContain('lang=en');
 
     const alternates = Array.from(doc.querySelectorAll('link[rel="alternate"][data-seo-managed="true"]'));
     expect(alternates.length).toBe(3);

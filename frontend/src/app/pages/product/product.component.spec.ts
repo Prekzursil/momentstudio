@@ -166,7 +166,8 @@ describe('ProductComponent', () => {
     fixture.detectChanges();
 
     const canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
-    expect(canonical?.getAttribute('href')).toContain('/products/prod?lang=en');
+    expect(canonical?.getAttribute('href')).toContain('/products/prod');
+    expect(canonical?.getAttribute('href')).not.toContain('lang=en');
     expect(document.querySelectorAll('link[rel="alternate"][data-seo-managed="true"]').length).toBe(3);
   });
 

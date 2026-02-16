@@ -200,6 +200,7 @@ class Settings(BaseSettings):
     csp_policy: str = "default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'"
     slow_query_threshold_ms: int = 500
     sentry_dsn: str | None = None
+    sentry_send_default_pii: bool = True
     sentry_traces_sample_rate: float = 0.0
     sentry_profiles_sample_rate: float = 0.0
     sentry_enable_logs: bool = False

@@ -83,6 +83,15 @@ Policy selection for this phase:
 
 Checks-only is the current steady-state policy for this repository. If contributor cadence changes in the future, review this document and explicitly update branch protection in a dedicated governance PR.
 
+## Non-blocking observability checks
+
+- `Percy Visual` runs visual snapshot coverage for storefront routes:
+  - PR core snapshot pass
+  - weekly/manual expanded snapshot pass
+- Percy is intentionally non-blocking in this phase and is not part of required branch-protection checks.
+- If `PERCY_TOKEN` is missing, Percy workflows skip with an explicit summary message.
+- Copilot custom setup workflow must expose a single job named `copilot-setup-steps` for agent compatibility.
+
 ## Evidence Pack vs Agent Pass
 
 This repository intentionally separates deterministic data collection from AI judgment:
@@ -114,8 +123,13 @@ Security constraints:
 
 - Severe findings (`severity:s1/s2`):
   - upsert as individual issues using deterministic fingerprint dedupe.
-- Lower-severity findings (`severity:s3/s4`):
+- Medium SEO debt findings (`severity:s3`, indexable storefront only):
+  - upsert as individual issues when labeled `audit:seo` and `indexable=true`.
+  - keep dedupe behavior identical (fingerprint marker in issue body).
+- Remaining lower-severity findings (`severity:s3/s4`) not eligible for direct issue upsert:
   - kept in the rolling digest issue.
+- Noindex storefront routes:
+  - excluded from strict SEO content gating and severe technical SEO issue creation.
 - Deep PR agent pass:
   - requires `audit:deep` label.
   - produces/updates one deep-audit issue for that PR.
