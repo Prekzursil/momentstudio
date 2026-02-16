@@ -2432,7 +2432,10 @@
         "backend": "Backend (DB gata)",
         "webhooksFailed": "Webhook-uri eșuate",
         "webhooksBacklog": "Backlog webhook",
+        "webhooksBacklogTotal": "Webhook în așteptare (total)",
+        "webhooksBacklogRecent": "Webhook în așteptare (recent)",
         "emailFailures": "Email-uri eșuate",
+        "totalPendingHint": "Total în așteptare pe toată perioada",
         "lastHours": "Ultimele {{hours}}h",
         "lastChecked": "Ultima verificare",
         "errors": {

@@ -2432,7 +2432,10 @@
         "backend": "Backend (DB ready)",
         "webhooksFailed": "Webhook failures",
         "webhooksBacklog": "Webhook backlog",
+        "webhooksBacklogTotal": "Webhook pending (total)",
+        "webhooksBacklogRecent": "Webhook pending (recent)",
         "emailFailures": "Email failures",
+        "totalPendingHint": "Total pending across all time",
         "lastHours": "Last {{hours}}h",
         "lastChecked": "Last checked",
         "errors": {

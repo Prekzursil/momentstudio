@@ -63,7 +63,7 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
             {{ healthError() }}
           </div>
 
-          <div *ngIf="!healthLoading()" class="grid gap-3 md:grid-cols-4">
+          <div *ngIf="!healthLoading()" class="grid gap-3 md:grid-cols-5">
             <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
               <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
                 {{ 'adminUi.ops.health.backend' | translate }}
@@ -87,9 +87,18 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
 
             <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
               <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                {{ 'adminUi.ops.health.webhooksBacklog' | translate }}
+                {{ 'adminUi.ops.health.webhooksBacklogTotal' | translate }}
               </p>
-              <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ webhookBacklog24h() }}</p>
+              <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ webhookBacklogTotal() }}</p>
+              <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">{{ 'adminUi.ops.health.totalPendingHint' | translate }}</p>
+            </div>
+
+
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.ops.health.webhooksBacklogRecent' | translate }}
+              </p>
+              <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ webhookBacklogRecent24h() }}</p>
               <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">{{ 'adminUi.ops.health.lastHours' | translate: { hours: 24 } }}</p>
             </div>
 
@@ -926,7 +935,8 @@ export class AdminOpsComponent implements OnInit {
   healthError = signal<string | null>(null);
   backendReady = signal(false);
   webhookFailures24h = signal(0);
-  webhookBacklog24h = signal(0);
+  webhookBacklogTotal = signal(0);
+  webhookBacklogRecent24h = signal(0);
   emailFailures24h = signal(0);
   healthCheckedAt = signal<Date | null>(null);
   newsletterExporting = signal(false);
@@ -1025,8 +1035,10 @@ export class AdminOpsComponent implements OnInit {
           this.webhookFailures24h.set(Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0);
         }
         if (res.webhooksBacklog) {
-          const count = Number((res.webhooksBacklog as any)?.pending ?? 0);
-          this.webhookBacklog24h.set(Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0);
+          const totalCount = Number((res.webhooksBacklog as any)?.pending ?? 0);
+          const recentCount = Number((res.webhooksBacklog as any)?.pending_recent ?? 0);
+          this.webhookBacklogTotal.set(Number.isFinite(totalCount) ? Math.max(0, Math.floor(totalCount)) : 0);
+          this.webhookBacklogRecent24h.set(Number.isFinite(recentCount) ? Math.max(0, Math.floor(recentCount)) : 0);
         }
         if (res.emailsFailed) {
           const count = Number((res.emailsFailed as any)?.failed ?? 0);

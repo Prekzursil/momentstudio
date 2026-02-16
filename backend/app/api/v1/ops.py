@@ -193,7 +193,8 @@ async def admin_webhook_backlog_stats(
     since_hours: int = Query(default=24, ge=1, le=168),
 ) -> WebhookBacklogCount:
     pending = await ops_service.count_webhook_backlog(session, since_hours=since_hours)
-    return WebhookBacklogCount(pending=pending, since_hours=int(since_hours))
+    pending_recent = await ops_service.count_recent_webhook_backlog(session, since_hours=since_hours)
+    return WebhookBacklogCount(pending=pending, pending_recent=pending_recent, since_hours=int(since_hours))
 
 
 @router.get("/admin/webhooks/{provider}/{event_id}", response_model=WebhookEventDetail)
