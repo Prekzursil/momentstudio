@@ -273,6 +273,57 @@ def test_catalog_admin_and_public_flows(test_app: Dict[str, object]) -> None:
     assert all(p["slug"] != "white-cup" for p in res.json()["items"])
 
 
+def test_catalog_category_filters_include_descendants(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    admin_token = create_admin_token(SessionLocal, email="nestedadmin@example.com")
+
+    parent = client.post(
+        "/api/v1/catalog/categories",
+        json={"name": "Parent Category"},
+        headers=auth_headers(admin_token),
+    )
+    assert parent.status_code == 201, parent.text
+    parent_slug = parent.json()["slug"]
+    parent_id = parent.json()["id"]
+
+    child = client.post(
+        "/api/v1/catalog/categories",
+        json={"name": "Child Category", "parent_id": parent_id},
+        headers=auth_headers(admin_token),
+    )
+    assert child.status_code == 201, child.text
+    child_slug = child.json()["slug"]
+    child_id = child.json()["id"]
+
+    product = client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": child_id,
+            "slug": "nested-cup",
+            "name": "Nested Cup",
+            "base_price": 12.0,
+            "currency": "RON",
+            "stock_quantity": 5,
+            "status": "published",
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert product.status_code == 201, product.text
+
+    listed = client.get("/api/v1/catalog/products", params={"category_slug": parent_slug, "sort": "name_asc"})
+    assert listed.status_code == 200
+    body = listed.json()
+    assert body["meta"]["total_items"] == 1
+    assert body["items"][0]["slug"] == "nested-cup"
+    assert body["items"][0]["category"]["slug"] == child_slug
+
+    bounds = client.get("/api/v1/catalog/products/price-bounds", params={"category_slug": parent_slug})
+    assert bounds.status_code == 200
+    assert bounds.json() == {"min_price": 12.0, "max_price": 12.0, "currency": "RON"}
+
+
 def test_catalog_slug_autogen_and_slug_reuse_after_delete(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
