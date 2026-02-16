@@ -7,7 +7,7 @@ on:
     inputs:
       pr_number:
         description: "PR number to run deep audit issue flow for"
-        required: true
+        required: false
         type: string
 
 permissions:
@@ -50,13 +50,49 @@ jobs:
             let pr = null;
 
             if (context.eventName === 'workflow_dispatch') {
-              const number = Number(core.getInput('pr_number') || 0);
-              if (!number) {
-                core.setFailed('workflow_dispatch requires pr_number input.');
+              const rawNumber = (core.getInput('pr_number') || '').trim();
+              const parsedNumber = rawNumber ? Number(rawNumber) : 0;
+              if (rawNumber && (!Number.isInteger(parsedNumber) || parsedNumber <= 0)) {
+                core.setFailed(
+                  `Invalid pr_number input: "${rawNumber}". ` +
+                  'Use a positive integer. Example: gh workflow run "Audit PR Deep Agent" -f pr_number=207'
+                );
                 return;
               }
-              const fetched = await github.rest.pulls.get({ owner, repo, pull_number: number });
-              pr = fetched.data;
+
+              if (parsedNumber) {
+                const fetched = await github.rest.pulls.get({ owner, repo, pull_number: parsedNumber });
+                pr = fetched.data;
+              } else {
+                const openPulls = await github.paginate(github.rest.pulls.list, {
+                  owner,
+                  repo,
+                  state: 'open',
+                  base: 'main',
+                  per_page: 100,
+                });
+                if (openPulls.length === 1) {
+                  pr = openPulls[0];
+                  core.notice(`workflow_dispatch auto-selected PR #${pr.number}.`);
+                } else if (openPulls.length === 0) {
+                  core.setFailed(
+                    'No open PR targeting main was found for workflow_dispatch auto-detect. ' +
+                    'Open a PR first or re-run with -f pr_number=<number>.'
+                  );
+                  return;
+                } else {
+                  const candidates = openPulls
+                    .slice(0, 15)
+                    .map((candidate) => `#${candidate.number} (${candidate.head?.ref || 'unknown'} -> ${candidate.base?.ref || 'main'})`)
+                    .join(', ');
+                  core.setFailed(
+                    'Multiple open PRs target main; cannot auto-select safely. ' +
+                    `Candidates: ${candidates}. ` +
+                    'Re-run with an explicit value, e.g. gh workflow run "Audit PR Deep Agent" -f pr_number=<number>.'
+                  );
+                  return;
+                }
+              }
             } else {
               pr = context.payload.pull_request;
             }
@@ -73,6 +109,7 @@ jobs:
             core.setOutput('has_deep_label', hasDeepLabel ? 'true' : 'false');
             const shouldRun = context.eventName === 'workflow_dispatch' || hasDeepLabel;
             core.setOutput('should_run', shouldRun ? 'true' : 'false');
+            core.setOutput('resolution_mode', context.eventName === 'workflow_dispatch' ? 'manual' : 'pull_request_target');
 
             let evidenceRunUrl = '';
             try {
@@ -218,3 +255,36 @@ jobs:
                 body: 'Automatic @copilot assignment failed. Maintainer can run: `gh issue edit ' + issueNumber + ' --add-assignee @copilot`.',
               });
             }
+
+      - name: Deep agent summary
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          pr_number="${{ steps.guard.outputs.pr_number }}"
+          pr_url="${{ steps.guard.outputs.pr_url }}"
+          should_run="${{ steps.guard.outputs.should_run }}"
+          evidence_url="${{ steps.guard.outputs.evidence_run_url }}"
+          resolution_mode="${{ steps.guard.outputs.resolution_mode }}"
+          issue_number="${{ steps.issue.outputs.issue_number }}"
+
+          {
+            echo "## Deep Agent Summary"
+            echo ""
+            echo "- Trigger event: \`${{ github.event_name }}\`"
+            echo "- Resolution mode: \`${resolution_mode:-unknown}\`"
+            if [[ -n "${pr_number}" ]]; then
+              echo "- PR: #${pr_number} (${pr_url})"
+            fi
+            if [[ -n "${evidence_url}" ]]; then
+              echo "- PR evidence run: ${evidence_url}"
+            fi
+            if [[ -z "${should_run}" ]]; then
+              echo "- Outcome: failed during PR context resolution"
+            elif [[ "${should_run}" == "true" ]]; then
+              echo "- Outcome: processed"
+              echo "- Deep issue number: \`${issue_number:-n/a}\`"
+            else
+              echo "- Outcome: skipped (missing \`audit:deep\` label on PR-triggered path)"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
