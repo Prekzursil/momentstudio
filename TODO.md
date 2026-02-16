@@ -103,8 +103,7 @@ showing what is already implemented.
 - [x] Protect main with checks-only required CI gates.
   - Evidence: GitHub branch protection on `main` requires `backend`, `backend-postgres`, `frontend`, `compose-smoke` checks with strict up-to-date enabled.
 - [x] Repo policy phase 2: evaluate enabling required review approvals once contributor cadence grows.
-  - Evidence: `.github/workflows/repo-policy-phase2-eval.yml`, `scripts/repo/evaluate_review_cadence.py`, `docs/REPOSITORY_POLICY.md`, `docs/reports/repo-policy-phase2-baseline-2026-02.md`
-- [ ] Repo policy phase 2 rollout: enable 1 required approval when cadence trigger passes in 2 consecutive monthly evaluations.
+  - Evidence: `docs/REPOSITORY_POLICY.md`, `docs/reports/repo-policy-phase2-baseline-2026-02.md`, `docs/reports/repo-policy-phase2-baseline-2026-02.json`
 - [x] DAM (local-only): add first-party media domain models + local-volume storage layout + Redis job queue primitives (no S3/cloud adapters).
   - Evidence: `backend/app/models/media.py`, `backend/alembic/versions/0152_create_media_dam_foundation.py`, `backend/app/services/media_dam.py`, `backend/app/workers/media_worker.py`, `backend/app/core/config.py`
 - [x] DAM APIs: ship `/content/admin/media/*` endpoints for upload/finalize/list/update/approve/reject/trash/restore/purge/usage/variants/edit/jobs/collections while keeping legacy image APIs compatible.
@@ -121,7 +120,9 @@ showing what is already implemented.
   - Evidence: `backend/app/services/media_dam.py`, `backend/app/api/v1/content.py`, `frontend/src/app/core/admin.service.ts`, `frontend/src/app/pages/admin/shared/dam-asset-library.component.ts`, `frontend/nginx/default.conf`, `infra/prod/Caddyfile`
 - [x] DAM phase 3: add media-job retries with exponential backoff and dead-letter triage UI.
   - Evidence: `backend/alembic/versions/0154_media_job_retry_dead_letter_v2.py`, `backend/app/models/media.py`, `backend/app/services/media_dam.py`, `backend/app/api/v1/content.py`, `backend/app/workers/media_worker.py`, `backend/app/schemas/media.py`, `frontend/src/app/core/admin.service.ts`, `frontend/src/app/pages/admin/shared/dam-asset-library.component.ts`, `frontend/src/app/pages/admin/ops/admin-ops.component.ts`
-- [ ] DAM phase 3.1: introduce jittered backoff and per-job-type retry policy overrides.
+- [x] DAM phase 3.1: introduce jittered backoff and per-job-type retry policy overrides.
+  - Evidence: `backend/alembic/versions/0155_media_job_retry_policy_overrides.py`, `backend/app/models/media.py`, `backend/app/services/media_dam.py`, `backend/app/api/v1/content.py`, `backend/app/schemas/media.py`, `frontend/src/app/core/admin.service.ts`, `frontend/src/app/pages/admin/shared/dam-asset-library.component.ts`, `backend/tests/test_media_dam_api.py`, `frontend/src/app/pages/admin/shared/dam-asset-library.component.spec.ts`
+- [ ] DAM phase 3.2: add policy change history timeline and one-click rollback presets for retry policy edits.
 - [x] Admin Content IA: add a dedicated `/admin/content/media` workspace between Scheduling and Settings for site-wide media operations.
   - Evidence: `frontend/src/app/app.routes.ts`, `frontend/src/app/pages/admin/content/admin-content-layout.component.ts`, `frontend/src/app/pages/admin/content/admin-content-media.component.ts`
 - [x] Media library: add sorting/date filters, asset details drawer, and rename action for uploaded images.
