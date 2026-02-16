@@ -592,15 +592,17 @@ def _resolved_policy_to_snapshot(policy: RetryPolicyResolved) -> dict[str, Any]:
 
 def _policy_snapshot_from_raw(raw: dict[str, Any], *, job_type: MediaJobType) -> RetryPolicyResolved:
     base = _default_retry_policy(job_type)
+    raw_attempts = raw.get("max_attempts", base.max_attempts)
     try:
-        attempts = int(raw.get("max_attempts") if "max_attempts" in raw else base.max_attempts)
+        attempts = int(raw_attempts if isinstance(raw_attempts, (int, float, str)) else base.max_attempts)
     except Exception:
         attempts = base.max_attempts
     attempts = max(1, min(MAX_RETRY_POLICY_ATTEMPTS, attempts))
     schedule_raw = raw.get("schedule")
     schedule = _validate_schedule(schedule_raw if isinstance(schedule_raw, list) else list(base.schedule))
+    raw_jitter = raw.get("jitter_ratio", base.jitter_ratio)
     try:
-        jitter = float(raw.get("jitter_ratio") if "jitter_ratio" in raw else base.jitter_ratio)
+        jitter = float(raw_jitter if isinstance(raw_jitter, (int, float, str)) else base.jitter_ratio)
     except Exception:
         jitter = base.jitter_ratio
     jitter = max(0.0, min(1.0, jitter))

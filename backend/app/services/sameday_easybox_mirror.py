@@ -691,7 +691,7 @@ async def list_sync_runs(session: AsyncSession, *, page: int, limit: int) -> tup
         .scalars()
         .all()
     )
-    return rows, total
+    return list(rows), total
 
 
 async def get_snapshot_status(session: AsyncSession) -> LockerMirrorSnapshotRead:
