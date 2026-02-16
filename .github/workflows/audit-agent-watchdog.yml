@@ -34,9 +34,36 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
+          set -euo pipefail
+          WATCHDOG_LOG="$(mktemp)"
           python3 scripts/audit/agent_issue_watchdog.py \
             --stale-days "${{ inputs.stale_days || '5' }}" \
-            --audit-filter "${{ inputs.audit_filter || 'audit:*' }}"
+            --audit-filter "${{ inputs.audit_filter || 'audit:*' }}" | tee "$WATCHDOG_LOG"
+
+          scanned="$(awk -F '=' '/^scanned=/{value=$2} END{print value}' "$WATCHDOG_LOG")"
+          stale="$(awk -F '=' '/^stale=/{value=$2} END{print value}' "$WATCHDOG_LOG")"
+          updated="$(awk -F '=' '/^updated=/{value=$2} END{print value}' "$WATCHDOG_LOG")"
+
+          for value in "$scanned" "$stale" "$updated"; do
+            if [[ ! "$value" =~ ^[0-9]+$ ]]; then
+              echo "Invalid watchdog counter output: scanned=$scanned stale=$stale updated=$updated"
+              exit 1
+            fi
+          done
+
+          {
+            echo "scanned=$scanned"
+            echo "stale=$stale"
+            echo "updated=$updated"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Agent watchdog summary"
+            echo
+            echo "- Scanned issues: \`$scanned\`"
+            echo "- Stale candidates: \`$stale\`"
+            echo "- Updated issues: \`$updated\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Log watchdog counters
         run: |

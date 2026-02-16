@@ -254,7 +254,7 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
 
     sitemap = client.get("/api/v1/sitemap.xml")
     assert sitemap.status_code == 200
-    assert "pages/secret?lang=en" not in sitemap.text
+    assert "pages/secret" not in sitemap.text
 
     # Draft not visible publicly
     client.patch(

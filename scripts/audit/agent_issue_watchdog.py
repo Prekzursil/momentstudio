@@ -7,11 +7,13 @@ import argparse
 import datetime as dt
 import json
 import os
+import re
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
+
+REPO_TOKEN_PATTERN = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,99})$")
 
 
 @dataclass(frozen=True)
@@ -33,7 +35,15 @@ def _split_repo(full_name: str) -> tuple[str, str]:
     repo = repo.strip()
     if not owner or not repo:
         raise ValueError("Repository must be in owner/repo format.")
+    if not _is_valid_repo_token(owner):
+        raise ValueError(f"Invalid repository owner token: {owner!r}")
+    if not _is_valid_repo_token(repo):
+        raise ValueError(f"Invalid repository name token: {repo!r}")
     return owner, repo
+
+
+def _is_valid_repo_token(token: str) -> bool:
+    return bool(REPO_TOKEN_PATTERN.fullmatch(token))
 
 
 def _github_context(repo_arg: str | None) -> GitHubContext:
@@ -135,46 +145,6 @@ def _update_labels(issue: dict[str, Any]) -> list[str]:
     return sorted(set(keep), key=lambda x: x.lower())
 
 
-def _safe_runner_file_path(raw_path: str) -> Path | None:
-    candidate = (raw_path or "").strip()
-    if not candidate:
-        return None
-    runner_temp = (os.environ.get("RUNNER_TEMP") or "").strip()
-    if not runner_temp:
-        return None
-    root = Path(runner_temp).resolve()
-    target = Path(candidate).resolve()
-    try:
-        target.relative_to(root)
-    except ValueError:
-        return None
-    return target
-
-
-def _write_outputs(*, scanned: int, stale: int, updated: int) -> None:
-    output_path = _safe_runner_file_path(os.environ.get("GITHUB_OUTPUT") or "")
-    if output_path:
-        with open(output_path, "a", encoding="utf-8") as handle:
-            handle.write(f"scanned={scanned}\n")
-            handle.write(f"stale={stale}\n")
-            handle.write(f"updated={updated}\n")
-
-
-def _write_step_summary(*, scanned: int, stale: int, updated: int) -> None:
-    summary_path = _safe_runner_file_path(os.environ.get("GITHUB_STEP_SUMMARY") or "")
-    if not summary_path:
-        return
-    lines = [
-        "## Agent watchdog summary",
-        "",
-        f"- Scanned issues: `{scanned}`",
-        f"- Stale candidates: `{stale}`",
-        f"- Updated issues: `{updated}`",
-    ]
-    with open(summary_path, "a", encoding="utf-8") as handle:
-        handle.write("\n".join(lines) + "\n")
-
-
 def run(repo: str | None, stale_days: int, audit_filter: str) -> int:
     ctx = _github_context(repo)
     now = dt.datetime.now(dt.timezone.utc)
@@ -219,8 +189,6 @@ def run(repo: str | None, stale_days: int, audit_filter: str) -> int:
     print(f"scanned={scanned}")
     print(f"stale={stale}")
     print(f"updated={updated}")
-    _write_outputs(scanned=scanned, stale=stale, updated=updated)
-    _write_step_summary(scanned=scanned, stale=stale, updated=updated)
     return 0
 
 

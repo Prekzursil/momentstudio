@@ -10,6 +10,13 @@ from app.models.catalog import Category, Product, ProductStatus
 from app.models.content import ContentBlock, ContentStatus
 
 
+def _localized_url(base: str, path: str, lang: str) -> str:
+    normalized_path = path if path.startswith("/") else f"/{path}"
+    if lang == "en":
+        return f"{base}{normalized_path}"
+    return f"{base}{normalized_path}?lang={lang}"
+
+
 async def build_sitemap_urls(session: AsyncSession, *, langs: list[str] | None = None) -> dict[str, list[str]]:
     base = settings.frontend_origin.rstrip("/")
     now = datetime.now(timezone.utc)
@@ -49,18 +56,18 @@ async def build_sitemap_urls(session: AsyncSession, *, langs: list[str] | None =
     by_lang: dict[str, list[str]] = {}
     for lang in languages:
         urls: set[str] = set()
-        urls.add(f"{base}/?lang={lang}")
-        urls.add(f"{base}/shop?lang={lang}")
-        urls.add(f"{base}/blog?lang={lang}")
+        urls.add(_localized_url(base, "/", lang))
+        urls.add(_localized_url(base, "/shop", lang))
+        urls.add(_localized_url(base, "/blog", lang))
 
         for slug in categories:
-            urls.add(f"{base}/shop/{slug}?lang={lang}")
+            urls.add(_localized_url(base, f"/shop/{slug}", lang))
         for slug in products:
-            urls.add(f"{base}/products/{slug}?lang={lang}")
+            urls.add(_localized_url(base, f"/products/{slug}", lang))
 
         for key in blog_keys:
             slug = key.split(".", 1)[1] if key.startswith("blog.") else key
-            urls.add(f"{base}/blog/{slug}?lang={lang}")
+            urls.add(_localized_url(base, f"/blog/{slug}", lang))
 
         for key, meta in page_rows:
             if isinstance(meta, dict) and meta.get("requires_auth"):
@@ -76,7 +83,7 @@ async def build_sitemap_urls(session: AsyncSession, *, langs: list[str] | None =
                 path = "/contact"
             else:
                 path = f"/pages/{slug}"
-            urls.add(f"{base}{path}?lang={lang}")
+            urls.add(_localized_url(base, path, lang))
 
         by_lang[lang] = sorted(urls)
 
