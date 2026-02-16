@@ -1,0 +1,45 @@
+name: Audit Agent Watchdog
+
+on:
+  schedule:
+    - cron: "15 6 * * *"
+  workflow_dispatch:
+    inputs:
+      stale_days:
+        description: "Staleness threshold in days"
+        required: false
+        default: "5"
+      audit_filter:
+        description: "Issue filter (all, audit:*, audit-only, or exact audit label)"
+        required: false
+        default: "audit:*"
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  audit-agent-watchdog:
+    runs-on: ubuntu-latest
+    outputs:
+      scanned: ${{ steps.watchdog.outputs.scanned }}
+      stale: ${{ steps.watchdog.outputs.stale }}
+      updated: ${{ steps.watchdog.outputs.updated }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Run stale issue watchdog
+        id: watchdog
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          python3 scripts/audit/agent_issue_watchdog.py \
+            --stale-days "${{ inputs.stale_days || '5' }}" \
+            --audit-filter "${{ inputs.audit_filter || 'audit:*' }}"
+
+      - name: Log watchdog counters
+        run: |
+          echo "scanned=${{ steps.watchdog.outputs.scanned }}"
+          echo "stale=${{ steps.watchdog.outputs.stale }}"
+          echo "updated=${{ steps.watchdog.outputs.updated }}"
