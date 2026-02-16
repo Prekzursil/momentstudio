@@ -14,6 +14,9 @@ import { NewsletterService } from '../../core/newsletter.service';
   template: `
     <app-container classes="py-10 grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
+      <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">
+        {{ 'newsletter.unsubscribe.title' | translate }}
+      </h1>
 
       <div
         *ngIf="loading"
