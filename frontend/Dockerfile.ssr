@@ -1,0 +1,31 @@
+FROM node:24-alpine AS build
+
+WORKDIR /app
+
+COPY frontend/package.json frontend/package-lock.json ./
+COPY frontend/scripts ./scripts
+RUN npm i -g npm@11.7.0
+RUN npm ci --loglevel=error
+
+COPY frontend/ ./
+RUN npm run build:ssr
+
+FROM node:24-alpine AS runtime
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV PORT=4000
+ENV SSR_AUTOSTART=1
+ENV SSR_API_BASE_URL=http://backend:8000/api/v1
+
+COPY --from=build /app/package.json /app/package-lock.json ./
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
+COPY --from=build /app/nginx/99-runtime-config.sh /usr/local/bin/write-runtime-config.sh
+
+RUN chmod +x /usr/local/bin/write-runtime-config.sh
+
+EXPOSE 4000
+
+CMD ["/bin/sh", "-c", "CONFIG_PATH=/app/dist/app/browser/assets/app-config.js /usr/local/bin/write-runtime-config.sh && node dist/app/server/main.js"]
