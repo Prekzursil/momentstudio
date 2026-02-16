@@ -178,7 +178,6 @@ This repository uses a lightweight governance pack to keep collaboration predict
 - Dependabot for grouped weekly patch/minor updates (backend/frontend/actions).
 - PR auto-labeling by changed paths and branch patterns.
 - Dependency review checks on pull requests.
-- Monthly repo-policy cadence evaluation for when to enable required review approvals.
 
 Roadmap board:
 
