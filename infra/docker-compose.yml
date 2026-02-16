@@ -101,7 +101,7 @@ services:
           "CMD",
           "python",
           "-c",
-          "import pathlib,time,sys; p=pathlib.Path('/tmp/media-worker-heartbeat.json'); sys.exit(0 if p.exists() and (time.time()-p.stat().st_mtime) < 90 else 1)",
+          "import asyncio,os,pathlib,socket,sys,time,urllib.parse; HEARTBEAT_MAX_AGE_SECONDS=90; EXIT_HEARTBEAT=11; EXIT_REDIS=12; EXIT_STALE=13; EXIT_DB=14; p=pathlib.Path('/tmp/media-worker-heartbeat.json'); now=time.time(); sys.exit(EXIT_HEARTBEAT) if (not p.exists() or (now-p.stat().st_mtime)>=HEARTBEAT_MAX_AGE_SECONDS) else None; redis_url=(os.getenv('REDIS_URL') or '').strip();\nif redis_url:\n u=urllib.parse.urlparse(redis_url); host=u.hostname; port=u.port or 6379;\n if not host: sys.exit(EXIT_REDIS);\n try:\n  with socket.create_connection((host,port), timeout=1.5) as s:\n   s.settimeout(1.5); s.sendall(b'*1\\r\\n$4\\r\\nPING\\r\\n');\n   if b'PONG' not in s.recv(64): sys.exit(EXIT_REDIS);\n except Exception:\n  sys.exit(EXIT_REDIS);\nasync def check_db():\n stale=max(60, int(os.getenv('MEDIA_DAM_PROCESSING_STALE_SECONDS','600') or '600')); db_url=(os.getenv('DATABASE_URL') or '').replace('+asyncpg','');\n if not db_url: raise RuntimeError('DATABASE_URL is required');\n import asyncpg\n conn=await asyncpg.connect(db_url, timeout=2, command_timeout=2)\n try:\n  return int(await conn.fetchval(\"select count(*) from media_jobs where status='processing' and started_at < (now() - make_interval(secs => $1::int))\", stale) or 0)\n finally:\n  await conn.close()\ntry:\n stale_count=asyncio.run(asyncio.wait_for(check_db(), timeout=3.5))\nexcept SystemExit: raise\nexcept Exception:\n sys.exit(EXIT_DB)\nsys.exit(EXIT_STALE if stale_count > 0 else 0)",
         ]
       interval: 10s
       timeout: 5s
