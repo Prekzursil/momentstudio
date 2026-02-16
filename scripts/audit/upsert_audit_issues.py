@@ -90,12 +90,24 @@ def _request(ctx: GitHubContext, method: str, path: str, payload: dict[str, Any]
 
 
 def _list_open_issues(ctx: GitHubContext, *, labels: list[str] | None = None) -> list[dict[str, Any]]:
-    params = {"state": "open", "per_page": "100"}
-    if labels:
-        params["labels"] = ",".join(labels)
-    query = urllib.parse.urlencode(params)
-    path = f"/repos/{ctx.owner}/{ctx.repo}/issues?{query}"
-    return [row for row in _request(ctx, "GET", path) if "pull_request" not in row]
+    per_page = 100
+    page = 1
+    all_issues: list[dict[str, Any]] = []
+
+    while True:
+        params = {"state": "open", "per_page": str(per_page), "page": str(page)}
+        if labels:
+            params["labels"] = ",".join(labels)
+        query = urllib.parse.urlencode(params)
+        path = f"/repos/{ctx.owner}/{ctx.repo}/issues?{query}"
+        page_rows = _request(ctx, "GET", path)
+        all_issues.extend(row for row in page_rows if "pull_request" not in row)
+
+        if len(page_rows) < per_page:
+            break
+        page += 1
+
+    return all_issues
 
 
 def _issue_body_for_finding(finding: dict[str, Any], run_url: str | None) -> str:
