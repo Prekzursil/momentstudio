@@ -239,6 +239,9 @@ Quick usage:
 1. Open PR and review `audit-evidence-pack` artifact from `Audit PR Evidence`.
 2. Add label `audit:deep` to request a Copilot deep audit issue for that PR.
 3. Review weekly digest issue for severe findings + rolling lower-severity notes.
+4. Manual run helpers:
+   - Weekly chain: run `Audit Weekly Evidence`, then run `Audit Weekly Agent` (or let `workflow_run` trigger it automatically).
+   - Deep agent: run `Audit PR Deep Agent` with `pr_number` (or leave blank to auto-detect when exactly one open PR targets `main`).
 
 Roadmap board:
 

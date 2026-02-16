@@ -3,6 +3,9 @@ name: Audit Weekly Agent
 on:
   schedule:
     - cron: "45 4 * * 1"
+  workflow_run:
+    workflows: ["Audit Weekly Evidence"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -14,6 +17,9 @@ permissions:
 jobs:
   audit-weekly-agent:
     runs-on: ubuntu-latest
+    concurrency:
+      group: audit-weekly-agent-main
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
@@ -50,22 +56,50 @@ jobs:
         with:
           script: |
             const { owner, repo } = context.repo;
+            if (context.eventName === 'workflow_run') {
+              const sourceRun = context.payload.workflow_run;
+              if (!sourceRun) {
+                core.setFailed('Missing workflow_run payload.');
+                return;
+              }
+              if (sourceRun.conclusion !== 'success') {
+                const reason = `Source run completed with conclusion=${sourceRun.conclusion}.`;
+                core.notice(reason);
+                core.setOutput('skip_followup', 'true');
+                core.setOutput('skip_reason', reason);
+                core.setOutput('source_trigger', 'workflow_run');
+                return;
+              }
+              core.setOutput('run_id', String(sourceRun.id));
+              core.setOutput('run_url', sourceRun.html_url || '');
+              core.setOutput('skip_followup', 'false');
+              core.setOutput('source_trigger', 'workflow_run');
+              return;
+            }
+
             const runs = await github.rest.actions.listWorkflowRuns({
               owner,
               repo,
               workflow_id: 'audit-weekly-evidence.yml',
               status: 'completed',
+              branch: 'main',
               per_page: 30,
             });
             const successRun = runs.data.workflow_runs.find((run) => run.conclusion === 'success');
             if (!successRun) {
-              core.setFailed('No successful Audit Weekly Evidence run found.');
+              core.setFailed(
+                'No successful Audit Weekly Evidence run found on main. ' +
+                'Run "Audit Weekly Evidence" first, then re-run this workflow.'
+              );
               return;
             }
             core.setOutput('run_id', String(successRun.id));
-            core.setOutput('run_url', successRun.html_url);
+            core.setOutput('run_url', successRun.html_url || '');
+            core.setOutput('skip_followup', 'false');
+            core.setOutput('source_trigger', 'workflow_dispatch');
 
       - name: Download weekly evidence artifact
+        if: steps.resolve.outputs.skip_followup != 'true'
         uses: actions/download-artifact@v4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -74,6 +108,7 @@ jobs:
           path: artifacts/audit-evidence
 
       - name: Upsert severe findings (dedupe by fingerprint)
+        if: steps.resolve.outputs.skip_followup != 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -85,6 +120,7 @@ jobs:
             --skip-digest
 
       - name: Build weekly digest issue body
+        if: steps.resolve.outputs.skip_followup != 'true'
         run: |
           python3 - <<'PY'
           import json
@@ -137,6 +173,7 @@ jobs:
           PY
 
       - name: Create or update rolling digest issue
+        if: steps.resolve.outputs.skip_followup != 'true'
         id: digest
         uses: actions/github-script@v7
         with:
@@ -176,6 +213,7 @@ jobs:
             core.setOutput('issue_number', String(created.data.number));
 
       - name: Assign weekly digest to Copilot
+        if: steps.resolve.outputs.skip_followup != 'true'
         uses: actions/github-script@v7
         env:
           ISSUE_NUMBER: ${{ steps.digest.outputs.issue_number }}
@@ -214,3 +252,38 @@ jobs:
                 body: note,
               });
             }
+
+      - name: Weekly agent summary
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_trigger="${{ steps.resolve.outputs.source_trigger }}"
+          source_run_url="${{ steps.resolve.outputs.run_url }}"
+          skip_followup="${{ steps.resolve.outputs.skip_followup }}"
+          skip_reason="${{ steps.resolve.outputs.skip_reason }}"
+          digest_issue="${{ steps.digest.outputs.issue_number }}"
+          severe_count="n/a"
+          if [[ -f artifacts/audit-evidence/deterministic-findings.json ]]; then
+            severe_count="$(jq '[.[] | select(.severity == "s1" or .severity == "s2")] | length' artifacts/audit-evidence/deterministic-findings.json)"
+          fi
+
+          {
+            echo "## Weekly Agent Summary"
+            echo ""
+            echo "- Trigger event: \`${{ github.event_name }}\`"
+            echo "- Source resolution mode: \`${source_trigger:-unknown}\`"
+            if [[ -n "${source_run_url}" ]]; then
+              echo "- Source evidence run: ${source_run_url}"
+            fi
+            if [[ -z "${skip_followup}" && -z "${source_run_url}" ]]; then
+              echo "- Outcome: failed before source run resolution"
+            elif [[ "${skip_followup}" == "true" ]]; then
+              echo "- Outcome: skipped"
+              echo "- Reason: ${skip_reason:-source run was not successful}"
+            else
+              echo "- Outcome: processed"
+              echo "- Severe findings considered: \`${severe_count}\`"
+              echo "- Digest issue number: \`${digest_issue:-n/a}\`"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
