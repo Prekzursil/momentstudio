@@ -1036,6 +1036,28 @@ export interface MediaJobEventsResponse {
   items: MediaJobEvent[];
 }
 
+export interface MediaRetryPolicy {
+  job_type: MediaJobType;
+  max_attempts: number;
+  backoff_schedule_seconds: number[];
+  jitter_ratio: number;
+  enabled: boolean;
+  updated_by_user_id?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MediaRetryPolicyListResponse {
+  items: MediaRetryPolicy[];
+}
+
+export interface MediaRetryPolicyUpdateRequest {
+  max_attempts?: number;
+  backoff_schedule_seconds?: number[];
+  jitter_ratio?: number;
+  enabled?: boolean;
+}
+
 export interface MediaJobTriageUpdateRequest {
   triage_state?: MediaJobTriageState;
   assigned_to_user_id?: string | null;
@@ -1808,6 +1830,22 @@ export class AdminService {
 
   getMediaTelemetry(): Observable<MediaTelemetryResponse> {
     return this.api.get<MediaTelemetryResponse>('/content/admin/media/telemetry');
+  }
+
+  listMediaRetryPolicies(): Observable<MediaRetryPolicyListResponse> {
+    return this.api.get<MediaRetryPolicyListResponse>('/content/admin/media/retry-policies');
+  }
+
+  updateMediaRetryPolicy(jobType: MediaJobType, payload: MediaRetryPolicyUpdateRequest): Observable<MediaRetryPolicy> {
+    return this.api.patch<MediaRetryPolicy>(`/content/admin/media/retry-policies/${encodeURIComponent(jobType)}`, payload);
+  }
+
+  resetMediaRetryPolicy(jobType: MediaJobType): Observable<MediaRetryPolicy> {
+    return this.api.post<MediaRetryPolicy>(`/content/admin/media/retry-policies/${encodeURIComponent(jobType)}/reset`, {});
+  }
+
+  resetAllMediaRetryPolicies(): Observable<MediaRetryPolicyListResponse> {
+    return this.api.post<MediaRetryPolicyListResponse>('/content/admin/media/retry-policies/reset-all', {});
   }
 
   requestMediaUsageReconcile(): Observable<MediaJob> {

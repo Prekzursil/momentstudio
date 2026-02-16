@@ -15,8 +15,10 @@ import {
   MediaJobStatus,
   MediaJobTriageState,
   MediaJobType,
+  MediaRetryPolicy,
   MediaTelemetryResponse
 } from '../../../core/admin.service';
+import { AuthService } from '../../../core/auth.service';
 import { ToastService } from '../../../core/toast.service';
 import { ErrorStateComponent } from '../../../shared/error-state.component';
 import { extractRequestId } from '../../../shared/http-error';
@@ -359,6 +361,99 @@ type QueueMode = 'pipeline' | 'dead_letter';
             </button>
           </div>
 
+          <div class="grid gap-2 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+            <div class="flex items-center justify-between gap-2">
+              <div>
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">Retry policies</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Per job-type attempts, schedule, and jitter for newly queued jobs.</p>
+              </div>
+              <button
+                type="button"
+                class="rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100"
+                [disabled]="!canEditRetryPolicies()"
+                (click)="resetAllRetryPolicies()"
+              >
+                Reset all
+              </button>
+            </div>
+
+            <p *ngIf="retryPoliciesError()" class="text-xs text-rose-700 dark:text-rose-300">{{ retryPoliciesError() }}</p>
+            <div *ngIf="retryPoliciesLoading()" class="text-xs text-slate-500 dark:text-slate-400">Loading retry policies…</div>
+
+            <div *ngFor="let policy of retryPolicies()" class="grid gap-2 rounded border border-slate-200 bg-slate-50 p-2 dark:border-slate-700 dark:bg-slate-950/20">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <p class="text-xs font-semibold text-slate-800 uppercase tracking-[0.14em] dark:text-slate-100">{{ policy.job_type }}</p>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">Updated {{ policy.updated_at | date: 'short' }}</p>
+              </div>
+              <div class="grid gap-2 md:grid-cols-5">
+                <label class="grid gap-1 text-xs">
+                  <span class="font-semibold text-slate-700 dark:text-slate-200">Enabled</span>
+                  <input
+                    type="checkbox"
+                    [ngModel]="retryPolicyDraft(policy.job_type).enabled"
+                    (ngModelChange)="setRetryPolicyDraftEnabled(policy.job_type, $event)"
+                    [disabled]="!canEditRetryPolicies()"
+                  />
+                </label>
+                <label class="grid gap-1 text-xs">
+                  <span class="font-semibold text-slate-700 dark:text-slate-200">Max attempts</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="20"
+                    class="h-10 rounded border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-900"
+                    [ngModel]="retryPolicyDraft(policy.job_type).max_attempts"
+                    (ngModelChange)="setRetryPolicyDraftMaxAttempts(policy.job_type, $event)"
+                    [disabled]="!canEditRetryPolicies()"
+                  />
+                </label>
+                <label class="grid gap-1 text-xs md:col-span-2">
+                  <span class="font-semibold text-slate-700 dark:text-slate-200">Schedule (seconds)</span>
+                  <input
+                    class="h-10 rounded border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-900"
+                    [ngModel]="retryPolicyDraft(policy.job_type).scheduleText"
+                    (ngModelChange)="setRetryPolicyDraftSchedule(policy.job_type, $event)"
+                    [disabled]="!canEditRetryPolicies()"
+                    placeholder="30,120,600,1800"
+                  />
+                </label>
+                <label class="grid gap-1 text-xs">
+                  <span class="font-semibold text-slate-700 dark:text-slate-200">Jitter ratio</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    class="h-10 rounded border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-900"
+                    [ngModel]="retryPolicyDraft(policy.job_type).jitter_ratio"
+                    (ngModelChange)="setRetryPolicyDraftJitter(policy.job_type, $event)"
+                    [disabled]="!canEditRetryPolicies()"
+                  />
+                </label>
+              </div>
+              <p class="text-[11px] text-slate-500 dark:text-slate-400">Preview delays: {{ retryDelayPreview(policy.job_type) }}</p>
+              <p *ngIf="retryPolicyError(policy.job_type)" class="text-xs text-rose-700 dark:text-rose-300">{{ retryPolicyError(policy.job_type) }}</p>
+              <div class="flex flex-wrap items-center gap-2 text-xs">
+                <button
+                  type="button"
+                  class="rounded border border-slate-300 px-2 py-1 font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100"
+                  [disabled]="!canEditRetryPolicies()"
+                  (click)="saveRetryPolicy(policy.job_type)"
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  class="rounded border border-slate-300 px-2 py-1 font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100"
+                  [disabled]="!canEditRetryPolicies()"
+                  (click)="resetRetryPolicy(policy.job_type)"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div *ngIf="selectedQueueJobCount() > 0" class="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-2 text-xs dark:border-slate-800 dark:bg-slate-900">
             <span class="font-semibold text-slate-700 dark:text-slate-100">{{ selectedQueueJobCount() }} selected</span>
             <button type="button" class="rounded border border-slate-300 px-2 py-1 font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100" (click)="bulkRetrySelectedJobs()">Retry selected</button>
@@ -588,6 +683,7 @@ type QueueMode = 'pipeline' | 'dead_letter';
 export class DamAssetLibraryComponent implements OnInit, OnDestroy {
   constructor(
     private readonly admin: AdminService,
+    private readonly auth: AuthService,
     private readonly toast: ToastService
   ) {}
 
@@ -603,6 +699,7 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
   readonly assets = signal<MediaAsset[]>([]);
   readonly collections = signal<MediaCollection[]>([]);
   readonly jobs = signal<MediaJob[]>([]);
+  readonly retryPolicies = signal<MediaRetryPolicy[]>([]);
   readonly selectedQueueJobIds = signal<Set<string>>(new Set());
   readonly activeJobEventsFor = signal<MediaJob | null>(null);
   readonly jobEvents = signal<MediaJobEvent[]>([]);
@@ -611,6 +708,8 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
   readonly loading = signal(false);
   readonly queueLoading = signal(false);
   readonly queueError = signal<string | null>(null);
+  readonly retryPoliciesLoading = signal(false);
+  readonly retryPoliciesError = signal<string | null>(null);
   readonly error = signal<string | null>(null);
   readonly errorRequestId = signal<string | null>(null);
   readonly detailAsset = signal<MediaAsset | null>(null);
@@ -672,6 +771,11 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
   editTitleRo = '';
   editAltRo = '';
   private queuePollHandle: ReturnType<typeof setInterval> | null = null;
+  private retryPolicyDrafts: Record<
+    string,
+    { max_attempts: number; scheduleText: string; jitter_ratio: number; enabled: boolean }
+  > = {};
+  private retryPolicyRowErrors: Record<string, string> = {};
 
   ngOnInit(): void {
     this.reload();
@@ -688,6 +792,7 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
     if (tab === 'queue') {
       this.startQueuePolling();
       this.loadJobs(true);
+      this.loadRetryPolicies();
       return;
     }
     this.stopQueuePolling();
@@ -805,6 +910,33 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
       });
   }
 
+  loadRetryPolicies(): void {
+    this.retryPoliciesLoading.set(true);
+    this.retryPoliciesError.set(null);
+    this.admin.listMediaRetryPolicies().subscribe({
+      next: (res) => {
+        const items = (res.items || []).slice().sort((a, b) => a.job_type.localeCompare(b.job_type));
+        this.retryPolicies.set(items);
+        const drafts: Record<string, { max_attempts: number; scheduleText: string; jitter_ratio: number; enabled: boolean }> = {};
+        for (const item of items) {
+          drafts[item.job_type] = {
+            max_attempts: item.max_attempts,
+            scheduleText: (item.backoff_schedule_seconds || []).join(','),
+            jitter_ratio: item.jitter_ratio,
+            enabled: item.enabled
+          };
+        }
+        this.retryPolicyDrafts = drafts;
+        this.retryPolicyRowErrors = {};
+        this.retryPoliciesLoading.set(false);
+      },
+      error: (err) => {
+        this.retryPoliciesError.set(err?.error?.detail || 'Failed to load retry policies.');
+        this.retryPoliciesLoading.set(false);
+      }
+    });
+  }
+
   prevQueuePage(): void {
     if (this.queuePage <= 1) return;
     this.queuePage -= 1;
@@ -828,6 +960,131 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
     this.queueCreatedFrom = '';
     this.queueCreatedTo = '';
     this.loadJobs(true);
+  }
+
+  canEditRetryPolicies(): boolean {
+    const role = (this.auth.role() || '').toLowerCase();
+    return role === 'owner' || role === 'admin';
+  }
+
+  retryPolicyDraft(jobType: MediaJobType): { max_attempts: number; scheduleText: string; jitter_ratio: number; enabled: boolean } {
+    if (!this.retryPolicyDrafts[jobType]) {
+      this.retryPolicyDrafts[jobType] = { max_attempts: 5, scheduleText: '30,120,600,1800', jitter_ratio: 0.15, enabled: true };
+    }
+    return this.retryPolicyDrafts[jobType];
+  }
+
+  setRetryPolicyDraftEnabled(jobType: MediaJobType, value: boolean): void {
+    this.retryPolicyDraft(jobType).enabled = !!value;
+  }
+
+  setRetryPolicyDraftMaxAttempts(jobType: MediaJobType, value: string | number): void {
+    this.retryPolicyDraft(jobType).max_attempts = Number(value);
+  }
+
+  setRetryPolicyDraftSchedule(jobType: MediaJobType, value: string): void {
+    this.retryPolicyDraft(jobType).scheduleText = String(value || '');
+  }
+
+  setRetryPolicyDraftJitter(jobType: MediaJobType, value: string | number): void {
+    this.retryPolicyDraft(jobType).jitter_ratio = Number(value);
+  }
+
+  retryPolicyError(jobType: MediaJobType): string | null {
+    return this.retryPolicyRowErrors[jobType] || null;
+  }
+
+  retryDelayPreview(jobType: MediaJobType): string {
+    const parsed = this.parseScheduleInput(this.retryPolicyDraft(jobType).scheduleText);
+    if (!parsed.length) return 'invalid schedule';
+    return parsed.map((seconds, idx) => `#${idx + 1}: ${seconds}s`).join(' · ');
+  }
+
+  async saveRetryPolicy(jobType: MediaJobType): Promise<void> {
+    if (!this.canEditRetryPolicies()) return;
+    const draft = this.retryPolicyDraft(jobType);
+    const parsedSchedule = this.parseScheduleInput(draft.scheduleText);
+    if (!parsedSchedule.length) {
+      this.retryPolicyRowErrors[jobType] = 'Schedule must contain at least one positive integer.';
+      this.toast.error(this.retryPolicyRowErrors[jobType]);
+      return;
+    }
+    if (!Number.isFinite(Number(draft.max_attempts)) || Number(draft.max_attempts) < 1 || Number(draft.max_attempts) > 20) {
+      this.retryPolicyRowErrors[jobType] = 'Max attempts must be between 1 and 20.';
+      this.toast.error(this.retryPolicyRowErrors[jobType]);
+      return;
+    }
+    const jitter = Number(draft.jitter_ratio);
+    if (!Number.isFinite(jitter) || jitter < 0 || jitter > 1) {
+      this.retryPolicyRowErrors[jobType] = 'Jitter ratio must be between 0 and 1.';
+      this.toast.error(this.retryPolicyRowErrors[jobType]);
+      return;
+    }
+    this.retryPolicyRowErrors[jobType] = '';
+    try {
+      const saved = await firstValueFrom(
+        this.admin.updateMediaRetryPolicy(jobType, {
+          enabled: !!draft.enabled,
+          max_attempts: Number(draft.max_attempts),
+          backoff_schedule_seconds: parsedSchedule,
+          jitter_ratio: jitter
+        })
+      );
+      this.retryPolicies.set(this.retryPolicies().map((row) => (row.job_type === saved.job_type ? saved : row)));
+      this.retryPolicyDrafts[saved.job_type] = {
+        max_attempts: saved.max_attempts,
+        scheduleText: (saved.backoff_schedule_seconds || []).join(','),
+        jitter_ratio: saved.jitter_ratio,
+        enabled: saved.enabled
+      };
+      this.toast.success(`Retry policy updated for ${saved.job_type}.`);
+    } catch (err) {
+      this.retryPolicyRowErrors[jobType] = (err as any)?.error?.detail || 'Failed to update retry policy.';
+      this.toast.error(this.retryPolicyRowErrors[jobType]);
+    }
+  }
+
+  async resetRetryPolicy(jobType: MediaJobType): Promise<void> {
+    if (!this.canEditRetryPolicies()) return;
+    try {
+      const saved = await firstValueFrom(this.admin.resetMediaRetryPolicy(jobType));
+      this.retryPolicies.set(this.retryPolicies().map((row) => (row.job_type === saved.job_type ? saved : row)));
+      this.retryPolicyDrafts[saved.job_type] = {
+        max_attempts: saved.max_attempts,
+        scheduleText: (saved.backoff_schedule_seconds || []).join(','),
+        jitter_ratio: saved.jitter_ratio,
+        enabled: saved.enabled
+      };
+      this.retryPolicyRowErrors[jobType] = '';
+      this.toast.success(`Retry policy reset for ${saved.job_type}.`);
+    } catch (err) {
+      this.retryPolicyRowErrors[jobType] = (err as any)?.error?.detail || 'Failed to reset retry policy.';
+      this.toast.error(this.retryPolicyRowErrors[jobType]);
+    }
+  }
+
+  async resetAllRetryPolicies(): Promise<void> {
+    if (!this.canEditRetryPolicies()) return;
+    try {
+      const res = await firstValueFrom(this.admin.resetAllMediaRetryPolicies());
+      const items = (res.items || []).slice().sort((a, b) => a.job_type.localeCompare(b.job_type));
+      this.retryPolicies.set(items);
+      const drafts: Record<string, { max_attempts: number; scheduleText: string; jitter_ratio: number; enabled: boolean }> = {};
+      for (const item of items) {
+        drafts[item.job_type] = {
+          max_attempts: item.max_attempts,
+          scheduleText: (item.backoff_schedule_seconds || []).join(','),
+          jitter_ratio: item.jitter_ratio,
+          enabled: item.enabled
+        };
+      }
+      this.retryPolicyDrafts = drafts;
+      this.retryPolicyRowErrors = {};
+      this.toast.success('All retry policies were reset to defaults.');
+    } catch (err) {
+      this.retryPoliciesError.set((err as any)?.error?.detail || 'Failed to reset retry policies.');
+      this.toast.error(this.retryPoliciesError() || 'Failed to reset retry policies.');
+    }
   }
 
   async runUsageReconcile(): Promise<void> {
@@ -1293,6 +1550,14 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
     if (this.queuePollHandle == null) return;
     clearInterval(this.queuePollHandle);
     this.queuePollHandle = null;
+  }
+
+  private parseScheduleInput(value: string): number[] {
+    return (value || '')
+      .split(',')
+      .map((token) => Number(token.trim()))
+      .filter((num) => Number.isFinite(num) && Number.isInteger(num) && num > 0)
+      .slice(0, 20);
   }
 
   private pushJob(job: MediaJob): void {
