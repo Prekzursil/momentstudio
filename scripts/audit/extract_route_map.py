@@ -5,16 +5,10 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-
-
-PATH_RE = re.compile(r"path:\s*'([^']*)'")
-TITLE_RE = re.compile(r"title:\s*'([^']+)'")
-ROBOTS_RE = re.compile(r"robots:\s*([A-Za-z0-9_:'\",\\-]+)")
 
 
 def _repo_root() -> Path:
@@ -34,61 +28,184 @@ def _resolve_repo_path(raw: str, *, allowed_prefixes: tuple[str, ...]) -> Path:
 
 
 @dataclass(frozen=True)
-class BlockRange:
+class ParsedExpression:
+    value: str
+
+
+@dataclass(frozen=True)
+class ParsedObject:
+    values: dict[str, Any]
     start: int
     end: int
 
-    def contains(self, offset: int) -> bool:
-        return self.start <= offset <= self.end
+
+def _skip_whitespace_and_comments(source: str, idx: int) -> int:
+    while idx < len(source):
+        if source.startswith("//", idx):
+            idx = source.find("\n", idx)
+            if idx < 0:
+                return len(source)
+            continue
+        if source.startswith("/*", idx):
+            end = source.find("*/", idx + 2)
+            if end < 0:
+                return len(source)
+            idx = end + 2
+            continue
+        if source[idx].isspace():
+            idx += 1
+            continue
+        break
+    return idx
 
 
-def _find_matching_bracket(text: str, start_idx: int) -> int:
-    depth = 0
-    in_string = False
-    string_quote = ""
+def _read_quoted_string(source: str, idx: int) -> tuple[str, int]:
+    quote = source[idx]
+    idx += 1
     escaped = False
-    for idx in range(start_idx, len(text)):
-        ch = text[idx]
-        if in_string:
-            if escaped:
-                escaped = False
-                continue
-            if ch == "\\":
-                escaped = True
-                continue
-            if ch == string_quote:
-                in_string = False
-                string_quote = ""
+    chunks: list[str] = []
+    while idx < len(source):
+        ch = source[idx]
+        if escaped:
+            chunks.append(ch)
+            escaped = False
+            idx += 1
             continue
+        if ch == "\\":
+            escaped = True
+            idx += 1
+            continue
+        if ch == quote:
+            return "".join(chunks), idx + 1
+        chunks.append(ch)
+        idx += 1
+    raise ValueError("Unterminated quoted string in routes file")
+
+
+def _read_identifier(source: str, idx: int) -> tuple[str, int]:
+    start = idx
+    while idx < len(source) and (source[idx].isalnum() or source[idx] in ("_", "$")):
+        idx += 1
+    if idx == start:
+        raise ValueError(f"Expected identifier at offset {idx}")
+    return source[start:idx], idx
+
+
+def _consume_expression_value(source: str, idx: int) -> tuple[str, int]:
+    start = idx
+    paren_depth = 0
+    bracket_depth = 0
+    brace_depth = 0
+    while idx < len(source):
+        idx = _skip_whitespace_and_comments(source, idx)
+        if idx >= len(source):
+            break
+        ch = source[idx]
         if ch in ("'", '"'):
-            in_string = True
-            string_quote = ch
+            _, idx = _read_quoted_string(source, idx)
             continue
-        if ch == "[":
-            depth += 1
+        if ch == "(":
+            paren_depth += 1
+        elif ch == ")":
+            if paren_depth > 0:
+                paren_depth -= 1
+        elif ch == "[":
+            bracket_depth += 1
         elif ch == "]":
-            depth -= 1
-            if depth == 0:
-                return idx
-    raise ValueError(f"Could not find matching bracket for index {start_idx}")
+            if bracket_depth > 0:
+                bracket_depth -= 1
+            elif paren_depth == 0 and brace_depth == 0:
+                break
+        elif ch == "{":
+            brace_depth += 1
+        elif ch == "}":
+            if brace_depth > 0:
+                brace_depth -= 1
+            elif paren_depth == 0 and bracket_depth == 0:
+                break
+        elif ch == "," and paren_depth == 0 and bracket_depth == 0 and brace_depth == 0:
+            break
+        idx += 1
+    return source[start:idx].strip(), idx
 
 
-def _find_children_range(source: str, anchor: str) -> BlockRange | None:
-    anchor_idx = source.find(anchor)
-    if anchor_idx < 0:
-        return None
-    children_idx = source.find("children", anchor_idx)
-    if children_idx < 0:
-        return None
-    open_idx = source.find("[", children_idx)
+def _parse_value(source: str, idx: int) -> tuple[Any, int]:
+    idx = _skip_whitespace_and_comments(source, idx)
+    if idx >= len(source):
+        return None, idx
+    ch = source[idx]
+    if ch in ("'", '"'):
+        return _read_quoted_string(source, idx)
+    if ch == "{":
+        obj, next_idx = _parse_object(source, idx)
+        return obj.values, next_idx
+    if ch == "[":
+        return _parse_array(source, idx)
+    raw, next_idx = _consume_expression_value(source, idx)
+    return ParsedExpression(raw), next_idx
+
+
+def _parse_object(source: str, idx: int) -> tuple[ParsedObject, int]:
+    if source[idx] != "{":
+        raise ValueError(f"Expected object start at offset {idx}")
+    start = idx
+    idx += 1
+    values: dict[str, Any] = {}
+
+    while idx < len(source):
+        idx = _skip_whitespace_and_comments(source, idx)
+        if idx >= len(source):
+            break
+        if source[idx] == "}":
+            return ParsedObject(values=values, start=start, end=idx), idx + 1
+        if source[idx] in ("'", '"'):
+            key, idx = _read_quoted_string(source, idx)
+        else:
+            key, idx = _read_identifier(source, idx)
+        idx = _skip_whitespace_and_comments(source, idx)
+        if idx >= len(source) or source[idx] != ":":
+            # Unsupported shorthand property; consume until delimiter.
+            _, idx = _consume_expression_value(source, idx)
+            idx = _skip_whitespace_and_comments(source, idx)
+            if idx < len(source) and source[idx] == ",":
+                idx += 1
+            continue
+        idx += 1
+        value, idx = _parse_value(source, idx)
+        values[key] = value
+        idx = _skip_whitespace_and_comments(source, idx)
+        if idx < len(source) and source[idx] == ",":
+            idx += 1
+    raise ValueError(f"Unterminated object starting at offset {start}")
+
+
+def _parse_array(source: str, idx: int) -> tuple[list[Any], int]:
+    if source[idx] != "[":
+        raise ValueError(f"Expected array start at offset {idx}")
+    idx += 1
+    items: list[Any] = []
+    while idx < len(source):
+        idx = _skip_whitespace_and_comments(source, idx)
+        if idx >= len(source):
+            break
+        if source[idx] == "]":
+            return items, idx + 1
+        value, idx = _parse_value(source, idx)
+        items.append(value)
+        idx = _skip_whitespace_and_comments(source, idx)
+        if idx < len(source) and source[idx] == ",":
+            idx += 1
+    raise ValueError("Unterminated array in routes file")
+
+
+def _extract_routes_array(source: str) -> list[Any]:
+    routes_anchor = source.find("routes")
+    search_start = 0 if routes_anchor < 0 else routes_anchor
+    open_idx = source.find("[", search_start)
     if open_idx < 0:
-        return None
-    close_idx = _find_matching_bracket(source, open_idx)
-    return BlockRange(start=open_idx, end=close_idx)
-
-
-def _extract_context_block(source: str, offset: int, span: int = 480) -> str:
-    return source[offset : min(len(source), offset + span)]
+        return []
+    routes, _ = _parse_array(source, open_idx)
+    return routes
 
 
 def _to_full_path(prefix: str, raw_path: str) -> str:
@@ -111,48 +228,64 @@ def _surface_for_path(path: str) -> str:
     return "storefront"
 
 
-def extract_route_map(routes_file: Path) -> dict[str, Any]:
-    source = routes_file.read_text(encoding="utf-8")
-    account_children = _find_children_range(source, "path: 'account'")
-    admin_children = _find_children_range(source, "path: 'admin'")
-    admin_content_children = _find_children_range(source, "path: 'content'")
+def _extract_robots_hint(route: dict[str, Any]) -> str | None:
+    robots = route.get("robots")
+    if isinstance(robots, str) and robots.strip():
+        return robots
+    if isinstance(robots, ParsedExpression) and robots.value.strip():
+        return robots.value
+    data = route.get("data")
+    if isinstance(data, dict):
+        data_robots = data.get("robots")
+        if isinstance(data_robots, str) and data_robots.strip():
+            return data_robots
+        if isinstance(data_robots, ParsedExpression) and data_robots.value.strip():
+            return data_robots.value
+    return None
 
-    rows: list[dict[str, Any]] = []
-    seen: set[tuple[str, str]] = set()
 
-    for match in PATH_RE.finditer(source):
-        raw_path = match.group(1)
-        start = match.start()
-        prefix = ""
-
-        if admin_content_children and admin_content_children.contains(start):
-            prefix = "/admin/content"
-        elif admin_children and admin_children.contains(start):
-            prefix = "/admin"
-        elif account_children and account_children.contains(start):
-            prefix = "/account"
+def _collect_rows(
+    routes: list[Any],
+    *,
+    prefix: str,
+    rows: list[dict[str, Any]],
+    seen: set[tuple[str, str]],
+) -> None:
+    for route in routes:
+        if not isinstance(route, dict):
+            continue
+        raw_path = route.get("path")
+        if not isinstance(raw_path, str):
+            continue
 
         full_path = _to_full_path(prefix, raw_path)
         surface = _surface_for_path(full_path)
         key = (full_path, surface)
-        if key in seen:
-            continue
-        seen.add(key)
+        if key not in seen:
+            seen.add(key)
+            title = route.get("title")
+            rows.append(
+                {
+                    "raw_path": raw_path,
+                    "prefix": prefix or "/",
+                    "full_path": full_path,
+                    "surface": surface,
+                    "title_key": title if isinstance(title, str) else None,
+                    "robots_hint": _extract_robots_hint(route),
+                }
+            )
 
-        context = _extract_context_block(source, start)
-        title_match = TITLE_RE.search(context)
-        robots_match = ROBOTS_RE.search(context)
+        children = route.get("children")
+        if isinstance(children, list):
+            _collect_rows(children, prefix=full_path, rows=rows, seen=seen)
 
-        rows.append(
-            {
-                "raw_path": raw_path,
-                "prefix": prefix or "/",
-                "full_path": full_path,
-                "surface": surface,
-                "title_key": title_match.group(1) if title_match else None,
-                "robots_hint": robots_match.group(1) if robots_match else None,
-            }
-        )
+
+def extract_route_map(routes_file: Path) -> dict[str, Any]:
+    source = routes_file.read_text(encoding="utf-8")
+    parsed_routes = _extract_routes_array(source)
+    rows: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    _collect_rows(parsed_routes, prefix="", rows=rows, seen=seen)
 
     rows.sort(key=lambda item: (item["surface"], item["full_path"]))
     by_surface: dict[str, int] = {"storefront": 0, "account": 0, "admin": 0}
