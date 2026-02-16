@@ -59,6 +59,69 @@ area:dam:
           - "frontend/src/app/pages/admin/content/admin-content-media.component.ts"
           - "frontend/src/app/pages/admin/shared/dam-asset-library.component.ts"
 
+audit:deep:
+  - head-branch:
+      - "^audit/.+"
+  - changed-files:
+      - any-glob-to-any-file:
+          - "scripts/audit/**"
+          - ".github/workflows/audit-*.yml"
+          - ".github/copilot-instructions.md"
+          - ".github/instructions/**"
+
+audit:ux:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "frontend/src/app/pages/**"
+          - "frontend/src/app/shared/**"
+          - "scripts/audit/**"
+
+audit:ia:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "frontend/src/app/app.routes.ts"
+          - "frontend/src/app/app.component.ts"
+          - "frontend/src/app/pages/admin/**"
+          - "scripts/audit/**"
+
+audit:seo:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "frontend/src/index.html"
+          - "frontend/src/app/core/seo-*.ts"
+          - "frontend/src/app/core/route-robots.service.ts"
+          - "frontend/e2e/seo-public-routes.spec.ts"
+          - "scripts/audit/**"
+
+audit:correctness:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "scripts/audit/**"
+          - "backend/tests/**"
+          - "frontend/src/**/*.spec.ts"
+
+surface:storefront:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "frontend/src/app/pages/home/**"
+          - "frontend/src/app/pages/shop/**"
+          - "frontend/src/app/pages/blog/**"
+          - "frontend/src/app/pages/product/**"
+          - "frontend/src/app/pages/cart/**"
+          - "frontend/src/app/pages/checkout/**"
+
+surface:account:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "frontend/src/app/pages/account/**"
+          - "frontend/src/app/pages/auth/**"
+          - "frontend/src/app/pages/tickets/**"
+
+surface:admin:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "frontend/src/app/pages/admin/**"
+
 dependencies:
   - head-branch:
       - "^dependabot/.+"

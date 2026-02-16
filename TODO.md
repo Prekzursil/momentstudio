@@ -102,6 +102,13 @@ showing what is already implemented.
   - Evidence: `.github/dependabot.yml`, `.github/workflows/dependency-review.yml`, `.github/workflows/pr-labeler.yml`, `.github/labeler.yml`, `.github/pull_request_template.md`, `.github/ISSUE_TEMPLATE/*`
 - [x] Protect main with checks-only required CI gates.
   - Evidence: GitHub branch protection on `main` requires `backend`, `backend-postgres`, `frontend`, `compose-smoke` checks with strict up-to-date enabled.
+- [x] AI workflow: split UX/IA automation into deterministic Evidence Pack + Copilot Agent Pass (weekly digest + opt-in deep PR audits).
+  - Evidence: `.github/workflows/audit-pr-evidence.yml`, `.github/workflows/audit-weekly-evidence.yml`, `.github/workflows/audit-weekly-agent.yml`, `.github/workflows/audit-pr-deep-agent.yml`, `scripts/audit/render_report_prompt.md`
+- [x] Audit tracking: add deterministic finding fingerprints and severe-issue dedupe/upsert automation.
+  - Evidence: `scripts/audit/normalize_findings_fingerprint.py`, `scripts/audit/upsert_audit_issues.py`, `scripts/audit/collect_audit_evidence.py`
+- [x] Copilot governance: add repo-level + path-scoped Copilot instructions and AI governance apply helper.
+  - Evidence: `.github/copilot-instructions.md`, `.github/instructions/storefront.instructions.md`, `.github/instructions/account.instructions.md`, `.github/instructions/admin.instructions.md`, `.github/instructions/backend-api.instructions.md`, `scripts/repo/apply_ai_governance.sh`
+- [ ] AI audit phase 2: auto-sync severe audit issues to roadmap project lane `Now` when project-write token is configured.
 - [x] Repo policy phase 2: evaluate enabling required review approvals once contributor cadence grows.
   - Evidence: `docs/REPOSITORY_POLICY.md`, `docs/reports/repo-policy-phase2-baseline-2026-02.md`, `docs/reports/repo-policy-phase2-baseline-2026-02.json`
 - [x] DAM (local-only): add first-party media domain models + local-volume storage layout + Redis job queue primitives (no S3/cloud adapters).

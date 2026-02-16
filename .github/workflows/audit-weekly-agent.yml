@@ -1,0 +1,216 @@
+name: Audit Weekly Agent
+
+on:
+  schedule:
+    - cron: "45 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  audit-weekly-agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Ensure core audit labels exist
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labels = [
+              { name: 'audit:ux', color: '0E8A16', description: 'UX audit finding.' },
+              { name: 'audit:ia', color: '1D76DB', description: 'Information architecture audit finding.' },
+              { name: 'audit:correctness', color: 'B60205', description: 'Correctness or runtime quality finding.' },
+              { name: 'ai:ready', color: '0366D6', description: 'Ready for AI agent execution.' },
+              { name: 'ai:in-progress', color: 'FBCA04', description: 'AI agent is processing.' },
+              { name: 'severity:s1', color: 'B60205', description: 'Critical severity finding.' },
+              { name: 'severity:s2', color: 'D93F0B', description: 'High severity finding.' },
+              { name: 'severity:s3', color: 'FBCA04', description: 'Medium severity finding.' },
+              { name: 'severity:s4', color: '0E8A16', description: 'Low severity finding.' },
+              { name: 'surface:storefront', color: '0969DA', description: 'Storefront-facing surface.' },
+              { name: 'surface:account', color: '1E9C48', description: 'Account/self-service surface.' },
+              { name: 'surface:admin', color: 'C2E0C6', description: 'Admin/operations surface.' },
+            ];
+            const { owner, repo } = context.repo;
+            for (const label of labels) {
+              try {
+                await github.rest.issues.createLabel({ owner, repo, ...label });
+              } catch (error) {
+                if (error.status !== 422) throw error;
+              }
+            }
+
+      - name: Resolve latest successful weekly evidence run
+        id: resolve
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const runs = await github.rest.actions.listWorkflowRuns({
+              owner,
+              repo,
+              workflow_id: 'audit-weekly-evidence.yml',
+              status: 'completed',
+              per_page: 30,
+            });
+            const successRun = runs.data.workflow_runs.find((run) => run.conclusion === 'success');
+            if (!successRun) {
+              core.setFailed('No successful Audit Weekly Evidence run found.');
+              return;
+            }
+            core.setOutput('run_id', String(successRun.id));
+            core.setOutput('run_url', successRun.html_url);
+
+      - name: Download weekly evidence artifact
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ steps.resolve.outputs.run_id }}
+          name: audit-evidence-pack
+          path: artifacts/audit-evidence
+
+      - name: Upsert severe findings (dedupe by fingerprint)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RUN_URL: ${{ steps.resolve.outputs.run_url }}
+        run: |
+          python3 scripts/audit/upsert_audit_issues.py \
+            --findings artifacts/audit-evidence/deterministic-findings.json \
+            --run-url "$RUN_URL" \
+            --skip-digest
+
+      - name: Build weekly digest issue body
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          findings_path = Path("artifacts/audit-evidence/deterministic-findings.json")
+          prompt_path = Path("scripts/audit/render_report_prompt.md")
+          findings = json.loads(findings_path.read_text(encoding="utf-8")) if findings_path.exists() else []
+          low = [row for row in findings if str(row.get("severity", "")).lower() in {"s3", "s4"}]
+          severe = [row for row in findings if str(row.get("severity", "")).lower() in {"s1", "s2"}]
+          prompt = prompt_path.read_text(encoding="utf-8").strip()
+          run_url = "${{ steps.resolve.outputs.run_url }}"
+
+          lines = [
+              "# Weekly UX/IA Audit Digest",
+              "",
+              "This rolling issue is fed by deterministic evidence and assigned to Copilot for judgment and optional fix PR proposals.",
+              "",
+              f"- Latest evidence run: {run_url}",
+              f"- Total findings: `{len(findings)}`",
+              f"- Severe findings (s1/s2): `{len(severe)}`",
+              f"- Lower findings (s3/s4): `{len(low)}`",
+              "",
+              "## Copilot task",
+              "",
+              "Use the evidence artifact and follow the exact output contract below.",
+              "",
+              "```md",
+              prompt,
+              "```",
+              "",
+              "## Lower-severity digest (s3/s4)",
+              "",
+          ]
+
+          if not low:
+              lines.append("- No lower-severity findings in this run.")
+          else:
+              for row in low[:120]:
+                  lines.append(
+                      f"- [{row.get('severity','s3')}] {row.get('title','Audit finding')} "
+                      f"(surface: `{row.get('surface','storefront')}`, route: `{row.get('route','/')}`, "
+                      f"fingerprint: `{row.get('fingerprint','')}`)"
+                  )
+
+          Path("artifacts/audit-evidence/weekly-digest-body.md").write_text(
+              "\n".join(lines).strip() + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Create or update rolling digest issue
+        id: digest
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const title = 'Weekly UX/IA Audit Digest';
+            const body = fs.readFileSync('artifacts/audit-evidence/weekly-digest-body.md', 'utf8');
+            const { owner, repo } = context.repo;
+
+            const openIssues = await github.paginate(github.rest.issues.listForRepo, {
+              owner,
+              repo,
+              state: 'open',
+              per_page: 100,
+            });
+            const existing = openIssues.find((issue) => !issue.pull_request && issue.title === title);
+            if (existing) {
+              await github.rest.issues.update({
+                owner,
+                repo,
+                issue_number: existing.number,
+                title,
+                body,
+                labels: ['audit:ux', 'audit:ia', 'audit:correctness', 'ai:ready'],
+              });
+              core.setOutput('issue_number', String(existing.number));
+              return;
+            }
+
+            const created = await github.rest.issues.create({
+              owner,
+              repo,
+              title,
+              body,
+              labels: ['audit:ux', 'audit:ia', 'audit:correctness', 'ai:ready'],
+            });
+            core.setOutput('issue_number', String(created.data.number));
+
+      - name: Assign weekly digest to Copilot
+        uses: actions/github-script@v7
+        env:
+          ISSUE_NUMBER: ${{ steps.digest.outputs.issue_number }}
+        with:
+          script: |
+            const issueNumber = Number(process.env.ISSUE_NUMBER || 0);
+            if (!issueNumber) {
+              core.setFailed('Missing digest issue number.');
+              return;
+            }
+            const { owner, repo } = context.repo;
+            try {
+              await github.rest.issues.addAssignees({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                assignees: ['copilot'],
+              });
+              await github.rest.issues.update({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                labels: ['audit:ux', 'audit:ia', 'audit:correctness', 'ai:in-progress'],
+              });
+            } catch (error) {
+              const note = [
+                'Copilot assignment failed automatically.',
+                'Run this manually if needed:',
+                '',
+                '`gh issue edit ' + issueNumber + ' --repo ' + owner + '/' + repo + ' --add-assignee @copilot`',
+              ].join('\n');
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                body: note,
+              });
+            }
