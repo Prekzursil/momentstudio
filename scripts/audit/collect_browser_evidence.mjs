@@ -3,9 +3,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { createRequire } from "node:module";
+import { pathToFileURL } from "node:url";
 
 const require = createRequire(new URL("../../frontend/package.json", import.meta.url));
-const { chromium } = require("@playwright/test");
 
 function parseArgs(argv) {
   const out = {};
@@ -23,6 +23,18 @@ function parseArgs(argv) {
     out[key] = value;
   }
   return out;
+}
+
+function resolveMaxRoutes(value, logger = console) {
+  const token = value === undefined ? undefined : String(value);
+  const parsed = Number.parseInt(token ?? "", 10);
+  const maxRoutes = Number.isFinite(parsed) && parsed > 0 ? parsed : 30;
+
+  if (token !== undefined && maxRoutes === 30 && parsed !== 30) {
+    logger?.warn?.(`Invalid --max-routes value "${token}"; defaulting to 30.`);
+  }
+
+  return maxRoutes;
 }
 
 function routeSlug(routePath) {
@@ -52,7 +64,7 @@ async function main() {
   const baseUrl = String(args["base-url"] || "").trim().replace(/\/$/, "");
   const routesJsonPath = String(args["routes-json"] || "").trim();
   const outputDir = String(args["output-dir"] || "").trim();
-  const maxRoutes = Math.max(1, Number.parseInt(String(args["max-routes"] || "30"), 10));
+  const maxRoutes = resolveMaxRoutes(args["max-routes"]);
 
   if (!baseUrl || !routesJsonPath || !outputDir) {
     throw new Error("Required args: --base-url --routes-json --output-dir");
@@ -65,6 +77,7 @@ async function main() {
   const screenshotDir = path.join(outputDir, "screenshots");
   await fs.mkdir(screenshotDir, { recursive: true });
 
+  const { chromium } = require("@playwright/test");
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
@@ -219,8 +232,12 @@ async function main() {
   await fs.writeFile(path.join(outputDir, "layout-signals.json"), `${JSON.stringify(layoutSignals, null, 2)}\n`, "utf-8");
 }
 
-main().catch((err) => {
-  const message = String(err?.message || err || "unknown error");
-  process.stderr.write(`${message}\n`);
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((err) => {
+    const message = String(err?.message || err || "unknown error");
+    process.stderr.write(`${message}\n`);
+    process.exit(1);
+  });
+}
+
+export { parseArgs, resolveMaxRoutes };
