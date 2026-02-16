@@ -93,6 +93,7 @@ export interface FailureCount {
 
 export interface WebhookBacklogCount {
   pending: number;
+  pending_recent: number;
   since_hours: number;
 }
 

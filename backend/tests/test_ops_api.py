@@ -14,7 +14,7 @@ from app.models.user import UserRole
 from app.models.passkeys import UserPasskey
 from app.models.email_event import EmailDeliveryEvent
 from app.models.email_failure import EmailDeliveryFailure
-from app.models.webhook import StripeWebhookEvent
+from app.models.webhook import PayPalWebhookEvent, StripeWebhookEvent
 from app.schemas.user import UserCreate
 from app.services.auth import create_user, issue_tokens_for_user
 
@@ -144,6 +144,66 @@ def test_ops_banners_and_shipping_simulation(test_app: Dict[str, object]) -> Non
     failure_stats = client.get("/api/v1/ops/admin/webhooks/stats?since_hours=24", headers=auth_headers(token))
     assert failure_stats.status_code == 200, failure_stats.text
     assert failure_stats.json()["failed"] == 1
+
+    def seed_webhook_backlog_rows() -> None:
+        async def _seed() -> None:
+            async with SessionLocal() as session:
+                now = datetime.now(timezone.utc)
+                session.add(
+                    StripeWebhookEvent(
+                        stripe_event_id="evt_pending_recent",
+                        event_type="checkout.session.completed",
+                        attempts=1,
+                        last_attempt_at=now - timedelta(hours=2),
+                        processed_at=None,
+                        last_error=None,
+                        payload={"id": "evt_pending_recent"},
+                    )
+                )
+                session.add(
+                    StripeWebhookEvent(
+                        stripe_event_id="evt_pending_old",
+                        event_type="checkout.session.completed",
+                        attempts=1,
+                        last_attempt_at=now - timedelta(days=5),
+                        processed_at=None,
+                        last_error="",
+                        payload={"id": "evt_pending_old"},
+                    )
+                )
+                session.add(
+                    PayPalWebhookEvent(
+                        paypal_event_id="pp_pending_old",
+                        event_type="PAYMENT.CAPTURE.COMPLETED",
+                        attempts=1,
+                        last_attempt_at=now - timedelta(days=3),
+                        processed_at=None,
+                        last_error=None,
+                        payload={"id": "pp_pending_old"},
+                    )
+                )
+                session.add(
+                    StripeWebhookEvent(
+                        stripe_event_id="evt_pending_failed",
+                        event_type="checkout.session.completed",
+                        attempts=1,
+                        last_attempt_at=now - timedelta(hours=1),
+                        processed_at=None,
+                        last_error="boom",
+                        payload={"id": "evt_pending_failed"},
+                    )
+                )
+                await session.commit()
+
+        asyncio.run(_seed())
+
+    seed_webhook_backlog_rows()
+
+    backlog_stats = client.get("/api/v1/ops/admin/webhooks/backlog?since_hours=24", headers=auth_headers(token))
+    assert backlog_stats.status_code == 200, backlog_stats.text
+    assert backlog_stats.json()["pending"] == 3
+    assert backlog_stats.json()["pending_recent"] == 1
+    assert backlog_stats.json()["since_hours"] == 24
 
     detail = client.get("/api/v1/ops/admin/webhooks/stripe/evt_test", headers=auth_headers(token))
     assert detail.status_code == 200, detail.text
