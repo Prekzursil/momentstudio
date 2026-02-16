@@ -141,6 +141,7 @@ class Settings(BaseSettings):
     media_dam_worker_heartbeat_prefix: str = "media:workers:heartbeat"
     media_dam_worker_heartbeat_ttl_seconds: int = 30
     media_dam_worker_heartbeat_file: str = "/tmp/media-worker-heartbeat.json"
+    media_dam_telemetry_heartbeat_scan_limit: int = 500
     media_dam_processing_stale_seconds: int = 600
     media_dam_retry_max_attempts: int = 5
     media_dam_retry_sweep_seconds: int = 10
