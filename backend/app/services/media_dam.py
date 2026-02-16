@@ -8,7 +8,7 @@ import mimetypes
 import random
 import re
 import shutil
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -1292,7 +1292,7 @@ async def get_telemetry(session: AsyncSession) -> MediaTelemetryResponse:
                     scanned += 1
                     await _consume_heartbeat(key)
             else:
-                for key in key_iter:
+                for key in cast(Iterable[object], key_iter):
                     if scanned >= scan_limit:
                         break
                     scanned += 1
