@@ -21,6 +21,11 @@ export type LockerMirrorSnapshot = {
   last_error: string | null;
   stale: boolean;
   stale_age_seconds: number | null;
+  challenge_failure_streak?: number;
+  schema_drift_detected?: boolean;
+  last_schema_drift_at?: string | null;
+  canary_alert_codes?: string[];
+  canary_alert_messages?: string[];
 };
 
 export type LockerCityRead = {

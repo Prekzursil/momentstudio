@@ -239,6 +239,9 @@ class Settings(BaseSettings):
     sameday_mirror_fetch_timeout_seconds: int = 30
     sameday_mirror_max_lockers: int = 20_000
     sameday_mirror_playwright_enabled: bool = True
+    sameday_mirror_challenge_failure_alert_streak: int = 3
+    sameday_mirror_schema_drift_ratio_drop: float = 0.20
+    sameday_mirror_schema_drift_min_ratio: float = 0.80
     lockers_use_overpass_fallback: bool = True
     sameday_api_base_url: str | None = None
     sameday_api_username: str | None = None

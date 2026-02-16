@@ -131,6 +131,15 @@ type LocationResult = { display_name: string; lat: number; lng: number; locker_c
         >
           {{ 'checkout.lockers.snapshotStale' | translate: { days: staleDays() } }}
         </div>
+        <div
+          *ngIf="provider === 'sameday' && (mirrorSnapshot?.canary_alert_messages || []).length"
+          class="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100"
+        >
+          <p class="font-semibold">{{ 'checkout.lockers.snapshotCanaryTitle' | translate }}</p>
+          <ul class="mt-1 list-disc pl-5">
+            <li *ngFor="let msg of mirrorSnapshot?.canary_alert_messages">{{ msg }}</li>
+          </ul>
+        </div>
       </div>
 
       <div #mapHost class="h-72 w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950"></div>

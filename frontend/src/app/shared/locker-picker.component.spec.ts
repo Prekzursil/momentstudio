@@ -34,7 +34,11 @@ describe('LockerPickerComponent', () => {
           last_success_at: '2026-01-01T00:00:00Z',
           last_error: null,
           stale: true,
-          stale_age_seconds: 86400 * 35
+          stale_age_seconds: 86400 * 35,
+          challenge_failure_streak: 3,
+          schema_drift_detected: true,
+          canary_alert_codes: ['schema_drift', 'challenge_failure_streak'],
+          canary_alert_messages: ['schema changed', 'challenge streak']
         }
       } as any)
     );
@@ -56,12 +60,15 @@ describe('LockerPickerComponent', () => {
   it('loads city suggestions from backend for sameday and stores stale snapshot metadata', async () => {
     component.provider = 'sameday';
     await (component as any).fetchLocations('Bucu');
+    fixture.detectChanges();
 
     expect(shipping.listLockerCities).toHaveBeenCalled();
     expect(component.searchResults.length).toBe(1);
     expect(component.searchResults[0].display_name).toContain('Bucuresti');
     expect(component.mirrorSnapshot?.stale).toBeTrue();
+    expect(component.mirrorSnapshot?.canary_alert_messages?.length).toBeGreaterThan(0);
     expect(component.staleDays()).toBeGreaterThanOrEqual(30);
+    expect((fixture.nativeElement.textContent || '').replace(/\s+/g, ' ')).toContain('checkout.lockers.snapshotCanaryTitle');
   });
 
   it('shows mirror unavailable message when backend returns 503 locker mirror error', async () => {

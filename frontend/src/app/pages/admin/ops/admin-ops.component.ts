@@ -230,6 +230,15 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
                 </p>
               </div>
             </div>
+            <div
+              *ngIf="(samedaySyncStatus()?.canary_alert_messages || []).length"
+              class="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100"
+            >
+              <p class="font-semibold">{{ 'adminUi.ops.samedaySync.canaryTitle' | translate }}</p>
+              <ul class="mt-1 list-disc pl-5">
+                <li *ngFor="let msg of samedaySyncStatus()?.canary_alert_messages">{{ msg }}</li>
+              </ul>
+            </div>
             <div *ngIf="samedaySyncRuns().length" class="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
               <table class="min-w-[720px] w-full text-xs">
                 <thead class="bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-200">
@@ -239,6 +248,8 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
                     <th class="px-2 py-1 text-left">{{ 'adminUi.ops.samedaySync.table.fetched' | translate }}</th>
                     <th class="px-2 py-1 text-left">{{ 'adminUi.ops.samedaySync.table.upserted' | translate }}</th>
                     <th class="px-2 py-1 text-left">{{ 'adminUi.ops.samedaySync.table.deactivated' | translate }}</th>
+                    <th class="px-2 py-1 text-left">{{ 'adminUi.ops.samedaySync.table.failureKind' | translate }}</th>
+                    <th class="px-2 py-1 text-left">{{ 'adminUi.ops.samedaySync.table.schemaDrift' | translate }}</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
@@ -248,6 +259,8 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
                     <td class="px-2 py-1">{{ run.fetched_count }}</td>
                     <td class="px-2 py-1">{{ run.upserted_count }}</td>
                     <td class="px-2 py-1">{{ run.deactivated_count }}</td>
+                    <td class="px-2 py-1">{{ run.failure_kind || '—' }}</td>
+                    <td class="px-2 py-1">{{ run.schema_drift_detected ? ('adminUi.ops.samedaySync.staleYes' | translate) : ('adminUi.ops.samedaySync.staleNo' | translate) }}</td>
                   </tr>
                 </tbody>
               </table>

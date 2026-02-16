@@ -1339,7 +1339,8 @@
       "results": "Lockere",
       "error": "Nu am putut încărca lockerele. Încearcă din nou.",
       "mirrorUnavailable": "Datele pentru lockere sunt în curs de sincronizare. Încearcă din nou în câteva momente.",
-      "snapshotStale": "Datele locker sunt mai vechi de {{days}} zile. Rezultatele pot fi parțial neactualizate.",
+  "snapshotStale": "Datele locker sunt mai vechi de {{days}} zile. Rezultatele pot fi parțial neactualizate.",
+  "snapshotCanaryTitle": "Alerte calitate mirror",
       "noGeolocation": "Geolocația nu este disponibilă în acest browser.",
       "geoDenied": "Nu am putut accesa locația. Permite accesul și încearcă din nou."
     },
@@ -2464,6 +2465,7 @@
       },
       "samedaySync": {
         "title": "Mirror Sameday Easybox",
+        "canaryTitle": "Alerte canar",
         "loading": "Se încarcă statusul sincronizării Sameday…",
         "runNow": "Rulează sincronizarea",
         "running": "Sincronizare în curs…",
@@ -2480,7 +2482,9 @@
           "status": "Status",
           "fetched": "Preluate",
           "upserted": "Actualizate",
-          "deactivated": "Dezactivate"
+          "deactivated": "Dezactivate",
+          "failureKind": "Tip eșec",
+          "schemaDrift": "Derivă schemă"
         },
         "success": {
           "started": "Sincronizarea Sameday s-a încheiat."

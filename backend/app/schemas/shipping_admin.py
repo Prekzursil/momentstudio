@@ -20,6 +20,13 @@ class SamedaySyncRunRead(BaseModel):
     fetched_count: int = Field(default=0, ge=0)
     upserted_count: int = Field(default=0, ge=0)
     deactivated_count: int = Field(default=0, ge=0)
+    candidate_count: int = Field(default=0, ge=0)
+    normalized_count: int = Field(default=0, ge=0)
+    normalization_ratio: float | None = Field(default=None, ge=0.0)
+    schema_signature: str | None = None
+    schema_drift_detected: bool = False
+    failure_kind: str | None = None
+    challenge_failure: bool = False
     error_message: str | None = None
     source_url_used: str | None = None
     payload_hash: str | None = None
@@ -37,4 +44,9 @@ class SamedaySyncStatusRead(BaseModel):
     last_error: str | None = None
     stale: bool = False
     stale_age_seconds: int | None = Field(default=None, ge=0)
+    challenge_failure_streak: int = Field(default=0, ge=0)
+    schema_drift_detected: bool = False
+    last_schema_drift_at: datetime | None = None
+    canary_alert_codes: list[str] = Field(default_factory=list)
+    canary_alert_messages: list[str] = Field(default_factory=list)
     latest_run: SamedaySyncRunRead | None = None

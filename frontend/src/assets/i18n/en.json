@@ -1339,7 +1339,8 @@
       "results": "Lockers",
       "error": "Could not load lockers. Please try again.",
       "mirrorUnavailable": "Locker data is syncing right now. Please try again in a minute.",
-      "snapshotStale": "Locker data is older than {{days}} days. Results may be partially outdated.",
+  "snapshotStale": "Locker data is older than {{days}} days. Results may be partially outdated.",
+  "snapshotCanaryTitle": "Mirror quality alerts",
       "noGeolocation": "Geolocation is not available in this browser.",
       "geoDenied": "Could not access your location. Please allow location access and try again."
     },
@@ -2464,6 +2465,7 @@
       },
       "samedaySync": {
         "title": "Sameday Easybox mirror",
+        "canaryTitle": "Canary alerts",
         "loading": "Loading Sameday sync status…",
         "runNow": "Run sync now",
         "running": "Sync running…",
@@ -2480,7 +2482,9 @@
           "status": "Status",
           "fetched": "Fetched",
           "upserted": "Upserted",
-          "deactivated": "Deactivated"
+          "deactivated": "Deactivated",
+          "failureKind": "Failure kind",
+          "schemaDrift": "Schema drift"
         },
         "success": {
           "started": "Sameday sync completed."

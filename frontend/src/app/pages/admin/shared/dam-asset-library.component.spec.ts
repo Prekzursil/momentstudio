@@ -464,17 +464,39 @@ describe('DamAssetLibraryComponent', () => {
     expect(component.isRetryPolicyHistoryOpen('ingest')).toBeTrue();
   });
 
-  it('rolls back retry policy to preset for owner/admin role', async () => {
-    spyOn(window, 'confirm').and.returnValue(true);
+  it('opens rollback preview for preset and applies on explicit confirmation', async () => {
     const fixture = TestBed.createComponent(DamAssetLibraryComponent);
     fixture.detectChanges();
     const component = fixture.componentInstance;
     component.switchTab('queue');
+    component.toggleRetryPolicyHistory('ingest');
+    await Promise.resolve();
 
     await component.rollbackRetryPolicyPreset('ingest', 'factory_default');
 
+    expect(admin.rollbackMediaRetryPolicy).not.toHaveBeenCalled();
+    expect(component.retryPolicyRollbackPreview()?.request.preset_key).toBe('factory_default');
+
+    await component.applyRetryPolicyRollbackPreview();
+
     expect(admin.rollbackMediaRetryPolicy).toHaveBeenCalledWith('ingest', { preset_key: 'factory_default' });
     expect(toast.success).toHaveBeenCalled();
+  });
+
+  it('opens rollback preview for history event and applies selected revision', async () => {
+    const fixture = TestBed.createComponent(DamAssetLibraryComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.switchTab('queue');
+    component.toggleRetryPolicyHistory('ingest');
+    await Promise.resolve();
+
+    await component.rollbackRetryPolicyEvent('ingest', 'evt-1');
+    expect(admin.rollbackMediaRetryPolicy).not.toHaveBeenCalled();
+    expect(component.retryPolicyRollbackPreview()?.request.event_id).toBe('evt-1');
+
+    await component.applyRetryPolicyRollbackPreview();
+    expect(admin.rollbackMediaRetryPolicy).toHaveBeenCalledWith('ingest', { event_id: 'evt-1' });
   });
 
   it('marks retry policy as known good for owner/admin role', async () => {

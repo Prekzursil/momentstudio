@@ -83,6 +83,10 @@ def test_sameday_mirror_sync_success_upsert_and_deactivate(test_ctx, monkeypatch
             run = await sameday_easybox_mirror.sync_now(session, trigger="test")
             assert run.status == ShippingLockerSyncStatus.success
             assert run.deactivated_count == 1
+            assert run.candidate_count == 1
+            assert run.normalized_count == 1
+            assert (run.normalization_ratio or 0.0) > 0
+            assert run.schema_signature
             rows = (await session.execute(select(ShippingLockerMirror).order_by(ShippingLockerMirror.external_id))).scalars().all()
             assert len(rows) == 2
             assert rows[0].name == "Easybox A1 Updated"
@@ -134,6 +138,8 @@ def test_sameday_mirror_sync_failure_keeps_previous_snapshot(test_ctx, monkeypat
         async with SessionLocal() as session:
             run = await sameday_easybox_mirror.sync_now(session, trigger="test")
             assert run.status == ShippingLockerSyncStatus.failed
+            assert run.failure_kind == "cloudflare_challenge"
+            assert run.challenge_failure is True
 
     _run(run_fail())
     after = _run(count_active())
@@ -216,6 +222,47 @@ def test_shipping_lockers_city_autocomplete(test_ctx):
     assert payload["snapshot"]["total_lockers"] == 2
 
 
+def test_shipping_lockers_city_snapshot_exposes_canary_alerts(test_ctx):
+    client: TestClient = test_ctx["client"]
+    SessionLocal = test_ctx["session_factory"]
+    now = datetime.now(timezone.utc)
+
+    async def seed():
+        async with SessionLocal() as session:
+            session.add(
+                ShippingLockerMirror(
+                    provider=ShippingLockerProvider.sameday,
+                    external_id="A1",
+                    name="Easybox A1",
+                    city="Bucuresti",
+                    county="Ilfov",
+                    lat=44.42,
+                    lng=26.1,
+                    is_active=True,
+                )
+            )
+            for idx in range(3):
+                session.add(
+                    ShippingLockerSyncRun(
+                        provider=ShippingLockerProvider.sameday,
+                        status=ShippingLockerSyncStatus.failed,
+                        started_at=now - timedelta(minutes=idx + 1),
+                        finished_at=now - timedelta(minutes=idx + 1),
+                        challenge_failure=True,
+                        failure_kind="cloudflare_challenge",
+                        error_message="Cloudflare challenge",
+                    )
+                )
+            await session.commit()
+
+    _run(seed())
+    response = client.get("/api/v1/shipping/lockers/cities?provider=sameday&q=Buc&limit=5")
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["snapshot"]["challenge_failure_streak"] == 3
+    assert "challenge_failure_streak" in payload["snapshot"]["canary_alert_codes"]
+
+
 def test_sync_status_stale_after_30_days(test_ctx):
     SessionLocal = test_ctx["session_factory"]
     now = datetime.now(timezone.utc)
@@ -241,6 +288,98 @@ def test_sync_status_stale_after_30_days(test_ctx):
             status_payload = await sameday_easybox_mirror.get_snapshot_status(session)
             assert status_payload.stale is True
             assert (status_payload.stale_age_seconds or 0) >= 31 * 24 * 3600
+
+    _run(check_status())
+
+
+def test_sync_status_flags_schema_drift_canary_alert(test_ctx):
+    SessionLocal = test_ctx["session_factory"]
+    now = datetime.now(timezone.utc)
+
+    async def seed():
+        async with SessionLocal() as session:
+            session.add(
+                ShippingLockerSyncRun(
+                    provider=ShippingLockerProvider.sameday,
+                    status=ShippingLockerSyncStatus.success,
+                    started_at=now - timedelta(hours=2),
+                    finished_at=now - timedelta(hours=2),
+                    fetched_count=100,
+                    upserted_count=20,
+                    candidate_count=120,
+                    normalized_count=100,
+                    normalization_ratio=0.83,
+                    schema_signature="old-signature",
+                    schema_drift_detected=False,
+                )
+            )
+            session.add(
+                ShippingLockerSyncRun(
+                    provider=ShippingLockerProvider.sameday,
+                    status=ShippingLockerSyncStatus.success,
+                    started_at=now - timedelta(hours=1),
+                    finished_at=now - timedelta(hours=1),
+                    fetched_count=90,
+                    upserted_count=10,
+                    candidate_count=120,
+                    normalized_count=90,
+                    normalization_ratio=0.75,
+                    schema_signature="new-signature",
+                    schema_drift_detected=True,
+                )
+            )
+            await session.commit()
+
+    _run(seed())
+
+    async def check_status():
+        async with SessionLocal() as session:
+            status_payload = await sameday_easybox_mirror.get_snapshot_status(session)
+            assert status_payload.schema_drift_detected is True
+            assert "schema_drift" in status_payload.canary_alert_codes
+            assert status_payload.last_schema_drift_at is not None
+
+    _run(check_status())
+
+
+def test_sync_status_flags_repeated_challenge_failures(test_ctx):
+    SessionLocal = test_ctx["session_factory"]
+    now = datetime.now(timezone.utc)
+
+    async def seed():
+        async with SessionLocal() as session:
+            session.add(
+                ShippingLockerSyncRun(
+                    provider=ShippingLockerProvider.sameday,
+                    status=ShippingLockerSyncStatus.success,
+                    started_at=now - timedelta(days=2),
+                    finished_at=now - timedelta(days=2),
+                    fetched_count=200,
+                    upserted_count=50,
+                )
+            )
+            for idx in range(3):
+                session.add(
+                    ShippingLockerSyncRun(
+                        provider=ShippingLockerProvider.sameday,
+                        status=ShippingLockerSyncStatus.failed,
+                        started_at=now - timedelta(minutes=idx + 1),
+                        finished_at=now - timedelta(minutes=idx + 1),
+                        challenge_failure=True,
+                        failure_kind="cloudflare_challenge",
+                        error_message="Cloudflare challenge",
+                    )
+                )
+            await session.commit()
+
+    _run(seed())
+
+    async def check_status():
+        async with SessionLocal() as session:
+            status_payload = await sameday_easybox_mirror.get_snapshot_status(session)
+            assert status_payload.challenge_failure_streak == 3
+            assert "challenge_failure_streak" in status_payload.canary_alert_codes
+            assert status_payload.canary_alert_messages
 
     _run(check_status())
 

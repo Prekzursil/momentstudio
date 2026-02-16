@@ -29,6 +29,22 @@ import { extractRequestId } from '../../../shared/http-error';
 
 type DamTab = 'library' | 'review' | 'collections' | 'trash' | 'queue';
 type QueueMode = 'pipeline' | 'dead_letter';
+type RetryPolicyDiffRow = {
+  field: 'max_attempts' | 'backoff_schedule_seconds' | 'jitter_ratio' | 'enabled';
+  label: string;
+  before: string;
+  after: string;
+  changed: boolean;
+  detail?: string;
+};
+type RetryPolicyRollbackPreview = {
+  jobType: MediaJobType;
+  targetLabel: string;
+  targetPolicy: MediaRetryPolicySnapshot;
+  currentPolicy: MediaRetryPolicySnapshot;
+  diffs: RetryPolicyDiffRow[];
+  request: { preset_key?: MediaRetryPolicyPresetKey; event_id?: string };
+};
 
 @Component({
   selector: 'app-dam-asset-library',
@@ -528,6 +544,25 @@ type QueueMode = 'pipeline' | 'dead_letter';
                   <p class="text-[11px] text-slate-500 dark:text-slate-400">
                     {{ formatPolicySnapshot(evt.before_policy) }} → {{ formatPolicySnapshot(evt.after_policy) }}
                   </p>
+                  <div class="mt-1 flex flex-wrap gap-1">
+                    <span
+                      *ngFor="let chip of retryPolicyDiffChips(evt.before_policy, evt.after_policy)"
+                      class="rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                    >
+                      {{ chip }}
+                    </span>
+                  </div>
+                  <div class="mt-1 grid gap-1" *ngIf="retryPolicyEventDiffRows(evt).length">
+                    <div
+                      *ngFor="let row of retryPolicyEventDiffRows(evt)"
+                      class="grid gap-1 rounded border border-slate-200 bg-white p-1 text-[11px] text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                    >
+                      <p class="font-semibold">{{ row.label }}</p>
+                      <p>Before: {{ row.before }}</p>
+                      <p>After: {{ row.after }}</p>
+                      <p *ngIf="row.detail" class="text-slate-500 dark:text-slate-400">{{ row.detail }}</p>
+                    </div>
+                  </div>
                   <p *ngIf="evt.note" class="text-xs text-slate-700 dark:text-slate-200">{{ evt.note }}</p>
                   <button
                     *ngIf="canEditRetryPolicies()"
@@ -546,6 +581,62 @@ type QueueMode = 'pipeline' | 'dead_letter';
                 >
                   Load more
                 </button>
+              </div>
+              <div
+                *ngIf="retryPolicyRollbackPreview()?.jobType === policy.job_type"
+                class="grid gap-2 rounded border border-indigo-300 bg-indigo-50 p-3 dark:border-indigo-900/70 dark:bg-indigo-950/30"
+              >
+                <div class="flex items-center justify-between gap-2">
+                  <p class="text-xs font-semibold text-indigo-900 dark:text-indigo-100">
+                    Rollback preview · {{ retryPolicyRollbackPreview()?.targetLabel }}
+                  </p>
+                  <button
+                    type="button"
+                    class="rounded border border-indigo-300 px-2 py-1 text-[11px] font-semibold text-indigo-800 dark:border-indigo-700 dark:text-indigo-200"
+                    (click)="cancelRetryPolicyRollbackPreview()"
+                  >
+                    Close
+                  </button>
+                </div>
+                <div class="grid gap-2 md:grid-cols-2">
+                  <div class="rounded border border-slate-300 bg-white p-2 text-[11px] dark:border-slate-700 dark:bg-slate-900">
+                    <p class="font-semibold text-slate-700 dark:text-slate-100">Current</p>
+                    <p>{{ formatPolicySnapshot(retryPolicyRollbackPreview()!.currentPolicy) }}</p>
+                  </div>
+                  <div class="rounded border border-slate-300 bg-white p-2 text-[11px] dark:border-slate-700 dark:bg-slate-900">
+                    <p class="font-semibold text-slate-700 dark:text-slate-100">Target</p>
+                    <p>{{ formatPolicySnapshot(retryPolicyRollbackPreview()!.targetPolicy) }}</p>
+                  </div>
+                </div>
+                <div class="grid gap-1 text-[11px]">
+                  <div
+                    *ngFor="let row of retryPolicyRollbackPreview()!.diffs"
+                    class="rounded border border-slate-300 bg-white p-2 dark:border-slate-700 dark:bg-slate-900"
+                  >
+                    <p class="font-semibold text-slate-700 dark:text-slate-100">{{ row.label }}</p>
+                    <p>Before: {{ row.before }}</p>
+                    <p>After: {{ row.after }}</p>
+                    <p *ngIf="row.detail" class="text-slate-500 dark:text-slate-400">{{ row.detail }}</p>
+                  </div>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    class="rounded border border-indigo-400 bg-indigo-600 px-2 py-1 text-xs font-semibold text-white disabled:opacity-60"
+                    [disabled]="retryPolicyRollbackApplying()"
+                    (click)="applyRetryPolicyRollbackPreview()"
+                  >
+                    Apply rollback
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100"
+                    [disabled]="retryPolicyRollbackApplying()"
+                    (click)="cancelRetryPolicyRollbackPreview()"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -878,6 +969,8 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
   private retryPolicyHistoryErrorByType: Record<string, string> = {};
   private retryPolicyPresetsByType: Record<string, MediaRetryPolicyPreset[]> = {};
   private readonly retryPolicyHistoryOpen = signal<Set<string>>(new Set());
+  readonly retryPolicyRollbackPreview = signal<RetryPolicyRollbackPreview | null>(null);
+  readonly retryPolicyRollbackApplying = signal(false);
 
   ngOnInit(): void {
     this.reload();
@@ -891,6 +984,7 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
 
   switchTab(tab: DamTab): void {
     this.tab.set(tab);
+    this.retryPolicyRollbackPreview.set(null);
     if (tab === 'queue') {
       this.startQueuePolling();
       this.loadJobs(true);
@@ -1244,6 +1338,76 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
     return `${snapshot.max_attempts} tries · [${schedule}] · jitter ${Number(snapshot.jitter_ratio).toFixed(2)} · ${snapshot.enabled ? 'on' : 'off'}`;
   }
 
+  private currentRetryPolicySnapshot(jobType: MediaJobType): MediaRetryPolicySnapshot | null {
+    const policy = this.retryPolicies().find((item) => item.job_type === jobType);
+    if (!policy) return null;
+    return {
+      max_attempts: policy.max_attempts,
+      backoff_schedule_seconds: [...(policy.backoff_schedule_seconds || [])],
+      jitter_ratio: Number(policy.jitter_ratio || 0),
+      enabled: !!policy.enabled,
+      version_ts: policy.updated_at || null
+    };
+  }
+
+  private computeRetryPolicyDiffRows(
+    before: MediaRetryPolicySnapshot,
+    after: MediaRetryPolicySnapshot
+  ): RetryPolicyDiffRow[] {
+    const beforeSchedule = [...(before.backoff_schedule_seconds || [])];
+    const afterSchedule = [...(after.backoff_schedule_seconds || [])];
+    const changedSteps: string[] = [];
+    const maxSteps = Math.max(beforeSchedule.length, afterSchedule.length);
+    for (let idx = 0; idx < maxSteps; idx += 1) {
+      const prev = beforeSchedule[idx];
+      const next = afterSchedule[idx];
+      if (prev === next) continue;
+      changedSteps.push(`#${idx + 1}: ${prev ?? '—'} -> ${next ?? '—'}`);
+    }
+
+    return [
+      {
+        field: 'max_attempts',
+        label: 'Max attempts',
+        before: String(before.max_attempts),
+        after: String(after.max_attempts),
+        changed: Number(before.max_attempts) !== Number(after.max_attempts)
+      },
+      {
+        field: 'backoff_schedule_seconds',
+        label: 'Schedule (seconds)',
+        before: beforeSchedule.join(', ') || '—',
+        after: afterSchedule.join(', ') || '—',
+        changed: changedSteps.length > 0,
+        detail: changedSteps.length ? changedSteps.join(' · ') : undefined
+      },
+      {
+        field: 'jitter_ratio',
+        label: 'Jitter ratio',
+        before: Number(before.jitter_ratio || 0).toFixed(2),
+        after: Number(after.jitter_ratio || 0).toFixed(2),
+        changed: Number(before.jitter_ratio || 0) !== Number(after.jitter_ratio || 0)
+      },
+      {
+        field: 'enabled',
+        label: 'Enabled',
+        before: before.enabled ? 'on' : 'off',
+        after: after.enabled ? 'on' : 'off',
+        changed: Boolean(before.enabled) !== Boolean(after.enabled)
+      }
+    ];
+  }
+
+  retryPolicyDiffChips(before: MediaRetryPolicySnapshot, after: MediaRetryPolicySnapshot): string[] {
+    return this.computeRetryPolicyDiffRows(before, after)
+      .filter((row) => row.changed)
+      .map((row) => row.label);
+  }
+
+  retryPolicyEventDiffRows(event: MediaRetryPolicyEvent): RetryPolicyDiffRow[] {
+    return this.computeRetryPolicyDiffRows(event.before_policy, event.after_policy).filter((row) => row.changed);
+  }
+
   async loadMoreRetryPolicyHistory(jobType: MediaJobType): Promise<void> {
     await this.loadRetryPolicyHistory(jobType, true);
   }
@@ -1263,31 +1427,82 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
 
   async rollbackRetryPolicyPreset(jobType: MediaJobType, presetKey: MediaRetryPolicyPresetKey): Promise<void> {
     if (!this.canEditRetryPolicies()) return;
-    if (!window.confirm(`Rollback ${jobType} retry policy to preset "${presetKey}"?`)) return;
-    try {
-      const saved = await firstValueFrom(this.admin.rollbackMediaRetryPolicy(jobType, { preset_key: presetKey }));
-      this.applyRetryPolicySavedState(saved);
-      this.toast.success(`Rolled back ${jobType} policy to ${presetKey}.`);
+    const presets = this.retryPolicyPresetsByType[jobType] || [];
+    let preset = presets.find((item) => item.preset_key === presetKey);
+    if (!preset) {
       await this.loadRetryPolicyPresets(jobType);
-      await this.loadRetryPolicyHistory(jobType, false);
-    } catch (err) {
-      this.retryPolicyRowErrors[jobType] = (err as any)?.error?.detail || 'Failed to rollback retry policy.';
-      this.toast.error(this.retryPolicyRowErrors[jobType]);
+      preset = (this.retryPolicyPresetsByType[jobType] || []).find((item) => item.preset_key === presetKey);
     }
+    if (!preset) {
+      this.retryPolicyRowErrors[jobType] = 'Preset is not available.';
+      this.toast.error(this.retryPolicyRowErrors[jobType]);
+      return;
+    }
+    const currentPolicy = this.currentRetryPolicySnapshot(jobType);
+    if (!currentPolicy) {
+      this.retryPolicyRowErrors[jobType] = 'Current policy could not be loaded.';
+      this.toast.error(this.retryPolicyRowErrors[jobType]);
+      return;
+    }
+    this.retryPolicyRollbackPreview.set({
+      jobType,
+      targetLabel: preset.label,
+      targetPolicy: preset.policy,
+      currentPolicy,
+      diffs: this.computeRetryPolicyDiffRows(currentPolicy, preset.policy),
+      request: { preset_key: presetKey }
+    });
   }
 
   async rollbackRetryPolicyEvent(jobType: MediaJobType, eventId: string): Promise<void> {
     if (!this.canEditRetryPolicies()) return;
-    if (!window.confirm('Rollback retry policy to this historical revision?')) return;
-    try {
-      const saved = await firstValueFrom(this.admin.rollbackMediaRetryPolicy(jobType, { event_id: eventId }));
-      this.applyRetryPolicySavedState(saved);
-      this.toast.success(`Rolled back ${jobType} policy to selected revision.`);
-      await this.loadRetryPolicyPresets(jobType);
+    const events = this.retryPolicyHistories[jobType] || [];
+    let event = events.find((item) => item.id === eventId);
+    if (!event) {
       await this.loadRetryPolicyHistory(jobType, false);
-    } catch (err) {
-      this.retryPolicyRowErrors[jobType] = (err as any)?.error?.detail || 'Failed to rollback retry policy revision.';
+      event = (this.retryPolicyHistories[jobType] || []).find((item) => item.id === eventId);
+    }
+    if (!event) {
+      this.retryPolicyRowErrors[jobType] = 'History event is not available.';
       this.toast.error(this.retryPolicyRowErrors[jobType]);
+      return;
+    }
+    const currentPolicy = this.currentRetryPolicySnapshot(jobType);
+    if (!currentPolicy) {
+      this.retryPolicyRowErrors[jobType] = 'Current policy could not be loaded.';
+      this.toast.error(this.retryPolicyRowErrors[jobType]);
+      return;
+    }
+    this.retryPolicyRollbackPreview.set({
+      jobType,
+      targetLabel: `history:${event.id.slice(0, 8)}`,
+      targetPolicy: event.after_policy,
+      currentPolicy,
+      diffs: this.computeRetryPolicyDiffRows(currentPolicy, event.after_policy),
+      request: { event_id: eventId }
+    });
+  }
+
+  cancelRetryPolicyRollbackPreview(): void {
+    this.retryPolicyRollbackPreview.set(null);
+  }
+
+  async applyRetryPolicyRollbackPreview(): Promise<void> {
+    const preview = this.retryPolicyRollbackPreview();
+    if (!preview || !this.canEditRetryPolicies()) return;
+    this.retryPolicyRollbackApplying.set(true);
+    try {
+      const saved = await firstValueFrom(this.admin.rollbackMediaRetryPolicy(preview.jobType, preview.request));
+      this.applyRetryPolicySavedState(saved);
+      this.toast.success(`Rolled back ${preview.jobType} policy.`);
+      await this.loadRetryPolicyPresets(preview.jobType);
+      await this.loadRetryPolicyHistory(preview.jobType, false);
+      this.retryPolicyRollbackPreview.set(null);
+    } catch (err) {
+      this.retryPolicyRowErrors[preview.jobType] = (err as any)?.error?.detail || 'Failed to rollback retry policy.';
+      this.toast.error(this.retryPolicyRowErrors[preview.jobType]);
+    } finally {
+      this.retryPolicyRollbackApplying.set(false);
     }
   }
 

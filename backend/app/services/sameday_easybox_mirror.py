@@ -78,6 +78,8 @@ _JSON_ENDPOINT_TEMPLATES = (
 )
 _PLAYWRIGHT_SCRIPT = Path(__file__).resolve().parents[3] / "frontend" / "scripts" / "fetch-sameday-lockers.mjs"
 _ALLOWED_HOSTS = {"sameday.ro", "www.sameday.ro"}
+_SCHEMA_DRIFT_ALERT_CODE = "schema_drift"
+_CHALLENGE_STREAK_ALERT_CODE = "challenge_failure_streak"
 
 
 @dataclass(slots=True)
@@ -368,6 +370,120 @@ async def _normalize_payload(payload: Any) -> list[_NormalizedLocker]:
     return unique[:cap]
 
 
+def _candidate_rows(payload: Any) -> list[dict[str, Any]]:
+    rows = _collect_candidate_rows(payload)
+    if not rows and isinstance(payload, list):
+        rows = [item for item in payload if isinstance(item, dict)]
+    return rows
+
+
+def _schema_signature_from_rows(rows: list[dict[str, Any]]) -> str | None:
+    if not rows:
+        return None
+    shape_count: Counter[str] = Counter()
+    for row in rows[:5000]:
+        keys = sorted(str(key) for key in row.keys())
+        props = row.get("properties")
+        if isinstance(props, dict):
+            keys.extend(f"properties.{str(key)}" for key in sorted(props.keys()))
+        shape_count["|".join(keys)] += 1
+    payload = [{"shape": shape, "count": int(count)} for shape, count in sorted(shape_count.items())]
+    digest = hashlib.sha256(
+        json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    ).hexdigest()
+    return digest[:40]
+
+
+def _classify_failure(error: Exception) -> tuple[str, bool]:
+    message = str(error or "").strip().lower()
+    if "cloudflare challenge" in message or "cf-mitigated" in message:
+        return "cloudflare_challenge", True
+    if "captcha" in message:
+        return "captcha_challenge", True
+    if "non-json response" in message:
+        return "non_json", False
+    if "no locker rows found" in message or "empty payload" in message:
+        return "empty_payload", False
+    if "from https://" in message or "from http://" in message:
+        return "upstream_http", False
+    return "unknown", False
+
+
+async def _get_previous_success(session: AsyncSession) -> ShippingLockerSyncRun | None:
+    return await session.scalar(
+        select(ShippingLockerSyncRun)
+        .where(
+            ShippingLockerSyncRun.provider == ShippingLockerProvider.sameday,
+            ShippingLockerSyncRun.status == ShippingLockerSyncStatus.success,
+        )
+        .order_by(desc(ShippingLockerSyncRun.started_at))
+        .limit(1)
+    )
+
+
+def _detect_schema_drift(
+    *,
+    previous_success: ShippingLockerSyncRun | None,
+    schema_signature: str | None,
+    normalization_ratio: float,
+) -> bool:
+    if previous_success is None:
+        return False
+    prev_signature = str(previous_success.schema_signature or "").strip() or None
+    prev_ratio = float(previous_success.normalization_ratio or 0.0)
+    ratio_drop_threshold = max(0.0, float(getattr(settings, "sameday_mirror_schema_drift_ratio_drop", 0.20) or 0.20))
+    min_ratio_threshold = max(0.0, float(getattr(settings, "sameday_mirror_schema_drift_min_ratio", 0.80) or 0.80))
+    signature_changed = bool(prev_signature and schema_signature and prev_signature != schema_signature)
+    ratio_drop = prev_ratio - float(normalization_ratio)
+    ratio_alert = ratio_drop >= ratio_drop_threshold and float(normalization_ratio) < min_ratio_threshold
+    return bool(signature_changed or ratio_alert)
+
+
+async def _get_challenge_failure_streak(session: AsyncSession) -> int:
+    recent_runs = (
+        (
+            await session.execute(
+                select(ShippingLockerSyncRun)
+                .where(ShippingLockerSyncRun.provider == ShippingLockerProvider.sameday)
+                .order_by(desc(ShippingLockerSyncRun.started_at))
+                .limit(50)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    streak = 0
+    for run in recent_runs:
+        if run.status != ShippingLockerSyncStatus.failed:
+            break
+        if not bool(run.challenge_failure):
+            break
+        streak += 1
+    return streak
+
+
+def _build_canary_alerts(
+    *,
+    schema_drift_detected: bool,
+    challenge_failure_streak: int,
+) -> tuple[list[str], list[str]]:
+    codes: list[str] = []
+    messages: list[str] = []
+    if schema_drift_detected:
+        codes.append(_SCHEMA_DRIFT_ALERT_CODE)
+        messages.append("Sameday payload schema drift detected. Verify parser compatibility before next sync.")
+    threshold = max(
+        1,
+        int(getattr(settings, "sameday_mirror_challenge_failure_alert_streak", 3) or 3),
+    )
+    if challenge_failure_streak >= threshold:
+        codes.append(_CHALLENGE_STREAK_ALERT_CODE)
+        messages.append(
+            f"Sameday crawl has {challenge_failure_streak} consecutive Cloudflare/captcha challenge failures."
+        )
+    return codes, messages
+
+
 async def _upsert_snapshot(session: AsyncSession, items: list[_NormalizedLocker], *, now: datetime) -> tuple[int, int]:
     existing_rows = (
         (
@@ -477,15 +593,33 @@ async def sync_now(session: AsyncSession, *, trigger: str) -> ShippingLockerSync
     await session.refresh(run)
 
     try:
+        previous_success = await _get_previous_success(session)
         payload, source_url = await _fetch_raw_payload()
+        candidate_rows = _candidate_rows(payload)
         normalized_items = await _normalize_payload(payload)
         if not normalized_items:
             raise RuntimeError("No locker rows found in upstream payload")
         now = _now()
+        candidate_count = int(len(candidate_rows))
+        normalized_count = int(len(normalized_items))
+        normalization_ratio = float(normalized_count / max(1, candidate_count))
+        schema_signature = _schema_signature_from_rows(candidate_rows)
+        schema_drift_detected = _detect_schema_drift(
+            previous_success=previous_success,
+            schema_signature=schema_signature,
+            normalization_ratio=normalization_ratio,
+        )
         upserted_count, deactivated_count = await _upsert_snapshot(session, normalized_items, now=now)
 
         run.status = ShippingLockerSyncStatus.success
         run.finished_at = now
+        run.candidate_count = candidate_count
+        run.normalized_count = normalized_count
+        run.normalization_ratio = normalization_ratio
+        run.schema_signature = schema_signature
+        run.schema_drift_detected = schema_drift_detected
+        run.failure_kind = None
+        run.challenge_failure = False
         run.fetched_count = len(normalized_items)
         run.upserted_count = upserted_count
         run.deactivated_count = deactivated_count
@@ -500,19 +634,34 @@ async def sync_now(session: AsyncSession, *, trigger: str) -> ShippingLockerSync
             extra={
                 "trigger": trigger,
                 "fetched_count": int(run.fetched_count),
+                "candidate_count": int(run.candidate_count or 0),
+                "normalization_ratio": float(run.normalization_ratio or 0.0),
+                "schema_drift_detected": bool(run.schema_drift_detected),
                 "upserted_count": int(run.upserted_count),
                 "deactivated_count": int(run.deactivated_count),
             },
         )
         return run
     except Exception as exc:
+        failure_kind, challenge_failure = _classify_failure(exc)
         run.status = ShippingLockerSyncStatus.failed
         run.finished_at = _now()
+        run.failure_kind = failure_kind
+        run.challenge_failure = challenge_failure
+        run.schema_drift_detected = False
         run.error_message = str(exc)[:4000]
         session.add(run)
         await session.commit()
         await session.refresh(run)
-        logger.warning("sameday_easybox_sync_failed", extra={"trigger": trigger, "error": str(exc)})
+        logger.warning(
+            "sameday_easybox_sync_failed",
+            extra={
+                "trigger": trigger,
+                "error": str(exc),
+                "failure_kind": failure_kind,
+                "challenge_failure": challenge_failure,
+            },
+        )
         return run
 
 
@@ -577,6 +726,27 @@ async def get_snapshot_status(session: AsyncSession) -> LockerMirrorSnapshotRead
         .order_by(desc(ShippingLockerSyncRun.started_at))
         .limit(1)
     )
+    latest_run = await session.scalar(
+        select(ShippingLockerSyncRun)
+        .where(ShippingLockerSyncRun.provider == ShippingLockerProvider.sameday)
+        .order_by(desc(ShippingLockerSyncRun.started_at))
+        .limit(1)
+    )
+    latest_schema_drift = await session.scalar(
+        select(ShippingLockerSyncRun)
+        .where(
+            ShippingLockerSyncRun.provider == ShippingLockerProvider.sameday,
+            ShippingLockerSyncRun.schema_drift_detected.is_(True),
+        )
+        .order_by(desc(ShippingLockerSyncRun.started_at))
+        .limit(1)
+    )
+    challenge_failure_streak = await _get_challenge_failure_streak(session)
+    schema_drift_detected = bool(latest_run and latest_run.schema_drift_detected)
+    canary_alert_codes, canary_alert_messages = _build_canary_alerts(
+        schema_drift_detected=schema_drift_detected,
+        challenge_failure_streak=challenge_failure_streak,
+    )
     stale_after = max(60, int(getattr(settings, "sameday_mirror_stale_after_seconds", 2592000) or 2592000))
     age_seconds: int | None = None
     stale = True
@@ -591,6 +761,11 @@ async def get_snapshot_status(session: AsyncSession) -> LockerMirrorSnapshotRead
         last_error=(latest_failed.error_message if latest_failed else None),
         stale=stale,
         stale_age_seconds=age_seconds,
+        challenge_failure_streak=challenge_failure_streak,
+        schema_drift_detected=schema_drift_detected,
+        last_schema_drift_at=_as_utc(latest_schema_drift.started_at) if latest_schema_drift else None,
+        canary_alert_codes=canary_alert_codes,
+        canary_alert_messages=canary_alert_messages,
     )
 
 

@@ -26,6 +26,11 @@ class LockerMirrorSnapshotRead(BaseModel):
     last_error: str | None = None
     stale: bool = False
     stale_age_seconds: int | None = Field(default=None, ge=0)
+    challenge_failure_streak: int = Field(default=0, ge=0)
+    schema_drift_detected: bool = False
+    last_schema_drift_at: datetime | None = None
+    canary_alert_codes: list[str] = Field(default_factory=list)
+    canary_alert_messages: list[str] = Field(default_factory=list)
 
 
 class LockerCityRead(BaseModel):

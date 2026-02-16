@@ -90,7 +90,21 @@ describe('AdminOpsComponent', () => {
         total_lockers: 100,
         stale: false,
         stale_age_seconds: 10,
-        latest_run: { id: '1', provider: 'sameday', status: 'success', started_at: '2026-02-18T00:00:00Z', fetched_count: 100, upserted_count: 10, deactivated_count: 2 }
+        challenge_failure_streak: 3,
+        schema_drift_detected: true,
+        canary_alert_codes: ['schema_drift', 'challenge_failure_streak'],
+        canary_alert_messages: ['schema changed', 'challenge streak'],
+        latest_run: {
+          id: '1',
+          provider: 'sameday',
+          status: 'success',
+          started_at: '2026-02-18T00:00:00Z',
+          fetched_count: 100,
+          upserted_count: 10,
+          deactivated_count: 2,
+          failure_kind: null,
+          schema_drift_detected: true
+        }
       } as any)
     );
     ops.listSamedaySyncRuns.and.returnValue(
@@ -103,7 +117,9 @@ describe('AdminOpsComponent', () => {
             started_at: '2026-02-18T00:00:00Z',
             fetched_count: 100,
             upserted_count: 10,
-            deactivated_count: 2
+            deactivated_count: 2,
+            failure_kind: null,
+            schema_drift_detected: true
           }
         ],
         meta: { page: 1, limit: 8, total: 1 }
@@ -134,5 +150,6 @@ describe('AdminOpsComponent', () => {
     expect(text).toContain('Dead-letter');
     expect(ops.getSamedaySyncStatus).toHaveBeenCalled();
     expect(text).toContain('adminUi.ops.samedaySync.title');
+    expect(text).toContain('adminUi.ops.samedaySync.canaryTitle');
   });
 });
