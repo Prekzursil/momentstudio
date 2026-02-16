@@ -1153,6 +1153,8 @@ async def admin_finalize_media_asset(
     except ValueError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asset not found")
 
+    queued_jobs = []
+
     ingest_job = await media_dam.enqueue_job(
         session,
         asset_id=asset_id,
@@ -1160,24 +1162,30 @@ async def admin_finalize_media_asset(
         payload={"reason": "manual_finalize"},
         created_by_user_id=admin.id,
     )
+    queued_jobs.append(ingest_job)
     if payload.run_ai_tagging:
-        await media_dam.enqueue_job(
+        ai_tag_job = await media_dam.enqueue_job(
             session,
             asset_id=asset_id,
             job_type=MediaJobType.ai_tag,
             payload={"reason": "finalize"},
             created_by_user_id=admin.id,
         )
+        queued_jobs.append(ai_tag_job)
     if payload.run_duplicate_scan:
-        await media_dam.enqueue_job(
+        duplicate_scan_job = await media_dam.enqueue_job(
             session,
             asset_id=asset_id,
             job_type=MediaJobType.duplicate_scan,
             payload={"reason": "finalize"},
             created_by_user_id=admin.id,
         )
+        queued_jobs.append(duplicate_scan_job)
     await session.commit()
-    background_tasks.add_task(_run_media_job_in_background, ingest_job.id)
+    for job in queued_jobs:
+        await media_dam.queue_job(job.id)
+    if media_dam.get_redis() is None:
+        background_tasks.add_task(_run_media_job_in_background, ingest_job.id)
     return media_dam.job_to_read(ingest_job)
 
 

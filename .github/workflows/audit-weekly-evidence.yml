@@ -1,0 +1,100 @@
+name: Audit Weekly Evidence
+
+on:
+  schedule:
+    - cron: "20 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit-weekly-evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Upgrade npm
+        run: npm i -g npm@11.7.0
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Start frontend for weekly evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/audit-evidence
+          cd frontend
+          npm run start -- --host 127.0.0.1 --port 4300 > ../artifacts/audit-evidence/frontend-audit.log 2>&1 &
+          echo $! > ../artifacts/audit-evidence/frontend-audit.pid
+          cd ..
+          for i in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:4300 >/dev/null; then
+              echo "Frontend audit server is ready."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Frontend audit server failed to start in time." >&2
+          exit 1
+
+      - name: Collect deterministic weekly evidence pack
+        run: |
+          python3 scripts/audit/collect_audit_evidence.py \
+            --mode weekly \
+            --routes-file frontend/src/app/app.routes.ts \
+            --output-dir artifacts/audit-evidence \
+            --base-url http://127.0.0.1:4300 \
+            --max-routes 120
+
+      - name: Upload audit evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-evidence-pack
+          path: artifacts/audit-evidence
+          if-no-files-found: error
+          retention-days: 21
+
+      - name: Weekly summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          findings_count="$(jq 'length' artifacts/audit-evidence/deterministic-findings.json)"
+          severe_count="$(jq '[.[] | select(.severity == "s1" or .severity == "s2")] | length' artifacts/audit-evidence/deterministic-findings.json)"
+          route_count="$(jq '.selected_route_count // 0' artifacts/audit-evidence/surface-map.json)"
+          {
+            echo "## Weekly Audit Evidence"
+            echo ""
+            echo "- Selected routes: \`${route_count}\`"
+            echo "- Findings: \`${findings_count}\`"
+            echo "- Severe (s1/s2): \`${severe_count}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Frontend logs (on failure)
+        if: failure()
+        run: |
+          test -f artifacts/audit-evidence/frontend-audit.log && tail -n 200 artifacts/audit-evidence/frontend-audit.log || true
+
+      - name: Stop frontend audit server
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f artifacts/audit-evidence/frontend-audit.pid ]]; then
+            pid="$(cat artifacts/audit-evidence/frontend-audit.pid)"
+            kill "$pid" 2>/dev/null || true
+          fi

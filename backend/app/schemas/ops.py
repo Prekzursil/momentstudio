@@ -144,6 +144,7 @@ class FailureCount(BaseModel):
 
 class WebhookBacklogCount(BaseModel):
     pending: int = 0
+    pending_recent: int = 0
     since_hours: int
 
 

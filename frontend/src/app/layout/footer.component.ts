@@ -1,5 +1,5 @@
 import { NgClass, NgForOf, NgIf } from '@angular/common';
-import { Component, ElementRef, HostListener, OnDestroy, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, ElementRef, HostListener, OnDestroy, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Subscription } from 'rxjs';
@@ -30,6 +30,7 @@ const DEFAULT_FACEBOOK_PAGES: SiteSocialLink[] = [
 @Component({
   selector: 'app-footer',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgIf, NgForOf, NgClass, RouterLink, TranslateModule, ImgFallbackDirective],
   template: `
     <footer class="border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
@@ -298,7 +299,8 @@ export class FooterComponent implements OnInit, OnDestroy {
     private social: SiteSocialService,
     private company: SiteCompanyService,
     private navigation: SiteNavigationService,
-    private translate: TranslateService
+    private translate: TranslateService,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
@@ -403,7 +405,15 @@ export class FooterComponent implements OnInit, OnDestroy {
   }
 
   private deferStateUpdate(run: () => void): void {
-    setTimeout(run, 0);
+    const applyUpdate = () => {
+      run();
+      this.cdr.markForCheck();
+    };
+    if (typeof window === 'undefined' || typeof window.requestAnimationFrame !== 'function') {
+      setTimeout(applyUpdate, 0);
+      return;
+    }
+    window.requestAnimationFrame(() => applyUpdate());
   }
 
   @HostListener('document:click', ['$event'])

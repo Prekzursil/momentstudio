@@ -81,6 +81,7 @@ Notes:
 - After a VPS reboot, the stack starts automatically (`restart: unless-stopped`). You usually **do not** need to run `deploy.sh` again.
 - By default, `deploy.sh` exports `APP_VERSION=$(git rev-parse --short HEAD)` before recreating containers so backend/frontend diagnostics show the deployed revision.
 - `deploy.sh` waits for `media-worker` heartbeat health before running post-sync checks. If the worker is unhealthy, deploy exits non-zero and prints worker logs.
+- `media-worker` health now validates four signals: fresh heartbeat file (<90s), optional Redis connectivity when `REDIS_URL` is set, DB connectivity, and zero `media_jobs` stuck in `processing` longer than `MEDIA_DAM_PROCESSING_STALE_SECONDS` (min 60s). Distinct exits are used for diagnosis: `11` heartbeat stale/missing, `12` Redis probe failed, `13` stale processing jobs detected, `14` DB probe/query failed.
 - `deploy.sh` runs `infra/prod/verify-live.sh` after startup. Set `RUN_POST_SYNC_VERIFY=0` to skip that step.
 - `deploy.sh` can print a Search Console URL Inspection checklist for key URLs (home/shop/blog/product). Set `RUN_GSC_INDEXING_CHECKLIST=0` to skip it.
 

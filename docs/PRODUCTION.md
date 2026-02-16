@@ -162,8 +162,7 @@ The simplest “all-in-one” backup is:
 Example (host-based), from repo root:
 
 ```bash
-cd infra/backup
-DATABASE_URL=postgresql://... ./export_all.sh
+DATABASE_URL=postgresql://... ./infra/backup/export_all.sh
 ```
 
 Recommended practice:

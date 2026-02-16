@@ -1766,9 +1766,15 @@ export class ShopComponent implements OnInit, OnDestroy {
 
 	  fetchCategories(): void {
 	    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
-	    this.catalog.listCategories(lang, { include_hidden: this.canEditCategories() }).subscribe((data) => {
-	      this.categories = data;
-	      this.rebuildCategoryTree();
+	    this.catalog.listCategories(lang, { include_hidden: this.canEditCategories() }).subscribe({
+	      next: (data) => {
+	        this.categories = data;
+	        this.rebuildCategoryTree();
+	      },
+	      error: () => {
+	        this.categories = [];
+	        this.rebuildCategoryTree();
+	      }
 	    });
 	  }
 

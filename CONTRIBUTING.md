@@ -92,11 +92,23 @@ If you have `make` available, common workflows are:
 - PRs use `.github/pull_request_template.md`; keep its validation/risk/backlog sections filled.
 - Labels are auto-applied from `.github/labeler.yml` via PR labeler workflow.
   - Common labels: `type:*`, `area:*`, `priority:*`.
+  - Audit labels: `audit:*`, `surface:*`, `severity:*`, `ai:*`.
+- Use label `audit:deep` when you want a Copilot deep UX/IA/correctness pass for a PR.
 - Dependabot opens weekly grouped patch/minor updates for:
   - `backend` (pip)
   - `frontend` (npm)
   - GitHub Actions
 - Major dependency upgrades are intentionally deferred and handled manually in focused PRs.
+
+## AI workflow quickstart
+
+This repo uses an evidence-first AI pipeline:
+
+1. `Audit PR Evidence` always runs on PRs and uploads `audit-evidence-pack`.
+2. Weekly, `Audit Weekly Evidence` gathers full-route evidence and `Audit Weekly Agent` updates the rolling digest issue.
+3. Deep PR audits are opt-in and label-gated (`audit:deep`) through `Audit PR Deep Agent`.
+
+CI only collects deterministic evidence. Agent judgments happen through Copilot issue assignment (`@copilot`).
 
 ## Required checks for `main`
 
@@ -106,3 +118,4 @@ Branch protection should enforce the checks defined in `docs/REPOSITORY_POLICY.m
 - `Backend CI / backend-postgres (pull_request)`
 - `Frontend CI / frontend (pull_request)`
 - `Docker Compose Smoke / compose-smoke (pull_request)`
+- `Audit PR Evidence / audit-pr-evidence (pull_request)`

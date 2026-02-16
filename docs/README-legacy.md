@@ -69,8 +69,7 @@ You can swap pieces later, but the initial design assumes:
 - Full backup helper (Postgres dump + JSON + uploads):
 
   ```bash
-  cd infra/backup
-  ./export_all.sh  # requires DATABASE_URL env and pg_dump installed
+  DATABASE_URL=postgresql://... ./infra/backup/export_all.sh  # requires pg_dump
   ```
 
 - Verify a backup can restore:

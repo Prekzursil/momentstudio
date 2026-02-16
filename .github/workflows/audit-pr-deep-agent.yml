@@ -1,0 +1,331 @@
+name: Audit PR Deep Agent
+
+on:
+  pull_request_target:
+    types: [labeled, reopened, synchronize, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to run deep audit issue flow for"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  deep-agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Ensure deep-audit labels exist
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labels = [
+              { name: 'audit:deep', color: '5319E7', description: 'Opt-in deep AI audit trigger for PRs.' },
+              { name: 'audit:ux', color: '0E8A16', description: 'UX audit finding.' },
+              { name: 'audit:ia', color: '1D76DB', description: 'Information architecture audit finding.' },
+              { name: 'ai:ready', color: '0366D6', description: 'Ready for AI agent execution.' },
+              { name: 'ai:in-progress', color: 'FBCA04', description: 'AI agent is processing.' },
+            ];
+            const { owner, repo } = context.repo;
+            for (const label of labels) {
+              try {
+                await github.rest.issues.createLabel({ owner, repo, ...label });
+              } catch (error) {
+                if (error.status !== 422) throw error;
+              }
+            }
+
+      - name: Resolve PR context and guard conditions
+        id: guard
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            let pr = null;
+
+            if (context.eventName === 'workflow_dispatch') {
+              const rawNumber = (core.getInput('pr_number') || '').trim();
+              const parsedNumber = rawNumber ? Number(rawNumber) : 0;
+              if (rawNumber && (!Number.isInteger(parsedNumber) || parsedNumber <= 0)) {
+                core.setFailed(
+                  `Invalid pr_number input: "${rawNumber}". ` +
+                  'Use a positive integer. Example: gh workflow run "Audit PR Deep Agent" -f pr_number=207'
+                );
+                return;
+              }
+
+              if (parsedNumber) {
+                const fetched = await github.rest.pulls.get({ owner, repo, pull_number: parsedNumber });
+                pr = fetched.data;
+              } else {
+                const openPulls = await github.paginate(github.rest.pulls.list, {
+                  owner,
+                  repo,
+                  state: 'open',
+                  base: 'main',
+                  per_page: 100,
+                });
+                if (openPulls.length === 1) {
+                  pr = openPulls[0];
+                  core.notice(`workflow_dispatch auto-selected PR #${pr.number}.`);
+                } else if (openPulls.length === 0) {
+                  core.setFailed(
+                    'No open PR targeting main was found for workflow_dispatch auto-detect. ' +
+                    'Open a PR first or re-run with -f pr_number=<number>.'
+                  );
+                  return;
+                } else {
+                  const candidates = openPulls
+                    .slice(0, 15)
+                    .map((candidate) => `#${candidate.number} (${candidate.head?.ref || 'unknown'} -> ${candidate.base?.ref || 'main'})`)
+                    .join(', ');
+                  core.setFailed(
+                    'Multiple open PRs target main; cannot auto-select safely. ' +
+                    `Candidates: ${candidates}. ` +
+                    'Re-run with an explicit value, e.g. gh workflow run "Audit PR Deep Agent" -f pr_number=<number>.'
+                  );
+                  return;
+                }
+              }
+            } else {
+              pr = context.payload.pull_request;
+            }
+
+            if (!pr) {
+              core.setFailed('Unable to resolve pull request context.');
+              return;
+            }
+
+            const hasDeepLabel = (pr.labels || []).some((label) => label.name === 'audit:deep');
+            const prHeadSha = pr.head?.sha || '';
+            core.setOutput('pr_number', String(pr.number));
+            core.setOutput('pr_url', pr.html_url);
+            core.setOutput('is_fork', pr.head?.repo?.fork ? 'true' : 'false');
+            core.setOutput('has_deep_label', hasDeepLabel ? 'true' : 'false');
+            core.setOutput('pr_head_sha', prHeadSha);
+            const shouldRun = context.eventName === 'workflow_dispatch' || hasDeepLabel;
+            core.setOutput('should_run', shouldRun ? 'true' : 'false');
+            core.setOutput('resolution_mode', context.eventName === 'workflow_dispatch' ? 'manual' : 'pull_request_target');
+
+            let evidenceRunUrl = '';
+            let evidenceRunSha = '';
+            try {
+              const runs = await github.rest.actions.listWorkflowRuns({
+                owner,
+                repo,
+                workflow_id: 'audit-pr-evidence.yml',
+                event: 'pull_request',
+                status: 'completed',
+                per_page: 50,
+              });
+              const matching = runs.data.workflow_runs.find((run) => {
+                if (run.conclusion !== 'success') return false;
+                if (run.head_sha !== prHeadSha) return false;
+                return (run.pull_requests || []).some((linked) => linked.number === pr.number);
+              });
+              evidenceRunUrl = matching?.html_url || '';
+              evidenceRunSha = matching?.head_sha || '';
+              if (evidenceRunUrl && evidenceRunSha) {
+                core.notice(`Selected evidence run for PR #${pr.number}: ${evidenceRunUrl} (head_sha: ${evidenceRunSha})`);
+              } else {
+                core.notice(`No successful Audit PR Evidence workflow run found for PR #${pr.number} at current head SHA ${prHeadSha}. Maintainers should rerun Audit PR Evidence.`);
+              }
+            } catch (error) {
+              core.notice(`Unable to resolve PR evidence run URL: ${error.message}`);
+            }
+            core.setOutput('evidence_run_url', evidenceRunUrl);
+            core.setOutput('evidence_run_sha', evidenceRunSha);
+
+            if (context.eventName !== 'workflow_dispatch' && !hasDeepLabel) {
+              core.notice('Skipping deep-agent flow: PR does not have audit:deep label.');
+            }
+
+      - name: Stop when deep-audit label is not present
+        if: steps.guard.outputs.should_run != 'true'
+        run: |
+          echo "audit:deep label not present; skipping."
+          exit 0
+
+      - name: Build deep-audit issue body
+        if: steps.guard.outputs.should_run == 'true'
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          prompt = Path("scripts/audit/render_report_prompt.md").read_text(encoding="utf-8").strip()
+          pr_number = "${{ steps.guard.outputs.pr_number }}"
+          pr_url = "${{ steps.guard.outputs.pr_url }}"
+          evidence_url = "${{ steps.guard.outputs.evidence_run_url }}"
+          is_fork = "${{ steps.guard.outputs.is_fork }}" == "true"
+
+          note = ""
+          if is_fork:
+              note = (
+                  "Fork PR detected. Automatic Copilot assignment is skipped for safety.\n"
+                  "Maintainer can manually run this workflow from a trusted context and assign @copilot."
+              )
+
+          body = [
+              f"# Deep UX/IA Audit Request for PR #{pr_number}",
+              "",
+              f"- PR: {pr_url}",
+              "- Scope trigger: `audit:deep`",
+              f"- Latest PR evidence run: {evidence_url or 'not found (run `Audit PR Evidence` manually)'}",
+              "",
+              note,
+              "",
+              "## Evidence",
+              "",
+              "Use the latest successful `Audit PR Evidence` workflow run for this PR.",
+              "",
+              "## Required output contract",
+              "",
+              "```md",
+              prompt,
+              "```",
+          ]
+          Path("deep-audit-body.md").write_text("\n".join([line for line in body if line is not None]).strip() + "\n", encoding="utf-8")
+          PY
+
+      - name: Create or update PR deep audit issue
+        if: steps.guard.outputs.should_run == 'true'
+        id: issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const { owner, repo } = context.repo;
+            const prNumber = Number('${{ steps.guard.outputs.pr_number }}');
+            const body = fs.readFileSync('deep-audit-body.md', 'utf8');
+            const title = `Deep UX/IA Audit - PR #${prNumber}`;
+            const baselineLabels = ['audit:deep', 'audit:ux', 'audit:ia'];
+            const readyLabel = 'ai:ready';
+            const inProgressLabel = 'ai:in-progress';
+
+            const mergeLabels = (existing, { targetAiState }) => {
+              const current = (existing || []).map((label) =>
+                typeof label === 'string' ? label : label.name,
+              );
+              const preserved = current.filter((label) => label !== readyLabel && label !== inProgressLabel);
+              return Array.from(new Set([...preserved, ...baselineLabels, targetAiState]));
+            };
+
+            const openIssues = await github.paginate(github.rest.issues.listForRepo, {
+              owner,
+              repo,
+              state: 'open',
+              per_page: 100,
+            });
+            const existing = openIssues.find((issue) => !issue.pull_request && issue.title === title);
+            if (existing) {
+              await github.rest.issues.update({
+                owner,
+                repo,
+                issue_number: existing.number,
+                body,
+                labels: mergeLabels(existing.labels, { targetAiState: readyLabel }),
+              });
+              core.setOutput('issue_number', String(existing.number));
+              return;
+            }
+
+            const created = await github.rest.issues.create({
+              owner,
+              repo,
+              title,
+              body,
+              labels: mergeLabels([], { targetAiState: readyLabel }),
+            });
+            core.setOutput('issue_number', String(created.data.number));
+
+      - name: Assign to Copilot when safe
+        if: steps.guard.outputs.should_run == 'true' && steps.guard.outputs.is_fork != 'true'
+        uses: actions/github-script@v7
+        env:
+          ISSUE_NUMBER: ${{ steps.issue.outputs.issue_number }}
+        with:
+          script: |
+            const issueNumber = Number(process.env.ISSUE_NUMBER || 0);
+            if (!issueNumber) {
+              core.setFailed('Missing deep-audit issue number.');
+              return;
+            }
+            const { owner, repo } = context.repo;
+            const baselineLabels = ['audit:deep', 'audit:ux', 'audit:ia'];
+            const readyLabel = 'ai:ready';
+            const inProgressLabel = 'ai:in-progress';
+
+            const mergeLabels = (existing, { targetAiState }) => {
+              const current = (existing || []).map((label) =>
+                typeof label === 'string' ? label : label.name,
+              );
+              const preserved = current.filter((label) => label !== readyLabel && label !== inProgressLabel);
+              return Array.from(new Set([...preserved, ...baselineLabels, targetAiState]));
+            };
+
+            try {
+              await github.rest.issues.addAssignees({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                assignees: ['copilot'],
+              });
+
+              const issue = await github.rest.issues.get({
+                owner,
+                repo,
+                issue_number: issueNumber,
+              });
+
+              await github.rest.issues.update({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                labels: mergeLabels(issue.data.labels, { targetAiState: inProgressLabel }),
+              });
+            } catch (error) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                body: 'Automatic @copilot assignment failed. Maintainer can run: `gh issue edit ' + issueNumber + ' --add-assignee @copilot`.',
+              });
+            }
+
+      - name: Deep agent summary
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          pr_number="${{ steps.guard.outputs.pr_number }}"
+          pr_url="${{ steps.guard.outputs.pr_url }}"
+          should_run="${{ steps.guard.outputs.should_run }}"
+          evidence_url="${{ steps.guard.outputs.evidence_run_url }}"
+          resolution_mode="${{ steps.guard.outputs.resolution_mode }}"
+          issue_number="${{ steps.issue.outputs.issue_number }}"
+
+          {
+            echo "## Deep Agent Summary"
+            echo ""
+            echo "- Trigger event: \`${{ github.event_name }}\`"
+            echo "- Resolution mode: \`${resolution_mode:-unknown}\`"
+            if [[ -n "${pr_number}" ]]; then
+              echo "- PR: #${pr_number} (${pr_url})"
+            fi
+            if [[ -n "${evidence_url}" ]]; then
+              echo "- PR evidence run: ${evidence_url}"
+            fi
+            if [[ -z "${should_run}" ]]; then
+              echo "- Outcome: failed during PR context resolution"
+            elif [[ "${should_run}" == "true" ]]; then
+              echo "- Outcome: processed"
+              echo "- Deep issue number: \`${issue_number:-n/a}\`"
+            else
+              echo "- Outcome: skipped (missing \`audit:deep\` label on PR-triggered path)"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

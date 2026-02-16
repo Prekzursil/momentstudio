@@ -1,0 +1,319 @@
+name: Audit Weekly Agent
+
+on:
+  schedule:
+    - cron: "45 4 * * 1"
+  workflow_run:
+    workflows: ["Audit Weekly Evidence"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  audit-weekly-agent:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: audit-weekly-agent-main
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Ensure core audit labels exist
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labels = [
+              { name: 'audit:ux', color: '0E8A16', description: 'UX audit finding.' },
+              { name: 'audit:ia', color: '1D76DB', description: 'Information architecture audit finding.' },
+              { name: 'audit:correctness', color: 'B60205', description: 'Correctness or runtime quality finding.' },
+              { name: 'ai:ready', color: '0366D6', description: 'Ready for AI agent execution.' },
+              { name: 'ai:in-progress', color: 'FBCA04', description: 'AI agent is processing.' },
+              { name: 'severity:s1', color: 'B60205', description: 'Critical severity finding.' },
+              { name: 'severity:s2', color: 'D93F0B', description: 'High severity finding.' },
+              { name: 'severity:s3', color: 'FBCA04', description: 'Medium severity finding.' },
+              { name: 'severity:s4', color: '0E8A16', description: 'Low severity finding.' },
+              { name: 'surface:storefront', color: '0969DA', description: 'Storefront-facing surface.' },
+              { name: 'surface:account', color: '1E9C48', description: 'Account/self-service surface.' },
+              { name: 'surface:admin', color: 'C2E0C6', description: 'Admin/operations surface.' },
+            ];
+            const { owner, repo } = context.repo;
+            for (const label of labels) {
+              try {
+                await github.rest.issues.createLabel({ owner, repo, ...label });
+              } catch (error) {
+                if (error.status !== 422) throw error;
+              }
+            }
+
+      - name: Resolve latest successful weekly evidence run
+        id: resolve
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            if (context.eventName === 'workflow_run') {
+              const sourceRun = context.payload.workflow_run;
+              if (!sourceRun) {
+                core.setFailed('Missing workflow_run payload.');
+                return;
+              }
+              if (sourceRun.conclusion !== 'success') {
+                const reason = `Source run completed with conclusion=${sourceRun.conclusion}.`;
+                core.notice(reason);
+                core.setOutput('skip_followup', 'true');
+                core.setOutput('skip_reason', reason);
+                core.setOutput('source_trigger', 'workflow_run');
+                return;
+              }
+              core.setOutput('run_id', String(sourceRun.id));
+              core.setOutput('run_url', sourceRun.html_url || '');
+              core.setOutput('skip_followup', 'false');
+              core.setOutput('source_trigger', 'workflow_run');
+              return;
+            }
+
+            const runs = await github.rest.actions.listWorkflowRuns({
+              owner,
+              repo,
+              workflow_id: 'audit-weekly-evidence.yml',
+              status: 'completed',
+              branch: 'main',
+              per_page: 30,
+            });
+            const successRun = runs.data.workflow_runs.find((run) => run.conclusion === 'success');
+            if (!successRun) {
+              core.setFailed(
+                'No successful Audit Weekly Evidence run found on main. ' +
+                'Run "Audit Weekly Evidence" first, then re-run this workflow.'
+              );
+              return;
+            }
+            core.setOutput('run_id', String(successRun.id));
+            core.setOutput('run_url', successRun.html_url || '');
+            core.setOutput('skip_followup', 'false');
+            core.setOutput('source_trigger', 'workflow_dispatch');
+
+      - name: Download weekly evidence artifact
+        if: steps.resolve.outputs.skip_followup != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ steps.resolve.outputs.run_id }}
+          name: audit-evidence-pack
+          path: artifacts/audit-evidence
+
+      - name: Upsert severe findings (dedupe by fingerprint)
+        if: steps.resolve.outputs.skip_followup != 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RUN_URL: ${{ steps.resolve.outputs.run_url }}
+        run: |
+          python3 scripts/audit/upsert_audit_issues.py \
+            --findings artifacts/audit-evidence/deterministic-findings.json \
+            --run-url "$RUN_URL" \
+            --skip-digest
+
+      - name: Build weekly digest issue body
+        if: steps.resolve.outputs.skip_followup != 'true'
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          findings_path = Path("artifacts/audit-evidence/deterministic-findings.json")
+          prompt_path = Path("scripts/audit/render_report_prompt.md")
+          findings = json.loads(findings_path.read_text(encoding="utf-8")) if findings_path.exists() else []
+          low = [row for row in findings if str(row.get("severity", "")).lower() in {"s3", "s4"}]
+          severe = [row for row in findings if str(row.get("severity", "")).lower() in {"s1", "s2"}]
+          prompt = prompt_path.read_text(encoding="utf-8").strip()
+          run_url = "${{ steps.resolve.outputs.run_url }}"
+
+          lines = [
+              "# Weekly UX/IA Audit Digest",
+              "",
+              "This rolling issue is fed by deterministic evidence and assigned to Copilot for judgment and optional fix PR proposals.",
+              "",
+              f"- Latest evidence run: {run_url}",
+              f"- Total findings: `{len(findings)}`",
+              f"- Severe findings (s1/s2): `{len(severe)}`",
+              f"- Lower findings (s3/s4): `{len(low)}`",
+              "",
+              "## Copilot task",
+              "",
+              "Use the evidence artifact and follow the exact output contract below.",
+              "",
+              "```md",
+              prompt,
+              "```",
+              "",
+              "## Lower-severity digest (s3/s4)",
+              "",
+          ]
+
+          if not low:
+              lines.append("- No lower-severity findings in this run.")
+          else:
+              for row in low[:120]:
+                  lines.append(
+                      f"- [{row.get('severity','s3')}] {row.get('title','Audit finding')} "
+                      f"(surface: `{row.get('surface','storefront')}`, route: `{row.get('route','/')}`, "
+                      f"fingerprint: `{row.get('fingerprint','')}`)"
+                  )
+
+          Path("artifacts/audit-evidence/weekly-digest-body.md").write_text(
+              "\n".join(lines).strip() + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Create or update rolling digest issue
+        if: steps.resolve.outputs.skip_followup != 'true'
+        id: digest
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const title = 'Weekly UX/IA Audit Digest';
+            const body = fs.readFileSync('artifacts/audit-evidence/weekly-digest-body.md', 'utf8');
+            const { owner, repo } = context.repo;
+            const baselineLabels = ['audit:ux', 'audit:ia', 'audit:correctness'];
+            const readyLabel = 'ai:ready';
+            const inProgressLabel = 'ai:in-progress';
+
+            const mergeLabels = (existing, { targetAiState }) => {
+              const current = (existing || []).map((label) =>
+                typeof label === 'string' ? label : label.name,
+              );
+              const preserved = current.filter((label) => label !== readyLabel && label !== inProgressLabel);
+              return Array.from(new Set([...preserved, ...baselineLabels, targetAiState]));
+            };
+
+            const openIssues = await github.paginate(github.rest.issues.listForRepo, {
+              owner,
+              repo,
+              state: 'open',
+              per_page: 100,
+            });
+            const existing = openIssues.find((issue) => !issue.pull_request && issue.title === title);
+            if (existing) {
+              await github.rest.issues.update({
+                owner,
+                repo,
+                issue_number: existing.number,
+                title,
+                body,
+                labels: mergeLabels(existing.labels, { targetAiState: readyLabel }),
+              });
+              core.setOutput('issue_number', String(existing.number));
+              return;
+            }
+
+            const created = await github.rest.issues.create({
+              owner,
+              repo,
+              title,
+              body,
+              labels: mergeLabels([], { targetAiState: readyLabel }),
+            });
+            core.setOutput('issue_number', String(created.data.number));
+
+      - name: Assign weekly digest to Copilot
+        if: steps.resolve.outputs.skip_followup != 'true'
+        uses: actions/github-script@v7
+        env:
+          ISSUE_NUMBER: ${{ steps.digest.outputs.issue_number }}
+        with:
+          script: |
+            const issueNumber = Number(process.env.ISSUE_NUMBER || 0);
+            if (!issueNumber) {
+              core.setFailed('Missing digest issue number.');
+              return;
+            }
+            const { owner, repo } = context.repo;
+            const baselineLabels = ['audit:ux', 'audit:ia', 'audit:correctness'];
+            const readyLabel = 'ai:ready';
+            const inProgressLabel = 'ai:in-progress';
+
+            const mergeLabels = (existing, { targetAiState }) => {
+              const current = (existing || []).map((label) =>
+                typeof label === 'string' ? label : label.name,
+              );
+              const preserved = current.filter((label) => label !== readyLabel && label !== inProgressLabel);
+              return Array.from(new Set([...preserved, ...baselineLabels, targetAiState]));
+            };
+
+            try {
+              await github.rest.issues.addAssignees({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                assignees: ['copilot'],
+              });
+
+              const issue = await github.rest.issues.get({
+                owner,
+                repo,
+                issue_number: issueNumber,
+              });
+
+              await github.rest.issues.update({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                labels: mergeLabels(issue.data.labels, { targetAiState: inProgressLabel }),
+              });
+            } catch (error) {
+              const note = [
+                'Copilot assignment failed automatically.',
+                'Run this manually if needed:',
+                '',
+                '`gh issue edit ' + issueNumber + ' --repo ' + owner + '/' + repo + ' --add-assignee @copilot`',
+              ].join('\n');
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                body: note,
+              });
+            }
+
+      - name: Weekly agent summary
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_trigger="${{ steps.resolve.outputs.source_trigger }}"
+          source_run_url="${{ steps.resolve.outputs.run_url }}"
+          skip_followup="${{ steps.resolve.outputs.skip_followup }}"
+          skip_reason="${{ steps.resolve.outputs.skip_reason }}"
+          digest_issue="${{ steps.digest.outputs.issue_number }}"
+          severe_count="n/a"
+          if [[ -f artifacts/audit-evidence/deterministic-findings.json ]]; then
+            severe_count="$(jq '[.[] | select(.severity == "s1" or .severity == "s2")] | length' artifacts/audit-evidence/deterministic-findings.json)"
+          fi
+
+          {
+            echo "## Weekly Agent Summary"
+            echo ""
+            echo "- Trigger event: \`${{ github.event_name }}\`"
+            echo "- Source resolution mode: \`${source_trigger:-unknown}\`"
+            if [[ -n "${source_run_url}" ]]; then
+              echo "- Source evidence run: ${source_run_url}"
+            fi
+            if [[ -z "${skip_followup}" && -z "${source_run_url}" ]]; then
+              echo "- Outcome: failed before source run resolution"
+            elif [[ "${skip_followup}" == "true" ]]; then
+              echo "- Outcome: skipped"
+              echo "- Reason: ${skip_reason:-source run was not successful}"
+            else
+              echo "- Outcome: processed"
+              echo "- Severe findings considered: \`${severe_count}\`"
+              echo "- Digest issue number: \`${digest_issue:-n/a}\`"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
