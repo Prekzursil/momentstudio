@@ -88,8 +88,13 @@ Checks-only is the current steady-state policy for this repository. If contribut
 - `Percy Visual` runs visual snapshot coverage for storefront routes:
   - PR core snapshot pass
   - weekly/manual expanded snapshot pass
+- `Applitools Visual` runs Eyes snapshot coverage for storefront routes:
+  - PR core snapshot pass
+  - weekly/manual run
 - Percy is intentionally non-blocking in this phase and is not part of required branch-protection checks.
+- Applitools is intentionally non-blocking in this phase and is not part of required branch-protection checks.
 - If `PERCY_TOKEN` is missing, Percy workflows skip with an explicit summary message.
+- If `APPLITOOLS_API_KEY` is missing, Applitools workflows skip with an explicit summary message.
 - Copilot custom setup workflow must expose a single job named `copilot-setup-steps` for agent compatibility.
 
 ## Evidence Pack vs Agent Pass
