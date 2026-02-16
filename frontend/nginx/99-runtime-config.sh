@@ -38,11 +38,12 @@ NETOPIA_ENABLED="${NETOPIA_ENABLED:-}"
 ADDRESS_AUTOCOMPLETE_ENABLED="${ADDRESS_AUTOCOMPLETE_ENABLED:-}"
 FRONTEND_CLARITY_PROJECT_ID="${FRONTEND_CLARITY_PROJECT_ID:-}"
 CLARITY_ENABLED="${CLARITY_ENABLED:-}"
+SENTRY_ENABLED="${SENTRY_ENABLED:-1}"
 SENTRY_DSN="${SENTRY_DSN:-}"
 SENTRY_SEND_DEFAULT_PII="${SENTRY_SEND_DEFAULT_PII:-1}"
-SENTRY_TRACES_SAMPLE_RATE="${SENTRY_TRACES_SAMPLE_RATE:-0}"
-SENTRY_REPLAY_SESSION_SAMPLE_RATE="${SENTRY_REPLAY_SESSION_SAMPLE_RATE:-0}"
-SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE="${SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE:-0}"
+SENTRY_TRACES_SAMPLE_RATE="${SENTRY_TRACES_SAMPLE_RATE:-1.0}"
+SENTRY_REPLAY_SESSION_SAMPLE_RATE="${SENTRY_REPLAY_SESSION_SAMPLE_RATE:-0.25}"
+SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE="${SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE:-1.0}"
 CAPTCHA_SITE_KEY="${CAPTCHA_SITE_KEY:-}"
 
 stripe_enabled="$(truthy "$STRIPE_ENABLED_RAW")"
@@ -70,11 +71,12 @@ window.__APP_CONFIG__ = {
   "addressAutocompleteEnabled": $(truthy "$ADDRESS_AUTOCOMPLETE_ENABLED"),
   "clarityProjectId": "$(escape "$FRONTEND_CLARITY_PROJECT_ID")",
   "clarityEnabled": ${clarity_enabled},
+  "sentryEnabled": $(truthy "$SENTRY_ENABLED"),
   "sentryDsn": "$(escape "$SENTRY_DSN")",
   "sentrySendDefaultPii": $(truthy "$SENTRY_SEND_DEFAULT_PII"),
-  "sentryTracesSampleRate": $(decimal_or_default "$SENTRY_TRACES_SAMPLE_RATE" "0"),
-  "sentryReplaySessionSampleRate": $(decimal_or_default "$SENTRY_REPLAY_SESSION_SAMPLE_RATE" "0"),
-  "sentryReplayOnErrorSampleRate": $(decimal_or_default "$SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE" "0"),
+  "sentryTracesSampleRate": $(decimal_or_default "$SENTRY_TRACES_SAMPLE_RATE" "1.0"),
+  "sentryReplaySessionSampleRate": $(decimal_or_default "$SENTRY_REPLAY_SESSION_SAMPLE_RATE" "0.25"),
+  "sentryReplayOnErrorSampleRate": $(decimal_or_default "$SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE" "1.0"),
   "captchaSiteKey": "$(escape "$CAPTCHA_SITE_KEY")"
 };
 EOF

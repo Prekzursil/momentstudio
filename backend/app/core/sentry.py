@@ -4,9 +4,12 @@ import logging
 
 from app.core.config import settings
 
+logger = logging.getLogger(__name__)
+
 
 def init_sentry() -> None:
     if not settings.sentry_dsn:
+        logger.info("sentry_disabled reason=missing_dsn")
         return
 
     import sentry_sdk
@@ -39,4 +42,13 @@ def init_sentry() -> None:
         enable_logs=settings.sentry_enable_logs,
         attach_stacktrace=True,
         send_default_pii=settings.sentry_send_default_pii,
+    )
+    logger.info(
+        "sentry_enabled environment=%s release=%s traces=%s profiles=%s logs=%s send_default_pii=%s",
+        settings.environment,
+        settings.app_version,
+        settings.sentry_traces_sample_rate,
+        settings.sentry_profiles_sample_rate,
+        settings.sentry_enable_logs,
+        settings.sentry_send_default_pii,
     )

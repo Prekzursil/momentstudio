@@ -41,6 +41,9 @@ def validate_production_settings() -> None:
     if not bool(settings.secure_cookies):
         problems.append("SECURE_COOKIES must be enabled in production.")
 
+    if not (settings.sentry_dsn or "").strip():
+        problems.append("SENTRY_DSN must be configured in production.")
+
     samesite = (settings.cookie_samesite or "").strip().lower()
     if samesite not in {"lax", "strict", "none"}:
         problems.append("COOKIE_SAMESITE must be one of: lax | strict | none.")

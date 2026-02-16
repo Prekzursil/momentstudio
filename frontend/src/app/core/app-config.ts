@@ -8,6 +8,7 @@ export interface AppConfig {
   addressAutocompleteEnabled: boolean;
   clarityProjectId: string;
   clarityEnabled: boolean;
+  sentryEnabled: boolean;
   sentryDsn: string;
   sentrySendDefaultPii: boolean;
   sentryTracesSampleRate: number;
@@ -32,11 +33,12 @@ const defaults: AppConfig = {
   addressAutocompleteEnabled: false,
   clarityProjectId: '',
   clarityEnabled: false,
+  sentryEnabled: true,
   sentryDsn: '',
   sentrySendDefaultPii: true,
-  sentryTracesSampleRate: 0,
-  sentryReplaySessionSampleRate: 0,
-  sentryReplayOnErrorSampleRate: 0,
+  sentryTracesSampleRate: 1,
+  sentryReplaySessionSampleRate: 0.25,
+  sentryReplayOnErrorSampleRate: 1,
   captchaSiteKey: ''
 };
 

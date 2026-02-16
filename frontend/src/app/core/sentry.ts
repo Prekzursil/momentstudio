@@ -14,6 +14,10 @@ function clampSampleRate(value: unknown): number {
 
 function initSentryAsync(): Promise<SentryModule | null> {
   if (initPromise) return initPromise;
+  if (!appConfig.sentryEnabled) {
+    initPromise = Promise.resolve(null);
+    return initPromise;
+  }
   if (!appConfig.sentryDsn) {
     initPromise = Promise.resolve(null);
     return initPromise;

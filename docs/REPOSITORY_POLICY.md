@@ -92,6 +92,16 @@ Checks-only is the current steady-state policy for this repository. If contribut
 - If `PERCY_TOKEN` is missing, Percy workflows skip with an explicit summary message.
 - Copilot custom setup workflow must expose a single job named `copilot-setup-steps` for agent compatibility.
 
+## Production observability policy
+
+- Production backend startup requires `SENTRY_DSN` (fail-fast enforcement in startup checks).
+- `send_default_pii` is intentionally enabled repository-wide (`SENTRY_SEND_DEFAULT_PII=1` for backend/frontend).
+- Frontend Sentry remains runtime-gated (`SENTRY_ENABLED`) and DSN-gated (`SENTRY_DSN`).
+- GitHub Actions `Sentry Release` workflow publishes releases and uploads frontend sourcemaps when configured:
+  - secret: `SENTRY_AUTH_TOKEN`
+  - variables: `SENTRY_ORG`, `SENTRY_PROJECT` (optional `SENTRY_URL` for self-hosted)
+- Missing Sentry CI configuration is treated as a non-fatal skip with explicit workflow summary output.
+
 ## Evidence Pack vs Agent Pass
 
 This repository intentionally separates deterministic data collection from AI judgment:

@@ -58,6 +58,9 @@ sameday_api_username="$(env_get "${BACKEND_ENV}" "SAMEDAY_API_USERNAME")"
 sameday_api_password="$(env_get "${BACKEND_ENV}" "SAMEDAY_API_PASSWORD")"
 fan_api_username="$(env_get "${BACKEND_ENV}" "FAN_API_USERNAME")"
 fan_api_password="$(env_get "${BACKEND_ENV}" "FAN_API_PASSWORD")"
+sentry_dsn_backend="$(env_get "${BACKEND_ENV}" "SENTRY_DSN")"
+sentry_dsn_frontend="$(env_get "${FRONTEND_ENV}" "SENTRY_DSN")"
+sentry_enabled_frontend="$(env_get "${FRONTEND_ENV}" "SENTRY_ENABLED")"
 
 backend_is_dev=0
 backend_is_prod=0
@@ -89,6 +92,15 @@ if [[ "${backend_is_prod}" -eq 1 ]]; then
   fi
   if [[ -z "$(trim "${paypal_live_id}")" ]]; then
     warnings+=("PAYPAL_CLIENT_ID_LIVE is empty in production mode.")
+  fi
+  if [[ -z "$(trim "${sentry_dsn_backend}")" ]]; then
+    errors+=("Backend SENTRY_DSN is required in production mode.")
+  fi
+  if [[ -z "$(trim "${sentry_dsn_frontend}")" ]]; then
+    errors+=("Frontend SENTRY_DSN is required in production mode.")
+  fi
+  if ! is_truthy "${sentry_enabled_frontend:-1}"; then
+    errors+=("SENTRY_ENABLED must be enabled for frontend production mode.")
   fi
 fi
 
@@ -129,6 +141,12 @@ if [[ "${backend_is_dev}" -eq 1 ]]; then
     && [[ -z "$(trim "${sameday_api_base_url}")" || -z "$(trim "${sameday_api_username}")" || -z "$(trim "${sameday_api_password}")" ]] \
     && ! is_truthy "${lockers_overpass_fallback}"; then
     warnings+=("Sameday lockers are likely unavailable in dev (mirror enabled without snapshot/credentials and no Overpass fallback).")
+  fi
+  if [[ -z "$(trim "${sentry_dsn_backend}")" ]]; then
+    warnings+=("Backend SENTRY_DSN is empty in dev mode; backend errors will not reach Sentry.")
+  fi
+  if [[ -z "$(trim "${sentry_dsn_frontend}")" ]]; then
+    warnings+=("Frontend SENTRY_DSN is empty in dev mode; frontend errors will not reach Sentry.")
   fi
 fi
 

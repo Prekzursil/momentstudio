@@ -1,0 +1,99 @@
+name: Sentry Release
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release-and-sourcemaps:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Sentry configuration
+        id: config
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+          SENTRY_URL: ${{ vars.SENTRY_URL }}
+        run: |
+          set -euo pipefail
+          missing=()
+          if [ -z "${SENTRY_AUTH_TOKEN:-}" ]; then
+            missing+=("SENTRY_AUTH_TOKEN secret")
+          fi
+          if [ -z "${SENTRY_ORG:-}" ]; then
+            missing+=("SENTRY_ORG variable")
+          fi
+          if [ -z "${SENTRY_PROJECT:-}" ]; then
+            missing+=("SENTRY_PROJECT variable")
+          fi
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "## Sentry Release"
+              echo ""
+              echo "Skipped: missing configuration."
+              for item in "${missing[@]}"; do
+                echo "- ${item}"
+              done
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+          echo "release=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          if [ -n "${SENTRY_URL:-}" ]; then
+            echo "url=${SENTRY_URL}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        if: steps.config.outputs.enabled == 'true'
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Node
+        if: steps.config.outputs.enabled == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Upgrade npm
+        if: steps.config.outputs.enabled == 'true'
+        run: npm i -g npm@11.7.0
+
+      - name: Build frontend with source maps
+        if: steps.config.outputs.enabled == 'true'
+        run: |
+          cd frontend
+          npm ci
+          npm run build -- --configuration production --source-map=true
+
+      - name: Publish Sentry release and sourcemaps
+        if: steps.config.outputs.enabled == 'true'
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+          SENTRY_URL: ${{ steps.config.outputs.url }}
+          RELEASE: ${{ steps.config.outputs.release }}
+        run: |
+          set -euo pipefail
+          SENTRY_CLI="npx --yes @sentry/cli"
+          ${SENTRY_CLI} releases new "$RELEASE"
+          ${SENTRY_CLI} releases set-commits "$RELEASE" --auto
+          ${SENTRY_CLI} sourcemaps inject frontend/dist/app/browser
+          ${SENTRY_CLI} sourcemaps upload --release "$RELEASE" frontend/dist/app/browser
+          ${SENTRY_CLI} releases finalize "$RELEASE"
+          {
+            echo "## Sentry Release"
+            echo ""
+            echo "Published release \`$RELEASE\` and uploaded frontend sourcemaps from \`frontend/dist/app/browser\`."
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -13,6 +13,7 @@ function parseDotEnv(contents) {
     ADDRESS_AUTOCOMPLETE_ENABLED: undefined,
     FRONTEND_CLARITY_PROJECT_ID: undefined,
     CLARITY_ENABLED: undefined,
+    SENTRY_ENABLED: undefined,
     SENTRY_DSN: undefined,
     SENTRY_SEND_DEFAULT_PII: undefined,
     SENTRY_TRACES_SAMPLE_RATE: undefined,
@@ -63,6 +64,9 @@ function parseDotEnv(contents) {
         break;
       case 'SENTRY_DSN':
         result.SENTRY_DSN = value;
+        break;
+      case 'SENTRY_ENABLED':
+        result.SENTRY_ENABLED = value;
         break;
       case 'SENTRY_SEND_DEFAULT_PII':
         result.SENTRY_SEND_DEFAULT_PII = value;
@@ -120,13 +124,14 @@ const netopiaEnabledRaw = process.env.NETOPIA_ENABLED ?? parsed.NETOPIA_ENABLED 
 const addressAutocompleteEnabledRaw = process.env.ADDRESS_AUTOCOMPLETE_ENABLED ?? parsed.ADDRESS_AUTOCOMPLETE_ENABLED ?? '';
 const clarityProjectId = process.env.FRONTEND_CLARITY_PROJECT_ID ?? parsed.FRONTEND_CLARITY_PROJECT_ID ?? '';
 const clarityEnabledRaw = process.env.CLARITY_ENABLED ?? parsed.CLARITY_ENABLED ?? '';
+const sentryEnabledRaw = process.env.SENTRY_ENABLED ?? parsed.SENTRY_ENABLED ?? '1';
 const sentryDsn = process.env.SENTRY_DSN ?? parsed.SENTRY_DSN ?? '';
 const sentrySendDefaultPiiRaw = process.env.SENTRY_SEND_DEFAULT_PII ?? parsed.SENTRY_SEND_DEFAULT_PII ?? '1';
-const sentryTracesSampleRateRaw = process.env.SENTRY_TRACES_SAMPLE_RATE ?? parsed.SENTRY_TRACES_SAMPLE_RATE ?? '0';
+const sentryTracesSampleRateRaw = process.env.SENTRY_TRACES_SAMPLE_RATE ?? parsed.SENTRY_TRACES_SAMPLE_RATE ?? '1.0';
 const sentryReplaySessionSampleRateRaw =
-  process.env.SENTRY_REPLAY_SESSION_SAMPLE_RATE ?? parsed.SENTRY_REPLAY_SESSION_SAMPLE_RATE ?? '0';
+  process.env.SENTRY_REPLAY_SESSION_SAMPLE_RATE ?? parsed.SENTRY_REPLAY_SESSION_SAMPLE_RATE ?? '0.25';
 const sentryReplayOnErrorSampleRateRaw =
-  process.env.SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE ?? parsed.SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE ?? '0';
+  process.env.SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE ?? parsed.SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE ?? '1.0';
 const captchaSiteKey = process.env.CAPTCHA_SITE_KEY ?? parsed.CAPTCHA_SITE_KEY ?? '';
 const paypalEnabled = ['1', 'true', 'yes', 'on'].includes(String(paypalEnabledRaw).trim().toLowerCase());
 const netopiaEnabled = ['1', 'true', 'yes', 'on'].includes(String(netopiaEnabledRaw).trim().toLowerCase());
@@ -136,6 +141,7 @@ const clarityEnabled =
     ? ['1', 'true', 'yes', 'on'].includes(String(clarityEnabledRaw).trim().toLowerCase())
     : Boolean(String(clarityProjectId).trim());
 const sentrySendDefaultPii = ['1', 'true', 'yes', 'on'].includes(String(sentrySendDefaultPiiRaw).trim().toLowerCase());
+const sentryEnabled = ['1', 'true', 'yes', 'on'].includes(String(sentryEnabledRaw).trim().toLowerCase());
 const sentryTracesSampleRate = Math.max(0, Math.min(1, Number.parseFloat(String(sentryTracesSampleRateRaw)) || 0));
 const sentryReplaySessionSampleRate = Math.max(
   0,
@@ -159,6 +165,7 @@ const config = {
   addressAutocompleteEnabled,
   clarityProjectId: String(clarityProjectId).trim(),
   clarityEnabled,
+  sentryEnabled,
   sentryDsn,
   sentrySendDefaultPii,
   sentryTracesSampleRate,
