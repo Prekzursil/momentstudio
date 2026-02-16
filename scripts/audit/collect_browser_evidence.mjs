@@ -57,7 +57,11 @@ function classifyConsoleMessage(message, level) {
     "net::err_connection_refused",
     "failed to load resource",
     "status of 404",
-    "httperrorresponse"
+    "httperrorresponse",
+    "failed to fetch",
+    "networkerror when attempting to fetch resource",
+    "xmlhttprequest",
+    "response with status"
   ];
   if (noisyPatterns.some((pattern) => text.includes(pattern))) {
     return { skip: false, severity: "s4", level: normalizedLevel };
@@ -173,10 +177,17 @@ async function main() {
         url: null,
         screenshot: null,
         title: null,
+        description: null,
+        og_description: null,
         canonical: null,
         robots: null,
+        indexable: null,
         h1_count: 0,
         h1_texts: [],
+        route_heading_count: 0,
+        word_count_initial_html: 0,
+        meaningful_text_block_count: 0,
+        internal_link_count: 0,
         skipped_reason: "unresolved_placeholder"
       });
       layoutSignals.push({
@@ -221,15 +232,47 @@ async function main() {
       const seo = await page.evaluate(() => {
         const canonical = document.querySelector("link[rel='canonical']")?.getAttribute("href") || null;
         const robots = document.querySelector("meta[name='robots']")?.getAttribute("content") || null;
+        const description = document.querySelector("meta[name='description']")?.getAttribute("content") || null;
+        const ogDescription = document.querySelector("meta[property='og:description']")?.getAttribute("content") || null;
         const title = document.title || null;
         const h1Nodes = Array.from(document.querySelectorAll("h1"));
         const h1Texts = h1Nodes.map((node) => (node.textContent || "").trim()).filter(Boolean);
+        const routeHeadingCount = document.querySelectorAll("[data-route-heading='true']").length;
+
+        const bodyText = (document.body?.innerText || "").replace(/\s+/g, " ").trim();
+        const wordCount = bodyText ? bodyText.split(" ").filter(Boolean).length : 0;
+        const candidateBlocks = Array.from(document.querySelectorAll("main p, article p, section p, li, h2, h3"))
+          .map((node) => (node.textContent || "").replace(/\s+/g, " ").trim())
+          .filter((text) => text.length >= 40);
+        const meaningfulTextBlocks = candidateBlocks.filter((text) => text.split(" ").filter(Boolean).length >= 8);
+
+        const internalLinks = Array.from(document.querySelectorAll("a[href]")).filter((anchor) => {
+          const href = String(anchor.getAttribute("href") || "").trim();
+          if (!href) return false;
+          if (href.startsWith("#")) return false;
+          if (href.startsWith("mailto:") || href.startsWith("tel:") || href.startsWith("javascript:")) return false;
+          if (href.startsWith("/")) return true;
+          try {
+            const url = new URL(href, window.location.origin);
+            return url.origin === window.location.origin;
+          } catch {
+            return false;
+          }
+        });
+        const noindex = String(robots || "").toLowerCase().includes("noindex");
         return {
           title,
+          description,
+          og_description: ogDescription,
           canonical,
           robots,
+          indexable: !noindex,
           h1_count: h1Nodes.length,
           h1_texts: h1Texts.slice(0, 5),
+          route_heading_count: routeHeadingCount,
+          word_count_initial_html: wordCount,
+          meaningful_text_block_count: meaningfulTextBlocks.length,
+          internal_link_count: internalLinks.length,
         };
       });
 
@@ -285,10 +328,17 @@ async function main() {
         url,
         screenshot: null,
         title: null,
+        description: null,
+        og_description: null,
         canonical: null,
         robots: null,
+        indexable: null,
         h1_count: 0,
         h1_texts: [],
+        route_heading_count: 0,
+        word_count_initial_html: 0,
+        meaningful_text_block_count: 0,
+        internal_link_count: 0,
         error: message,
       });
       layoutSignals.push({

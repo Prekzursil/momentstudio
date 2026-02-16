@@ -80,3 +80,70 @@ def test_console_noise_finding_stays_non_severe() -> None:
     assert findings[0]["rule_id"] == "browser_console_error"
     assert findings[0]["severity"] == "s4"
 
+
+def test_canonical_policy_requires_clean_en_and_lang_ro() -> None:
+    module = _load_module()
+    findings = module._build_deterministic_findings(
+        seo_snapshot=[
+            {
+                "route": "/shop",
+                "resolved_route": "/shop",
+                "surface": "storefront",
+                "title": "Shop",
+                "description": "Browse products.",
+                "canonical": "https://momentstudio.ro/shop?lang=en",
+                "robots": "index,follow",
+                "h1_count": 1,
+                "word_count_initial_html": 100,
+                "meaningful_text_block_count": 2,
+                "internal_link_count": 3,
+                "indexable": True,
+            },
+            {
+                "route": "/shop?lang=ro",
+                "resolved_route": "/shop?lang=ro",
+                "surface": "storefront",
+                "title": "Shop RO",
+                "description": "Exploreaza produse.",
+                "canonical": "https://momentstudio.ro/shop",
+                "robots": "index,follow",
+                "h1_count": 1,
+                "word_count_initial_html": 100,
+                "meaningful_text_block_count": 2,
+                "internal_link_count": 3,
+                "indexable": True,
+            },
+        ],
+        console_errors=[],
+        layout_signals=[],
+    )
+    mismatches = [row for row in findings if row["rule_id"] == "seo_canonical_policy_mismatch"]
+    assert len(mismatches) == 2
+
+
+def test_indexable_missing_description_and_thin_content_rules() -> None:
+    module = _load_module()
+    findings = module._build_deterministic_findings(
+        seo_snapshot=[
+            {
+                "route": "/about",
+                "resolved_route": "/about",
+                "surface": "storefront",
+                "title": "About",
+                "description": "",
+                "canonical": "https://momentstudio.ro/about",
+                "robots": "index,follow",
+                "h1_count": 1,
+                "word_count_initial_html": 12,
+                "meaningful_text_block_count": 0,
+                "internal_link_count": 1,
+                "indexable": True,
+            }
+        ],
+        console_errors=[],
+        layout_signals=[],
+    )
+    rules = {row["rule_id"] for row in findings}
+    assert "seo_missing_description" in rules
+    assert "seo_no_meaningful_text" in rules
+    assert "seo_low_internal_links" in rules

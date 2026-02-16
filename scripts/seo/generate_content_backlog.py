@@ -87,6 +87,10 @@ def _classify_issue_type(rule_id: str) -> tuple[str, str]:
     return "duplicate_description", "Make description unique with route-specific summary."
   if "broken_link" in rid:
     return "broken_link", "Fix or remove broken links; replace with canonical destination."
+  if "low_internal_links" in rid:
+    return "internal_links", "Add contextual internal links to related indexable routes."
+  if "canonical_policy_mismatch" in rid:
+    return "canonical_policy", "Align canonical policy with sitemap language policy."
   return "other", "Review route content and metadata for SEO intent clarity."
 
 
@@ -96,7 +100,11 @@ def build_backlog(findings: list[dict[str, Any]]) -> list[BacklogItem]:
 
   for finding in findings:
     rule_id = str(finding.get("rule_id") or "")
-    if not rule_id.startswith("seo."):
+    labels = [str(label).strip().lower() for label in list(finding.get("labels") or [])]
+    is_seo = rule_id.startswith("seo_") or "audit:seo" in labels
+    if not is_seo:
+      continue
+    if not bool(finding.get("indexable")):
       continue
     route = str(finding.get("route") or "").strip() or "/"
     severity = str(finding.get("severity") or "s4").lower()
@@ -104,7 +112,11 @@ def build_backlog(findings: list[dict[str, Any]]) -> list[BacklogItem]:
     issue_type, task = _classify_issue_type(rule_id)
     key = (route, issue_type)
     score = SEVERITY_WEIGHT.get(severity, 0)
-    evidence_path = str(finding.get("evidence_path") or "").strip()
+    evidence_paths = [
+      str(path).strip()
+      for path in list(finding.get("evidence_files") or [])
+      if str(path).strip()
+    ]
 
     existing = grouped.get(key)
     if existing is None:
@@ -125,7 +137,7 @@ def build_backlog(findings: list[dict[str, Any]]) -> list[BacklogItem]:
       else:
         existing.score += max(1, score // 4)
 
-    if evidence_path:
+    for evidence_path in evidence_paths:
       by_key_evidence[key].append(evidence_path)
 
   backlog = list(grouped.values())
