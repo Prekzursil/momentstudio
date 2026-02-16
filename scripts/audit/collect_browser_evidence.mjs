@@ -251,9 +251,13 @@ async function main() {
           if (!href) return false;
           if (href.startsWith("#")) return false;
           if (href.startsWith("mailto:") || href.startsWith("tel:") || href.startsWith("javascript:")) return false;
+          if (href.startsWith("//")) return false;
           if (href.startsWith("/")) return true;
           try {
             const url = new URL(href, window.location.origin);
+            if (url.protocol !== "http:" && url.protocol !== "https:") {
+              return false;
+            }
             return url.origin === window.location.origin;
           } catch {
             return false;
