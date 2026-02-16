@@ -112,6 +112,23 @@ async def _publish_heartbeat(redis, *, worker_id: str) -> None:
     await _await_if_needed(redis.set(key, json.dumps(payload, separators=(",", ":"), ensure_ascii=False), ex=HEARTBEAT_TTL_SECONDS))
 
 
+def _normalize_job_id_candidate(raw: object) -> str | None:
+    if isinstance(raw, bytes):
+        candidate = raw.decode("utf-8", errors="ignore")
+    elif isinstance(raw, str):
+        candidate = raw
+    else:
+        candidate = str(raw)
+    candidate = candidate.strip()
+    if not candidate:
+        logger.warning(
+            "media_worker_invalid_job_payload",
+            extra={"raw_type": type(raw).__name__, "raw_repr": repr(raw)},
+        )
+        return None
+    return candidate
+
+
 async def run_media_worker(poll_interval_seconds: float = 2.0) -> None:
     redis = get_redis()
     worker_id = _worker_id()
@@ -174,7 +191,10 @@ async def run_media_worker(poll_interval_seconds: float = 2.0) -> None:
             if not result:
                 continue
             _, raw = result
-            await _process_job_id(str(raw))
+            candidate = _normalize_job_id_candidate(raw)
+            if candidate is None:
+                continue
+            await _process_job_id(candidate)
         except asyncio.CancelledError:
             raise
         except Exception:

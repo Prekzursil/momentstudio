@@ -103,15 +103,18 @@ jobs:
             }
 
             const hasDeepLabel = (pr.labels || []).some((label) => label.name === 'audit:deep');
+            const prHeadSha = pr.head?.sha || '';
             core.setOutput('pr_number', String(pr.number));
             core.setOutput('pr_url', pr.html_url);
             core.setOutput('is_fork', pr.head?.repo?.fork ? 'true' : 'false');
             core.setOutput('has_deep_label', hasDeepLabel ? 'true' : 'false');
+            core.setOutput('pr_head_sha', prHeadSha);
             const shouldRun = context.eventName === 'workflow_dispatch' || hasDeepLabel;
             core.setOutput('should_run', shouldRun ? 'true' : 'false');
             core.setOutput('resolution_mode', context.eventName === 'workflow_dispatch' ? 'manual' : 'pull_request_target');
 
             let evidenceRunUrl = '';
+            let evidenceRunSha = '';
             try {
               const runs = await github.rest.actions.listWorkflowRuns({
                 owner,
@@ -123,13 +126,21 @@ jobs:
               });
               const matching = runs.data.workflow_runs.find((run) => {
                 if (run.conclusion !== 'success') return false;
+                if (run.head_sha !== prHeadSha) return false;
                 return (run.pull_requests || []).some((linked) => linked.number === pr.number);
               });
               evidenceRunUrl = matching?.html_url || '';
+              evidenceRunSha = matching?.head_sha || '';
+              if (evidenceRunUrl && evidenceRunSha) {
+                core.notice(`Selected evidence run for PR #${pr.number}: ${evidenceRunUrl} (head_sha: ${evidenceRunSha})`);
+              } else {
+                core.notice(`No successful Audit PR Evidence workflow run found for PR #${pr.number} at current head SHA ${prHeadSha}. Maintainers should rerun Audit PR Evidence.`);
+              }
             } catch (error) {
               core.notice(`Unable to resolve PR evidence run URL: ${error.message}`);
             }
             core.setOutput('evidence_run_url', evidenceRunUrl);
+            core.setOutput('evidence_run_sha', evidenceRunSha);
 
             if (context.eventName !== 'workflow_dispatch' && !hasDeepLabel) {
               core.notice('Skipping deep-agent flow: PR does not have audit:deep label.');
@@ -192,6 +203,17 @@ jobs:
             const prNumber = Number('${{ steps.guard.outputs.pr_number }}');
             const body = fs.readFileSync('deep-audit-body.md', 'utf8');
             const title = `Deep UX/IA Audit - PR #${prNumber}`;
+            const baselineLabels = ['audit:deep', 'audit:ux', 'audit:ia'];
+            const readyLabel = 'ai:ready';
+            const inProgressLabel = 'ai:in-progress';
+
+            const mergeLabels = (existing, { targetAiState }) => {
+              const current = (existing || []).map((label) =>
+                typeof label === 'string' ? label : label.name,
+              );
+              const preserved = current.filter((label) => label !== readyLabel && label !== inProgressLabel);
+              return Array.from(new Set([...preserved, ...baselineLabels, targetAiState]));
+            };
 
             const openIssues = await github.paginate(github.rest.issues.listForRepo, {
               owner,
@@ -206,7 +228,7 @@ jobs:
                 repo,
                 issue_number: existing.number,
                 body,
-                labels: ['audit:deep', 'audit:ux', 'audit:ia', 'ai:ready'],
+                labels: mergeLabels(existing.labels, { targetAiState: readyLabel }),
               });
               core.setOutput('issue_number', String(existing.number));
               return;
@@ -217,7 +239,7 @@ jobs:
               repo,
               title,
               body,
-              labels: ['audit:deep', 'audit:ux', 'audit:ia', 'ai:ready'],
+              labels: mergeLabels([], { targetAiState: readyLabel }),
             });
             core.setOutput('issue_number', String(created.data.number));
 
@@ -234,6 +256,18 @@ jobs:
               return;
             }
             const { owner, repo } = context.repo;
+            const baselineLabels = ['audit:deep', 'audit:ux', 'audit:ia'];
+            const readyLabel = 'ai:ready';
+            const inProgressLabel = 'ai:in-progress';
+
+            const mergeLabels = (existing, { targetAiState }) => {
+              const current = (existing || []).map((label) =>
+                typeof label === 'string' ? label : label.name,
+              );
+              const preserved = current.filter((label) => label !== readyLabel && label !== inProgressLabel);
+              return Array.from(new Set([...preserved, ...baselineLabels, targetAiState]));
+            };
+
             try {
               await github.rest.issues.addAssignees({
                 owner,
@@ -241,11 +275,18 @@ jobs:
                 issue_number: issueNumber,
                 assignees: ['copilot'],
               });
+
+              const issue = await github.rest.issues.get({
+                owner,
+                repo,
+                issue_number: issueNumber,
+              });
+
               await github.rest.issues.update({
                 owner,
                 repo,
                 issue_number: issueNumber,
-                labels: ['audit:deep', 'audit:ux', 'audit:ia', 'ai:in-progress'],
+                labels: mergeLabels(issue.data.labels, { targetAiState: inProgressLabel }),
               });
             } catch (error) {
               await github.rest.issues.createComment({
