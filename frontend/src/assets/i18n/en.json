@@ -5197,7 +5197,17 @@
       "media": {
         "title": "Media library",
         "hint": "Manage DAM assets in one place: uploads, review queue, collections, trash, usage, variants, and metadata for images/videos/documents.",
-        "libraryTitle": "All media assets"
+        "libraryTitle": "All media assets",
+        "retryPolicies": {
+          "history": "History",
+          "hideHistory": "Hide history",
+          "factoryDefault": "Factory default",
+          "lastChange": "Last change",
+          "knownGood": "Known good",
+          "markKnownGood": "Mark known good",
+          "rollbackSelected": "Rollback to this revision",
+          "loadMoreHistory": "Load more"
+        }
       },
       "scheduling": {
         "title": "Scheduling",

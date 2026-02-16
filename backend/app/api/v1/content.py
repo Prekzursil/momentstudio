@@ -67,7 +67,11 @@ from app.schemas.media import (
     MediaJobListResponse,
     MediaJobRetryBulkRequest,
     MediaRetryPolicyListResponse,
+    MediaRetryPolicyHistoryResponse,
+    MediaRetryPolicyPresetsResponse,
     MediaRetryPolicyRead,
+    MediaRetryPolicyEventRead,
+    MediaRetryPolicyRollbackRequest,
     MediaRetryPolicyUpdateRequest,
     MediaRejectRequest,
     MediaTelemetryResponse,
@@ -1447,6 +1451,38 @@ async def admin_media_retry_policies(
     return MediaRetryPolicyListResponse(items=items)
 
 
+@router.get("/admin/media/retry-policies/history", response_model=MediaRetryPolicyHistoryResponse)
+async def admin_media_retry_policy_history(
+    job_type: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=100),
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> MediaRetryPolicyHistoryResponse:
+    try:
+        items, meta = await media_dam.list_retry_policy_history(
+            session,
+            job_type=job_type,
+            page=page,
+            limit=limit,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return MediaRetryPolicyHistoryResponse(items=items, meta=meta)
+
+
+@router.get("/admin/media/retry-policies/{job_type}/presets", response_model=MediaRetryPolicyPresetsResponse)
+async def admin_media_retry_policy_presets(
+    job_type: str,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> MediaRetryPolicyPresetsResponse:
+    try:
+        return await media_dam.get_retry_policy_presets(session, job_type=job_type)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
 @router.patch("/admin/media/retry-policies/{job_type}", response_model=MediaRetryPolicyRead)
 async def admin_update_media_retry_policy(
     job_type: str,
@@ -1461,6 +1497,44 @@ async def admin_update_media_retry_policy(
             job_type=job_type,
             payload=payload,
             updated_by_user_id=admin.id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@router.post("/admin/media/retry-policies/{job_type}/rollback", response_model=MediaRetryPolicyRead)
+async def admin_rollback_media_retry_policy(
+    job_type: str,
+    payload: MediaRetryPolicyRollbackRequest,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> MediaRetryPolicyRead:
+    _require_owner_or_admin(admin, detail="Only owner/admin can rollback retry policies")
+    try:
+        return await media_dam.rollback_retry_policy(
+            session,
+            job_type=job_type,
+            payload=payload,
+            actor_user_id=admin.id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@router.post("/admin/media/retry-policies/{job_type}/mark-known-good", response_model=MediaRetryPolicyEventRead)
+async def admin_mark_media_retry_policy_known_good(
+    job_type: str,
+    note: str | None = Query(default=None),
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> MediaRetryPolicyEventRead:
+    _require_owner_or_admin(admin, detail="Only owner/admin can update known-good retry policies")
+    try:
+        return await media_dam.mark_retry_policy_known_good(
+            session,
+            job_type=job_type,
+            actor_user_id=admin.id,
+            note=note,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))

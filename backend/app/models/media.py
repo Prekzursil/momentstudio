@@ -314,6 +314,22 @@ class MediaJobRetryPolicy(Base):
     )
 
 
+class MediaJobRetryPolicyEvent(Base):
+    __tablename__ = "media_job_retry_policy_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    job_type: Mapped[MediaJobType] = mapped_column(Enum(MediaJobType), nullable=False, index=True)
+    action: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    actor_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    preset_key: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    before_policy_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    after_policy_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
 class MediaCollection(Base):
     __tablename__ = "media_collections"
 

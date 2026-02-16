@@ -19,6 +19,7 @@ make env-dev
 make env-status
 make env-doctor
 make dev
+make dev-owner
 ```
 
 Switch back to local production-like profile:
@@ -88,6 +89,30 @@ If production-like settings are active, startup stops and tells you to run:
 ```bash
 make env-dev
 ```
+
+## One-command local owner workflow
+
+Use this when you want a reproducible local dev start with an owner account already bootstrapped:
+
+```bash
+make dev-owner
+```
+
+What it does:
+
+1. Bootstraps/switches to the dev profile.
+2. Runs env doctor in `--require-dev` mode (fails if profile is production-like).
+3. Starts local compose Postgres if DB is down.
+4. Runs `alembic upgrade head`.
+5. Runs `python -m app.cli bootstrap-owner`.
+6. Starts `./start.sh`.
+
+Override defaults if needed:
+
+- `DEV_OWNER_EMAIL`
+- `DEV_OWNER_PASSWORD`
+- `DEV_OWNER_USERNAME`
+- `DEV_OWNER_DISPLAY_NAME`
 
 ## Production Integrity Notes
 

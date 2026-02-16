@@ -41,6 +41,21 @@ make dev
   - Ports automatically bump if they’re already in use.
 - If `DATABASE_URL` is not reachable and Docker is available, `start.sh` will try to start the Compose Postgres service.
 
+One-command owner bootstrap + dev start:
+
+```bash
+make dev-owner
+```
+
+- Forces the local dev profile (`make env-dev` behavior).
+- Applies backend migrations.
+- Creates/repairs the local owner account.
+- Starts backend + frontend in the foreground.
+- Default local owner credentials:
+  - email: `owner@local.test`
+  - password: `OwnerDev!123`
+  - override with `DEV_OWNER_EMAIL`, `DEV_OWNER_PASSWORD`, `DEV_OWNER_USERNAME`, `DEV_OWNER_DISPLAY_NAME`.
+
 ### Option B: Docker Compose stack (prod-like)
 
 ```bash
@@ -98,12 +113,31 @@ make env-dev
 make env-prod
 make env-status
 make env-doctor
+make dev-owner
 make lint
 make test
 make docker-up
 make docker-down
 make compose-smoke
 ```
+
+## Sameday mirror first sync (ops runbook)
+
+The checkout locker picker uses the local Sameday mirror snapshot from the database.
+
+First-time initialization:
+
+1. Sign in as owner/admin and open `Admin -> Ops` (`/admin/ops`).
+2. In the Sameday mirror card, click `Run sync now`.
+3. Confirm expected status:
+   - latest run = `success`
+   - locker count > `0`
+   - stale = `false`
+
+If stale appears:
+
+- `stale=true` + previous successful snapshot: checkout still serves the last snapshot.
+- `stale=true` + no successful snapshot: Sameday locker queries can return `503` until a successful sync completes.
 
 Frontend-only:
 

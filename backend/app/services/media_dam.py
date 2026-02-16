@@ -39,6 +39,7 @@ from app.models.media import (
     MediaJob,
     MediaJobEvent,
     MediaJobRetryPolicy,
+    MediaJobRetryPolicyEvent,
     MediaJobStatus,
     MediaJobTag,
     MediaJobTagLink,
@@ -59,7 +60,12 @@ from app.schemas.media import (
     MediaCollectionUpsertRequest,
     MediaJobEventRead,
     MediaJobRead,
+    MediaRetryPolicyEventRead,
+    MediaRetryPolicyPresetRead,
+    MediaRetryPolicyPresetsResponse,
     MediaRetryPolicyRead,
+    MediaRetryPolicyRollbackRequest,
+    MediaRetryPolicySnapshotRead,
     MediaRetryPolicyUpdateRequest,
     MediaJobTriageStateLiteral,
     MediaTelemetryResponse,
@@ -89,6 +95,13 @@ DEFAULT_RETRY_POLICIES: dict[MediaJobType, dict[str, Any]] = {
     MediaJobType.ai_tag: {"max_attempts": 4, "schedule": [60, 300, 900, 1800], "jitter_ratio": 0.20, "enabled": True},
     MediaJobType.duplicate_scan: {"max_attempts": 4, "schedule": [120, 600, 1800], "jitter_ratio": 0.20, "enabled": True},
     MediaJobType.usage_reconcile: {"max_attempts": 3, "schedule": [300, 900, 1800], "jitter_ratio": 0.10, "enabled": True},
+}
+
+RETRY_POLICY_PRESET_KEYS: tuple[str, ...] = ("factory_default", "last_change", "known_good")
+RETRY_POLICY_PRESET_LABELS: dict[str, str] = {
+    "factory_default": "Factory default",
+    "last_change": "Last change",
+    "known_good": "Known good",
 }
 
 PROFILE_DIMENSIONS: dict[str, tuple[int, int]] = {
@@ -577,6 +590,99 @@ def _resolved_policy_to_snapshot(policy: RetryPolicyResolved) -> dict[str, Any]:
     }
 
 
+def _policy_snapshot_from_raw(raw: dict[str, Any], *, job_type: MediaJobType) -> RetryPolicyResolved:
+    base = _default_retry_policy(job_type)
+    try:
+        attempts = int(raw.get("max_attempts") if "max_attempts" in raw else base.max_attempts)
+    except Exception:
+        attempts = base.max_attempts
+    attempts = max(1, min(MAX_RETRY_POLICY_ATTEMPTS, attempts))
+    schedule_raw = raw.get("schedule")
+    schedule = _validate_schedule(schedule_raw if isinstance(schedule_raw, list) else list(base.schedule))
+    try:
+        jitter = float(raw.get("jitter_ratio") if "jitter_ratio" in raw else base.jitter_ratio)
+    except Exception:
+        jitter = base.jitter_ratio
+    jitter = max(0.0, min(1.0, jitter))
+    enabled = bool(raw.get("enabled", base.enabled))
+    version_ts = str(raw.get("version_ts") or base.version_ts)
+    return RetryPolicyResolved(
+        max_attempts=attempts,
+        schedule=schedule,
+        jitter_ratio=jitter,
+        enabled=enabled,
+        version_ts=version_ts,
+    )
+
+
+def _snapshot_to_schema(policy: RetryPolicyResolved) -> MediaRetryPolicySnapshotRead:
+    return MediaRetryPolicySnapshotRead(
+        max_attempts=int(policy.max_attempts),
+        backoff_schedule_seconds=[int(v) for v in policy.schedule],
+        jitter_ratio=float(policy.jitter_ratio),
+        enabled=bool(policy.enabled),
+        version_ts=str(policy.version_ts),
+    )
+
+
+def _serialize_policy_snapshot_json(policy: RetryPolicyResolved) -> str:
+    return json.dumps(_resolved_policy_to_snapshot(policy), separators=(",", ":"), ensure_ascii=False)
+
+
+def _deserialize_policy_snapshot_json(value: str | None, *, job_type: MediaJobType) -> RetryPolicyResolved:
+    try:
+        raw = json.loads(value or "{}")
+    except Exception:
+        raw = {}
+    if not isinstance(raw, dict):
+        raw = {}
+    return _policy_snapshot_from_raw(raw, job_type=job_type)
+
+
+def retry_policy_event_to_read(event: MediaJobRetryPolicyEvent) -> MediaRetryPolicyEventRead:
+    before = _deserialize_policy_snapshot_json(event.before_policy_json, job_type=event.job_type)
+    after = _deserialize_policy_snapshot_json(event.after_policy_json, job_type=event.job_type)
+    preset_key = str(event.preset_key or "").strip() or None
+    if preset_key not in RETRY_POLICY_PRESET_KEYS:
+        preset_key = None
+    return MediaRetryPolicyEventRead(
+        id=event.id,
+        job_type=event.job_type.value,
+        action=event.action,
+        actor_user_id=event.actor_user_id,
+        preset_key=cast(Any, preset_key),
+        before_policy=_snapshot_to_schema(before),
+        after_policy=_snapshot_to_schema(after),
+        note=event.note,
+        created_at=event.created_at,
+    )
+
+
+async def _record_retry_policy_event(
+    session: AsyncSession,
+    *,
+    job_type: MediaJobType,
+    action: str,
+    actor_user_id: UUID | None,
+    before_policy: RetryPolicyResolved,
+    after_policy: RetryPolicyResolved,
+    preset_key: str | None = None,
+    note: str | None = None,
+) -> MediaJobRetryPolicyEvent:
+    row = MediaJobRetryPolicyEvent(
+        job_type=job_type,
+        action=(action or "").strip()[:40] or "update",
+        actor_user_id=actor_user_id,
+        preset_key=(preset_key or "").strip()[:32] or None,
+        before_policy_json=_serialize_policy_snapshot_json(before_policy),
+        after_policy_json=_serialize_policy_snapshot_json(after_policy),
+        note=(note or "").strip() or None,
+    )
+    session.add(row)
+    await session.flush()
+    return row
+
+
 def _retry_policy_to_read(job_type: MediaJobType, policy: RetryPolicyResolved, row: MediaJobRetryPolicy | None) -> MediaRetryPolicyRead:
     created_at = row.created_at if row is not None else _now()
     updated_at = row.updated_at if row is not None else created_at
@@ -669,20 +775,28 @@ async def upsert_retry_policy(
         )
         session.add(row)
         await session.flush()
-    current = _policy_row_to_resolved(row, job_type=parsed_job_type)
-    resolved = _normalize_retry_policy_fields(
+    before_policy = _policy_row_to_resolved(row, job_type=parsed_job_type)
+    after_policy = _normalize_retry_policy_fields(
         max_attempts=payload.max_attempts,
         schedule=payload.backoff_schedule_seconds,
         jitter_ratio=payload.jitter_ratio,
         enabled=payload.enabled,
-        fallback=current,
+        fallback=before_policy,
     )
-    row.max_attempts = resolved.max_attempts
-    row.backoff_schedule_json = json.dumps(_validate_schedule(resolved.schedule), separators=(",", ":"))
-    row.jitter_ratio = resolved.jitter_ratio
-    row.enabled = resolved.enabled
+    row.max_attempts = after_policy.max_attempts
+    row.backoff_schedule_json = json.dumps(_validate_schedule(after_policy.schedule), separators=(",", ":"))
+    row.jitter_ratio = after_policy.jitter_ratio
+    row.enabled = after_policy.enabled
     row.updated_by_user_id = updated_by_user_id
     session.add(row)
+    await _record_retry_policy_event(
+        session,
+        job_type=parsed_job_type,
+        action="update",
+        actor_user_id=updated_by_user_id,
+        before_policy=before_policy,
+        after_policy=after_policy,
+    )
     await session.commit()
     await session.refresh(row)
     return _retry_policy_to_read(parsed_job_type, _policy_row_to_resolved(row, job_type=parsed_job_type), row)
@@ -697,6 +811,7 @@ async def reset_retry_policy(
     parsed_job_type = _parse_job_type(job_type)
     fallback = _default_retry_policy(parsed_job_type)
     row = await session.scalar(select(MediaJobRetryPolicy).where(MediaJobRetryPolicy.job_type == parsed_job_type))
+    before_policy = _policy_row_to_resolved(row, job_type=parsed_job_type)
     if row is None:
         row = MediaJobRetryPolicy(job_type=parsed_job_type)
     row.max_attempts = fallback.max_attempts
@@ -705,16 +820,277 @@ async def reset_retry_policy(
     row.enabled = fallback.enabled
     row.updated_by_user_id = updated_by_user_id
     session.add(row)
+    await _record_retry_policy_event(
+        session,
+        job_type=parsed_job_type,
+        action="reset",
+        actor_user_id=updated_by_user_id,
+        before_policy=before_policy,
+        after_policy=fallback,
+        preset_key="factory_default",
+    )
     await session.commit()
     await session.refresh(row)
     return _retry_policy_to_read(parsed_job_type, _policy_row_to_resolved(row, job_type=parsed_job_type), row)
 
 
 async def reset_all_retry_policies(session: AsyncSession, *, updated_by_user_id: UUID | None) -> list[MediaRetryPolicyRead]:
-    out: list[MediaRetryPolicyRead] = []
+    rows = (
+        await session.execute(select(MediaJobRetryPolicy).order_by(MediaJobRetryPolicy.job_type.asc()))
+    ).scalars().all()
+    by_type = {row.job_type: row for row in rows}
     for job_type in MediaJobType:
-        out.append(await reset_retry_policy(session, job_type=job_type, updated_by_user_id=updated_by_user_id))
-    return out
+        row = by_type.get(job_type)
+        before_policy = _policy_row_to_resolved(row, job_type=job_type)
+        fallback = _default_retry_policy(job_type)
+        if row is None:
+            row = MediaJobRetryPolicy(job_type=job_type)
+            session.add(row)
+            await session.flush()
+        row.max_attempts = fallback.max_attempts
+        row.backoff_schedule_json = json.dumps(fallback.schedule, separators=(",", ":"))
+        row.jitter_ratio = fallback.jitter_ratio
+        row.enabled = fallback.enabled
+        row.updated_by_user_id = updated_by_user_id
+        session.add(row)
+        await _record_retry_policy_event(
+            session,
+            job_type=job_type,
+            action="reset_all",
+            actor_user_id=updated_by_user_id,
+            before_policy=before_policy,
+            after_policy=fallback,
+            preset_key="factory_default",
+        )
+    await session.commit()
+    return await list_retry_policies(session)
+
+
+def _apply_resolved_policy_to_row(
+    row: MediaJobRetryPolicy,
+    *,
+    policy: RetryPolicyResolved,
+    updated_by_user_id: UUID | None,
+) -> None:
+    row.max_attempts = int(policy.max_attempts)
+    row.backoff_schedule_json = json.dumps(_validate_schedule(policy.schedule), separators=(",", ":"))
+    row.jitter_ratio = float(policy.jitter_ratio)
+    row.enabled = bool(policy.enabled)
+    row.updated_by_user_id = updated_by_user_id
+
+
+async def list_retry_policy_history(
+    session: AsyncSession,
+    *,
+    job_type: str | MediaJobType | None = None,
+    page: int = 1,
+    limit: int = 20,
+) -> tuple[list[MediaRetryPolicyEventRead], dict[str, int]]:
+    page = max(1, int(page or 1))
+    limit = max(1, min(100, int(limit or 20)))
+    clauses: list[ColumnElement[bool]] = []
+    parsed_job_type: MediaJobType | None = None
+    if job_type:
+        parsed_job_type = _parse_job_type(job_type)
+        clauses.append(MediaJobRetryPolicyEvent.job_type == parsed_job_type)
+
+    stmt = select(MediaJobRetryPolicyEvent)
+    count_stmt = select(func.count()).select_from(MediaJobRetryPolicyEvent)
+    if clauses:
+        stmt = stmt.where(and_(*clauses))
+        count_stmt = count_stmt.where(and_(*clauses))
+    stmt = (
+        stmt.order_by(MediaJobRetryPolicyEvent.created_at.desc(), MediaJobRetryPolicyEvent.id.desc())
+        .offset((page - 1) * limit)
+        .limit(limit)
+    )
+    rows = (await session.execute(stmt)).scalars().all()
+    total_items = int((await session.scalar(count_stmt)) or 0)
+    total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
+    return [retry_policy_event_to_read(row) for row in rows], {
+        "total_items": total_items,
+        "total_pages": total_pages,
+        "page": page,
+        "limit": limit,
+    }
+
+
+def _preset_to_read(
+    *,
+    preset_key: str,
+    policy: RetryPolicyResolved,
+    source_event_id: UUID | None = None,
+    fallback_used: bool = False,
+    updated_at: datetime | None = None,
+) -> MediaRetryPolicyPresetRead:
+    return MediaRetryPolicyPresetRead(
+        preset_key=cast(Any, preset_key),
+        label=RETRY_POLICY_PRESET_LABELS.get(preset_key, preset_key.replace("_", " ").title()),
+        policy=_snapshot_to_schema(policy),
+        source_event_id=source_event_id,
+        fallback_used=fallback_used,
+        updated_at=updated_at,
+    )
+
+
+async def get_retry_policy_presets(
+    session: AsyncSession,
+    *,
+    job_type: str | MediaJobType,
+) -> MediaRetryPolicyPresetsResponse:
+    parsed_job_type = _parse_job_type(job_type)
+    default_policy = _default_retry_policy(parsed_job_type)
+
+    # known_good uses the latest explicit marker.
+    known_good_event = await session.scalar(
+        select(MediaJobRetryPolicyEvent)
+        .where(
+            MediaJobRetryPolicyEvent.job_type == parsed_job_type,
+            MediaJobRetryPolicyEvent.action == "mark_known_good",
+        )
+        .order_by(MediaJobRetryPolicyEvent.created_at.desc(), MediaJobRetryPolicyEvent.id.desc())
+    )
+    if known_good_event is not None:
+        known_good_policy = _deserialize_policy_snapshot_json(
+            known_good_event.after_policy_json,
+            job_type=parsed_job_type,
+        )
+        known_good_preset = _preset_to_read(
+            preset_key="known_good",
+            policy=known_good_policy,
+            source_event_id=known_good_event.id,
+            fallback_used=False,
+            updated_at=known_good_event.created_at,
+        )
+    else:
+        known_good_preset = _preset_to_read(
+            preset_key="known_good",
+            policy=default_policy,
+            fallback_used=True,
+        )
+
+    # last_change reverts to the "before" snapshot of the latest mutating event.
+    last_change_event = await session.scalar(
+        select(MediaJobRetryPolicyEvent)
+        .where(
+            MediaJobRetryPolicyEvent.job_type == parsed_job_type,
+            MediaJobRetryPolicyEvent.action.in_(("update", "reset", "reset_all", "rollback")),
+        )
+        .order_by(MediaJobRetryPolicyEvent.created_at.desc(), MediaJobRetryPolicyEvent.id.desc())
+    )
+    if last_change_event is not None:
+        last_change_policy = _deserialize_policy_snapshot_json(
+            last_change_event.before_policy_json,
+            job_type=parsed_job_type,
+        )
+        last_change_preset = _preset_to_read(
+            preset_key="last_change",
+            policy=last_change_policy,
+            source_event_id=last_change_event.id,
+            fallback_used=False,
+            updated_at=last_change_event.created_at,
+        )
+    else:
+        last_change_preset = _preset_to_read(
+            preset_key="last_change",
+            policy=default_policy,
+            fallback_used=True,
+        )
+
+    return MediaRetryPolicyPresetsResponse(
+        job_type=parsed_job_type.value,
+        items=[
+            _preset_to_read(preset_key="factory_default", policy=default_policy),
+            last_change_preset,
+            known_good_preset,
+        ],
+    )
+
+
+async def mark_retry_policy_known_good(
+    session: AsyncSession,
+    *,
+    job_type: str | MediaJobType,
+    actor_user_id: UUID | None,
+    note: str | None = None,
+) -> MediaRetryPolicyEventRead:
+    parsed_job_type = _parse_job_type(job_type)
+    row = await session.scalar(select(MediaJobRetryPolicy).where(MediaJobRetryPolicy.job_type == parsed_job_type))
+    current = _policy_row_to_resolved(row, job_type=parsed_job_type)
+    event = await _record_retry_policy_event(
+        session,
+        job_type=parsed_job_type,
+        action="mark_known_good",
+        actor_user_id=actor_user_id,
+        before_policy=current,
+        after_policy=current,
+        preset_key="known_good",
+        note=note,
+    )
+    await session.commit()
+    await session.refresh(event)
+    return retry_policy_event_to_read(event)
+
+
+async def rollback_retry_policy(
+    session: AsyncSession,
+    *,
+    job_type: str | MediaJobType,
+    payload: MediaRetryPolicyRollbackRequest,
+    actor_user_id: UUID | None,
+) -> MediaRetryPolicyRead:
+    parsed_job_type = _parse_job_type(job_type)
+    row = await session.scalar(select(MediaJobRetryPolicy).where(MediaJobRetryPolicy.job_type == parsed_job_type))
+    before_policy = _policy_row_to_resolved(row, job_type=parsed_job_type)
+
+    target_policy: RetryPolicyResolved
+    target_preset_key: str | None = payload.preset_key
+    if payload.event_id:
+        event = await session.scalar(
+            select(MediaJobRetryPolicyEvent).where(
+                MediaJobRetryPolicyEvent.id == payload.event_id,
+                MediaJobRetryPolicyEvent.job_type == parsed_job_type,
+            )
+        )
+        if event is None:
+            raise ValueError("Retry policy history event not found")
+        target_policy = _deserialize_policy_snapshot_json(event.after_policy_json, job_type=parsed_job_type)
+        target_preset_key = None
+    else:
+        presets = await get_retry_policy_presets(session, job_type=parsed_job_type)
+        preset = next((item for item in presets.items if item.preset_key == payload.preset_key), None)
+        if preset is None:
+            raise ValueError("Unknown retry policy preset")
+        target_policy = _policy_snapshot_from_raw(
+            {
+                "max_attempts": preset.policy.max_attempts,
+                "schedule": list(preset.policy.backoff_schedule_seconds),
+                "jitter_ratio": preset.policy.jitter_ratio,
+                "enabled": preset.policy.enabled,
+                "version_ts": preset.policy.version_ts or "preset",
+            },
+            job_type=parsed_job_type,
+        )
+
+    if row is None:
+        row = MediaJobRetryPolicy(job_type=parsed_job_type)
+        session.add(row)
+        await session.flush()
+    _apply_resolved_policy_to_row(row, policy=target_policy, updated_by_user_id=actor_user_id)
+    session.add(row)
+    await _record_retry_policy_event(
+        session,
+        job_type=parsed_job_type,
+        action="rollback",
+        actor_user_id=actor_user_id,
+        before_policy=before_policy,
+        after_policy=target_policy,
+        preset_key=target_preset_key,
+        note=payload.note,
+    )
+    await session.commit()
+    await session.refresh(row)
+    return _retry_policy_to_read(parsed_job_type, _policy_row_to_resolved(row, job_type=parsed_job_type), row)
 
 
 async def _apply_job_tag_changes(

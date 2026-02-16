@@ -122,7 +122,9 @@ showing what is already implemented.
   - Evidence: `backend/alembic/versions/0154_media_job_retry_dead_letter_v2.py`, `backend/app/models/media.py`, `backend/app/services/media_dam.py`, `backend/app/api/v1/content.py`, `backend/app/workers/media_worker.py`, `backend/app/schemas/media.py`, `frontend/src/app/core/admin.service.ts`, `frontend/src/app/pages/admin/shared/dam-asset-library.component.ts`, `frontend/src/app/pages/admin/ops/admin-ops.component.ts`
 - [x] DAM phase 3.1: introduce jittered backoff and per-job-type retry policy overrides.
   - Evidence: `backend/alembic/versions/0155_media_job_retry_policy_overrides.py`, `backend/app/models/media.py`, `backend/app/services/media_dam.py`, `backend/app/api/v1/content.py`, `backend/app/schemas/media.py`, `frontend/src/app/core/admin.service.ts`, `frontend/src/app/pages/admin/shared/dam-asset-library.component.ts`, `backend/tests/test_media_dam_api.py`, `frontend/src/app/pages/admin/shared/dam-asset-library.component.spec.ts`
-- [ ] DAM phase 3.2: add policy change history timeline and one-click rollback presets for retry policy edits.
+- [x] DAM phase 3.2: add policy change history timeline and one-click rollback presets for retry policy edits.
+  - Evidence: `backend/alembic/versions/0157_media_retry_policy_history_events.py`, `backend/app/models/media.py`, `backend/app/services/media_dam.py`, `backend/app/api/v1/content.py`, `backend/app/schemas/media.py`, `frontend/src/app/core/admin.service.ts`, `frontend/src/app/pages/admin/shared/dam-asset-library.component.ts`, `backend/tests/test_media_dam_api.py`, `frontend/src/app/pages/admin/shared/dam-asset-library.component.spec.ts`
+- [ ] DAM phase 3.3: add diff visualization for policy history entries and side-by-side rollback preview before apply.
 - [x] Admin Content IA: add a dedicated `/admin/content/media` workspace between Scheduling and Settings for site-wide media operations.
   - Evidence: `frontend/src/app/app.routes.ts`, `frontend/src/app/pages/admin/content/admin-content-layout.component.ts`, `frontend/src/app/pages/admin/content/admin-content-media.component.ts`
 - [x] Media library: add sorting/date filters, asset details drawer, and rename action for uploaded images.
@@ -225,6 +227,8 @@ showing what is already implemented.
 - [x] Shipping: mirror Sameday Easybox lockers locally and serve checkout map search from DB snapshots (monthly sync + manual ops trigger).
   - Evidence: `backend/alembic/versions/0156_sameday_easybox_mirror.py`, `backend/app/services/sameday_easybox_mirror.py`, `backend/app/services/sameday_easybox_sync_scheduler.py`, `backend/app/services/lockers.py`, `backend/app/api/v1/shipping.py`, `backend/app/api/v1/shipping_admin.py`, `frontend/src/app/shared/locker-picker.component.ts`, `frontend/src/app/pages/admin/ops/admin-ops.component.ts`
   - Evidence (tests): `backend/tests/test_sameday_easybox_mirror.py`, `frontend/src/app/shared/locker-picker.component.spec.ts`
+- [x] Shipping ops docs: add Sameday mirror first-sync and stale-data troubleshooting runbook snippet (README + production docs).
+  - Evidence: `README.md`, `docs/PRODUCTION.md`, `infra/prod/README.md`
 - [ ] Shipping mirror hardening: add schema-drift canary alerts for upstream payload changes and repeated Cloudflare/captcha crawl failures.
 - [x] Coupons v2: validate marketing opt-in before committing coupon changes when `send_email=true` (avoid partial success).
 - [x] Email: add RFC 8058 one-click unsubscribe headers (`List-Unsubscribe-Post`).

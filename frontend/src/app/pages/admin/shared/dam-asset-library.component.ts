@@ -16,6 +16,10 @@ import {
   MediaJobTriageState,
   MediaJobType,
   MediaRetryPolicy,
+  MediaRetryPolicyEvent,
+  MediaRetryPolicyPreset,
+  MediaRetryPolicyPresetKey,
+  MediaRetryPolicySnapshot,
   MediaTelemetryResponse
 } from '../../../core/admin.service';
 import { AuthService } from '../../../core/auth.service';
@@ -450,6 +454,98 @@ type QueueMode = 'pipeline' | 'dead_letter';
                 >
                   Reset
                 </button>
+                <button
+                  type="button"
+                  class="rounded border border-slate-300 px-2 py-1 font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100"
+                  [disabled]="!canEditRetryPolicies()"
+                  (click)="markRetryPolicyKnownGood(policy.job_type)"
+                >
+                  Mark known good
+                </button>
+                <button
+                  type="button"
+                  class="rounded border border-slate-300 px-2 py-1 font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100"
+                  [disabled]="!canEditRetryPolicies()"
+                  (click)="rollbackRetryPolicyPreset(policy.job_type, 'factory_default')"
+                >
+                  Factory default
+                </button>
+                <button
+                  type="button"
+                  class="rounded border border-slate-300 px-2 py-1 font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100"
+                  [disabled]="!canEditRetryPolicies()"
+                  (click)="rollbackRetryPolicyPreset(policy.job_type, 'last_change')"
+                >
+                  Last change
+                </button>
+                <button
+                  type="button"
+                  class="rounded border border-slate-300 px-2 py-1 font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100"
+                  [disabled]="!canEditRetryPolicies()"
+                  (click)="rollbackRetryPolicyPreset(policy.job_type, 'known_good')"
+                >
+                  Known good
+                </button>
+                <button
+                  type="button"
+                  class="rounded border border-slate-300 px-2 py-1 font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100"
+                  (click)="toggleRetryPolicyHistory(policy.job_type)"
+                >
+                  {{ isRetryPolicyHistoryOpen(policy.job_type) ? 'Hide history' : 'History' }}
+                </button>
+              </div>
+              <div
+                *ngIf="isRetryPolicyHistoryOpen(policy.job_type)"
+                class="grid gap-2 rounded border border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-900/40"
+              >
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                  Presets: {{ retryPolicyPresetSummary(policy.job_type) }}
+                </p>
+                <p *ngIf="retryPolicyHistoryError(policy.job_type)" class="text-xs text-rose-700 dark:text-rose-300">
+                  {{ retryPolicyHistoryError(policy.job_type) }}
+                </p>
+                <p *ngIf="retryPolicyHistoryLoading(policy.job_type)" class="text-xs text-slate-500 dark:text-slate-400">
+                  Loading policy history…
+                </p>
+                <p
+                  *ngIf="!retryPolicyHistoryLoading(policy.job_type) && retryPolicyHistoryItems(policy.job_type).length === 0"
+                  class="text-xs text-slate-500 dark:text-slate-400"
+                >
+                  No policy events yet.
+                </p>
+                <div
+                  *ngFor="let evt of retryPolicyHistoryItems(policy.job_type)"
+                  class="rounded border border-slate-200 bg-slate-50 p-2 dark:border-slate-700 dark:bg-slate-950/20"
+                >
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <p class="text-xs font-semibold text-slate-900 dark:text-slate-50">
+                      {{ evt.action }} <span *ngIf="evt.preset_key">· {{ evt.preset_key }}</span>
+                    </p>
+                    <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                      {{ evt.created_at | date: 'short' }} · actor {{ evt.actor_user_id || 'system' }}
+                    </p>
+                  </div>
+                  <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                    {{ formatPolicySnapshot(evt.before_policy) }} → {{ formatPolicySnapshot(evt.after_policy) }}
+                  </p>
+                  <p *ngIf="evt.note" class="text-xs text-slate-700 dark:text-slate-200">{{ evt.note }}</p>
+                  <button
+                    *ngIf="canEditRetryPolicies()"
+                    type="button"
+                    class="mt-1 text-xs text-indigo-700 underline dark:text-indigo-300"
+                    (click)="rollbackRetryPolicyEvent(policy.job_type, evt.id)"
+                  >
+                    Rollback to this revision
+                  </button>
+                </div>
+                <button
+                  *ngIf="retryPolicyHistoryHasMore(policy.job_type)"
+                  type="button"
+                  class="justify-self-start rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100"
+                  (click)="loadMoreRetryPolicyHistory(policy.job_type)"
+                >
+                  Load more
+                </button>
               </div>
             </div>
           </div>
@@ -776,6 +872,12 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
     { max_attempts: number; scheduleText: string; jitter_ratio: number; enabled: boolean }
   > = {};
   private retryPolicyRowErrors: Record<string, string> = {};
+  private retryPolicyHistories: Record<string, MediaRetryPolicyEvent[]> = {};
+  private retryPolicyHistoryMeta: Record<string, { page: number; total_pages: number }> = {};
+  private retryPolicyHistoryLoadingByType: Record<string, boolean> = {};
+  private retryPolicyHistoryErrorByType: Record<string, string> = {};
+  private retryPolicyPresetsByType: Record<string, MediaRetryPolicyPreset[]> = {};
+  private readonly retryPolicyHistoryOpen = signal<Set<string>>(new Set());
 
   ngOnInit(): void {
     this.reload();
@@ -928,6 +1030,12 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
         }
         this.retryPolicyDrafts = drafts;
         this.retryPolicyRowErrors = {};
+        this.retryPolicyHistories = {};
+        this.retryPolicyHistoryMeta = {};
+        this.retryPolicyHistoryLoadingByType = {};
+        this.retryPolicyHistoryErrorByType = {};
+        this.retryPolicyPresetsByType = {};
+        this.retryPolicyHistoryOpen.set(new Set<string>());
         this.retryPoliciesLoading.set(false);
       },
       error: (err) => {
@@ -1030,13 +1138,11 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
           jitter_ratio: jitter
         })
       );
-      this.retryPolicies.set(this.retryPolicies().map((row) => (row.job_type === saved.job_type ? saved : row)));
-      this.retryPolicyDrafts[saved.job_type] = {
-        max_attempts: saved.max_attempts,
-        scheduleText: (saved.backoff_schedule_seconds || []).join(','),
-        jitter_ratio: saved.jitter_ratio,
-        enabled: saved.enabled
-      };
+      this.applyRetryPolicySavedState(saved);
+      if (this.isRetryPolicyHistoryOpen(saved.job_type)) {
+        await this.loadRetryPolicyPresets(saved.job_type);
+        await this.loadRetryPolicyHistory(saved.job_type, false);
+      }
       this.toast.success(`Retry policy updated for ${saved.job_type}.`);
     } catch (err) {
       this.retryPolicyRowErrors[jobType] = (err as any)?.error?.detail || 'Failed to update retry policy.';
@@ -1048,14 +1154,11 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
     if (!this.canEditRetryPolicies()) return;
     try {
       const saved = await firstValueFrom(this.admin.resetMediaRetryPolicy(jobType));
-      this.retryPolicies.set(this.retryPolicies().map((row) => (row.job_type === saved.job_type ? saved : row)));
-      this.retryPolicyDrafts[saved.job_type] = {
-        max_attempts: saved.max_attempts,
-        scheduleText: (saved.backoff_schedule_seconds || []).join(','),
-        jitter_ratio: saved.jitter_ratio,
-        enabled: saved.enabled
-      };
-      this.retryPolicyRowErrors[jobType] = '';
+      this.applyRetryPolicySavedState(saved);
+      if (this.isRetryPolicyHistoryOpen(saved.job_type)) {
+        await this.loadRetryPolicyPresets(saved.job_type);
+        await this.loadRetryPolicyHistory(saved.job_type, false);
+      }
       this.toast.success(`Retry policy reset for ${saved.job_type}.`);
     } catch (err) {
       this.retryPolicyRowErrors[jobType] = (err as any)?.error?.detail || 'Failed to reset retry policy.';
@@ -1080,10 +1183,111 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
       }
       this.retryPolicyDrafts = drafts;
       this.retryPolicyRowErrors = {};
+      this.retryPolicyHistories = {};
+      this.retryPolicyHistoryMeta = {};
+      this.retryPolicyHistoryLoadingByType = {};
+      this.retryPolicyHistoryErrorByType = {};
+      this.retryPolicyPresetsByType = {};
+      this.retryPolicyHistoryOpen.set(new Set<string>());
       this.toast.success('All retry policies were reset to defaults.');
     } catch (err) {
       this.retryPoliciesError.set((err as any)?.error?.detail || 'Failed to reset retry policies.');
       this.toast.error(this.retryPoliciesError() || 'Failed to reset retry policies.');
+    }
+  }
+
+  isRetryPolicyHistoryOpen(jobType: MediaJobType): boolean {
+    return this.retryPolicyHistoryOpen().has(jobType);
+  }
+
+  toggleRetryPolicyHistory(jobType: MediaJobType): void {
+    const next = new Set(this.retryPolicyHistoryOpen());
+    if (next.has(jobType)) {
+      next.delete(jobType);
+      this.retryPolicyHistoryOpen.set(next);
+      return;
+    }
+    next.add(jobType);
+    this.retryPolicyHistoryOpen.set(next);
+    void this.loadRetryPolicyPresets(jobType);
+    void this.loadRetryPolicyHistory(jobType, false);
+  }
+
+  retryPolicyHistoryLoading(jobType: MediaJobType): boolean {
+    return !!this.retryPolicyHistoryLoadingByType[jobType];
+  }
+
+  retryPolicyHistoryError(jobType: MediaJobType): string | null {
+    return this.retryPolicyHistoryErrorByType[jobType] || null;
+  }
+
+  retryPolicyHistoryItems(jobType: MediaJobType): MediaRetryPolicyEvent[] {
+    return this.retryPolicyHistories[jobType] || [];
+  }
+
+  retryPolicyHistoryHasMore(jobType: MediaJobType): boolean {
+    const meta = this.retryPolicyHistoryMeta[jobType];
+    if (!meta) return false;
+    return meta.page < meta.total_pages;
+  }
+
+  retryPolicyPresetSummary(jobType: MediaJobType): string {
+    const items = this.retryPolicyPresetsByType[jobType] || [];
+    if (!items.length) return 'loading…';
+    return items
+      .map((preset) => `${preset.label}${preset.fallback_used ? ' (fallback)' : ''}`)
+      .join(' · ');
+  }
+
+  formatPolicySnapshot(snapshot: MediaRetryPolicySnapshot): string {
+    const schedule = (snapshot.backoff_schedule_seconds || []).join(',');
+    return `${snapshot.max_attempts} tries · [${schedule}] · jitter ${Number(snapshot.jitter_ratio).toFixed(2)} · ${snapshot.enabled ? 'on' : 'off'}`;
+  }
+
+  async loadMoreRetryPolicyHistory(jobType: MediaJobType): Promise<void> {
+    await this.loadRetryPolicyHistory(jobType, true);
+  }
+
+  async markRetryPolicyKnownGood(jobType: MediaJobType): Promise<void> {
+    if (!this.canEditRetryPolicies()) return;
+    try {
+      await firstValueFrom(this.admin.markMediaRetryPolicyKnownGood(jobType));
+      this.toast.success(`Marked current policy as known good for ${jobType}.`);
+      await this.loadRetryPolicyPresets(jobType);
+      await this.loadRetryPolicyHistory(jobType, false);
+    } catch (err) {
+      this.retryPolicyRowErrors[jobType] = (err as any)?.error?.detail || 'Failed to mark policy as known good.';
+      this.toast.error(this.retryPolicyRowErrors[jobType]);
+    }
+  }
+
+  async rollbackRetryPolicyPreset(jobType: MediaJobType, presetKey: MediaRetryPolicyPresetKey): Promise<void> {
+    if (!this.canEditRetryPolicies()) return;
+    if (!window.confirm(`Rollback ${jobType} retry policy to preset "${presetKey}"?`)) return;
+    try {
+      const saved = await firstValueFrom(this.admin.rollbackMediaRetryPolicy(jobType, { preset_key: presetKey }));
+      this.applyRetryPolicySavedState(saved);
+      this.toast.success(`Rolled back ${jobType} policy to ${presetKey}.`);
+      await this.loadRetryPolicyPresets(jobType);
+      await this.loadRetryPolicyHistory(jobType, false);
+    } catch (err) {
+      this.retryPolicyRowErrors[jobType] = (err as any)?.error?.detail || 'Failed to rollback retry policy.';
+      this.toast.error(this.retryPolicyRowErrors[jobType]);
+    }
+  }
+
+  async rollbackRetryPolicyEvent(jobType: MediaJobType, eventId: string): Promise<void> {
+    if (!this.canEditRetryPolicies()) return;
+    if (!window.confirm('Rollback retry policy to this historical revision?')) return;
+    try {
+      const saved = await firstValueFrom(this.admin.rollbackMediaRetryPolicy(jobType, { event_id: eventId }));
+      this.applyRetryPolicySavedState(saved);
+      this.toast.success(`Rolled back ${jobType} policy to selected revision.`);
+      await this.loadRetryPolicyPresets(jobType);
+      await this.loadRetryPolicyHistory(jobType, false);
+    } catch (err) {
+      this.retryPolicyRowErrors[jobType] = (err as any)?.error?.detail || 'Failed to rollback retry policy revision.';
+      this.toast.error(this.retryPolicyRowErrors[jobType]);
     }
   }
 
@@ -1558,6 +1762,58 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
       .map((token) => Number(token.trim()))
       .filter((num) => Number.isFinite(num) && Number.isInteger(num) && num > 0)
       .slice(0, 20);
+  }
+
+  private applyRetryPolicySavedState(saved: MediaRetryPolicy): void {
+    this.retryPolicies.set(this.retryPolicies().map((row) => (row.job_type === saved.job_type ? saved : row)));
+    this.retryPolicyDrafts[saved.job_type] = {
+      max_attempts: saved.max_attempts,
+      scheduleText: (saved.backoff_schedule_seconds || []).join(','),
+      jitter_ratio: saved.jitter_ratio,
+      enabled: saved.enabled
+    };
+    this.retryPolicyRowErrors[saved.job_type] = '';
+  }
+
+  private async loadRetryPolicyPresets(jobType: MediaJobType): Promise<void> {
+    try {
+      const res = await firstValueFrom(this.admin.getMediaRetryPolicyPresets(jobType));
+      this.retryPolicyPresetsByType[jobType] = (res.items || []).slice();
+    } catch (err) {
+      this.retryPolicyPresetsByType[jobType] = [];
+      this.retryPolicyHistoryErrorByType[jobType] = (err as any)?.error?.detail || 'Failed to load retry policy presets.';
+    }
+  }
+
+  private async loadRetryPolicyHistory(jobType: MediaJobType, append: boolean): Promise<void> {
+    if (this.retryPolicyHistoryLoadingByType[jobType]) return;
+    const currentMeta = this.retryPolicyHistoryMeta[jobType];
+    const nextPage = append ? Math.max(1, (currentMeta?.page || 1) + 1) : 1;
+    if (append && currentMeta && currentMeta.page >= currentMeta.total_pages) return;
+    this.retryPolicyHistoryLoadingByType[jobType] = true;
+    this.retryPolicyHistoryErrorByType[jobType] = '';
+    try {
+      const res = await firstValueFrom(
+        this.admin.listMediaRetryPolicyHistory({
+          job_type: jobType,
+          page: nextPage,
+          limit: 10
+        })
+      );
+      const nextItems = res.items || [];
+      this.retryPolicyHistories[jobType] = append
+        ? [...(this.retryPolicyHistories[jobType] || []), ...nextItems]
+        : nextItems;
+      const meta = res.meta || { page: nextPage, total_pages: 1 };
+      this.retryPolicyHistoryMeta[jobType] = {
+        page: Number(meta.page || nextPage),
+        total_pages: Math.max(1, Number(meta.total_pages || 1))
+      };
+    } catch (err) {
+      this.retryPolicyHistoryErrorByType[jobType] = (err as any)?.error?.detail || 'Failed to load retry policy history.';
+    } finally {
+      this.retryPolicyHistoryLoadingByType[jobType] = false;
+    }
   }
 
   private pushJob(job: MediaJob): void {

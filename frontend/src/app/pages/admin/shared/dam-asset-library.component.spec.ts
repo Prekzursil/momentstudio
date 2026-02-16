@@ -59,6 +59,10 @@ describe('DamAssetLibraryComponent', () => {
       'listMediaJobEvents',
       'getMediaTelemetry',
       'listMediaRetryPolicies',
+      'listMediaRetryPolicyHistory',
+      'getMediaRetryPolicyPresets',
+      'rollbackMediaRetryPolicy',
+      'markMediaRetryPolicyKnownGood',
       'updateMediaRetryPolicy',
       'resetMediaRetryPolicy',
       'resetAllMediaRetryPolicies',
@@ -239,6 +243,94 @@ describe('DamAssetLibraryComponent', () => {
         ]
       })
     );
+    admin.listMediaRetryPolicyHistory.and.returnValue(
+      of({
+        items: [
+          {
+            id: 'evt-1',
+            job_type: 'ingest',
+            action: 'update',
+            actor_user_id: 'owner-1',
+            preset_key: null,
+            before_policy: {
+              max_attempts: 5,
+              backoff_schedule_seconds: [30, 120, 600, 1800],
+              jitter_ratio: 0.15,
+              enabled: true,
+              version_ts: 'seed'
+            },
+            after_policy: {
+              max_attempts: 6,
+              backoff_schedule_seconds: [10, 30, 120],
+              jitter_ratio: 0.2,
+              enabled: true,
+              version_ts: 'seed'
+            },
+            note: null,
+            created_at: '2026-02-16T03:00:00Z'
+          }
+        ],
+        meta: { total_items: 1, total_pages: 1, page: 1, limit: 10 }
+      })
+    );
+    admin.getMediaRetryPolicyPresets.and.returnValue(
+      of({
+        job_type: 'ingest',
+        items: [
+          {
+            preset_key: 'factory_default',
+            label: 'Factory default',
+            policy: {
+              max_attempts: 5,
+              backoff_schedule_seconds: [30, 120, 600, 1800],
+              jitter_ratio: 0.15,
+              enabled: true,
+              version_ts: 'seed'
+            },
+            source_event_id: null,
+            fallback_used: false,
+            updated_at: null
+          }
+        ]
+      })
+    );
+    admin.rollbackMediaRetryPolicy.and.returnValue(
+      of({
+        job_type: 'ingest',
+        max_attempts: 5,
+        backoff_schedule_seconds: [30, 120, 600, 1800],
+        jitter_ratio: 0.15,
+        enabled: true,
+        updated_by_user_id: 'owner-1',
+        created_at: '2026-02-16T00:00:00Z',
+        updated_at: '2026-02-16T04:00:00Z'
+      })
+    );
+    admin.markMediaRetryPolicyKnownGood.and.returnValue(
+      of({
+        id: 'evt-2',
+        job_type: 'ingest',
+        action: 'mark_known_good',
+        actor_user_id: 'owner-1',
+        preset_key: 'known_good',
+        before_policy: {
+          max_attempts: 5,
+          backoff_schedule_seconds: [30, 120, 600, 1800],
+          jitter_ratio: 0.15,
+          enabled: true,
+          version_ts: 'seed'
+        },
+        after_policy: {
+          max_attempts: 5,
+          backoff_schedule_seconds: [30, 120, 600, 1800],
+          jitter_ratio: 0.15,
+          enabled: true,
+          version_ts: 'seed'
+        },
+        note: null,
+        created_at: '2026-02-16T05:00:00Z'
+      })
+    );
 
     TestBed.configureTestingModule({
       imports: [DamAssetLibraryComponent],
@@ -350,6 +442,51 @@ describe('DamAssetLibraryComponent', () => {
     expect(component.canEditRetryPolicies()).toBeFalse();
     await component.saveRetryPolicy('ingest');
     expect(admin.updateMediaRetryPolicy).not.toHaveBeenCalled();
+  });
+
+  it('loads retry policy history + presets when toggling history panel', async () => {
+    const fixture = TestBed.createComponent(DamAssetLibraryComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.switchTab('queue');
+    admin.listMediaRetryPolicyHistory.calls.reset();
+    admin.getMediaRetryPolicyPresets.calls.reset();
+
+    component.toggleRetryPolicyHistory('ingest');
+    await Promise.resolve();
+
+    expect(admin.listMediaRetryPolicyHistory).toHaveBeenCalledWith({
+      job_type: 'ingest',
+      page: 1,
+      limit: 10
+    });
+    expect(admin.getMediaRetryPolicyPresets).toHaveBeenCalledWith('ingest');
+    expect(component.isRetryPolicyHistoryOpen('ingest')).toBeTrue();
+  });
+
+  it('rolls back retry policy to preset for owner/admin role', async () => {
+    spyOn(window, 'confirm').and.returnValue(true);
+    const fixture = TestBed.createComponent(DamAssetLibraryComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.switchTab('queue');
+
+    await component.rollbackRetryPolicyPreset('ingest', 'factory_default');
+
+    expect(admin.rollbackMediaRetryPolicy).toHaveBeenCalledWith('ingest', { preset_key: 'factory_default' });
+    expect(toast.success).toHaveBeenCalled();
+  });
+
+  it('marks retry policy as known good for owner/admin role', async () => {
+    const fixture = TestBed.createComponent(DamAssetLibraryComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.switchTab('queue');
+
+    await component.markRetryPolicyKnownGood('ingest');
+
+    expect(admin.markMediaRetryPolicyKnownGood).toHaveBeenCalledWith('ingest');
+    expect(toast.success).toHaveBeenCalled();
   });
 
   it('rejects invalid retry schedule input before calling API', async () => {

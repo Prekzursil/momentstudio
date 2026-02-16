@@ -95,6 +95,12 @@ Useful helpers:
 - Verify live endpoints/headers manually: `./infra/prod/verify-live.sh`
 - Print Search Console indexing checklist manually: `./infra/prod/request-indexing-checklist.sh`
 
+Sameday mirror post-deploy check:
+
+1. Open `Admin -> Ops` (`/admin/ops`).
+2. Confirm Sameday mirror status is healthy (`latest run = success`, locker count > 0, stale = false).
+3. If stale/error is shown, run `Run sync now` from the same card and re-check run history.
+
 View logs manually:
 
 ```bash

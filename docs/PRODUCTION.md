@@ -221,3 +221,36 @@ For the VPS stack (`infra/prod/`), `./infra/prod/deploy.sh` can print a ready-to
 
 The checklist prints key URLs for EN/RO (`home`, `shop`, `blog`) and a representative product URL discovered from `/sitemap.xml`,
 plus direct URL Inspection links for quick “Request indexing” actions.
+
+## 9) Sameday mirror sync runbook
+
+The Sameday Easybox/FANbox checkout picker is served from the local mirror snapshot in DB. Checkout should not depend on live upstream calls.
+
+### First-time snapshot initialization
+
+1. Sign in as owner/admin and open `Admin -> Ops` (`/admin/ops`).
+2. In the Sameday mirror card, click `Run sync now`.
+3. Verify:
+   - latest run status = `success`
+   - locker count is greater than `0`
+   - stale flag = `false`
+
+### Stale interpretation
+
+- `stale=false`: mirror is fresh; normal operation.
+- `stale=true` with prior successful snapshot:
+  - checkout continues serving the last successful snapshot.
+  - manual sync should still be triggered to refresh.
+- `stale=true` with no successful snapshot:
+  - Sameday locker endpoints can return `503`.
+  - checkout should prompt fallback delivery method until snapshot succeeds.
+
+### Recovery flow
+
+1. Trigger manual sync (`Run sync now`) and inspect recent runs/errors.
+2. If repeated failures persist:
+   - review backend logs for crawler/Cloudflare changes,
+   - verify mirror configuration/env values,
+   - validate outbound connectivity.
+3. Keep checkout live using existing last successful snapshot when available.
+4. If no snapshot is available, temporarily steer users to non-locker shipping options, then retry sync after fix.

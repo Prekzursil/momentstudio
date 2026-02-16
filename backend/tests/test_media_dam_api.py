@@ -473,6 +473,53 @@ def test_media_dam_retry_policy_endpoints_and_permissions(
     assert updated_payload["backoff_schedule_seconds"] == [12, 34, 89]
     assert updated_payload["jitter_ratio"] == pytest.approx(0.25)
 
+    history_read = client.get(
+        "/api/v1/content/admin/media/retry-policies/history?job_type=variant&page=1&limit=20",
+        headers=auth_headers(content_token),
+    )
+    assert history_read.status_code == 200, history_read.text
+    history_items = history_read.json()["items"]
+    assert any(row["action"] == "update" for row in history_items)
+
+    presets_read = client.get(
+        "/api/v1/content/admin/media/retry-policies/variant/presets",
+        headers=auth_headers(content_token),
+    )
+    assert presets_read.status_code == 200, presets_read.text
+    preset_keys = [item["preset_key"] for item in presets_read.json()["items"]]
+    assert preset_keys == ["factory_default", "last_change", "known_good"]
+
+    rollback_forbidden = client.post(
+        "/api/v1/content/admin/media/retry-policies/variant/rollback",
+        json={"preset_key": "factory_default"},
+        headers=auth_headers(content_token),
+    )
+    assert rollback_forbidden.status_code == 403, rollback_forbidden.text
+
+    mark_known_good = client.post(
+        "/api/v1/content/admin/media/retry-policies/variant/mark-known-good",
+        headers=auth_headers(admin_token),
+    )
+    assert mark_known_good.status_code == 200, mark_known_good.text
+    assert mark_known_good.json()["action"] == "mark_known_good"
+
+    rollback_known_good = client.post(
+        "/api/v1/content/admin/media/retry-policies/variant/rollback",
+        json={"preset_key": "known_good"},
+        headers=auth_headers(admin_token),
+    )
+    assert rollback_known_good.status_code == 200, rollback_known_good.text
+    assert rollback_known_good.json()["job_type"] == "variant"
+
+    history_after = client.get(
+        "/api/v1/content/admin/media/retry-policies/history?job_type=variant&page=1&limit=20",
+        headers=auth_headers(admin_token),
+    )
+    assert history_after.status_code == 200, history_after.text
+    actions_after = [row["action"] for row in history_after.json()["items"]]
+    assert "mark_known_good" in actions_after
+    assert "rollback" in actions_after
+
     invalid_schedule = client.patch(
         "/api/v1/content/admin/media/retry-policies/variant",
         json={"backoff_schedule_seconds": [0]},
@@ -495,6 +542,20 @@ def test_media_dam_retry_policy_endpoints_and_permissions(
     assert reset_all.status_code == 200, reset_all.text
     all_types = {row["job_type"] for row in reset_all.json()["items"]}
     assert all_types == {job_type.value for job_type in MediaJobType}
+
+    # Rollback by event id restores the selected event snapshot.
+    variant_events = [
+        row
+        for row in history_after.json()["items"]
+        if row["action"] == "update" and row["job_type"] == "variant"
+    ]
+    assert variant_events
+    rollback_event = client.post(
+        "/api/v1/content/admin/media/retry-policies/variant/rollback",
+        json={"event_id": variant_events[0]["id"]},
+        headers=auth_headers(admin_token),
+    )
+    assert rollback_event.status_code == 200, rollback_event.text
 
 
 def test_media_dam_retry_policy_snapshot_and_jitter_schedule(

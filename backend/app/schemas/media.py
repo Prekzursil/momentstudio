@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 MediaAssetTypeLiteral = Literal["image", "video", "document"]
@@ -14,6 +14,7 @@ MediaJobStatusLiteral = Literal["queued", "processing", "completed", "failed", "
 MediaJobTypeLiteral = Literal["ingest", "variant", "edit", "ai_tag", "duplicate_scan", "usage_reconcile"]
 MediaJobTriageStateLiteral = Literal["open", "retrying", "ignored", "resolved"]
 MediaRetryPolicyJobTypeLiteral = MediaJobTypeLiteral
+MediaRetryPolicyPresetKeyLiteral = Literal["factory_default", "last_change", "known_good"]
 
 
 class MediaAssetI18nRead(BaseModel):
@@ -209,6 +210,57 @@ class MediaRetryPolicyUpdateRequest(BaseModel):
     backoff_schedule_seconds: list[int] | None = Field(default=None, min_length=1, max_length=20)
     jitter_ratio: float | None = Field(default=None, ge=0.0, le=1.0)
     enabled: bool | None = None
+
+
+class MediaRetryPolicySnapshotRead(BaseModel):
+    max_attempts: int
+    backoff_schedule_seconds: list[int] = Field(default_factory=list)
+    jitter_ratio: float
+    enabled: bool = True
+    version_ts: str | None = None
+
+
+class MediaRetryPolicyEventRead(BaseModel):
+    id: UUID
+    job_type: MediaRetryPolicyJobTypeLiteral
+    action: str
+    actor_user_id: UUID | None = None
+    preset_key: MediaRetryPolicyPresetKeyLiteral | None = None
+    before_policy: MediaRetryPolicySnapshotRead
+    after_policy: MediaRetryPolicySnapshotRead
+    note: str | None = None
+    created_at: datetime
+
+
+class MediaRetryPolicyHistoryResponse(BaseModel):
+    items: list[MediaRetryPolicyEventRead]
+    meta: dict[str, int]
+
+
+class MediaRetryPolicyPresetRead(BaseModel):
+    preset_key: MediaRetryPolicyPresetKeyLiteral
+    label: str
+    policy: MediaRetryPolicySnapshotRead
+    source_event_id: UUID | None = None
+    fallback_used: bool = False
+    updated_at: datetime | None = None
+
+
+class MediaRetryPolicyPresetsResponse(BaseModel):
+    job_type: MediaRetryPolicyJobTypeLiteral
+    items: list[MediaRetryPolicyPresetRead]
+
+
+class MediaRetryPolicyRollbackRequest(BaseModel):
+    preset_key: MediaRetryPolicyPresetKeyLiteral | None = None
+    event_id: UUID | None = None
+    note: str | None = Field(default=None, max_length=500)
+
+    @model_validator(mode="after")
+    def validate_target(self) -> "MediaRetryPolicyRollbackRequest":
+        if bool(self.preset_key) == bool(self.event_id):
+            raise ValueError("Provide exactly one of preset_key or event_id")
+        return self
 
 
 class MediaJobRetryBulkRequest(BaseModel):

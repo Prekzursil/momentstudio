@@ -1058,6 +1058,53 @@ export interface MediaRetryPolicyUpdateRequest {
   enabled?: boolean;
 }
 
+export type MediaRetryPolicyPresetKey = 'factory_default' | 'last_change' | 'known_good';
+
+export interface MediaRetryPolicySnapshot {
+  max_attempts: number;
+  backoff_schedule_seconds: number[];
+  jitter_ratio: number;
+  enabled: boolean;
+  version_ts?: string | null;
+}
+
+export interface MediaRetryPolicyEvent {
+  id: string;
+  job_type: MediaJobType;
+  action: string;
+  actor_user_id?: string | null;
+  preset_key?: MediaRetryPolicyPresetKey | null;
+  before_policy: MediaRetryPolicySnapshot;
+  after_policy: MediaRetryPolicySnapshot;
+  note?: string | null;
+  created_at: string;
+}
+
+export interface MediaRetryPolicyHistoryResponse {
+  items: MediaRetryPolicyEvent[];
+  meta: { total_items: number; total_pages: number; page: number; limit: number };
+}
+
+export interface MediaRetryPolicyPreset {
+  preset_key: MediaRetryPolicyPresetKey;
+  label: string;
+  policy: MediaRetryPolicySnapshot;
+  source_event_id?: string | null;
+  fallback_used: boolean;
+  updated_at?: string | null;
+}
+
+export interface MediaRetryPolicyPresetsResponse {
+  job_type: MediaJobType;
+  items: MediaRetryPolicyPreset[];
+}
+
+export interface MediaRetryPolicyRollbackRequest {
+  preset_key?: MediaRetryPolicyPresetKey;
+  event_id?: string;
+  note?: string | null;
+}
+
 export interface MediaJobTriageUpdateRequest {
   triage_state?: MediaJobTriageState;
   assigned_to_user_id?: string | null;
@@ -1836,8 +1883,38 @@ export class AdminService {
     return this.api.get<MediaRetryPolicyListResponse>('/content/admin/media/retry-policies');
   }
 
+  listMediaRetryPolicyHistory(params?: {
+    job_type?: MediaJobType;
+    page?: number;
+    limit?: number;
+  }): Observable<MediaRetryPolicyHistoryResponse> {
+    return this.api.get<MediaRetryPolicyHistoryResponse>('/content/admin/media/retry-policies/history', params as any);
+  }
+
+  getMediaRetryPolicyPresets(jobType: MediaJobType): Observable<MediaRetryPolicyPresetsResponse> {
+    return this.api.get<MediaRetryPolicyPresetsResponse>(
+      `/content/admin/media/retry-policies/${encodeURIComponent(jobType)}/presets`
+    );
+  }
+
   updateMediaRetryPolicy(jobType: MediaJobType, payload: MediaRetryPolicyUpdateRequest): Observable<MediaRetryPolicy> {
     return this.api.patch<MediaRetryPolicy>(`/content/admin/media/retry-policies/${encodeURIComponent(jobType)}`, payload);
+  }
+
+  rollbackMediaRetryPolicy(jobType: MediaJobType, payload: MediaRetryPolicyRollbackRequest): Observable<MediaRetryPolicy> {
+    return this.api.post<MediaRetryPolicy>(
+      `/content/admin/media/retry-policies/${encodeURIComponent(jobType)}/rollback`,
+      payload
+    );
+  }
+
+  markMediaRetryPolicyKnownGood(jobType: MediaJobType, params?: { note?: string }): Observable<MediaRetryPolicyEvent> {
+    return this.api.post<MediaRetryPolicyEvent>(
+      `/content/admin/media/retry-policies/${encodeURIComponent(jobType)}/mark-known-good`,
+      {},
+      undefined,
+      params as any
+    );
   }
 
   resetMediaRetryPolicy(jobType: MediaJobType): Observable<MediaRetryPolicy> {

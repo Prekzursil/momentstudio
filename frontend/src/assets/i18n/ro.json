@@ -5197,7 +5197,17 @@
       "media": {
         "title": "Bibliotecă media",
         "hint": "Gestionează DAM-ul într-un singur loc: încărcări, coadă de review, colecții, coș de gunoi, utilizare, variante și metadate pentru imagini/video/documente.",
-        "libraryTitle": "Toate resursele media"
+        "libraryTitle": "Toate resursele media",
+        "retryPolicies": {
+          "history": "Istoric",
+          "hideHistory": "Ascunde istoricul",
+          "factoryDefault": "Implicit",
+          "lastChange": "Ultima schimbare",
+          "knownGood": "Varianta bună",
+          "markKnownGood": "Marchează varianta bună",
+          "rollbackSelected": "Revino la această versiune",
+          "loadMoreHistory": "Încarcă mai mult"
+        }
       },
       "scheduling": {
         "title": "Programare",
