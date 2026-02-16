@@ -80,8 +80,6 @@ Operational visibility:
 - `API_BASE_URL=/api/v1` (when using the frontend nginx reverse proxy)
 - Optional CAPTCHA (Cloudflare Turnstile):
   - `CAPTCHA_SITE_KEY=...` (public site key from Cloudflare Turnstile)
-- Optional FullStory session replay:
-  - `FULLSTORY_ORG_ID=...` (enable only after consent/masking policy review)
 - Payments:
   - Stripe: `STRIPE_ENABLED=1`
   - Optional PayPal: `PAYPAL_ENABLED=1`

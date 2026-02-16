@@ -121,7 +121,6 @@ services:
       PAYPAL_ENABLED: ${PAYPAL_ENABLED:-1}
       NETOPIA_ENABLED: ${NETOPIA_ENABLED:-0}
       CAPTCHA_SITE_KEY: ${CAPTCHA_SITE_KEY:-}
-      FULLSTORY_ORG_ID: ${FULLSTORY_ORG_ID:-}
     ports:
       - "4201:80"
     healthcheck:

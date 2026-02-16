@@ -166,8 +166,6 @@ showing what is already implemented.
   - Evidence (tests): `frontend/src/app/core/route-robots.service.spec.ts`, `frontend/src/app/pages/home/home.component.spec.ts`
 - [x] SEO phase 3: automated public-route crawl audit (title/description/H1/canonical/robots) as CI guard.
   - Evidence: `frontend/e2e/seo-public-routes.spec.ts`, `.github/workflows/compose-smoke.yml`
-- [x] Observability: add FullStory browser SDK integration behind runtime env toggle and analytics consent gating.
-  - Evidence: `frontend/src/app/core/fullstory.ts`, `frontend/src/app/core/analytics.service.ts`, `frontend/src/app/core/app-config.ts`, `frontend/scripts/generate-config.mjs`, `frontend/nginx/99-runtime-config.sh`, `frontend/.env.example`
 - [x] Netopia: notifyURL/webhook must always respond HTTP 200 with an IPN ack payload (avoid INVALID_RESPONSE_STATUS).
   - Evidence: `backend/app/api/v1/payments.py`, `backend/tests/test_netopia_webhook.py`
 - [x] CI: run PayPal + Stripe mock checkout E2E (success + decline/cancel) in compose smoke.
@@ -232,7 +230,6 @@ showing what is already implemented.
   - Evidence: `README.md`, `docs/PRODUCTION.md`, `infra/prod/README.md`
 - [x] Shipping mirror hardening: add schema-drift canary alerts for upstream payload changes and repeated Cloudflare/captcha crawl failures.
   - Evidence: `backend/alembic/versions/0158_sameday_sync_canary_fields.py`, `backend/app/services/sameday_easybox_mirror.py`, `backend/app/schemas/shipping.py`, `backend/app/schemas/shipping_admin.py`, `backend/app/api/v1/shipping_admin.py`, `frontend/src/app/pages/admin/ops/admin-ops.component.ts`, `frontend/src/app/shared/locker-picker.component.ts`, `backend/tests/test_sameday_easybox_mirror.py`, `frontend/src/app/pages/admin/ops/admin-ops.component.spec.ts`, `frontend/src/app/shared/locker-picker.component.spec.ts`
-- [ ] Shipping mirror hardening v2: add canary trend chart + alert routing hooks (email/webhook) for sustained upstream instability.
 - [x] Coupons v2: validate marketing opt-in before committing coupon changes when `send_email=true` (avoid partial success).
 - [x] Email: add RFC 8058 one-click unsubscribe headers (`List-Unsubscribe-Post`).
 - [x] Newsletter: auto-unsubscribe landing page on load and return HTML on API GET (fallback UX when clients open the unsubscribe URL).

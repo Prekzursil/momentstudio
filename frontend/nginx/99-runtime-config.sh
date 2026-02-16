@@ -24,7 +24,6 @@ NETOPIA_ENABLED="${NETOPIA_ENABLED:-}"
 ADDRESS_AUTOCOMPLETE_ENABLED="${ADDRESS_AUTOCOMPLETE_ENABLED:-}"
 SENTRY_DSN="${SENTRY_DSN:-}"
 CAPTCHA_SITE_KEY="${CAPTCHA_SITE_KEY:-}"
-FULLSTORY_ORG_ID="${FULLSTORY_ORG_ID:-}"
 
 stripe_enabled="$(truthy "$STRIPE_ENABLED_RAW")"
 
@@ -41,7 +40,6 @@ window.__APP_CONFIG__ = {
   "netopiaEnabled": $(truthy "$NETOPIA_ENABLED"),
   "addressAutocompleteEnabled": $(truthy "$ADDRESS_AUTOCOMPLETE_ENABLED"),
   "sentryDsn": "$(escape "$SENTRY_DSN")",
-  "captchaSiteKey": "$(escape "$CAPTCHA_SITE_KEY")",
-  "fullstoryOrgId": "$(escape "$FULLSTORY_ORG_ID")"
+  "captchaSiteKey": "$(escape "$CAPTCHA_SITE_KEY")"
 };
 EOF
