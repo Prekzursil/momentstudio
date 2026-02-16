@@ -5,12 +5,13 @@ from typing import Dict
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
-from app.models.user import UserRole
+from app.models.user import AdminAuditLog, UserRole
 from app.models.passkeys import UserPasskey
 from app.models.email_event import EmailDeliveryEvent
 from app.models.email_failure import EmailDeliveryFailure
@@ -72,6 +73,19 @@ def create_admin_token(session_factory) -> str:
     return asyncio.run(_create())
 
 
+def list_admin_audit_actions(session_factory) -> list[AdminAuditLog]:
+    async def _list() -> list[AdminAuditLog]:
+        async with session_factory() as session:
+            rows = (
+                await session.execute(
+                    select(AdminAuditLog).order_by(AdminAuditLog.created_at.asc())
+                )
+            ).scalars().all()
+            return list(rows)
+
+    return asyncio.run(_list())
+
+
 def test_ops_banners_and_shipping_simulation(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
@@ -97,13 +111,20 @@ def test_ops_banners_and_shipping_simulation(test_app: Dict[str, object]) -> Non
     assert created.status_code == 201, created.text
     banner_id = created.json()["id"]
 
+    updated = client.patch(
+        f"/api/v1/ops/admin/banners/{uuid.UUID(banner_id)}",
+        headers=auth_headers(token),
+        json={"message_en": "Emergency maintenance", "is_active": False},
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["message_en"] == "Emergency maintenance"
+
     listed = client.get("/api/v1/ops/admin/banners", headers=auth_headers(token))
     assert listed.status_code == 200, listed.text
     assert any(row["id"] == banner_id for row in listed.json())
 
     active = client.get("/api/v1/ops/banner")
-    assert active.status_code == 200, active.text
-    assert active.json()["message_en"] == "Planned downtime"
+    assert active.status_code == 204, active.text
 
     simulated = client.post(
         "/api/v1/ops/admin/shipping-simulate",
@@ -229,6 +250,21 @@ def test_ops_banners_and_shipping_simulation(test_app: Dict[str, object]) -> Non
     retried = client.post("/api/v1/ops/admin/webhooks/stripe/evt_test/retry", headers=auth_headers(token))
     assert retried.status_code == 200, retried.text
     assert retried.json()["status"] == "processed"
+
+    audit_rows = list_admin_audit_actions(SessionLocal)
+    action_rows = {row.action: row for row in audit_rows}
+    assert "ops.banner.create" in action_rows
+    assert "ops.banner.update" in action_rows
+    assert "ops.banner.delete" in action_rows
+    assert "ops.webhook.retry" in action_rows
+
+    assert action_rows["ops.banner.create"].actor_user_id is not None
+    assert action_rows["ops.banner.create"].data["banner_id"] == banner_id
+    assert set(action_rows["ops.banner.update"].data["changed_fields"]) == {"is_active", "message_en"}
+    assert action_rows["ops.banner.update"].data["banner_id"] == banner_id
+    assert action_rows["ops.banner.delete"].data["banner_id"] == banner_id
+    assert action_rows["ops.webhook.retry"].data["provider"] == "stripe"
+    assert action_rows["ops.webhook.retry"].data["event_id"] == "evt_test"
 
 
 def test_ops_diagnostics(test_app: Dict[str, object]) -> None:

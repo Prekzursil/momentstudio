@@ -26,6 +26,7 @@ from app.schemas.ops import (
     WebhookEventRead,
 )
 from app.services import ops as ops_service
+from app.services import audit_chain as audit_chain_service
 
 router = APIRouter(prefix="/ops", tags=["ops"])
 
@@ -56,7 +57,7 @@ async def admin_diagnostics(_: User = Depends(require_admin_section("ops"))) -> 
 async def admin_create_banner(
     payload: MaintenanceBannerCreate,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("ops")),
+    admin: User = Depends(require_admin_section("ops")),
 ) -> MaintenanceBannerRead:
     now = datetime.now(timezone.utc)
     if payload.ends_at and payload.ends_at <= payload.starts_at:
@@ -65,6 +66,20 @@ async def admin_create_banner(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Start time is too far in the past")
     banner = MaintenanceBanner(**payload.model_dump())
     created = await ops_service.create_maintenance_banner(session, banner)
+    await audit_chain_service.add_admin_audit_log(
+        session,
+        action="ops.banner.create",
+        actor_user_id=admin.id,
+        subject_user_id=None,
+        data={
+            "banner_id": str(created.id),
+            "is_active": bool(created.is_active),
+            "level": str(created.level),
+            "starts_at": created.starts_at.isoformat() if created.starts_at else None,
+            "ends_at": created.ends_at.isoformat() if created.ends_at else None,
+        },
+    )
+    await session.commit()
     return MaintenanceBannerRead.model_validate(created)
 
 
@@ -73,7 +88,7 @@ async def admin_update_banner(
     banner_id: UUID,
     payload: MaintenanceBannerUpdate,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("ops")),
+    admin: User = Depends(require_admin_section("ops")),
 ) -> MaintenanceBannerRead:
     banner = await session.get(MaintenanceBanner, banner_id)
     if not banner:
@@ -83,9 +98,29 @@ async def admin_update_banner(
     next_ends = data.get("ends_at", getattr(banner, "ends_at", None))
     if next_ends and next_starts and next_ends <= next_starts:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="End time must be after start time")
+    before = {
+        key: (value.isoformat() if isinstance(value, datetime) else value)
+        for key, value in ((field, getattr(banner, field)) for field in data)
+    }
     for key, value in data.items():
         setattr(banner, key, value)
     updated = await ops_service.update_maintenance_banner(session, banner)
+    await audit_chain_service.add_admin_audit_log(
+        session,
+        action="ops.banner.update",
+        actor_user_id=admin.id,
+        subject_user_id=None,
+        data={
+            "banner_id": str(updated.id),
+            "changed_fields": sorted(list(data.keys())),
+            "before": before,
+            "after": {
+                key: (value.isoformat() if isinstance(value, datetime) else value)
+                for key, value in ((field, getattr(updated, field)) for field in data)
+            },
+        },
+    )
+    await session.commit()
     return MaintenanceBannerRead.model_validate(updated)
 
 
@@ -93,12 +128,27 @@ async def admin_update_banner(
 async def admin_delete_banner(
     banner_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("ops")),
+    admin: User = Depends(require_admin_section("ops")),
 ) -> None:
     banner = await session.get(MaintenanceBanner, banner_id)
     if not banner:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Banner not found")
+    deleted_snapshot = {
+        "banner_id": str(banner.id),
+        "is_active": bool(banner.is_active),
+        "level": str(banner.level),
+        "starts_at": banner.starts_at.isoformat() if banner.starts_at else None,
+        "ends_at": banner.ends_at.isoformat() if banner.ends_at else None,
+    }
     await ops_service.delete_maintenance_banner(session, banner)
+    await audit_chain_service.add_admin_audit_log(
+        session,
+        action="ops.banner.delete",
+        actor_user_id=admin.id,
+        subject_user_id=None,
+        data=deleted_snapshot,
+    )
+    await session.commit()
 
 
 @router.post("/admin/shipping-simulate", response_model=ShippingSimulationResult)
@@ -162,9 +212,23 @@ async def admin_retry_webhook(
     event_id: str,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("ops")),
+    admin: User = Depends(require_admin_section("ops")),
 ) -> WebhookEventRead:
-    return await ops_service.retry_webhook(session, background_tasks, provider=provider, event_id=event_id)
+    retried = await ops_service.retry_webhook(session, background_tasks, provider=provider, event_id=event_id)
+    await audit_chain_service.add_admin_audit_log(
+        session,
+        action="ops.webhook.retry",
+        actor_user_id=admin.id,
+        subject_user_id=None,
+        data={
+            "provider": provider,
+            "event_id": event_id,
+            "status": retried.status,
+            "attempts": retried.attempts,
+        },
+    )
+    await session.commit()
+    return retried
 
 
 @router.get("/admin/email-failures/stats", response_model=FailureCount)
