@@ -92,6 +92,7 @@ This repository intentionally separates deterministic data collection from AI ju
   - No LLM/API calls are used in CI evidence collection.
 - Agent Pass (Copilot issue assignment):
   - `Audit Weekly Agent` updates the rolling issue `Weekly UX/IA Audit Digest`, upserts severe findings, and assigns `@copilot`.
+  - `Audit PR Agent` creates/updates a PR-scoped audit issue when `audit:agent` is applied to a PR (or manual dispatch is used) and assigns `@copilot` when safe.
   - `Audit PR Deep Agent` is opt-in and only runs for PRs labeled `audit:deep`.
 
 ## Workflow Permissions Model
@@ -99,6 +100,7 @@ This repository intentionally separates deterministic data collection from AI ju
 - `audit-pr-evidence.yml`: `contents: read`
 - `audit-weekly-evidence.yml`: `contents: read`
 - `audit-weekly-agent.yml`: `contents: read`, `issues: write`, `pull-requests: read`
+- `audit-pr-agent.yml`: `contents: read`, `issues: write`, `pull-requests: read`
 - `audit-pr-deep-agent.yml`: `contents: read`, `issues: write`, `pull-requests: read`
 - `audit-agent-watchdog.yml`: `contents: read`, `issues: write`
 
