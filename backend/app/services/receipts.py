@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Sequence, SupportsFloat, SupportsIndex
 from xml.sax.saxutils import escape as xml_escape
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
@@ -18,9 +18,9 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 
 from app.core.config import settings
 from app.schemas.receipt import ReceiptAddressRead, ReceiptItemRead, ReceiptRead, ReceiptRefundRead
+from app.services.font_utils import load_font as _load_font
 
 
-Font = ImageFont.FreeTypeFont | ImageFont.ImageFont
 MoneyValue = str | SupportsFloat | SupportsIndex
 _REPORTLAB_FONTS: tuple[str, str] | None = None
 
@@ -481,30 +481,6 @@ def _render_order_receipt_pdf_reportlab(order, items: Sequence | None = None, *,
 
     doc.build(story)
     return buf.getvalue()
-
-
-def _load_font(size: int, *, bold: bool = False) -> Font:
-    candidates: list[str] = []
-    if bold:
-        candidates.extend(
-            [
-                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-            ]
-        )
-    else:
-        candidates.extend(
-            [
-                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-            ]
-        )
-    for path in candidates:
-        try:
-            return ImageFont.truetype(path, size=size)
-        except OSError:
-            continue
-    return ImageFont.load_default()
 
 
 def _money(value: MoneyValue, currency: str, *, locale: str | None = None) -> str:
