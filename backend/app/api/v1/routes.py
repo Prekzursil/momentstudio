@@ -17,6 +17,7 @@ from app.api.v1 import notifications
 from app.api.v1 import support
 from app.api.v1 import returns
 from app.api.v1 import shipping
+from app.api.v1 import shipping_admin
 from app.api.v1 import legal
 from app.api.v1 import coupons_v2
 from app.api.v1 import taxes
@@ -54,6 +55,7 @@ api_router.include_router(notifications.router)
 api_router.include_router(support.router)
 api_router.include_router(returns.router)
 api_router.include_router(shipping.router)
+api_router.include_router(shipping_admin.router)
 api_router.include_router(legal.router)
 api_router.include_router(coupons_v2.router)
 api_router.include_router(taxes.router)

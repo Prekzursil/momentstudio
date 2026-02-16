@@ -222,6 +222,10 @@ showing what is already implemented.
 - [x] Auth: login/register should not get stuck after errors; improve error visibility and re-attempt flow (incl. CAPTCHA).
 - [x] Frontend: stop showing duplicate generic “Request failed” toasts when pages already handle errors.
 - [x] Checkout: investigate Easybox/FANbox checkout regressions when frontend runs on alternate dev port (4201).
+- [x] Shipping: mirror Sameday Easybox lockers locally and serve checkout map search from DB snapshots (monthly sync + manual ops trigger).
+  - Evidence: `backend/alembic/versions/0156_sameday_easybox_mirror.py`, `backend/app/services/sameday_easybox_mirror.py`, `backend/app/services/sameday_easybox_sync_scheduler.py`, `backend/app/services/lockers.py`, `backend/app/api/v1/shipping.py`, `backend/app/api/v1/shipping_admin.py`, `frontend/src/app/shared/locker-picker.component.ts`, `frontend/src/app/pages/admin/ops/admin-ops.component.ts`
+  - Evidence (tests): `backend/tests/test_sameday_easybox_mirror.py`, `frontend/src/app/shared/locker-picker.component.spec.ts`
+- [ ] Shipping mirror hardening: add schema-drift canary alerts for upstream payload changes and repeated Cloudflare/captcha crawl failures.
 - [x] Coupons v2: validate marketing opt-in before committing coupon changes when `send_email=true` (avoid partial success).
 - [x] Email: add RFC 8058 one-click unsubscribe headers (`List-Unsubscribe-Post`).
 - [x] Newsletter: auto-unsubscribe landing page on load and return HTML on API GET (fallback UX when clients open the unsubscribe URL).

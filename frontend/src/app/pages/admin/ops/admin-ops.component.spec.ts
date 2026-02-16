@@ -33,7 +33,10 @@ describe('AdminOpsComponent', () => {
       'updateBanner',
       'deleteBanner',
       'getWebhookDetail',
-      'retryWebhook'
+      'retryWebhook',
+      'getSamedaySyncStatus',
+      'listSamedaySyncRuns',
+      'runSamedaySyncNow'
     ]);
     toast = jasmine.createSpyObj<ToastService>('ToastService', ['success', 'error']);
 
@@ -81,6 +84,32 @@ describe('AdminOpsComponent', () => {
     ops.deleteBanner.and.returnValue(of({} as any));
     ops.getWebhookDetail.and.returnValue(of({} as any));
     ops.retryWebhook.and.returnValue(of({} as any));
+    ops.getSamedaySyncStatus.and.returnValue(
+      of({
+        provider: 'sameday',
+        total_lockers: 100,
+        stale: false,
+        stale_age_seconds: 10,
+        latest_run: { id: '1', provider: 'sameday', status: 'success', started_at: '2026-02-18T00:00:00Z', fetched_count: 100, upserted_count: 10, deactivated_count: 2 }
+      } as any)
+    );
+    ops.listSamedaySyncRuns.and.returnValue(
+      of({
+        items: [
+          {
+            id: '1',
+            provider: 'sameday',
+            status: 'success',
+            started_at: '2026-02-18T00:00:00Z',
+            fetched_count: 100,
+            upserted_count: 10,
+            deactivated_count: 2
+          }
+        ],
+        meta: { page: 1, limit: 8, total: 1 }
+      } as any)
+    );
+    ops.runSamedaySyncNow.and.returnValue(of({} as any));
 
     await TestBed.configureTestingModule({
       imports: [TranslateModule.forRoot(), AdminOpsComponent],
@@ -103,5 +132,7 @@ describe('AdminOpsComponent', () => {
     expect(text).toContain('DAM telemetry');
     expect(text).toContain('Queue');
     expect(text).toContain('Dead-letter');
+    expect(ops.getSamedaySyncStatus).toHaveBeenCalled();
+    expect(text).toContain('adminUi.ops.samedaySync.title');
   });
 });

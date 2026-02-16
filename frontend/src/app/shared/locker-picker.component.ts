@@ -2,11 +2,12 @@ import { CommonModule } from '@angular/common';
 import { AfterViewInit, Component, ElementRef, Input, OnChanges, OnDestroy, Output, EventEmitter, SimpleChanges, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { ShippingService, LockerProvider, LockerRead } from '../core/shipping.service';
+import { firstValueFrom } from 'rxjs';
+import { ShippingService, LockerMirrorSnapshot, LockerProvider, LockerRead } from '../core/shipping.service';
 import { LazyStylesService } from '../core/lazy-styles.service';
 
 type Leaflet = typeof import('leaflet');
-type LocationResult = { display_name: string; lat: number; lng: number };
+type LocationResult = { display_name: string; lat: number; lng: number; locker_count?: number };
 
 @Component({
   selector: 'app-locker-picker',
@@ -98,7 +99,15 @@ type LocationResult = { display_name: string; lat: number; lng: number };
               (click)="applyLocation(r)"
               role="option"
             >
-              <p class="text-sm text-slate-900 dark:text-slate-100">{{ r.display_name }}</p>
+              <div class="flex items-center justify-between gap-2">
+                <p class="text-sm text-slate-900 dark:text-slate-100">{{ r.display_name }}</p>
+                <span
+                  *ngIf="r.locker_count != null"
+                  class="rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:border-slate-700 dark:text-slate-200"
+                >
+                  {{ r.locker_count }}
+                </span>
+              </div>
             </button>
           </div>
         </div>
@@ -115,6 +124,12 @@ type LocationResult = { display_name: string; lat: number; lng: number };
             <span class="truncate max-w-[18rem]">{{ selectedLocation.display_name }}</span>
             <span class="text-slate-500 dark:text-slate-300" aria-hidden="true">&times;</span>
           </button>
+        </div>
+        <div
+          *ngIf="provider === 'sameday' && mirrorSnapshot?.stale"
+          class="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100"
+        >
+          {{ 'checkout.lockers.snapshotStale' | translate: { days: staleDays() } }}
         </div>
       </div>
 
@@ -169,6 +184,7 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
   searchLoading = false;
   searchError = '';
   selectedLocation: LocationResult | null = null;
+  mirrorSnapshot: LockerMirrorSnapshot | null = null;
 
   private leaflet: Leaflet | null = null;
   private map: import('leaflet').Map | null = null;
@@ -182,12 +198,23 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
 
   ngAfterViewInit(): void {
     void this.initMap();
+    if (this.provider === 'sameday') {
+      void this.refreshMirrorSnapshot();
+    }
   }
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['provider'] && !changes['provider'].firstChange) {
       // Provider changed; clear selection and refresh results around the last center.
       this.selectLocker(null);
+      this.searchResults = [];
+      this.searchError = '';
+      this.searchQuery = '';
+      if (this.provider === 'sameday') {
+        void this.refreshMirrorSnapshot();
+      } else {
+        this.mirrorSnapshot = null;
+      }
       if (this.initialized) {
         this.searchThisArea();
       }
@@ -345,11 +372,16 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
           this.redrawMarkers();
           resolve();
         },
-        error: () => {
+        error: (err) => {
           this.loading = false;
           this.lockers = [];
           this.redrawMarkers();
-          this.error = this.translate.instant('checkout.lockers.error');
+          const detail = String(err?.error?.detail || '').toLowerCase();
+          if (this.provider === 'sameday' && (detail.includes('mirror') || detail.includes('locker'))) {
+            this.error = this.translate.instant('checkout.lockers.mirrorUnavailable');
+          } else {
+            this.error = this.translate.instant('checkout.lockers.error');
+          }
           resolve();
         }
       });
@@ -394,6 +426,43 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
     this.searchAbort = controller;
     this.searchLoading = true;
     this.searchError = '';
+
+    if (this.provider === 'sameday') {
+      try {
+        const response = await firstValueFrom(
+          this.shipping.listLockerCities({
+            provider: this.provider,
+            q: query,
+            limit: 6
+          })
+        );
+        if (controller.signal.aborted) return;
+        this.mirrorSnapshot = response?.snapshot ?? null;
+        const rows = Array.isArray(response?.items) ? response.items : [];
+        const results: LocationResult[] = rows
+          .map((row) => ({
+            display_name: String(row.display_name || '').trim(),
+            lat: Number(row.lat),
+            lng: Number(row.lng),
+            locker_count: Number.isFinite(Number(row.locker_count)) ? Number(row.locker_count) : undefined
+          }))
+          .filter((row) => row.display_name && Number.isFinite(row.lat) && Number.isFinite(row.lng));
+        this.searchResults = results;
+        this.searchLoading = false;
+        if (opts?.applyFirst && results.length) {
+          this.applyLocation(results[0]);
+        } else if (opts?.applyFirst && !results.length) {
+          this.searchError = this.translate.instant('checkout.lockers.searchNoResults');
+        }
+      } catch (err) {
+        this.searchLoading = false;
+        this.searchResults = [];
+        if ((err as any)?.name !== 'AbortError') {
+          this.searchError = this.translate.instant('checkout.lockers.searchError');
+        }
+      }
+      return;
+    }
 
     const params = new URLSearchParams({
       format: 'jsonv2',
@@ -440,6 +509,22 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
       if ((err as any)?.name !== 'AbortError') {
         this.searchError = this.translate.instant('checkout.lockers.searchError');
       }
+    }
+  }
+
+  staleDays(): number {
+    const age = Number(this.mirrorSnapshot?.stale_age_seconds ?? 0);
+    if (!Number.isFinite(age) || age <= 0) return 30;
+    return Math.max(1, Math.floor(age / 86400));
+  }
+
+  private async refreshMirrorSnapshot(): Promise<void> {
+    if (this.provider !== 'sameday') return;
+    try {
+      const res = await firstValueFrom(this.shipping.listLockerCities({ provider: this.provider, q: '', limit: 1 }));
+      this.mirrorSnapshot = res?.snapshot ?? null;
+    } catch {
+      // Best-effort only; picker should remain usable without snapshot metadata.
     }
   }
 }

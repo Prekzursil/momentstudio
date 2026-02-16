@@ -101,6 +101,12 @@ from app.models.support import ContactSubmission, ContactSubmissionMessage, Cont
 from app.models.returns import ReturnRequest, ReturnRequestItem, ReturnRequestStatus  # noqa: F401
 from app.models.ops import MaintenanceBanner  # noqa: F401
 from app.models.admin_dashboard_settings import AdminDashboardAlertThresholds  # noqa: F401
+from app.models.shipping_locker import (  # noqa: F401
+    ShippingLockerMirror,
+    ShippingLockerProvider,
+    ShippingLockerSyncRun,
+    ShippingLockerSyncStatus,
+)
 
 __all__ = [
     "Base",
@@ -206,4 +212,8 @@ __all__ = [
     "ReturnRequestStatus",
     "MaintenanceBanner",
     "AdminDashboardAlertThresholds",
+    "ShippingLockerMirror",
+    "ShippingLockerProvider",
+    "ShippingLockerSyncRun",
+    "ShippingLockerSyncStatus",
 ]

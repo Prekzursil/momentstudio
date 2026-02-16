@@ -153,6 +153,37 @@ export interface OpsDiagnosticsRead {
   netopia: OpsDiagnosticsCheck;
 }
 
+export type SamedaySyncStatus = 'running' | 'success' | 'failed';
+
+export interface SamedaySyncRunRead {
+  id: string;
+  provider: 'sameday';
+  status: SamedaySyncStatus;
+  started_at: string;
+  finished_at?: string | null;
+  fetched_count: number;
+  upserted_count: number;
+  deactivated_count: number;
+  error_message?: string | null;
+  source_url_used?: string | null;
+  payload_hash?: string | null;
+}
+
+export interface SamedaySyncStatusRead {
+  provider: 'sameday';
+  total_lockers: number;
+  last_success_at?: string | null;
+  last_error?: string | null;
+  stale: boolean;
+  stale_age_seconds?: number | null;
+  latest_run?: SamedaySyncRunRead | null;
+}
+
+export interface SamedaySyncRunListResponse {
+  items: SamedaySyncRunRead[];
+  meta: { page: number; limit: number; total: number };
+}
+
 @Injectable({ providedIn: 'root' })
 export class OpsService {
   constructor(private api: ApiService) {}
@@ -233,6 +264,18 @@ export class OpsService {
 
   getDiagnostics(): Observable<OpsDiagnosticsRead> {
     return this.api.get<OpsDiagnosticsRead>('/ops/admin/diagnostics');
+  }
+
+  getSamedaySyncStatus(): Observable<SamedaySyncStatusRead> {
+    return this.api.get<SamedaySyncStatusRead>('/admin/shipping/sameday-sync/status');
+  }
+
+  listSamedaySyncRuns(params?: { page?: number; limit?: number }): Observable<SamedaySyncRunListResponse> {
+    return this.api.get<SamedaySyncRunListResponse>('/admin/shipping/sameday-sync/runs', params as any);
+  }
+
+  runSamedaySyncNow(): Observable<SamedaySyncRunRead> {
+    return this.api.post<SamedaySyncRunRead>('/admin/shipping/sameday-sync/run', {});
   }
 
   downloadNewsletterConfirmedSubscribersExport(): Observable<Blob> {

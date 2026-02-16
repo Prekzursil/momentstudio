@@ -1338,6 +1338,8 @@
       "none": "Nu am găsit lockere în apropiere. Mută harta sau mărește zona.",
       "results": "Lockere",
       "error": "Nu am putut încărca lockerele. Încearcă din nou.",
+      "mirrorUnavailable": "Datele pentru lockere sunt în curs de sincronizare. Încearcă din nou în câteva momente.",
+      "snapshotStale": "Datele locker sunt mai vechi de {{days}} zile. Rezultatele pot fi parțial neactualizate.",
       "noGeolocation": "Geolocația nu este disponibilă în acest browser.",
       "geoDenied": "Nu am putut accesa locația. Permite accesul și încearcă din nou."
     },
@@ -2458,6 +2460,34 @@
         },
         "errors": {
           "load": "Nu am putut încărca diagnosticarea."
+        }
+      },
+      "samedaySync": {
+        "title": "Mirror Sameday Easybox",
+        "loading": "Se încarcă statusul sincronizării Sameday…",
+        "runNow": "Rulează sincronizarea",
+        "running": "Sincronizare în curs…",
+        "totalLockers": "Lockere active",
+        "stale": "Snapshot învechit",
+        "staleYes": "Da",
+        "staleNo": "Nu",
+        "staleAge": "Vechime snapshot",
+        "lastSuccess": "Ultimul succes",
+        "latestRun": "Ultima rulare",
+        "lastError": "Ultima eroare",
+        "table": {
+          "started": "Pornit",
+          "status": "Status",
+          "fetched": "Preluate",
+          "upserted": "Actualizate",
+          "deactivated": "Dezactivate"
+        },
+        "success": {
+          "started": "Sincronizarea Sameday s-a încheiat."
+        },
+        "errors": {
+          "load": "Nu am putut încărca statusul sincronizării Sameday.",
+          "run": "Nu am putut porni sincronizarea Sameday."
         }
       },
       "newsletter": {

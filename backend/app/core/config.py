@@ -233,6 +233,12 @@ class Settings(BaseSettings):
     # Locker lookup (Sameday/FANbox)
     # In production you should configure official courier credentials.
     # For local development, Overpass (OpenStreetMap) can be used as a best-effort fallback.
+    sameday_mirror_enabled: bool = True
+    sameday_mirror_sync_interval_seconds: int = 60 * 60 * 24 * 30
+    sameday_mirror_stale_after_seconds: int = 60 * 60 * 24 * 30
+    sameday_mirror_fetch_timeout_seconds: int = 30
+    sameday_mirror_max_lockers: int = 20_000
+    sameday_mirror_playwright_enabled: bool = True
     lockers_use_overpass_fallback: bool = True
     sameday_api_base_url: str | None = None
     sameday_api_username: str | None = None
