@@ -10,11 +10,12 @@ def init_sentry() -> None:
         return
 
     import sentry_sdk
+    from sentry_sdk.integrations import Integration
     from sentry_sdk.integrations.fastapi import FastApiIntegration
     from sentry_sdk.integrations.logging import LoggingIntegration
     from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 
-    integrations: list[object] = [
+    integrations: list[Integration] = [
         FastApiIntegration(),
         SqlalchemyIntegration(),
     ]
