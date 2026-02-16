@@ -12,6 +12,7 @@ import { CardComponent } from '../../shared/card.component';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { MarkdownService } from '../../core/markdown.service';
 import { SeoHeadLinksService } from '../../core/seo-head-links.service';
+import { resolveRouteSeoDescription } from '../../core/route-seo-defaults';
 import { CmsPageBlocksComponent } from '../../shared/cms-page-blocks.component';
 import { PageBlock, pageBlocksToPlainText, parsePageBlocks } from '../../shared/page-blocks';
 
@@ -172,14 +173,18 @@ export class AboutComponent implements OnInit, OnDestroy {
 
   private setMetaTags(title: string, body: string): void {
     const pageTitle = title ? `${title} | momentstudio` : 'About | momentstudio';
-    const description = (body || '').replace(/\s+/g, ' ').trim().slice(0, 160);
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
-    const canonical = this.seoHeadLinks.setLocalizedCanonical('/about', lang, { lang });
+    const description = resolveRouteSeoDescription(
+      'about',
+      lang,
+      (body || '').replace(/\s+/g, ' ').trim().slice(0, 160),
+      this.translate.instant('meta.descriptions.about'),
+      this.translate.instant('about.metaDescription')
+    );
+    const canonical = this.seoHeadLinks.setLocalizedCanonical('/about', lang, {});
     this.title.setTitle(pageTitle);
-    if (description) {
-      this.meta.updateTag({ name: 'description', content: description });
-      this.meta.updateTag({ property: 'og:description', content: description });
-    }
+    this.meta.updateTag({ name: 'description', content: description });
+    this.meta.updateTag({ property: 'og:description', content: description });
     this.meta.updateTag({ property: 'og:title', content: pageTitle });
     this.meta.updateTag({ property: 'og:url', content: canonical });
   }

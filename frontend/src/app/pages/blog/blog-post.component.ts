@@ -33,6 +33,8 @@ import { formatIdentity } from '../../shared/user-identity';
 import { catchError } from 'rxjs/operators';
 import { SeoHeadLinksService } from '../../core/seo-head-links.service';
 import { StructuredDataService } from '../../core/structured-data.service';
+import { resolveRouteSeoDescription } from '../../core/route-seo-defaults';
+import { SeoCopyFallbackService } from '../../core/seo-copy-fallback.service';
 
 hljs.registerLanguage('bash', bash);
 hljs.registerLanguage('css', css);
@@ -202,7 +204,7 @@ hljs.registerLanguage('typescript', typescript);
       </div>
 
       <div class="grid gap-2">
-        <h1 class="text-3xl font-semibold text-slate-900 dark:text-slate-50">
+        <h1 class="text-3xl font-semibold text-slate-900 dark:text-slate-50" data-route-heading="true" tabindex="-1">
           <span *ngIf="loadingPost(); else postTitleTpl">{{ 'blog.post.loadingTitle' | translate }}</span>
           <ng-template #postTitleTpl>{{ post()?.title }}</ng-template>
         </h1>
@@ -260,6 +262,12 @@ hljs.registerLanguage('typescript', typescript);
                 loading="lazy"
               />
               <div class="markdown blog-markdown text-slate-700 dark:text-slate-200" [innerHTML]="bodyHtml()"></div>
+              <p
+                *ngIf="!hasMeaningfulArticleText()"
+                class="mx-auto w-full max-w-prose text-base text-slate-700 leading-relaxed dark:text-slate-200"
+              >
+                {{ fallbackIntro() }}
+              </p>
               <div class="mx-auto w-full max-w-prose no-print">
                 <a
                   routerLink="/blog"
@@ -810,6 +818,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   loadingPost = signal<boolean>(true);
   hasPostError = signal<boolean>(false);
   bodyHtml = signal<string>('');
+  fallbackIntro = signal<string>('');
   toc = signal<Array<{ id: string; title: string; level: 2 | 3 }>>([]);
   activeHeadingId = signal<string | null>(null);
   neighbors = signal<{ previous: BlogPostListItem | null; next: BlogPostListItem | null }>({ previous: null, next: null });
@@ -952,7 +961,8 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     private toast: ToastService,
     private markdown: MarkdownService,
     private catalog: CatalogService,
-    public auth: AuthService
+    public auth: AuthService,
+    private seoCopyFallback: SeoCopyFallbackService
   ) {}
 
   ngOnInit(): void {
@@ -995,6 +1005,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     this.hasPostError.set(false);
     this.post.set(null);
     this.readingProgress.set(0);
+    this.fallbackIntro.set('');
     this.showBackToTop.set(false);
     this.toc.set([]);
     this.activeHeadingId.set(null);
@@ -1052,6 +1063,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     req.subscribe({
       next: (post) => {
         this.post.set(post);
+        this.fallbackIntro.set(this.seoCopyFallback.blogPostIntro(lang, post.title));
         const rendered = this.renderPostBody(post.body_markdown);
         this.bodyHtml.set(rendered.html);
         this.toc.set(rendered.toc);
@@ -1076,6 +1088,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       error: () => {
         this.post.set(null);
         this.bodyHtml.set('');
+        this.fallbackIntro.set(this.seoCopyFallback.blogPostIntro(lang, this.slug));
         this.toc.set([]);
         this.activeHeadingId.set(null);
         this.neighbors.set({ previous: null, next: null });
@@ -1922,14 +1935,18 @@ export class BlogPostComponent implements OnInit, OnDestroy {
 
   private setMetaTags(post: BlogPost): void {
     const pageTitle = `${post.title} | momentstudio`;
-    const description = (post.summary || post.body_markdown || '').replace(/\s+/g, ' ').trim().slice(0, 160);
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
+    const description = resolveRouteSeoDescription(
+      'blog_post',
+      lang,
+      (post.summary || post.body_markdown || '').replace(/\s+/g, ' ').trim().slice(0, 160),
+      this.translate.instant('meta.descriptions.blog_post'),
+      this.translate.instant('blog.post.metaDescription')
+    );
     this.title.setTitle(pageTitle);
-    if (description) {
-      this.meta.updateTag({ name: 'description', content: description });
-      this.meta.updateTag({ property: 'og:description', content: description });
-      this.meta.updateTag({ name: 'twitter:description', content: description });
-    }
+    this.meta.updateTag({ name: 'description', content: description });
+    this.meta.updateTag({ property: 'og:description', content: description });
+    this.meta.updateTag({ name: 'twitter:description', content: description });
     this.meta.updateTag({ property: 'og:title', content: pageTitle });
     this.meta.updateTag({ property: 'og:type', content: 'article' });
     this.meta.updateTag({ property: 'og:site_name', content: 'momentstudio' });
@@ -1971,7 +1988,12 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   private setErrorMetaTags(): void {
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     const title = this.translate.instant('blog.post.metaTitle');
-    const description = this.translate.instant('blog.post.metaDescription');
+    const description = resolveRouteSeoDescription(
+      'blog_post',
+      lang,
+      this.translate.instant('meta.descriptions.blog_post'),
+      this.translate.instant('blog.post.metaDescription')
+    );
     this.title.setTitle(title);
     this.meta.updateTag({ name: 'description', content: description });
     this.meta.updateTag({ property: 'og:title', content: title });
@@ -1992,9 +2014,17 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   private setCanonical(): string {
     if (!this.slug) return '';
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
-    const href = this.seoHeadLinks.setLocalizedCanonical(`/blog/${encodeURIComponent(this.slug)}`, lang, { lang });
+    const href = this.seoHeadLinks.setLocalizedCanonical(`/blog/${encodeURIComponent(this.slug)}`, lang, {});
     this.meta.updateTag({ property: 'og:url', content: href });
     return href;
+  }
+
+  hasMeaningfulArticleText(): boolean {
+    const text = String(this.bodyHtml() || '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return text.length >= 100;
   }
 
   private measureReadingProgressSoon(): void {

@@ -22,7 +22,7 @@ describe('AboutComponent', () => {
     title = jasmine.createSpyObj<Title>('Title', ['setTitle']);
     api = jasmine.createSpyObj<ApiService>('ApiService', ['get']);
     seoHeadLinks = jasmine.createSpyObj<SeoHeadLinksService>('SeoHeadLinksService', ['setLocalizedCanonical']);
-    seoHeadLinks.setLocalizedCanonical.and.returnValue('http://localhost:4200/about?lang=en');
+    seoHeadLinks.setLocalizedCanonical.and.returnValue('http://localhost:4200/about');
     api.get.and.callFake((path: string, params?: Record<string, unknown>) => {
       if (path !== '/content/pages/about') throw new Error(`Unexpected path: ${path}`);
       if (params?.['lang'] === 'ro') {
@@ -70,8 +70,8 @@ describe('AboutComponent', () => {
     expect(meta.updateTag).toHaveBeenCalledWith({ name: 'description', content: 'Hello' });
     expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:description', content: 'Hello' });
     expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:title', content: 'About | momentstudio' });
-    expect(seoHeadLinks.setLocalizedCanonical).toHaveBeenCalledWith('/about', 'en', { lang: 'en' });
-    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:url', content: 'http://localhost:4200/about?lang=en' });
+    expect(seoHeadLinks.setLocalizedCanonical).toHaveBeenCalledWith('/about', 'en', {});
+    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:url', content: 'http://localhost:4200/about' });
   });
 
   it('updates meta tags when language changes', () => {
@@ -89,7 +89,7 @@ describe('AboutComponent', () => {
     expect(meta.updateTag).toHaveBeenCalledWith({ name: 'description', content: 'Salut' });
     expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:description', content: 'Salut' });
     expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:title', content: 'Despre noi | momentstudio' });
-    expect(seoHeadLinks.setLocalizedCanonical).toHaveBeenCalledWith('/about', 'ro', { lang: 'ro' });
+    expect(seoHeadLinks.setLocalizedCanonical).toHaveBeenCalledWith('/about', 'ro', {});
     expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:url', content: 'http://localhost:4200/about?lang=ro' });
   });
 

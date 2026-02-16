@@ -28,7 +28,7 @@ describe('CmsPageComponent', () => {
     title = jasmine.createSpyObj<Title>('Title', ['setTitle']);
     api = jasmine.createSpyObj<ApiService>('ApiService', ['get']);
     seoHeadLinks = jasmine.createSpyObj<SeoHeadLinksService>('SeoHeadLinksService', ['setLocalizedCanonical']);
-    seoHeadLinks.setLocalizedCanonical.and.returnValue('http://localhost:4200/pages/about?lang=en');
+    seoHeadLinks.setLocalizedCanonical.and.returnValue('http://localhost:4200/pages/about');
 
     api.get.and.callFake((path: string, params?: Record<string, unknown>) => {
       if (path === '/content/pages/about') {
@@ -72,8 +72,8 @@ describe('CmsPageComponent', () => {
     fixture.detectChanges();
 
     expect(title.setTitle).toHaveBeenCalledWith('About page | momentstudio');
-    expect(seoHeadLinks.setLocalizedCanonical).toHaveBeenCalledWith('/pages/about', 'en', { lang: 'en' });
-    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:url', content: 'http://localhost:4200/pages/about?lang=en' });
+    expect(seoHeadLinks.setLocalizedCanonical).toHaveBeenCalledWith('/pages/about', 'en', {});
+    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:url', content: 'http://localhost:4200/pages/about' });
   });
 
   it('updates canonical language when translation changes', () => {
@@ -88,8 +88,7 @@ describe('CmsPageComponent', () => {
     translate.use('ro');
 
     expect(title.setTitle).toHaveBeenCalledWith('Despre | momentstudio');
-    expect(seoHeadLinks.setLocalizedCanonical).toHaveBeenCalledWith('/pages/about', 'ro', { lang: 'ro' });
+    expect(seoHeadLinks.setLocalizedCanonical).toHaveBeenCalledWith('/pages/about', 'ro', {});
     expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:url', content: 'http://localhost:4200/pages/about?lang=ro' });
   });
 });
-

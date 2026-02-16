@@ -52,7 +52,8 @@ describe('ShopComponent i18n meta', () => {
     expect(title.setTitle).toHaveBeenCalledWith('EN title');
     expect(meta.updateTag).toHaveBeenCalledWith({ name: 'description', content: 'EN desc' });
     const canonicalEn = doc.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
-    expect(canonicalEn?.getAttribute('href')).toContain('/shop?lang=en');
+    expect(canonicalEn?.getAttribute('href')).toContain('/shop');
+    expect(canonicalEn?.getAttribute('href')).not.toContain('lang=en');
     expect(doc.querySelectorAll('link[rel="alternate"][data-seo-managed="true"]').length).toBe(3);
     expect((doc.querySelector('script#seo-route-schema-1')?.textContent || '')).toContain('"CollectionPage"');
 
