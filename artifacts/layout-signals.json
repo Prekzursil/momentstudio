@@ -1,0 +1,499 @@
+[
+  {
+    "route": "/account",
+    "surface": "account",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/account/addresses",
+    "surface": "account",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/account/comments",
+    "surface": "account",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/account/coupons",
+    "surface": "account",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/account/notifications",
+    "surface": "account",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/account/notifications/settings",
+    "surface": "account",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/account/orders",
+    "surface": "account",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/account/overview",
+    "surface": "account",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/account/password",
+    "surface": "account",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/account/privacy",
+    "surface": "account",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/account/profile",
+    "surface": "account",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/account/security",
+    "surface": "account",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/account/wishlist",
+    "surface": "account",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/tickets",
+    "surface": "account",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/admin",
+    "surface": "admin",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/admin/content",
+    "surface": "admin",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/admin/content/blog",
+    "surface": "admin",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/admin/content/home",
+    "surface": "admin",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/admin/content/media",
+    "surface": "admin",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/admin/content/pages",
+    "surface": "admin",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/admin/content/scheduling",
+    "surface": "admin",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/admin/content/settings",
+    "surface": "admin",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/admin/coupons",
+    "surface": "admin",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/admin/dashboard",
+    "surface": "admin",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/admin/gdpr",
+    "surface": "admin",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/admin/inventory",
+    "surface": "admin",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/admin/ip-bypass",
+    "surface": "admin",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/admin/ops",
+    "surface": "admin",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/admin/orders",
+    "surface": "admin",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/admin/orders/:orderId",
+    "surface": "admin",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/admin/orders/exports",
+    "surface": "admin",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/admin/products",
+    "surface": "admin",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/admin/returns",
+    "surface": "admin",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/admin/segments",
+    "surface": "admin",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/admin/support",
+    "surface": "admin",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/admin/users",
+    "surface": "admin",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/**",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/about",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/auth/google/callback",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/blog",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/blog/:slug",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/blog/series/:series",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/blog/tag/:tag",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/cart",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/checkout",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/checkout/mock/paypal",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/checkout/mock/stripe",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/checkout/netopia/cancel",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/checkout/netopia/return",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/checkout/paypal/cancel",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/checkout/paypal/return",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/checkout/stripe/cancel",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/checkout/stripe/return",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/checkout/success",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/contact",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/error",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/login",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/login/2fa",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/newsletter/confirm",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/newsletter/unsubscribe",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/offline",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/pages/:slug",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/password-reset",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/password-reset/confirm",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/products/:slug",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/receipt/:token",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/register",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/shop",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/shop/:category",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  },
+  {
+    "route": "/verify-email",
+    "surface": "storefront",
+    "sticky_count": 1,
+    "scrollable_count": 1,
+    "nested_scrollables_count": 0
+  }
+]

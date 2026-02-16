@@ -1,0 +1,1482 @@
+[
+  {
+    "fingerprint": "f4ba6cac375ae58bdaeb7540bf994f8fe967e97fe1e5debd6a83813821124641",
+    "title": "Browser error on `/admin/gdpr`",
+    "description": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Templa",
+    "severity": "s2",
+    "impact": 4,
+    "effort": "M",
+    "route": "/admin/gdpr",
+    "surface": "admin",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s2",
+      "surface:admin",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "8296a60d91dc6ef4009bdc81e45bd3037932a633ceaa06aa450b87fff077f7b4",
+    "title": "Browser error on `/admin/segments`",
+    "description": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Templa",
+    "severity": "s2",
+    "impact": 4,
+    "effort": "M",
+    "route": "/admin/segments",
+    "surface": "admin",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s2",
+      "surface:admin",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "9f5aabc437bd8d1a4300ba0d29b84dad51d15a88a65cbc3f83662c2b3f755c67",
+    "title": "Browser error on `/`",
+    "description": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Templa",
+    "severity": "s2",
+    "impact": 4,
+    "effort": "M",
+    "route": "/",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s2",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "933b39994c9b36d8cc084d5f8d94cb62f928a1cecc98ad56433acecf5e544c36",
+    "title": "Browser error on `/**`",
+    "description": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Templa",
+    "severity": "s2",
+    "impact": 4,
+    "effort": "M",
+    "route": "/**",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s2",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "f4e59155875231f70903d183d7c85600005a5905fcf7cd9197dbb9f07b203cc9",
+    "title": "Browser error on `/contact`",
+    "description": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Templa",
+    "severity": "s2",
+    "impact": 4,
+    "effort": "M",
+    "route": "/contact",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s2",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "d3b850162e90157ef96bdf0b65d50d43b071b76c10ab0d00718a21b408374120",
+    "title": "Browser error on `/error`",
+    "description": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Templa",
+    "severity": "s2",
+    "impact": 4,
+    "effort": "M",
+    "route": "/error",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s2",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "0bdb0e36a5e670924e76ad381114d1eeb2794494df4301c5e4b4a73d95e06f34",
+    "title": "Missing H1 on storefront route `/newsletter/confirm`",
+    "description": "Storefront route rendered without a primary H1 heading.",
+    "severity": "s2",
+    "impact": 4,
+    "effort": "M",
+    "route": "/newsletter/confirm",
+    "surface": "storefront",
+    "rule_id": "ux_missing_h1",
+    "primary_file": "frontend/src/app/app.routes.ts",
+    "evidence_files": [
+      "seo-snapshot.json"
+    ],
+    "labels": [
+      "severity:s2",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "dfb47c8a6d941b74ae65eff8b95fae15dba9d9e17ab860b01e564d6e70739ff1",
+    "title": "Missing H1 on storefront route `/newsletter/unsubscribe`",
+    "description": "Storefront route rendered without a primary H1 heading.",
+    "severity": "s2",
+    "impact": 4,
+    "effort": "M",
+    "route": "/newsletter/unsubscribe",
+    "surface": "storefront",
+    "rule_id": "ux_missing_h1",
+    "primary_file": "frontend/src/app/app.routes.ts",
+    "evidence_files": [
+      "seo-snapshot.json"
+    ],
+    "labels": [
+      "severity:s2",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "a974accc9c961000419eeca1dbb7980a27772258f81b428cc86cdcdf85e5f090",
+    "title": "Missing H1 on storefront route `/products/:slug`",
+    "description": "Storefront route rendered without a primary H1 heading.",
+    "severity": "s2",
+    "impact": 4,
+    "effort": "M",
+    "route": "/products/:slug",
+    "surface": "storefront",
+    "rule_id": "ux_missing_h1",
+    "primary_file": "frontend/src/app/app.routes.ts",
+    "evidence_files": [
+      "seo-snapshot.json"
+    ],
+    "labels": [
+      "severity:s2",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "c868e44aba6f15bf936ea8791b472e00ef52d464ab5923cd7c1c462f9046ef49",
+    "title": "Browser error on `/shop`",
+    "description": "HttpErrorResponse",
+    "severity": "s2",
+    "impact": 4,
+    "effort": "M",
+    "route": "/shop",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s2",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "b65dff550a6807a3c08680e029249186d03d367ef4e4e40797c5fb8ccd81618f",
+    "title": "Browser error on `/shop/:category`",
+    "description": "HttpErrorResponse",
+    "severity": "s2",
+    "impact": 4,
+    "effort": "M",
+    "route": "/shop/:category",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s2",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "dd4e461e724317cc08c132e69da7f901fc8436c6f52baceb9f082ace9cb0e44f",
+    "title": "Browser error on `/account`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/account",
+    "surface": "account",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:account",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "4892efd6401b7213a7562ca9399b4303adf99a936e33b59ea29e302e52b0513e",
+    "title": "Browser error on `/account/addresses`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/account/addresses",
+    "surface": "account",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:account",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "05b0215bf432a84dab39e7d5a692bfac5073c558ff602714b900249c2cd7c4df",
+    "title": "Browser error on `/account/comments`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/account/comments",
+    "surface": "account",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:account",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "34fb24a6c050f69bc38f7ce131e19545aacd542dbedb89756951a4ba4ec2ec21",
+    "title": "Browser error on `/account/coupons`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/account/coupons",
+    "surface": "account",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:account",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "c0771256e23848b230337ee3bcc7f294769ceb13a21c4b868f71f2ed16a918db",
+    "title": "Browser error on `/account/notifications`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/account/notifications",
+    "surface": "account",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:account",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "b7096f512429265c8ce97b2b4e31a0bb34cbfc7eb59431a54869ae58e96ea3e3",
+    "title": "Browser error on `/account/notifications/settings`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/account/notifications/settings",
+    "surface": "account",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:account",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "519f5c544b4502ff1ad34e1c005955790c6324ac015edb468865f443bc68dbe1",
+    "title": "Browser error on `/account/orders`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/account/orders",
+    "surface": "account",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:account",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "c1047ffe6d505427398b1274b1c110639e6c27049dbb112337e0944898332af2",
+    "title": "Browser error on `/account/overview`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/account/overview",
+    "surface": "account",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:account",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "f37353e9af4c5967ffd5666676e67120ec3911e229cd4114608d35d1a450a436",
+    "title": "Browser error on `/account/password`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/account/password",
+    "surface": "account",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:account",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "ce8100df6308527c7e32e4ce2839de8eba06f9dab5e26966fd86be5794f44c85",
+    "title": "Browser error on `/account/privacy`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/account/privacy",
+    "surface": "account",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:account",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "dbf9b752e0ee458ec334646168e9855eac036e07c92990f91ff36cefb2e42779",
+    "title": "Browser error on `/account/profile`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/account/profile",
+    "surface": "account",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:account",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "bc6f9f4e42175204c5d77881511d1313f25064a77801006a9a7421ff8bbd4c68",
+    "title": "Browser error on `/account/security`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/account/security",
+    "surface": "account",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:account",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "7da4f666d9afeb3a3ccba18893c3eda8ffd8e69a85f6e4ce97d19958e4dbfb2e",
+    "title": "Browser error on `/account/wishlist`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/account/wishlist",
+    "surface": "account",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:account",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "af0b7f2cd4d00a2b63b7fbd0e932583585b249ef7fe9cb6cc4b18742dd891243",
+    "title": "Browser error on `/tickets`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/tickets",
+    "surface": "account",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:account",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "a1d1e348650e5e44cb9b5fb5caf9d75052a4b255e5275aaa5defd8e79544cbcd",
+    "title": "Browser error on `/admin`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/admin",
+    "surface": "admin",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:admin",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "cf4145fa3fa27acdaf44d59c80bafe7af37a4a0d9608df1fcc2ca3b9f6e6f958",
+    "title": "Browser error on `/admin/content`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/admin/content",
+    "surface": "admin",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:admin",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "e3836ecd7d0ecf0b73421c028494f4ef07a8e6355256518cffaf590758afccf1",
+    "title": "Browser error on `/admin/content/blog`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/admin/content/blog",
+    "surface": "admin",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:admin",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "21cf02023a3afdb8a769db7d55c34bede0ef5761dbf552e0d2646ddd66b0aaf6",
+    "title": "Browser error on `/admin/content/home`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/admin/content/home",
+    "surface": "admin",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:admin",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "cb30d9ad177f8c63e5309b0e5729afda0a2df2faf1f842ffcd5be1815c642f35",
+    "title": "Browser error on `/admin/content/media`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/admin/content/media",
+    "surface": "admin",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:admin",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "23915e7ba70afa06984b9bfe32367e723e1e7db89d2361910b574671c8704fa6",
+    "title": "Browser error on `/admin/content/pages`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/admin/content/pages",
+    "surface": "admin",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:admin",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "3445b2bd2ce93da4c9609d517b3e3ad9afca935028a2e27cb7773c5ca3b98b54",
+    "title": "Browser error on `/admin/content/scheduling`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/admin/content/scheduling",
+    "surface": "admin",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:admin",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "fbea94b4d2310ecaeed44fec3d2db0d96726878edad12331878b4b7fdb9384bf",
+    "title": "Browser error on `/admin/content/settings`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/admin/content/settings",
+    "surface": "admin",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:admin",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "af08520a14aae96123afa9632accda2ce99e73cea9be1df085859fcb077964c0",
+    "title": "Browser error on `/admin/coupons`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/admin/coupons",
+    "surface": "admin",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:admin",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "19ac35b6ebf0b461b2abdd9816cf9debaba8e97b382e8da3346e9cd9794924c8",
+    "title": "Browser error on `/admin/dashboard`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/admin/dashboard",
+    "surface": "admin",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:admin",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "af7c468d14b9eabaa11f2121c86e937e285af1f1938b9066f0e951c62d208522",
+    "title": "Browser error on `/admin/inventory`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/admin/inventory",
+    "surface": "admin",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:admin",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "b9aeae8761a5d7ca3231b8b375a875ce671624915160e3bd7300cffe6f91d07f",
+    "title": "Browser error on `/admin/ip-bypass`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/admin/ip-bypass",
+    "surface": "admin",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:admin",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "679e8cbba13f3abe5d9f1e109c8e0017cdd668ff87ef7398e709d288a1dc4a3b",
+    "title": "Browser error on `/admin/ops`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/admin/ops",
+    "surface": "admin",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:admin",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "a5016a9d9708fb77eda65ea13d90739e7d44b5fd8ee22cad981a39a3d4a73133",
+    "title": "Browser error on `/admin/orders`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/admin/orders",
+    "surface": "admin",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:admin",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "e15577378e8bd24fac0a3fd71b54cdb3c880dc2962f18629da687d85e99edc56",
+    "title": "Browser error on `/admin/orders/:orderId`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/admin/orders/:orderId",
+    "surface": "admin",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:admin",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "0849c183c2ce81a960bd4d553ab5bb1b4af51ed72187c42c07be2950340abc77",
+    "title": "Browser error on `/admin/orders/exports`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/admin/orders/exports",
+    "surface": "admin",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:admin",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "7a63171f980a9197e2d8758bbb6ea4a457eefe83a5b7cf808338bf6a1dda7721",
+    "title": "Browser error on `/admin/products`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/admin/products",
+    "surface": "admin",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:admin",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "f2b01b26b7a5bf0b86670cb6c265e2632c6eb80921b2d7bf79f5e239c519261b",
+    "title": "Browser error on `/admin/returns`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/admin/returns",
+    "surface": "admin",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:admin",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "eb1b546af3de9f674a09955b6a3f533224d1dcb54a6fd431e196b41c3f908f0a",
+    "title": "Browser error on `/admin/support`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/admin/support",
+    "surface": "admin",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:admin",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "b584b93b1056163bb9e0f0136eb8136c5de18da2803bc36d522357065056960e",
+    "title": "Browser error on `/admin/users`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/admin/users",
+    "surface": "admin",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:admin",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "f462f8fa615b6390ea03c54e0a640a142bd0ea79589b3ab1d79186a314458635",
+    "title": "Browser error on `/about`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/about",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "955f46fda7990d39af6ce063a932e2288032f5acc257be1656cb1f5969263699",
+    "title": "Browser error on `/auth/google/callback`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/auth/google/callback",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "9867f4d9139f2eef8a4fe9e0de24a2f961e1b20642677d11acb2fcb8c994f494",
+    "title": "Browser error on `/blog`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/blog",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "427ddf7cfb1f4a7ff027ac252458a483a8897baba451a809929d6d489e2c0bec",
+    "title": "Browser error on `/blog/:slug`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/blog/:slug",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "af027ea54addffc0e934756c2bb4de29f29e8eb6c201c8349b92b34ad89b21c6",
+    "title": "Browser error on `/blog/series/:series`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/blog/series/:series",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "ac6e35cf4ebadb960a118daaed8ac9b790bb8b724d19d093a7757cc8a23db630",
+    "title": "Browser error on `/blog/tag/:tag`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/blog/tag/:tag",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "10e12e85156572cebe43f4d110558cf4af988c1bb91b236d0e7439e00c1223ea",
+    "title": "Browser error on `/cart`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/cart",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "35882715ce76fb0698d622d760b712277d710abb622d5cb50e506cc6d6a0847d",
+    "title": "Browser error on `/checkout`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/checkout",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "916d8b739918eda4b0bd29f31dc16d421cbdbc68ef0690824606bd63c80fb339",
+    "title": "Browser error on `/checkout/mock/paypal`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/checkout/mock/paypal",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "72dee25c49d30794f7e404f7ce57a9cdb6f27bec44da6f0f2b97a5fa0491efa0",
+    "title": "Browser error on `/checkout/mock/stripe`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/checkout/mock/stripe",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "0ec13c40d5672c5a8540cc1dd81de51cbd76bcae046d9ade285c74b01c23550f",
+    "title": "Browser error on `/checkout/netopia/cancel`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/checkout/netopia/cancel",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "df3086af08a0f3b28ebaed1f71113cd250d466876f0c968d772ffa957c57fc90",
+    "title": "Browser error on `/checkout/netopia/return`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/checkout/netopia/return",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "c9492f611e997c75f9a295b67802321597d76b4e93013836c4384124fea1e289",
+    "title": "Browser error on `/checkout/paypal/cancel`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/checkout/paypal/cancel",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "6a4f1a9c55e95c8fb957f04c37b0549d6887575b0a76ad2e720763a3a77e11a3",
+    "title": "Browser error on `/checkout/paypal/return`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/checkout/paypal/return",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "a8d0da642e530f1e4b26f7e4cf944d215f51f59253132d417007cc12b6d5d790",
+    "title": "Browser error on `/checkout/stripe/cancel`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/checkout/stripe/cancel",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "b100782abb54ed5b97cb1241274704f6f6ecae4050422b15b8996827767c94c2",
+    "title": "Browser error on `/checkout/stripe/return`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/checkout/stripe/return",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "f0f3bc8ef5da65c7c9f3596de58e14eb865ac0fc7024c4deb92033208b209c2e",
+    "title": "Browser error on `/checkout/success`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/checkout/success",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "d116adbc28ced6398e3393fe33d6ae808784f695bee9cf9859ea2e4377fae47d",
+    "title": "Browser error on `/login`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/login",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "970e55d8b331620d8ed22bd498de55ed5865437df39d25c330d6f955892557c2",
+    "title": "Browser error on `/login/2fa`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/login/2fa",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "2db48130ac5d01f3a36b14e88b93df01ce4d6497e380b76947effd0a7d6c1dad",
+    "title": "Browser error on `/newsletter/confirm`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/newsletter/confirm",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "147bc57b1f50d9783e7294c78ec334ae91ed32177d7953ba3a38bff068265da5",
+    "title": "Browser error on `/newsletter/unsubscribe`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/newsletter/unsubscribe",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "1d744818a9f25e9cb00bb45d0303efdd96b95af61cf48038b0762d44457827b2",
+    "title": "Browser error on `/offline`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/offline",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "a10279266686b7228a57bf7cf930ba38dacfbe78f5fd1bb1426bc14ac08b9f3e",
+    "title": "Browser error on `/pages/:slug`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/pages/:slug",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "075d89d198158c6a8e99b338ef8eb396716c96d3f983c15918422f1e2bba9653",
+    "title": "Browser error on `/password-reset`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/password-reset",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "ccc0f6a0dc72da7b6615741364dfa783cae8ef25954b2bc4479519aa7d3a76c3",
+    "title": "Browser error on `/password-reset/confirm`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/password-reset/confirm",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "ea96902f824daf82839c81b44e1d1c94686c9237ad25c62a330290da2aeda91a",
+    "title": "Browser error on `/products/:slug`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/products/:slug",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "37d8dc995552e072495e5c86fb5627c3aa7e5c45a287b787c5ac57c370066b67",
+    "title": "Browser error on `/receipt/:token`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/receipt/:token",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "781fddfe5a114e08388ab5f1f796ef79cd037e5fdd536e157fd020cef85dc7fc",
+    "title": "Browser error on `/register`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/register",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  },
+  {
+    "fingerprint": "2bda02b63ae046438853ae8dcd8d41cf20fd8095ca85f432663f62ffc1af5e7e",
+    "title": "Browser error on `/verify-email`",
+    "description": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/err",
+    "severity": "s3",
+    "impact": 2,
+    "effort": "M",
+    "route": "/verify-email",
+    "surface": "storefront",
+    "rule_id": "browser_console_error",
+    "primary_file": "scripts/audit/collect_browser_evidence.mjs",
+    "evidence_files": [
+      "console-errors.json"
+    ],
+    "labels": [
+      "severity:s3",
+      "surface:storefront",
+      "audit:correctness"
+    ]
+  }
+]

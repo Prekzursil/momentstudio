@@ -1,0 +1,2592 @@
+[
+  {
+    "route": "/account",
+    "surface": "account",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/account",
+    "surface": "account",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/account",
+    "surface": "account",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/account",
+    "surface": "account",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/account",
+    "surface": "account",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/account/addresses",
+    "surface": "account",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/account/addresses",
+    "surface": "account",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/account/addresses",
+    "surface": "account",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/account/addresses",
+    "surface": "account",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/account/addresses",
+    "surface": "account",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/account/comments",
+    "surface": "account",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/account/comments",
+    "surface": "account",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/account/comments",
+    "surface": "account",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/account/comments",
+    "surface": "account",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/account/coupons",
+    "surface": "account",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/account/coupons",
+    "surface": "account",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/account/coupons",
+    "surface": "account",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/account/coupons",
+    "surface": "account",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/account/coupons",
+    "surface": "account",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/account/notifications",
+    "surface": "account",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/account/notifications",
+    "surface": "account",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/account/notifications",
+    "surface": "account",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/account/notifications",
+    "surface": "account",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/account/notifications",
+    "surface": "account",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/account/notifications/settings",
+    "surface": "account",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/account/notifications/settings",
+    "surface": "account",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/account/notifications/settings",
+    "surface": "account",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/account/notifications/settings",
+    "surface": "account",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/account/notifications/settings",
+    "surface": "account",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/account/orders",
+    "surface": "account",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/account/orders",
+    "surface": "account",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/account/orders",
+    "surface": "account",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/account/orders",
+    "surface": "account",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/account/overview",
+    "surface": "account",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/account/overview",
+    "surface": "account",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/account/overview",
+    "surface": "account",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/account/overview",
+    "surface": "account",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/account/overview",
+    "surface": "account",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/account/password",
+    "surface": "account",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/account/password",
+    "surface": "account",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/account/password",
+    "surface": "account",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/account/password",
+    "surface": "account",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/account/password",
+    "surface": "account",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/account/privacy",
+    "surface": "account",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/account/privacy",
+    "surface": "account",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/account/privacy",
+    "surface": "account",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/account/privacy",
+    "surface": "account",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/account/privacy",
+    "surface": "account",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/account/profile",
+    "surface": "account",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/account/profile",
+    "surface": "account",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/account/profile",
+    "surface": "account",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/account/profile",
+    "surface": "account",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/account/profile",
+    "surface": "account",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/account/security",
+    "surface": "account",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/account/security",
+    "surface": "account",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/account/security",
+    "surface": "account",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/account/security",
+    "surface": "account",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/account/security",
+    "surface": "account",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/account/wishlist",
+    "surface": "account",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/account/wishlist",
+    "surface": "account",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/account/wishlist",
+    "surface": "account",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/account/wishlist",
+    "surface": "account",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/account/wishlist",
+    "surface": "account",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/tickets",
+    "surface": "account",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/tickets",
+    "surface": "account",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/tickets",
+    "surface": "account",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/tickets",
+    "surface": "account",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/tickets",
+    "surface": "account",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/admin",
+    "surface": "admin",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/admin",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/admin",
+    "surface": "admin",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/admin",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/admin/content",
+    "surface": "admin",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/admin/content",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/admin/content",
+    "surface": "admin",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/admin/content",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/content",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/content",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/content",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/admin/content/blog",
+    "surface": "admin",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/admin/content/blog",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/admin/content/blog",
+    "surface": "admin",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/admin/content/blog",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/content/blog",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/content/blog",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/content/blog",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/admin/content/home",
+    "surface": "admin",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/admin/content/home",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/admin/content/home",
+    "surface": "admin",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/admin/content/home",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/content/home",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/content/home",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/content/home",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/admin/content/media",
+    "surface": "admin",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/admin/content/media",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/admin/content/media",
+    "surface": "admin",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/admin/content/media",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/content/media",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/content/media",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/content/media",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/admin/content/pages",
+    "surface": "admin",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/admin/content/pages",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/admin/content/pages",
+    "surface": "admin",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/admin/content/pages",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/content/pages",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/content/pages",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/admin/content/scheduling",
+    "surface": "admin",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/admin/content/scheduling",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/admin/content/scheduling",
+    "surface": "admin",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/admin/content/scheduling",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/content/scheduling",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/content/scheduling",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/admin/content/settings",
+    "surface": "admin",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/admin/content/settings",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/admin/content/settings",
+    "surface": "admin",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/admin/content/settings",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/content/settings",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/content/settings",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/content/settings",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/admin/coupons",
+    "surface": "admin",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/admin/coupons",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/admin/coupons",
+    "surface": "admin",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/admin/coupons",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/coupons",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/coupons",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/admin/dashboard",
+    "surface": "admin",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/admin/dashboard",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/admin/dashboard",
+    "surface": "admin",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/admin/dashboard",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/dashboard",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/dashboard",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/admin/gdpr",
+    "surface": "admin",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/admin/gdpr",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/admin/gdpr",
+    "surface": "admin",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/admin/gdpr",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/inventory",
+    "surface": "admin",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/admin/inventory",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/admin/inventory",
+    "surface": "admin",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/admin/inventory",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/inventory",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/inventory",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/inventory",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/admin/ip-bypass",
+    "surface": "admin",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/admin/ip-bypass",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/admin/ip-bypass",
+    "surface": "admin",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/admin/ip-bypass",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/ip-bypass",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/ip-bypass",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/admin/ops",
+    "surface": "admin",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/admin/ops",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/admin/ops",
+    "surface": "admin",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/admin/ops",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/ops",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/ops",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/admin/orders",
+    "surface": "admin",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/admin/orders",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/admin/orders",
+    "surface": "admin",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/admin/orders",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/orders",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/orders",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/orders",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/admin/orders/:orderId",
+    "surface": "admin",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/admin/orders/:orderId",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/admin/orders/:orderId",
+    "surface": "admin",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/admin/orders/:orderId",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/orders/:orderId",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/orders/:orderId",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/admin/orders/exports",
+    "surface": "admin",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/admin/orders/exports",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/admin/orders/exports",
+    "surface": "admin",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/admin/orders/exports",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/orders/exports",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/orders/exports",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/admin/products",
+    "surface": "admin",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/admin/products",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/admin/products",
+    "surface": "admin",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/admin/products",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/products",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/products",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/admin/returns",
+    "surface": "admin",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/admin/returns",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/admin/returns",
+    "surface": "admin",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/admin/returns",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/returns",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/returns",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/returns",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/admin/segments",
+    "surface": "admin",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/admin/segments",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/admin/segments",
+    "surface": "admin",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/admin/segments",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/support",
+    "surface": "admin",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/admin/support",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/admin/support",
+    "surface": "admin",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/admin/support",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/support",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/support",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/support",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/admin/users",
+    "surface": "admin",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/admin/users",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/admin/users",
+    "surface": "admin",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/admin/users",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/users",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/users",
+    "surface": "admin",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/admin/users",
+    "surface": "admin",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/",
+    "surface": "storefront",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/**",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/**",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/**",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/**",
+    "surface": "storefront",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/about",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/about",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/about",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/about",
+    "surface": "storefront",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/about",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/auth/google/callback",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/auth/google/callback",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/auth/google/callback",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/auth/google/callback",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/blog",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/blog",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/blog",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/blog",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/blog/:slug",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/blog/:slug",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/blog/:slug",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/blog/:slug",
+    "surface": "storefront",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/blog/:slug",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/blog/series/:series",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/blog/series/:series",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/blog/series/:series",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/blog/series/:series",
+    "surface": "storefront",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/blog/series/:series",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/blog/tag/:tag",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/blog/tag/:tag",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/blog/tag/:tag",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/blog/tag/:tag",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/cart",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/cart",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/cart",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/cart",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/checkout",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/checkout",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/checkout",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/checkout",
+    "surface": "storefront",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/checkout",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/checkout/mock/paypal",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/checkout/mock/paypal",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/checkout/mock/paypal",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/checkout/mock/paypal",
+    "surface": "storefront",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/checkout/mock/paypal",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/checkout/mock/stripe",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/checkout/mock/stripe",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/checkout/mock/stripe",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/checkout/mock/stripe",
+    "surface": "storefront",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/checkout/mock/stripe",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/checkout/netopia/cancel",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/checkout/netopia/cancel",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/checkout/netopia/cancel",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/checkout/netopia/cancel",
+    "surface": "storefront",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/checkout/netopia/cancel",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/checkout/netopia/return",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/checkout/netopia/return",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/checkout/netopia/return",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/checkout/netopia/return",
+    "surface": "storefront",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/checkout/netopia/return",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/checkout/paypal/cancel",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/checkout/paypal/cancel",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/checkout/paypal/cancel",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/checkout/paypal/cancel",
+    "surface": "storefront",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/checkout/paypal/cancel",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/checkout/paypal/return",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/checkout/paypal/return",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/checkout/paypal/return",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/checkout/paypal/return",
+    "surface": "storefront",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/checkout/paypal/return",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/checkout/stripe/cancel",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/checkout/stripe/cancel",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/checkout/stripe/cancel",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/checkout/stripe/cancel",
+    "surface": "storefront",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/checkout/stripe/cancel",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/checkout/stripe/return",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/checkout/stripe/return",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/checkout/stripe/return",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/checkout/stripe/return",
+    "surface": "storefront",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/checkout/stripe/return",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/checkout/success",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/checkout/success",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/checkout/success",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/checkout/success",
+    "surface": "storefront",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/checkout/success",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/contact",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/contact",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/contact",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/contact",
+    "surface": "storefront",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/error",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/error",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/error",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/error",
+    "surface": "storefront",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/login",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/login",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/login",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/login",
+    "surface": "storefront",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/login",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/login/2fa",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/login/2fa",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/login/2fa",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/login/2fa",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/newsletter/confirm",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/newsletter/confirm",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/newsletter/confirm",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/newsletter/confirm",
+    "surface": "storefront",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/newsletter/confirm",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/newsletter/unsubscribe",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/newsletter/unsubscribe",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/newsletter/unsubscribe",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/newsletter/unsubscribe",
+    "surface": "storefront",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/newsletter/unsubscribe",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/offline",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/offline",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/offline",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/offline",
+    "surface": "storefront",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/offline",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/pages/:slug",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/pages/:slug",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/pages/:slug",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/pages/:slug",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/password-reset",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/password-reset",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/password-reset",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/password-reset",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/password-reset/confirm",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/password-reset/confirm",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/password-reset/confirm",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/password-reset/confirm",
+    "surface": "storefront",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/password-reset/confirm",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/products/:slug",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/products/:slug",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/products/:slug",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/products/:slug",
+    "surface": "storefront",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/products/:slug",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/receipt/:token",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/receipt/:token",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/receipt/:token",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/receipt/:token",
+    "surface": "storefront",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/receipt/:token",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/register",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/register",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/register",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/register",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/shop",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/shop",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/shop",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/shop",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/shop",
+    "surface": "storefront",
+    "level": "error",
+    "severity": "s2",
+    "text": "HttpErrorResponse"
+  },
+  {
+    "route": "/shop/:category",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/shop/:category",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/shop/:category",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/shop/:category",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  },
+  {
+    "route": "/shop/:category",
+    "surface": "storefront",
+    "level": "error",
+    "severity": "s2",
+    "text": "HttpErrorResponse"
+  },
+  {
+    "route": "/verify-email",
+    "surface": "storefront",
+    "level": "info",
+    "severity": "s4",
+    "text": "[webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled."
+  },
+  {
+    "route": "/verify-email",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "The `useDefaultLang` and `defaultLanguage` options are deprecated. Please use `fallbackLang` instead."
+  },
+  {
+    "route": "/verify-email",
+    "surface": "storefront",
+    "level": "log",
+    "severity": "s4",
+    "text": "Angular is running in development mode."
+  },
+  {
+    "route": "/verify-email",
+    "surface": "storefront",
+    "level": "error",
+    "severity": "s2",
+    "text": "ERROR RuntimeError: NG0100: ExpressionChangedAfterItHasBeenCheckedError: Expression has changed after it was checked. Previous value: 'true'. Current value: 'false'. Expression location: FooterComponent component. Find more at https://v21.angular.dev/errors/NG0100\n    at throwErrorIfNoChangesMode (http://127.0.0.1:4300/vendor.js:22410:9)\n    at bindingUpdated (http://127.0.0.1:4300/vendor.js:26808:9)\n    at Module.ɵɵproperty (http://127.0.0.1:4300/vendor.js:33169:7)\n    at FooterComponent_Template (http://127.0.0.1:4300/main.js:6193:67)\n    at executeTemplate (http://127.0.0.1:4300/vendor.js:23763:5)\n    at refreshView (http://127.0.0.1:4300/vendor.js:24425:7)\n    at detectChangesInView (http://127.0.0.1:4300/vendor.js:24565:5)\n    at detectChangesInViewIfAttached (http://127.0.0.1:4300/vendor.js:24548:3)\n    at detectChangesInComponent (http://127.0.0.1:4300/vendor.js:24539:5)\n    at detectChangesInChildComponents (http://127.0.0.1:4300/vendor.js:24587:5)"
+  },
+  {
+    "route": "/verify-email",
+    "surface": "storefront",
+    "level": "warning",
+    "severity": "s3",
+    "text": "NG0913: An image with src http://127.0.0.1:4300/assets/brand/made-by-andrei-visalon-light.png is the Largest Contentful Paint (LCP) element but was given a \"loading\" value of \"lazy\", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to \"eager\", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://v21.angular.dev/errors/NG0913. Find more at https://v21.angular.dev/errors/NG0913"
+  }
+]

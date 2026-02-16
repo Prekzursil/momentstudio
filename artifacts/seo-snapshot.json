@@ -1,0 +1,917 @@
+[
+  {
+    "route": "/account",
+    "surface": "account",
+    "url": "http://127.0.0.1:4300/account",
+    "screenshot": "screenshots/account.png",
+    "title": "Login | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "Login"
+    ]
+  },
+  {
+    "route": "/account/addresses",
+    "surface": "account",
+    "url": "http://127.0.0.1:4300/account/addresses",
+    "screenshot": "screenshots/account-addresses.png",
+    "title": "Login | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "Login"
+    ]
+  },
+  {
+    "route": "/account/comments",
+    "surface": "account",
+    "url": "http://127.0.0.1:4300/account/comments",
+    "screenshot": "screenshots/account-comments.png",
+    "title": "Login | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "Login"
+    ]
+  },
+  {
+    "route": "/account/coupons",
+    "surface": "account",
+    "url": "http://127.0.0.1:4300/account/coupons",
+    "screenshot": "screenshots/account-coupons.png",
+    "title": "Login | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "Login"
+    ]
+  },
+  {
+    "route": "/account/notifications",
+    "surface": "account",
+    "url": "http://127.0.0.1:4300/account/notifications",
+    "screenshot": "screenshots/account-notifications.png",
+    "title": "Login | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "Login"
+    ]
+  },
+  {
+    "route": "/account/notifications/settings",
+    "surface": "account",
+    "url": "http://127.0.0.1:4300/account/notifications/settings",
+    "screenshot": "screenshots/account-notifications-settings.png",
+    "title": "Login | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "Login"
+    ]
+  },
+  {
+    "route": "/account/orders",
+    "surface": "account",
+    "url": "http://127.0.0.1:4300/account/orders",
+    "screenshot": "screenshots/account-orders.png",
+    "title": "Login | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "Login"
+    ]
+  },
+  {
+    "route": "/account/overview",
+    "surface": "account",
+    "url": "http://127.0.0.1:4300/account/overview",
+    "screenshot": "screenshots/account-overview.png",
+    "title": "Login | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "Login"
+    ]
+  },
+  {
+    "route": "/account/password",
+    "surface": "account",
+    "url": "http://127.0.0.1:4300/account/password",
+    "screenshot": "screenshots/account-password.png",
+    "title": "Login | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "Login"
+    ]
+  },
+  {
+    "route": "/account/privacy",
+    "surface": "account",
+    "url": "http://127.0.0.1:4300/account/privacy",
+    "screenshot": "screenshots/account-privacy.png",
+    "title": "Login | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "Login"
+    ]
+  },
+  {
+    "route": "/account/profile",
+    "surface": "account",
+    "url": "http://127.0.0.1:4300/account/profile",
+    "screenshot": "screenshots/account-profile.png",
+    "title": "Login | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "Login"
+    ]
+  },
+  {
+    "route": "/account/security",
+    "surface": "account",
+    "url": "http://127.0.0.1:4300/account/security",
+    "screenshot": "screenshots/account-security.png",
+    "title": "Login | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "Login"
+    ]
+  },
+  {
+    "route": "/account/wishlist",
+    "surface": "account",
+    "url": "http://127.0.0.1:4300/account/wishlist",
+    "screenshot": "screenshots/account-wishlist.png",
+    "title": "Login | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "Login"
+    ]
+  },
+  {
+    "route": "/tickets",
+    "surface": "account",
+    "url": "http://127.0.0.1:4300/tickets",
+    "screenshot": "screenshots/tickets.png",
+    "title": "Login | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "Login"
+    ]
+  },
+  {
+    "route": "/admin",
+    "surface": "admin",
+    "url": "http://127.0.0.1:4300/admin",
+    "screenshot": "screenshots/admin.png",
+    "title": "momentstudio | Handcrafted ceramics storefront",
+    "canonical": "http://127.0.0.1:4300/?lang=en",
+    "robots": "index,follow,max-image-preview:large",
+    "h1_count": 1,
+    "h1_texts": [
+      "momentstudio"
+    ]
+  },
+  {
+    "route": "/admin/content",
+    "surface": "admin",
+    "url": "http://127.0.0.1:4300/admin/content",
+    "screenshot": "screenshots/admin-content.png",
+    "title": "momentstudio | Handcrafted ceramics storefront",
+    "canonical": "http://127.0.0.1:4300/?lang=en",
+    "robots": "index,follow,max-image-preview:large",
+    "h1_count": 1,
+    "h1_texts": [
+      "momentstudio"
+    ]
+  },
+  {
+    "route": "/admin/content/blog",
+    "surface": "admin",
+    "url": "http://127.0.0.1:4300/admin/content/blog",
+    "screenshot": "screenshots/admin-content-blog.png",
+    "title": "momentstudio | Handcrafted ceramics storefront",
+    "canonical": "http://127.0.0.1:4300/?lang=en",
+    "robots": "index,follow,max-image-preview:large",
+    "h1_count": 1,
+    "h1_texts": [
+      "momentstudio"
+    ]
+  },
+  {
+    "route": "/admin/content/home",
+    "surface": "admin",
+    "url": "http://127.0.0.1:4300/admin/content/home",
+    "screenshot": "screenshots/admin-content-home.png",
+    "title": "momentstudio | Handcrafted ceramics storefront",
+    "canonical": "http://127.0.0.1:4300/?lang=en",
+    "robots": "index,follow,max-image-preview:large",
+    "h1_count": 1,
+    "h1_texts": [
+      "momentstudio"
+    ]
+  },
+  {
+    "route": "/admin/content/media",
+    "surface": "admin",
+    "url": "http://127.0.0.1:4300/admin/content/media",
+    "screenshot": "screenshots/admin-content-media.png",
+    "title": "momentstudio | Handcrafted ceramics storefront",
+    "canonical": "http://127.0.0.1:4300/?lang=en",
+    "robots": "index,follow,max-image-preview:large",
+    "h1_count": 1,
+    "h1_texts": [
+      "momentstudio"
+    ]
+  },
+  {
+    "route": "/admin/content/pages",
+    "surface": "admin",
+    "url": "http://127.0.0.1:4300/admin/content/pages",
+    "screenshot": "screenshots/admin-content-pages.png",
+    "title": "momentstudio | Handcrafted ceramics storefront",
+    "canonical": "http://127.0.0.1:4300/?lang=en",
+    "robots": "index,follow,max-image-preview:large",
+    "h1_count": 1,
+    "h1_texts": [
+      "momentstudio"
+    ]
+  },
+  {
+    "route": "/admin/content/scheduling",
+    "surface": "admin",
+    "url": "http://127.0.0.1:4300/admin/content/scheduling",
+    "screenshot": "screenshots/admin-content-scheduling.png",
+    "title": "momentstudio | Handcrafted ceramics storefront",
+    "canonical": "http://127.0.0.1:4300/?lang=en",
+    "robots": "index,follow,max-image-preview:large",
+    "h1_count": 1,
+    "h1_texts": [
+      "momentstudio"
+    ]
+  },
+  {
+    "route": "/admin/content/settings",
+    "surface": "admin",
+    "url": "http://127.0.0.1:4300/admin/content/settings",
+    "screenshot": "screenshots/admin-content-settings.png",
+    "title": "momentstudio | Handcrafted ceramics storefront",
+    "canonical": "http://127.0.0.1:4300/?lang=en",
+    "robots": "index,follow,max-image-preview:large",
+    "h1_count": 1,
+    "h1_texts": [
+      "momentstudio"
+    ]
+  },
+  {
+    "route": "/admin/coupons",
+    "surface": "admin",
+    "url": "http://127.0.0.1:4300/admin/coupons",
+    "screenshot": "screenshots/admin-coupons.png",
+    "title": "momentstudio | Handcrafted ceramics storefront",
+    "canonical": "http://127.0.0.1:4300/?lang=en",
+    "robots": "index,follow,max-image-preview:large",
+    "h1_count": 1,
+    "h1_texts": [
+      "momentstudio"
+    ]
+  },
+  {
+    "route": "/admin/dashboard",
+    "surface": "admin",
+    "url": "http://127.0.0.1:4300/admin/dashboard",
+    "screenshot": "screenshots/admin-dashboard.png",
+    "title": "momentstudio | Handcrafted ceramics storefront",
+    "canonical": "http://127.0.0.1:4300/?lang=en",
+    "robots": "index,follow,max-image-preview:large",
+    "h1_count": 1,
+    "h1_texts": [
+      "momentstudio"
+    ]
+  },
+  {
+    "route": "/admin/gdpr",
+    "surface": "admin",
+    "url": "http://127.0.0.1:4300/admin/gdpr",
+    "screenshot": "screenshots/admin-gdpr.png",
+    "title": "Not Found",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "Page not found"
+    ]
+  },
+  {
+    "route": "/admin/inventory",
+    "surface": "admin",
+    "url": "http://127.0.0.1:4300/admin/inventory",
+    "screenshot": "screenshots/admin-inventory.png",
+    "title": "momentstudio | Handcrafted ceramics storefront",
+    "canonical": "http://127.0.0.1:4300/?lang=en",
+    "robots": "index,follow,max-image-preview:large",
+    "h1_count": 1,
+    "h1_texts": [
+      "momentstudio"
+    ]
+  },
+  {
+    "route": "/admin/ip-bypass",
+    "surface": "admin",
+    "url": "http://127.0.0.1:4300/admin/ip-bypass",
+    "screenshot": "screenshots/admin-ip-bypass.png",
+    "title": "momentstudio | Handcrafted ceramics storefront",
+    "canonical": "http://127.0.0.1:4300/?lang=en",
+    "robots": "index,follow,max-image-preview:large",
+    "h1_count": 1,
+    "h1_texts": [
+      "momentstudio"
+    ]
+  },
+  {
+    "route": "/admin/ops",
+    "surface": "admin",
+    "url": "http://127.0.0.1:4300/admin/ops",
+    "screenshot": "screenshots/admin-ops.png",
+    "title": "momentstudio | Handcrafted ceramics storefront",
+    "canonical": "http://127.0.0.1:4300/?lang=en",
+    "robots": "index,follow,max-image-preview:large",
+    "h1_count": 1,
+    "h1_texts": [
+      "momentstudio"
+    ]
+  },
+  {
+    "route": "/admin/orders",
+    "surface": "admin",
+    "url": "http://127.0.0.1:4300/admin/orders",
+    "screenshot": "screenshots/admin-orders.png",
+    "title": "momentstudio | Handcrafted ceramics storefront",
+    "canonical": "http://127.0.0.1:4300/?lang=en",
+    "robots": "index,follow,max-image-preview:large",
+    "h1_count": 1,
+    "h1_texts": [
+      "momentstudio"
+    ]
+  },
+  {
+    "route": "/admin/orders/:orderId",
+    "surface": "admin",
+    "url": "http://127.0.0.1:4300/admin/orders/:orderId",
+    "screenshot": "screenshots/admin-orders-_orderId.png",
+    "title": "momentstudio | Handcrafted ceramics storefront",
+    "canonical": "http://127.0.0.1:4300/?lang=en",
+    "robots": "index,follow,max-image-preview:large",
+    "h1_count": 1,
+    "h1_texts": [
+      "momentstudio"
+    ]
+  },
+  {
+    "route": "/admin/orders/exports",
+    "surface": "admin",
+    "url": "http://127.0.0.1:4300/admin/orders/exports",
+    "screenshot": "screenshots/admin-orders-exports.png",
+    "title": "momentstudio | Handcrafted ceramics storefront",
+    "canonical": "http://127.0.0.1:4300/?lang=en",
+    "robots": "index,follow,max-image-preview:large",
+    "h1_count": 1,
+    "h1_texts": [
+      "momentstudio"
+    ]
+  },
+  {
+    "route": "/admin/products",
+    "surface": "admin",
+    "url": "http://127.0.0.1:4300/admin/products",
+    "screenshot": "screenshots/admin-products.png",
+    "title": "momentstudio | Handcrafted ceramics storefront",
+    "canonical": "http://127.0.0.1:4300/?lang=en",
+    "robots": "index,follow,max-image-preview:large",
+    "h1_count": 1,
+    "h1_texts": [
+      "momentstudio"
+    ]
+  },
+  {
+    "route": "/admin/returns",
+    "surface": "admin",
+    "url": "http://127.0.0.1:4300/admin/returns",
+    "screenshot": "screenshots/admin-returns.png",
+    "title": "momentstudio | Handcrafted ceramics storefront",
+    "canonical": "http://127.0.0.1:4300/?lang=en",
+    "robots": "index,follow,max-image-preview:large",
+    "h1_count": 1,
+    "h1_texts": [
+      "momentstudio"
+    ]
+  },
+  {
+    "route": "/admin/segments",
+    "surface": "admin",
+    "url": "http://127.0.0.1:4300/admin/segments",
+    "screenshot": "screenshots/admin-segments.png",
+    "title": "Not Found",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "Page not found"
+    ]
+  },
+  {
+    "route": "/admin/support",
+    "surface": "admin",
+    "url": "http://127.0.0.1:4300/admin/support",
+    "screenshot": "screenshots/admin-support.png",
+    "title": "momentstudio | Handcrafted ceramics storefront",
+    "canonical": "http://127.0.0.1:4300/?lang=en",
+    "robots": "index,follow,max-image-preview:large",
+    "h1_count": 1,
+    "h1_texts": [
+      "momentstudio"
+    ]
+  },
+  {
+    "route": "/admin/users",
+    "surface": "admin",
+    "url": "http://127.0.0.1:4300/admin/users",
+    "screenshot": "screenshots/admin-users.png",
+    "title": "momentstudio | Handcrafted ceramics storefront",
+    "canonical": "http://127.0.0.1:4300/?lang=en",
+    "robots": "index,follow,max-image-preview:large",
+    "h1_count": 1,
+    "h1_texts": [
+      "momentstudio"
+    ]
+  },
+  {
+    "route": "/",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/",
+    "screenshot": "screenshots/root.png",
+    "title": "momentstudio | Handcrafted ceramics storefront",
+    "canonical": "http://127.0.0.1:4300/?lang=en",
+    "robots": "index,follow,max-image-preview:large",
+    "h1_count": 1,
+    "h1_texts": [
+      "momentstudio"
+    ]
+  },
+  {
+    "route": "/**",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/**",
+    "screenshot": "screenshots/__.png",
+    "title": "Not Found",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "Page not found"
+    ]
+  },
+  {
+    "route": "/about",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/about",
+    "screenshot": "screenshots/about.png",
+    "title": "Our story | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "index,follow,max-image-preview:large",
+    "h1_count": 1,
+    "h1_texts": [
+      "Our story"
+    ]
+  },
+  {
+    "route": "/auth/google/callback",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/auth/google/callback",
+    "screenshot": "screenshots/auth-google-callback.png",
+    "title": "Login | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "Login"
+    ]
+  },
+  {
+    "route": "/blog",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/blog",
+    "screenshot": "screenshots/blog.png",
+    "title": "Blog | momentstudio",
+    "canonical": "http://127.0.0.1:4300/blog?lang=en",
+    "robots": "index,follow,max-image-preview:large",
+    "h1_count": 1,
+    "h1_texts": [
+      "Blog"
+    ]
+  },
+  {
+    "route": "/blog/:slug",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/blog/:slug",
+    "screenshot": "screenshots/blog-_slug.png",
+    "title": "Blog post | momentstudio",
+    "canonical": "http://127.0.0.1:4300/blog/%3Aslug?lang=en",
+    "robots": "index,follow,max-image-preview:large",
+    "h1_count": 1,
+    "h1_texts": []
+  },
+  {
+    "route": "/blog/series/:series",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/blog/series/:series",
+    "screenshot": "screenshots/blog-series-_series.png",
+    "title": "Blog · Series: :series | momentstudio",
+    "canonical": "http://127.0.0.1:4300/blog/series/%3Aseries?lang=en",
+    "robots": "index,follow,max-image-preview:large",
+    "h1_count": 1,
+    "h1_texts": [
+      "Blog"
+    ]
+  },
+  {
+    "route": "/blog/tag/:tag",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/blog/tag/:tag",
+    "screenshot": "screenshots/blog-tag-_tag.png",
+    "title": "Blog · #:tag | momentstudio",
+    "canonical": "http://127.0.0.1:4300/blog/tag/%3Atag?lang=en",
+    "robots": "index,follow,max-image-preview:large",
+    "h1_count": 1,
+    "h1_texts": [
+      "Blog"
+    ]
+  },
+  {
+    "route": "/cart",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/cart",
+    "screenshot": "screenshots/cart.png",
+    "title": "Cart | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "index,follow,max-image-preview:large",
+    "h1_count": 1,
+    "h1_texts": [
+      "Your cart"
+    ]
+  },
+  {
+    "route": "/checkout",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/checkout",
+    "screenshot": "screenshots/checkout.png",
+    "title": "Cart | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "index,follow,max-image-preview:large",
+    "h1_count": 1,
+    "h1_texts": [
+      "Your cart"
+    ]
+  },
+  {
+    "route": "/checkout/mock/paypal",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/checkout/mock/paypal",
+    "screenshot": "screenshots/checkout-mock-paypal.png",
+    "title": "PayPal (Mock) | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "Mock checkout"
+    ]
+  },
+  {
+    "route": "/checkout/mock/stripe",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/checkout/mock/stripe",
+    "screenshot": "screenshots/checkout-mock-stripe.png",
+    "title": "Stripe (Mock) | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "Mock checkout"
+    ]
+  },
+  {
+    "route": "/checkout/netopia/cancel",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/checkout/netopia/cancel",
+    "screenshot": "screenshots/checkout-netopia-cancel.png",
+    "title": "Checkout | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "Netopia checkout cancelled"
+    ]
+  },
+  {
+    "route": "/checkout/netopia/return",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/checkout/netopia/return",
+    "screenshot": "screenshots/checkout-netopia-return.png",
+    "title": "Netopia | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "Netopia"
+    ]
+  },
+  {
+    "route": "/checkout/paypal/cancel",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/checkout/paypal/cancel",
+    "screenshot": "screenshots/checkout-paypal-cancel.png",
+    "title": "Checkout | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "PayPal checkout cancelled"
+    ]
+  },
+  {
+    "route": "/checkout/paypal/return",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/checkout/paypal/return",
+    "screenshot": "screenshots/checkout-paypal-return.png",
+    "title": "PayPal | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "PayPal"
+    ]
+  },
+  {
+    "route": "/checkout/stripe/cancel",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/checkout/stripe/cancel",
+    "screenshot": "screenshots/checkout-stripe-cancel.png",
+    "title": "Checkout | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "Stripe checkout cancelled"
+    ]
+  },
+  {
+    "route": "/checkout/stripe/return",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/checkout/stripe/return",
+    "screenshot": "screenshots/checkout-stripe-return.png",
+    "title": "Stripe | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "Stripe"
+    ]
+  },
+  {
+    "route": "/checkout/success",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/checkout/success",
+    "screenshot": "screenshots/checkout-success.png",
+    "title": "Order placed | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "Thank you for your purchase!"
+    ]
+  },
+  {
+    "route": "/contact",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/contact",
+    "screenshot": "screenshots/contact.png",
+    "title": "Contact | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "index,follow,max-image-preview:large",
+    "h1_count": 1,
+    "h1_texts": [
+      "Contact"
+    ]
+  },
+  {
+    "route": "/error",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/error",
+    "screenshot": "screenshots/error.png",
+    "title": "Something went wrong",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "Something went wrong"
+    ]
+  },
+  {
+    "route": "/login",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/login",
+    "screenshot": "screenshots/login.png",
+    "title": "Login | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "Login"
+    ]
+  },
+  {
+    "route": "/login/2fa",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/login/2fa",
+    "screenshot": "screenshots/login-2fa.png",
+    "title": "Login | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "Login"
+    ]
+  },
+  {
+    "route": "/newsletter/confirm",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/newsletter/confirm",
+    "screenshot": "screenshots/newsletter-confirm.png",
+    "title": "Newsletter | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 0,
+    "h1_texts": []
+  },
+  {
+    "route": "/newsletter/unsubscribe",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/newsletter/unsubscribe",
+    "screenshot": "screenshots/newsletter-unsubscribe.png",
+    "title": "Unsubscribe | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 0,
+    "h1_texts": []
+  },
+  {
+    "route": "/offline",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/offline",
+    "screenshot": "screenshots/offline.png",
+    "title": "Offline | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "You're offline"
+    ]
+  },
+  {
+    "route": "/pages/:slug",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/pages/:slug",
+    "screenshot": "screenshots/pages-_slug.png",
+    "title": ":slug | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "index,follow,max-image-preview:large",
+    "h1_count": 1,
+    "h1_texts": [
+      "Page"
+    ]
+  },
+  {
+    "route": "/password-reset",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/password-reset",
+    "screenshot": "screenshots/password-reset.png",
+    "title": "Password reset | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "Reset password"
+    ]
+  },
+  {
+    "route": "/password-reset/confirm",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/password-reset/confirm",
+    "screenshot": "screenshots/password-reset-confirm.png",
+    "title": "Set new password | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "Set new password"
+    ]
+  },
+  {
+    "route": "/products/:slug",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/products/:slug",
+    "screenshot": "screenshots/products-_slug.png",
+    "title": "Product | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "index,follow,max-image-preview:large",
+    "h1_count": 0,
+    "h1_texts": []
+  },
+  {
+    "route": "/receipt/:token",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/receipt/:token",
+    "screenshot": "screenshots/receipt-_token.png",
+    "title": "Receipt | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "—"
+    ]
+  },
+  {
+    "route": "/register",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/register",
+    "screenshot": "screenshots/register.png",
+    "title": "Register | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "Create account"
+    ]
+  },
+  {
+    "route": "/shop",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/shop",
+    "screenshot": "screenshots/shop.png",
+    "title": "Shop handcrafted ceramics | momentstudio",
+    "canonical": "http://127.0.0.1:4300/shop?lang=en",
+    "robots": "index,follow,max-image-preview:large",
+    "h1_count": 1,
+    "h1_texts": [
+      "Shop"
+    ]
+  },
+  {
+    "route": "/shop/:category",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/shop/:category",
+    "screenshot": "screenshots/shop-_category.png",
+    "title": "Shop handcrafted ceramics | momentstudio",
+    "canonical": "http://127.0.0.1:4300/shop?lang=en",
+    "robots": "index,follow,max-image-preview:large",
+    "h1_count": 1,
+    "h1_texts": [
+      "Shop"
+    ]
+  },
+  {
+    "route": "/verify-email",
+    "surface": "storefront",
+    "url": "http://127.0.0.1:4300/verify-email",
+    "screenshot": "screenshots/verify-email.png",
+    "title": "Verify email | momentstudio",
+    "canonical": "https://momentstudio.ro/",
+    "robots": "noindex,nofollow",
+    "h1_count": 1,
+    "h1_texts": [
+      "Verify email"
+    ]
+  }
+]

@@ -1,0 +1,572 @@
+{
+  "routes": [
+    {
+      "raw_path": "account",
+      "prefix": "/",
+      "full_path": "/account",
+      "surface": "account",
+      "title_key": null,
+      "robots_hint": "NOINDEX_ROBOTS"
+    },
+    {
+      "raw_path": "addresses",
+      "prefix": "/account",
+      "full_path": "/account/addresses",
+      "surface": "account",
+      "title_key": null,
+      "robots_hint": null
+    },
+    {
+      "raw_path": "comments",
+      "prefix": "/account",
+      "full_path": "/account/comments",
+      "surface": "account",
+      "title_key": "meta.titles.change_password",
+      "robots_hint": null
+    },
+    {
+      "raw_path": "coupons",
+      "prefix": "/account",
+      "full_path": "/account/coupons",
+      "surface": "account",
+      "title_key": null,
+      "robots_hint": null
+    },
+    {
+      "raw_path": "notifications",
+      "prefix": "/account",
+      "full_path": "/account/notifications",
+      "surface": "account",
+      "title_key": null,
+      "robots_hint": null
+    },
+    {
+      "raw_path": "notifications/settings",
+      "prefix": "/account",
+      "full_path": "/account/notifications/settings",
+      "surface": "account",
+      "title_key": null,
+      "robots_hint": null
+    },
+    {
+      "raw_path": "orders",
+      "prefix": "/account",
+      "full_path": "/account/orders",
+      "surface": "account",
+      "title_key": null,
+      "robots_hint": null
+    },
+    {
+      "raw_path": "overview",
+      "prefix": "/account",
+      "full_path": "/account/overview",
+      "surface": "account",
+      "title_key": null,
+      "robots_hint": null
+    },
+    {
+      "raw_path": "password",
+      "prefix": "/account",
+      "full_path": "/account/password",
+      "surface": "account",
+      "title_key": "meta.titles.change_password",
+      "robots_hint": "NOINDEX_ROBOTS"
+    },
+    {
+      "raw_path": "privacy",
+      "prefix": "/account",
+      "full_path": "/account/privacy",
+      "surface": "account",
+      "title_key": "meta.titles.change_password",
+      "robots_hint": null
+    },
+    {
+      "raw_path": "profile",
+      "prefix": "/account",
+      "full_path": "/account/profile",
+      "surface": "account",
+      "title_key": null,
+      "robots_hint": null
+    },
+    {
+      "raw_path": "security",
+      "prefix": "/account",
+      "full_path": "/account/security",
+      "surface": "account",
+      "title_key": null,
+      "robots_hint": null
+    },
+    {
+      "raw_path": "wishlist",
+      "prefix": "/account",
+      "full_path": "/account/wishlist",
+      "surface": "account",
+      "title_key": null,
+      "robots_hint": null
+    },
+    {
+      "raw_path": "tickets",
+      "prefix": "/",
+      "full_path": "/tickets",
+      "surface": "account",
+      "title_key": "meta.titles.help_center",
+      "robots_hint": "NOINDEX_ROBOTS"
+    },
+    {
+      "raw_path": "admin",
+      "prefix": "/",
+      "full_path": "/admin",
+      "surface": "admin",
+      "title_key": "meta.titles.admin_access",
+      "robots_hint": "NOINDEX_ROBOTS"
+    },
+    {
+      "raw_path": "content",
+      "prefix": "/admin",
+      "full_path": "/admin/content",
+      "surface": "admin",
+      "title_key": null,
+      "robots_hint": null
+    },
+    {
+      "raw_path": "blog",
+      "prefix": "/admin/content",
+      "full_path": "/admin/content/blog",
+      "surface": "admin",
+      "title_key": "meta.titles.admin_content_blog",
+      "robots_hint": null
+    },
+    {
+      "raw_path": "home",
+      "prefix": "/admin/content",
+      "full_path": "/admin/content/home",
+      "surface": "admin",
+      "title_key": "meta.titles.admin_content_home",
+      "robots_hint": null
+    },
+    {
+      "raw_path": "media",
+      "prefix": "/admin/content",
+      "full_path": "/admin/content/media",
+      "surface": "admin",
+      "title_key": "meta.titles.admin_content_media",
+      "robots_hint": null
+    },
+    {
+      "raw_path": "pages",
+      "prefix": "/admin/content",
+      "full_path": "/admin/content/pages",
+      "surface": "admin",
+      "title_key": "meta.titles.admin_content_pages",
+      "robots_hint": null
+    },
+    {
+      "raw_path": "scheduling",
+      "prefix": "/admin/content",
+      "full_path": "/admin/content/scheduling",
+      "surface": "admin",
+      "title_key": "meta.titles.admin_content_scheduling",
+      "robots_hint": null
+    },
+    {
+      "raw_path": "settings",
+      "prefix": "/admin/content",
+      "full_path": "/admin/content/settings",
+      "surface": "admin",
+      "title_key": "meta.titles.admin_content_settings",
+      "robots_hint": null
+    },
+    {
+      "raw_path": "coupons",
+      "prefix": "/admin",
+      "full_path": "/admin/coupons",
+      "surface": "admin",
+      "title_key": "meta.titles.admin_coupons",
+      "robots_hint": null
+    },
+    {
+      "raw_path": "dashboard",
+      "prefix": "/admin",
+      "full_path": "/admin/dashboard",
+      "surface": "admin",
+      "title_key": "meta.titles.admin",
+      "robots_hint": null
+    },
+    {
+      "raw_path": "gdpr",
+      "prefix": "/admin",
+      "full_path": "/admin/gdpr",
+      "surface": "admin",
+      "title_key": "meta.titles.admin_gdpr",
+      "robots_hint": null
+    },
+    {
+      "raw_path": "inventory",
+      "prefix": "/admin",
+      "full_path": "/admin/inventory",
+      "surface": "admin",
+      "title_key": "meta.titles.admin_inventory",
+      "robots_hint": null
+    },
+    {
+      "raw_path": "ip-bypass",
+      "prefix": "/admin",
+      "full_path": "/admin/ip-bypass",
+      "surface": "admin",
+      "title_key": "meta.titles.admin_access",
+      "robots_hint": null
+    },
+    {
+      "raw_path": "ops",
+      "prefix": "/admin",
+      "full_path": "/admin/ops",
+      "surface": "admin",
+      "title_key": "meta.titles.admin_ops",
+      "robots_hint": "NOINDEX_ROBOTS"
+    },
+    {
+      "raw_path": "orders",
+      "prefix": "/admin",
+      "full_path": "/admin/orders",
+      "surface": "admin",
+      "title_key": "meta.titles.admin_orders",
+      "robots_hint": null
+    },
+    {
+      "raw_path": "orders/:orderId",
+      "prefix": "/admin",
+      "full_path": "/admin/orders/:orderId",
+      "surface": "admin",
+      "title_key": "meta.titles.admin_order",
+      "robots_hint": null
+    },
+    {
+      "raw_path": "orders/exports",
+      "prefix": "/admin",
+      "full_path": "/admin/orders/exports",
+      "surface": "admin",
+      "title_key": "meta.titles.admin_order_exports",
+      "robots_hint": null
+    },
+    {
+      "raw_path": "products",
+      "prefix": "/admin",
+      "full_path": "/admin/products",
+      "surface": "admin",
+      "title_key": "meta.titles.admin_products",
+      "robots_hint": null
+    },
+    {
+      "raw_path": "returns",
+      "prefix": "/admin",
+      "full_path": "/admin/returns",
+      "surface": "admin",
+      "title_key": "meta.titles.admin_returns",
+      "robots_hint": null
+    },
+    {
+      "raw_path": "segments",
+      "prefix": "/admin",
+      "full_path": "/admin/segments",
+      "surface": "admin",
+      "title_key": "meta.titles.admin_segments",
+      "robots_hint": null
+    },
+    {
+      "raw_path": "support",
+      "prefix": "/admin",
+      "full_path": "/admin/support",
+      "surface": "admin",
+      "title_key": "meta.titles.admin_support",
+      "robots_hint": null
+    },
+    {
+      "raw_path": "users",
+      "prefix": "/admin",
+      "full_path": "/admin/users",
+      "surface": "admin",
+      "title_key": "meta.titles.admin_users",
+      "robots_hint": null
+    },
+    {
+      "raw_path": "",
+      "prefix": "/",
+      "full_path": "/",
+      "surface": "storefront",
+      "title_key": "meta.titles.home",
+      "robots_hint": null
+    },
+    {
+      "raw_path": "**",
+      "prefix": "/",
+      "full_path": "/**",
+      "surface": "storefront",
+      "title_key": "meta.titles.not_found",
+      "robots_hint": "NOINDEX_ROBOTS"
+    },
+    {
+      "raw_path": "about",
+      "prefix": "/",
+      "full_path": "/about",
+      "surface": "storefront",
+      "title_key": "meta.titles.about",
+      "robots_hint": null
+    },
+    {
+      "raw_path": "auth/google/callback",
+      "prefix": "/",
+      "full_path": "/auth/google/callback",
+      "surface": "storefront",
+      "title_key": "meta.titles.google_signin",
+      "robots_hint": "NOINDEX_ROBOTS"
+    },
+    {
+      "raw_path": "blog",
+      "prefix": "/",
+      "full_path": "/blog",
+      "surface": "storefront",
+      "title_key": "meta.titles.blog",
+      "robots_hint": null
+    },
+    {
+      "raw_path": "blog/:slug",
+      "prefix": "/",
+      "full_path": "/blog/:slug",
+      "surface": "storefront",
+      "title_key": "meta.titles.blog",
+      "robots_hint": null
+    },
+    {
+      "raw_path": "blog/series/:series",
+      "prefix": "/",
+      "full_path": "/blog/series/:series",
+      "surface": "storefront",
+      "title_key": "meta.titles.blog",
+      "robots_hint": null
+    },
+    {
+      "raw_path": "blog/tag/:tag",
+      "prefix": "/",
+      "full_path": "/blog/tag/:tag",
+      "surface": "storefront",
+      "title_key": "meta.titles.blog",
+      "robots_hint": null
+    },
+    {
+      "raw_path": "cart",
+      "prefix": "/",
+      "full_path": "/cart",
+      "surface": "storefront",
+      "title_key": "meta.titles.cart",
+      "robots_hint": "NOINDEX_ROBOTS"
+    },
+    {
+      "raw_path": "checkout",
+      "prefix": "/",
+      "full_path": "/checkout",
+      "surface": "storefront",
+      "title_key": "meta.titles.checkout",
+      "robots_hint": "NOINDEX_ROBOTS"
+    },
+    {
+      "raw_path": "checkout/mock/paypal",
+      "prefix": "/",
+      "full_path": "/checkout/mock/paypal",
+      "surface": "storefront",
+      "title_key": "meta.titles.checkout_paypal_mock",
+      "robots_hint": "NOINDEX_ROBOTS"
+    },
+    {
+      "raw_path": "checkout/mock/stripe",
+      "prefix": "/",
+      "full_path": "/checkout/mock/stripe",
+      "surface": "storefront",
+      "title_key": "meta.titles.checkout_stripe_mock",
+      "robots_hint": "NOINDEX_ROBOTS"
+    },
+    {
+      "raw_path": "checkout/netopia/cancel",
+      "prefix": "/",
+      "full_path": "/checkout/netopia/cancel",
+      "surface": "storefront",
+      "title_key": "meta.titles.checkout",
+      "robots_hint": "NOINDEX_ROBOTS"
+    },
+    {
+      "raw_path": "checkout/netopia/return",
+      "prefix": "/",
+      "full_path": "/checkout/netopia/return",
+      "surface": "storefront",
+      "title_key": "meta.titles.checkout_netopia",
+      "robots_hint": "NOINDEX_ROBOTS"
+    },
+    {
+      "raw_path": "checkout/paypal/cancel",
+      "prefix": "/",
+      "full_path": "/checkout/paypal/cancel",
+      "surface": "storefront",
+      "title_key": "meta.titles.checkout",
+      "robots_hint": "NOINDEX_ROBOTS"
+    },
+    {
+      "raw_path": "checkout/paypal/return",
+      "prefix": "/",
+      "full_path": "/checkout/paypal/return",
+      "surface": "storefront",
+      "title_key": "meta.titles.checkout_paypal",
+      "robots_hint": "NOINDEX_ROBOTS"
+    },
+    {
+      "raw_path": "checkout/stripe/cancel",
+      "prefix": "/",
+      "full_path": "/checkout/stripe/cancel",
+      "surface": "storefront",
+      "title_key": "meta.titles.checkout",
+      "robots_hint": "NOINDEX_ROBOTS"
+    },
+    {
+      "raw_path": "checkout/stripe/return",
+      "prefix": "/",
+      "full_path": "/checkout/stripe/return",
+      "surface": "storefront",
+      "title_key": "meta.titles.checkout_stripe",
+      "robots_hint": "NOINDEX_ROBOTS"
+    },
+    {
+      "raw_path": "checkout/success",
+      "prefix": "/",
+      "full_path": "/checkout/success",
+      "surface": "storefront",
+      "title_key": "meta.titles.checkout_success",
+      "robots_hint": "NOINDEX_ROBOTS"
+    },
+    {
+      "raw_path": "contact",
+      "prefix": "/",
+      "full_path": "/contact",
+      "surface": "storefront",
+      "title_key": "meta.titles.contact",
+      "robots_hint": null
+    },
+    {
+      "raw_path": "error",
+      "prefix": "/",
+      "full_path": "/error",
+      "surface": "storefront",
+      "title_key": "meta.titles.error",
+      "robots_hint": "NOINDEX_ROBOTS"
+    },
+    {
+      "raw_path": "login",
+      "prefix": "/",
+      "full_path": "/login",
+      "surface": "storefront",
+      "title_key": "meta.titles.login",
+      "robots_hint": "NOINDEX_ROBOTS"
+    },
+    {
+      "raw_path": "login/2fa",
+      "prefix": "/",
+      "full_path": "/login/2fa",
+      "surface": "storefront",
+      "title_key": "meta.titles.two_factor",
+      "robots_hint": "NOINDEX_ROBOTS"
+    },
+    {
+      "raw_path": "newsletter/confirm",
+      "prefix": "/",
+      "full_path": "/newsletter/confirm",
+      "surface": "storefront",
+      "title_key": "meta.titles.newsletter",
+      "robots_hint": "NOINDEX_ROBOTS"
+    },
+    {
+      "raw_path": "newsletter/unsubscribe",
+      "prefix": "/",
+      "full_path": "/newsletter/unsubscribe",
+      "surface": "storefront",
+      "title_key": "meta.titles.unsubscribe",
+      "robots_hint": "NOINDEX_ROBOTS"
+    },
+    {
+      "raw_path": "offline",
+      "prefix": "/",
+      "full_path": "/offline",
+      "surface": "storefront",
+      "title_key": "meta.titles.offline",
+      "robots_hint": "NOINDEX_ROBOTS"
+    },
+    {
+      "raw_path": "pages/:slug",
+      "prefix": "/",
+      "full_path": "/pages/:slug",
+      "surface": "storefront",
+      "title_key": "meta.titles.page",
+      "robots_hint": null
+    },
+    {
+      "raw_path": "password-reset",
+      "prefix": "/",
+      "full_path": "/password-reset",
+      "surface": "storefront",
+      "title_key": "meta.titles.password_reset",
+      "robots_hint": "NOINDEX_ROBOTS"
+    },
+    {
+      "raw_path": "password-reset/confirm",
+      "prefix": "/",
+      "full_path": "/password-reset/confirm",
+      "surface": "storefront",
+      "title_key": "meta.titles.password_reset_confirm",
+      "robots_hint": "NOINDEX_ROBOTS"
+    },
+    {
+      "raw_path": "products/:slug",
+      "prefix": "/",
+      "full_path": "/products/:slug",
+      "surface": "storefront",
+      "title_key": "meta.titles.product",
+      "robots_hint": null
+    },
+    {
+      "raw_path": "receipt/:token",
+      "prefix": "/",
+      "full_path": "/receipt/:token",
+      "surface": "storefront",
+      "title_key": "meta.titles.receipt",
+      "robots_hint": "NOINDEX_ROBOTS"
+    },
+    {
+      "raw_path": "register",
+      "prefix": "/",
+      "full_path": "/register",
+      "surface": "storefront",
+      "title_key": "meta.titles.register",
+      "robots_hint": "NOINDEX_ROBOTS"
+    },
+    {
+      "raw_path": "shop",
+      "prefix": "/",
+      "full_path": "/shop",
+      "surface": "storefront",
+      "title_key": "meta.titles.shop",
+      "robots_hint": null
+    },
+    {
+      "raw_path": "shop/:category",
+      "prefix": "/",
+      "full_path": "/shop/:category",
+      "surface": "storefront",
+      "title_key": "meta.titles.shop",
+      "robots_hint": null
+    },
+    {
+      "raw_path": "verify-email",
+      "prefix": "/",
+      "full_path": "/verify-email",
+      "surface": "storefront",
+      "title_key": "meta.titles.verify_email",
+      "robots_hint": "NOINDEX_ROBOTS"
+    }
+  ]
+}
