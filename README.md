@@ -232,6 +232,7 @@ Workflows:
 - `Audit PR Evidence` (required check): fast deterministic evidence on pull requests.
 - `Audit Weekly Evidence`: full weekly evidence pack.
 - `Audit Weekly Agent`: creates/updates rolling issue `Weekly UX/IA Audit Digest` and assigns `@copilot`.
+- `Audit PR Agent`: label a PR with `audit:agent` (or run the workflow manually) to open a Copilot-assigned audit issue against the latest PR evidence.
 - `Audit PR Deep Agent`: opt-in deep pass for PRs labeled `audit:deep`.
 
 Quick usage:
