@@ -9,7 +9,7 @@ const require = createRequire(new URL("../../frontend/package.json", import.meta
 
 function parseArgs(argv) {
   const out = {};
-  const allowedKeys = new Set(["base-url", "routes-json", "output-dir", "max-routes"]);
+  const allowedKeys = new Set(["base-url", "routes-json", "output-dir", "max-routes", "route-samples"]);
   for (let i = 2; i < argv.length; i += 1) {
     const token = argv[i];
     if (!token.startsWith("--")) {
@@ -49,14 +49,77 @@ function toSeverity(level) {
   return "s4";
 }
 
-function isLikelyApiNoise(message) {
+function classifyConsoleMessage(message, level) {
   const text = String(message || "").toLowerCase();
-  return (
-    text.includes("/api/") ||
-    text.includes("net::err_connection_refused") ||
-    text.includes("failed to load resource") ||
-    text.includes("status of 404")
-  );
+  const normalizedLevel = String(level || "").toLowerCase();
+  const noisyPatterns = [
+    "/api/",
+    "net::err_connection_refused",
+    "failed to load resource",
+    "status of 404",
+    "httperrorresponse"
+  ];
+  if (noisyPatterns.some((pattern) => text.includes(pattern))) {
+    return { skip: false, severity: "s4", level: normalizedLevel };
+  }
+  return { skip: false, severity: toSeverity(normalizedLevel), level: normalizedLevel };
+}
+
+function placeholderKeys(pathTemplate) {
+  const matches = String(pathTemplate || "").matchAll(/:([A-Za-z][A-Za-z0-9_]*)/g);
+  return Array.from(matches, (match) => String(match[1] || "")).filter(Boolean);
+}
+
+function materializeRoute(routeTemplate, routeSamples) {
+  const template = String(routeTemplate || "/");
+  const keys = placeholderKeys(template);
+  if (!keys.length) {
+    return {
+      resolvedRoute: template,
+      unresolvedPlaceholder: false,
+      unresolvedKeys: []
+    };
+  }
+
+  const sample = routeSamples[template];
+  if (!sample || typeof sample !== "object") {
+    return {
+      resolvedRoute: template,
+      unresolvedPlaceholder: true,
+      unresolvedKeys: keys
+    };
+  }
+
+  let resolvedRoute = template;
+  const unresolvedKeys = [];
+  for (const key of keys) {
+    const raw = sample[key];
+    const value = String(raw ?? "").trim();
+    if (!value) {
+      unresolvedKeys.push(key);
+      continue;
+    }
+    resolvedRoute = resolvedRoute.replaceAll(`:${key}`, encodeURIComponent(value));
+  }
+  return {
+    resolvedRoute,
+    unresolvedPlaceholder: unresolvedKeys.length > 0 || placeholderKeys(resolvedRoute).length > 0,
+    unresolvedKeys
+  };
+}
+
+async function loadRouteSamples(routeSamplesPath) {
+  const fallbackPath = new URL("./fixtures/route-samples.json", import.meta.url);
+  const target = routeSamplesPath ? path.resolve(routeSamplesPath) : fallbackPath;
+  try {
+    const payload = JSON.parse(await fs.readFile(target, "utf-8"));
+    if (!payload || typeof payload !== "object") {
+      return {};
+    }
+    return payload;
+  } catch {
+    return {};
+  }
 }
 
 async function main() {
@@ -64,6 +127,7 @@ async function main() {
   const baseUrl = String(args["base-url"] || "").trim().replace(/\/$/, "");
   const routesJsonPath = String(args["routes-json"] || "").trim();
   const outputDir = String(args["output-dir"] || "").trim();
+  const routeSamplesPath = String(args["route-samples"] || "").trim();
   const maxRoutes = resolveMaxRoutes(args["max-routes"]);
 
   if (!baseUrl || !routesJsonPath || !outputDir) {
@@ -72,6 +136,7 @@ async function main() {
 
   const routesPayload = JSON.parse(await fs.readFile(routesJsonPath, "utf-8"));
   const routes = Array.isArray(routesPayload?.routes) ? routesPayload.routes.slice(0, maxRoutes) : [];
+  const routeSamples = await loadRouteSamples(routeSamplesPath);
 
   await fs.mkdir(outputDir, { recursive: true });
   const screenshotDir = path.join(outputDir, "screenshots");
@@ -87,25 +152,61 @@ async function main() {
   const layoutSignals = [];
 
   for (const route of routes) {
-    const fullPath = String(route?.full_path || "/");
+    const routeTemplate = String(route?.full_path || "/");
     const surface = String(route?.surface || "storefront");
-    const url = `${baseUrl}${fullPath.startsWith("/") ? fullPath : `/${fullPath}`}`;
-    const slug = routeSlug(fullPath);
+    const materialized = materializeRoute(routeTemplate, routeSamples);
+    const resolvedPath = materialized.resolvedRoute.startsWith("/") ? materialized.resolvedRoute : `/${materialized.resolvedRoute}`;
+    const url = `${baseUrl}${resolvedPath}`;
+    const slug = routeSlug(resolvedPath || routeTemplate);
     const screenshotPath = path.join("screenshots", `${slug}.png`);
     const screenshotAbsPath = path.join(outputDir, screenshotPath);
     const routeConsole = [];
     const routePageErrors = [];
 
+    if (materialized.unresolvedPlaceholder) {
+      seoSnapshot.push({
+        route: routeTemplate,
+        route_template: routeTemplate,
+        resolved_route: resolvedPath,
+        unresolved_placeholder: true,
+        unresolved_keys: materialized.unresolvedKeys,
+        url: null,
+        screenshot: null,
+        title: null,
+        canonical: null,
+        robots: null,
+        h1_count: 0,
+        h1_texts: [],
+        skipped_reason: "unresolved_placeholder"
+      });
+      layoutSignals.push({
+        route: routeTemplate,
+        route_template: routeTemplate,
+        resolved_route: resolvedPath,
+        unresolved_placeholder: true,
+        surface,
+        sticky_count: 0,
+        scrollable_count: 0,
+        nested_scrollables_count: 0,
+        skipped_reason: "unresolved_placeholder"
+      });
+      continue;
+    }
+
     const onConsole = (msg) => {
       routeConsole.push({
-        route: fullPath,
+        route: routeTemplate,
+        route_template: routeTemplate,
+        resolved_route: resolvedPath,
         level: String(msg.type() || "info"),
         text: String(msg.text() || ""),
       });
     };
     const onPageError = (err) => {
       routePageErrors.push({
-        route: fullPath,
+        route: routeTemplate,
+        route_template: routeTemplate,
+        resolved_route: resolvedPath,
         level: "error",
         text: String(err?.message || err || ""),
       });
@@ -156,21 +257,30 @@ async function main() {
       });
 
       seoSnapshot.push({
-        route: fullPath,
+        route: routeTemplate,
+        route_template: routeTemplate,
+        resolved_route: resolvedPath,
+        unresolved_placeholder: false,
         surface,
         url,
         screenshot: screenshotPath,
         ...seo,
       });
       layoutSignals.push({
-        route: fullPath,
+        route: routeTemplate,
+        route_template: routeTemplate,
+        resolved_route: resolvedPath,
+        unresolved_placeholder: false,
         surface,
         ...layout,
       });
     } catch (err) {
       const message = String(err?.message || err || "unknown browser error");
       seoSnapshot.push({
-        route: fullPath,
+        route: routeTemplate,
+        route_template: routeTemplate,
+        resolved_route: resolvedPath,
+        unresolved_placeholder: false,
         surface,
         url,
         screenshot: null,
@@ -182,7 +292,10 @@ async function main() {
         error: message,
       });
       layoutSignals.push({
-        route: fullPath,
+        route: routeTemplate,
+        route_template: routeTemplate,
+        resolved_route: resolvedPath,
+        unresolved_placeholder: false,
         surface,
         sticky_count: 0,
         scrollable_count: 0,
@@ -190,7 +303,9 @@ async function main() {
         error: message,
       });
       routeConsole.push({
-        route: fullPath,
+        route: routeTemplate,
+        route_template: routeTemplate,
+        resolved_route: resolvedPath,
         level: "error",
         text: message,
       });
@@ -200,26 +315,32 @@ async function main() {
     }
 
     for (const item of routeConsole) {
-      if (isLikelyApiNoise(item.text)) {
+      const classification = classifyConsoleMessage(item.text, item.level);
+      if (classification.skip) {
         continue;
       }
       consoleErrors.push({
         route: item.route,
+        route_template: item.route_template,
+        resolved_route: item.resolved_route,
         surface,
-        level: item.level,
-        severity: toSeverity(item.level),
+        level: classification.level,
+        severity: classification.severity,
         text: item.text,
       });
     }
     for (const item of routePageErrors) {
-      if (isLikelyApiNoise(item.text)) {
+      const classification = classifyConsoleMessage(item.text, item.level);
+      if (classification.skip) {
         continue;
       }
       consoleErrors.push({
         route: item.route,
+        route_template: item.route_template,
+        resolved_route: item.resolved_route,
         surface,
-        level: item.level,
-        severity: "s2",
+        level: classification.level,
+        severity: classification.severity === "s4" ? "s4" : "s2",
         text: item.text,
       });
     }

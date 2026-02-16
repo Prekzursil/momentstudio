@@ -13,6 +13,7 @@ import { MarkdownService } from '../../core/markdown.service';
 import { SiteSocialLink, SiteSocialService } from '../../core/site-social.service';
 import { StorefrontAdminModeService } from '../../core/storefront-admin-mode.service';
 import { ContactSubmissionTopic, SupportService } from '../../core/support.service';
+import { SeoHeadLinksService } from '../../core/seo-head-links.service';
 import { ContainerComponent } from '../../layout/container.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../shared/button.component';
@@ -48,7 +49,11 @@ interface ContentBlock {
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
 
       <div class="flex flex-wrap items-start justify-between gap-3">
-        <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">
+        <h1
+          class="text-2xl font-semibold text-slate-900 dark:text-slate-50"
+          data-route-heading="true"
+          tabindex="-1"
+        >
           {{ block()?.title || ('contact.title' | translate) }}
         </h1>
         <app-button
@@ -322,6 +327,7 @@ export class ContactComponent implements OnInit, OnDestroy {
     private translate: TranslateService,
     private title: Title,
     private meta: Meta,
+    private seoHeadLinks: SeoHeadLinksService,
     private markdown: MarkdownService,
     private social: SiteSocialService,
     private auth: AuthService,
@@ -387,12 +393,15 @@ export class ContactComponent implements OnInit, OnDestroy {
     const baseTitle = (title || '').includes('|') ? title : `${title} | momentstudio`;
     const pageTitle = title ? baseTitle : this.translate.instant('contact.metaTitle');
     const description = (body || '').replace(/\s+/g, ' ').trim().slice(0, 160) || this.translate.instant('contact.metaDescription');
+    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
+    const canonical = this.seoHeadLinks.setLocalizedCanonical('/contact', lang, { lang });
     this.title.setTitle(pageTitle);
     if (description) {
       this.meta.updateTag({ name: 'description', content: description });
       this.meta.updateTag({ property: 'og:description', content: description });
     }
     this.meta.updateTag({ property: 'og:title', content: pageTitle });
+    this.meta.updateTag({ property: 'og:url', content: canonical });
   }
 
   initialsForLabel(label: string): string {

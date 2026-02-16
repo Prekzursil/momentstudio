@@ -1,0 +1,23 @@
+{
+  "/products/:slug": {
+    "slug": "sample-product"
+  },
+  "/blog/:slug": {
+    "slug": "welcome"
+  },
+  "/blog/tag/:tag": {
+    "tag": "featured"
+  },
+  "/blog/series/:series": {
+    "series": "starter-series"
+  },
+  "/shop/:category": {
+    "category": "featured"
+  },
+  "/receipt/:token": {
+    "token": "sample-receipt-token"
+  },
+  "/admin/orders/:orderId": {
+    "orderId": "1001"
+  }
+}

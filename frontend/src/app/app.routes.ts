@@ -78,7 +78,12 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/product/product.component').then((m) => m.ProductComponent),
     title: 'meta.titles.product'
   },
-  { path: 'cart', loadComponent: () => import('./pages/cart/cart.component').then((m) => m.CartComponent), title: 'meta.titles.cart' },
+  {
+    path: 'cart',
+    loadComponent: () => import('./pages/cart/cart.component').then((m) => m.CartComponent),
+    title: 'meta.titles.cart',
+    data: { robots: NOINDEX_ROBOTS }
+  },
   {
     path: 'checkout',
     loadComponent: () => import('./pages/checkout/checkout.component').then((m) => m.CheckoutComponent),

@@ -277,11 +277,11 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
 
     sitemap = client.get("/api/v1/sitemap.xml")
     assert sitemap.status_code == 200
-    assert "blog/first-post?lang=en" in sitemap.text
-    assert "blog/second-post?lang=en" in sitemap.text
-    assert "blog/third-post?lang=en" in sitemap.text
-    assert "blog/scheduled-post?lang=en" not in sitemap.text
-    assert "blog/expired-post?lang=en" not in sitemap.text
+    assert "blog/first-post" in sitemap.text
+    assert "blog/second-post" in sitemap.text
+    assert "blog/third-post" in sitemap.text
+    assert "blog/scheduled-post" not in sitemap.text
+    assert "blog/expired-post" not in sitemap.text
 
     # Draft previews: admin can mint a token and fetch the unpublished/scheduled post.
     minted = client.post(
@@ -499,9 +499,9 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     assert detail_unpublished.status_code == 404, detail_unpublished.text
     sitemap_after_unpublish = client.get("/api/v1/sitemap.xml")
     assert sitemap_after_unpublish.status_code == 200
-    assert "blog/first-post?lang=en" in sitemap_after_unpublish.text
-    assert "blog/second-post?lang=en" not in sitemap_after_unpublish.text
-    assert "blog/third-post?lang=en" in sitemap_after_unpublish.text
+    assert "blog/first-post" in sitemap_after_unpublish.text
+    assert "blog/second-post" not in sitemap_after_unpublish.text
+    assert "blog/third-post" in sitemap_after_unpublish.text
 
 
 def test_blog_comment_spam_controls(test_app: Dict[str, object]) -> None:

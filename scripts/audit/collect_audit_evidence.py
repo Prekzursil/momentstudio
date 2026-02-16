@@ -151,6 +151,8 @@ def _browser_collect(
         str(output_dir),
         "--max-routes",
         str(max_routes),
+        "--route-samples",
+        str(repo_root / "scripts" / "audit" / "fixtures" / "route-samples.json"),
     ]
     try:
         proc = _run_node(cmd, cwd=repo_root)
@@ -198,19 +200,26 @@ def _build_deterministic_findings(
 
     for row in seo_snapshot:
         route = str(row.get("route") or "/")
+        route_template = str(row.get("route_template") or route)
+        resolved_route = str(row.get("resolved_route") or route_template)
         surface = str(row.get("surface") or "storefront")
         title = str(row.get("title") or "").strip()
         canonical = str(row.get("canonical") or "").strip()
+        robots = str(row.get("robots") or "").strip().lower()
         h1_count = int(row.get("h1_count") or 0)
         render_error = str(row.get("error") or "").strip()
+        unresolved_placeholder = bool(row.get("unresolved_placeholder"))
+        noindex_route = "noindex" in robots
 
         if render_error:
+            if unresolved_placeholder:
+                continue
             findings.append(
                 _finding(
-                    title=f"Route render error on `{route}`",
+                    title=f"Route render error on `{route_template}`",
                     description=render_error,
                     severity="s2",
-                    route=route,
+                    route=route_template,
                     surface=surface,
                     rule_id="route_render_error",
                     primary_file="scripts/audit/collect_browser_evidence.mjs",
@@ -220,13 +229,13 @@ def _build_deterministic_findings(
             )
             continue
 
-        if not title:
+        if not title and not unresolved_placeholder:
             findings.append(
                 _finding(
-                    title=f"Missing title on `{route}`",
+                    title=f"Missing title on `{route_template}`",
                     description="Route has an empty document title.",
                     severity="s2",
-                    route=route,
+                    route=route_template,
                     surface=surface,
                     rule_id="seo_missing_title",
                     primary_file="frontend/src/app/app.routes.ts",
@@ -235,13 +244,13 @@ def _build_deterministic_findings(
                 )
             )
 
-        if surface == "storefront" and h1_count == 0:
+        if surface == "storefront" and h1_count == 0 and not noindex_route and not unresolved_placeholder:
             findings.append(
                 _finding(
-                    title=f"Missing H1 on storefront route `{route}`",
+                    title=f"Missing H1 on storefront route `{route_template}`",
                     description="Storefront route rendered without a primary H1 heading.",
                     severity="s2",
-                    route=route,
+                    route=route_template,
                     surface=surface,
                     rule_id="ux_missing_h1",
                     primary_file="frontend/src/app/app.routes.ts",
@@ -249,13 +258,13 @@ def _build_deterministic_findings(
                     effort="M",
                 )
             )
-        elif h1_count > 1:
+        elif h1_count > 1 and not unresolved_placeholder:
             findings.append(
                 _finding(
-                    title=f"Multiple H1 headings on `{route}`",
+                    title=f"Multiple H1 headings on `{route_template}`",
                     description=f"Found {h1_count} H1 elements. This can hurt IA clarity.",
                     severity="s3",
-                    route=route,
+                    route=route_template,
                     surface=surface,
                     rule_id="ux_multiple_h1",
                     primary_file="frontend/src/app/app.routes.ts",
@@ -264,13 +273,16 @@ def _build_deterministic_findings(
                 )
             )
 
-        if surface == "storefront" and not canonical:
+        if surface == "storefront" and not canonical and not noindex_route and not unresolved_placeholder:
             findings.append(
                 _finding(
-                    title=f"Missing canonical link on `{route}`",
-                    description="Storefront route did not expose a canonical URL.",
+                    title=f"Missing canonical link on `{route_template}`",
+                    description=(
+                        f"Storefront route did not expose a canonical URL "
+                        f"(resolved route `{resolved_route}`)."
+                    ),
                     severity="s3",
-                    route=route,
+                    route=route_template,
                     surface=surface,
                     rule_id="seo_missing_canonical",
                     primary_file="frontend/src/app/core/seo-head-links.service.ts",

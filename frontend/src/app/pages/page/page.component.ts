@@ -14,6 +14,7 @@ import { PageBlock, pageBlocksToPlainText, parsePageBlocks } from '../../shared/
 import { ButtonComponent } from '../../shared/button.component';
 import { CmsPageBlocksComponent } from '../../shared/cms-page-blocks.component';
 import { StorefrontAdminModeService } from '../../core/storefront-admin-mode.service';
+import { SeoHeadLinksService } from '../../core/seo-head-links.service';
 
 interface ContentImage {
   url: string;
@@ -54,7 +55,11 @@ interface LegalIndexDoc {
       <app-breadcrumb [crumbs]="crumbs()"></app-breadcrumb>
 
       <div class="flex flex-wrap items-start justify-between gap-3">
-        <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">
+        <h1
+          class="text-2xl font-semibold text-slate-900 dark:text-slate-50"
+          data-route-heading="true"
+          tabindex="-1"
+        >
           {{ block()?.title || ('nav.page' | translate) }}
         </h1>
         <app-button
@@ -157,7 +162,8 @@ export class CmsPageComponent implements OnInit, OnDestroy {
     private translate: TranslateService,
     private title: Title,
     private meta: Meta,
-    private markdown: MarkdownService
+    private markdown: MarkdownService,
+    private seoHeadLinks: SeoHeadLinksService
   ) {}
 
   canEditPage(): boolean {
@@ -239,7 +245,7 @@ export class CmsPageComponent implements OnInit, OnDestroy {
           { label: 'nav.home', url: '/' },
           { label: block.title || slug }
         ]);
-        this.setMetaTags(block.title || slug, metaBody);
+        this.setMetaTags(block.title || slug, metaBody, canonicalSlug || slug);
       },
       error: (err) => {
         if (err?.status === 401) {
@@ -265,7 +271,7 @@ export class CmsPageComponent implements OnInit, OnDestroy {
           { label: 'nav.home', url: '/' },
           { label: slug }
         ]);
-        this.setMetaTags(slug, this.translate.instant('about.metaDescription'));
+        this.setMetaTags(slug, this.translate.instant('about.metaDescription'), slug);
       }
     });
   }
@@ -353,14 +359,19 @@ export class CmsPageComponent implements OnInit, OnDestroy {
     return raw.startsWith('page.') ? raw.slice('page.'.length) : '';
   }
 
-  private setMetaTags(title: string, body: string): void {
+  private setMetaTags(title: string, body: string, slug: string): void {
     const pageTitle = title ? `${title} | momentstudio` : 'Page | momentstudio';
     const description = (body || '').replace(/\s+/g, ' ').trim().slice(0, 160);
+    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
+    const safeSlug = encodeURIComponent(String(slug || '').trim());
+    const path = safeSlug ? `/pages/${safeSlug}` : '/pages';
+    const canonical = this.seoHeadLinks.setLocalizedCanonical(path, lang, { lang });
     this.title.setTitle(pageTitle);
     if (description) {
       this.meta.updateTag({ name: 'description', content: description });
       this.meta.updateTag({ property: 'og:description', content: description });
     }
     this.meta.updateTag({ property: 'og:title', content: pageTitle });
+    this.meta.updateTag({ property: 'og:url', content: canonical });
   }
 }

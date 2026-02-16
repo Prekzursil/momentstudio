@@ -9,7 +9,9 @@ import { RouterLink } from '@angular/router';
   template: `
     <div class="text-center grid gap-4 py-16" role="alert" aria-live="assertive">
       <p class="text-sm uppercase tracking-[0.3em] text-red-500">Error</p>
-      <h1 class="text-3xl font-semibold text-slate-900 dark:text-slate-50">Something went wrong</h1>
+      <h1 class="text-3xl font-semibold text-slate-900 dark:text-slate-50" data-route-heading="true" tabindex="-1">
+        Something went wrong
+      </h1>
       <p class="text-slate-600 dark:text-slate-300">We've logged the issue. Please try again, return home, or contact support.</p>
       <div class="flex justify-center gap-3 flex-wrap">
         <app-button label="Retry" (action)="onRetry()"></app-button>

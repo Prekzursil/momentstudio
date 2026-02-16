@@ -7,6 +7,9 @@ export interface AppConfig {
   netopiaEnabled: boolean;
   addressAutocompleteEnabled: boolean;
   sentryDsn: string;
+  sentryTracesSampleRate: number;
+  sentryReplaySessionSampleRate: number;
+  sentryReplayOnErrorSampleRate: number;
   captchaSiteKey: string;
 }
 
@@ -25,6 +28,9 @@ const defaults: AppConfig = {
   netopiaEnabled: false,
   addressAutocompleteEnabled: false,
   sentryDsn: '',
+  sentryTracesSampleRate: 0,
+  sentryReplaySessionSampleRate: 0,
+  sentryReplayOnErrorSampleRate: 0,
   captchaSiteKey: ''
 };
 

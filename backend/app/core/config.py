@@ -201,6 +201,9 @@ class Settings(BaseSettings):
     slow_query_threshold_ms: int = 500
     sentry_dsn: str | None = None
     sentry_traces_sample_rate: float = 0.0
+    sentry_profiles_sample_rate: float = 0.0
+    sentry_enable_logs: bool = False
+    sentry_log_level: str = "error"
 
     google_client_id: str | None = None
     google_client_secret: str | None = None
