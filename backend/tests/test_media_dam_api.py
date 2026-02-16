@@ -1,4 +1,5 @@
 import asyncio
+import json
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from pathlib import Path
@@ -16,7 +17,7 @@ from app.core.config import settings
 from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
-from app.models.media import MediaJobStatus
+from app.models.media import MediaJobStatus, MediaJobType
 from app.models.passkeys import UserPasskey
 from app.models.user import UserRole
 from app.schemas.user import UserCreate
@@ -430,3 +431,142 @@ def test_media_dam_due_retry_sweep_requeues_failed_jobs(
     job_after = client.get(f"/api/v1/content/admin/media/jobs/{job_id}", headers=auth_headers(admin_token))
     assert job_after.status_code == 200, job_after.text
     assert job_after.json()["status"] == "queued"
+
+
+def test_media_dam_retry_policy_endpoints_and_permissions(
+    test_app: Dict[str, object], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_staff_token(SessionLocal, email="dam-admin-policy@example.com", role=UserRole.admin)
+    content_token = create_staff_token(SessionLocal, email="dam-content-policy@example.com", role=UserRole.content)
+    monkeypatch.setattr(settings, "media_root", str(tmp_path / "uploads"))
+    monkeypatch.setattr(settings, "private_media_root", str(tmp_path / "private_uploads"))
+
+    listed = client.get("/api/v1/content/admin/media/retry-policies", headers=auth_headers(content_token))
+    assert listed.status_code == 200, listed.text
+    by_type = {row["job_type"]: row for row in listed.json()["items"]}
+    assert "ingest" in by_type
+    assert "variant" in by_type
+
+    forbidden = client.patch(
+        "/api/v1/content/admin/media/retry-policies/variant",
+        json={"max_attempts": 6},
+        headers=auth_headers(content_token),
+    )
+    assert forbidden.status_code == 403, forbidden.text
+
+    updated = client.patch(
+        "/api/v1/content/admin/media/retry-policies/variant",
+        json={
+            "max_attempts": 6,
+            "backoff_schedule_seconds": [12, 34, 89],
+            "jitter_ratio": 0.25,
+            "enabled": True,
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert updated.status_code == 200, updated.text
+    updated_payload = updated.json()
+    assert updated_payload["job_type"] == "variant"
+    assert updated_payload["max_attempts"] == 6
+    assert updated_payload["backoff_schedule_seconds"] == [12, 34, 89]
+    assert updated_payload["jitter_ratio"] == pytest.approx(0.25)
+
+    invalid_schedule = client.patch(
+        "/api/v1/content/admin/media/retry-policies/variant",
+        json={"backoff_schedule_seconds": [0]},
+        headers=auth_headers(admin_token),
+    )
+    assert invalid_schedule.status_code == 400, invalid_schedule.text
+
+    reset_one = client.post(
+        "/api/v1/content/admin/media/retry-policies/variant/reset",
+        headers=auth_headers(admin_token),
+    )
+    assert reset_one.status_code == 200, reset_one.text
+    assert reset_one.json()["backoff_schedule_seconds"] == [20, 90, 300, 900]
+    assert reset_one.json()["max_attempts"] == 5
+
+    reset_all = client.post(
+        "/api/v1/content/admin/media/retry-policies/reset-all",
+        headers=auth_headers(admin_token),
+    )
+    assert reset_all.status_code == 200, reset_all.text
+    all_types = {row["job_type"] for row in reset_all.json()["items"]}
+    assert all_types == {job_type.value for job_type in MediaJobType}
+
+
+def test_media_dam_retry_policy_snapshot_and_jitter_schedule(
+    test_app: Dict[str, object], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_staff_token(SessionLocal, email="dam-admin-jitter@example.com", role=UserRole.admin)
+    monkeypatch.setattr(settings, "media_root", str(tmp_path / "uploads"))
+    monkeypatch.setattr(settings, "private_media_root", str(tmp_path / "private_uploads"))
+
+    async def _fail_variant(*_args, **_kwargs):
+        raise RuntimeError("variant failed for jitter test")
+
+    monkeypatch.setattr(media_dam, "_process_variant_job", _fail_variant)
+    monkeypatch.setattr(media_dam.random, "uniform", lambda _a, _b: 0.5)
+
+    update_policy = client.patch(
+        "/api/v1/content/admin/media/retry-policies/variant",
+        json={"max_attempts": 4, "backoff_schedule_seconds": [100], "jitter_ratio": 0.5, "enabled": True},
+        headers=auth_headers(admin_token),
+    )
+    assert update_policy.status_code == 200, update_policy.text
+
+    upload = client.post(
+        "/api/v1/content/admin/media/assets/upload",
+        files={"file": ("dam-jitter.jpg", _jpeg_bytes(), "image/jpeg")},
+        params={"visibility": "private", "auto_finalize": "true"},
+        headers=auth_headers(admin_token),
+    )
+    assert upload.status_code == 201, upload.text
+    asset_id = upload.json()["id"]
+
+    variant_job = client.post(
+        f"/api/v1/content/admin/media/assets/{asset_id}/variants",
+        json={"profile": "web-640"},
+        headers=auth_headers(admin_token),
+    )
+    assert variant_job.status_code == 200, variant_job.text
+    payload = variant_job.json()
+    assert payload["status"] == "failed"
+    assert payload["max_attempts"] == 4
+    assert payload["next_retry_at"] is not None
+    completed_at = datetime.fromisoformat(payload["completed_at"].replace("Z", "+00:00"))
+    next_retry_at = datetime.fromisoformat(payload["next_retry_at"].replace("Z", "+00:00"))
+    retry_delay_seconds = int(round((next_retry_at - completed_at).total_seconds()))
+    assert retry_delay_seconds == 150
+
+    async def _assert_snapshot() -> None:
+        async with SessionLocal() as session:
+            job = await media_dam.get_job_or_404(session, UUID(payload["id"]))
+            body = json.loads(job.payload_json or "{}")
+            snap = body.get("__retry_policy")
+            assert isinstance(snap, dict)
+            assert int(snap["max_attempts"]) == 4
+            assert [int(v) for v in snap["schedule"]] == [100]
+            assert float(snap["jitter_ratio"]) == pytest.approx(0.5)
+
+            # Legacy jobs without a snapshot still fall back to the active DB policy.
+            body.pop("__retry_policy", None)
+            job.payload_json = json.dumps(body, separators=(",", ":"))
+            job.attempt = 0
+            job.max_attempts = 0
+            job.status = MediaJobStatus.queued
+            session.add(job)
+            await session.commit()
+
+            queued = await media_dam.get_job_or_404(session, job.id)
+            await media_dam.process_job_inline(session, queued)
+            refreshed = await media_dam.get_job_or_404(session, job.id)
+            assert refreshed.max_attempts == 4
+            assert refreshed.status == MediaJobStatus.failed
+            assert refreshed.next_retry_at is not None
+
+    asyncio.run(_assert_snapshot())

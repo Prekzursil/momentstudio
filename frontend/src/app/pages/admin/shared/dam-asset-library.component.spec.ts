@@ -2,11 +2,13 @@ import { TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 
 import { AdminService, MediaAsset } from '../../../core/admin.service';
+import { AuthService } from '../../../core/auth.service';
 import { ToastService } from '../../../core/toast.service';
 import { DamAssetLibraryComponent } from './dam-asset-library.component';
 
 describe('DamAssetLibraryComponent', () => {
   let admin: jasmine.SpyObj<AdminService>;
+  let auth: jasmine.SpyObj<AuthService>;
   let toast: jasmine.SpyObj<ToastService>;
 
   const baseAsset: MediaAsset = {
@@ -56,6 +58,10 @@ describe('DamAssetLibraryComponent', () => {
       'updateMediaJobTriage',
       'listMediaJobEvents',
       'getMediaTelemetry',
+      'listMediaRetryPolicies',
+      'updateMediaRetryPolicy',
+      'resetMediaRetryPolicy',
+      'resetAllMediaRetryPolicies',
       'requestMediaUsageReconcile',
       'approveMediaAsset',
       'rejectMediaAsset',
@@ -66,7 +72,9 @@ describe('DamAssetLibraryComponent', () => {
       'updateMediaCollection',
       'replaceMediaCollectionItems'
     ]);
+    auth = jasmine.createSpyObj<AuthService>('AuthService', ['role']);
     toast = jasmine.createSpyObj<ToastService>('ToastService', ['success', 'error']);
+    auth.role.and.returnValue('admin');
 
     admin.listMediaAssets.and.returnValue(
       of({
@@ -175,11 +183,68 @@ describe('DamAssetLibraryComponent', () => {
       })
     );
     admin.listMediaJobEvents.and.returnValue(of({ items: [] }));
+    admin.listMediaRetryPolicies.and.returnValue(
+      of({
+        items: [
+          {
+            job_type: 'ingest',
+            max_attempts: 5,
+            backoff_schedule_seconds: [30, 120, 600, 1800],
+            jitter_ratio: 0.15,
+            enabled: true,
+            updated_by_user_id: null,
+            created_at: '2026-02-16T00:00:00Z',
+            updated_at: '2026-02-16T00:00:00Z'
+          }
+        ]
+      })
+    );
+    admin.updateMediaRetryPolicy.and.returnValue(
+      of({
+        job_type: 'ingest',
+        max_attempts: 6,
+        backoff_schedule_seconds: [10, 30, 120],
+        jitter_ratio: 0.2,
+        enabled: true,
+        updated_by_user_id: 'owner-1',
+        created_at: '2026-02-16T00:00:00Z',
+        updated_at: '2026-02-16T01:00:00Z'
+      })
+    );
+    admin.resetMediaRetryPolicy.and.returnValue(
+      of({
+        job_type: 'ingest',
+        max_attempts: 5,
+        backoff_schedule_seconds: [30, 120, 600, 1800],
+        jitter_ratio: 0.15,
+        enabled: true,
+        updated_by_user_id: null,
+        created_at: '2026-02-16T00:00:00Z',
+        updated_at: '2026-02-16T02:00:00Z'
+      })
+    );
+    admin.resetAllMediaRetryPolicies.and.returnValue(
+      of({
+        items: [
+          {
+            job_type: 'ingest',
+            max_attempts: 5,
+            backoff_schedule_seconds: [30, 120, 600, 1800],
+            jitter_ratio: 0.15,
+            enabled: true,
+            updated_by_user_id: null,
+            created_at: '2026-02-16T00:00:00Z',
+            updated_at: '2026-02-16T02:00:00Z'
+          }
+        ]
+      })
+    );
 
     TestBed.configureTestingModule({
       imports: [DamAssetLibraryComponent],
       providers: [
         { provide: AdminService, useValue: admin },
+        { provide: AuthService, useValue: auth },
         { provide: ToastService, useValue: toast }
       ]
     });
@@ -236,6 +301,7 @@ describe('DamAssetLibraryComponent', () => {
         dead_letter_only: false
       })
     );
+    expect(admin.listMediaRetryPolicies).toHaveBeenCalled();
   });
 
   it('switches queue mode to dead-letter and requests dead-letter-only list', () => {
@@ -252,5 +318,52 @@ describe('DamAssetLibraryComponent', () => {
         dead_letter_only: true
       })
     );
+  });
+
+  it('saves retry policy edits from the jobs tab', async () => {
+    const fixture = TestBed.createComponent(DamAssetLibraryComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+
+    component.switchTab('queue');
+    component.retryPolicyDraft('ingest').max_attempts = 6;
+    component.retryPolicyDraft('ingest').scheduleText = '10,30,120';
+    component.retryPolicyDraft('ingest').jitter_ratio = 0.2;
+    await component.saveRetryPolicy('ingest');
+
+    expect(admin.updateMediaRetryPolicy).toHaveBeenCalledWith('ingest', {
+      enabled: true,
+      max_attempts: 6,
+      backoff_schedule_seconds: [10, 30, 120],
+      jitter_ratio: 0.2
+    });
+    expect(toast.success).toHaveBeenCalled();
+  });
+
+  it('keeps retry policy editor read-only for non owner/admin roles', async () => {
+    auth.role.and.returnValue('content');
+    const fixture = TestBed.createComponent(DamAssetLibraryComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.switchTab('queue');
+
+    expect(component.canEditRetryPolicies()).toBeFalse();
+    await component.saveRetryPolicy('ingest');
+    expect(admin.updateMediaRetryPolicy).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid retry schedule input before calling API', async () => {
+    const fixture = TestBed.createComponent(DamAssetLibraryComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.switchTab('queue');
+    admin.updateMediaRetryPolicy.calls.reset();
+    toast.error.calls.reset();
+
+    component.retryPolicyDraft('ingest').scheduleText = 'abc,0';
+    await component.saveRetryPolicy('ingest');
+
+    expect(admin.updateMediaRetryPolicy).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalled();
   });
 });
