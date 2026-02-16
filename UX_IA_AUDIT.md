@@ -1,163 +1,3 @@
-# Full-Site UX/IA Audit Report
-**Date:** 2026-02-16
-**Scope:** AdrianaArt E-commerce Platform (Storefront, Account, Admin)
-**Analyst:** Senior Product Designer + Frontend Architect
-
----
-
-## Executive Summary
-
-This audit analyzed the entire frontend codebase (121 components) across three major surfaces: **Storefront**, **Account**, and **Admin**. The application has strong foundations (consistent design tokens, dark mode support, reusable components) but suffers from **control surface sprawl**, **redundant navigation patterns**, and **cluttered admin toolbars** that dilute user focus.
-
-**Key Finding:** The Admin shell operates as "two shells at once" — a main sidebar shell for navigation PLUS a nested content editor shell with its own extensive toolbar (5 segmented controls). This creates cognitive overhead and visual clutter.
-
----
-
-## Site Map & Surface Architecture
-
-### **Storefront Shell** (Public)
-```
-/ (home)
-/shop
-  /shop/:category
-/products/:slug
-/cart
-/checkout → /checkout/success
-/blog
-  /blog/:slug
-  /blog/tag/:tag
-  /blog/series/:series
-/pages/:slug
-/about
-/contact
-/receipt/:token
-```
-**Shell Components:** Header (sticky), Footer, Global CMS banners
-
----
-
-### **Account Shell** (Authenticated Users)
-```
-/account
-  /overview
-  /profile
-  /orders
-  /addresses
-  /wishlist
-  /coupons
-  /notifications
-    /notifications/settings
-  /security
-  /comments
-  /privacy
-  /password
-/tickets (Help Center - separate route)
-```
-**Shell Components:** Left sidebar (desktop) OR dropdown select (mobile), Sign Out button in header
-
----
-
-### **Admin Shell** (Staff)
-```
-/admin/dashboard
-/admin/content (sub-shell)
-  /content/home
-  /content/pages
-  /content/blog
-  /content/scheduling
-  /content/media
-  /content/settings
-/admin/products
-/admin/inventory
-/admin/orders
-  /orders/:orderId
-  /orders/exports
-/admin/returns
-/admin/coupons
-/admin/users
-  /users/gdpr
-  /users/segments
-/admin/support
-/admin/ops
-/admin/ip-bypass
-```
-**Shell Components:** Left sidebar (260px, sticky, searchable, with favorites, alerts, and preferences), nested content toolbar (5 segmented controls)
-
----
-
-### **Auth Routes** (Public/Semi-Public)
-```
-/login
-/login/2fa
-/register
-/password-reset
-/password-reset/confirm
-/verify-email
-/auth/google/callback
-```
-
----
-
-## TOP 10 HIGHEST-IMPACT UX ISSUES
-
-### **1. Admin Content Editor: "Five Toolbars at Once"**
-**Issue:** Cluttered Control Surface
-**Evidence:**
-- `/admin/content/admin-content-layout.component.ts:22-186`
-- Five horizontal segmented controls rendered in one row:
-  1. Editor Mode (Simple/Advanced)
-  2. Preview Device (Desktop/Tablet/Mobile)
-  3. Preview Layout (Stacked/Split)
-  4. Preview Language (EN/RO)
-  5. Preview Theme (Light/Dark)
-- On smaller screens, this wraps into a multi-row toolbar, pushing actual content down
-- Each control uses identical visual weight (rounded-full pills with borders)
-
-**Why:** This overwhelms users with preview settings that are secondary to the primary job (editing content). The equal visual weight makes it unclear what's most important.
-
-**Fix:**
-- Move preview settings into an **overflow menu** or **collapsible panel** (e.g., "Preview Options ▾")
-- Keep only **Editor Mode** visible by default (it affects editing behavior)
-- Make preview controls accessible via keyboard shortcut (Cmd+P for preview settings)
-
-**Effort:** M (refactor toolbar into primary/overflow sections)
-**Impact:** 5/5 (directly affects all content editors daily)
-
----
-
-### **2. Admin Sidebar: Triple Navigation Redundancy**
-**Issue:** Duplicated Patterns
-**Evidence:**
-- `/admin/admin-layout.component.ts:86-357`
-- Lines 116-223: Preferences section (collapsible details)
-- Lines 225-289: Alerts section (dynamic badges)
-- Lines 291-309: Favorites section (pinnable pages)
-- Lines 311-346: Full navigation list (all pages) with star icons to favorite
-
-**Why:**
-- **Favorites section** duplicates navigation items that already appear in the full list below
-- Users can access the same page via: (1) Favorites, (2) Full navigation list, (3) Search box
-- The star icon next to EVERY nav item (line 335-344) adds visual noise
-
-**Fix:**
-- Remove dedicated "Favorites" section; show starred items inline with a subtle star indicator
-- OR: Keep favorites section, but remove star icons from main nav (use favorites as "recent/pinned" only)
-- Consider hiding alerts section when there are zero alerts (it currently shows/hides based on `shouldShowAlerts()` but leaves a divider)
-
-**Effort:** M (refactor favorites logic, update template)
-**Impact:** 4/5 (reduces visual clutter, speeds up navigation decisions)
-
----
-
-### **3. Account Section: Double Navigation on Desktop**
-**Issue:** Parallel Implementations
-**Evidence:**
-- `/account/account.component.ts:92-115` — Mobile dropdown select
-- `/account/account.component.ts:118-216` — Desktop left sidebar
-- Both always render; mobile is hidden with `lg:hidden`, desktop with `hidden lg:grid`
-
-**Why:**
-- The mobile dropdown select renders ALL options in a `<select>` tag, duplicating the sidebar structure
 - If routes change, both templates must be updated independently (DRY violation)
 - Account nav links also appear in header user menu dropdown (lines 146-184 in header.component.ts)
 
@@ -561,3 +401,85 @@ The AdrianaArt platform has a solid technical foundation but suffers from **incr
 - `/frontend/src/app/pages/admin/content/admin-content-layout.component.ts` (content sub-shell)
 - `/frontend/src/app/pages/account/account.component.ts` (account shell)
 - Plus ~115 other component files explored via code analysis tools
+# Weekly UX/IA + Correctness Audit (2026-02-16)
+
+## Top 10 Highest-Impact Issues
+1) Issue: Global footer change-detection failure (NG0100) fires on storefront/account/admin routes, including the error fallback.
+   - Evidence: artifacts/console-errors.json (routes `/`, `/contact`, `/error`, `/admin/gdpr`, `/**`), frontend/src/app/layout/footer.component.ts:1-340.
+   - Why: ExpressionChangedAfterItHasBeenCheckedError is thrown before paint, risking broken renders and masking real errors across every surface.
+   - Fix: Move subscription-driven state mutations to `ngAfterViewInit` and trigger `cdr.markForCheck()`/`detectChanges()` before exiting async callbacks; avoid mutating `openMenu` during the same change detection tick.
+   - Effort: M
+   - Impact: 5
+
+2) Issue: Shop and category pages throw HttpErrorResponse, blocking catalog discovery.
+   - Evidence: artifacts/deterministic-findings.json (entries for `/shop` and `/shop/:category`), artifacts/console-errors.json (route `/shop`), artifacts/screenshots/shop.png.
+   - Why: The primary product browse flow fails, stopping shoppers before they reach PDP or cart.
+   - Fix: Harden CatalogService calls with retry + offline empty-state, and gate rendering on resolved data so the page degrades with a friendly fallback instead of an uncaught HttpErrorResponse.
+   - Effort: M
+   - Impact: 4
+
+3) Issue: Product detail page renders without an H1 and emits a homepage canonical, diluting SEO equity.
+   - Evidence: artifacts/seo-snapshot.json (route `/products/:slug`, `h1_count: 0`, canonical `https://momentstudio.ro/`), frontend/src/app/pages/product/product.component.ts:760-806.
+   - Why: Search engines see duplicate canonicals and no primary heading, weakening organic relevance for each product.
+   - Fix: Render a visible H1 with the product name and ensure `setLocalizedCanonical` resolves to `/products/{slug}` for both SSR and client runs.
+   - Effort: M
+   - Impact: 4
+
+4) Issue: Newsletter confirmation page has no H1, hurting accessibility and clarity even though it is noindex.
+   - Evidence: artifacts/seo-snapshot.json (route `/newsletter/confirm`, `h1_count: 0`, screenshot `artifacts/screenshots/newsletter-confirm.png`).
+   - Why: Screen readers lack a page landmark and users lack a clear confirmation headline.
+   - Fix: Add a concise H1 like “Newsletter confirmed” aligned with the confirmation copy.
+   - Effort: S
+   - Impact: 3
+
+5) Issue: Newsletter unsubscribe page also lacks an H1.
+   - Evidence: artifacts/seo-snapshot.json (route `/newsletter/unsubscribe`, `h1_count: 0`, screenshot `artifacts/screenshots/newsletter-unsubscribe.png`).
+   - Why: Users unsubscribing get no top-level heading; assistive tech misses the page purpose.
+   - Fix: Add an H1 describing the unsubscribe state and any next steps.
+   - Effort: S
+   - Impact: 3
+
+6) Issue: Checkout and payment return/cancel routes log LCP warnings because the brand image is lazy-loaded.
+   - Evidence: artifacts/deterministic-findings.json (routes `/checkout`, `/checkout/paypal/return`, `/checkout/stripe/return`, `/checkout/success`), artifacts/console-errors.json (NG0913 warning referencing `assets/brand/made-by-andrei-visalon-light.png`), frontend/src/app/layout/footer.component.ts:274-302.
+   - Why: LCP penalties on the checkout shell slow a conversion-critical flow and inflate Core Web Vitals risk.
+   - Fix: Mark the brand image `priority`/`loading="eager"` via `NgOptimizedImage` and swap to a lighter inline SVG for the footer logo on checkout surfaces.
+   - Effort: S
+   - Impact: 3
+
+7) Issue: Account child routes do not declare noindex, exposing private surfaces to indexing if crawled directly.
+   - Evidence: artifacts/route-map.json (account children such as `/account/addresses` and `/account/orders` show `robots_hint: null`), frontend/src/app/app.routes.ts:186-240.
+   - Why: Auth-only pages risk being indexed or cached by search engines, leaking metadata and creating broken entry points.
+   - Fix: Apply `data: { robots: NOINDEX_ROBOTS }` on each account child or ensure the meta resolver inherits and emits the parent robots tag for all descendants.
+   - Effort: S
+   - Impact: 4
+
+8) Issue: Admin content shell stacks five equally-weighted segmented controls in one toolbar row.
+   - Evidence: artifacts/screenshots/admin-content.png, frontend/src/app/pages/admin/content/admin-content-layout.component.ts:35-186.
+   - Why: Editor Mode, Device, Layout, Language, and Theme all compete as primary actions, crowding the viewport and delaying content focus.
+   - Fix: Keep Editor Mode visible, move Preview controls into a “Preview options” popover, and persist the last selection per user.
+   - Effort: M
+   - Impact: 4
+
+9) Issue: Admin sidebar duplicates navigation via Favorites section plus star icons on every item.
+   - Evidence: frontend/src/app/pages/admin/admin-layout.component.ts:116-346, artifacts/screenshots/admin.png.
+   - Why: Users see two parallel nav systems (favorites list and starred main list), increasing scanning time and maintenance overhead.
+   - Fix: Show favorites inline as badges within the main list or remove inline stars when the Favorites block is visible; hide Alerts when empty to reduce vertical clutter.
+   - Effort: M
+   - Impact: 3
+
+10) Issue: Account shell renders both a mobile select and a desktop sidebar simultaneously.
+    - Evidence: frontend/src/app/pages/account/account.component.ts:92-216, artifacts/screenshots/account.png.
+    - Why: Two parallel navigation implementations increase code paths and risk state drift between viewports.
+    - Fix: Drive both layouts from a single nav model with a shared selection state, rendering only the relevant control per breakpoint.
+    - Effort: M
+    - Impact: 3
+
+## Surface Boundary Proposal
+- Storefront shell: Public shopping, content marketing, blog, and checkout entry/returns; keep auth callbacks and receipt views here but protect them with clear status messaging.
+- Account shell: Self-service profile, orders, addresses, notifications, security, comments, privacy, wishlist, coupons, and tickets; all routes should inherit noindex and avoid admin-only controls.
+- Admin shell: Operational dashboards, catalog/inventory/orders/returns, coupons, users/segments/GDPR, ops/IP bypass, support, and the content editor sub-shell; no shopper-facing actions should appear here.
+
+## Control Surface Rule Per Page Type
+- Storefront pages — Primary job: help visitors discover and purchase products. Top actions: add to cart, proceed to checkout, apply filters/sort. Overflow: secondary preview toggles, social links, and admin edit shortcuts.
+- Account pages — Primary job: let customers manage their data and orders. Top actions: update profile/address, view/reorder, manage notifications/security. Overflow: export data, delete account, and less-used preferences.
+- Admin pages — Primary job: operate the business. Top actions: per-page primary CTA (e.g., publish content, fulfill order, adjust inventory). Overflow: filters, bulk actions beyond top 3, and preview/simulation toggles.
