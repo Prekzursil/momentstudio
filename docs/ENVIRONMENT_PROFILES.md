@@ -69,12 +69,16 @@ Backups created on every switch:
   - `SECURE_COOKIES=0`
   - `CAPTCHA_ENABLED=0`
   - `PAYMENTS_PROVIDER=mock`
+  - `LOCKERS_USE_OVERPASS_FALLBACK=1`
+  - `SAMEDAY_MIRROR_ENABLED=0`
 - Frontend:
   - `APP_ENV=development`
   - `API_BASE_URL=/api/v1`
   - payment buttons enabled (UI visible), captcha key empty
 
 This is designed for daily coding with low risk and fewer setup blockers.
+Shipping note:
+- dev defaults keep Overpass fallback on and Sameday mirror off so locker search is usable even when courier credentials or mirror snapshot are not configured.
 
 ## Start Script Guard
 
@@ -161,3 +165,18 @@ Manual fallback:
 ```bash
 docker compose -f infra/docker-compose.yml up -d db
 ```
+
+### Lockers API shows "Locker API is not configured"
+
+`scripts/env/doctor.sh` now warns when dev locker config is inconsistent.
+
+Typical fix:
+
+```bash
+make env-dev
+```
+
+If you intentionally need mirror behavior in local dev:
+1. set `SAMEDAY_MIRROR_ENABLED=1`,
+2. seed a successful mirror snapshot from Admin Ops (`Run sync now`),
+3. optionally keep `LOCKERS_USE_OVERPASS_FALLBACK=1` as resilience.

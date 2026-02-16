@@ -51,6 +51,13 @@ secret_key="$(env_get "${BACKEND_ENV}" "SECRET_KEY")"
 stripe_live_key="$(env_get "${BACKEND_ENV}" "STRIPE_SECRET_KEY_LIVE")"
 paypal_live_id="$(env_get "${BACKEND_ENV}" "PAYPAL_CLIENT_ID_LIVE")"
 frontend_captcha_site_key="$(env_get "${FRONTEND_ENV}" "CAPTCHA_SITE_KEY")"
+lockers_overpass_fallback="$(env_get "${BACKEND_ENV}" "LOCKERS_USE_OVERPASS_FALLBACK")"
+sameday_mirror_enabled="$(env_get "${BACKEND_ENV}" "SAMEDAY_MIRROR_ENABLED")"
+sameday_api_base_url="$(env_get "${BACKEND_ENV}" "SAMEDAY_API_BASE_URL")"
+sameday_api_username="$(env_get "${BACKEND_ENV}" "SAMEDAY_API_USERNAME")"
+sameday_api_password="$(env_get "${BACKEND_ENV}" "SAMEDAY_API_PASSWORD")"
+fan_api_username="$(env_get "${BACKEND_ENV}" "FAN_API_USERNAME")"
+fan_api_password="$(env_get "${BACKEND_ENV}" "FAN_API_PASSWORD")"
 
 backend_is_dev=0
 backend_is_prod=0
@@ -111,6 +118,18 @@ fi
 
 if [[ "${frontend_is_dev}" -eq 1 && -n "$(trim "${frontend_captcha_site_key}")" ]]; then
   warnings+=("Frontend CAPTCHA_SITE_KEY is set in dev mode; ensure localhost is allowed in Turnstile widget settings.")
+fi
+
+if [[ "${backend_is_dev}" -eq 1 ]]; then
+  if ! is_truthy "${lockers_overpass_fallback}" \
+    && [[ -z "$(trim "${fan_api_username}")" || -z "$(trim "${fan_api_password}")" ]]; then
+    warnings+=("FAN lockers will fail in dev (LOCKERS_USE_OVERPASS_FALLBACK=0 and FAN API credentials are empty).")
+  fi
+  if is_truthy "${sameday_mirror_enabled}" \
+    && [[ -z "$(trim "${sameday_api_base_url}")" || -z "$(trim "${sameday_api_username}")" || -z "$(trim "${sameday_api_password}")" ]] \
+    && ! is_truthy "${lockers_overpass_fallback}"; then
+    warnings+=("Sameday lockers are likely unavailable in dev (mirror enabled without snapshot/credentials and no Overpass fallback).")
+  fi
 fi
 
 if [[ "${REQUIRE_DEV}" -eq 1 ]]; then
