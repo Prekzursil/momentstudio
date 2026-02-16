@@ -10,6 +10,7 @@ import os
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 
@@ -134,8 +135,24 @@ def _update_labels(issue: dict[str, Any]) -> list[str]:
     return sorted(set(keep), key=lambda x: x.lower())
 
 
+def _safe_runner_file_path(raw_path: str) -> Path | None:
+    candidate = (raw_path or "").strip()
+    if not candidate:
+        return None
+    runner_temp = (os.environ.get("RUNNER_TEMP") or "").strip()
+    if not runner_temp:
+        return None
+    root = Path(runner_temp).resolve()
+    target = Path(candidate).resolve()
+    try:
+        target.relative_to(root)
+    except ValueError:
+        return None
+    return target
+
+
 def _write_outputs(*, scanned: int, stale: int, updated: int) -> None:
-    output_path = (os.environ.get("GITHUB_OUTPUT") or "").strip()
+    output_path = _safe_runner_file_path(os.environ.get("GITHUB_OUTPUT") or "")
     if output_path:
         with open(output_path, "a", encoding="utf-8") as handle:
             handle.write(f"scanned={scanned}\n")
@@ -144,7 +161,7 @@ def _write_outputs(*, scanned: int, stale: int, updated: int) -> None:
 
 
 def _write_step_summary(*, scanned: int, stale: int, updated: int) -> None:
-    summary_path = (os.environ.get("GITHUB_STEP_SUMMARY") or "").strip()
+    summary_path = _safe_runner_file_path(os.environ.get("GITHUB_STEP_SUMMARY") or "")
     if not summary_path:
         return
     lines = [
