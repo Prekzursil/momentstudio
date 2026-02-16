@@ -85,22 +85,23 @@ async def get_category_by_slug(session: AsyncSession, slug: str) -> Category | N
 
 
 async def _get_category_descendant_ids(session: AsyncSession, root_id: uuid.UUID) -> list[uuid.UUID]:
-    result = await session.execute(select(Category.id, Category.parent_id))
-    children_by_parent: dict[uuid.UUID, list[uuid.UUID]] = {}
-    for cat_id, parent_id in result.all():
-        if parent_id is None:
-            continue
-        children_by_parent.setdefault(parent_id, []).append(cat_id)
     resolved: list[uuid.UUID] = []
-    stack = [root_id]
     seen: set[uuid.UUID] = set()
-    while stack:
-        current = stack.pop()
-        if current in seen:
-            continue
-        seen.add(current)
-        resolved.append(current)
-        stack.extend(children_by_parent.get(current, []))
+    frontier = [root_id]
+    while frontier:
+        next_frontier: list[uuid.UUID] = []
+        for current in frontier:
+            if current in seen:
+                continue
+            seen.add(current)
+            resolved.append(current)
+        child_rows = (
+            await session.execute(select(Category.id).where(Category.parent_id.in_(frontier)))
+        ).scalars()
+        for child_id in child_rows:
+            if child_id not in seen:
+                next_frontier.append(child_id)
+        frontier = next_frontier
     return resolved
 
 
