@@ -79,8 +79,7 @@ PYTHONPATH=$(pwd) mypy app
 - Full backup helper (Postgres dump + JSON + uploads):
 
   ```bash
-  cd ../infra/backup
-  DATABASE_URL=... ./export_all.sh
+  DATABASE_URL=... ./infra/backup/export_all.sh
   ```
 
 - Backup verification:
