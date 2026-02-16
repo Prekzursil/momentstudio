@@ -6,10 +6,15 @@ import json
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
+import os
 from typing import Any
 
 
 SEVERITY_WEIGHT = {"s1": 100, "s2": 60, "s3": 25, "s4": 10}
+ALLOWED_RELATIVE_ROOTS = (
+  "artifacts/audit-evidence",
+  "docs/reports",
+)
 
 
 @dataclass
@@ -25,6 +30,43 @@ class BacklogItem:
 
 def _read_json(path: Path) -> Any:
   return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _resolve_repo_path(raw: str, *, must_exist: bool) -> Path:
+  value = (raw or "").strip()
+  if not value:
+    raise SystemExit("path value cannot be empty")
+
+  if os.path.isabs(value):
+    raise SystemExit(f"absolute paths are not allowed: {value}")
+
+  repo_root = Path.cwd().resolve()
+  candidate = (repo_root / value).resolve()
+
+  try:
+    candidate.relative_to(repo_root)
+  except ValueError as exc:
+    raise SystemExit(f"path escapes repository root: {value}") from exc
+
+  allowed = False
+  for root in ALLOWED_RELATIVE_ROOTS:
+    allowed_root = (repo_root / root).resolve()
+    try:
+      candidate.relative_to(allowed_root)
+      allowed = True
+      break
+    except ValueError:
+      continue
+  if not allowed:
+    raise SystemExit(
+      "path must be under one of: "
+      + ", ".join(ALLOWED_RELATIVE_ROOTS)
+      + f" (got: {value})"
+    )
+
+  if must_exist and not candidate.exists():
+    raise SystemExit(f"path does not exist: {value}")
+  return candidate
 
 
 def _classify_issue_type(rule_id: str) -> tuple[str, str]:
@@ -142,13 +184,17 @@ def main() -> int:
   parser.add_argument("--md-out", required=True, help="Output Markdown path")
   args = parser.parse_args()
 
-  findings_path = Path(args.findings)
+  findings_path = _resolve_repo_path(args.findings, must_exist=True)
   findings = _read_json(findings_path)
   if not isinstance(findings, list):
     raise SystemExit("findings payload must be a list")
 
   backlog = build_backlog(findings)
-  write_outputs(backlog, Path(args.json_out), Path(args.md_out))
+  write_outputs(
+    backlog,
+    _resolve_repo_path(args.json_out, must_exist=False),
+    _resolve_repo_path(args.md_out, must_exist=False),
+  )
 
   print(f"items={len(backlog)}")
   return 0
