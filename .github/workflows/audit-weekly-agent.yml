@@ -145,6 +145,17 @@ jobs:
             const title = 'Weekly UX/IA Audit Digest';
             const body = fs.readFileSync('artifacts/audit-evidence/weekly-digest-body.md', 'utf8');
             const { owner, repo } = context.repo;
+            const baselineLabels = ['audit:ux', 'audit:ia', 'audit:correctness'];
+            const readyLabel = 'ai:ready';
+            const inProgressLabel = 'ai:in-progress';
+
+            const mergeLabels = (existing, { targetAiState }) => {
+              const current = (existing || []).map((label) =>
+                typeof label === 'string' ? label : label.name,
+              );
+              const preserved = current.filter((label) => label !== readyLabel && label !== inProgressLabel);
+              return Array.from(new Set([...preserved, ...baselineLabels, targetAiState]));
+            };
 
             const openIssues = await github.paginate(github.rest.issues.listForRepo, {
               owner,
@@ -160,7 +171,7 @@ jobs:
                 issue_number: existing.number,
                 title,
                 body,
-                labels: ['audit:ux', 'audit:ia', 'audit:correctness', 'ai:ready'],
+                labels: mergeLabels(existing.labels, { targetAiState: readyLabel }),
               });
               core.setOutput('issue_number', String(existing.number));
               return;
@@ -171,7 +182,7 @@ jobs:
               repo,
               title,
               body,
-              labels: ['audit:ux', 'audit:ia', 'audit:correctness', 'ai:ready'],
+              labels: mergeLabels([], { targetAiState: readyLabel }),
             });
             core.setOutput('issue_number', String(created.data.number));
 
@@ -187,6 +198,18 @@ jobs:
               return;
             }
             const { owner, repo } = context.repo;
+            const baselineLabels = ['audit:ux', 'audit:ia', 'audit:correctness'];
+            const readyLabel = 'ai:ready';
+            const inProgressLabel = 'ai:in-progress';
+
+            const mergeLabels = (existing, { targetAiState }) => {
+              const current = (existing || []).map((label) =>
+                typeof label === 'string' ? label : label.name,
+              );
+              const preserved = current.filter((label) => label !== readyLabel && label !== inProgressLabel);
+              return Array.from(new Set([...preserved, ...baselineLabels, targetAiState]));
+            };
+
             try {
               await github.rest.issues.addAssignees({
                 owner,
@@ -194,11 +217,18 @@ jobs:
                 issue_number: issueNumber,
                 assignees: ['copilot'],
               });
+
+              const issue = await github.rest.issues.get({
+                owner,
+                repo,
+                issue_number: issueNumber,
+              });
+
               await github.rest.issues.update({
                 owner,
                 repo,
                 issue_number: issueNumber,
-                labels: ['audit:ux', 'audit:ia', 'audit:correctness', 'ai:in-progress'],
+                labels: mergeLabels(issue.data.labels, { targetAiState: inProgressLabel }),
               });
             } catch (error) {
               const note = [
