@@ -2,7 +2,10 @@ import { Injectable } from '@angular/core';
 import { SeoLanguage } from './seo-head-links.service';
 
 function cleanText(value: unknown, maxLen = 220): string {
-  const text = String(value ?? '').replace(/\s+/g, ' ').trim();
+  if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
+    return '';
+  }
+  const text = String(value).replace(/\s+/g, ' ').trim();
   if (!text) return '';
   return text.slice(0, maxLen).trim();
 }
@@ -53,4 +56,3 @@ export class SeoCopyFallbackService {
     return `${safeTitle} summarizes key points in an easy-to-scan format and links to relevant follow-up pages.`;
   }
 }
-

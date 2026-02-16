@@ -46,7 +46,10 @@ const FALLBACK_DESCRIPTIONS: Record<SeoRouteKey, Record<SeoLanguage, string>> = 
 };
 
 function normalizeCandidate(value: unknown): string {
-  const text = String(value ?? '').replace(/\s+/g, ' ').trim();
+  if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
+    return '';
+  }
+  const text = String(value).replace(/\s+/g, ' ').trim();
   if (!text) return '';
   // Ignore unresolved translation keys returned by instant().
   if (/^[a-z0-9_.-]+$/i.test(text) && text.includes('.')) return '';
@@ -60,4 +63,3 @@ export function resolveRouteSeoDescription(route: SeoRouteKey, lang: SeoLanguage
   }
   return FALLBACK_DESCRIPTIONS[route][lang];
 }
-
