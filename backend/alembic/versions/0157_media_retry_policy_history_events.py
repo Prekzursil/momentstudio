@@ -25,7 +25,7 @@ def _job_type_enum() -> sa.Enum:
     bind = op.get_bind()
     backend = (bind.dialect.name or "").lower()
     if backend == "postgresql":
-        return sa.Enum(
+        return postgresql.ENUM(
             "ingest",
             "variant",
             "edit",

@@ -37,7 +37,7 @@ def _job_type_enum() -> sa.Enum:
     bind = op.get_bind()
     backend = (bind.dialect.name or "").lower()
     if backend == "postgresql":
-        return sa.Enum(
+        return postgresql.ENUM(
             "ingest",
             "variant",
             "edit",
@@ -86,7 +86,7 @@ def upgrade() -> None:
     table = sa.table(
         "media_job_retry_policies",
         sa.column("id", postgresql.UUID(as_uuid=True)),
-        sa.column("job_type", sa.String()),
+        sa.column("job_type", _job_type_enum()),
         sa.column("max_attempts", sa.Integer()),
         sa.column("backoff_schedule_json", sa.Text()),
         sa.column("jitter_ratio", sa.Float()),

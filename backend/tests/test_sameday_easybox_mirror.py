@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 from datetime import timedelta, timezone, datetime
 from types import SimpleNamespace
-from typing import Any
 from uuid import uuid4
 
 from fastapi.testclient import TestClient

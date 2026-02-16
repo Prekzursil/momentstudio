@@ -18,7 +18,9 @@ def upgrade() -> None:
     bind = op.get_bind()
     backend = (bind.dialect.name or "").lower()
     if backend == "postgresql":
-        op.execute("ALTER TYPE mediajobtype ADD VALUE IF NOT EXISTS 'usage_reconcile'")
+        context = op.get_context()
+        with context.autocommit_block():
+            op.execute("ALTER TYPE mediajobtype ADD VALUE IF NOT EXISTS 'usage_reconcile'")
 
 
 def downgrade() -> None:
