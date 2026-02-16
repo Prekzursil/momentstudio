@@ -38,5 +38,5 @@ def init_sentry() -> None:
         integrations=integrations,
         enable_logs=settings.sentry_enable_logs,
         attach_stacktrace=True,
-        send_default_pii=False,
+        send_default_pii=settings.sentry_send_default_pii,
     )

@@ -11,7 +11,10 @@ function parseDotEnv(contents) {
     PAYPAL_ENABLED: undefined,
     NETOPIA_ENABLED: undefined,
     ADDRESS_AUTOCOMPLETE_ENABLED: undefined,
+    FRONTEND_CLARITY_PROJECT_ID: undefined,
+    CLARITY_ENABLED: undefined,
     SENTRY_DSN: undefined,
+    SENTRY_SEND_DEFAULT_PII: undefined,
     SENTRY_TRACES_SAMPLE_RATE: undefined,
     SENTRY_REPLAY_SESSION_SAMPLE_RATE: undefined,
     SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE: undefined,
@@ -52,8 +55,17 @@ function parseDotEnv(contents) {
       case 'ADDRESS_AUTOCOMPLETE_ENABLED':
         result.ADDRESS_AUTOCOMPLETE_ENABLED = value;
         break;
+      case 'FRONTEND_CLARITY_PROJECT_ID':
+        result.FRONTEND_CLARITY_PROJECT_ID = value;
+        break;
+      case 'CLARITY_ENABLED':
+        result.CLARITY_ENABLED = value;
+        break;
       case 'SENTRY_DSN':
         result.SENTRY_DSN = value;
+        break;
+      case 'SENTRY_SEND_DEFAULT_PII':
+        result.SENTRY_SEND_DEFAULT_PII = value;
         break;
       case 'SENTRY_TRACES_SAMPLE_RATE':
         result.SENTRY_TRACES_SAMPLE_RATE = value;
@@ -106,7 +118,10 @@ const stripeEnabled = ['1', 'true', 'yes', 'on'].includes(String(stripeEnabledRa
 const paypalEnabledRaw = process.env.PAYPAL_ENABLED ?? parsed.PAYPAL_ENABLED ?? '';
 const netopiaEnabledRaw = process.env.NETOPIA_ENABLED ?? parsed.NETOPIA_ENABLED ?? '';
 const addressAutocompleteEnabledRaw = process.env.ADDRESS_AUTOCOMPLETE_ENABLED ?? parsed.ADDRESS_AUTOCOMPLETE_ENABLED ?? '';
+const clarityProjectId = process.env.FRONTEND_CLARITY_PROJECT_ID ?? parsed.FRONTEND_CLARITY_PROJECT_ID ?? '';
+const clarityEnabledRaw = process.env.CLARITY_ENABLED ?? parsed.CLARITY_ENABLED ?? '';
 const sentryDsn = process.env.SENTRY_DSN ?? parsed.SENTRY_DSN ?? '';
+const sentrySendDefaultPiiRaw = process.env.SENTRY_SEND_DEFAULT_PII ?? parsed.SENTRY_SEND_DEFAULT_PII ?? '1';
 const sentryTracesSampleRateRaw = process.env.SENTRY_TRACES_SAMPLE_RATE ?? parsed.SENTRY_TRACES_SAMPLE_RATE ?? '0';
 const sentryReplaySessionSampleRateRaw =
   process.env.SENTRY_REPLAY_SESSION_SAMPLE_RATE ?? parsed.SENTRY_REPLAY_SESSION_SAMPLE_RATE ?? '0';
@@ -116,6 +131,11 @@ const captchaSiteKey = process.env.CAPTCHA_SITE_KEY ?? parsed.CAPTCHA_SITE_KEY ?
 const paypalEnabled = ['1', 'true', 'yes', 'on'].includes(String(paypalEnabledRaw).trim().toLowerCase());
 const netopiaEnabled = ['1', 'true', 'yes', 'on'].includes(String(netopiaEnabledRaw).trim().toLowerCase());
 const addressAutocompleteEnabled = ['1', 'true', 'yes', 'on'].includes(String(addressAutocompleteEnabledRaw).trim().toLowerCase());
+const clarityEnabled =
+  String(clarityEnabledRaw ?? '').trim()
+    ? ['1', 'true', 'yes', 'on'].includes(String(clarityEnabledRaw).trim().toLowerCase())
+    : Boolean(String(clarityProjectId).trim());
+const sentrySendDefaultPii = ['1', 'true', 'yes', 'on'].includes(String(sentrySendDefaultPiiRaw).trim().toLowerCase());
 const sentryTracesSampleRate = Math.max(0, Math.min(1, Number.parseFloat(String(sentryTracesSampleRateRaw)) || 0));
 const sentryReplaySessionSampleRate = Math.max(
   0,
@@ -137,7 +157,10 @@ const config = {
   paypalEnabled,
   netopiaEnabled,
   addressAutocompleteEnabled,
+  clarityProjectId: String(clarityProjectId).trim(),
+  clarityEnabled,
   sentryDsn,
+  sentrySendDefaultPii,
   sentryTracesSampleRate,
   sentryReplaySessionSampleRate,
   sentryReplayOnErrorSampleRate,

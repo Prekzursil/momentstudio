@@ -35,6 +35,13 @@ export class AnalyticsService {
   setEnabled(value: boolean): void {
     this.enabledState.set(Boolean(value));
     this.persistEnabled(this.enabledState());
+    if (typeof window !== 'undefined') {
+      try {
+        window.dispatchEvent(new CustomEvent('app:analytics-opt-in', { detail: { enabled: this.enabledState() } }));
+      } catch {
+        // ignore
+      }
+    }
     if (this.enabledState()) {
       this.startSession();
       return;
