@@ -30,6 +30,7 @@ jobs:
             const labels = [
               { name: 'audit:ux', color: '0E8A16', description: 'UX audit finding.' },
               { name: 'audit:ia', color: '1D76DB', description: 'Information architecture audit finding.' },
+              { name: 'audit:seo', color: '0E8A16', description: 'SEO quality finding.' },
               { name: 'audit:correctness', color: 'B60205', description: 'Correctness or runtime quality finding.' },
               { name: 'ai:ready', color: '0366D6', description: 'Ready for AI agent execution.' },
               { name: 'ai:in-progress', color: 'FBCA04', description: 'AI agent is processing.' },
@@ -117,6 +118,7 @@ jobs:
           python3 scripts/audit/upsert_audit_issues.py \
             --findings artifacts/audit-evidence/deterministic-findings.json \
             --run-url "$RUN_URL" \
+            --include-s3-seo \
             --skip-digest
 
       - name: Build weekly digest issue body
@@ -294,8 +296,10 @@ jobs:
           skip_reason="${{ steps.resolve.outputs.skip_reason }}"
           digest_issue="${{ steps.digest.outputs.issue_number }}"
           severe_count="n/a"
+          seo_s3_count="n/a"
           if [[ -f artifacts/audit-evidence/deterministic-findings.json ]]; then
             severe_count="$(jq '[.[] | select(.severity == "s1" or .severity == "s2")] | length' artifacts/audit-evidence/deterministic-findings.json)"
+            seo_s3_count="$(jq '[.[] | select(.severity == "s3" and (.labels // [] | index("audit:seo")) and (.indexable == true))] | length' artifacts/audit-evidence/deterministic-findings.json)"
           fi
 
           {
@@ -314,6 +318,7 @@ jobs:
             else
               echo "- Outcome: processed"
               echo "- Severe findings considered: \`${severe_count}\`"
+              echo "- Indexable SEO s3 findings considered: \`${seo_s3_count}\`"
               echo "- Digest issue number: \`${digest_issue:-n/a}\`"
             fi
           } >> "$GITHUB_STEP_SUMMARY"

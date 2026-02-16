@@ -246,7 +246,7 @@ Workflows:
 
 - `Audit PR Evidence` (required check): fast deterministic evidence on pull requests, captured against SSR output.
 - `Audit Weekly Evidence`: full weekly evidence pack + generated SEO content backlog, captured against SSR output.
-- `Audit Weekly Agent`: creates/updates rolling issue `Weekly UX/IA Audit Digest` and assigns `@copilot`.
+- `Audit Weekly Agent`: creates/updates rolling issue `Weekly UX/IA Audit Digest`, upserts `s1/s2` findings, and also upserts indexable-route `s3` SEO debt issues (`audit:seo`) with deterministic fingerprint dedupe.
 - `Audit PR Agent`: label a PR with `audit:agent` (or run the workflow manually) to open a Copilot-assigned audit issue against the latest PR evidence.
 - `Audit PR Deep Agent`: opt-in deep pass for PRs labeled `audit:deep`.
 
@@ -255,7 +255,8 @@ Quick usage:
 1. Open PR and review `audit-evidence-pack` artifact from `Audit PR Evidence`.
 2. Add label `audit:deep` to request a Copilot deep audit issue for that PR.
 3. Review weekly digest issue for severe findings + rolling lower-severity notes.
-4. Manual run helpers:
+4. Review route-level SEO debt issues labeled `audit:seo` + `ai:ready` (created from weekly evidence for indexable routes only).
+5. Manual run helpers:
    - Weekly chain: run `Audit Weekly Evidence`, then run `Audit Weekly Agent` (or let `workflow_run` trigger it automatically).
    - Deep agent: run `Audit PR Deep Agent` with `pr_number` (or leave blank to auto-detect when exactly one open PR targets `main`).
 

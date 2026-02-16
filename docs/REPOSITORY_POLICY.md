@@ -114,8 +114,13 @@ Security constraints:
 
 - Severe findings (`severity:s1/s2`):
   - upsert as individual issues using deterministic fingerprint dedupe.
-- Lower-severity findings (`severity:s3/s4`):
+- Medium SEO debt findings (`severity:s3`, indexable storefront only):
+  - upsert as individual issues when labeled `audit:seo` and `indexable=true`.
+  - keep dedupe behavior identical (fingerprint marker in issue body).
+- Remaining lower-severity findings (`severity:s3/s4`) not eligible for direct issue upsert:
   - kept in the rolling digest issue.
+- Noindex storefront routes:
+  - excluded from strict SEO content gating and severe technical SEO issue creation.
 - Deep PR agent pass:
   - requires `audit:deep` label.
   - produces/updates one deep-audit issue for that PR.
