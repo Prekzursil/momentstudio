@@ -1256,11 +1256,12 @@ async def get_telemetry(session: AsyncSession) -> MediaTelemetryResponse:
             queue_depth = 0
 
         try:
-            keys = await _await_if_needed(redis.keys(f"{prefix}:*"))
-            for key in keys or []:
+            scan_limit = max(1, int(getattr(settings, "media_dam_telemetry_heartbeat_scan_limit", 500) or 500))
+
+            async def _consume_heartbeat(key: object) -> bool:
                 raw = await _await_if_needed(redis.get(str(key)))
                 if not raw:
-                    continue
+                    return False
                 payload = json_loads(raw)
                 last_seen_raw = payload.get("last_seen_at")
                 try:
@@ -1268,7 +1269,7 @@ async def get_telemetry(session: AsyncSession) -> MediaTelemetryResponse:
                     if last_seen.tzinfo is None:
                         last_seen = last_seen.replace(tzinfo=timezone.utc)
                 except Exception:
-                    continue
+                    return False
                 lag = max(0, int((now - last_seen).total_seconds()))
                 workers.append(
                     MediaTelemetryWorkerRead(
@@ -1280,6 +1281,22 @@ async def get_telemetry(session: AsyncSession) -> MediaTelemetryResponse:
                         lag_seconds=lag,
                     )
                 )
+                return True
+
+            scanned = 0
+            key_iter = redis.scan_iter(match=f"{prefix}:*")
+            if hasattr(key_iter, "__aiter__"):
+                async for key in key_iter:
+                    if scanned >= scan_limit:
+                        break
+                    scanned += 1
+                    await _consume_heartbeat(key)
+            else:
+                for key in key_iter:
+                    if scanned >= scan_limit:
+                        break
+                    scanned += 1
+                    await _consume_heartbeat(key)
         except Exception:
             workers = []
 

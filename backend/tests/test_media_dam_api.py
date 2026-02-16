@@ -229,6 +229,77 @@ def test_media_dam_jobs_telemetry_and_reconcile(test_app: Dict[str, object], tmp
     assert invalid_range.status_code == 400, invalid_range.text
 
 
+
+
+def test_media_dam_telemetry_scans_heartbeat_keys_with_limit(
+    test_app: Dict[str, object],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_staff_token(SessionLocal, email="dam-admin-scan@example.com", role=UserRole.admin)
+
+    prefix = "media:workers:heartbeat:test"
+    monkeypatch.setattr(settings, "media_dam_worker_heartbeat_prefix", prefix)
+    monkeypatch.setattr(settings, "media_dam_telemetry_heartbeat_scan_limit", 2)
+
+    now = datetime.now(timezone.utc)
+
+    class FakeRedis:
+        def __init__(self) -> None:
+            self.payloads = {
+                f"{prefix}:worker-1": json.dumps({
+                    "worker_id": "worker-1",
+                    "hostname": "host-1",
+                    "pid": 1001,
+                    "app_version": "v1",
+                    "last_seen_at": now.isoformat(),
+                }),
+                f"{prefix}:worker-2": json.dumps({
+                    "worker_id": "worker-2",
+                    "hostname": "host-2",
+                    "pid": 1002,
+                    "app_version": "v1",
+                    "last_seen_at": now.isoformat(),
+                }),
+                f"{prefix}:worker-3": json.dumps({
+                    "worker_id": "worker-3",
+                    "hostname": "host-3",
+                    "pid": 1003,
+                    "app_version": "v1",
+                    "last_seen_at": now.isoformat(),
+                }),
+            }
+            self.scan_calls = 0
+
+        def keys(self, pattern: str):  # pragma: no cover - should never be called
+            raise AssertionError("keys() should not be used for telemetry discovery")
+
+        def scan_iter(self, *, match: str):
+            assert match == f"{prefix}:*"
+            self.scan_calls += 1
+            for key in sorted(self.payloads):
+                yield key
+
+        def get(self, key: str):
+            return self.payloads.get(key)
+
+        def llen(self, key: str):
+            return 0
+
+    fake_redis = FakeRedis()
+    monkeypatch.setattr(media_dam, "get_redis", lambda: fake_redis)
+
+    telemetry = client.get("/api/v1/content/admin/media/telemetry", headers=auth_headers(admin_token))
+    assert telemetry.status_code == 200, telemetry.text
+    payload = telemetry.json()
+
+    assert payload["online_workers"] == 2
+    assert len(payload["workers"]) == 2
+    assert [worker["worker_id"] for worker in payload["workers"]] == ["worker-1", "worker-2"]
+    assert fake_redis.scan_calls == 1
+
+
 def test_media_dam_private_preview_and_public_serving_gate(test_app: Dict[str, object], tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
