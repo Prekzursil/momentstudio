@@ -870,6 +870,10 @@ export interface ContentImageAssetListResponse {
   meta: { total_items: number; total_pages: number; page: number; limit: number };
 }
 
+export interface ContentImageAssetUpdateRequest {
+  alt_text?: string | null;
+}
+
 export interface ContentImageEditRequest {
   rotate_cw?: 0 | 90 | 180 | 270;
   crop_aspect_w?: number;
@@ -883,6 +887,268 @@ export interface ContentImageAssetUsageResponse {
   url: string;
   stored_in_key?: string | null;
   keys: string[];
+}
+
+export type MediaAssetType = 'image' | 'video' | 'document';
+export type MediaAssetStatus = 'draft' | 'approved' | 'rejected' | 'archived' | 'trashed';
+export type MediaAssetVisibility = 'public' | 'private';
+export type MediaJobType = 'ingest' | 'variant' | 'edit' | 'ai_tag' | 'duplicate_scan' | 'usage_reconcile';
+export type MediaJobStatus = 'queued' | 'processing' | 'completed' | 'failed' | 'dead_letter';
+export type MediaJobTriageState = 'open' | 'retrying' | 'ignored' | 'resolved';
+
+export interface MediaAssetI18n {
+  lang: 'en' | 'ro';
+  title?: string | null;
+  alt_text?: string | null;
+  caption?: string | null;
+  description?: string | null;
+}
+
+export interface MediaVariant {
+  id: string;
+  profile: string;
+  format?: string | null;
+  width?: number | null;
+  height?: number | null;
+  public_url: string;
+  size_bytes?: number | null;
+  created_at: string;
+}
+
+export interface MediaAsset {
+  id: string;
+  asset_type: MediaAssetType;
+  status: MediaAssetStatus;
+  visibility: MediaAssetVisibility;
+  source_kind: string;
+  source_ref?: string | null;
+  storage_key: string;
+  public_url: string;
+  preview_url?: string | null;
+  original_filename?: string | null;
+  mime_type?: string | null;
+  size_bytes?: number | null;
+  width?: number | null;
+  height?: number | null;
+  duration_ms?: number | null;
+  page_count?: number | null;
+  checksum_sha256?: string | null;
+  perceptual_hash?: string | null;
+  dedupe_group?: string | null;
+  rights_license?: string | null;
+  rights_owner?: string | null;
+  rights_notes?: string | null;
+  approved_at?: string | null;
+  trashed_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  tags: string[];
+  i18n: MediaAssetI18n[];
+  variants: MediaVariant[];
+}
+
+export interface MediaAssetListResponse {
+  items: MediaAsset[];
+  meta: { total_items: number; total_pages: number; page: number; limit: number };
+}
+
+export interface MediaAssetUpdateRequest {
+  status?: MediaAssetStatus;
+  visibility?: MediaAssetVisibility;
+  rights_license?: string | null;
+  rights_owner?: string | null;
+  rights_notes?: string | null;
+  tags?: string[];
+  i18n?: MediaAssetI18n[];
+}
+
+export interface MediaFinalizeRequest {
+  run_ai_tagging?: boolean;
+  run_duplicate_scan?: boolean;
+}
+
+export interface MediaVariantRequest {
+  profile: string;
+}
+
+export interface MediaEditRequest {
+  rotate_cw?: 0 | 90 | 180 | 270;
+  crop_aspect_w?: number;
+  crop_aspect_h?: number;
+  resize_max_width?: number;
+  resize_max_height?: number;
+}
+
+export interface MediaUsageEdge {
+  source_type: string;
+  source_key: string;
+  source_id?: string | null;
+  field_path: string;
+  lang?: string | null;
+  last_seen_at: string;
+}
+
+export interface MediaUsageResponse {
+  asset_id: string;
+  public_url: string;
+  items: MediaUsageEdge[];
+}
+
+export interface MediaJob {
+  id: string;
+  asset_id?: string | null;
+  job_type: MediaJobType;
+  status: MediaJobStatus;
+  progress_pct: number;
+  attempt: number;
+  max_attempts: number;
+  next_retry_at?: string | null;
+  last_error_at?: string | null;
+  dead_lettered_at?: string | null;
+  triage_state: MediaJobTriageState;
+  assigned_to_user_id?: string | null;
+  sla_due_at?: string | null;
+  incident_url?: string | null;
+  tags: string[];
+  error_code?: string | null;
+  error_message?: string | null;
+  created_at: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+}
+
+export interface MediaJobListResponse {
+  items: MediaJob[];
+  meta: { total_items: number; total_pages: number; page: number; limit: number };
+}
+
+export interface MediaJobEvent {
+  id: string;
+  job_id: string;
+  actor_user_id?: string | null;
+  action: string;
+  note?: string | null;
+  meta_json?: string | null;
+  created_at: string;
+}
+
+export interface MediaJobEventsResponse {
+  items: MediaJobEvent[];
+}
+
+export interface MediaRetryPolicy {
+  job_type: MediaJobType;
+  max_attempts: number;
+  backoff_schedule_seconds: number[];
+  jitter_ratio: number;
+  enabled: boolean;
+  updated_by_user_id?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MediaRetryPolicyListResponse {
+  items: MediaRetryPolicy[];
+}
+
+export interface MediaRetryPolicyUpdateRequest {
+  max_attempts?: number;
+  backoff_schedule_seconds?: number[];
+  jitter_ratio?: number;
+  enabled?: boolean;
+}
+
+export type MediaRetryPolicyPresetKey = 'factory_default' | 'last_change' | 'known_good';
+
+export interface MediaRetryPolicySnapshot {
+  max_attempts: number;
+  backoff_schedule_seconds: number[];
+  jitter_ratio: number;
+  enabled: boolean;
+  version_ts?: string | null;
+}
+
+export interface MediaRetryPolicyEvent {
+  id: string;
+  job_type: MediaJobType;
+  action: string;
+  actor_user_id?: string | null;
+  preset_key?: MediaRetryPolicyPresetKey | null;
+  before_policy: MediaRetryPolicySnapshot;
+  after_policy: MediaRetryPolicySnapshot;
+  note?: string | null;
+  created_at: string;
+}
+
+export interface MediaRetryPolicyHistoryResponse {
+  items: MediaRetryPolicyEvent[];
+  meta: { total_items: number; total_pages: number; page: number; limit: number };
+}
+
+export interface MediaRetryPolicyPreset {
+  preset_key: MediaRetryPolicyPresetKey;
+  label: string;
+  policy: MediaRetryPolicySnapshot;
+  source_event_id?: string | null;
+  fallback_used: boolean;
+  updated_at?: string | null;
+}
+
+export interface MediaRetryPolicyPresetsResponse {
+  job_type: MediaJobType;
+  items: MediaRetryPolicyPreset[];
+}
+
+export interface MediaRetryPolicyRollbackRequest {
+  preset_key?: MediaRetryPolicyPresetKey;
+  event_id?: string;
+  note?: string | null;
+}
+
+export interface MediaJobTriageUpdateRequest {
+  triage_state?: MediaJobTriageState;
+  assigned_to_user_id?: string | null;
+  clear_assignee?: boolean;
+  sla_due_at?: string | null;
+  clear_sla_due_at?: boolean;
+  incident_url?: string | null;
+  clear_incident_url?: boolean;
+  add_tags?: string[];
+  remove_tags?: string[];
+  note?: string | null;
+}
+
+export interface MediaTelemetryWorker {
+  worker_id: string;
+  hostname?: string | null;
+  pid?: number | null;
+  app_version?: string | null;
+  last_seen_at: string;
+  lag_seconds: number;
+}
+
+export interface MediaTelemetryResponse {
+  queue_depth: number;
+  online_workers: number;
+  workers: MediaTelemetryWorker[];
+  stale_processing_count: number;
+  dead_letter_count: number;
+  sla_breached_count: number;
+  retry_scheduled_count: number;
+  oldest_queued_age_seconds?: number | null;
+  avg_processing_seconds?: number | null;
+  status_counts: Record<string, number>;
+  type_counts: Record<string, number>;
+}
+
+export interface MediaCollection {
+  id: string;
+  name: string;
+  slug: string;
+  visibility: MediaAssetVisibility;
+  created_at: string;
+  updated_at: string;
+  item_count: number;
 }
 
 export interface ContentLinkCheckIssue {
@@ -1470,8 +1736,21 @@ export class AdminService {
     return this.api.patch<ContentBlock>(`/content/admin/${encodeURIComponent(key)}/translation-status`, payload);
   }
 
-  listContentImages(params?: { key?: string; q?: string; tag?: string; page?: number; limit?: number }): Observable<ContentImageAssetListResponse> {
+  listContentImages(params?: {
+    key?: string;
+    q?: string;
+    tag?: string;
+    sort?: 'newest' | 'oldest' | 'key_asc' | 'key_desc';
+    created_from?: string;
+    created_to?: string;
+    page?: number;
+    limit?: number;
+  }): Observable<ContentImageAssetListResponse> {
     return this.api.get<ContentImageAssetListResponse>('/content/admin/assets/images', params as any);
+  }
+
+  updateContentImage(imageId: string, payload: ContentImageAssetUpdateRequest): Observable<ContentImageAssetRead> {
+    return this.api.patch<ContentImageAssetRead>(`/content/admin/assets/images/${encodeURIComponent(imageId)}`, payload);
   }
 
   updateContentImageTags(imageId: string, tags: string[]): Observable<ContentImageAssetRead> {
@@ -1492,6 +1771,183 @@ export class AdminService {
 
   deleteContentImage(imageId: string, params?: { delete_versions?: boolean }): Observable<void> {
     return this.api.delete<void>(`/content/admin/assets/images/${encodeURIComponent(imageId)}`, undefined, params as any);
+  }
+
+  listMediaAssets(params?: {
+    q?: string;
+    tag?: string;
+    asset_type?: MediaAssetType | '';
+    status?: MediaAssetStatus | '';
+    visibility?: MediaAssetVisibility | '';
+    include_trashed?: boolean;
+    created_from?: string;
+    created_to?: string;
+    page?: number;
+    limit?: number;
+    sort?: 'newest' | 'oldest' | 'name_asc' | 'name_desc';
+  }): Observable<MediaAssetListResponse> {
+    return this.api.get<MediaAssetListResponse>('/content/admin/media/assets', params as any);
+  }
+
+  uploadMediaAsset(
+    file: File,
+    params?: { visibility?: MediaAssetVisibility; auto_finalize?: boolean }
+  ): Observable<MediaAsset> {
+    const form = new FormData();
+    form.append('file', file);
+    return this.api.post<MediaAsset>('/content/admin/media/assets/upload', form, undefined, params as any);
+  }
+
+  finalizeMediaAsset(assetId: string, payload?: MediaFinalizeRequest): Observable<MediaJob> {
+    return this.api.post<MediaJob>(`/content/admin/media/assets/${encodeURIComponent(assetId)}/finalize`, payload || {});
+  }
+
+  updateMediaAsset(assetId: string, payload: MediaAssetUpdateRequest): Observable<MediaAsset> {
+    return this.api.patch<MediaAsset>(`/content/admin/media/assets/${encodeURIComponent(assetId)}`, payload);
+  }
+
+  approveMediaAsset(assetId: string, note?: string): Observable<MediaAsset> {
+    return this.api.post<MediaAsset>(`/content/admin/media/assets/${encodeURIComponent(assetId)}/approve`, { note: note || null });
+  }
+
+  rejectMediaAsset(assetId: string, note?: string): Observable<MediaAsset> {
+    return this.api.post<MediaAsset>(`/content/admin/media/assets/${encodeURIComponent(assetId)}/reject`, { note: note || null });
+  }
+
+  softDeleteMediaAsset(assetId: string): Observable<void> {
+    return this.api.delete<void>(`/content/admin/media/assets/${encodeURIComponent(assetId)}`);
+  }
+
+  restoreMediaAsset(assetId: string): Observable<MediaAsset> {
+    return this.api.post<MediaAsset>(`/content/admin/media/assets/${encodeURIComponent(assetId)}/restore`, {});
+  }
+
+  purgeMediaAsset(assetId: string): Observable<void> {
+    return this.api.post<void>(`/content/admin/media/assets/${encodeURIComponent(assetId)}/purge`, {});
+  }
+
+  getMediaAssetUsage(assetId: string): Observable<MediaUsageResponse> {
+    return this.api.get<MediaUsageResponse>(`/content/admin/media/assets/${encodeURIComponent(assetId)}/usage`);
+  }
+
+  requestMediaVariant(assetId: string, profile: string): Observable<MediaJob> {
+    return this.api.post<MediaJob>(`/content/admin/media/assets/${encodeURIComponent(assetId)}/variants`, { profile });
+  }
+
+  editMediaAsset(assetId: string, payload: MediaEditRequest): Observable<MediaJob> {
+    return this.api.post<MediaJob>(`/content/admin/media/assets/${encodeURIComponent(assetId)}/edit`, payload);
+  }
+
+  getMediaJob(jobId: string): Observable<MediaJob> {
+    return this.api.get<MediaJob>(`/content/admin/media/jobs/${encodeURIComponent(jobId)}`);
+  }
+
+  listMediaJobs(params?: {
+    page?: number;
+    limit?: number;
+    status?: MediaJobStatus | '';
+    job_type?: MediaJobType | '';
+    asset_id?: string;
+    triage_state?: MediaJobTriageState | '';
+    assigned_to_user_id?: string;
+    tag?: string;
+    sla_breached?: boolean;
+    dead_letter_only?: boolean;
+    created_from?: string;
+    created_to?: string;
+  }): Observable<MediaJobListResponse> {
+    return this.api.get<MediaJobListResponse>('/content/admin/media/jobs', params as any);
+  }
+
+  retryMediaJob(jobId: string): Observable<MediaJob> {
+    return this.api.post<MediaJob>(`/content/admin/media/jobs/${encodeURIComponent(jobId)}/retry`, {});
+  }
+
+  retryMediaJobsBulk(jobIds: string[]): Observable<MediaJobListResponse> {
+    return this.api.post<MediaJobListResponse>('/content/admin/media/jobs/retry-bulk', { job_ids: jobIds });
+  }
+
+  updateMediaJobTriage(jobId: string, payload: MediaJobTriageUpdateRequest): Observable<MediaJob> {
+    return this.api.patch<MediaJob>(`/content/admin/media/jobs/${encodeURIComponent(jobId)}/triage`, payload);
+  }
+
+  listMediaJobEvents(jobId: string, params?: { limit?: number }): Observable<MediaJobEventsResponse> {
+    return this.api.get<MediaJobEventsResponse>(`/content/admin/media/jobs/${encodeURIComponent(jobId)}/events`, params as any);
+  }
+
+  getMediaTelemetry(): Observable<MediaTelemetryResponse> {
+    return this.api.get<MediaTelemetryResponse>('/content/admin/media/telemetry');
+  }
+
+  listMediaRetryPolicies(): Observable<MediaRetryPolicyListResponse> {
+    return this.api.get<MediaRetryPolicyListResponse>('/content/admin/media/retry-policies');
+  }
+
+  listMediaRetryPolicyHistory(params?: {
+    job_type?: MediaJobType;
+    page?: number;
+    limit?: number;
+  }): Observable<MediaRetryPolicyHistoryResponse> {
+    return this.api.get<MediaRetryPolicyHistoryResponse>('/content/admin/media/retry-policies/history', params as any);
+  }
+
+  getMediaRetryPolicyPresets(jobType: MediaJobType): Observable<MediaRetryPolicyPresetsResponse> {
+    return this.api.get<MediaRetryPolicyPresetsResponse>(
+      `/content/admin/media/retry-policies/${encodeURIComponent(jobType)}/presets`
+    );
+  }
+
+  updateMediaRetryPolicy(jobType: MediaJobType, payload: MediaRetryPolicyUpdateRequest): Observable<MediaRetryPolicy> {
+    return this.api.patch<MediaRetryPolicy>(`/content/admin/media/retry-policies/${encodeURIComponent(jobType)}`, payload);
+  }
+
+  rollbackMediaRetryPolicy(jobType: MediaJobType, payload: MediaRetryPolicyRollbackRequest): Observable<MediaRetryPolicy> {
+    return this.api.post<MediaRetryPolicy>(
+      `/content/admin/media/retry-policies/${encodeURIComponent(jobType)}/rollback`,
+      payload
+    );
+  }
+
+  markMediaRetryPolicyKnownGood(jobType: MediaJobType, params?: { note?: string }): Observable<MediaRetryPolicyEvent> {
+    return this.api.post<MediaRetryPolicyEvent>(
+      `/content/admin/media/retry-policies/${encodeURIComponent(jobType)}/mark-known-good`,
+      {},
+      undefined,
+      params as any
+    );
+  }
+
+  resetMediaRetryPolicy(jobType: MediaJobType): Observable<MediaRetryPolicy> {
+    return this.api.post<MediaRetryPolicy>(`/content/admin/media/retry-policies/${encodeURIComponent(jobType)}/reset`, {});
+  }
+
+  resetAllMediaRetryPolicies(): Observable<MediaRetryPolicyListResponse> {
+    return this.api.post<MediaRetryPolicyListResponse>('/content/admin/media/retry-policies/reset-all', {});
+  }
+
+  requestMediaUsageReconcile(): Observable<MediaJob> {
+    return this.api.post<MediaJob>('/content/admin/media/usage/reconcile', {});
+  }
+
+  listMediaCollections(): Observable<MediaCollection[]> {
+    return this.api.get<MediaCollection[]>('/content/admin/media/collections');
+  }
+
+  createMediaCollection(payload: { name: string; slug: string; visibility?: MediaAssetVisibility }): Observable<MediaCollection> {
+    return this.api.post<MediaCollection>('/content/admin/media/collections', payload);
+  }
+
+  updateMediaCollection(
+    collectionId: string,
+    payload: { name: string; slug: string; visibility?: MediaAssetVisibility }
+  ): Observable<MediaCollection> {
+    return this.api.patch<MediaCollection>(`/content/admin/media/collections/${encodeURIComponent(collectionId)}`, payload);
+  }
+
+  replaceMediaCollectionItems(collectionId: string, assetIds: string[]): Observable<void> {
+    return this.api.post<void>(`/content/admin/media/collections/${encodeURIComponent(collectionId)}/items`, {
+      asset_ids: assetIds
+    });
   }
 
   linkCheckContent(key: string): Observable<ContentLinkCheckResponse> {

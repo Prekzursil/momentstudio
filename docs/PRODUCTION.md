@@ -9,6 +9,12 @@ At a high level:
 - **Frontend**: static Angular build served by nginx (also reverse-proxies `/api/*` and `/media/*` to the backend).
 - **TLS / public ingress**: your reverse proxy (Caddy/nginx/Traefik) in front of the frontend.
 
+Important local-vs-production note:
+
+- The local profile switcher (`scripts/env/switch.sh`, `make env-dev`, `make env-prod`) is for local machines.
+- On VPS, keep managing `backend/.env` and `frontend/.env` directly for production deployment.
+- Do not copy local development profile files to production hosts.
+
 ## 1) Pick a deployment model
 
 ### Model A (recommended): Docker Compose + reverse proxy
@@ -173,6 +179,22 @@ Recommended practice:
 3) Run migrations (`alembic upgrade head`).
 4) Re-import JSON (`python -m app.cli import-data --input export-*.json`).
 
+### DAM local-volume backup baseline
+
+Media DAM is intentionally local-only (no S3/object storage). Treat these folders as critical data:
+
+- `uploads/originals/`
+- `uploads/variants/`
+- `uploads/previews/`
+- `uploads/trash/`
+
+Operational baseline:
+
+- daily incremental filesystem snapshot
+- weekly full snapshot
+- retention >= 30 days
+- monthly restore drill to staging validating `/media/*` and DAM admin endpoints
+
 ## 7) Updating the app
 
 If you deploy from GHCR images (see `.github/workflows/release.yml`), the typical upgrade flow is:
@@ -182,3 +204,51 @@ If you deploy from GHCR images (see `.github/workflows/release.yml`), the typica
 3) Verify health:
    - backend: `/api/v1/health` and `/api/v1/health/ready`
    - frontend: load `/` and admin area
+
+## 8) Search Console indexing checklist (post-deploy)
+
+For the VPS stack (`infra/prod/`), `./infra/prod/deploy.sh` can print a ready-to-run URL Inspection checklist after verification.
+
+- Enabled by default: `RUN_GSC_INDEXING_CHECKLIST=1` (set in `infra/prod/.env`).
+- Disable when needed: `RUN_GSC_INDEXING_CHECKLIST=0`.
+- Run manually anytime:
+
+```bash
+./infra/prod/request-indexing-checklist.sh
+```
+
+The checklist prints key URLs for EN/RO (`home`, `shop`, `blog`) and a representative product URL discovered from `/sitemap.xml`,
+plus direct URL Inspection links for quick “Request indexing” actions.
+
+## 9) Sameday mirror sync runbook
+
+The Sameday Easybox/FANbox checkout picker is served from the local mirror snapshot in DB. Checkout should not depend on live upstream calls.
+
+### First-time snapshot initialization
+
+1. Sign in as owner/admin and open `Admin -> Ops` (`/admin/ops`).
+2. In the Sameday mirror card, click `Run sync now`.
+3. Verify:
+   - latest run status = `success`
+   - locker count is greater than `0`
+   - stale flag = `false`
+
+### Stale interpretation
+
+- `stale=false`: mirror is fresh; normal operation.
+- `stale=true` with prior successful snapshot:
+  - checkout continues serving the last successful snapshot.
+  - manual sync should still be triggered to refresh.
+- `stale=true` with no successful snapshot:
+  - Sameday locker endpoints can return `503`.
+  - checkout should prompt fallback delivery method until snapshot succeeds.
+
+### Recovery flow
+
+1. Trigger manual sync (`Run sync now`) and inspect recent runs/errors.
+2. If repeated failures persist:
+   - review backend logs for crawler/Cloudflare changes,
+   - verify mirror configuration/env values,
+   - validate outbound connectivity.
+3. Keep checkout live using existing last successful snapshot when available.
+4. If no snapshot is available, temporarily steer users to non-locker shipping options, then retry sync after fix.

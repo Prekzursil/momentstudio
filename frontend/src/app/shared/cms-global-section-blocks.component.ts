@@ -8,6 +8,7 @@ import { MarkdownService } from '../core/markdown.service';
 import { ContainerComponent } from '../layout/container.component';
 import { BannerBlockComponent } from './banner-block.component';
 import { CarouselBlockComponent } from './carousel-block.component';
+import { SkeletonComponent } from './skeleton.component';
 import { PageBlock, UiLang, pageBlockInnerClasses, pageBlockOuterClasses, parsePageBlocks } from './page-blocks';
 
 type ContentBlockRead = {
@@ -17,89 +18,101 @@ type ContentBlockRead = {
 @Component({
   selector: 'app-cms-global-section-blocks',
   standalone: true,
-  imports: [CommonModule, TranslateModule, ContainerComponent, BannerBlockComponent, CarouselBlockComponent],
+  imports: [CommonModule, TranslateModule, ContainerComponent, BannerBlockComponent, CarouselBlockComponent, SkeletonComponent],
   template: `
-    <section *ngIf="blocks().length" class="w-full" [ngClass]="sectionClasses">
+    <section *ngIf="loading() || blocks().length" class="w-full" [ngClass]="sectionClasses">
       <app-container [classes]="containerClasses">
-        <div class="grid gap-6">
-          <ng-container *ngFor="let b of blocks()">
-            <div class="w-full" [ngClass]="pageBlockOuterClasses(b.layout)">
-              <div [ngClass]="pageBlockInnerClasses(b.layout)">
-                <ng-container [ngSwitch]="b.type">
-                  <div *ngSwitchCase="'text'" class="grid gap-2">
-                    <h2 *ngIf="b.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">
-                      {{ b.title }}
-                    </h2>
-                    <div class="markdown text-base text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="b.body_html"></div>
-                  </div>
+        <ng-container *ngIf="loading(); else loadedBlocks">
+          <div
+            class="grid gap-3 rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/40"
+            [ngClass]="reserveLoadingHeightClass || 'min-h-[8rem]'"
+            data-cms-global-loading="true"
+          >
+            <app-skeleton *ngFor="let row of loadingRows()" height="14px" [width]="row % 2 === 0 ? '94%' : '78%'"></app-skeleton>
+          </div>
+        </ng-container>
 
-                  <div *ngSwitchCase="'image'" class="grid gap-2">
-                    <h2 *ngIf="b.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">
-                      {{ b.title }}
-                    </h2>
-                    <a
-                      *ngIf="b.link_url; else plainImage"
-                      class="block"
-                      [href]="b.link_url"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <img
-                        [src]="b.url"
-                        [alt]="b.alt || b.title || ''"
-                        class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
-                        [style.object-position]="focalPosition(b.focal_x, b.focal_y)"
-                        loading="lazy"
-                      />
-                    </a>
-                    <ng-template #plainImage>
-                      <img
-                        [src]="b.url"
-                        [alt]="b.alt || b.title || ''"
-                        class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
-                        [style.object-position]="focalPosition(b.focal_x, b.focal_y)"
-                        loading="lazy"
-                      />
-                    </ng-template>
-                    <p *ngIf="b.caption" class="text-sm text-slate-600 dark:text-slate-300">{{ b.caption }}</p>
-                  </div>
+        <ng-template #loadedBlocks>
+          <div class="grid gap-6">
+            <ng-container *ngFor="let b of blocks()">
+              <div class="w-full" [ngClass]="pageBlockOuterClasses(b.layout)">
+                <div [ngClass]="pageBlockInnerClasses(b.layout)">
+                  <ng-container [ngSwitch]="b.type">
+                    <div *ngSwitchCase="'text'" class="grid gap-2">
+                      <h2 *ngIf="b.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">
+                        {{ b.title }}
+                      </h2>
+                      <div class="markdown text-base text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="b.body_html"></div>
+                    </div>
 
-                  <div *ngSwitchCase="'gallery'" class="grid gap-2">
-                    <h2 *ngIf="b.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">
-                      {{ b.title }}
-                    </h2>
-                    <div class="grid gap-3 sm:grid-cols-2">
-                      <div *ngFor="let img of b.images" class="grid gap-2">
+                    <div *ngSwitchCase="'image'" class="grid gap-2">
+                      <h2 *ngIf="b.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">
+                        {{ b.title }}
+                      </h2>
+                      <a
+                        *ngIf="b.link_url; else plainImage"
+                        class="block"
+                        [href]="b.link_url"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
                         <img
-                          [src]="img.url"
-                          [alt]="img.alt || b.title || ''"
+                          [src]="b.url"
+                          [alt]="b.alt || b.title || ''"
                           class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
-                          [style.object-position]="focalPosition(img.focal_x, img.focal_y)"
+                          [style.object-position]="focalPosition(b.focal_x, b.focal_y)"
                           loading="lazy"
                         />
-                        <p *ngIf="img.caption" class="text-sm text-slate-600 dark:text-slate-300">{{ img.caption }}</p>
+                      </a>
+                      <ng-template #plainImage>
+                        <img
+                          [src]="b.url"
+                          [alt]="b.alt || b.title || ''"
+                          class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
+                          [style.object-position]="focalPosition(b.focal_x, b.focal_y)"
+                          loading="lazy"
+                        />
+                      </ng-template>
+                      <p *ngIf="b.caption" class="text-sm text-slate-600 dark:text-slate-300">{{ b.caption }}</p>
+                    </div>
+
+                    <div *ngSwitchCase="'gallery'" class="grid gap-2">
+                      <h2 *ngIf="b.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">
+                        {{ b.title }}
+                      </h2>
+                      <div class="grid gap-3 sm:grid-cols-2">
+                        <div *ngFor="let img of b.images" class="grid gap-2">
+                          <img
+                            [src]="img.url"
+                            [alt]="img.alt || b.title || ''"
+                            class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
+                            [style.object-position]="focalPosition(img.focal_x, img.focal_y)"
+                            loading="lazy"
+                          />
+                          <p *ngIf="img.caption" class="text-sm text-slate-600 dark:text-slate-300">{{ img.caption }}</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div *ngSwitchCase="'banner'" class="grid gap-2">
-                    <h2 *ngIf="b.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">
-                      {{ b.title }}
-                    </h2>
-                    <app-banner-block [slide]="b.slide"></app-banner-block>
-                  </div>
+                    <div *ngSwitchCase="'banner'" class="grid gap-2">
+                      <h2 *ngIf="b.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">
+                        {{ b.title }}
+                      </h2>
+                      <app-banner-block [slide]="b.slide"></app-banner-block>
+                    </div>
 
-                  <div *ngSwitchCase="'carousel'" class="grid gap-2">
-                    <h2 *ngIf="b.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">
-                      {{ b.title }}
-                    </h2>
-                    <app-carousel-block [slides]="b.slides" [settings]="b.settings"></app-carousel-block>
-                  </div>
-                </ng-container>
+                    <div *ngSwitchCase="'carousel'" class="grid gap-2">
+                      <h2 *ngIf="b.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">
+                        {{ b.title }}
+                      </h2>
+                      <app-carousel-block [slides]="b.slides" [settings]="b.settings"></app-carousel-block>
+                    </div>
+                  </ng-container>
+                </div>
               </div>
-            </div>
-          </ng-container>
-        </div>
+            </ng-container>
+          </div>
+        </ng-template>
       </app-container>
     </section>
   `
@@ -108,8 +121,11 @@ export class CmsGlobalSectionBlocksComponent implements OnInit, OnDestroy {
   @Input({ required: true }) contentKey!: string;
   @Input() sectionClasses = '';
   @Input() containerClasses = 'py-6';
+  @Input() reserveLoadingHeightClass = '';
+  @Input() loadingSkeletonCount = 3;
 
   blocks = signal<PageBlock[]>([]);
+  loading = signal<boolean>(false);
   pageBlockOuterClasses = pageBlockOuterClasses;
   pageBlockInnerClasses = pageBlockInnerClasses;
 
@@ -130,6 +146,11 @@ export class CmsGlobalSectionBlocksComponent implements OnInit, OnDestroy {
     this.langSub?.unsubscribe();
   }
 
+  loadingRows(): number[] {
+    const count = Math.max(1, Number(this.loadingSkeletonCount) || 1);
+    return Array.from({ length: count }, (_, i) => i);
+  }
+
   focalPosition(focalX?: number, focalY?: number): string {
     const x = Math.max(0, Math.min(100, Math.round(Number(focalX ?? 50))));
     const y = Math.max(0, Math.min(100, Math.round(Number(focalY ?? 50))));
@@ -140,22 +161,26 @@ export class CmsGlobalSectionBlocksComponent implements OnInit, OnDestroy {
     const key = (this.contentKey || '').trim();
     if (!key) {
       this.blocks.set([]);
+      this.loading.set(false);
       return;
     }
     const lang: UiLang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
+    this.loading.set(true);
     this.api.get<ContentBlockRead>(`/content/${encodeURIComponent(key)}`, { lang }).subscribe({
       next: (block) => {
         const meta = ((block as { meta?: Record<string, unknown> | null })?.meta || {}) as Record<string, unknown>;
         this.blocks.set(parsePageBlocks(meta, lang, (md) => this.markdown.render(md)));
+        this.loading.set(false);
       },
       error: (err) => {
         if (err?.status === 404) {
           this.blocks.set([]);
+          this.loading.set(false);
           return;
         }
         this.blocks.set([]);
+        this.loading.set(false);
       }
     });
   }
 }
-

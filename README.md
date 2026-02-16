@@ -26,18 +26,35 @@ This repository is a monorepo:
 ### Option A: one-command dev (recommended)
 
 ```bash
+make env-dev
 make dev
 # or
 ./start.sh
 ```
 
 - Starts the backend + frontend in dev mode and runs `alembic upgrade head`.
+- `make env-dev` activates safe local settings (mock payments, captcha disabled, localhost cookies).
 - Uses an Angular dev proxy so the browser talks to a single origin (avoids CORS in local dev).
 - Defaults to:
   - Frontend: `http://localhost:4200`
   - Backend: `http://127.0.0.1:8000`
   - Ports automatically bump if they’re already in use.
 - If `DATABASE_URL` is not reachable and Docker is available, `start.sh` will try to start the Compose Postgres service.
+
+One-command owner bootstrap + dev start:
+
+```bash
+make dev-owner
+```
+
+- Forces the local dev profile (`make env-dev` behavior).
+- Applies backend migrations.
+- Creates/repairs the local owner account.
+- Starts backend + frontend in the foreground.
+- Default local owner credentials:
+  - email: `owner@local.test`
+  - password: `OwnerDev!123`
+  - override with `DEV_OWNER_EMAIL`, `DEV_OWNER_PASSWORD`, `DEV_OWNER_USERNAME`, `DEV_OWNER_DISPLAY_NAME`.
 
 ### Option B: Docker Compose stack (prod-like)
 
@@ -63,20 +80,64 @@ docker compose -f infra/docker-compose.yml exec -T backend python -m app.cli boo
 
 ## Configuration
 
-- Backend: copy `backend/.env.example` → `backend/.env`
-- Frontend: copy `frontend/.env.example` → `frontend/.env`
+- One-time profile bootstrap:
+
+  ```bash
+  ./scripts/env/bootstrap.sh
+  ```
+
+- Switch active local profile:
+
+  ```bash
+  make env-dev    # safe daily local development
+  make env-prod   # local production-like mode
+  make env-status
+  make env-doctor
+  ```
+
+- Backend profile files:
+  - `backend/.env.development.local`
+  - `backend/.env.production.local`
+- Frontend profile files:
+  - `frontend/.env.development.local`
+  - `frontend/.env.production.local`
 - Docker stack: `infra/docker-compose.yml`
+
+See `docs/ENVIRONMENT_PROFILES.md` for full details and troubleshooting.
 
 ## Common commands
 
 ```bash
 make dev
+make env-dev
+make env-prod
+make env-status
+make env-doctor
+make dev-owner
 make lint
 make test
 make docker-up
 make docker-down
 make compose-smoke
 ```
+
+## Sameday mirror first sync (ops runbook)
+
+The checkout locker picker uses the local Sameday mirror snapshot from the database.
+
+First-time initialization:
+
+1. Sign in as owner/admin and open `Admin -> Ops` (`/admin/ops`).
+2. In the Sameday mirror card, click `Run sync now`.
+3. Confirm expected status:
+   - latest run = `success`
+   - locker count > `0`
+   - stale = `false`
+
+If stale appears:
+
+- `stale=true` + previous successful snapshot: checkout still serves the last snapshot.
+- `stale=true` + no successful snapshot: Sameday locker queries can return `503` until a successful sync completes.
 
 Frontend-only:
 
@@ -137,6 +198,7 @@ The `Release` GitHub Actions workflow builds/pushes images when you push a tag l
 - `SECURITY.md` — security disclosure policy
 - `docs/REPOSITORY_POLICY.md` — branch protection, labels, CI gates, and merge policy
 - `docs/PRODUCTION.md` — production deployment guide
+- `docs/ENVIRONMENT_PROFILES.md` — local dev/prod profile switching guide
 - `docs/GOOGLE_OAUTH.md` — Google OAuth setup (origins + redirect URIs)
 - `docs/DEV_PORTS.md` — dev ports + proxy/CORS expectations
 - `backend/README.md`, `frontend/README.md`, `infra/README.md`
@@ -150,7 +212,6 @@ This repository uses a lightweight governance pack to keep collaboration predict
 - Dependabot for grouped weekly patch/minor updates (backend/frontend/actions).
 - PR auto-labeling by changed paths and branch patterns.
 - Dependency review checks on pull requests.
-- Monthly repo-policy cadence evaluation for when to enable required review approvals.
 
 Roadmap board:
 

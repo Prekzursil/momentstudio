@@ -4,6 +4,12 @@ This repo supports two common local workflows. They intentionally use different 
 
 ## Option A: `start.sh` (local dev proxy)
 
+Before first run, activate the dev profile:
+
+```bash
+make env-dev
+```
+
 - Frontend (Angular dev server): `http://localhost:4200` (default)
 - Backend (uvicorn): `http://127.0.0.1:8000` (default)
 
@@ -40,4 +46,3 @@ If you run the frontend and backend on different origins without a proxy (advanc
 
 - Backend `CORS_ORIGINS` includes the frontend origin.
 - Backend `FRONTEND_ORIGIN` matches the frontend origin (used for redirects + links in emails and payment flows).
-

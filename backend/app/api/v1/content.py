@@ -4,7 +4,8 @@ from datetime import datetime, timedelta, timezone
 from io import StringIO
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Query, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy import select, func, or_, and_, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,12 +13,15 @@ from app.core.config import settings
 from app.core.dependencies import get_current_user_optional, get_session, require_admin_section
 from app.core.security import create_content_preview_token, decode_content_preview_token
 from app.models.content import ContentBlock, ContentBlockVersion, ContentImage, ContentRedirect, ContentImageTag, ContentStatus
+from app.models.media import MediaAssetStatus, MediaJobType
 from app.models.user import User
+from app.models.user import UserRole
 from app.schemas.content import (
     ContentAuditRead,
     ContentBlockCreate,
     ContentBlockRead,
     ContentBlockUpdate,
+    ContentImageAssetUpdate,
     ContentImageAssetListResponse,
     ContentImageAssetRead,
     ContentImageAssetUsageResponse,
@@ -48,9 +52,37 @@ from app.schemas.content import (
     SitemapPreviewResponse,
     StructuredDataValidationResponse,
 )
+from app.schemas.media import (
+    MediaApproveRequest,
+    MediaAssetListResponse,
+    MediaAssetRead,
+    MediaAssetUpdateRequest,
+    MediaCollectionItemsRequest,
+    MediaCollectionRead,
+    MediaCollectionUpsertRequest,
+    MediaEditRequest,
+    MediaFinalizeRequest,
+    MediaJobRead,
+    MediaJobEventsResponse,
+    MediaJobListResponse,
+    MediaJobRetryBulkRequest,
+    MediaRetryPolicyListResponse,
+    MediaRetryPolicyHistoryResponse,
+    MediaRetryPolicyPresetsResponse,
+    MediaRetryPolicyRead,
+    MediaRetryPolicyEventRead,
+    MediaRetryPolicyRollbackRequest,
+    MediaRetryPolicyUpdateRequest,
+    MediaRejectRequest,
+    MediaTelemetryResponse,
+    MediaJobTriageUpdateRequest,
+    MediaUsageResponse,
+    MediaVariantRequest,
+)
 from app.services import step_up as step_up_service
 from app.schemas.social import SocialThumbnailRequest, SocialThumbnailResponse
 from app.services import content as content_service
+from app.services import media_dam
 from app.services import sitemap as sitemap_service
 from app.services import structured_data as structured_data_service
 from app.services import social_thumbnails
@@ -87,6 +119,11 @@ def _normalize_image_tags(tags: list[str]) -> list[str]:
         if len(normalized) >= 10:
             break
     return normalized
+
+
+def _require_owner_or_admin(user: User, *, detail: str = "Only owner/admin can perform this action") -> None:
+    if user.role not in (UserRole.owner, UserRole.admin):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=detail)
 
 
 def _redirect_key_to_display_value(key: str) -> str:
@@ -206,6 +243,11 @@ async def get_content(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
     if getattr(block, "key", "").startswith("page.") and _requires_auth(block) and not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    if getattr(block, "key", "") == "site.social":
+        hydrated_meta = await social_thumbnails.hydrate_site_social_meta(block.meta if isinstance(block.meta, dict) else None)
+        out = ContentBlockRead.model_validate(block)
+        out.meta = hydrated_meta
+        return out
     return block
 
 
@@ -254,11 +296,18 @@ async def admin_fetch_social_thumbnail(
     _: User = Depends(require_admin_section("content")),
 ) -> SocialThumbnailResponse:
     try:
-        thumbnail_url = await social_thumbnails.fetch_social_thumbnail_url(payload.url)
+        thumbnail_url = await social_thumbnails.fetch_social_thumbnail_url(
+            payload.url,
+            persist_local=True,
+            force_refresh=True,
+            allow_remote_fallback=False,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Could not fetch thumbnail") from exc
+    if not thumbnail_url:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Could not persist thumbnail")
     return SocialThumbnailResponse(thumbnail_url=thumbnail_url)
 
 
@@ -717,6 +766,9 @@ async def admin_list_content_images(
     key: str | None = Query(default=None, description="Filter by content block key"),
     q: str | None = Query(default=None, description="Search content key, URL, or alt text"),
     tag: str | None = Query(default=None, description="Filter by tag"),
+    sort: str = Query(default="newest", pattern="^(newest|oldest|key_asc|key_desc)$"),
+    created_from: datetime | None = Query(default=None, description="Filter images created at or after this ISO datetime"),
+    created_to: datetime | None = Query(default=None, description="Filter images created at or before this ISO datetime"),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=24, ge=1, le=100),
     _: User = Depends(require_admin_section("content")),
@@ -736,6 +788,12 @@ async def admin_list_content_images(
     tag_value = (tag or "").strip().lower()
     if tag_value:
         filters.append(ContentImageTag.tag == tag_value)
+    if created_from:
+        filters.append(ContentImage.created_at >= created_from)
+    if created_to:
+        filters.append(ContentImage.created_at <= created_to)
+    if created_from and created_to and created_from > created_to:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date range")
 
     count_query = select(func.count()).select_from(ContentImage).join(ContentBlock)
     if tag_value:
@@ -747,11 +805,19 @@ async def admin_list_content_images(
     total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
     offset = (page - 1) * limit
 
+    order_map = {
+        "newest": [ContentImage.created_at.desc(), ContentImage.id.desc()],
+        "oldest": [ContentImage.created_at.asc(), ContentImage.id.asc()],
+        "key_asc": [ContentBlock.key.asc(), ContentImage.created_at.desc(), ContentImage.id.desc()],
+        "key_desc": [ContentBlock.key.desc(), ContentImage.created_at.desc(), ContentImage.id.desc()],
+    }
+    order_clauses = order_map.get(sort, order_map["newest"])
+
     query = (
         select(ContentImage, ContentBlock.key)
         .join(ContentBlock)
         .where(*filters)
-        .order_by(ContentImage.created_at.desc(), ContentImage.id.desc())
+        .order_by(*order_clauses)
         .offset(offset)
         .limit(limit)
     )
@@ -789,6 +855,46 @@ async def admin_list_content_images(
     return ContentImageAssetListResponse(
         items=items,
         meta={"total_items": total_items, "total_pages": total_pages, "page": page, "limit": limit},
+    )
+
+
+@router.patch("/admin/assets/images/{image_id}", response_model=ContentImageAssetRead)
+async def admin_update_content_image(
+    image_id: UUID,
+    payload: ContentImageAssetUpdate,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> ContentImageAssetRead:
+    image = await session.scalar(select(ContentImage).where(ContentImage.id == image_id))
+    if not image:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+
+    next_alt = (payload.alt_text or "").strip()
+    image.alt_text = next_alt or None
+    session.add(image)
+    await session.commit()
+
+    tags = (
+        await session.execute(select(ContentImageTag.tag).where(ContentImageTag.content_image_id == image_id))
+    ).scalars().all()
+    tags_sorted = sorted(set(tags))
+
+    content_key = ""
+    if getattr(image, "content_block_id", None):
+        content_key = (await session.scalar(select(ContentBlock.key).where(ContentBlock.id == image.content_block_id))) or ""
+
+    return ContentImageAssetRead(
+        id=image.id,
+        root_image_id=getattr(image, "root_image_id", None),
+        source_image_id=getattr(image, "source_image_id", None),
+        url=image.url,
+        alt_text=image.alt_text,
+        sort_order=image.sort_order,
+        focal_x=getattr(image, "focal_x", 50),
+        focal_y=getattr(image, "focal_y", 50),
+        created_at=image.created_at,
+        content_key=content_key,
+        tags=tags_sorted,
     )
 
 
@@ -956,6 +1062,647 @@ async def admin_delete_content_image(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
 
     await content_service.delete_image_asset(session, image=image, actor_id=admin.id, delete_versions=delete_versions)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/admin/media/assets", response_model=MediaAssetListResponse)
+async def admin_list_media_assets(
+    q: str = Query(default=""),
+    tag: str = Query(default=""),
+    asset_type: str = Query(default=""),
+    status_filter: str = Query(default="", alias="status"),
+    visibility: str = Query(default=""),
+    include_trashed: bool = Query(default=False),
+    created_from: str | None = Query(default=None),
+    created_to: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=24, ge=1, le=200),
+    sort: str = Query(default="newest"),
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> MediaAssetListResponse:
+    parsed_from = None
+    parsed_to = None
+    try:
+        if created_from:
+            parsed_from = datetime.fromisoformat(created_from)
+        if created_to:
+            parsed_to = datetime.fromisoformat(created_to)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date filters")
+    if parsed_from and parsed_to and parsed_from > parsed_to:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date range")
+
+    try:
+        rows, meta = await media_dam.list_assets(
+            session,
+            media_dam.MediaListFilters(
+                q=q,
+                tag=tag,
+                asset_type=asset_type,
+                status=status_filter,
+                visibility=visibility,
+                include_trashed=include_trashed,
+                created_from=parsed_from,
+                created_to=parsed_to,
+                page=page,
+                limit=limit,
+                sort=sort,
+            ),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return MediaAssetListResponse(items=[media_dam.asset_to_read(row) for row in rows], meta=meta)
+
+
+@router.post("/admin/media/assets/upload", response_model=MediaAssetRead, status_code=status.HTTP_201_CREATED)
+async def admin_upload_media_asset(
+    file: UploadFile = File(...),
+    visibility: str = Query(default="private"),
+    auto_finalize: bool = Query(default=True),
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> MediaAssetRead:
+    result = await media_dam.create_asset_from_upload(
+        session,
+        file=file,
+        created_by_user_id=admin.id,
+        visibility=media_dam.coerce_visibility(visibility),
+    )
+    if result.ingest_job_id and auto_finalize:
+        try:
+            job = await media_dam.get_job_or_404(session, result.ingest_job_id)
+            await media_dam.process_job_inline(session, job)
+            asset = await media_dam.get_asset_or_404(session, result.asset.id)
+            return media_dam.asset_to_read(asset)
+        except ValueError:
+            pass
+    return result.asset
+
+
+@router.post("/admin/media/assets/{asset_id}/finalize", response_model=MediaJobRead)
+async def admin_finalize_media_asset(
+    asset_id: UUID,
+    payload: MediaFinalizeRequest,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> MediaJobRead:
+    try:
+        await media_dam.get_asset_or_404(session, asset_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asset not found")
+
+    ingest_job = await media_dam.enqueue_job(
+        session,
+        asset_id=asset_id,
+        job_type=MediaJobType.ingest,
+        payload={"reason": "manual_finalize"},
+        created_by_user_id=admin.id,
+    )
+    if payload.run_ai_tagging:
+        await media_dam.enqueue_job(
+            session,
+            asset_id=asset_id,
+            job_type=MediaJobType.ai_tag,
+            payload={"reason": "finalize"},
+            created_by_user_id=admin.id,
+        )
+    if payload.run_duplicate_scan:
+        await media_dam.enqueue_job(
+            session,
+            asset_id=asset_id,
+            job_type=MediaJobType.duplicate_scan,
+            payload={"reason": "finalize"},
+            created_by_user_id=admin.id,
+        )
+    await session.commit()
+    background_tasks.add_task(_run_media_job_in_background, ingest_job.id)
+    return media_dam.job_to_read(ingest_job)
+
+
+async def _run_media_job_in_background(job_id: UUID) -> None:
+    from app.db.session import SessionLocal
+
+    async with SessionLocal() as session:
+        try:
+            job = await media_dam.get_job_or_404(session, job_id)
+            await media_dam.process_job_inline(session, job)
+        except Exception:
+            return
+
+
+@router.patch("/admin/media/assets/{asset_id}", response_model=MediaAssetRead)
+async def admin_update_media_asset(
+    asset_id: UUID,
+    payload: MediaAssetUpdateRequest,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> MediaAssetRead:
+    try:
+        asset = await media_dam.get_asset_or_404(session, asset_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asset not found")
+    await media_dam.apply_asset_update(session, asset, payload)
+    await session.commit()
+    refreshed = await media_dam.get_asset_or_404(session, asset_id)
+    return media_dam.asset_to_read(refreshed)
+
+
+@router.post("/admin/media/assets/{asset_id}/approve", response_model=MediaAssetRead)
+async def admin_approve_media_asset(
+    asset_id: UUID,
+    payload: MediaApproveRequest,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> MediaAssetRead:
+    _require_owner_or_admin(admin, detail="Only owner/admin can approve assets")
+    try:
+        asset = await media_dam.get_asset_or_404(session, asset_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asset not found")
+    updated = await media_dam.change_status(
+        session,
+        asset=asset,
+        to_status=MediaAssetStatus.approved,
+        actor_id=admin.id,
+        note=payload.note,
+        set_approved_actor=True,
+    )
+    return media_dam.asset_to_read(updated)
+
+
+@router.post("/admin/media/assets/{asset_id}/reject", response_model=MediaAssetRead)
+async def admin_reject_media_asset(
+    asset_id: UUID,
+    payload: MediaRejectRequest,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> MediaAssetRead:
+    _require_owner_or_admin(admin, detail="Only owner/admin can reject assets")
+    try:
+        asset = await media_dam.get_asset_or_404(session, asset_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asset not found")
+    updated = await media_dam.change_status(
+        session,
+        asset=asset,
+        to_status=MediaAssetStatus.rejected,
+        actor_id=admin.id,
+        note=payload.note,
+    )
+    return media_dam.asset_to_read(updated)
+
+
+@router.delete("/admin/media/assets/{asset_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def admin_soft_delete_media_asset(
+    asset_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> Response:
+    try:
+        asset = await media_dam.get_asset_or_404(session, asset_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asset not found")
+    await media_dam.soft_delete_asset(session, asset, admin.id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/admin/media/assets/{asset_id}/restore", response_model=MediaAssetRead)
+async def admin_restore_media_asset(
+    asset_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> MediaAssetRead:
+    try:
+        asset = await media_dam.get_asset_or_404(session, asset_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asset not found")
+    restored = await media_dam.restore_asset(session, asset, admin.id)
+    return media_dam.asset_to_read(restored)
+
+
+@router.post("/admin/media/assets/{asset_id}/purge", status_code=status.HTTP_204_NO_CONTENT)
+async def admin_purge_media_asset(
+    asset_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> Response:
+    _require_owner_or_admin(admin, detail="Only owner/admin can purge assets")
+    try:
+        asset = await media_dam.get_asset_or_404(session, asset_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asset not found")
+    await media_dam.purge_asset(session, asset)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/admin/media/assets/{asset_id}/usage", response_model=MediaUsageResponse)
+async def admin_media_asset_usage(
+    asset_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> MediaUsageResponse:
+    try:
+        asset = await media_dam.get_asset_or_404(session, asset_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asset not found")
+    return await media_dam.rebuild_usage_edges(session, asset)
+
+
+@router.get("/admin/media/assets/{asset_id}/preview")
+async def admin_media_asset_preview(
+    asset_id: UUID,
+    exp: int = Query(..., description="Unix expiry timestamp"),
+    sig: str = Query(..., min_length=16, description="HMAC signature"),
+    variant_profile: str | None = Query(default=None),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    try:
+        asset = await media_dam.get_asset_or_404(session, asset_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asset not found")
+
+    if not media_dam.verify_preview_signature(asset.id, exp=exp, sig=sig, variant_profile=variant_profile):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid media preview signature")
+
+    try:
+        path = media_dam.resolve_asset_preview_path(asset, variant_profile=variant_profile)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Variant not found")
+    except FileNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Media file missing")
+
+    return FileResponse(path, headers={"Cache-Control": "private, no-store"})
+
+
+@router.post("/admin/media/assets/{asset_id}/variants", response_model=MediaJobRead)
+async def admin_media_asset_variants(
+    asset_id: UUID,
+    payload: MediaVariantRequest,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> MediaJobRead:
+    try:
+        await media_dam.get_asset_or_404(session, asset_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asset not found")
+    job = await media_dam.enqueue_job(
+        session,
+        asset_id=asset_id,
+        job_type=MediaJobType.variant,
+        payload={"profile": payload.profile},
+        created_by_user_id=admin.id,
+    )
+    await session.commit()
+    await media_dam.process_job_inline(session, job)
+    return media_dam.job_to_read(job)
+
+
+@router.post("/admin/media/assets/{asset_id}/edit", response_model=MediaJobRead)
+async def admin_media_asset_edit(
+    asset_id: UUID,
+    payload: MediaEditRequest,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> MediaJobRead:
+    try:
+        await media_dam.get_asset_or_404(session, asset_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asset not found")
+    job = await media_dam.enqueue_job(
+        session,
+        asset_id=asset_id,
+        job_type=MediaJobType.edit,
+        payload=payload.model_dump(exclude_none=True),
+        created_by_user_id=admin.id,
+    )
+    await session.commit()
+    await media_dam.process_job_inline(session, job)
+    return media_dam.job_to_read(job)
+
+
+@router.get("/admin/media/jobs", response_model=MediaJobListResponse)
+async def admin_list_media_jobs(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=24, ge=1, le=200),
+    status_filter: str = Query(default="", alias="status"),
+    job_type: str = Query(default=""),
+    asset_id: UUID | None = Query(default=None),
+    triage_state: str = Query(default=""),
+    assigned_to_user_id: UUID | None = Query(default=None),
+    tag: str = Query(default=""),
+    sla_breached: bool = Query(default=False),
+    dead_letter_only: bool = Query(default=False),
+    created_from: str | None = Query(default=None),
+    created_to: str | None = Query(default=None),
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> MediaJobListResponse:
+    parsed_from = None
+    parsed_to = None
+    try:
+        if created_from:
+            parsed_from = datetime.fromisoformat(created_from)
+        if created_to:
+            parsed_to = datetime.fromisoformat(created_to)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date filters")
+    if parsed_from and parsed_to and parsed_from > parsed_to:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date range")
+
+    try:
+        rows, meta = await media_dam.list_jobs(
+            session,
+            media_dam.MediaJobListFilters(
+                page=page,
+                limit=limit,
+                status=status_filter,
+                job_type=job_type,
+                asset_id=asset_id,
+                triage_state=triage_state,
+                assigned_to_user_id=assigned_to_user_id,
+                tag=tag,
+                sla_breached=sla_breached,
+                dead_letter_only=dead_letter_only,
+                created_from=parsed_from,
+                created_to=parsed_to,
+            ),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return MediaJobListResponse(items=[media_dam.job_to_read(row) for row in rows], meta=meta)
+
+
+@router.get("/admin/media/telemetry", response_model=MediaTelemetryResponse)
+async def admin_media_telemetry(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> MediaTelemetryResponse:
+    return await media_dam.get_telemetry(session)
+
+
+@router.get("/admin/media/retry-policies", response_model=MediaRetryPolicyListResponse)
+async def admin_media_retry_policies(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> MediaRetryPolicyListResponse:
+    items = await media_dam.list_retry_policies(session)
+    return MediaRetryPolicyListResponse(items=items)
+
+
+@router.get("/admin/media/retry-policies/history", response_model=MediaRetryPolicyHistoryResponse)
+async def admin_media_retry_policy_history(
+    job_type: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=100),
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> MediaRetryPolicyHistoryResponse:
+    try:
+        items, meta = await media_dam.list_retry_policy_history(
+            session,
+            job_type=job_type,
+            page=page,
+            limit=limit,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return MediaRetryPolicyHistoryResponse(items=items, meta=meta)
+
+
+@router.get("/admin/media/retry-policies/{job_type}/presets", response_model=MediaRetryPolicyPresetsResponse)
+async def admin_media_retry_policy_presets(
+    job_type: str,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> MediaRetryPolicyPresetsResponse:
+    try:
+        return await media_dam.get_retry_policy_presets(session, job_type=job_type)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@router.patch("/admin/media/retry-policies/{job_type}", response_model=MediaRetryPolicyRead)
+async def admin_update_media_retry_policy(
+    job_type: str,
+    payload: MediaRetryPolicyUpdateRequest,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> MediaRetryPolicyRead:
+    _require_owner_or_admin(admin, detail="Only owner/admin can update retry policies")
+    try:
+        return await media_dam.upsert_retry_policy(
+            session,
+            job_type=job_type,
+            payload=payload,
+            updated_by_user_id=admin.id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@router.post("/admin/media/retry-policies/{job_type}/rollback", response_model=MediaRetryPolicyRead)
+async def admin_rollback_media_retry_policy(
+    job_type: str,
+    payload: MediaRetryPolicyRollbackRequest,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> MediaRetryPolicyRead:
+    _require_owner_or_admin(admin, detail="Only owner/admin can rollback retry policies")
+    try:
+        return await media_dam.rollback_retry_policy(
+            session,
+            job_type=job_type,
+            payload=payload,
+            actor_user_id=admin.id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@router.post("/admin/media/retry-policies/{job_type}/mark-known-good", response_model=MediaRetryPolicyEventRead)
+async def admin_mark_media_retry_policy_known_good(
+    job_type: str,
+    note: str | None = Query(default=None),
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> MediaRetryPolicyEventRead:
+    _require_owner_or_admin(admin, detail="Only owner/admin can update known-good retry policies")
+    try:
+        return await media_dam.mark_retry_policy_known_good(
+            session,
+            job_type=job_type,
+            actor_user_id=admin.id,
+            note=note,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@router.post("/admin/media/retry-policies/{job_type}/reset", response_model=MediaRetryPolicyRead)
+async def admin_reset_media_retry_policy(
+    job_type: str,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> MediaRetryPolicyRead:
+    _require_owner_or_admin(admin, detail="Only owner/admin can reset retry policies")
+    try:
+        return await media_dam.reset_retry_policy(session, job_type=job_type, updated_by_user_id=admin.id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@router.post("/admin/media/retry-policies/reset-all", response_model=MediaRetryPolicyListResponse)
+async def admin_reset_all_media_retry_policies(
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> MediaRetryPolicyListResponse:
+    _require_owner_or_admin(admin, detail="Only owner/admin can reset retry policies")
+    items = await media_dam.reset_all_retry_policies(session, updated_by_user_id=admin.id)
+    return MediaRetryPolicyListResponse(items=items)
+
+
+@router.post("/admin/media/usage/reconcile", response_model=MediaJobRead)
+async def admin_media_usage_reconcile(
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> MediaJobRead:
+    limit = max(1, int(getattr(settings, "media_usage_reconcile_batch_size", 200) or 200))
+    job = await media_dam.enqueue_job(
+        session,
+        asset_id=None,
+        job_type=MediaJobType.usage_reconcile,
+        payload={"limit": limit, "reason": "manual_reconcile"},
+        created_by_user_id=admin.id,
+    )
+    await session.commit()
+    await media_dam.queue_job(job.id)
+    if media_dam.get_redis() is None:
+        background_tasks.add_task(_run_media_job_in_background, job.id)
+    return media_dam.job_to_read(job)
+
+
+@router.get("/admin/media/jobs/{job_id}", response_model=MediaJobRead)
+async def admin_get_media_job(
+    job_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> MediaJobRead:
+    try:
+        job = await media_dam.get_job_or_404(session, job_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    return media_dam.job_to_read(job)
+
+
+@router.post("/admin/media/jobs/{job_id}/retry", response_model=MediaJobRead)
+async def admin_retry_media_job(
+    job_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> MediaJobRead:
+    try:
+        job = await media_dam.get_job_or_404(session, job_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    retried = await media_dam.manual_retry_job(session, job=job, actor_user_id=admin.id)
+    return media_dam.job_to_read(retried)
+
+
+@router.post("/admin/media/jobs/retry-bulk", response_model=MediaJobListResponse)
+async def admin_retry_media_jobs_bulk(
+    payload: MediaJobRetryBulkRequest,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> MediaJobListResponse:
+    rows = await media_dam.bulk_retry_jobs(session, job_ids=payload.job_ids, actor_user_id=admin.id)
+    return MediaJobListResponse(
+        items=[media_dam.job_to_read(row) for row in rows],
+        meta={"total_items": len(rows), "total_pages": 1, "page": 1, "limit": len(rows)},
+    )
+
+
+@router.patch("/admin/media/jobs/{job_id}/triage", response_model=MediaJobRead)
+async def admin_update_media_job_triage(
+    job_id: UUID,
+    payload: MediaJobTriageUpdateRequest,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> MediaJobRead:
+    try:
+        job = await media_dam.get_job_or_404(session, job_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    updated = await media_dam.update_job_triage(
+        session,
+        job=job,
+        actor_user_id=admin.id,
+        triage_state=payload.triage_state,
+        assigned_to_user_id=payload.assigned_to_user_id,
+        clear_assignee=payload.clear_assignee,
+        sla_due_at=payload.sla_due_at,
+        clear_sla_due_at=payload.clear_sla_due_at,
+        incident_url=payload.incident_url,
+        clear_incident_url=payload.clear_incident_url,
+        add_tags=payload.add_tags,
+        remove_tags=payload.remove_tags,
+        note=payload.note,
+    )
+    return media_dam.job_to_read(updated)
+
+
+@router.get("/admin/media/jobs/{job_id}/events", response_model=MediaJobEventsResponse)
+async def admin_list_media_job_events(
+    job_id: UUID,
+    limit: int = Query(default=200, ge=1, le=500),
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> MediaJobEventsResponse:
+    try:
+        await media_dam.get_job_or_404(session, job_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    rows = await media_dam.list_job_events(session, job_id=job_id, limit=limit)
+    return MediaJobEventsResponse(items=[media_dam.job_event_to_read(row) for row in rows])
+
+
+@router.get("/admin/media/collections", response_model=list[MediaCollectionRead])
+async def admin_list_media_collections(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> list[MediaCollectionRead]:
+    return await media_dam.list_collections(session)
+
+
+@router.post("/admin/media/collections", response_model=MediaCollectionRead, status_code=status.HTTP_201_CREATED)
+async def admin_create_media_collection(
+    payload: MediaCollectionUpsertRequest,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> MediaCollectionRead:
+    return await media_dam.upsert_collection(session, collection_id=None, payload=payload, actor_id=admin.id)
+
+
+@router.patch("/admin/media/collections/{collection_id}", response_model=MediaCollectionRead)
+async def admin_update_media_collection(
+    collection_id: UUID,
+    payload: MediaCollectionUpsertRequest,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("content")),
+) -> MediaCollectionRead:
+    return await media_dam.upsert_collection(session, collection_id=collection_id, payload=payload, actor_id=admin.id)
+
+
+@router.post("/admin/media/collections/{collection_id}/items", status_code=status.HTTP_204_NO_CONTENT)
+async def admin_update_media_collection_items(
+    collection_id: UUID,
+    payload: MediaCollectionItemsRequest,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("content")),
+) -> Response:
+    await media_dam.replace_collection_items(session, collection_id=collection_id, asset_ids=payload.asset_ids)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

@@ -12,6 +12,11 @@ import { AuthService } from '../../core/auth.service';
 import { MarkdownService } from '../../core/markdown.service';
 
 describe('HomeComponent', () => {
+  afterEach(() => {
+    document.querySelectorAll('link[rel="alternate"][data-seo-managed="true"]').forEach((el) => el.remove());
+    document.querySelectorAll('script[data-seo-route-schema="true"]').forEach((el) => el.remove());
+  });
+
   it('renders sections in CMS order', () => {
     const meta = jasmine.createSpyObj<Meta>('Meta', ['updateTag']);
     const title = jasmine.createSpyObj<Title>('Title', ['setTitle']);
@@ -100,10 +105,15 @@ describe('HomeComponent', () => {
     const fixture = TestBed.createComponent(HomeComponent);
     fixture.detectChanges();
 
+    expect(fixture.nativeElement.querySelectorAll('h1').length).toBe(1);
     const h2s = Array.from(fixture.nativeElement.querySelectorAll('h2') as NodeListOf<HTMLElement>).map((el) =>
       (el.textContent || '').trim()
     );
     expect(h2s).toEqual(['Featured pieces', 'Why this starter']);
+    const canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
+    expect(canonical?.getAttribute('href')).toContain('/?lang=en');
+    expect(document.querySelectorAll('link[rel="alternate"][data-seo-managed="true"]').length).toBe(3);
+    expect((document.querySelector('script#seo-route-schema-1')?.textContent || '')).toContain('"WebPage"');
   });
 
   it('loads section data for enabled CMS sections', () => {

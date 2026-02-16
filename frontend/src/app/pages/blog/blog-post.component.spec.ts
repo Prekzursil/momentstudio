@@ -4,7 +4,7 @@ import { ActivatedRoute } from '@angular/router';
 import { RouterTestingModule } from '@angular/router/testing';
 import { Meta, Title } from '@angular/platform-browser';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { of } from 'rxjs';
+import { Observable, of, Subject } from 'rxjs';
 
 import { BlogPostComponent } from './blog-post.component';
 import { AdminService } from '../../core/admin.service';
@@ -24,6 +24,13 @@ describe('BlogPostComponent', () => {
   let markdown: jasmine.SpyObj<MarkdownService>;
   let auth: jasmine.SpyObj<AuthService>;
   let doc: Document;
+  let routeParams$: Subject<Record<string, unknown>>;
+  let routeQueryParams$: Subject<Record<string, unknown>>;
+  let routeStub: {
+    snapshot: { params: Record<string, unknown>; queryParams: Record<string, unknown> };
+    params: Observable<Record<string, unknown>>;
+    queryParams: Observable<Record<string, unknown>>;
+  };
 
   const post: BlogPost = {
     slug: 'first-post',
@@ -62,6 +69,13 @@ describe('BlogPostComponent', () => {
     markdown.render.and.returnValue('<p>Body</p>');
     auth.isAuthenticated.and.returnValue(false);
     auth.user.and.returnValue(null);
+    routeParams$ = new Subject<Record<string, unknown>>();
+    routeQueryParams$ = new Subject<Record<string, unknown>>();
+    routeStub = {
+      snapshot: { params: {}, queryParams: {} },
+      params: routeParams$.asObservable(),
+      queryParams: routeQueryParams$.asObservable()
+    };
   });
 
   function configure(): void {
@@ -78,7 +92,7 @@ describe('BlogPostComponent', () => {
         { provide: MarkdownService, useValue: markdown },
         { provide: StorefrontAdminModeService, useValue: { enabled: () => false } },
         { provide: AuthService, useValue: auth },
-        { provide: ActivatedRoute, useValue: { params: of({}), queryParams: of({}) } },
+        { provide: ActivatedRoute, useValue: routeStub },
         { provide: DOCUMENT, useValue: doc }
       ]
     });
@@ -106,6 +120,12 @@ describe('BlogPostComponent', () => {
     const canonical = doc.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
     expect(canonical).toBeTruthy();
     expect(canonical?.getAttribute('href')).toContain('/blog/first-post?lang=en');
+
+    const alternates = Array.from(doc.querySelectorAll('link[rel="alternate"][data-seo-managed="true"]'));
+    expect(alternates.length).toBe(3);
+
+    const routeSchema = doc.querySelector('script#seo-route-schema-1');
+    expect(routeSchema?.textContent || '').toContain('"BlogPosting"');
   });
 
   it('uses preview endpoint when preview token is present', () => {
@@ -117,5 +137,18 @@ describe('BlogPostComponent', () => {
     cmp.load();
 
     expect(blog.getPreviewPost).toHaveBeenCalledWith('first-post', 'token', 'en');
+  });
+
+  it('uses route snapshot slug and preview token on first paint', () => {
+    routeStub.snapshot.params = { slug: 'snapshot-post' };
+    routeStub.snapshot.queryParams = { preview: 'preview-token' };
+    blog.getPreviewPost.and.returnValue(of({ ...post, slug: 'snapshot-post' }));
+
+    configure();
+    const fixture = TestBed.createComponent(BlogPostComponent);
+    fixture.detectChanges();
+
+    expect(blog.getPreviewPost).toHaveBeenCalledWith('snapshot-post', 'preview-token', 'en');
+    expect(blog.getPost).not.toHaveBeenCalled();
   });
 });

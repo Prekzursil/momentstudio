@@ -2,7 +2,9 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from io import BytesIO
+from pathlib import Path
 from typing import Dict
+from urllib.parse import urlparse
 
 import pytest
 from fastapi.testclient import TestClient
@@ -331,6 +333,14 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     assert first_img["root_image_id"] is None
     assert first_img["source_image_id"] is None
 
+    rename = client.patch(
+        f"/api/v1/content/admin/assets/images/{first_img['id']}",
+        json={"alt_text": "Homepage hero image"},
+        headers=auth_headers(admin_token),
+    )
+    assert rename.status_code == 200, rename.text
+    assert rename.json()["alt_text"] == "Homepage hero image"
+
     # Asset tags: set tags and filter by tag.
     tag_set = client.patch(
         f"/api/v1/content/admin/assets/images/{first_img['id']}/tags",
@@ -386,6 +396,37 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     )
     assert tagged.status_code == 200, tagged.text
     assert any("hero" in (item.get("tags") or []) for item in tagged.json()["items"])
+
+    other_upload = client.post(
+        "/api/v1/content/admin/page.about/images",
+        files={"file": ("about.jpg", _jpeg_bytes(), "image/jpeg")},
+        headers=auth_headers(admin_token),
+    )
+    assert other_upload.status_code == 200, other_upload.text
+
+    sorted_by_key = client.get(
+        "/api/v1/content/admin/assets/images",
+        params={"sort": "key_asc", "limit": 100},
+        headers=auth_headers(admin_token),
+    )
+    assert sorted_by_key.status_code == 200, sorted_by_key.text
+    sort_items = sorted_by_key.json()["items"]
+    assert [item["content_key"] for item in sort_items] == sorted(item["content_key"] for item in sort_items)
+
+    future_only = client.get(
+        "/api/v1/content/admin/assets/images",
+        params={"created_from": "2999-01-01T00:00:00Z"},
+        headers=auth_headers(admin_token),
+    )
+    assert future_only.status_code == 200, future_only.text
+    assert future_only.json()["meta"]["total_items"] == 0
+
+    invalid_range = client.get(
+        "/api/v1/content/admin/assets/images",
+        params={"created_from": "2026-01-02T00:00:00Z", "created_to": "2026-01-01T00:00:00Z"},
+        headers=auth_headers(admin_token),
+    )
+    assert invalid_range.status_code == 400, invalid_range.text
 
     assets_filtered = client.get(
         "/api/v1/content/admin/assets/images",
@@ -647,15 +688,31 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     assert "new" in ro_after.json()["body_markdown"]
 
 
-def test_admin_fetch_social_thumbnail(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]) -> None:
+def test_admin_fetch_social_thumbnail(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object], tmp_path: Path) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
     admin_token = create_admin_token(SessionLocal)
+    monkeypatch.setattr(settings, "media_root", str(tmp_path))
 
-    html = '<html><head><meta property="og:image" content="/img/profile.png"></head><body>ok</body></html>'
+    instagram_html = (
+        '<html><head>'
+        '<meta property="og:image" content="https://scontent.cdninstagram.com/v/t51.2885-19/profile.jpg?oe=699592F8">'
+        "</head><body>ok</body></html>"
+    )
+    facebook_html = (
+        '<html><head>'
+        '<meta property="og:image" content="https://scontent.fbcdn.net/v/t39.30808-1/fb-page.jpg">'
+        "</head><body>ok</body></html>"
+    )
+    image_bytes = _jpeg_bytes()
 
     async def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, text=html, request=request)
+        host = (request.url.host or "").lower().rstrip(".")
+        if host in {"scontent.cdninstagram.com", "scontent.fbcdn.net"}:
+            return httpx.Response(200, content=image_bytes, headers={"content-type": "image/jpeg"}, request=request)
+        if host == "www.facebook.com":
+            return httpx.Response(200, text=facebook_html, request=request)
+        return httpx.Response(200, text=instagram_html, request=request)
 
     transport = httpx.MockTransport(handler)
     real_async_client = httpx.AsyncClient
@@ -683,7 +740,21 @@ def test_admin_fetch_social_thumbnail(monkeypatch: pytest.MonkeyPatch, test_app:
         headers=auth_headers(admin_token),
     )
     assert res.status_code == 200, res.text
-    assert res.json()["thumbnail_url"] == "https://www.instagram.com/img/profile.png"
+    thumb = str(res.json()["thumbnail_url"] or "")
+    assert thumb.startswith("/media/social/")
+    saved = (tmp_path / thumb.removeprefix("/media/")).resolve()
+    assert saved.exists()
+
+    fb_res = client.post(
+        "/api/v1/content/admin/social/thumbnail",
+        json={"url": "https://www.facebook.com/moments.in.clay.studio"},
+        headers=auth_headers(admin_token),
+    )
+    assert fb_res.status_code == 200, fb_res.text
+    fb_thumb = str(fb_res.json()["thumbnail_url"] or "")
+    assert fb_thumb.startswith("/media/social/")
+    fb_saved = (tmp_path / fb_thumb.removeprefix("/media/")).resolve()
+    assert fb_saved.exists()
 
     bad = client.post(
         "/api/v1/content/admin/social/thumbnail",
@@ -691,6 +762,65 @@ def test_admin_fetch_social_thumbnail(monkeypatch: pytest.MonkeyPatch, test_app:
         headers=auth_headers(admin_token),
     )
     assert bad.status_code == 400
+
+
+def test_public_site_social_hydrates_stale_remote_thumbnail_without_db_mutation(
+    monkeypatch: pytest.MonkeyPatch,
+    test_app: Dict[str, object],
+) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_admin_token(SessionLocal)
+
+    stale_remote = "https://scontent.cdninstagram.com/v/t51.2885-19/stale.jpg?oe=696AF278"
+    create = client.post(
+        "/api/v1/content/admin/site.social",
+        json={
+            "title": "Site social",
+            "body_markdown": "Social links",
+            "status": "published",
+            "meta": {
+                "version": 1,
+                "instagram_pages": [
+                    {
+                        "label": "momentstudio",
+                        "url": "https://www.instagram.com/momentstudio/",
+                        "thumbnail_url": stale_remote,
+                    }
+                ],
+                "facebook_pages": [],
+                "contact": {"email": "a@b.com"},
+            },
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert create.status_code == 201, create.text
+
+    async def fake_fetch(
+        url: str,
+        *,
+        persist_local: bool = False,
+        force_refresh: bool = False,
+        allow_remote_fallback: bool = True,
+    ) -> str | None:
+        parsed = urlparse(url)
+        host = (parsed.hostname or "").lower().rstrip(".")
+        assert host == "www.instagram.com"
+        assert persist_local is True
+        return "/media/social/hydrated.jpg"
+
+    monkeypatch.setattr(social_thumbnails, "fetch_social_thumbnail_url", fake_fetch)
+
+    public_res = client.get("/api/v1/content/site.social")
+    assert public_res.status_code == 200, public_res.text
+    public_meta = public_res.json().get("meta") or {}
+    public_thumb = public_meta["instagram_pages"][0]["thumbnail_url"]
+    assert public_thumb == "/media/social/hydrated.jpg"
+
+    admin_res = client.get("/api/v1/content/admin/site.social", headers=auth_headers(admin_token))
+    assert admin_res.status_code == 200, admin_res.text
+    admin_meta = admin_res.json().get("meta") or {}
+    assert admin_meta["instagram_pages"][0]["thumbnail_url"] == stale_remote
 
 
 def test_legal_pages_require_bilingual_before_publish(test_app: Dict[str, object]) -> None:

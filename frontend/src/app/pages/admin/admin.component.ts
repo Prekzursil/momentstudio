@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Params } from '@angular/router';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { ErrorStateComponent } from '../../shared/error-state.component';
@@ -234,6 +234,7 @@ type BlogDraftState = {
   tags: string;
   series: string;
   cover_image_url: string;
+  cover_fit: 'cover' | 'contain';
   reading_time_minutes: string;
   pinned: boolean;
   pin_order: string;
@@ -5956,6 +5957,19 @@ class CmsDraftManager<T> {
                           [disabled]="blogEditLang !== blogBaseLang"
                         />
                         <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.blog.cover.hint' | translate }}</span>
+                        <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.blog.cover.sizeHint' | translate }}</span>
+                      </label>
+
+                      <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 sm:max-w-xs">
+                        {{ 'adminUi.blog.cover.fitModeLabel' | translate }}
+                        <select
+                          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                          [(ngModel)]="blogForm.cover_fit"
+                          [disabled]="blogEditLang !== blogBaseLang"
+                        >
+                          <option value="cover">{{ 'adminUi.blog.cover.fitModeCover' | translate }}</option>
+                          <option value="contain">{{ 'adminUi.blog.cover.fitModeContain' | translate }}</option>
+                        </select>
                       </label>
 
                       <div *ngIf="blogCoverPreviewUrl() as coverUrl" class="grid gap-3 sm:grid-cols-2">
@@ -5967,9 +5981,10 @@ class CmsDraftManager<T> {
                             <img
                               [src]="coverUrl"
                               [alt]="blogForm.title || 'cover'"
-                              class="w-full aspect-[16/9] object-cover"
+                              class="w-full aspect-[16/9]"
+                              [ngClass]="blogForm.cover_fit === 'contain' ? 'object-contain bg-slate-50 dark:bg-slate-900' : 'object-cover'"
                               [style.object-position]="blogCoverPreviewFocalPosition()"
-                              loading="lazy"
+                              loading="eager"
                               decoding="async"
                             />
                           </div>
@@ -5982,9 +5997,10 @@ class CmsDraftManager<T> {
                             <img
                               [src]="coverUrl"
                               [alt]="blogForm.title || 'cover'"
-                              class="w-full aspect-[1/1] object-cover"
+                              class="w-full aspect-[1/1]"
+                              [ngClass]="blogForm.cover_fit === 'contain' ? 'object-contain bg-slate-50 dark:bg-slate-900' : 'object-cover'"
                               [style.object-position]="blogCoverPreviewFocalPosition()"
-                              loading="lazy"
+                              loading="eager"
                               decoding="async"
                             />
                           </div>
@@ -7190,6 +7206,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 	    tags: '',
 	    series: '',
 	    cover_image_url: '',
+      cover_fit: 'cover' as 'cover' | 'contain',
 	    reading_time_minutes: '',
 	    pinned: false,
 	    pin_order: '1'
@@ -7556,27 +7573,29 @@ export class AdminComponent implements OnInit, OnDestroy {
 	    return created;
 	  }
 
-	  private currentPageDraftState(pageKey: PageBuilderKey): PageBlocksDraftState {
-	    return {
-	      blocks: this.pageBlocks[pageKey] || [],
-	      status: this.pageBlocksStatus[pageKey] || 'draft',
-	      publishedAt: this.pageBlocksPublishedAt[pageKey] || '',
-	      publishedUntil: this.pageBlocksPublishedUntil[pageKey] || '',
-	      requiresAuth: Boolean(this.pageBlocksRequiresAuth[pageKey])
-	    };
-	  }
+  private currentPageDraftState(pageKey: PageBuilderKey): PageBlocksDraftState {
+    const safePageKey = this.safePageRecordKey(pageKey);
+    return {
+      blocks: this.pageBlocks[safePageKey] || [],
+      status: this.pageBlocksStatus[safePageKey] || 'draft',
+      publishedAt: this.pageBlocksPublishedAt[safePageKey] || '',
+      publishedUntil: this.pageBlocksPublishedUntil[safePageKey] || '',
+      requiresAuth: Boolean(this.pageBlocksRequiresAuth[safePageKey])
+    };
+  }
 
     private normalizePageBlockDraft(block: PageBlockDraft): PageBlockDraft {
       return { ...block, layout: this.toCmsBlockLayout(block.layout) };
     }
 
-	  private applyPageDraftState(pageKey: PageBuilderKey, draft: PageBlocksDraftState): void {
-	    this.pageBlocks[pageKey] = Array.isArray(draft?.blocks) ? draft.blocks.map((b) => this.normalizePageBlockDraft(b)) : [];
-	    this.pageBlocksStatus[pageKey] = draft?.status === 'published' ? 'published' : draft?.status === 'review' ? 'review' : 'draft';
-	    this.pageBlocksPublishedAt[pageKey] = draft?.publishedAt || '';
-	    this.pageBlocksPublishedUntil[pageKey] = draft?.publishedUntil || '';
-	    this.pageBlocksRequiresAuth[pageKey] = Boolean(draft?.requiresAuth);
-	  }
+  private applyPageDraftState(pageKey: PageBuilderKey, draft: PageBlocksDraftState): void {
+    const safePageKey = this.safePageRecordKey(pageKey);
+    this.pageBlocks[safePageKey] = Array.isArray(draft?.blocks) ? draft.blocks.map((b) => this.normalizePageBlockDraft(b)) : [];
+    this.pageBlocksStatus[safePageKey] = draft?.status === 'published' ? 'published' : draft?.status === 'review' ? 'review' : 'draft';
+    this.pageBlocksPublishedAt[safePageKey] = draft?.publishedAt || '';
+    this.pageBlocksPublishedUntil[safePageKey] = draft?.publishedUntil || '';
+    this.pageBlocksRequiresAuth[safePageKey] = Boolean(draft?.requiresAuth);
+  }
 
 	  private blogDraftId(key: string, lang: UiLang): string {
 	    return `${key}.${lang}`;
@@ -7607,6 +7626,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 	      tags: this.blogForm.tags,
 	      series: this.blogForm.series,
 	      cover_image_url: this.blogForm.cover_image_url,
+        cover_fit: this.blogForm.cover_fit,
 	      reading_time_minutes: this.blogForm.reading_time_minutes,
 	      pinned: Boolean(this.blogForm.pinned),
 	      pin_order: this.blogForm.pin_order
@@ -7779,14 +7799,16 @@ export class AdminComponent implements OnInit, OnDestroy {
 	  }
 
   private rememberContentVersion(key: string, block: { version?: number } | null | undefined): void {
+    const safeKey = this.safeRecordKey(key);
     const version = block?.version;
     if (typeof version === 'number' && Number.isFinite(version) && version > 0) {
-      this.contentVersions[key] = version;
+      this.setRecordValue(this.contentVersions, safeKey, version);
     }
   }
 
   private expectedVersion(key: string): number | undefined {
-    const version = this.contentVersions[key];
+    const safeKey = this.safeRecordKey(key);
+    const version = this.contentVersions[safeKey];
     return typeof version === 'number' && Number.isFinite(version) && version > 0 ? version : undefined;
   }
 
@@ -7797,8 +7819,9 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   private handleContentConflict(err: any, key: string, reload: () => void): boolean {
     if (err?.status !== 409) return false;
+    const safeKey = this.safeRecordKey(key);
     this.toast.error(this.t('adminUi.content.errors.conflictTitle'), this.t('adminUi.content.errors.conflictCopy'));
-    delete this.contentVersions[key];
+    this.deleteRecordValue(this.contentVersions, safeKey);
     reload();
     return true;
   }
@@ -7905,30 +7928,15 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    const initialSection = this.normalizeSection(this.route.snapshot.data['section']);
+    this.applySection(initialSection);
+    this.applyContentEditQuery(initialSection, this.route.snapshot.queryParams || {});
+
     this.routeSub = combineLatest([this.route.data, this.route.queryParams]).subscribe(([data, query]) => {
       const next = this.normalizeSection(data['section']);
       this.applySection(next);
-
-      const raw = typeof query['edit'] === 'string' ? query['edit'] : '';
-      const cleaned = raw.trim();
-      if (!cleaned) return;
-
-      if (next === 'blog') {
-        const key = cleaned.startsWith('blog.') ? cleaned : `blog.${cleaned}`;
-        if (this.selectedBlogKey === key) return;
-        this.loadBlogEditor(key);
-        return;
-      }
-
-      if (next === 'pages') {
-        const key = isCmsGlobalSectionKey(cleaned) ? cleaned : cleaned.startsWith('page.') ? cleaned : `page.${cleaned}`;
-        const normalized = key.trim();
-        if (!normalized || normalized === 'page.') return;
-        if (normalized === this.pageBlocksKey) return;
-        this.onPageBlocksKeyChange(normalized as PageBuilderKey);
-      }
+      this.applyContentEditQuery(next, query || {});
     });
-    this.syncCmsDraftPoller(this.section());
   }
 
   ngOnDestroy(): void {
@@ -7990,6 +7998,27 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.resetSectionState(next);
     this.loadForSection(next);
     this.syncCmsDraftPoller(next);
+  }
+
+  private applyContentEditQuery(section: AdminContentSection, query: Params): void {
+    const raw = typeof query['edit'] === 'string' ? query['edit'] : '';
+    const cleaned = raw.trim();
+    if (!cleaned) return;
+
+    if (section === 'blog') {
+      const key = cleaned.startsWith('blog.') ? cleaned : `blog.${cleaned}`;
+      if (this.selectedBlogKey === key) return;
+      this.loadBlogEditor(key);
+      return;
+    }
+
+    if (section === 'pages') {
+      const key = isCmsGlobalSectionKey(cleaned) ? cleaned : cleaned.startsWith('page.') ? cleaned : `page.${cleaned}`;
+      const normalized = key.trim();
+      if (!normalized || normalized === 'page.') return;
+      if (normalized === this.pageBlocksKey) return;
+      this.onPageBlocksKeyChange(normalized as PageBuilderKey);
+    }
   }
 
   private syncCmsDraftPoller(section: AdminContentSection): void {
@@ -10545,6 +10574,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 	          tags: '',
 	          series: '',
 	          cover_image_url: '',
+            cover_fit: 'cover',
 	          reading_time_minutes: '',
 	          pinned: false,
 	          pin_order: '1'
@@ -10562,7 +10592,7 @@ export class AdminComponent implements OnInit, OnDestroy {
             focal_y: img.focal_y ?? 50
           }))
           .sort((a, b) => a.sort_order - b.sort_order);
-        this.blogImages = images;
+        this.blogImages = [...images];
         this.loadBlogVersions();
       },
       error: () => this.toast.error(this.t('adminUi.blog.errors.loadPost'))
@@ -10572,9 +10602,13 @@ export class AdminComponent implements OnInit, OnDestroy {
   private reloadContentBlocks(): void {
     this.admin.content().subscribe({
       next: (c) => {
-        this.contentBlocks = c;
-        this.syncContentVersions(c);
+        const nextBlocks = Array.isArray(c) ? [...c] : [];
+        this.contentBlocks = nextBlocks;
+        this.syncContentVersions(nextBlocks);
         this.pruneBlogBulkSelection();
+      },
+      error: () => {
+        this.contentBlocks = [];
       }
     });
   }
@@ -10590,6 +10624,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 	      tags: '',
 	      series: '',
 	      cover_image_url: '',
+        cover_fit: 'cover',
 	      reading_time_minutes: '',
 	      pinned: false,
 	      pin_order: '1'
@@ -10737,6 +10772,8 @@ export class AdminComponent implements OnInit, OnDestroy {
 
 	    const cover = meta['cover_image_url'] || meta['cover_image'] || '';
 	    this.blogForm.cover_image_url = typeof cover === 'string' ? cover : '';
+    const coverFit = typeof meta['cover_fit'] === 'string' ? String(meta['cover_fit']).trim().toLowerCase() : '';
+    this.blogForm.cover_fit = coverFit === 'contain' ? 'contain' : 'cover';
     const rt = meta['reading_time_minutes'] ?? meta['reading_time'] ?? '';
     this.blogForm.reading_time_minutes = rt ? String(rt) : '';
 
@@ -10768,6 +10805,8 @@ export class AdminComponent implements OnInit, OnDestroy {
 	    const cover = this.blogForm.cover_image_url.trim();
 	    if (cover) meta['cover_image_url'] = cover;
 	    else delete meta['cover_image_url'];
+    if (this.blogForm.cover_fit === 'contain') meta['cover_fit'] = 'contain';
+    else delete meta['cover_fit'];
 
     const rt = Number(String(this.blogForm.reading_time_minutes || '').trim());
     if (Number.isFinite(rt) && rt > 0) meta['reading_time_minutes'] = Math.trunc(rt);
@@ -11814,8 +11853,9 @@ export class AdminComponent implements OnInit, OnDestroy {
 
     const onSuccessWithBlock = (block?: any | null) => {
       this.rememberContentVersion(key, block);
-      this.pageBlocksNeedsTranslationEn[key] = Boolean(block?.needs_translation_en);
-      this.pageBlocksNeedsTranslationRo[key] = Boolean(block?.needs_translation_ro);
+      const safePageKey = this.safePageRecordKey(key as PageBuilderKey);
+      this.setPageRecordValue(this.pageBlocksNeedsTranslationEn, safePageKey, Boolean(block?.needs_translation_en));
+      this.setPageRecordValue(this.pageBlocksNeedsTranslationRo, safePageKey, Boolean(block?.needs_translation_ro));
       this.loadContentPages();
       onSuccess();
     };
@@ -11874,7 +11914,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   private setPageHidden(key: string, hidden: boolean): void {
-    const target = (key || '').trim();
+    const target = this.safePageRecordKey((key || '').trim() as PageBuilderKey);
     if (!target) return;
 
     const pageIndex = this.contentPages.findIndex((p) => p.key === target);
@@ -11885,7 +11925,7 @@ export class AdminComponent implements OnInit, OnDestroy {
       if (!this.showHiddenPages && hidden) this.ensureSelectedPageIsVisible();
     }
 
-    this.pageVisibilitySaving[target] = true;
+    this.setRecordValue(this.pageVisibilitySaving, target, true);
     this.admin.getContent(target).subscribe({
       next: (block) => {
         this.rememberContentVersion(target, block);
@@ -11895,13 +11935,13 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.admin.updateContentBlock(target, payload).subscribe({
           next: (updated) => {
             this.rememberContentVersion(target, updated);
-            this.pageVisibilitySaving[target] = false;
+            this.setRecordValue(this.pageVisibilitySaving, target, false);
             this.toast.success(hidden ? this.t('adminUi.site.pages.visibility.hidden') : this.t('adminUi.site.pages.visibility.visible'));
             this.loadContentPages();
             if (!this.showHiddenPages) this.ensureSelectedPageIsVisible();
           },
           error: (err) => {
-            this.pageVisibilitySaving[target] = false;
+            this.setRecordValue(this.pageVisibilitySaving, target, false);
             if (prevHidden !== null && pageIndex >= 0) {
               this.contentPages[pageIndex] = { ...this.contentPages[pageIndex], hidden: prevHidden };
               this.contentPages = [...this.contentPages];
@@ -11912,7 +11952,7 @@ export class AdminComponent implements OnInit, OnDestroy {
         });
       },
       error: () => {
-        this.pageVisibilitySaving[target] = false;
+        this.setRecordValue(this.pageVisibilitySaving, target, false);
         if (prevHidden !== null && pageIndex >= 0) {
           this.contentPages[pageIndex] = { ...this.contentPages[pageIndex], hidden: prevHidden };
           this.contentPages = [...this.contentPages];
@@ -12095,8 +12135,9 @@ export class AdminComponent implements OnInit, OnDestroy {
 
     const onSuccessWithBlock = (block?: any | null) => {
       this.rememberContentVersion(key, block);
-      this.pageBlocksNeedsTranslationEn[key] = Boolean(block?.needs_translation_en);
-      this.pageBlocksNeedsTranslationRo[key] = Boolean(block?.needs_translation_ro);
+      const safePageKey = this.safePageRecordKey(key as PageBuilderKey);
+      this.setPageRecordValue(this.pageBlocksNeedsTranslationEn, safePageKey, Boolean(block?.needs_translation_en));
+      this.setPageRecordValue(this.pageBlocksNeedsTranslationRo, safePageKey, Boolean(block?.needs_translation_ro));
       this.loadContentPages();
       onSuccess();
     };
@@ -12164,23 +12205,23 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   togglePageNeedsTranslation(pageKey: PageBuilderKey, lang: UiLang, event: Event): void {
-    const key = (pageKey || '').trim();
+    const key = this.safePageRecordKey(pageKey);
     if (!key) return;
     const target = event.target as HTMLInputElement | null;
     const checked = Boolean(target?.checked);
     const payload = lang === 'en' ? { needs_translation_en: checked } : { needs_translation_ro: checked };
-    this.pageBlocksTranslationSaving[key] = true;
+    this.setPageRecordValue(this.pageBlocksTranslationSaving, key, true);
     this.admin.updateContentTranslationStatus(key, payload).subscribe({
       next: (block) => {
-        this.pageBlocksNeedsTranslationEn[key] = Boolean(block.needs_translation_en);
-        this.pageBlocksNeedsTranslationRo[key] = Boolean(block.needs_translation_ro);
-        this.pageBlocksTranslationSaving[key] = false;
+        this.setPageRecordValue(this.pageBlocksNeedsTranslationEn, key, Boolean(block.needs_translation_en));
+        this.setPageRecordValue(this.pageBlocksNeedsTranslationRo, key, Boolean(block.needs_translation_ro));
+        this.setPageRecordValue(this.pageBlocksTranslationSaving, key, false);
         this.toast.success(this.t('adminUi.site.pages.builder.translation.success'));
         this.loadContentPages();
       },
       error: (err) => {
         const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
-        this.pageBlocksTranslationSaving[key] = false;
+        this.setPageRecordValue(this.pageBlocksTranslationSaving, key, false);
         this.toast.error(detail || this.t('adminUi.site.pages.builder.translation.errors.save'));
       }
     });
@@ -12247,7 +12288,7 @@ export class AdminComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.reusableBlocksLoading = false;
         if (err?.status === 404) {
-          delete this.contentVersions[this.reusableBlocksKey];
+          this.deleteRecordValue(this.contentVersions, this.reusableBlocksKey);
           this.reusableBlocksMeta = {};
           this.reusableBlocks = [];
           this.reusableBlocksExists = false;
@@ -12270,7 +12311,8 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   savePageBlockAsReusable(pageKey: PageBuilderKey, blockKey: string): void {
-    const blocks = this.pageBlocks[pageKey] || [];
+    const safePageKey = this.safePageRecordKey(pageKey);
+    const blocks = this.pageBlocks[safePageKey] || [];
     const target = blocks.find((b) => b.key === blockKey);
     if (!target) return;
 
@@ -12298,9 +12340,10 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   insertReusableBlockIntoPage(pageKey: PageBuilderKey, id: string): void {
+    const safePageKey = this.safePageRecordKey(pageKey);
     const found = this.reusableBlocks.find((b) => b.id === id);
     if (!found) return;
-    const current = [...(this.pageBlocks[pageKey] || [])];
+    const current = [...(this.pageBlocks[safePageKey] || [])];
     const existingKeys = new Set(current.map((b) => b.key));
     const type = found.block.type;
     const base = `${type}_${id}_${Date.now()}`;
@@ -12313,7 +12356,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     const snapshot = this.deepCloneJson(found.block) as Omit<PageBlockDraft, 'key'>;
     const draft = { ...snapshot, key: nextKey, enabled: true, layout: this.toCmsBlockLayout(snapshot.layout) } satisfies PageBlockDraft;
     current.push(draft);
-    this.pageBlocks[pageKey] = current;
+    this.pageBlocks[safePageKey] = current;
   }
 
   deleteReusableBlock(id: string): void {
@@ -12396,50 +12439,59 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   onPageBlocksKeyChange(next: PageBuilderKey): void {
-    if (!next || this.pageBlocksKey === next) return;
-    this.pageBlocksKey = next;
+    const safePageKey = this.safePageRecordKey(next);
+    if (!safePageKey || this.pageBlocksKey === safePageKey) return;
+    this.pageBlocksKey = safePageKey;
     this.pagePreviewForSlug = null;
     this.pagePreviewToken = null;
     this.pagePreviewExpiresAt = null;
     this.pagePreviewOrigin = null;
     this.pagePreviewNonce = 0;
-    this.ensureNewPageBlockTypeForKey(next);
-    this.loadPageBlocks(next);
+    this.ensureNewPageBlockTypeForKey(safePageKey);
+    this.loadPageBlocks(safePageKey);
   }
 
   loadPageBlocks(pageKey: PageBuilderKey): void {
-    this.pageBlocksMessage[pageKey] = null;
-    this.pageBlocksError[pageKey] = null;
-    this.admin.getContent(pageKey).subscribe({
+    const safePageKey = this.safePageRecordKey(pageKey);
+    this.setPageRecordValue(this.pageBlocksMessage, safePageKey, null);
+    this.setPageRecordValue(this.pageBlocksError, safePageKey, null);
+    this.admin.getContent(safePageKey).subscribe({
 	      next: (block) => {
-	        this.rememberContentVersion(pageKey, block);
-	        this.pageBlocksNeedsTranslationEn[pageKey] = Boolean(block.needs_translation_en);
-	        this.pageBlocksNeedsTranslationRo[pageKey] = Boolean(block.needs_translation_ro);
-        this.pageBlocksStatus[pageKey] =
-          block.status === 'published' ? 'published' : block.status === 'review' ? 'review' : 'draft';
-        this.pageBlocksPublishedAt[pageKey] = block.published_at ? this.toLocalDateTime(block.published_at) : '';
-        this.pageBlocksPublishedUntil[pageKey] = block.published_until ? this.toLocalDateTime(block.published_until) : '';
+	        this.rememberContentVersion(safePageKey, block);
+	        this.setPageRecordValue(this.pageBlocksNeedsTranslationEn, safePageKey, Boolean(block.needs_translation_en));
+	        this.setPageRecordValue(this.pageBlocksNeedsTranslationRo, safePageKey, Boolean(block.needs_translation_ro));
+        this.setPageRecordValue(
+          this.pageBlocksStatus,
+          safePageKey,
+          block.status === 'published' ? 'published' : block.status === 'review' ? 'review' : 'draft'
+        );
+        this.setPageRecordValue(this.pageBlocksPublishedAt, safePageKey, block.published_at ? this.toLocalDateTime(block.published_at) : '');
+        this.setPageRecordValue(
+          this.pageBlocksPublishedUntil,
+          safePageKey,
+          block.published_until ? this.toLocalDateTime(block.published_until) : ''
+        );
 	        const metaObj = ((block as { meta?: Record<string, unknown> | null }).meta || {}) as Record<string, unknown>;
-	        this.pageBlocksMeta[pageKey] = metaObj;
-	        this.pageBlocksRequiresAuth[pageKey] = Boolean(metaObj['requires_auth']);
-	        this.pageBlocks[pageKey] = this.parsePageBlocksDraft(metaObj);
-	        this.ensurePageDraft(pageKey).initFromServer(this.currentPageDraftState(pageKey));
+	        this.setPageRecordValue(this.pageBlocksMeta, safePageKey, metaObj);
+	        this.setPageRecordValue(this.pageBlocksRequiresAuth, safePageKey, Boolean(metaObj['requires_auth']));
+	        this.pageBlocks[safePageKey] = this.parsePageBlocksDraft(metaObj);
+	        this.ensurePageDraft(safePageKey).initFromServer(this.currentPageDraftState(safePageKey));
 	      },
 	      error: (err) => {
 	        if (err?.status === 404) {
-	          delete this.contentVersions[pageKey];
-          this.pageBlocksNeedsTranslationEn[pageKey] = false;
-          this.pageBlocksNeedsTranslationRo[pageKey] = false;
-          this.pageBlocksStatus[pageKey] = 'draft';
-          this.pageBlocksPublishedAt[pageKey] = '';
-          this.pageBlocksPublishedUntil[pageKey] = '';
-	          this.pageBlocksMeta[pageKey] = {};
-	          this.pageBlocksRequiresAuth[pageKey] = false;
-	          this.pageBlocks[pageKey] = [];
-	          this.ensurePageDraft(pageKey).initFromServer(this.currentPageDraftState(pageKey));
+	          this.deleteRecordValue(this.contentVersions, safePageKey);
+          this.setPageRecordValue(this.pageBlocksNeedsTranslationEn, safePageKey, false);
+          this.setPageRecordValue(this.pageBlocksNeedsTranslationRo, safePageKey, false);
+          this.setPageRecordValue(this.pageBlocksStatus, safePageKey, 'draft');
+          this.setPageRecordValue(this.pageBlocksPublishedAt, safePageKey, '');
+          this.setPageRecordValue(this.pageBlocksPublishedUntil, safePageKey, '');
+	          this.setPageRecordValue(this.pageBlocksMeta, safePageKey, {});
+	          this.setPageRecordValue(this.pageBlocksRequiresAuth, safePageKey, false);
+	          this.pageBlocks[safePageKey] = [];
+	          this.ensurePageDraft(safePageKey).initFromServer(this.currentPageDraftState(safePageKey));
 	          return;
 	        }
-	        this.pageBlocksError[pageKey] = this.t('adminUi.site.pages.builder.errors.load');
+	        this.setPageRecordValue(this.pageBlocksError, safePageKey, this.t('adminUi.site.pages.builder.errors.load'));
 	      }
     });
   }
@@ -13202,18 +13254,20 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   addPageBlockFromLibrary(pageKey: PageBuilderKey, type: CmsBlockLibraryBlockType, template: CmsBlockLibraryTemplate): void {
-    const current = [...(this.pageBlocks[pageKey] || [])];
-    this.insertPageBlockAt(pageKey, type, current.length, template);
+    const safePageKey = this.safePageRecordKey(pageKey);
+    const current = [...(this.pageBlocks[safePageKey] || [])];
+    this.insertPageBlockAt(safePageKey, type, current.length, template);
   }
 
 	  private insertPageBlockAt(pageKey: PageBuilderKey, type: CmsBlockLibraryBlockType, index: number, template: CmsBlockLibraryTemplate): string | null {
-	    const allowed = this.allowedPageBlockTypesForKey(pageKey);
+      const safePageKey = this.safePageRecordKey(pageKey);
+	    const allowed = this.allowedPageBlockTypesForKey(safePageKey);
 	    if (allowed.length && !allowed.includes(type as PageBlockType)) {
 	      this.toast.error(this.t('adminUi.site.pages.builder.errors.blockTypeNotAllowed'));
 	      return null;
 	    }
 
-	    const current = [...(this.pageBlocks[pageKey] || [])];
+	    const current = [...(this.pageBlocks[safePageKey] || [])];
 	    const existing = new Set(current.map((b) => b.key));
 	    const base = `${type}_${Date.now()}`;
     let key = base;
@@ -13257,13 +13311,13 @@ export class AdminComponent implements OnInit, OnDestroy {
       layout: this.defaultCmsBlockLayout()
     };
 
-    if (template === 'starter') {
-      this.applyStarterTemplateToCustomBlock(type, draft);
-    }
+	    if (template === 'starter') {
+	      this.applyStarterTemplateToCustomBlock(type, draft);
+	    }
 
 	    const safeIndex = Math.max(0, Math.min(index, current.length));
 	    current.splice(safeIndex, 0, draft);
-	    this.pageBlocks[pageKey] = current;
+	    this.pageBlocks[safePageKey] = current;
 	    return key;
 	  }
 
@@ -13427,18 +13481,21 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   addPageBlock(pageKey: PageBuilderKey): void {
-    const current = [...(this.pageBlocks[pageKey] || [])];
-    this.insertPageBlockAt(pageKey, this.newPageBlockType, current.length, 'blank');
+    const safePageKey = this.safePageRecordKey(pageKey);
+    const current = [...(this.pageBlocks[safePageKey] || [])];
+    this.insertPageBlockAt(safePageKey, this.newPageBlockType, current.length, 'blank');
   }
 
   removePageBlock(pageKey: PageBuilderKey, blockKey: string): void {
-    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).filter((b) => b.key !== blockKey);
+    const safePageKey = this.safePageRecordKey(pageKey);
+    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).filter((b) => b.key !== blockKey);
   }
 
 	  togglePageBlockEnabled(pageKey: PageBuilderKey, blockKey: string, event: Event): void {
+      const safePageKey = this.safePageRecordKey(pageKey);
 	    const target = event.target as HTMLInputElement | null;
 	    const enabled = target?.checked !== false;
-	    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => (b.key === blockKey ? { ...b, enabled } : b));
+	    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => (b.key === blockKey ? { ...b, enabled } : b));
 	  }
 
 	  pageBlockLabel(block: PageBlockDraft): string {
@@ -13448,14 +13505,15 @@ export class AdminComponent implements OnInit, OnDestroy {
 	  }
 
 	  movePageBlock(pageKey: PageBuilderKey, blockKey: string, delta: number): void {
-	    const current = [...(this.pageBlocks[pageKey] || [])];
+      const safePageKey = this.safePageRecordKey(pageKey);
+	    const current = [...(this.pageBlocks[safePageKey] || [])];
 	    const from = current.findIndex((b) => b.key === blockKey);
 	    if (from === -1) return;
 	    const to = from + delta;
 	    if (to < 0 || to >= current.length) return;
 	    const [moved] = current.splice(from, 1);
 	    current.splice(to, 0, moved);
-	    this.pageBlocks[pageKey] = current;
+	    this.pageBlocks[safePageKey] = current;
 	    this.announceCms(
 	      this.t('adminUi.content.reorder.moved', { label: this.pageBlockLabel(moved), pos: to + 1, count: current.length })
 	    );
@@ -13490,8 +13548,9 @@ export class AdminComponent implements OnInit, OnDestroy {
 	    const files = this.extractCmsImageFiles(event);
 	    if (!files.length) return;
 	    event.preventDefault();
-	    const index = (this.pageBlocks[pageKey] || []).length;
-	    void this.insertPageMediaFiles(pageKey, index, files);
+      const safePageKey = this.safePageRecordKey(pageKey);
+	    const index = (this.pageBlocks[safePageKey] || []).length;
+	    void this.insertPageMediaFiles(safePageKey, index, files);
 	  }
 
 	  onHomeMediaDropOnContainer(event: DragEvent): void {
@@ -13503,10 +13562,11 @@ export class AdminComponent implements OnInit, OnDestroy {
 	  }
 
 	  onPageBlockDropZone(event: DragEvent, pageKey: PageBuilderKey, index: number): void {
+      const safePageKey = this.safePageRecordKey(pageKey);
 	    event.preventDefault();
-	    const current = [...(this.pageBlocks[pageKey] || [])];
+	    const current = [...(this.pageBlocks[safePageKey] || [])];
 
-    if (this.draggingPageBlocksKey === pageKey && this.draggingPageBlockKey) {
+    if (this.draggingPageBlocksKey === safePageKey && this.draggingPageBlockKey) {
       const from = current.findIndex((b) => b.key === this.draggingPageBlockKey);
       if (from === -1) {
         this.onPageBlockDragEnd();
@@ -13516,7 +13576,7 @@ export class AdminComponent implements OnInit, OnDestroy {
       const [moved] = current.splice(from, 1);
       const nextIndex = from < safeIndex ? safeIndex - 1 : safeIndex;
       current.splice(nextIndex, 0, moved);
-      this.pageBlocks[pageKey] = current;
+      this.pageBlocks[safePageKey] = current;
       this.onPageBlockDragEnd();
       return;
     }
@@ -13527,39 +13587,40 @@ export class AdminComponent implements OnInit, OnDestroy {
       return;
     }
 
-	    this.insertPageBlockAt(pageKey, payload.type, index, payload.template);
+	    this.insertPageBlockAt(safePageKey, payload.type, index, payload.template);
 	    this.pageInsertDragActive = false;
 	  }
 
 	  onPageBlockDrop(event: DragEvent, pageKey: PageBuilderKey, targetKey: string): void {
+      const safePageKey = this.safePageRecordKey(pageKey);
 	    event.preventDefault();
 
 	    const mediaFiles = this.extractCmsImageFiles(event);
 	    if (mediaFiles.length) {
-	      const current = [...(this.pageBlocks[pageKey] || [])];
+	      const current = [...(this.pageBlocks[safePageKey] || [])];
 	      const to = current.findIndex((b) => b.key === targetKey);
 	      const safeIndex = to !== -1 ? to : current.length;
-	      void this.insertPageMediaFiles(pageKey, safeIndex, mediaFiles);
+	      void this.insertPageMediaFiles(safePageKey, safeIndex, mediaFiles);
 	      this.pageInsertDragActive = false;
 	      return;
 	    }
 
 	    const payload = this.readCmsBlockPayload(event);
 	    if (payload && payload.scope === 'page') {
-	      const current = [...(this.pageBlocks[pageKey] || [])];
+	      const current = [...(this.pageBlocks[safePageKey] || [])];
 	      const to = current.findIndex((b) => b.key === targetKey);
 	      if (to !== -1) {
-        this.insertPageBlockAt(pageKey, payload.type, to, payload.template);
+        this.insertPageBlockAt(safePageKey, payload.type, to, payload.template);
       }
       this.pageInsertDragActive = false;
       return;
     }
 
     if (!this.draggingPageBlocksKey || !this.draggingPageBlockKey) return;
-    if (this.draggingPageBlocksKey !== pageKey) return;
+    if (this.draggingPageBlocksKey !== safePageKey) return;
     if (this.draggingPageBlockKey === targetKey) return;
 
-    const current = [...(this.pageBlocks[pageKey] || [])];
+    const current = [...(this.pageBlocks[safePageKey] || [])];
     const from = current.findIndex((b) => b.key === this.draggingPageBlockKey);
     const to = current.findIndex((b) => b.key === targetKey);
     if (from === -1 || to === -1) return;
@@ -13567,7 +13628,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     const [moved] = current.splice(from, 1);
     const nextIndex = from < to ? to - 1 : to;
     current.splice(nextIndex, 0, moved);
-    this.pageBlocks[pageKey] = current;
+    this.pageBlocks[safePageKey] = current;
     this.onPageBlockDragEnd();
 	  }
 
@@ -13653,10 +13714,11 @@ export class AdminComponent implements OnInit, OnDestroy {
 	    }
 	  }
 
-	  private async insertPageMediaFiles(pageKey: PageBuilderKey, index: number, files: File[]): Promise<void> {
-	    const normalized = this.normalizeCmsImageFiles(files);
-	    if (!normalized.length) return;
-	    const allowed = this.allowedPageBlockTypesForKey(pageKey);
+  private async insertPageMediaFiles(pageKey: PageBuilderKey, index: number, files: File[]): Promise<void> {
+    const safePageKey = this.safePageRecordKey(pageKey);
+    const normalized = this.normalizeCmsImageFiles(files);
+    if (!normalized.length) return;
+    const allowed = this.allowedPageBlockTypesForKey(safePageKey);
 	    const canImage = allowed.includes('image');
 	    const canGallery = allowed.includes('gallery');
 
@@ -13675,21 +13737,21 @@ export class AdminComponent implements OnInit, OnDestroy {
 	      return;
 	    }
 
-	    const uploads: Array<{ url: string; focal_x: number; focal_y: number; alt: string }> = [];
-	    for (const file of normalized) {
-	      const uploaded = await this.uploadCmsImageToKey(String(pageKey), file);
-	      if (!uploaded) continue;
-	      uploads.push({ ...uploaded, alt: this.filenameToAltText(file.name) });
-	    }
-	    if (!uploads.length) return;
+    const uploads: Array<{ url: string; focal_x: number; focal_y: number; alt: string }> = [];
+    for (const file of normalized) {
+      const uploaded = await this.uploadCmsImageToKey(String(safePageKey), file);
+      if (!uploaded) continue;
+      uploads.push({ ...uploaded, alt: this.filenameToAltText(file.name) });
+    }
+    if (!uploads.length) return;
 
-	    const safeIndex = Math.max(0, Math.min(index, (this.pageBlocks[pageKey] || []).length));
-	    if (mode === 'image') {
-	      const createdKey = this.insertPageBlockAt(pageKey, 'image', safeIndex, 'blank');
-	      if (!createdKey) return;
-	      const u = uploads[0];
-	      this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) =>
-	        b.key === createdKey
+    const safeIndex = Math.max(0, Math.min(index, (this.pageBlocks[safePageKey] || []).length));
+    if (mode === 'image') {
+      const createdKey = this.insertPageBlockAt(safePageKey, 'image', safeIndex, 'blank');
+      if (!createdKey) return;
+      const u = uploads[0];
+      this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) =>
+        b.key === createdKey
 	          ? {
 	              ...b,
 	              url: u.url,
@@ -13699,10 +13761,10 @@ export class AdminComponent implements OnInit, OnDestroy {
 	            }
 	          : b
 	      );
-	    } else if (mode === 'gallery') {
-	      const createdKey = this.insertPageBlockAt(pageKey, 'gallery', safeIndex, 'blank');
-	      if (!createdKey) return;
-	      this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+    } else if (mode === 'gallery') {
+      const createdKey = this.insertPageBlockAt(safePageKey, 'gallery', safeIndex, 'blank');
+      if (!createdKey) return;
+      this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
 	        if (b.key !== createdKey || b.type !== 'gallery') return b;
 	        return {
 	          ...b,
@@ -13716,12 +13778,12 @@ export class AdminComponent implements OnInit, OnDestroy {
 	        };
 	      });
 	    } else {
-	      let cursor = safeIndex;
-	      for (const u of uploads) {
-	        const createdKey = this.insertPageBlockAt(pageKey, 'image', cursor, 'blank');
-	        if (!createdKey) break;
-	        this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) =>
-	          b.key === createdKey
+      let cursor = safeIndex;
+      for (const u of uploads) {
+        const createdKey = this.insertPageBlockAt(safePageKey, 'image', cursor, 'blank');
+        if (!createdKey) break;
+        this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) =>
+          b.key === createdKey
 	            ? {
 	                ...b,
 	                url: u.url,
@@ -13782,23 +13844,25 @@ export class AdminComponent implements OnInit, OnDestroy {
 	    this.toast.success(this.t('adminUi.content.mediaDrop.inserted', { count: uploads.length }));
 	  }
 
-	  setPageImageBlockUrl(pageKey: PageBuilderKey, blockKey: string, asset: ContentImageAssetRead): void {
-	    const value = (asset?.url || '').trim();
-	    if (!value) return;
+  setPageImageBlockUrl(pageKey: PageBuilderKey, blockKey: string, asset: ContentImageAssetRead): void {
+    const safePageKey = this.safePageRecordKey(pageKey);
+    const value = (asset?.url || '').trim();
+    if (!value) return;
     const focalX = this.toFocalValue(asset.focal_x);
     const focalY = this.toFocalValue(asset.focal_y);
-    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) =>
+    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) =>
       b.key === blockKey ? { ...b, url: value, focal_x: focalX, focal_y: focalY } : b
     );
     this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
   }
 
   setPageBannerSlideImage(pageKey: PageBuilderKey, blockKey: string, asset: ContentImageAssetRead): void {
+    const safePageKey = this.safePageRecordKey(pageKey);
     const value = (asset?.url || '').trim();
     if (!value) return;
     const focalX = this.toFocalValue(asset.focal_x);
     const focalY = this.toFocalValue(asset.focal_y);
-    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
       if (b.key !== blockKey || b.type !== 'banner') return b;
       return { ...b, slide: { ...b.slide, image_url: value, focal_x: focalX, focal_y: focalY } };
     });
@@ -13806,14 +13870,16 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   addPageCarouselSlide(pageKey: PageBuilderKey, blockKey: string): void {
-    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+    const safePageKey = this.safePageRecordKey(pageKey);
+    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
       if (b.key !== blockKey || b.type !== 'carousel') return b;
       return { ...b, slides: [...(b.slides || []), this.emptySlideDraft()] };
     });
   }
 
   removePageCarouselSlide(pageKey: PageBuilderKey, blockKey: string, idx: number): void {
-    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+    const safePageKey = this.safePageRecordKey(pageKey);
+    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
       if (b.key !== blockKey || b.type !== 'carousel') return b;
       const next = [...(b.slides || [])];
       next.splice(idx, 1);
@@ -13822,7 +13888,8 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   movePageCarouselSlide(pageKey: PageBuilderKey, blockKey: string, idx: number, delta: number): void {
-    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+    const safePageKey = this.safePageRecordKey(pageKey);
+    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
       if (b.key !== blockKey || b.type !== 'carousel') return b;
       const slides = [...(b.slides || [])];
       const from = idx;
@@ -13836,11 +13903,12 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   setPageCarouselSlideImage(pageKey: PageBuilderKey, blockKey: string, idx: number, asset: ContentImageAssetRead): void {
+    const safePageKey = this.safePageRecordKey(pageKey);
     const value = (asset?.url || '').trim();
     if (!value) return;
     const focalX = this.toFocalValue(asset.focal_x);
     const focalY = this.toFocalValue(asset.focal_y);
-    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
       if (b.key !== blockKey || b.type !== 'carousel') return b;
       const slides = [...(b.slides || [])];
       const target = slides[idx];
@@ -13852,7 +13920,8 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   addPageGalleryImage(pageKey: PageBuilderKey, blockKey: string): void {
-    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+    const safePageKey = this.safePageRecordKey(pageKey);
+    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
       if (b.key !== blockKey || b.type !== 'gallery') return b;
       return {
         ...b,
@@ -13871,11 +13940,12 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   addPageGalleryImageFromAsset(pageKey: PageBuilderKey, blockKey: string, asset: ContentImageAssetRead): void {
+    const safePageKey = this.safePageRecordKey(pageKey);
     const value = (asset?.url || '').trim();
     if (!value) return;
     const focalX = this.toFocalValue(asset.focal_x);
     const focalY = this.toFocalValue(asset.focal_y);
-    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
       if (b.key !== blockKey || b.type !== 'gallery') return b;
       return {
         ...b,
@@ -13895,7 +13965,8 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   removePageGalleryImage(pageKey: PageBuilderKey, blockKey: string, idx: number): void {
-    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+    const safePageKey = this.safePageRecordKey(pageKey);
+    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
       if (b.key !== blockKey || b.type !== 'gallery') return b;
       const next = [...b.images];
       next.splice(idx, 1);
@@ -13904,7 +13975,8 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   addPageColumnsColumn(pageKey: PageBuilderKey, blockKey: string): void {
-    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+    const safePageKey = this.safePageRecordKey(pageKey);
+    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
       if (b.key !== blockKey || b.type !== 'columns') return b;
       const cols = [...(b.columns || [])];
       if (cols.length >= 3) return b;
@@ -13914,7 +13986,8 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   removePageColumnsColumn(pageKey: PageBuilderKey, blockKey: string, idx: number): void {
-    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+    const safePageKey = this.safePageRecordKey(pageKey);
+    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
       if (b.key !== blockKey || b.type !== 'columns') return b;
       const cols = [...(b.columns || [])];
       if (cols.length <= 2) return b;
@@ -14006,7 +14079,8 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   addPageFaqItem(pageKey: PageBuilderKey, blockKey: string): void {
-    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+    const safePageKey = this.safePageRecordKey(pageKey);
+    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
       if (b.key !== blockKey || b.type !== 'faq') return b;
       const items = [...(b.faq_items || [])];
       if (items.length >= 20) return b;
@@ -14016,7 +14090,8 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   removePageFaqItem(pageKey: PageBuilderKey, blockKey: string, idx: number): void {
-    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+    const safePageKey = this.safePageRecordKey(pageKey);
+    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
       if (b.key !== blockKey || b.type !== 'faq') return b;
       const items = [...(b.faq_items || [])];
       if (items.length <= 1) return b;
@@ -14027,7 +14102,8 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   addPageTestimonial(pageKey: PageBuilderKey, blockKey: string): void {
-    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+    const safePageKey = this.safePageRecordKey(pageKey);
+    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
       if (b.key !== blockKey || b.type !== 'testimonials') return b;
       const items = [...(b.testimonials || [])];
       if (items.length >= 12) return b;
@@ -14037,7 +14113,8 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   removePageTestimonial(pageKey: PageBuilderKey, blockKey: string, idx: number): void {
-    this.pageBlocks[pageKey] = (this.pageBlocks[pageKey] || []).map((b) => {
+    const safePageKey = this.safePageRecordKey(pageKey);
+    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
       if (b.key !== blockKey || b.type !== 'testimonials') return b;
       const items = [...(b.testimonials || [])];
       if (items.length <= 1) return b;
@@ -14325,26 +14402,27 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   savePageBlocks(pageKey: PageBuilderKey, opts?: { bypassChecklist?: boolean }): void {
-    this.pageBlocksMessage[pageKey] = null;
-    this.pageBlocksError[pageKey] = null;
+    const safePageKey = this.safePageRecordKey(pageKey);
+    this.pageBlocksMessage[safePageKey] = null;
+    this.pageBlocksError[safePageKey] = null;
 
-    const status: ContentStatusUi = this.pageBlocksStatus[pageKey] || 'draft';
+    const status: ContentStatusUi = this.pageBlocksStatus[safePageKey] || 'draft';
     if (!opts?.bypassChecklist && status === 'published') {
-      this.openPagePublishChecklist(pageKey);
+      this.openPagePublishChecklist(safePageKey);
       return;
     }
 
-    const meta = this.buildPageBlocksMeta(pageKey);
+    const meta = this.buildPageBlocksMeta(safePageKey);
     const published_at =
       status === 'published'
-        ? this.pageBlocksPublishedAt[pageKey]
-          ? new Date(this.pageBlocksPublishedAt[pageKey]).toISOString()
+        ? this.pageBlocksPublishedAt[safePageKey]
+          ? new Date(this.pageBlocksPublishedAt[safePageKey]).toISOString()
           : null
         : null;
     const published_until =
       status === 'published'
-        ? this.pageBlocksPublishedUntil[pageKey]
-          ? new Date(this.pageBlocksPublishedUntil[pageKey]).toISOString()
+        ? this.pageBlocksPublishedUntil[safePageKey]
+          ? new Date(this.pageBlocksPublishedUntil[safePageKey]).toISOString()
           : null
         : null;
     const payload: Record<string, unknown> = { meta, status, published_at, published_until, lang: this.infoLang };
@@ -14352,67 +14430,82 @@ export class AdminComponent implements OnInit, OnDestroy {
     const ok = this.t('adminUi.site.pages.builder.success.save');
     const errMsg = this.t('adminUi.site.pages.builder.errors.save');
 
-    const reload = () => this.loadPageBlocks(pageKey);
+    const reload = () => this.loadPageBlocks(safePageKey);
 
-    this.admin.updateContentBlock(pageKey, this.withExpectedVersion(pageKey, payload)).subscribe({
+    this.admin.updateContentBlock(safePageKey, this.withExpectedVersion(safePageKey, payload)).subscribe({
       next: (block) => {
-        this.rememberContentVersion(pageKey, block);
-        this.pageBlocksNeedsTranslationEn[pageKey] = Boolean(block.needs_translation_en);
-        this.pageBlocksNeedsTranslationRo[pageKey] = Boolean(block.needs_translation_ro);
-        this.pageBlocksStatus[pageKey] =
+        this.rememberContentVersion(safePageKey, block);
+        this.pageBlocksNeedsTranslationEn[safePageKey] = Boolean(block.needs_translation_en);
+        this.pageBlocksNeedsTranslationRo[safePageKey] = Boolean(block.needs_translation_ro);
+        this.pageBlocksStatus[safePageKey] =
           block.status === 'published' ? 'published' : block.status === 'review' ? 'review' : 'draft';
-        this.pageBlocksPublishedAt[pageKey] = block.published_at ? this.toLocalDateTime(block.published_at) : '';
-        this.pageBlocksPublishedUntil[pageKey] = block.published_until ? this.toLocalDateTime(block.published_until) : '';
-        this.pageBlocksMeta[pageKey] = ((block as { meta?: Record<string, unknown> | null }).meta || {}) as Record<string, unknown>;
-	        this.pageBlocksRequiresAuth[pageKey] = Boolean(this.pageBlocksMeta[pageKey]?.['requires_auth']);
-	        this.pageBlocksMessage[pageKey] = ok;
-	        this.pageBlocksError[pageKey] = null;
-	        this.ensurePageDraft(pageKey).markServerSaved(this.currentPageDraftState(pageKey), true);
-          const slug = this.pagePreviewSlug(pageKey);
-          if (slug && this.pagePreviewForSlug === slug) this.refreshPagePreview();
-	      },
+        this.pageBlocksPublishedAt[safePageKey] = block.published_at ? this.toLocalDateTime(block.published_at) : '';
+        this.pageBlocksPublishedUntil[safePageKey] = block.published_until
+          ? this.toLocalDateTime(block.published_until)
+          : '';
+        this.pageBlocksMeta[safePageKey] = ((block as { meta?: Record<string, unknown> | null }).meta || {}) as Record<
+          string,
+          unknown
+        >;
+        this.pageBlocksRequiresAuth[safePageKey] = Boolean(this.pageBlocksMeta[safePageKey]?.['requires_auth']);
+        this.pageBlocksMessage[safePageKey] = ok;
+        this.pageBlocksError[safePageKey] = null;
+        this.ensurePageDraft(safePageKey).markServerSaved(this.currentPageDraftState(safePageKey), true);
+        const slug = this.pagePreviewSlug(safePageKey);
+        if (slug && this.pagePreviewForSlug === slug) this.refreshPagePreview();
+      },
       error: (err) => {
-        if (this.handleContentConflict(err, pageKey, reload)) {
-          this.pageBlocksError[pageKey] = errMsg;
-          this.pageBlocksMessage[pageKey] = null;
+        if (this.handleContentConflict(err, safePageKey, reload)) {
+          this.pageBlocksError[safePageKey] = errMsg;
+          this.pageBlocksMessage[safePageKey] = null;
           return;
         }
-	        if (err?.status === 404) {
-	          const createPayload = {
-	            title: this.contentPages.find((p) => p.key === pageKey)?.title || cmsGlobalSectionDefaultTitle(pageKey) || pageKey,
-	            body_markdown: 'Page builder',
-	            status,
-	            lang: this.infoLang,
-	            published_at,
+        if (err?.status === 404) {
+          const createPayload = {
+            title:
+              this.contentPages.find((p) => p.key === safePageKey)?.title ||
+              cmsGlobalSectionDefaultTitle(safePageKey) ||
+              safePageKey,
+            body_markdown: 'Page builder',
+            status,
+            lang: this.infoLang,
+            published_at,
             published_until,
             meta
           };
-          this.admin.createContent(pageKey, createPayload).subscribe({
-	            next: (created) => {
-	              this.rememberContentVersion(pageKey, created);
-	              this.pageBlocksNeedsTranslationEn[pageKey] = Boolean(created.needs_translation_en);
-	              this.pageBlocksNeedsTranslationRo[pageKey] = Boolean(created.needs_translation_ro);
-              this.pageBlocksStatus[pageKey] =
+          this.admin.createContent(safePageKey, createPayload).subscribe({
+            next: (created) => {
+              this.rememberContentVersion(safePageKey, created);
+              this.pageBlocksNeedsTranslationEn[safePageKey] = Boolean(created.needs_translation_en);
+              this.pageBlocksNeedsTranslationRo[safePageKey] = Boolean(created.needs_translation_ro);
+              this.pageBlocksStatus[safePageKey] =
                 created.status === 'published' ? 'published' : created.status === 'review' ? 'review' : 'draft';
-              this.pageBlocksPublishedAt[pageKey] = created.published_at ? this.toLocalDateTime(created.published_at) : '';
-              this.pageBlocksPublishedUntil[pageKey] = created.published_until ? this.toLocalDateTime(created.published_until) : '';
-              this.pageBlocksMeta[pageKey] = ((created as { meta?: Record<string, unknown> | null }).meta || {}) as Record<string, unknown>;
-	              this.pageBlocksRequiresAuth[pageKey] = Boolean(this.pageBlocksMeta[pageKey]?.['requires_auth']);
-	              this.pageBlocksMessage[pageKey] = ok;
-	              this.pageBlocksError[pageKey] = null;
-	              this.ensurePageDraft(pageKey).markServerSaved(this.currentPageDraftState(pageKey), true);
-                const slug = this.pagePreviewSlug(pageKey);
-                if (slug && this.pagePreviewForSlug === slug) this.refreshPagePreview();
-	            },
+              this.pageBlocksPublishedAt[safePageKey] = created.published_at
+                ? this.toLocalDateTime(created.published_at)
+                : '';
+              this.pageBlocksPublishedUntil[safePageKey] = created.published_until
+                ? this.toLocalDateTime(created.published_until)
+                : '';
+              this.pageBlocksMeta[safePageKey] = ((created as { meta?: Record<string, unknown> | null }).meta || {}) as Record<
+                string,
+                unknown
+              >;
+              this.pageBlocksRequiresAuth[safePageKey] = Boolean(this.pageBlocksMeta[safePageKey]?.['requires_auth']);
+              this.pageBlocksMessage[safePageKey] = ok;
+              this.pageBlocksError[safePageKey] = null;
+              this.ensurePageDraft(safePageKey).markServerSaved(this.currentPageDraftState(safePageKey), true);
+              const slug = this.pagePreviewSlug(safePageKey);
+              if (slug && this.pagePreviewForSlug === slug) this.refreshPagePreview();
+            },
             error: () => {
-              this.pageBlocksError[pageKey] = errMsg;
-              this.pageBlocksMessage[pageKey] = null;
+              this.pageBlocksError[safePageKey] = errMsg;
+              this.pageBlocksMessage[safePageKey] = null;
             }
           });
           return;
         }
-        this.pageBlocksError[pageKey] = errMsg;
-        this.pageBlocksMessage[pageKey] = null;
+        this.pageBlocksError[safePageKey] = errMsg;
+        this.pageBlocksMessage[safePageKey] = null;
       }
     });
   }
@@ -14420,6 +14513,54 @@ export class AdminComponent implements OnInit, OnDestroy {
   // Homepage sections (page builder blocks)
   selectHomeBlocksLang(lang: UiLang): void {
     this.homeBlocksLang = lang;
+  }
+
+  private safePageRecordKey(pageKey: PageBuilderKey): PageBuilderKey {
+    const value = String(pageKey || '').trim();
+    if (!/^page\.[a-z0-9._-]+$/i.test(value)) {
+      return 'page.about';
+    }
+    const normalized = value.toLowerCase();
+    if (
+      normalized === 'page.__proto__' ||
+      normalized.endsWith('.__proto__') ||
+      normalized.endsWith('.prototype') ||
+      normalized.endsWith('.constructor')
+    ) {
+      return 'page.about';
+    }
+    return value as PageBuilderKey;
+  }
+
+  private safeRecordKey(key: string, fallback = 'unknown'): string {
+    const value = String(key || '').trim();
+    if (!/^[a-z0-9._:-]+$/i.test(value)) {
+      return fallback;
+    }
+    const normalized = value.toLowerCase();
+    if (
+      normalized === '__proto__' ||
+      normalized === 'prototype' ||
+      normalized === 'constructor' ||
+      normalized.endsWith('.__proto__') ||
+      normalized.endsWith('.prototype') ||
+      normalized.endsWith('.constructor')
+    ) {
+      return fallback;
+    }
+    return value;
+  }
+
+  private setPageRecordValue<T>(record: Record<string, T>, pageKey: PageBuilderKey, value: T): void {
+    Reflect.set(record, this.safePageRecordKey(pageKey), value);
+  }
+
+  private setRecordValue<T>(record: Record<string, T>, key: string, value: T, fallback = 'unknown'): void {
+    Reflect.set(record, this.safeRecordKey(key, fallback), value);
+  }
+
+  private deleteRecordValue(record: Record<string, unknown>, key: string, fallback = 'unknown'): void {
+    Reflect.deleteProperty(record, this.safeRecordKey(key, fallback));
   }
 
   private emptyLocalizedText(): LocalizedText {

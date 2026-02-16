@@ -63,8 +63,8 @@ describe('AboutComponent', () => {
 
     expect(title.setTitle).toHaveBeenCalledWith('About | momentstudio');
     expect(meta.updateTag).toHaveBeenCalledWith({ name: 'description', content: 'Hello' });
-    expect(meta.updateTag).toHaveBeenCalledWith({ name: 'og:description', content: 'Hello' });
-    expect(meta.updateTag).toHaveBeenCalledWith({ name: 'og:title', content: 'About | momentstudio' });
+    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:description', content: 'Hello' });
+    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:title', content: 'About | momentstudio' });
   });
 
   it('updates meta tags when language changes', () => {
@@ -78,8 +78,8 @@ describe('AboutComponent', () => {
 
     expect(title.setTitle).toHaveBeenCalledWith('Despre noi | momentstudio');
     expect(meta.updateTag).toHaveBeenCalledWith({ name: 'description', content: 'Salut' });
-    expect(meta.updateTag).toHaveBeenCalledWith({ name: 'og:description', content: 'Salut' });
-    expect(meta.updateTag).toHaveBeenCalledWith({ name: 'og:title', content: 'Despre noi | momentstudio' });
+    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:description', content: 'Salut' });
+    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:title', content: 'Despre noi | momentstudio' });
   });
 
   it('uses page blocks for meta description when present', () => {

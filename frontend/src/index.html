@@ -3,13 +3,67 @@
   <head>
     <meta charset="utf-8" />
     <base href="/" />
+    <link
+      rel="preload"
+      as="image"
+      href="assets/home/banner_image.jpeg"
+      imagesrcset="assets/home/banner_image-640.jpg 640w, assets/home/banner_image-960.jpg 960w, assets/home/banner_image.jpeg 1280w"
+      imagesizes="(min-width: 1024px) 1152px, 100vw"
+      fetchpriority="high"
+    />
     <script src="assets/app-config.js"></script>
     <script src="assets/theme-bootstrap.js"></script>
     <title>momentstudio</title>
+    <meta
+      name="description"
+      content="Discover handmade jewelry, curated gifts, and thoughtful pieces crafted for meaningful moments."
+    />
+    <script type="application/ld+json" id="seo-default-organization">
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "momentstudio",
+        "url": "https://momentstudio.ro",
+        "logo": "https://momentstudio.ro/assets/home/banner_image.jpeg"
+      }
+    </script>
+    <script type="application/ld+json" id="seo-default-website">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "momentstudio",
+        "url": "https://momentstudio.ro",
+        "inLanguage": ["en", "ro"],
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": "https://momentstudio.ro/shop?lang=en&q={search_term_string}",
+          "query-input": "required name=search_term_string"
+        }
+      }
+    </script>
+    <meta name="robots" content="index,follow,max-image-preview:large" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="momentstudio" />
+    <meta property="og:title" content="momentstudio" />
+    <meta
+      property="og:description"
+      content="Discover handmade jewelry, curated gifts, and thoughtful pieces crafted for meaningful moments."
+    />
+    <meta property="og:url" content="https://momentstudio.ro/" />
+    <meta property="og:image" content="https://momentstudio.ro/assets/home/banner_image.jpeg" />
+    <meta property="og:image:alt" content="momentstudio hero banner" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="momentstudio" />
+    <meta
+      name="twitter:description"
+      content="Discover handmade jewelry, curated gifts, and thoughtful pieces crafted for meaningful moments."
+    />
+    <meta name="twitter:image" content="https://momentstudio.ro/assets/home/banner_image.jpeg" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f8fafc" />
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0f172a" />
+    <link rel="canonical" href="https://momentstudio.ro/" />
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
     <link rel="manifest" href="manifest.webmanifest" />
   </head>

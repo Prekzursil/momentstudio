@@ -76,6 +76,37 @@ services:
       timeout: 5s
       retries: 30
 
+  media-worker:
+    build:
+      context: ../
+      dockerfile: backend/Dockerfile
+    env_file:
+      - ../backend/.env.example
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/adrianaart
+      FRONTEND_ORIGIN: http://localhost:4201
+      REDIS_URL: redis://redis:6379/0
+      PAYMENTS_PROVIDER: ${PAYMENTS_PROVIDER:-real}
+      NETOPIA_ENABLED: ${NETOPIA_ENABLED:-0}
+      RUN_DB_MIGRATIONS: "0"
+    command: ["python", "-m", "app.workers.media_worker"]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import pathlib,time,sys; p=pathlib.Path('/tmp/media-worker-heartbeat.json'); sys.exit(0 if p.exists() and (time.time()-p.stat().st_mtime) < 90 else 1)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
   frontend:
     build:
       context: ../

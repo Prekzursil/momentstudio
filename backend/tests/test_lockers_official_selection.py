@@ -13,6 +13,7 @@ def anyio_backend() -> str:
 async def test_list_lockers_prefers_official_when_configured(monkeypatch) -> None:
     lockers_service._reset_cache_for_tests()
 
+    monkeypatch.setattr(lockers_service.settings, "sameday_mirror_enabled", False)
     monkeypatch.setattr(lockers_service.settings, "sameday_api_base_url", "https://example.invalid")
     monkeypatch.setattr(lockers_service.settings, "sameday_api_username", "u")
     monkeypatch.setattr(lockers_service.settings, "sameday_api_password", "p")
@@ -42,6 +43,7 @@ async def test_list_lockers_prefers_official_when_configured(monkeypatch) -> Non
 @pytest.mark.anyio("asyncio")
 async def test_list_lockers_raises_when_not_configured_and_no_overpass(monkeypatch) -> None:
     lockers_service._reset_cache_for_tests()
+    monkeypatch.setattr(lockers_service.settings, "sameday_mirror_enabled", False)
     monkeypatch.setattr(lockers_service.settings, "sameday_api_base_url", None)
     monkeypatch.setattr(lockers_service.settings, "sameday_api_username", None)
     monkeypatch.setattr(lockers_service.settings, "sameday_api_password", None)

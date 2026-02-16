@@ -5,6 +5,7 @@ import { AppComponent } from './app.component';
 import { TranslateModule } from '@ngx-translate/core';
 import { of } from 'rxjs';
 import { AuthService } from './core/auth.service';
+import { RouteRobotsService } from './core/route-robots.service';
 
 describe('AppComponent', () => {
   beforeEach(async () => {
@@ -16,11 +17,20 @@ describe('AppComponent', () => {
           useValue: {
             user: () => null,
             isAuthenticated: () => false,
+            isStaff: () => false,
+            isAdmin: () => false,
+            isImpersonating: () => false,
             ensureAuthenticated: () => of(false),
             loadCurrentUser: () => of(null),
-            updatePreferredLanguage: () => of(null)
+            updatePreferredLanguage: () => of(null),
+            checkAdminAccess: () => of(null),
+            logout: () => of(null)
           }
-        }
+        },
+        {
+          provide: RouteRobotsService,
+          useValue: { start: () => void 0 }
+        },
       ]
     }).compileComponents();
   });
@@ -29,5 +39,12 @@ describe('AppComponent', () => {
     const fixture = TestBed.createComponent(AppComponent);
     const app = fixture.componentInstance;
     expect(app).toBeTruthy();
+  });
+
+  it('renders a semantic main landmark', () => {
+    const fixture = TestBed.createComponent(AppComponent);
+    fixture.detectChanges();
+    const main = fixture.nativeElement.querySelector('main#main-content');
+    expect(main).toBeTruthy();
   });
 });

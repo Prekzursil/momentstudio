@@ -17,8 +17,14 @@ www.{$PUBLIC_DOMAIN} {
 		reverse_proxy backend:8000
 	}
 
+	@media_private path /media/private/*
+	handle @media_private {
+		respond "Not Found" 404
+	}
+
 	@media path /media/*
 	handle @media {
+		header Cache-Control "public, max-age=2592000, immutable"
 		reverse_proxy backend:8000
 	}
 

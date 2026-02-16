@@ -85,6 +85,43 @@ jobs:
             fi
           done
 
+          home_html="$(mktemp)"
+          curl -fsS http://localhost:4201/ > "$home_html"
+          bundle_path="$(
+            grep -Eo "/?[^\"[:space:]]+\.[0-9a-f]{8,}\.js" "$home_html" \
+              | head -n 1 \
+              || true
+          )"
+          if [[ -z "${bundle_path}" ]]; then
+            echo "Unable to find hashed JS bundle in homepage HTML" >&2
+            exit 1
+          fi
+          bundle_path="/${bundle_path#/}"
+
+          bundle_headers="$(mktemp)"
+          curl -fsSI "http://localhost:4201${bundle_path}" > "$bundle_headers"
+          bundle_cache="$(
+            awk -F': *' 'tolower($1) == "cache-control" { print tolower($2) }' "$bundle_headers" \
+              | tr -d '\r' \
+              | head -n 1
+          )"
+          if [[ "${bundle_cache}" != *immutable* ]]; then
+            echo "Unexpected bundle cache-control: ${bundle_cache:-<missing>}" >&2
+            exit 1
+          fi
+
+          app_config_headers="$(mktemp)"
+          curl -fsSI http://localhost:4201/assets/app-config.js > "$app_config_headers"
+          app_config_cache="$(
+            awk -F': *' 'tolower($1) == "cache-control" { print tolower($2) }' "$app_config_headers" \
+              | tr -d '\r' \
+              | head -n 1
+          )"
+          if [[ "${app_config_cache}" != *no-store* ]]; then
+            echo "Unexpected app-config cache-control: ${app_config_cache:-<missing>}" >&2
+            exit 1
+          fi
+
       - name: Generate E2E owner credentials
         run: |
           set -euo pipefail
@@ -112,6 +149,11 @@ jobs:
           # Keep the PR gate fast and stable: run only the smoke suite here.
           # Full E2E coverage can be run via `npm run e2e` locally or in a separate workflow.
           E2E_BASE_URL=http://localhost:4201 E2E_OWNER_IDENTIFIER="$E2E_OWNER_IDENTIFIER" E2E_OWNER_PASSWORD="$E2E_OWNER_PASSWORD" npm run e2e -- e2e/smoke.spec.ts --workers=1
+
+      - name: Playwright E2E (SEO crawl guard, chromium)
+        run: |
+          cd frontend
+          E2E_BASE_URL=http://localhost:4201 npm run e2e -- e2e/seo-public-routes.spec.ts --workers=1 --project=chromium
 
       - name: Playwright E2E (admin freeze guard, firefox)
         run: |

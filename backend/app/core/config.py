@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 
 import secrets
 
@@ -9,7 +10,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Application settings loaded from environment variables or a .env file."""
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=False)
+    _backend_root = Path(__file__).resolve().parents[2]
+    _backend_env_file = _backend_root / ".env"
+    _default_sqlite_path = _backend_root / "adrianaart.db"
+    _default_sqlite_url = f"sqlite+aiosqlite:///{_default_sqlite_path.as_posix()}"
+
+    model_config = SettingsConfigDict(env_file=str(_backend_env_file), env_file_encoding="utf-8", case_sensitive=False)
 
     app_name: str = "momentstudio API"
     app_version: str = "0.1.0"
@@ -27,7 +33,7 @@ class Settings(BaseSettings):
     # Use a safe, passwordless local default to avoid encouraging credential-less Postgres URLs
     # in source code (security scanners flag these) and to reduce the chance of accidentally
     # connecting to the wrong database when a local `.env` is missing.
-    database_url: str = "sqlite+aiosqlite:///./adrianaart.db"
+    database_url: str = _default_sqlite_url
     db_pool_size: int | None = None
     db_max_overflow: int | None = None
     backup_last_at: str | None = None
@@ -129,6 +135,18 @@ class Settings(BaseSettings):
 
     media_root: str = "uploads"
     private_media_root: str = "private_uploads"
+    media_dam_queue_key: str = "media:jobs:queue"
+    media_dam_trash_retention_days: int = 30
+    media_private_preview_ttl_seconds: int = 600
+    media_dam_worker_heartbeat_prefix: str = "media:workers:heartbeat"
+    media_dam_worker_heartbeat_ttl_seconds: int = 30
+    media_dam_worker_heartbeat_file: str = "/tmp/media-worker-heartbeat.json"
+    media_dam_processing_stale_seconds: int = 600
+    media_dam_retry_max_attempts: int = 5
+    media_dam_retry_sweep_seconds: int = 10
+    media_usage_reconcile_enabled: bool = True
+    media_usage_reconcile_interval_seconds: int = 60 * 60 * 24
+    media_usage_reconcile_batch_size: int = 200
     # Admin uploads (product images, CMS assets, shipping labels) are allowed to be much larger
     # than customer uploads, but should still have a ceiling to avoid accidental disk exhaustion.
     # Set to a large value; we still enforce a ceiling to avoid DoS/disk exhaustion.
@@ -215,6 +233,15 @@ class Settings(BaseSettings):
     # Locker lookup (Sameday/FANbox)
     # In production you should configure official courier credentials.
     # For local development, Overpass (OpenStreetMap) can be used as a best-effort fallback.
+    sameday_mirror_enabled: bool = True
+    sameday_mirror_sync_interval_seconds: int = 60 * 60 * 24 * 30
+    sameday_mirror_stale_after_seconds: int = 60 * 60 * 24 * 30
+    sameday_mirror_fetch_timeout_seconds: int = 30
+    sameday_mirror_max_lockers: int = 20_000
+    sameday_mirror_playwright_enabled: bool = True
+    sameday_mirror_challenge_failure_alert_streak: int = 3
+    sameday_mirror_schema_drift_ratio_drop: float = 0.20
+    sameday_mirror_schema_drift_min_ratio: float = 0.80
     lockers_use_overpass_fallback: bool = True
     sameday_api_base_url: str | None = None
     sameday_api_username: str | None = None

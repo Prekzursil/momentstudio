@@ -37,6 +37,7 @@ export class AnalyticsService {
     this.persistEnabled(this.enabledState());
     if (this.enabledState()) {
       this.startSession();
+      return;
     }
   }
 

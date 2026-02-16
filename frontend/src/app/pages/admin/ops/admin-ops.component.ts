@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { catchError, forkJoin, of } from 'rxjs';
+import { AdminService, MediaTelemetryResponse } from '../../../core/admin.service';
 import {
   OpsService,
   BannerLevel,
@@ -13,7 +14,9 @@ import {
   OpsDiagnosticsRead,
   EmailFailureRead,
   WebhookEventRead,
-  WebhookEventDetail
+  WebhookEventDetail,
+  SamedaySyncRunRead,
+  SamedaySyncStatusRead
 } from '../../../core/ops.service';
 import { appConfig } from '../../../core/app-config';
 import { HealthService } from '../../../core/health.service';
@@ -96,6 +99,171 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
               </p>
               <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ emailFailures24h() }}</p>
               <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">{{ 'adminUi.ops.health.lastHours' | translate: { hours: 24 } }}</p>
+            </div>
+          </div>
+
+          <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20 grid gap-2">
+            <div class="flex items-center justify-between gap-2">
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">DAM telemetry</p>
+              <button
+                type="button"
+                class="rounded border border-slate-300 px-2 py-1 text-[11px] font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200"
+                [disabled]="damTelemetryLoading()"
+                (click)="loadDamTelemetry()"
+              >
+                Refresh
+              </button>
+            </div>
+            <div *ngIf="damTelemetryLoading()" class="text-xs text-slate-500 dark:text-slate-400">Loading DAM telemetry…</div>
+            <div *ngIf="damTelemetryError()" class="text-xs text-rose-700 dark:text-rose-300">{{ damTelemetryError() }}</div>
+            <div *ngIf="damTelemetry() as dam" class="grid gap-2 sm:grid-cols-3 lg:grid-cols-7">
+              <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
+                <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Queue</p>
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ dam.queue_depth }}</p>
+              </div>
+              <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
+                <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Workers</p>
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ dam.online_workers }}</p>
+              </div>
+              <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
+                <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Stale</p>
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ dam.stale_processing_count }}</p>
+              </div>
+              <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
+                <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Oldest queued</p>
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ formatDamAge(dam.oldest_queued_age_seconds) }}</p>
+              </div>
+              <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
+                <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Dead-letter</p>
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ dam.dead_letter_count }}</p>
+              </div>
+              <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
+                <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">SLA breaches</p>
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ dam.sla_breached_count }}</p>
+              </div>
+              <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
+                <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Retry scheduled</p>
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ dam.retry_scheduled_count }}</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20 grid gap-2">
+            <div class="flex items-center justify-between gap-2">
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.ops.samedaySync.title' | translate }}
+              </p>
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  class="rounded border border-slate-300 px-2 py-1 text-[11px] font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200"
+                  [disabled]="samedaySyncLoading() || samedaySyncRunning()"
+                  (click)="loadSamedaySyncStatus()"
+                >
+                  {{ 'adminUi.actions.refresh' | translate }}
+                </button>
+                <button
+                  type="button"
+                  class="rounded border border-indigo-300 bg-indigo-50 px-2 py-1 text-[11px] font-semibold text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-200"
+                  [disabled]="samedaySyncRunning()"
+                  (click)="runSamedaySyncNow()"
+                >
+                  {{
+                    samedaySyncRunning()
+                      ? ('adminUi.ops.samedaySync.running' | translate)
+                      : ('adminUi.ops.samedaySync.runNow' | translate)
+                  }}
+                </button>
+              </div>
+            </div>
+            <div *ngIf="samedaySyncLoading()" class="text-xs text-slate-500 dark:text-slate-400">
+              {{ 'adminUi.ops.samedaySync.loading' | translate }}
+            </div>
+            <div *ngIf="samedaySyncError()" class="text-xs text-rose-700 dark:text-rose-300">{{ samedaySyncError() }}</div>
+            <div *ngIf="samedaySyncStatus() as sync" class="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
+              <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
+                <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.ops.samedaySync.totalLockers' | translate }}
+                </p>
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ sync.total_lockers }}</p>
+              </div>
+              <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
+                <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.ops.samedaySync.stale' | translate }}
+                </p>
+                <p class="text-sm font-semibold" [ngClass]="sync.stale ? 'text-amber-700 dark:text-amber-300' : 'text-emerald-700 dark:text-emerald-300'">
+                  {{
+                    sync.stale
+                      ? ('adminUi.ops.samedaySync.staleYes' | translate)
+                      : ('adminUi.ops.samedaySync.staleNo' | translate)
+                  }}
+                </p>
+              </div>
+              <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
+                <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.ops.samedaySync.lastSuccess' | translate }}
+                </p>
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  {{ sync.last_success_at ? (sync.last_success_at | date: 'short') : '—' }}
+                </p>
+              </div>
+              <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
+                <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.ops.samedaySync.staleAge' | translate }}
+                </p>
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ formatDamAge(sync.stale_age_seconds) }}</p>
+              </div>
+              <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
+                <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.ops.samedaySync.latestRun' | translate }}
+                </p>
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  {{ sync.latest_run?.status || '—' }}
+                </p>
+              </div>
+              <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
+                <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.ops.samedaySync.lastError' | translate }}
+                </p>
+                <p class="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  {{ sync.last_error || '—' }}
+                </p>
+              </div>
+            </div>
+            <div
+              *ngIf="(samedaySyncStatus()?.canary_alert_messages || []).length"
+              class="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100"
+            >
+              <p class="font-semibold">{{ 'adminUi.ops.samedaySync.canaryTitle' | translate }}</p>
+              <ul class="mt-1 list-disc pl-5">
+                <li *ngFor="let msg of samedaySyncStatus()?.canary_alert_messages">{{ msg }}</li>
+              </ul>
+            </div>
+            <div *ngIf="samedaySyncRuns().length" class="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+              <table class="min-w-[720px] w-full text-xs">
+                <thead class="bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                  <tr>
+                    <th class="px-2 py-1 text-left">{{ 'adminUi.ops.samedaySync.table.started' | translate }}</th>
+                    <th class="px-2 py-1 text-left">{{ 'adminUi.ops.samedaySync.table.status' | translate }}</th>
+                    <th class="px-2 py-1 text-left">{{ 'adminUi.ops.samedaySync.table.fetched' | translate }}</th>
+                    <th class="px-2 py-1 text-left">{{ 'adminUi.ops.samedaySync.table.upserted' | translate }}</th>
+                    <th class="px-2 py-1 text-left">{{ 'adminUi.ops.samedaySync.table.deactivated' | translate }}</th>
+                    <th class="px-2 py-1 text-left">{{ 'adminUi.ops.samedaySync.table.failureKind' | translate }}</th>
+                    <th class="px-2 py-1 text-left">{{ 'adminUi.ops.samedaySync.table.schemaDrift' | translate }}</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+                  <tr *ngFor="let run of samedaySyncRuns()">
+                    <td class="px-2 py-1">{{ run.started_at | date: 'short' }}</td>
+                    <td class="px-2 py-1">{{ run.status }}</td>
+                    <td class="px-2 py-1">{{ run.fetched_count }}</td>
+                    <td class="px-2 py-1">{{ run.upserted_count }}</td>
+                    <td class="px-2 py-1">{{ run.deactivated_count }}</td>
+                    <td class="px-2 py-1">{{ run.failure_kind || '—' }}</td>
+                    <td class="px-2 py-1">{{ run.schema_drift_detected ? ('adminUi.ops.samedaySync.staleYes' | translate) : ('adminUi.ops.samedaySync.staleNo' | translate) }}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
 
@@ -766,6 +934,14 @@ export class AdminOpsComponent implements OnInit {
   diagnosticsLoading = signal(true);
   diagnosticsError = signal<string | null>(null);
   diagnostics = signal<OpsDiagnosticsRead | null>(null);
+  damTelemetryLoading = signal(false);
+  damTelemetryError = signal<string | null>(null);
+  damTelemetry = signal<MediaTelemetryResponse | null>(null);
+  samedaySyncLoading = signal(false);
+  samedaySyncRunning = signal(false);
+  samedaySyncError = signal<string | null>(null);
+  samedaySyncStatus = signal<SamedaySyncStatusRead | null>(null);
+  samedaySyncRuns = signal<SamedaySyncRunRead[]>([]);
 
   bannersLoading = signal(true);
   bannersError = signal<string | null>(null);
@@ -808,6 +984,7 @@ export class AdminOpsComponent implements OnInit {
   webhookRetrying = signal<string | null>(null);
 
   constructor(
+    private adminService: AdminService,
     private health: HealthService,
     private ops: OpsService,
     private toast: ToastService,
@@ -819,6 +996,8 @@ export class AdminOpsComponent implements OnInit {
     this.resetBannerForm();
     this.loadHealthDashboard();
     this.loadDiagnostics();
+    this.loadDamTelemetry();
+    this.loadSamedaySyncStatus();
     this.loadBanners();
     this.loadShippingMethods();
     this.applyEmailFailuresDeepLink();
@@ -889,6 +1068,69 @@ export class AdminOpsComponent implements OnInit {
         this.diagnosticsLoading.set(false);
       }
     });
+  }
+
+  loadDamTelemetry(): void {
+    this.damTelemetryLoading.set(true);
+    this.damTelemetryError.set(null);
+    this.adminService.getMediaTelemetry().subscribe({
+      next: (res) => {
+        this.damTelemetry.set(res);
+        this.damTelemetryLoading.set(false);
+      },
+      error: () => {
+        this.damTelemetryError.set('Failed to load DAM telemetry.');
+        this.damTelemetryLoading.set(false);
+      }
+    });
+  }
+
+  loadSamedaySyncStatus(): void {
+    this.samedaySyncLoading.set(true);
+    this.samedaySyncError.set(null);
+    forkJoin({
+      status: this.ops.getSamedaySyncStatus().pipe(catchError(() => of(null))),
+      runs: this.ops.listSamedaySyncRuns({ page: 1, limit: 8 }).pipe(catchError(() => of(null)))
+    }).subscribe({
+      next: (res) => {
+        this.samedaySyncStatus.set((res.status as SamedaySyncStatusRead | null) ?? null);
+        this.samedaySyncRuns.set((res.runs as any)?.items || []);
+        if (!res.status || !res.runs) {
+          this.samedaySyncError.set(this.translate.instant('adminUi.ops.samedaySync.errors.load'));
+        }
+        this.samedaySyncLoading.set(false);
+      },
+      error: () => {
+        this.samedaySyncError.set(this.translate.instant('adminUi.ops.samedaySync.errors.load'));
+        this.samedaySyncLoading.set(false);
+      }
+    });
+  }
+
+  runSamedaySyncNow(): void {
+    if (this.samedaySyncRunning()) return;
+    this.samedaySyncRunning.set(true);
+    this.samedaySyncError.set(null);
+    this.ops.runSamedaySyncNow().subscribe({
+      next: () => {
+        this.toast.success(this.translate.instant('adminUi.ops.samedaySync.success.started'));
+        this.samedaySyncRunning.set(false);
+        this.loadSamedaySyncStatus();
+      },
+      error: (err) => {
+        this.samedaySyncRunning.set(false);
+        const detail = err?.error?.detail || this.translate.instant('adminUi.ops.samedaySync.errors.run');
+        this.samedaySyncError.set(String(detail));
+        this.toast.error(String(detail));
+      }
+    });
+  }
+
+  formatDamAge(ageSeconds?: number | null): string {
+    if (ageSeconds == null) return 'n/a';
+    if (ageSeconds < 60) return `${ageSeconds}s`;
+    if (ageSeconds < 3600) return `${Math.floor(ageSeconds / 60)}m`;
+    return `${Math.floor(ageSeconds / 3600)}h`;
   }
 
   diagnosticsBadgeClass(status: string): string {

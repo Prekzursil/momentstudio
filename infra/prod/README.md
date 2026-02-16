@@ -5,6 +5,7 @@ This folder contains a production-oriented Docker Compose stack for **momentstud
 - Caddy (TLS termination, reverse proxy)
 - Frontend (Angular build served by nginx)
 - Backend (FastAPI + Alembic migrations at startup)
+- Media worker (Redis-backed DAM job processor)
 - Postgres
 - Redis (shared rate limiting/caches; recommended for multi-replica)
 
@@ -46,6 +47,12 @@ cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env
 ```
 
+Important:
+
+- The local profile tooling (`scripts/env/switch.sh`, `make env-dev`, `make env-prod`) is intended for local development machines.
+- Production deployment in this folder continues to use explicit VPS-side `backend/.env` and `frontend/.env` files.
+- Do not sync local development profile files (`*.development.local`) to the VPS.
+
 Edit:
 
 - `infra/prod/.env`
@@ -73,7 +80,9 @@ Notes:
 - `deploy.sh` runs `docker compose up -d --build`. It **does not wipe** your database or uploads (volumes are preserved).
 - After a VPS reboot, the stack starts automatically (`restart: unless-stopped`). You usually **do not** need to run `deploy.sh` again.
 - By default, `deploy.sh` exports `APP_VERSION=$(git rev-parse --short HEAD)` before recreating containers so backend/frontend diagnostics show the deployed revision.
+- `deploy.sh` waits for `media-worker` heartbeat health before running post-sync checks. If the worker is unhealthy, deploy exits non-zero and prints worker logs.
 - `deploy.sh` runs `infra/prod/verify-live.sh` after startup. Set `RUN_POST_SYNC_VERIFY=0` to skip that step.
+- `deploy.sh` can print a Search Console URL Inspection checklist for key URLs (home/shop/blog/product). Set `RUN_GSC_INDEXING_CHECKLIST=0` to skip it.
 
 Useful helpers:
 
@@ -83,6 +92,13 @@ Useful helpers:
 - View logs: `./infra/prod/logs.sh` (optionally pass service names)
 - List services: `./infra/prod/ps.sh`
 - Verify live endpoints/headers manually: `./infra/prod/verify-live.sh`
+- Print Search Console indexing checklist manually: `./infra/prod/request-indexing-checklist.sh`
+
+Sameday mirror post-deploy check:
+
+1. Open `Admin -> Ops` (`/admin/ops`).
+2. Confirm Sameday mirror status is healthy (`latest run = success`, locker count > 0, stale = false).
+3. If stale/error is shown, run `Run sync now` from the same card and re-check run history.
 
 View logs manually:
 
@@ -144,6 +160,28 @@ Restore from a backup:
 ```bash
 ./infra/prod/restore.sh infra/prod/backups/backup-<timestamp>.tar.gz
 ```
+
+### DAM local storage snapshot policy (local-only, no cloud/object storage)
+
+The DAM stack is local-volume only. Keep these subpaths on the same persistent volume:
+
+- `uploads/originals/`
+- `uploads/variants/`
+- `uploads/previews/`
+- `uploads/trash/`
+
+Recommended policy:
+
+- daily incremental snapshot
+- weekly full snapshot
+- retention aligned with DAM trash retention (`30 days` by default)
+
+Restore drill (monthly):
+
+1. Restore latest DB + uploads archive to staging.
+2. Verify `/api/v1/content/admin/media/assets` listing and random sample renders from `/media/*`.
+3. Verify trash/restore/purge actions on staging.
+4. Record restore duration and any gaps in ops notes.
 
 ### One-time migration: local dev → VPS
 

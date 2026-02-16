@@ -6,9 +6,12 @@ from math import asin, cos, radians, sin, sqrt
 from typing import Final
 
 import httpx
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.db.session import SessionLocal
 from app.schemas.shipping import LockerProvider, LockerRead
+from app.services import sameday_easybox_mirror
 
 
 _OVERPASS_URL: Final[str] = "https://overpass-api.de/api/interpreter"
@@ -405,15 +408,48 @@ async def list_lockers(
     radius_km: float = 10.0,
     limit: int = 60,
     force_refresh: bool = False,
+    session: AsyncSession | None = None,
 ) -> list[LockerRead]:
     now = datetime.now(timezone.utc)
-    source = "official" if ((provider == LockerProvider.sameday and _sameday_configured()) or (provider == LockerProvider.fan_courier and _fan_configured())) else "overpass"
+    source = (
+        "mirror"
+        if provider == LockerProvider.sameday and bool(getattr(settings, "sameday_mirror_enabled", True))
+        else (
+            "official"
+            if (
+                (provider == LockerProvider.sameday and _sameday_configured())
+                or (provider == LockerProvider.fan_courier and _fan_configured())
+            )
+            else "overpass"
+        )
+    )
     key = f"{provider}:{source}:{_round_coord(lat)}:{_round_coord(lng)}:{int(radius_km)}:{int(limit)}"
     cached = _cache.get(key)
     if not force_refresh and cached and cached.expires_at > now:
         return cached.items
 
     try:
+        if source == "mirror":
+            async def _query(mirror_session: AsyncSession) -> list[LockerRead]:
+                try:
+                    return await sameday_easybox_mirror.list_nearby_lockers(
+                        mirror_session,
+                        lat=float(lat),
+                        lng=float(lng),
+                        radius_km=radius_km,
+                        limit=limit,
+                    )
+                except RuntimeError as exc:
+                    raise LockersNotConfiguredError(str(exc)) from exc
+
+            if session is not None:
+                items = await _query(session)
+            else:
+                async with SessionLocal() as mirror_session:
+                    items = await _query(mirror_session)
+            _cache[key] = _CacheEntry(expires_at=now + _CACHE_TTL, items=items)
+            return items
+
         if source == "official":
             points = await _get_all_lockers(provider)
             items = _select_nearby_lockers(points, lat=float(lat), lng=float(lng), radius_km=radius_km, limit=limit, provider=provider)

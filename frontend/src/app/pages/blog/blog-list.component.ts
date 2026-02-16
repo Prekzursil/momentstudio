@@ -13,6 +13,8 @@ import { ButtonComponent } from '../../shared/button.component';
 import { CardComponent } from '../../shared/card.component';
 import { ContainerComponent } from '../../layout/container.component';
 import { SkeletonComponent } from '../../shared/skeleton.component';
+import { SeoHeadLinksService } from '../../core/seo-head-links.service';
+import { StructuredDataService } from '../../core/structured-data.service';
 
 @Component({
   selector: 'app-blog-list',
@@ -206,11 +208,10 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
             <img
               [src]="heroPost.cover_image_url"
               [alt]="heroPost.title"
-              class="absolute inset-0 h-full w-full object-cover transition-opacity duration-300"
+              class="absolute inset-0 h-full w-full"
+              [ngClass]="coverImageClass(heroPost.cover_fit)"
               [style.object-position]="focalPosition(heroPost.cover_focal_x, heroPost.cover_focal_y)"
-              [class.opacity-0]="!isImageLoaded(heroPost.cover_image_url)"
-              (load)="markImageLoaded(heroPost.cover_image_url)"
-              loading="lazy"
+              loading="eager"
               decoding="async"
             />
           </div>
@@ -291,10 +292,9 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
                       <img
                         [src]="post.cover_image_url"
                         [alt]="post.title"
-                        class="relative w-full aspect-[16/9] object-cover transition-opacity duration-300"
+                        class="relative w-full aspect-[16/9]"
+                        [ngClass]="coverImageClass(post.cover_fit)"
                         [style.object-position]="focalPosition(post.cover_focal_x, post.cover_focal_y)"
-                        [class.opacity-0]="!isImageLoaded(post.cover_image_url)"
-                        (load)="markImageLoaded(post.cover_image_url)"
                         loading="lazy"
                         decoding="async"
                       />
@@ -393,13 +393,11 @@ export class BlogListComponent implements OnInit, OnDestroy {
   tagQuery = '';
   seriesQuery = '';
   sort: BlogSort = 'newest';
-  private readonly loadedImages = new Set<string>();
   private readonly failedThumbs = new Set<string>();
   private loadSeq = 0;
 
   private sub?: Subscription;
   private langSub?: Subscription;
-  private canonicalEl?: HTMLLinkElement;
   private document: Document = inject(DOCUMENT);
 
   constructor(
@@ -409,23 +407,26 @@ export class BlogListComponent implements OnInit, OnDestroy {
     private storefrontAdminMode: StorefrontAdminModeService,
     private translate: TranslateService,
     private title: Title,
-    private meta: Meta
+    private meta: Meta,
+    private seoHeadLinks: SeoHeadLinksService,
+    private structuredData: StructuredDataService
   ) {}
 
   ngOnInit(): void {
+    this.loadFromRoute(this.route.snapshot.params || {}, this.route.snapshot.queryParams || {});
     this.sub = combineLatest([this.route.params, this.route.queryParams]).subscribe(([routeParams, queryParams]) =>
       this.loadFromRoute(routeParams, queryParams)
     );
     this.langSub = this.translate.onLangChange.subscribe(() => this.load());
-    this.setMetaTags();
   }
 
   ngOnDestroy(): void {
     this.sub?.unsubscribe();
     this.langSub?.unsubscribe();
+    this.structuredData.clearRouteSchemas();
   }
 
-  private setMetaTags(): void {
+  private setMetaTags(page: number): void {
     const title = this.routeSeries
       ? this.translate.instant('blog.seriesMetaTitle', { series: this.routeSeries })
       : this.routeTag
@@ -440,6 +441,26 @@ export class BlogListComponent implements OnInit, OnDestroy {
     this.meta.updateTag({ name: 'description', content: description });
     this.meta.updateTag({ property: 'og:title', content: title });
     this.meta.updateTag({ property: 'og:description', content: description });
+
+    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
+    const safePage = Number.isFinite(page) && page > 1 ? Math.floor(page) : undefined;
+    const path = this.routeSeries
+      ? `/blog/series/${encodeURIComponent(this.routeSeries)}`
+      : this.routeTag
+        ? `/blog/tag/${encodeURIComponent(this.routeTag)}`
+        : '/blog';
+    const canonical = this.seoHeadLinks.setLocalizedCanonical(path, lang, { lang, page: safePage });
+    this.meta.updateTag({ property: 'og:url', content: canonical });
+    this.structuredData.setRouteSchemas([
+      {
+        '@context': 'https://schema.org',
+        '@type': 'CollectionPage',
+        name: title,
+        description,
+        url: canonical,
+        inLanguage: lang
+      }
+    ]);
   }
 
   private loadFromRoute(routeParams: Params, queryParams: Params): void {
@@ -498,7 +519,7 @@ export class BlogListComponent implements OnInit, OnDestroy {
     this.hasError.set(false);
     this.heroPost = null;
     this.gridPosts = [];
-    this.setCanonical(page);
+    this.setMetaTags(page);
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     this.blog
       .listPosts({
@@ -526,7 +547,7 @@ export class BlogListComponent implements OnInit, OnDestroy {
         this.pageMeta = resp.meta;
         this.loading.set(false);
         this.hasError.set(false);
-        this.setMetaTags();
+        this.setMetaTags(resp.meta.page);
       },
       error: () => {
         if (loadSeq !== this.loadSeq) return;
@@ -536,7 +557,7 @@ export class BlogListComponent implements OnInit, OnDestroy {
         this.pageMeta = null;
         this.loading.set(false);
         this.hasError.set(true);
-        this.setMetaTags();
+        this.setMetaTags(page);
       }
     });
   }
@@ -631,36 +652,6 @@ export class BlogListComponent implements OnInit, OnDestroy {
     this.blog.prefetchPost(cleaned, lang);
   }
 
-  private setCanonical(page: number): void {
-    if (typeof window === 'undefined' || !this.document) return;
-    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
-    const qs = new URLSearchParams({ lang });
-    if (page > 1) qs.set('page', String(page));
-    const q = this.searchQuery.trim();
-    const tag = this.tagQuery.trim();
-    const series = this.seriesQuery.trim();
-    const sort = this.sort;
-    if (q) qs.set('q', q);
-    if (!this.routeTag && !this.routeSeries && tag) qs.set('tag', tag);
-    if (!this.routeTag && !this.routeSeries && series) qs.set('series', series);
-    if (sort && sort !== 'newest') qs.set('sort', sort);
-    const base = this.routeSeries
-      ? `/blog/series/${encodeURIComponent(this.routeSeries)}`
-      : this.routeTag
-        ? `/blog/tag/${encodeURIComponent(this.routeTag)}`
-        : '/blog';
-    const href = `${window.location.origin}${base}?${qs.toString()}`;
-    let link: HTMLLinkElement | null = this.document.querySelector('link[rel="canonical"]');
-    if (!link) {
-      link = this.document.createElement('link');
-      link.setAttribute('rel', 'canonical');
-      this.document.head.appendChild(link);
-    }
-    link.setAttribute('href', href);
-    this.canonicalEl = link;
-    this.meta.updateTag({ property: 'og:url', content: href });
-  }
-
   private normalizeSort(value: unknown): BlogSort | null {
     if (typeof value !== 'string') return null;
     const v = value.trim();
@@ -680,14 +671,8 @@ export class BlogListComponent implements OnInit, OnDestroy {
     w.localStorage.setItem('blog_sort', value);
   }
 
-  markImageLoaded(src: string | null | undefined): void {
-    if (!src) return;
-    this.loadedImages.add(src);
-  }
-
-  isImageLoaded(src: string | null | undefined): boolean {
-    if (!src) return true;
-    return this.loadedImages.has(src);
+  coverImageClass(fit: string | null | undefined): string {
+    return fit === 'contain' ? 'object-contain bg-slate-50 dark:bg-slate-900' : 'object-cover';
   }
 
   thumbUrl(src: string | null | undefined): string | null {

@@ -9,6 +9,24 @@ import { SiteNavigationLink, SiteNavigationService } from '../core/site-navigati
 import { SiteSocialService, SiteSocialLink } from '../core/site-social.service';
 import { ImgFallbackDirective } from '../shared/img-fallback.directive';
 
+type FooterSocialPage = {
+  label: string;
+  url: string;
+  thumbnailUrl?: string | null;
+  initials: string;
+  avatarClass: string;
+};
+
+const DEFAULT_INSTAGRAM_PAGES: SiteSocialLink[] = [
+  { label: 'Moments in Clay - Studio', url: 'https://www.instagram.com/moments_in_clay_studio/' },
+  { label: 'adrianaartizanat', url: 'https://www.instagram.com/adrianaartizanat/' },
+];
+
+const DEFAULT_FACEBOOK_PAGES: SiteSocialLink[] = [
+  { label: 'Moments in Clay - Studio', url: 'https://www.facebook.com/moments.in.clay.studio' },
+  { label: 'adrianaartizanat', url: 'https://www.facebook.com/adrianaartizanat' },
+];
+
 @Component({
   selector: 'app-footer',
   standalone: true,
@@ -22,166 +40,202 @@ import { ImgFallbackDirective } from '../shared/img-fallback.directive';
             <p class="text-slate-500 dark:text-slate-400">{{ 'app.tagline' | translate }}</p>
           </div>
 
-          <div class="flex flex-wrap items-center gap-4">
-            <div class="relative" data-footer-dropdown>
-              <button
-                type="button"
-                class="inline-flex items-center gap-1 font-medium hover:text-slate-900 dark:hover:text-white"
-                (click)="toggleMenu('instagram')"
-                [attr.aria-expanded]="openMenu === 'instagram'"
-                aria-haspopup="menu"
-              >
-                {{ 'footer.instagram' | translate }}
-                <span class="text-xs text-slate-500 dark:text-slate-400">▴</span>
-              </button>
-              <div
-                *ngIf="openMenu === 'instagram'"
-                class="absolute bottom-full left-0 mb-2 w-72 rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden dark:border-slate-700 dark:bg-slate-900"
-                role="menu"
-              >
-                <a
-                  *ngFor="let page of instagramPages"
-                  class="flex items-center gap-3 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
-                  [href]="page.url"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  (click)="closeMenu()"
-                  role="menuitem"
-                >
-                  <ng-container *ngIf="page.thumbnailUrl; else instagramAvatar">
-                    <img
-                      [src]="page.thumbnailUrl"
-                      [alt]="page.label"
-                      class="h-8 w-8 rounded-full border border-slate-200 object-cover dark:border-slate-700"
-                      appImgFallback="assets/placeholder/avatar-placeholder.svg"
-                      loading="lazy"
-                    />
-                  </ng-container>
-                  <ng-template #instagramAvatar>
-                    <span class="h-8 w-8 rounded-full grid place-items-center text-xs font-semibold text-white" [ngClass]="page.avatarClass">
-                      {{ page.initials }}
-                    </span>
-                  </ng-template>
-                  <span class="truncate">{{ page.label }}</span>
-                </a>
+          <div class="min-h-[2.5rem]">
+            <ng-container *ngIf="socialLoading; else socialLinksReady">
+              <div class="flex flex-wrap items-center gap-3" data-footer-social-loading="true">
+                <span class="h-5 w-24 rounded-full bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
+                <span class="h-5 w-24 rounded-full bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
+                <span class="h-5 w-16 rounded-full bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
               </div>
-            </div>
+            </ng-container>
+            <ng-template #socialLinksReady>
+              <div class="flex flex-wrap items-center gap-4">
+                <div class="relative" data-footer-dropdown>
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1 font-medium hover:text-slate-900 dark:hover:text-white"
+                    (click)="toggleMenu('instagram')"
+                    [attr.aria-expanded]="openMenu === 'instagram'"
+                    aria-haspopup="menu"
+                  >
+                    {{ 'footer.instagram' | translate }}
+                    <span class="text-xs text-slate-500 dark:text-slate-400">▴</span>
+                  </button>
+                  <div
+                    *ngIf="openMenu === 'instagram'"
+                    class="absolute bottom-full left-0 mb-2 w-72 rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden dark:border-slate-700 dark:bg-slate-900"
+                    role="menu"
+                  >
+                    <a
+                      *ngFor="let page of instagramPages"
+                      class="flex items-center gap-3 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+                      [href]="page.url"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      (click)="closeMenu()"
+                      role="menuitem"
+                    >
+                      <ng-container *ngIf="page.thumbnailUrl; else instagramAvatar">
+                        <img
+                          [src]="page.thumbnailUrl"
+                          [alt]="page.label"
+                          class="h-8 w-8 rounded-full border border-slate-200 object-cover dark:border-slate-700"
+                          appImgFallback="assets/placeholder/avatar-placeholder.svg"
+                          loading="lazy"
+                        />
+                      </ng-container>
+                      <ng-template #instagramAvatar>
+                        <span class="h-8 w-8 rounded-full grid place-items-center text-xs font-semibold text-white" [ngClass]="page.avatarClass">
+                          {{ page.initials }}
+                        </span>
+                      </ng-template>
+                      <span class="truncate">{{ page.label }}</span>
+                    </a>
+                  </div>
+                </div>
 
-            <div class="relative" data-footer-dropdown>
-              <button
-                type="button"
-                class="inline-flex items-center gap-1 font-medium hover:text-slate-900 dark:hover:text-white"
-                (click)="toggleMenu('facebook')"
-                [attr.aria-expanded]="openMenu === 'facebook'"
-                aria-haspopup="menu"
-              >
-                {{ 'footer.facebook' | translate }}
-                <span class="text-xs text-slate-500 dark:text-slate-400">▴</span>
-              </button>
-              <div
-                *ngIf="openMenu === 'facebook'"
-                class="absolute bottom-full left-0 mb-2 w-72 rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden dark:border-slate-700 dark:bg-slate-900"
-                role="menu"
-              >
-                <a
-                  *ngFor="let page of facebookPages"
-                  class="flex items-center gap-3 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
-                  [href]="page.url"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  (click)="closeMenu()"
-                  role="menuitem"
-                >
-                  <ng-container *ngIf="page.thumbnailUrl; else facebookAvatar">
-                    <img
-                      [src]="page.thumbnailUrl"
-                      [alt]="page.label"
-                      class="h-8 w-8 rounded-full border border-slate-200 object-cover dark:border-slate-700"
-                      appImgFallback="assets/placeholder/avatar-placeholder.svg"
-                      loading="lazy"
-                    />
-                  </ng-container>
-                  <ng-template #facebookAvatar>
-                    <span class="h-8 w-8 rounded-full grid place-items-center text-xs font-semibold text-white" [ngClass]="page.avatarClass">
-                      {{ page.initials }}
-                    </span>
-                  </ng-template>
-                  <span class="truncate">{{ page.label }}</span>
-                </a>
+                <div class="relative" data-footer-dropdown>
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1 font-medium hover:text-slate-900 dark:hover:text-white"
+                    (click)="toggleMenu('facebook')"
+                    [attr.aria-expanded]="openMenu === 'facebook'"
+                    aria-haspopup="menu"
+                  >
+                    {{ 'footer.facebook' | translate }}
+                    <span class="text-xs text-slate-500 dark:text-slate-400">▴</span>
+                  </button>
+                  <div
+                    *ngIf="openMenu === 'facebook'"
+                    class="absolute bottom-full left-0 mb-2 w-72 rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden dark:border-slate-700 dark:bg-slate-900"
+                    role="menu"
+                  >
+                    <a
+                      *ngFor="let page of facebookPages"
+                      class="flex items-center gap-3 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+                      [href]="page.url"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      (click)="closeMenu()"
+                      role="menuitem"
+                    >
+                      <ng-container *ngIf="page.thumbnailUrl; else facebookAvatar">
+                        <img
+                          [src]="page.thumbnailUrl"
+                          [alt]="page.label"
+                          class="h-8 w-8 rounded-full border border-slate-200 object-cover dark:border-slate-700"
+                          appImgFallback="assets/placeholder/avatar-placeholder.svg"
+                          loading="lazy"
+                        />
+                      </ng-container>
+                      <ng-template #facebookAvatar>
+                        <span class="h-8 w-8 rounded-full grid place-items-center text-xs font-semibold text-white" [ngClass]="page.avatarClass">
+                          {{ page.initials }}
+                        </span>
+                      </ng-template>
+                      <span class="truncate">{{ page.label }}</span>
+                    </a>
+                  </div>
+                </div>
+
+                <a class="font-medium hover:text-slate-900 dark:hover:text-white" routerLink="/contact">{{ 'footer.contact' | translate }}</a>
               </div>
-            </div>
-
-            <a class="font-medium hover:text-slate-900 dark:hover:text-white" routerLink="/contact">{{ 'footer.contact' | translate }}</a>
+            </ng-template>
           </div>
         </div>
 
-        <div class="grid gap-2 content-start">
+        <div class="grid gap-2 content-start min-h-[9rem]" data-footer-nav-shell="handcrafted">
           <p class="font-semibold text-slate-900 dark:text-slate-100">{{ 'footer.handcraftedArt' | translate }}</p>
-          <ng-container *ngIf="footerHandcraftedLinks?.length; else defaultHandcraftedLinks">
-            <ng-container *ngFor="let link of footerHandcraftedLinks; trackBy: trackSiteNavLink">
-              <a
-                *ngIf="!isExternalLink(link.url)"
-                class="hover:text-slate-900 dark:hover:text-white"
-                [routerLink]="link.url"
-              >
-                {{ navLabel(link) }}
-              </a>
-              <a
-                *ngIf="isExternalLink(link.url)"
-                class="hover:text-slate-900 dark:hover:text-white"
-                [href]="link.url"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {{ navLabel(link) }}
-              </a>
-            </ng-container>
+          <ng-container *ngIf="navLoading; else handcraftedLinksReady">
+            <span class="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800 animate-pulse" data-footer-nav-loading="handcrafted"></span>
+            <span class="h-4 w-24 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
+            <span class="h-4 w-24 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
+            <span class="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
           </ng-container>
-          <ng-template #defaultHandcraftedLinks>
-            <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/shop">{{ 'nav.shop' | translate }}</a>
-            <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/about">{{ 'nav.about' | translate }}</a>
-            <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/contact">{{ 'nav.contact' | translate }}</a>
-            <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/pages/terms">{{ 'nav.terms' | translate }}</a>
+          <ng-template #handcraftedLinksReady>
+            <ng-container *ngIf="footerHandcraftedLinks?.length; else defaultHandcraftedLinks">
+              <ng-container *ngFor="let link of footerHandcraftedLinks; trackBy: trackSiteNavLink">
+                <a
+                  *ngIf="!isExternalLink(link.url)"
+                  class="hover:text-slate-900 dark:hover:text-white"
+                  [routerLink]="link.url"
+                >
+                  {{ navLabel(link) }}
+                </a>
+                <a
+                  *ngIf="isExternalLink(link.url)"
+                  class="hover:text-slate-900 dark:hover:text-white"
+                  [href]="link.url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {{ navLabel(link) }}
+                </a>
+              </ng-container>
+            </ng-container>
+            <ng-template #defaultHandcraftedLinks>
+              <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/shop">{{ 'nav.shop' | translate }}</a>
+              <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/about">{{ 'nav.about' | translate }}</a>
+              <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/contact">{{ 'nav.contact' | translate }}</a>
+              <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/pages/terms">{{ 'nav.terms' | translate }}</a>
+            </ng-template>
           </ng-template>
         </div>
 
-        <div class="grid gap-2 content-start">
+        <div class="grid gap-2 content-start min-h-[9rem]" data-footer-nav-shell="legal">
           <p class="font-semibold text-slate-900 dark:text-slate-100">{{ 'footer.legal' | translate }}</p>
-          <ng-container *ngIf="footerLegalLinks?.length; else defaultLegalLinks">
-            <ng-container *ngFor="let link of footerLegalLinks; trackBy: trackSiteNavLink">
-              <a
-                *ngIf="!isExternalLink(link.url)"
-                class="hover:text-slate-900 dark:hover:text-white"
-                [routerLink]="link.url"
-              >
-                {{ navLabel(link) }}
-              </a>
-              <a
-                *ngIf="isExternalLink(link.url)"
-                class="hover:text-slate-900 dark:hover:text-white"
-                [href]="link.url"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {{ navLabel(link) }}
-              </a>
-            </ng-container>
+          <ng-container *ngIf="navLoading; else legalLinksReady">
+            <span class="h-4 w-24 rounded bg-slate-200 dark:bg-slate-800 animate-pulse" data-footer-nav-loading="legal"></span>
+            <span class="h-4 w-36 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
+            <span class="h-4 w-20 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
           </ng-container>
-          <ng-template #defaultLegalLinks>
-            <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/pages/terms">{{ 'nav.terms' | translate }}</a>
-            <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/pages/privacy-policy">{{ 'footer.privacyPolicy' | translate }}</a>
-            <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/pages/anpc">{{ 'footer.anpc' | translate }}</a>
+          <ng-template #legalLinksReady>
+            <ng-container *ngIf="footerLegalLinks?.length; else defaultLegalLinks">
+              <ng-container *ngFor="let link of footerLegalLinks; trackBy: trackSiteNavLink">
+                <a
+                  *ngIf="!isExternalLink(link.url)"
+                  class="hover:text-slate-900 dark:hover:text-white"
+                  [routerLink]="link.url"
+                >
+                  {{ navLabel(link) }}
+                </a>
+                <a
+                  *ngIf="isExternalLink(link.url)"
+                  class="hover:text-slate-900 dark:hover:text-white"
+                  [href]="link.url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {{ navLabel(link) }}
+                </a>
+              </ng-container>
+            </ng-container>
+            <ng-template #defaultLegalLinks>
+              <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/pages/terms">{{ 'nav.terms' | translate }}</a>
+              <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/pages/privacy-policy">{{ 'footer.privacyPolicy' | translate }}</a>
+              <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/pages/anpc">{{ 'footer.anpc' | translate }}</a>
+            </ng-template>
           </ng-template>
         </div>
 
-        <div class="grid gap-2 content-start">
+        <div class="grid gap-2 content-start min-h-[10.5rem]" data-footer-company-shell>
           <p class="font-semibold text-slate-900 dark:text-slate-100">{{ 'footer.companyInfo' | translate }}</p>
-          <p *ngIf="companyInfo.name" class="font-medium text-slate-800 dark:text-slate-100">{{ companyInfo.name }}</p>
-          <p *ngIf="companyInfo.registrationNumber">{{ 'footer.registrationNumber' | translate }}: {{ companyInfo.registrationNumber }}</p>
-          <p *ngIf="companyInfo.cui">{{ 'footer.cui' | translate }}: {{ companyInfo.cui }}</p>
-          <p *ngIf="companyInfo.address">{{ 'footer.address' | translate }}: {{ companyInfo.address }}</p>
-          <p *ngIf="companyInfo.phone">{{ 'footer.phone' | translate }}: {{ companyInfo.phone }}</p>
-          <p *ngIf="companyInfo.email">{{ 'footer.email' | translate }}: {{ companyInfo.email }}</p>
+          <ng-container *ngIf="companyLoading; else companyInfoReady">
+            <span class="h-4 w-48 rounded bg-slate-200 dark:bg-slate-800 animate-pulse" data-footer-company-loading="true"></span>
+            <span class="h-4 w-36 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
+            <span class="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
+            <span class="h-4 w-56 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
+            <span class="h-4 w-32 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
+            <span class="h-4 w-40 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
+          </ng-container>
+          <ng-template #companyInfoReady>
+            <p *ngIf="companyInfo.name" class="font-medium text-slate-800 dark:text-slate-100">{{ companyInfo.name }}</p>
+            <p *ngIf="companyInfo.registrationNumber">{{ 'footer.registrationNumber' | translate }}: {{ companyInfo.registrationNumber }}</p>
+            <p *ngIf="companyInfo.cui">{{ 'footer.cui' | translate }}: {{ companyInfo.cui }}</p>
+            <p *ngIf="companyInfo.address">{{ 'footer.address' | translate }}: {{ companyInfo.address }}</p>
+            <p *ngIf="companyInfo.phone">{{ 'footer.phone' | translate }}: {{ companyInfo.phone }}</p>
+            <p *ngIf="companyInfo.email">{{ 'footer.email' | translate }}: {{ companyInfo.email }}</p>
+          </ng-template>
         </div>
 
         <div class="lg:col-span-4 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-200 pt-6 dark:border-slate-800">
@@ -218,9 +272,12 @@ import { ImgFallbackDirective } from '../shared/img-fallback.directive';
 })
 export class FooterComponent implements OnInit, OnDestroy {
   openMenu: 'instagram' | 'facebook' | null = null;
+  socialLoading = true;
+  companyLoading = true;
+  navLoading = true;
 
-  instagramPages: Array<{ label: string; url: string; thumbnailUrl?: string | null; initials: string; avatarClass: string }> = [];
-  facebookPages: Array<{ label: string; url: string; thumbnailUrl?: string | null; initials: string; avatarClass: string }> = [];
+  instagramPages: FooterSocialPage[] = this.toFooterPages('instagram', DEFAULT_INSTAGRAM_PAGES);
+  facebookPages: FooterSocialPage[] = this.toFooterPages('facebook', DEFAULT_FACEBOOK_PAGES);
   footerHandcraftedLinks: SiteNavigationLink[] | null = null;
   footerLegalLinks: SiteNavigationLink[] | null = null;
   companyInfo: SiteCompanyInfo = {
@@ -245,16 +302,48 @@ export class FooterComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    this.socialSub = this.social.get().subscribe((data) => {
-      this.instagramPages = this.toFooterPages('instagram', data.instagramPages);
-      this.facebookPages = this.toFooterPages('facebook', data.facebookPages);
+    this.socialSub = this.social.get().subscribe({
+      next: (data) => {
+        const instagram = data.instagramPages?.length ? data.instagramPages : DEFAULT_INSTAGRAM_PAGES;
+        const facebook = data.facebookPages?.length ? data.facebookPages : DEFAULT_FACEBOOK_PAGES;
+        this.deferStateUpdate(() => {
+          this.instagramPages = this.toFooterPages('instagram', instagram);
+          this.facebookPages = this.toFooterPages('facebook', facebook);
+          this.socialLoading = false;
+        });
+      },
+      error: () => {
+        this.deferStateUpdate(() => {
+          this.socialLoading = false;
+        });
+      }
     });
-    this.companySub = this.company.get().subscribe((info) => {
-      this.companyInfo = info;
+    this.companySub = this.company.get().subscribe({
+      next: (info) => {
+        this.deferStateUpdate(() => {
+          this.companyInfo = info;
+          this.companyLoading = false;
+        });
+      },
+      error: () => {
+        this.deferStateUpdate(() => {
+          this.companyLoading = false;
+        });
+      }
     });
-    this.navSub = this.navigation.get().subscribe((data) => {
-      this.footerHandcraftedLinks = data?.footerHandcraftedLinks?.length ? data.footerHandcraftedLinks : null;
-      this.footerLegalLinks = data?.footerLegalLinks?.length ? data.footerLegalLinks : null;
+    this.navSub = this.navigation.get().subscribe({
+      next: (data) => {
+        this.deferStateUpdate(() => {
+          this.footerHandcraftedLinks = data?.footerHandcraftedLinks?.length ? data.footerHandcraftedLinks : null;
+          this.footerLegalLinks = data?.footerLegalLinks?.length ? data.footerLegalLinks : null;
+          this.navLoading = false;
+        });
+      },
+      error: () => {
+        this.deferStateUpdate(() => {
+          this.navLoading = false;
+        });
+      }
     });
   }
 
@@ -282,7 +371,7 @@ export class FooterComponent implements OnInit, OnDestroy {
   private toFooterPages(
     platform: 'instagram' | 'facebook',
     pages: SiteSocialLink[]
-  ): Array<{ label: string; url: string; thumbnailUrl?: string | null; initials: string; avatarClass: string }> {
+  ): FooterSocialPage[] {
     const palettes =
       platform === 'instagram'
         ? ['bg-gradient-to-br from-fuchsia-500 to-rose-500', 'bg-gradient-to-br from-amber-500 to-rose-500']
@@ -311,6 +400,10 @@ export class FooterComponent implements OnInit, OnDestroy {
 
   closeMenu(): void {
     this.openMenu = null;
+  }
+
+  private deferStateUpdate(run: () => void): void {
+    setTimeout(run, 0);
   }
 
   @HostListener('document:click', ['$event'])

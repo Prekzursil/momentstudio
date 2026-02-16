@@ -359,8 +359,8 @@ export class CmsPageComponent implements OnInit, OnDestroy {
     this.title.setTitle(pageTitle);
     if (description) {
       this.meta.updateTag({ name: 'description', content: description });
-      this.meta.updateTag({ name: 'og:description', content: description });
+      this.meta.updateTag({ property: 'og:description', content: description });
     }
-    this.meta.updateTag({ name: 'og:title', content: pageTitle });
+    this.meta.updateTag({ property: 'og:title', content: pageTitle });
   }
 }

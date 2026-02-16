@@ -153,6 +153,49 @@ export interface OpsDiagnosticsRead {
   netopia: OpsDiagnosticsCheck;
 }
 
+export type SamedaySyncStatus = 'running' | 'success' | 'failed';
+
+export interface SamedaySyncRunRead {
+  id: string;
+  provider: 'sameday';
+  status: SamedaySyncStatus;
+  started_at: string;
+  finished_at?: string | null;
+  fetched_count: number;
+  upserted_count: number;
+  deactivated_count: number;
+  candidate_count?: number;
+  normalized_count?: number;
+  normalization_ratio?: number | null;
+  schema_signature?: string | null;
+  schema_drift_detected?: boolean;
+  failure_kind?: string | null;
+  challenge_failure?: boolean;
+  error_message?: string | null;
+  source_url_used?: string | null;
+  payload_hash?: string | null;
+}
+
+export interface SamedaySyncStatusRead {
+  provider: 'sameday';
+  total_lockers: number;
+  last_success_at?: string | null;
+  last_error?: string | null;
+  stale: boolean;
+  stale_age_seconds?: number | null;
+  challenge_failure_streak?: number;
+  schema_drift_detected?: boolean;
+  last_schema_drift_at?: string | null;
+  canary_alert_codes?: string[];
+  canary_alert_messages?: string[];
+  latest_run?: SamedaySyncRunRead | null;
+}
+
+export interface SamedaySyncRunListResponse {
+  items: SamedaySyncRunRead[];
+  meta: { page: number; limit: number; total: number };
+}
+
 @Injectable({ providedIn: 'root' })
 export class OpsService {
   constructor(private api: ApiService) {}
@@ -233,6 +276,18 @@ export class OpsService {
 
   getDiagnostics(): Observable<OpsDiagnosticsRead> {
     return this.api.get<OpsDiagnosticsRead>('/ops/admin/diagnostics');
+  }
+
+  getSamedaySyncStatus(): Observable<SamedaySyncStatusRead> {
+    return this.api.get<SamedaySyncStatusRead>('/admin/shipping/sameday-sync/status');
+  }
+
+  listSamedaySyncRuns(params?: { page?: number; limit?: number }): Observable<SamedaySyncRunListResponse> {
+    return this.api.get<SamedaySyncRunListResponse>('/admin/shipping/sameday-sync/runs', params as any);
+  }
+
+  runSamedaySyncNow(): Observable<SamedaySyncRunRead> {
+    return this.api.post<SamedaySyncRunRead>('/admin/shipping/sameday-sync/run', {});
   }
 
   downloadNewsletterConfirmedSubscribersExport(): Observable<Blob> {

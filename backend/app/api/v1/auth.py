@@ -970,23 +970,39 @@ async def refresh_tokens(
     session: AsyncSession = Depends(get_session),
     _: None = Depends(refresh_rate_limit),
     response: Response = None,
-) -> TokenPair:
+) -> TokenPair | Response:
+    silent_header = str(request.headers.get("X-Silent") or "").strip().lower()
+    silent_refresh_probe = silent_header in {"1", "true", "yes", "on"}
+
+    def _silent_no_content() -> Response:
+        if response:
+            clear_refresh_cookie(response)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
     refresh_token = (refresh_request.refresh_token or "").strip()
     if not refresh_token:
         refresh_token = (request.cookies.get("refresh_token") or "").strip()
     if not refresh_token:
+        if silent_refresh_probe:
+            return _silent_no_content()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token missing")
 
     payload = security.decode_token(refresh_token)
     if not payload or payload.get("type") != "refresh":
+        if silent_refresh_probe:
+            return _silent_no_content()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
     jti = str(payload.get("jti") or "").strip()
     sub = payload.get("sub")
     if not jti or not sub:
+        if silent_refresh_probe:
+            return _silent_no_content()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
     try:
         token_user_id = UUID(str(sub))
     except Exception:
+        if silent_refresh_probe:
+            return _silent_no_content()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
 
     # Lock the refresh session row during rotation to make concurrent refreshes multi-tab safe.

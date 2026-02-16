@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import re
+import unicodedata
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
@@ -158,6 +159,17 @@ def _meta_cover_image_url(meta: dict | None) -> str | None:
     return None
 
 
+def _meta_cover_fit(meta: dict | None) -> str:
+    if not meta:
+        return "cover"
+    raw = meta.get("cover_fit")
+    if isinstance(raw, str):
+        value = raw.strip().lower()
+        if value in {"cover", "contain"}:
+            return value
+    return "cover"
+
+
 def _meta_summary(meta: dict | None, *, lang: str | None, base_lang: str | None) -> str | None:
     if not meta:
         return None
@@ -178,6 +190,15 @@ def _meta_summary(meta: dict | None, *, lang: str | None, base_lang: str | None)
 def _normalize_blog_sort(raw: str | None) -> str:
     value = (raw or "").strip().lower()
     return value if value in _BLOG_SORT_VALUES else "newest"
+
+
+def _normalize_search_text(value: str | None) -> str:
+    raw = (value or "").strip()
+    if not raw:
+        return ""
+    normalized = unicodedata.normalize("NFKD", raw)
+    without_marks = "".join(ch for ch in normalized if not unicodedata.combining(ch))
+    return without_marks.lower()
 
 
 async def list_published_posts(
@@ -252,9 +273,9 @@ async def list_published_posts(
             ContentBlock.published_at.desc().nullslast(),
             ContentBlock.updated_at.desc(),
         ]
-    query_text = (q or "").strip().lower()
-    tag_text = (tag or "").strip().lower()
-    series_text = (series or "").strip().lower()
+    query_text = _normalize_search_text(q)
+    tag_text = _normalize_search_text(tag)
+    series_text = _normalize_search_text(series)
 
     if not query_text and not tag_text and not series_text:
         offset = (page - 1) * limit
@@ -298,14 +319,14 @@ async def list_published_posts(
             meta = getattr(block, "meta", None) or {}
             if tag_text:
                 tags = _normalize_tags(meta.get("tags"))
-                if tag_text not in {t.lower() for t in tags}:
+                if tag_text not in {_normalize_search_text(t) for t in tags}:
                     continue
             if series_text:
                 series_value = meta.get("series")
-                if not isinstance(series_value, str) or series_text != series_value.strip().lower():
+                if not isinstance(series_value, str) or series_text != _normalize_search_text(series_value):
                     continue
             if query_text:
-                haystack = f"{block.title}\n{_plain_text_from_markdown(block.body_markdown)}".lower()
+                haystack = _normalize_search_text(f"{block.title}\n{_plain_text_from_markdown(block.body_markdown)}")
                 if query_text not in haystack:
                     continue
             filtered.append(block)
@@ -421,6 +442,7 @@ def to_list_item(block: ContentBlock, *, lang: str | None = None) -> dict:
         "cover_image_url": cover,
         "cover_focal_x": getattr(cover_image, "focal_x", None) if cover_image else None,
         "cover_focal_y": getattr(cover_image, "focal_y", None) if cover_image else None,
+        "cover_fit": _meta_cover_fit(meta),
         "tags": _normalize_tags(meta.get("tags")),
         "series": series.strip() if isinstance(series, str) and series.strip() else None,
         "author_name": author_name,
@@ -452,6 +474,7 @@ def to_read(block: ContentBlock, *, lang: str | None = None) -> dict:
         "cover_image_url": cover,
         "cover_focal_x": getattr(cover_image, "focal_x", None) if cover_image else None,
         "cover_focal_y": getattr(cover_image, "focal_y", None) if cover_image else None,
+        "cover_fit": _meta_cover_fit(meta),
         "tags": _normalize_tags(meta.get("tags")),
         "series": series.strip() if isinstance(series, str) and series.strip() else None,
         "author_name": author_name,

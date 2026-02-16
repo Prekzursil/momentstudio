@@ -15,6 +15,8 @@ import { ButtonComponent } from '../../shared/button.component';
       <div class="flex justify-center gap-3 flex-wrap">
         <app-button [label]="'pwa.retry' | translate" (action)="onRetry()"></app-button>
         <app-button routerLink="/" variant="ghost" [label]="'pwa.goHome' | translate"></app-button>
+        <app-button routerLink="/shop" variant="ghost" label="Browse shop"></app-button>
+        <app-button routerLink="/blog" variant="ghost" label="Read blog"></app-button>
       </div>
     </div>
   `
@@ -24,4 +26,3 @@ export class OfflineComponent {
     location.reload();
   }
 }
-

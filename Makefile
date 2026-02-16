@@ -1,7 +1,22 @@
-.PHONY: dev test lint docker-up docker-down backend-test frontend-test backend-lint frontend-lint compose-smoke
+.PHONY: dev dev-owner test lint docker-up docker-down backend-test frontend-test backend-lint frontend-lint compose-smoke env-dev env-prod env-status env-doctor
 
 dev:
 	./start.sh
+
+dev-owner:
+	./scripts/dev/dev-owner.sh
+
+env-dev:
+	./scripts/env/switch.sh dev
+
+env-prod:
+	./scripts/env/switch.sh prod
+
+env-status:
+	./scripts/env/status.sh
+
+env-doctor:
+	./scripts/env/doctor.sh
 
 test: backend-test frontend-test
 

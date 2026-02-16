@@ -51,6 +51,15 @@ check_header_singleton() {
   fi
 }
 
+extract_header() {
+  local header_name="$1"
+  local headers_file="$2"
+  awk -F': *' -v key="$(printf '%s' "${header_name}" | tr '[:upper:]' '[:lower:]')" \
+    'tolower($1) == key { print tolower($2) }' "${headers_file}" \
+    | tr -d '\r' \
+    | head -n 1
+}
+
 echo "Verifying production endpoints at ${verify_base_url}"
 
 if curl -fsS "${verify_base_url}/api/v1/health" >/dev/null; then
@@ -68,7 +77,11 @@ fi
 headers_file="$(mktemp)"
 manifest_headers_file="$(mktemp)"
 app_config_file="$(mktemp)"
-trap 'rm -f "${headers_file}" "${manifest_headers_file}" "${app_config_file}"' EXIT
+home_html_file="$(mktemp)"
+bundle_headers_file="$(mktemp)"
+app_config_headers_file="$(mktemp)"
+asset_headers_file="$(mktemp)"
+trap 'rm -f "${headers_file}" "${manifest_headers_file}" "${app_config_file}" "${home_html_file}" "${bundle_headers_file}" "${app_config_headers_file}" "${asset_headers_file}"' EXIT
 
 if curl -fsSI "${verify_base_url}/" >"${headers_file}"; then
   pass "HEAD /"
@@ -86,15 +99,61 @@ else
   fail "HEAD /manifest.webmanifest failed"
 fi
 
-manifest_mime="$(
-  awk -F': *' 'tolower($1) == "content-type" { print tolower($2) }' "${manifest_headers_file}" \
-    | tr -d '\r' \
-    | head -n 1
-)"
+manifest_mime="$(extract_header "content-type" "${manifest_headers_file}")"
 if [[ "${manifest_mime}" == "${expected_manifest_mime}"* ]]; then
   pass "Manifest content-type is '${manifest_mime}'"
 else
   fail "Manifest content-type is '${manifest_mime:-<missing>}' (expected '${expected_manifest_mime}')"
+fi
+
+if curl -fsS "${verify_base_url}/" >"${home_html_file}"; then
+  pass "GET / (bundle discovery)"
+else
+  fail "GET / failed (bundle discovery)"
+fi
+
+bundle_path="$(
+  grep -Eo "/[^\"[:space:]]+\.[0-9a-f]{8,}\.js" "${home_html_file}" \
+    | head -n 1 \
+    || true
+)"
+if [[ -z "${bundle_path}" ]]; then
+  fail "Could not discover a hashed JS bundle path from /"
+else
+  pass "Discovered hashed bundle path '${bundle_path}'"
+  if curl -fsSI "${verify_base_url}${bundle_path}" >"${bundle_headers_file}"; then
+    bundle_cache="$(extract_header "cache-control" "${bundle_headers_file}")"
+    if [[ "${bundle_cache}" == *"immutable"* ]]; then
+      pass "Hashed bundle cache-control is '${bundle_cache}'"
+    else
+      fail "Hashed bundle cache-control is '${bundle_cache:-<missing>}' (expected immutable)"
+    fi
+  else
+    fail "HEAD ${bundle_path} failed"
+  fi
+fi
+
+if curl -fsSI "${verify_base_url}/assets/app-config.js" >"${app_config_headers_file}"; then
+  app_config_cache="$(extract_header "cache-control" "${app_config_headers_file}")"
+  if [[ "${app_config_cache}" == *"no-store"* ]]; then
+    pass "app-config.js cache-control is '${app_config_cache}'"
+  else
+    fail "app-config.js cache-control is '${app_config_cache:-<missing>}' (expected no-store)"
+  fi
+else
+  fail "HEAD /assets/app-config.js failed"
+fi
+
+cache_asset_path="${VERIFY_CACHE_ASSET_PATH:-/assets/home/banner_image.jpeg}"
+if curl -fsSI "${verify_base_url}${cache_asset_path}" >"${asset_headers_file}"; then
+  asset_cache="$(extract_header "cache-control" "${asset_headers_file}")"
+  if [[ "${asset_cache}" == *"max-age="* && "${asset_cache}" != *"no-store"* ]]; then
+    pass "Asset cache-control (${cache_asset_path}) is '${asset_cache}'"
+  else
+    fail "Asset cache-control (${cache_asset_path}) is '${asset_cache:-<missing>}' (expected long-lived max-age)"
+  fi
+else
+  fail "HEAD ${cache_asset_path} failed"
 fi
 
 if [[ -n "${expected_app_version}" ]]; then

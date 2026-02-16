@@ -103,8 +103,7 @@ showing what is already implemented.
 - [x] Protect main with checks-only required CI gates.
   - Evidence: GitHub branch protection on `main` requires `backend`, `backend-postgres`, `frontend`, `compose-smoke` checks with strict up-to-date enabled.
 - [x] Repo policy phase 2: evaluate enabling required review approvals once contributor cadence grows.
-  - Evidence: `.github/workflows/repo-policy-phase2-eval.yml`, `scripts/repo/evaluate_review_cadence.py`, `docs/REPOSITORY_POLICY.md`, `docs/reports/repo-policy-phase2-baseline-2026-02.md`
-- [ ] Repo policy phase 2 rollout: enable 1 required approval when cadence trigger passes in 2 consecutive monthly evaluations.
+  - Evidence: `docs/REPOSITORY_POLICY.md`, `docs/reports/repo-policy-phase2-baseline-2026-02.md`, `docs/reports/repo-policy-phase2-baseline-2026-02.json`
 - [x] DAM (local-only): add first-party media domain models + local-volume storage layout + Redis job queue primitives (no S3/cloud adapters).
   - Evidence: `backend/app/models/media.py`, `backend/alembic/versions/0152_create_media_dam_foundation.py`, `backend/app/services/media_dam.py`, `backend/app/workers/media_worker.py`, `backend/app/core/config.py`
 - [x] DAM APIs: ship `/content/admin/media/*` endpoints for upload/finalize/list/update/approve/reject/trash/restore/purge/usage/variants/edit/jobs/collections while keeping legacy image APIs compatible.
@@ -119,7 +118,14 @@ showing what is already implemented.
   - Evidence: `backend/app/services/media_dam.py`, `backend/app/services/media_usage_reconcile_scheduler.py`, `backend/app/main.py`, `backend/app/models/media.py`, `backend/app/schemas/media.py`, `backend/alembic/versions/0153_add_media_usage_reconcile_job_type.py`
 - [x] DAM phase 2: enforce private-asset delivery via authenticated/signed access path (keep public `/media/*` only for approved public assets).
   - Evidence: `backend/app/services/media_dam.py`, `backend/app/api/v1/content.py`, `frontend/src/app/core/admin.service.ts`, `frontend/src/app/pages/admin/shared/dam-asset-library.component.ts`, `frontend/nginx/default.conf`, `infra/prod/Caddyfile`
-- [ ] DAM phase 3: add media-job retries with exponential backoff and dead-letter triage UI.
+- [x] DAM phase 3: add media-job retries with exponential backoff and dead-letter triage UI.
+  - Evidence: `backend/alembic/versions/0154_media_job_retry_dead_letter_v2.py`, `backend/app/models/media.py`, `backend/app/services/media_dam.py`, `backend/app/api/v1/content.py`, `backend/app/workers/media_worker.py`, `backend/app/schemas/media.py`, `frontend/src/app/core/admin.service.ts`, `frontend/src/app/pages/admin/shared/dam-asset-library.component.ts`, `frontend/src/app/pages/admin/ops/admin-ops.component.ts`
+- [x] DAM phase 3.1: introduce jittered backoff and per-job-type retry policy overrides.
+  - Evidence: `backend/alembic/versions/0155_media_job_retry_policy_overrides.py`, `backend/app/models/media.py`, `backend/app/services/media_dam.py`, `backend/app/api/v1/content.py`, `backend/app/schemas/media.py`, `frontend/src/app/core/admin.service.ts`, `frontend/src/app/pages/admin/shared/dam-asset-library.component.ts`, `backend/tests/test_media_dam_api.py`, `frontend/src/app/pages/admin/shared/dam-asset-library.component.spec.ts`
+- [x] DAM phase 3.2: add policy change history timeline and one-click rollback presets for retry policy edits.
+  - Evidence: `backend/alembic/versions/0157_media_retry_policy_history_events.py`, `backend/app/models/media.py`, `backend/app/services/media_dam.py`, `backend/app/api/v1/content.py`, `backend/app/schemas/media.py`, `frontend/src/app/core/admin.service.ts`, `frontend/src/app/pages/admin/shared/dam-asset-library.component.ts`, `backend/tests/test_media_dam_api.py`, `frontend/src/app/pages/admin/shared/dam-asset-library.component.spec.ts`
+- [x] DAM phase 3.3: add diff visualization for policy history entries and side-by-side rollback preview before apply.
+  - Evidence: `frontend/src/app/pages/admin/shared/dam-asset-library.component.ts`, `frontend/src/app/pages/admin/shared/dam-asset-library.component.spec.ts`
 - [x] Admin Content IA: add a dedicated `/admin/content/media` workspace between Scheduling and Settings for site-wide media operations.
   - Evidence: `frontend/src/app/app.routes.ts`, `frontend/src/app/pages/admin/content/admin-content-layout.component.ts`, `frontend/src/app/pages/admin/content/admin-content-media.component.ts`
 - [x] Media library: add sorting/date filters, asset details drawer, and rename action for uploaded images.
@@ -134,6 +140,32 @@ showing what is already implemented.
 - [x] Search consistency: avoid stale/out-of-order responses overwriting latest results (blog + shop).
   - Evidence: `frontend/src/app/pages/blog/blog-list.component.ts`, `frontend/src/app/pages/shop/shop.component.ts`
   - Evidence (tests): `frontend/src/app/pages/blog/blog-list.component.spec.ts`, `frontend/src/app/pages/shop/shop.component.spec.ts`
+- [x] SEO/social preview: add baseline OG/Twitter tags in the static entry HTML and use OpenGraph `property=` tags across key pages.
+  - Evidence: `frontend/src/index.html`, `frontend/src/app/pages/about/about.component.ts`, `frontend/src/app/pages/contact/contact.component.ts`, `frontend/src/app/pages/shop/shop.component.ts`, `frontend/src/app/pages/page/page.component.ts`
+  - Evidence (tests): `frontend/src/app/pages/about/about.component.spec.ts`, `frontend/src/app/pages/contact/contact.component.spec.ts`
+- [x] SEO: add `hreflang` + canonical alternates for EN/RO route variants to reduce duplicate indexing between localized URLs.
+  - Evidence: `frontend/src/app/core/seo-head-links.service.ts`, `frontend/src/app/pages/home/home.component.ts`, `frontend/src/app/pages/shop/shop.component.ts`, `frontend/src/app/pages/blog/blog-list.component.ts`, `frontend/src/app/pages/blog/blog-post.component.ts`, `frontend/src/app/pages/product/product.component.ts`
+- [x] SEO: add Organization/WebSite JSON-LD defaults at app entry and validate in Search Console rich results.
+  - Evidence: `frontend/src/index.html`, `frontend/src/app/core/structured-data.service.ts`, `frontend/src/app/pages/home/home.component.ts`, `frontend/src/app/pages/shop/shop.component.ts`, `frontend/src/app/pages/blog/blog-list.component.ts`, `frontend/src/app/pages/blog/blog-post.component.ts`
+- [x] SEO ops: add post-deploy Search Console indexing checklist for key URLs (home/shop/blog/product) and wire it into prod deploy output.
+  - Evidence: `infra/prod/request-indexing-checklist.sh`, `infra/prod/deploy.sh`, `infra/prod/.env.example`, `infra/prod/README.md`, `docs/PRODUCTION.md`
+- [x] Performance: add balanced cache headers for frontend static bundles/assets and media responses (hashed immutable + runtime config uncached).
+  - Evidence: `frontend/nginx/default.conf`, `infra/prod/Caddyfile`, `infra/prod/verify-live.sh`, `.github/workflows/compose-smoke.yml`
+- [x] Lighthouse quick wins: add semantic main landmark in app shell and preload default homepage hero image for better LCP discovery.
+  - Evidence: `frontend/src/app/app.component.ts`, `frontend/src/app/app.component.spec.ts`, `frontend/src/index.html`
+- [x] Auth diagnostics: silent startup refresh probe should not emit expected anonymous 401 errors in browser diagnostics.
+  - Evidence: `backend/app/api/v1/auth.py`, `backend/tests/test_auth.py`
+- [x] CLS phase 2: reserve layout space for dynamic footer/global CMS blocks to reduce app-footer shifts without changing typography.
+  - Evidence: `frontend/src/app/shared/cms-global-section-blocks.component.ts`, `frontend/src/app/layout/footer.component.ts`, `frontend/src/app/app.component.ts`
+  - Evidence (tests): `frontend/src/app/shared/cms-global-section-blocks.component.spec.ts`, `frontend/src/app/layout/footer.component.spec.ts`
+- [x] Social: make Instagram/Facebook thumbnail fetch persistent by storing local media URLs (stable until manual refetch).
+  - Evidence: `backend/app/services/social_thumbnails.py`, `backend/app/services/storage.py`, `backend/app/api/v1/content.py`
+  - Evidence (tests): `backend/tests/test_content_api.py`
+- [x] SEO sweep: enforce route-level robots policy and resolve key public crawlability issues (home H1 + utility-page outlinks).
+  - Evidence: `frontend/src/app/core/route-robots.service.ts`, `frontend/src/app/app.routes.ts`, `frontend/src/app/app.component.ts`, `frontend/src/app/pages/home/home.component.ts`, `frontend/src/app/pages/error/error.component.ts`, `frontend/src/app/pages/not-found/not-found.component.ts`, `frontend/src/app/pages/offline/offline.component.ts`
+  - Evidence (tests): `frontend/src/app/core/route-robots.service.spec.ts`, `frontend/src/app/pages/home/home.component.spec.ts`
+- [x] SEO phase 3: automated public-route crawl audit (title/description/H1/canonical/robots) as CI guard.
+  - Evidence: `frontend/e2e/seo-public-routes.spec.ts`, `.github/workflows/compose-smoke.yml`
 - [x] Netopia: notifyURL/webhook must always respond HTTP 200 with an IPN ack payload (avoid INVALID_RESPONSE_STATUS).
   - Evidence: `backend/app/api/v1/payments.py`, `backend/tests/test_netopia_webhook.py`
 - [x] CI: run PayPal + Stripe mock checkout E2E (success + decline/cancel) in compose smoke.
@@ -191,6 +223,13 @@ showing what is already implemented.
 - [x] Auth: login/register should not get stuck after errors; improve error visibility and re-attempt flow (incl. CAPTCHA).
 - [x] Frontend: stop showing duplicate generic “Request failed” toasts when pages already handle errors.
 - [x] Checkout: investigate Easybox/FANbox checkout regressions when frontend runs on alternate dev port (4201).
+- [x] Shipping: mirror Sameday Easybox lockers locally and serve checkout map search from DB snapshots (monthly sync + manual ops trigger).
+  - Evidence: `backend/alembic/versions/0156_sameday_easybox_mirror.py`, `backend/app/services/sameday_easybox_mirror.py`, `backend/app/services/sameday_easybox_sync_scheduler.py`, `backend/app/services/lockers.py`, `backend/app/api/v1/shipping.py`, `backend/app/api/v1/shipping_admin.py`, `frontend/src/app/shared/locker-picker.component.ts`, `frontend/src/app/pages/admin/ops/admin-ops.component.ts`
+  - Evidence (tests): `backend/tests/test_sameday_easybox_mirror.py`, `frontend/src/app/shared/locker-picker.component.spec.ts`
+- [x] Shipping ops docs: add Sameday mirror first-sync and stale-data troubleshooting runbook snippet (README + production docs).
+  - Evidence: `README.md`, `docs/PRODUCTION.md`, `infra/prod/README.md`
+- [x] Shipping mirror hardening: add schema-drift canary alerts for upstream payload changes and repeated Cloudflare/captcha crawl failures.
+  - Evidence: `backend/alembic/versions/0158_sameday_sync_canary_fields.py`, `backend/app/services/sameday_easybox_mirror.py`, `backend/app/schemas/shipping.py`, `backend/app/schemas/shipping_admin.py`, `backend/app/api/v1/shipping_admin.py`, `frontend/src/app/pages/admin/ops/admin-ops.component.ts`, `frontend/src/app/shared/locker-picker.component.ts`, `backend/tests/test_sameday_easybox_mirror.py`, `frontend/src/app/pages/admin/ops/admin-ops.component.spec.ts`, `frontend/src/app/shared/locker-picker.component.spec.ts`
 - [x] Coupons v2: validate marketing opt-in before committing coupon changes when `send_email=true` (avoid partial success).
 - [x] Email: add RFC 8058 one-click unsubscribe headers (`List-Unsubscribe-Post`).
 - [x] Newsletter: auto-unsubscribe landing page on load and return HTML on API GET (fallback UX when clients open the unsubscribe URL).

@@ -86,6 +86,7 @@ describe('ProductComponent', () => {
 
   afterEach(() => {
     document.querySelector('link[rel="canonical"]')?.remove();
+    document.querySelectorAll('link[rel="alternate"][data-seo-managed="true"]').forEach((el) => el.remove());
     document.querySelectorAll('script[type="application/ld+json"]').forEach((el) => el.remove());
   });
 
@@ -146,6 +147,27 @@ describe('ProductComponent', () => {
     expect(catalog.requestBackInStock).toHaveBeenCalledWith('p1');
     expect(cmp.backInStockRequest?.id).toBe('r1');
     expect(toast.success).toHaveBeenCalled();
+  });
+
+  it('sets canonical and alternate links for product detail', () => {
+    catalog.getProduct.and.returnValue(
+      of({
+        id: 'prod',
+        slug: 'prod',
+        name: 'Product',
+        base_price: 42,
+        currency: 'RON',
+        stock_quantity: 3,
+        images: []
+      } as any)
+    );
+
+    const fixture = TestBed.createComponent(ProductComponent);
+    fixture.detectChanges();
+
+    const canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
+    expect(canonical?.getAttribute('href')).toContain('/products/prod?lang=en');
+    expect(document.querySelectorAll('link[rel="alternate"][data-seo-managed="true"]').length).toBe(3);
   });
 
   it('ignores stale product loads when navigating quickly between slugs', () => {
