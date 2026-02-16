@@ -150,6 +150,14 @@ npm test -- --watch=false
 npm run build
 ```
 
+Frontend SSR smoke (initial HTML crawlability):
+
+```bash
+cd frontend
+npm run build:ssr
+PORT=4000 SSR_API_BASE_URL=http://127.0.0.1:8000/api/v1 npm run serve:ssr
+```
+
 Backend-only:
 
 ```bash
@@ -236,8 +244,8 @@ The UX/IA/correctness automation is split intentionally:
 
 Workflows:
 
-- `Audit PR Evidence` (required check): fast deterministic evidence on pull requests.
-- `Audit Weekly Evidence`: full weekly evidence pack.
+- `Audit PR Evidence` (required check): fast deterministic evidence on pull requests, captured against SSR output.
+- `Audit Weekly Evidence`: full weekly evidence pack + generated SEO content backlog, captured against SSR output.
 - `Audit Weekly Agent`: creates/updates rolling issue `Weekly UX/IA Audit Digest` and assigns `@copilot`.
 - `Audit PR Agent`: label a PR with `audit:agent` (or run the workflow manually) to open a Copilot-assigned audit issue against the latest PR evidence.
 - `Audit PR Deep Agent`: opt-in deep pass for PRs labeled `audit:deep`.

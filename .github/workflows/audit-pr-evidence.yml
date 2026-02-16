@@ -46,12 +46,13 @@ jobs:
             : > artifacts/audit-evidence/changed-files.txt
           fi
 
-      - name: Start frontend for route capture
+      - name: Start SSR frontend for route capture
         shell: bash
         run: |
           set -euo pipefail
           cd frontend
-          npm run start -- --host 127.0.0.1 --port 4300 > ../artifacts/audit-evidence/frontend-audit.log 2>&1 &
+          npm run build:ssr
+          PORT=4300 SSR_API_BASE_URL=http://127.0.0.1:8000/api/v1 npm run serve:ssr > ../artifacts/audit-evidence/frontend-audit.log 2>&1 &
           echo $! > ../artifacts/audit-evidence/frontend-audit.pid
           cd ..
           for i in $(seq 1 90); do
@@ -74,6 +75,13 @@ jobs:
             --changed-files-file artifacts/audit-evidence/changed-files.txt \
             --max-routes 30
 
+      - name: Generate SEO content backlog delta
+        run: |
+          python3 scripts/seo/generate_content_backlog.py \
+            --findings artifacts/audit-evidence/deterministic-findings.json \
+            --json-out artifacts/audit-evidence/seo-content-backlog.json \
+            --md-out artifacts/audit-evidence/seo-content-backlog.md
+
       - name: Upload audit evidence artifact
         uses: actions/upload-artifact@v4
         with:
@@ -89,12 +97,14 @@ jobs:
           findings_count="$(jq 'length' artifacts/audit-evidence/deterministic-findings.json)"
           severe_count="$(jq '[.[] | select(.severity == "s1" or .severity == "s2")] | length' artifacts/audit-evidence/deterministic-findings.json)"
           route_count="$(jq '.selected_route_count // 0' artifacts/audit-evidence/surface-map.json)"
+          backlog_count="$(jq 'length' artifacts/audit-evidence/seo-content-backlog.json)"
           {
             echo "## Audit PR Evidence"
             echo ""
             echo "- Selected routes: \`${route_count}\`"
             echo "- Findings: \`${findings_count}\`"
             echo "- Severe (s1/s2): \`${severe_count}\`"
+            echo "- SEO backlog items: \`${backlog_count}\`"
             echo ""
             echo "See artifact: \`audit-evidence-pack\`"
           } >> "$GITHUB_STEP_SUMMARY"

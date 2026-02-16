@@ -3,7 +3,8 @@
 This folder contains a production-oriented Docker Compose stack for **momentstudio.ro**:
 
 - Caddy (TLS termination, reverse proxy)
-- Frontend (Angular build served by nginx)
+- Frontend SSR (`frontend-ssr`, Angular server runtime)
+- Frontend static fallback (`frontend`, nginx-served Angular build)
 - Backend (FastAPI + Alembic migrations at startup)
 - Media worker (Redis-backed DAM job processor)
 - Postgres
@@ -58,6 +59,7 @@ Edit:
 - `infra/prod/.env`
   - set a strong `POSTGRES_PASSWORD`
   - optionally set `CADDY_EMAIL`
+  - optionally set `SSR_API_BASE_URL` (defaults to `http://backend:8000/api/v1` for `frontend-ssr`)
 - `backend/.env`
   - set `ENVIRONMENT=production`
   - set a strong `SECRET_KEY`
@@ -78,6 +80,8 @@ Edit:
 Notes:
 
 - `deploy.sh` runs `docker compose up -d --build`. It **does not wipe** your database or uploads (volumes are preserved).
+- Caddy routes non-API traffic to `frontend-ssr:4000` by default.
+- The legacy static `frontend` service remains available as a rollback target.
 - After a VPS reboot, the stack starts automatically (`restart: unless-stopped`). You usually **do not** need to run `deploy.sh` again.
 - By default, `deploy.sh` exports `APP_VERSION=$(git rev-parse --short HEAD)` before recreating containers so backend/frontend diagnostics show the deployed revision.
 - `deploy.sh` waits for `media-worker` heartbeat health before running post-sync checks. If the worker is unhealthy, deploy exits non-zero and prints worker logs.
@@ -94,6 +98,15 @@ Useful helpers:
 - List services: `./infra/prod/ps.sh`
 - Verify live endpoints/headers manually: `./infra/prod/verify-live.sh`
 - Print Search Console indexing checklist manually: `./infra/prod/request-indexing-checklist.sh`
+
+SSR rollback switch (one release window):
+
+1. Edit `infra/prod/Caddyfile` and change `reverse_proxy frontend-ssr:4000` to `reverse_proxy frontend:80`.
+2. Reload only Caddy:
+
+   ```bash
+   ./infra/prod/reload-env.sh caddy
+   ```
 
 Sameday mirror post-deploy check:
 

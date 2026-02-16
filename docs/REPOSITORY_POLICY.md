@@ -88,7 +88,7 @@ Checks-only is the current steady-state policy for this repository. If contribut
 This repository intentionally separates deterministic data collection from AI judgment:
 
 - Evidence Pack (deterministic CI):
-  - `Audit PR Evidence` and `Audit Weekly Evidence` collect route map, SEO snapshot, console/layout signals, screenshots, and deterministic findings.
+  - `Audit PR Evidence` and `Audit Weekly Evidence` collect route map, SEO snapshot, console/layout signals, screenshots, and deterministic findings from SSR-rendered pages.
   - No LLM/API calls are used in CI evidence collection.
 - Agent Pass (Copilot issue assignment):
   - `Audit Weekly Agent` updates the rolling issue `Weekly UX/IA Audit Digest`, upserts severe findings, and assigns `@copilot`.

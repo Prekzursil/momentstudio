@@ -35,6 +35,13 @@ const defaults: AppConfig = {
 };
 
 export const appConfig: AppConfig = (() => {
-  if (typeof window === 'undefined') return defaults;
+  if (typeof window === 'undefined') {
+    const ssrApiBase =
+      (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.['SSR_API_BASE_URL']?.trim() || '';
+    return {
+      ...defaults,
+      ...(ssrApiBase ? { apiBaseUrl: ssrApiBase.replace(/\/$/, '') } : {}),
+    };
+  }
   return { ...defaults, ...(window.__APP_CONFIG__ ?? {}) };
 })();

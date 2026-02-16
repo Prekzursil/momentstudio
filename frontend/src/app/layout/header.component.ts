@@ -1,7 +1,7 @@
-import { Component, EffectRef, EventEmitter, Input, Output, computed, effect, OnDestroy, signal } from '@angular/core';
+import { Component, EffectRef, EventEmitter, Input, Output, computed, effect, inject, OnDestroy, PLATFORM_ID, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { NavDrawerComponent, NavLink } from '../shared/nav-drawer.component';
-import { DatePipe, NgClass, NgForOf, NgIf } from '@angular/common';
+import { DatePipe, isPlatformBrowser, NgClass, NgForOf, NgIf } from '@angular/common';
 import { CartStore } from '../core/cart.store';
 import { ThemePreference } from '../core/theme.service';
 import { FormsModule } from '@angular/forms';
@@ -394,6 +394,7 @@ import { Subscription } from 'rxjs';
   `
 })
 export class HeaderComponent implements OnDestroy {
+  private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
   @Input() themePreference: ThemePreference = 'system';
   @Output() themeChange = new EventEmitter<ThemePreference>();
   private readonly languageSig = signal<'en' | 'ro'>('en');
@@ -480,6 +481,10 @@ export class HeaderComponent implements OnDestroy {
 		    private toast: ToastService,
 		    private translate: TranslateService
 		  ) {
+    if (!this.isBrowser) {
+      return;
+    }
+
     this.authEffect = effect(() => {
       const authed = this.isAuthenticated();
       if (!authed) {
@@ -684,15 +689,17 @@ export class HeaderComponent implements OnDestroy {
     this.stopUnreadPolling();
     this.navSub?.unsubscribe();
     this.authEffect?.destroy();
-    if (this.bannerPoll) window.clearInterval(this.bannerPoll);
+    if (this.bannerPoll && this.isBrowser) window.clearInterval(this.bannerPoll);
   }
 
   private startUnreadPolling(): void {
+    if (!this.isBrowser) return;
     if (this.unreadPoll) return;
     this.unreadPoll = window.setInterval(() => this.notificationsService.refreshUnreadCount(), 60_000);
   }
 
   private stopUnreadPolling(): void {
+    if (!this.isBrowser) return;
     if (!this.unreadPoll) return;
     window.clearInterval(this.unreadPoll);
     this.unreadPoll = undefined;
