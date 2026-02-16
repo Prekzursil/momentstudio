@@ -12,9 +12,36 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 
 SEVERITY_TO_IMPACT = {"s1": 5, "s2": 4, "s3": 2, "s4": 1}
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def _resolve_repo_path(raw: str, *, allowed_prefixes: tuple[str, ...]) -> Path:
+    root = _repo_root()
+    candidate = (root / raw).resolve()
+    try:
+        rel = candidate.relative_to(root).as_posix()
+    except ValueError as exc:
+        raise ValueError(f"Path must stay inside repository: {raw}") from exc
+    if not any(rel == prefix or rel.startswith(f"{prefix}/") for prefix in allowed_prefixes):
+        raise ValueError(f"Path is outside allowed audit roots: {raw}")
+    return candidate
+
+
+def _validate_base_url(raw: str) -> str:
+    value = raw.strip()
+    if not value:
+        return ""
+    parsed = urlparse(value)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("base-url must be an http/https URL with host.")
+    return value
 
 
 def _now_iso() -> str:
@@ -33,7 +60,19 @@ def _fingerprint(route: str, rule_id: str, primary_file: str, surface: str) -> s
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def _run(cmd: list[str], *, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+def _run_python(args: list[str], *, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+    cmd = [sys.executable, *args]
+    return subprocess.run(
+        cmd,
+        cwd=str(cwd) if cwd else None,
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+
+
+def _run_node(args: list[str], *, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+    cmd = ["node", *args]
     return subprocess.run(
         cmd,
         cwd=str(cwd) if cwd else None,
@@ -103,7 +142,6 @@ def _browser_collect(
 ) -> tuple[bool, str]:
     script = repo_root / "scripts" / "audit" / "collect_browser_evidence.mjs"
     cmd = [
-        "node",
         str(script),
         "--base-url",
         base_url,
@@ -115,7 +153,7 @@ def _browser_collect(
         str(max_routes),
     ]
     try:
-        proc = _run(cmd, cwd=repo_root)
+        proc = _run_node(cmd, cwd=repo_root)
         return True, (proc.stdout or "").strip()
     except subprocess.CalledProcessError as exc:
         err = (exc.stderr or exc.stdout or str(exc)).strip()
@@ -372,25 +410,28 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = _parse_args()
-    repo_root = Path(__file__).resolve().parents[2]
-    output_dir = (repo_root / args.output_dir).resolve()
+    repo_root = _repo_root()
+    output_dir = _resolve_repo_path(args.output_dir, allowed_prefixes=("artifacts",))
     output_dir.mkdir(parents=True, exist_ok=True)
 
     route_map_path = output_dir / "route-map.json"
-    _run(
+    routes_file = _resolve_repo_path(args.routes_file, allowed_prefixes=("frontend",))
+    _run_python(
         [
-            sys.executable,
             str(repo_root / "scripts" / "audit" / "extract_route_map.py"),
             "--routes-file",
-            str((repo_root / args.routes_file).resolve()),
+            str(routes_file.relative_to(repo_root)),
             "--out",
-            str(route_map_path),
+            str(route_map_path.relative_to(repo_root)),
         ],
         cwd=repo_root,
     )
     route_map = _load_json(route_map_path, default={"routes": [], "summary": {}})
 
-    changed_files = _load_changed_files((repo_root / args.changed_files_file).resolve() if args.changed_files_file else None)
+    changed_files_path = (
+        _resolve_repo_path(args.changed_files_file, allowed_prefixes=("artifacts",)) if args.changed_files_file else None
+    )
+    changed_files = _load_changed_files(changed_files_path)
     selected_routes = _routes_for_mode(route_map, changed_files=changed_files, max_routes=max(1, int(args.max_routes)))
     _write_json(
         output_dir / "surface-map.json",
@@ -406,10 +447,11 @@ def main() -> int:
 
     browser_ok = False
     browser_message = ""
-    if args.base_url.strip():
+    base_url = _validate_base_url(args.base_url)
+    if base_url:
         browser_ok, browser_message = _browser_collect(
             repo_root=repo_root,
-            base_url=args.base_url.strip(),
+            base_url=base_url,
             selected_routes_path=output_dir / "selected-routes.json",
             output_dir=output_dir,
             max_routes=max(1, int(args.max_routes)),
@@ -436,7 +478,7 @@ def main() -> int:
     _write_evidence_index(
         output_dir=output_dir,
         mode=args.mode,
-        base_url=args.base_url.strip() or None,
+        base_url=base_url or None,
         route_map=route_map if isinstance(route_map, dict) else {},
         selected_routes=selected_routes,
         findings=findings,
@@ -454,4 +496,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

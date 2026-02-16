@@ -18,6 +18,22 @@ from typing import Any
 SEVERE_LEVELS = {"s1", "s2"}
 
 
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def _resolve_repo_path(raw: str, *, allowed_prefixes: tuple[str, ...]) -> Path:
+    root = _repo_root()
+    candidate = (root / raw).resolve()
+    try:
+        rel = candidate.relative_to(root).as_posix()
+    except ValueError as exc:
+        raise ValueError(f"Path must stay inside repository: {raw}") from exc
+    if not any(rel == prefix or rel.startswith(f"{prefix}/") for prefix in allowed_prefixes):
+        raise ValueError(f"Path is outside allowed audit roots: {raw}")
+    return candidate
+
+
 @dataclass(frozen=True)
 class GitHubContext:
     token: str
@@ -280,7 +296,10 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = _parse_args()
-    findings_path = Path(args.findings).resolve()
+    findings_path = _resolve_repo_path(
+        args.findings,
+        allowed_prefixes=("artifacts/audit-evidence", "artifacts/audit-evidence-local"),
+    )
     if not findings_path.exists():
         raise FileNotFoundError(f"Findings file not found: {findings_path}")
 

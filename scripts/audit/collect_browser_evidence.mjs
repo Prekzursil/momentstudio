@@ -9,12 +9,16 @@ const { chromium } = require("@playwright/test");
 
 function parseArgs(argv) {
   const out = {};
+  const allowedKeys = new Set(["base-url", "routes-json", "output-dir", "max-routes"]);
   for (let i = 2; i < argv.length; i += 1) {
     const token = argv[i];
     if (!token.startsWith("--")) {
       continue;
     }
     const key = token.slice(2);
+    if (!allowedKeys.has(key)) {
+      continue;
+    }
     const value = argv[i + 1] && !argv[i + 1].startsWith("--") ? argv[++i] : "1";
     out[key] = value;
   }
@@ -220,4 +224,3 @@ main().catch((err) => {
   process.stderr.write(`${message}\n`);
   process.exit(1);
 });
-
