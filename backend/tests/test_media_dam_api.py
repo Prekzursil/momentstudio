@@ -91,6 +91,13 @@ def test_media_dam_upload_finalize_and_lifecycle(test_app: Dict[str, object], tm
     monkeypatch.setattr(settings, "media_root", str(tmp_path / "uploads"))
     monkeypatch.setattr(settings, "private_media_root", str(tmp_path / "private_uploads"))
 
+    queued_job_ids: list[str] = []
+
+    async def _fake_queue_job(job_id: UUID) -> None:
+        queued_job_ids.append(str(job_id))
+
+    monkeypatch.setattr(media_dam, "queue_job", _fake_queue_job)
+
     upload = client.post(
         "/api/v1/content/admin/media/assets/upload",
         files={"file": ("dam.jpg", _jpeg_bytes(), "image/jpeg")},
@@ -114,6 +121,17 @@ def test_media_dam_upload_finalize_and_lifecycle(test_app: Dict[str, object], tm
     )
     assert finalize.status_code == 200, finalize.text
     job_id = finalize.json()["id"]
+    assert len(queued_job_ids) == 3
+    assert job_id in queued_job_ids
+
+    listed_jobs = client.get(
+        f"/api/v1/content/admin/media/jobs?asset_id={asset_id}&limit=10",
+        headers=auth_headers(admin_token),
+    )
+    assert listed_jobs.status_code == 200, listed_jobs.text
+    listed_job_types = {item["job_type"] for item in listed_jobs.json()["items"]}
+    assert {"ingest", "ai_tag", "duplicate_scan"}.issubset(listed_job_types)
+
     job = client.get(f"/api/v1/content/admin/media/jobs/{job_id}", headers=auth_headers(admin_token))
     assert job.status_code == 200, job.text
     assert job.json()["job_type"] == "ingest"
