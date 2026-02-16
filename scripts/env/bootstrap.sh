@@ -49,6 +49,8 @@ seed_backend_dev_profile() {
   upsert_env "${BACKEND_ENV_DEV_PROFILE}" "STRIPE_ENV" "sandbox"
   upsert_env "${BACKEND_ENV_DEV_PROFILE}" "PAYPAL_ENV" "sandbox"
   upsert_env "${BACKEND_ENV_DEV_PROFILE}" "NETOPIA_ENABLED" "0"
+  upsert_env "${BACKEND_ENV_DEV_PROFILE}" "LOCKERS_USE_OVERPASS_FALLBACK" "1"
+  upsert_env "${BACKEND_ENV_DEV_PROFILE}" "SAMEDAY_MIRROR_ENABLED" "0"
   upsert_env "${BACKEND_ENV_DEV_PROFILE}" "GOOGLE_REDIRECT_URI" "http://localhost:4200/auth/google/callback"
 }
 

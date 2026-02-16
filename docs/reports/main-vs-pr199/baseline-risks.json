@@ -1,0 +1,41 @@
+{
+  "baseline_pr": 199,
+  "baseline_merge_commit": "5e3b438520a023ae2f3d1ce3b27fa772e10aa627",
+  "generated_at": "2026-02-16T09:35:00Z",
+  "must_not_regress": [
+    {
+      "id": "payments.netopia.webhook.200_ack",
+      "severity": "S1",
+      "description": "Netopia webhook must always return HTTP 200 with ack payload, including rejection/error branches.",
+      "evidence_files": [
+        "backend/app/api/v1/payments.py",
+        "backend/tests/test_netopia_webhook.py"
+      ]
+    },
+    {
+      "id": "checkout.compose_smoke.payments",
+      "severity": "S2",
+      "description": "Compose smoke must execute Stripe and PayPal checkout E2E paths.",
+      "evidence_files": [
+        ".github/workflows/compose-smoke.yml",
+        "frontend/e2e/checkout-stripe.spec.ts",
+        "frontend/e2e/checkout-paypal.spec.ts"
+      ]
+    },
+    {
+      "id": "required_checks.green",
+      "severity": "S2",
+      "description": "Main required checks must remain green for backend/frontend/compose-smoke/CodeQL.",
+      "evidence_files": [
+        "GitHub Actions workflow runs on main"
+      ]
+    }
+  ],
+  "comparative_focus": [
+    "payments",
+    "shipping lockers",
+    "media/dam upload surfaces",
+    "checkout/auth/session"
+  ]
+}
+

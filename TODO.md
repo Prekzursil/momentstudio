@@ -96,6 +96,8 @@ showing what is already implemented.
   - Evidence: `frontend/e2e/admin-dashboard-freeze.spec.ts`, `.github/workflows/compose-smoke.yml`, `frontend/playwright.config.ts`
 
 ## High priority (next)
+- [x] Main vs PR #199: complete parity audit + remediation with production-safe smoke checks and env-profile hardening.
+  - Evidence: `docs/reports/main-vs-pr199/baseline-contracts.md`, `docs/reports/main-vs-pr199/main-delta-risk-map.md`, `docs/reports/main-vs-pr199/local-matrix-results.md`, `docs/reports/main-vs-pr199/production-safe-smoke.md`, `docs/reports/main-vs-pr199/final-audit-scorecard.md`, `backend/tests/test_checkout_flow.py`, `scripts/env/bootstrap.sh`, `scripts/env/doctor.sh`, `docs/ENVIRONMENT_PROFILES.md`
 - [x] Repository governance: add license/security/codeowners/code-of-conduct baseline files.
   - Evidence: `LICENSE`, `SECURITY.md`, `CODEOWNERS`, `CODE_OF_CONDUCT.md`, `.editorconfig`, `.gitattributes`
 - [x] GitHub automation: add dependabot, dependency-review, PR labeler, and templates.

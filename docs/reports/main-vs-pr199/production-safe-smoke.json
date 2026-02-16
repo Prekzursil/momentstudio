@@ -1,0 +1,47 @@
+{
+  "generated_at": "2026-02-16T09:35:00Z",
+  "target_base_url": "https://momentstudio.ro",
+  "mode": "public_and_safe_auth_only",
+  "results": [
+    {"path": "/", "method": "GET", "status": 200},
+    {"path": "/shop", "method": "GET", "status": 200},
+    {"path": "/contact", "method": "GET", "status": 200},
+    {"path": "/blog", "method": "GET", "status": 200},
+    {"path": "/products/non-existent-slug", "method": "GET", "status": 200},
+    {"path": "/newsletter/confirm", "method": "GET", "status": 200},
+    {"path": "/newsletter/unsubscribe", "method": "GET", "status": 200},
+    {"path": "/api/v1/health/ready", "method": "GET", "status": 200},
+    {"path": "/api/v1/content/home.sections", "method": "GET", "status": 200},
+    {"path": "/api/v1/content/site.navigation", "method": "GET", "status": 200},
+    {
+      "path": "/api/v1/shipping/lockers",
+      "method": "GET",
+      "query": "provider=fan_courier&lat=44.4268&lng=26.1025&radius_km=10&limit=20",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/shipping/lockers",
+      "method": "GET",
+      "query": "provider=sameday&lat=44.4268&lng=26.1025&radius_km=10&limit=20",
+      "status": 503
+    },
+    {
+      "path": "/api/v1/shipping/lockers/cities",
+      "method": "GET",
+      "query": "provider=sameday&q=Bucuresti&limit=8",
+      "status": 404
+    },
+    {"path": "/api/v1/auth/refresh", "method": "POST", "status": 401},
+    {"path": "/api/v1/auth/login", "method": "POST", "status": 400}
+  ],
+  "observations": {
+    "fan_courier_available": true,
+    "sameday_available": false,
+    "sameday_city_endpoint_available": false,
+    "unexpected_5xx_on_safe_auth": false
+  },
+  "coverage_gaps": [
+    "No authenticated production user checkout probe was executed in this audit."
+  ]
+}
+

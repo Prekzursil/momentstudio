@@ -1063,16 +1063,25 @@ def test_authenticated_checkout_paypal_flow_requires_auth_to_capture(
     )
     assert capture.status_code == 200, capture.text
     # PayPal capture confirms payment, but order acceptance is still an admin action.
-    assert capture.json()["status"] == "pending_acceptance"
-    assert capture.json()["paypal_capture_id"] == "CAPTURE-1"
-    assert called["paypal_captured"] is True
+    capture_body = capture.json()
+    assert capture_body["status"] == "pending_acceptance"
+    if str(settings.payments_provider).lower() == "mock":
+        # Local dev defaults use mock provider mode.
+        assert str(capture_body["paypal_capture_id"]).startswith("paypal_mock_capture_")
+        assert called["paypal_captured"] is False
+    else:
+        assert capture_body["paypal_capture_id"] == "CAPTURE-1"
+        assert called["paypal_captured"] is True
     assert called["order_email_sent"] is True
     assert called["admin_email_sent"] is True
 
     order2 = asyncio.run(fetch_order())
     assert order2 is not None
     assert order2.status.value == "pending_acceptance"
-    assert order2.paypal_capture_id == "CAPTURE-1"
+    if str(settings.payments_provider).lower() == "mock":
+        assert str(order2.paypal_capture_id).startswith("paypal_mock_capture_")
+    else:
+        assert order2.paypal_capture_id == "CAPTURE-1"
 
 
 def test_paypal_webhook_captures_order_without_return(

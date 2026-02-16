@@ -161,6 +161,13 @@ alembic upgrade head
 pytest
 ```
 
+Payment provider test parity:
+
+```bash
+# Local dev default is mock provider. For CI-like payment assertions:
+PAYMENTS_PROVIDER=providers PYTHONPATH=backend /home/prekzursil/AdrianaArt/backend/.venv/bin/pytest -q backend/tests/test_checkout_flow.py
+```
+
 ## E2E tests (Playwright)
 
 The CI runs Playwright against the Docker stack. You can run it locally too:
