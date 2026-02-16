@@ -100,6 +100,7 @@ This repository intentionally separates deterministic data collection from AI ju
 - `audit-weekly-evidence.yml`: `contents: read`
 - `audit-weekly-agent.yml`: `contents: read`, `issues: write`, `pull-requests: read`
 - `audit-pr-deep-agent.yml`: `contents: read`, `issues: write`, `pull-requests: read`
+- `audit-agent-watchdog.yml`: `contents: read`, `issues: write`
 
 Security constraints:
 
@@ -116,6 +117,23 @@ Security constraints:
 - Deep PR agent pass:
   - requires `audit:deep` label.
   - produces/updates one deep-audit issue for that PR.
+
+
+## Agent Issue Watchdog
+
+To avoid long-running stalled agent tasks, `audit-agent-watchdog.yml` runs on a daily schedule and via manual dispatch.
+
+Policy:
+
+- Target issues: open issues labeled `ai:in-progress`.
+- Optional scope filter: `audit:*` (default), `all`, or exact audit labels like `audit:ux`.
+- Staleness threshold: **5 days** by default (maintainers may override to a value in the 3–7 day range on manual dispatch).
+- Escalation action for stale issues:
+  - post an automated timeout/escalation comment,
+  - remove `ai:in-progress`,
+  - add `ai:ready` (re-queue),
+  - unassign `copilot` if still assigned.
+- Workflow output logs counters for `scanned`, `stale`, and `updated` issues.
 
 ## Merge Strategy Guidance
 
