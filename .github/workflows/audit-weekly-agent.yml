@@ -192,12 +192,43 @@ jobs:
           if not low:
               lines.append("- No lower-severity findings in this run.")
           else:
-              for row in low[:120]:
-                  lines.append(
-                      f"- [{row.get('severity','s3')}] {row.get('title','Audit finding')} "
-                      f"(surface: `{row.get('surface','storefront')}`, route: `{row.get('route','/')}`, "
-                      f"fingerprint: `{row.get('fingerprint','')}`)"
-                  )
+              aggregated_noise = [
+                  row
+                  for row in low
+                  if str(row.get("rule_id") or "") == "browser_console_noise_cluster" and bool(row.get("aggregated"))
+              ]
+              other_low = [
+                  row
+                  for row in low
+                  if row not in aggregated_noise
+              ]
+
+              if aggregated_noise:
+                  lines.extend(["### Aggregated Browser Console Noise", ""])
+                  for row in aggregated_noise[:40]:
+                      severity = row.get("severity", "s4")
+                      surface = row.get("surface", "storefront")
+                      count = int(row.get("cluster_count") or 0)
+                      message = " ".join(str(row.get("representative_message") or "").split())
+                      sample_routes = [str(route) for route in list(row.get("sample_routes") or []) if str(route).strip()]
+                      lines.append(
+                          f"- [{severity}] `{surface}` cluster impacting `{count}` route(s): `{message[:220]}` "
+                          f"(fingerprint: `{row.get('fingerprint','')}`)"
+                      )
+                      if sample_routes:
+                          lines.append(
+                              "  - Sample routes: " + ", ".join(f"`{route}`" for route in sample_routes[:8])
+                          )
+                  lines.append("")
+
+              if other_low:
+                  lines.extend(["### Other Lower-Severity Findings", ""])
+                  for row in other_low[:120]:
+                      lines.append(
+                          f"- [{row.get('severity','s3')}] {row.get('title','Audit finding')} "
+                          f"(surface: `{row.get('surface','storefront')}`, route: `{row.get('route','/')}`, "
+                          f"fingerprint: `{row.get('fingerprint','')}`)"
+                      )
 
           Path("artifacts/audit-evidence/weekly-digest-body.md").write_text(
               "\n".join(lines).strip() + "\n",

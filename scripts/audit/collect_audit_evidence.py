@@ -512,18 +512,37 @@ def _build_deterministic_findings(
                 )
             )
 
+    console_noise_clusters: dict[tuple[str, str, str], dict[str, Any]] = {}
     for row in console_errors:
         route = str(row.get("route") or "/")
         surface = str(row.get("surface") or "storefront")
         text = str(row.get("text") or "").strip()
         if not text:
             continue
-        severity = str(row.get("severity") or "s3")
+        severity = str(row.get("severity") or "s3").lower()
+        severity = severity if severity in {"s1", "s2", "s3", "s4"} else "s3"
+        if severity == "s4":
+            normalized_text = " ".join(text.split()).lower()
+            if not normalized_text:
+                continue
+            key = (surface, severity, normalized_text)
+            cluster = console_noise_clusters.setdefault(
+                key,
+                {
+                    "surface": surface,
+                    "severity": severity,
+                    "message": text[:500],
+                    "routes": set(),
+                },
+            )
+            cluster["routes"].add(route)
+            continue
+
         findings.append(
             _finding(
                 title=f"Browser error on `{route}`",
                 description=text[:500],
-                severity=severity if severity in {"s1", "s2", "s3", "s4"} else "s3",
+                severity=severity,
                 route=route,
                 surface=surface,
                 rule_id="browser_console_error",
@@ -532,6 +551,32 @@ def _build_deterministic_findings(
                 effort="M",
             )
         )
+
+    for (surface, severity, normalized_text), cluster in sorted(console_noise_clusters.items()):
+        routes = sorted(str(route) for route in cluster.get("routes", set()) if str(route).strip())
+        if not routes:
+            continue
+        sample_routes = routes[:8]
+        signature = hashlib.sha256(f"{surface}|{severity}|{normalized_text}".encode("utf-8")).hexdigest()[:12]
+        noise_finding = _finding(
+            title=f"Browser console noise cluster on `{surface}` ({len(routes)} routes)",
+            description=(
+                f"Representative console message: {cluster.get('message','')}\n\n"
+                f"Affected routes (sample): {', '.join(f'`{route}`' for route in sample_routes)}"
+            ),
+            severity=severity,
+            route=f"cluster:{signature}",
+            surface=surface,
+            rule_id="browser_console_noise_cluster",
+            primary_file="scripts/audit/collect_browser_evidence.mjs",
+            evidence_files=["console-errors.json"],
+            effort="S",
+        )
+        noise_finding["cluster_count"] = len(routes)
+        noise_finding["sample_routes"] = sample_routes
+        noise_finding["representative_message"] = cluster.get("message", "")
+        noise_finding["aggregated"] = True
+        findings.append(noise_finding)
 
     for row in layout_signals:
         route = str(row.get("route") or "/")
