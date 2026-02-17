@@ -84,10 +84,15 @@ jobs:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ vars.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
-          SENTRY_URL: ${{ steps.config.outputs.url }}
+          SENTRY_URL_INPUT: ${{ steps.config.outputs.url }}
           RELEASE: ${{ steps.config.outputs.release }}
         run: |
           set -euo pipefail
+          if [ -n "${SENTRY_URL_INPUT:-}" ]; then
+            export SENTRY_URL="${SENTRY_URL_INPUT}"
+          else
+            unset SENTRY_URL || true
+          fi
           SENTRY_CLI="npx --yes @sentry/cli@2.57.0"
           ${SENTRY_CLI} releases new "$RELEASE"
           ${SENTRY_CLI} releases set-commits "$RELEASE" --auto
