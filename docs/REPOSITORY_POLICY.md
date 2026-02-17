@@ -149,6 +149,52 @@ Security constraints:
   - requires `audit:deep` label.
   - produces/updates one deep-audit issue for that PR.
 
+## AI Audit Phase 2: Roadmap Auto-Sync
+
+Phase 2 extends the weekly agent flow with optional project synchronization:
+
+- Source: severe issue upsert output from `scripts/audit/upsert_audit_issues.py` (`--severe-output`).
+- Target: `AdrianaArt Roadmap` (`Prekzursil` project `#2` by default, overridable via variables).
+- Behavior:
+  - upsert open severe issues into project items.
+  - enforce `Roadmap Lane=Now`.
+  - set `Status=Todo` only when status is empty or non-terminal.
+  - do not auto-remove/archive items in this phase.
+
+Configuration:
+
+- Secret: `ROADMAP_PROJECT_WRITE_TOKEN` (optional)
+- Variable: `ROADMAP_PROJECT_OWNER` (optional, default `Prekzursil`)
+- Variable: `ROADMAP_PROJECT_NUMBER` (optional, default `2`)
+
+Safety rules:
+
+- If project write token is missing, the sync step is skipped safely and workflow stays green.
+- Skip reason is emitted in weekly workflow summary.
+- No token value is printed in logs.
+
+## Sentry Observability Baseline
+
+Sentry remains opt-in and environment-driven:
+
+- Backend captures errors/traces/profiles with additive config keys:
+  - `SENTRY_DSN`
+  - `SENTRY_TRACES_SAMPLE_RATE`
+  - `SENTRY_PROFILES_SAMPLE_RATE`
+  - `SENTRY_ENABLE_LOGS`
+  - `SENTRY_LOG_LEVEL`
+- Frontend captures errors/traces/replays through runtime config:
+  - `SENTRY_DSN`
+  - `SENTRY_TRACES_SAMPLE_RATE`
+  - `SENTRY_REPLAY_SESSION_SAMPLE_RATE`
+  - `SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE`
+
+Operational guardrails:
+
+- Never hardcode DSNs in source-controlled files.
+- Keep sampling rates environment-specific.
+- If noise/cost spikes, set rates to `0` as first-line rollback.
+
 
 ## Agent Issue Watchdog
 

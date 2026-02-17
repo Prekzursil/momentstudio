@@ -75,7 +75,7 @@ def test_upsert_issues_updates_existing_and_creates_new(monkeypatch) -> None:
     monkeypatch.setattr(module, "_request", fake_request)
     monkeypatch.setattr(module, "_safe_create_issue", fake_create_issue)
 
-    created, updated = module._upsert_issues(
+    created, updated, rows = module._upsert_issues(
         ctx,
         findings,
         run_url="https://example.test/run",
@@ -86,6 +86,7 @@ def test_upsert_issues_updates_existing_and_creates_new(monkeypatch) -> None:
     assert patched_numbers == [77]
     assert len(created_calls) == 1
     assert "ai:ready" in created_calls[0][2]
+    assert [row["action"] for row in rows] == ["updated", "created"]
 
 
 def test_close_stale_fingerprint_issues_closes_only_non_active_and_not_in_progress(monkeypatch) -> None:
