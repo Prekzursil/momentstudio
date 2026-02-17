@@ -7,6 +7,7 @@ import { of } from 'rxjs';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { MarkdownService } from '../../core/markdown.service';
+import { SeoHeadLinksService } from '../../core/seo-head-links.service';
 import { SiteSocialService } from '../../core/site-social.service';
 import { SupportService } from '../../core/support.service';
 import { ContactComponent } from './contact.component';
@@ -15,6 +16,7 @@ describe('ContactComponent', () => {
   let meta: jasmine.SpyObj<Meta>;
   let title: jasmine.SpyObj<Title>;
   let api: jasmine.SpyObj<ApiService>;
+  let seoHeadLinks: jasmine.SpyObj<SeoHeadLinksService>;
   let auth: jasmine.SpyObj<AuthService>;
   let support: jasmine.SpyObj<SupportService>;
   let translate: TranslateService;
@@ -23,6 +25,8 @@ describe('ContactComponent', () => {
     meta = jasmine.createSpyObj<Meta>('Meta', ['updateTag']);
     title = jasmine.createSpyObj<Title>('Title', ['setTitle']);
     api = jasmine.createSpyObj<ApiService>('ApiService', ['get']);
+    seoHeadLinks = jasmine.createSpyObj<SeoHeadLinksService>('SeoHeadLinksService', ['setLocalizedCanonical']);
+    seoHeadLinks.setLocalizedCanonical.and.returnValue('http://localhost:4200/contact');
     api.get.and.callFake((path: string, params?: Record<string, unknown>) => {
       if (path !== '/content/pages/contact') throw new Error(`Unexpected path: ${path}`);
       if (params?.['lang'] === 'ro') {
@@ -50,6 +54,7 @@ describe('ContactComponent', () => {
         { provide: Title, useValue: title },
         { provide: Meta, useValue: meta },
         { provide: ApiService, useValue: api },
+        { provide: SeoHeadLinksService, useValue: seoHeadLinks },
         { provide: MarkdownService, useValue: markdown },
         { provide: SiteSocialService, useValue: social },
         { provide: AuthService, useValue: auth },
@@ -83,6 +88,8 @@ describe('ContactComponent', () => {
     expect(meta.updateTag).toHaveBeenCalledWith({ name: 'description', content: 'Hello' });
     expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:description', content: 'Hello' });
     expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:title', content: 'Contact | momentstudio' });
+    expect(seoHeadLinks.setLocalizedCanonical).toHaveBeenCalledWith('/contact', 'en', {});
+    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:url', content: 'http://localhost:4200/contact' });
   });
 
   it('updates meta tags when language changes', () => {
@@ -91,6 +98,8 @@ describe('ContactComponent', () => {
 
     title.setTitle.calls.reset();
     meta.updateTag.calls.reset();
+    seoHeadLinks.setLocalizedCanonical.calls.reset();
+    seoHeadLinks.setLocalizedCanonical.and.returnValue('http://localhost:4200/contact?lang=ro');
 
     translate.use('ro');
 
@@ -98,6 +107,8 @@ describe('ContactComponent', () => {
     expect(meta.updateTag).toHaveBeenCalledWith({ name: 'description', content: 'Salut' });
     expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:description', content: 'Salut' });
     expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:title', content: 'Contact RO | momentstudio' });
+    expect(seoHeadLinks.setLocalizedCanonical).toHaveBeenCalledWith('/contact', 'ro', {});
+    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:url', content: 'http://localhost:4200/contact?lang=ro' });
   });
 
   it('uses page blocks for meta description when present', () => {

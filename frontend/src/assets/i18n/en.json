@@ -78,6 +78,16 @@
       "offline": "Offline | momentstudio",
       "error": "Something went wrong",
       "not_found": "Not Found"
+    },
+    "descriptions": {
+      "home": "Discover handcrafted ceramic art, featured collections, and new arrivals from momentstudio.",
+      "shop": "Browse handmade products by category, compare options, and find pieces crafted for everyday use.",
+      "blog": "Read practical stories, guides, and studio updates from momentstudio.",
+      "blog_post": "Read this article from momentstudio for practical ideas and studio context.",
+      "page": "Read this momentstudio page for details, policy information, and support links.",
+      "product": "View product details, materials, and availability for this handmade piece from momentstudio.",
+      "about": "Learn about momentstudio and the makers behind handcrafted ceramic art.",
+      "contact": "Contact momentstudio for custom requests, order support, and collaboration questions."
     }
   },
   "nav": {
@@ -164,6 +174,8 @@
     "admin": {
       "edit": "Edit this page"
     },
+    "exploreMore": "Explore related pages",
+    "exploreMoreCopy": "Continue with nearby sections that help you browse products, stories, and support information.",
     "blocks": {
       "productGrid": {
         "errorTitle": "Could not load products.",
@@ -1209,7 +1221,9 @@
     "addedTitle": "Added to cart",
     "addedBody": "{{qty}} × {{name}} added to cart",
     "metaTitle": "{{name}} | momentstudio",
-    "metaDescriptionFallback": "Discover {{name}} — a handcrafted piece from momentstudio."
+    "metaDescriptionFallback": "Discover {{name}} — a handcrafted piece from momentstudio.",
+    "exploreMore": "Explore related pages",
+    "exploreMoreCopy": "Use these links to continue browsing products, stories, and support resources."
   },
   "cart": {
     "title": "Your cart",

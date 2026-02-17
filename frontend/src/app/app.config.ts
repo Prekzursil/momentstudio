@@ -11,6 +11,7 @@ import { provideServiceWorker } from '@angular/service-worker';
 import { appConfig as runtimeConfig } from './core/app-config';
 import { TranslatedTitleStrategy } from './core/translated-title.strategy';
 import { AppMissingTranslationHandler } from './core/missing-translation.handler';
+import { provideClientHydration, withEventReplay } from '@angular/platform-browser';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -32,8 +33,7 @@ export const appConfig: ApplicationConfig = {
     },
     importProvidersFrom(
       TranslateModule.forRoot({
-        defaultLanguage: 'en',
-        useDefaultLang: true,
+        fallbackLang: 'en',
         missingTranslationHandler: {
           provide: MissingTranslationHandler,
           useClass: AppMissingTranslationHandler
@@ -43,6 +43,6 @@ export const appConfig: ApplicationConfig = {
     ...provideTranslateHttpLoader({
       prefix: '/assets/i18n/',
       suffix: '.json',
-    }),
+    }), provideClientHydration(withEventReplay()),
   ]
 };

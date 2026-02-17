@@ -1,0 +1,51 @@
+{
+  "generated_at": "2026-02-16T09:35:00Z",
+  "backend_matrix": {
+    "suite": [
+      "backend/tests/test_netopia_webhook.py",
+      "backend/tests/test_checkout_flow.py",
+      "backend/tests/test_shipping_lockers_api.py",
+      "backend/tests/test_lockers_official_selection.py",
+      "backend/tests/test_sameday_easybox_mirror.py",
+      "backend/tests/test_media_dam_api.py"
+    ],
+    "pre_fix": {
+      "mock": {
+        "passed": 37,
+        "failed": 1,
+        "failure_ids": [
+          "test_authenticated_checkout_paypal_flow_requires_auth_to_capture"
+        ],
+        "classification": "environment_profile_mismatch"
+      },
+      "providers": {
+        "passed": 38,
+        "failed": 0
+      }
+    },
+    "post_fix": {
+      "mock": {
+        "passed": 38,
+        "failed": 0
+      },
+      "providers": {
+        "passed": 38,
+        "failed": 0
+      }
+    }
+  },
+  "frontend": {
+    "targeted_specs": {
+      "passed": 37,
+      "failed": 0
+    },
+    "build": "pass"
+  },
+  "compose": {
+    "config": "pass"
+  },
+  "residual_warnings": [
+    "aiosqlite event-loop shutdown warnings in some test paths (non-blocking, pre-existing)"
+  ]
+}
+

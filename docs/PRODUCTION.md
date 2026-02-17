@@ -85,6 +85,43 @@ Operational visibility:
   - Optional PayPal: `PAYPAL_ENABLED=1`
   - Optional Netopia: `NETOPIA_ENABLED=1`
 
+### Sentry (required in production)
+
+Backend:
+
+- `SENTRY_DSN` must be configured when `ENVIRONMENT=production` (startup fails fast otherwise).
+- `SENTRY_SEND_DEFAULT_PII=1` (repository policy).
+- Recommended baseline:
+  - `SENTRY_TRACES_SAMPLE_RATE=1.0`
+  - `SENTRY_PROFILES_SAMPLE_RATE=1.0`
+  - `SENTRY_ENABLE_LOGS=1`
+  - `SENTRY_LOG_LEVEL=info`
+
+Frontend:
+
+- `SENTRY_ENABLED=1`
+- `SENTRY_DSN` (same DSN as backend for shared-project strategy)
+- `SENTRY_SEND_DEFAULT_PII=1`
+- Recommended baseline:
+  - `SENTRY_TRACES_SAMPLE_RATE=1.0`
+  - `SENTRY_REPLAY_SESSION_SAMPLE_RATE=0.25`
+  - `SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE=1.0`
+
+Release/sourcemap upload from GitHub Actions:
+
+- Workflow: `.github/workflows/sentry-release.yml`
+- Required repository settings:
+  - secret: `SENTRY_AUTH_TOKEN`
+  - variable: `SENTRY_ORG`
+  - variable: `SENTRY_PROJECT`
+  - optional variable: `SENTRY_URL` (self-hosted only)
+
+Rollback/noise controls (without disabling Sentry entirely):
+
+- backend: set `SENTRY_TRACES_SAMPLE_RATE=0` and `SENTRY_PROFILES_SAMPLE_RATE=0`
+- frontend: set `SENTRY_TRACES_SAMPLE_RATE=0` and `SENTRY_REPLAY_SESSION_SAMPLE_RATE=0`
+- keep `SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE=1.0` if you still want replay only for error sessions
+
 ### Cloudflare Turnstile (setup)
 
 1. Cloudflare Dashboard → **Turnstile** → **Add widget**.

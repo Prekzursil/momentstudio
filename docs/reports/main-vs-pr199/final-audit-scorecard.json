@@ -1,0 +1,55 @@
+{
+  "generated_at": "2026-02-16T09:35:00Z",
+  "baseline": {
+    "pr": 199,
+    "merge_commit": "5e3b438520a023ae2f3d1ce3b27fa772e10aa627"
+  },
+  "head": {
+    "commit": "dd589b6adcfcc295b14f0c9cae71abb949d1dbf7",
+    "branch": "fix/main-vs-pr199-regression-audit"
+  },
+  "verdict": {
+    "result": "pass",
+    "better_than_baseline": true,
+    "unresolved_s1_s2": 0
+  },
+  "contract_gates": [
+    {"id": "payments.netopia.webhook.200_ack", "status": "pass"},
+    {"id": "checkout.compose_smoke.payments", "status": "pass"},
+    {"id": "required_checks.green", "status": "pass"},
+    {"id": "shipping.fan_path", "status": "pass"},
+    {"id": "media_dam.targeted", "status": "pass"}
+  ],
+  "findings": [
+    {
+      "id": "env_parity.payment_provider_mode",
+      "severity": "S3",
+      "status": "resolved",
+      "files_touched": [
+        "backend/tests/test_checkout_flow.py"
+      ]
+    },
+    {
+      "id": "env_parity.dev_locker_defaults",
+      "severity": "S3",
+      "status": "resolved",
+      "files_touched": [
+        "scripts/env/bootstrap.sh",
+        "scripts/env/doctor.sh",
+        "docs/ENVIRONMENT_PROFILES.md"
+      ]
+    },
+    {
+      "id": "tests.sqlite_thread_warnings",
+      "severity": "S4",
+      "status": "accepted_non_blocking",
+      "files_touched": []
+    }
+  ],
+  "production_observations": {
+    "fan_locker_status": 200,
+    "sameday_locker_status": 503,
+    "sameday_cities_status": 404
+  }
+}
+

@@ -1,0 +1,216 @@
+name: Percy Visual
+
+on:
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: "Snapshot scope"
+        required: false
+        type: choice
+        default: core
+        options:
+          - core
+          - full
+          - both
+
+permissions:
+  contents: read
+
+jobs:
+  percy-core-pr:
+    if: (github.event_name == 'pull_request' && vars.PERCY_PR_ENABLED == '1') || (github.event_name == 'workflow_dispatch' && (github.event.inputs.scope == 'core' || github.event.inputs.scope == 'both' || github.event.inputs.scope == ''))
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Upgrade npm
+        run: npm i -g npm@11.7.0
+
+      - name: Resolve Percy token availability
+        id: token
+        env:
+          PERCY_TOKEN: ${{ secrets.PERCY_TOKEN }}
+        run: |
+          if [ -n "${PERCY_TOKEN:-}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "## Percy Visual (Core)"
+              echo ""
+              echo "Skipped: \`PERCY_TOKEN\` is not configured."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Install frontend dependencies
+        if: steps.token.outputs.enabled == 'true'
+        run: |
+          cd frontend
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Build and start compose stack
+        if: steps.token.outputs.enabled == 'true'
+        env:
+          LOCKERS_USE_OVERPASS_FALLBACK: "0"
+          PAYMENTS_PROVIDER: "mock"
+        run: docker compose -f infra/docker-compose.yml up -d --build
+
+      - name: Wait for frontend/backend
+        if: steps.token.outputs.enabled == 'true'
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:8001/api/v1/health/ready >/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:4201 >/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+          curl -fsS http://localhost:4201 >/dev/null
+
+      - name: Percy core snapshot run (non-blocking)
+        if: steps.token.outputs.enabled == 'true'
+        env:
+          PERCY_TOKEN: ${{ secrets.PERCY_TOKEN }}
+          E2E_BASE_URL: http://localhost:4201
+        run: |
+          set +e
+          cd frontend
+          npx percy exec -- npm run e2e -- e2e/percy-core-routes.spec.ts --project=chromium --workers=1
+          status=$?
+          if [ "$status" -eq 0 ]; then
+            {
+              echo "## Percy Visual (Core)"
+              echo ""
+              echo "Core snapshot run completed."
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "## Percy Visual (Core)"
+              echo ""
+              echo "Core snapshot run reported failures (non-blocking)."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit 0
+
+      - name: Logs (on failure)
+        if: failure() && steps.token.outputs.enabled == 'true'
+        run: docker compose -f infra/docker-compose.yml logs --no-color --tail=200
+
+      - name: Tear down
+        if: always() && steps.token.outputs.enabled == 'true'
+        run: docker compose -f infra/docker-compose.yml down -v
+
+  percy-full-nightly:
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.scope == 'full' || github.event.inputs.scope == 'both'))
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Upgrade npm
+        run: npm i -g npm@11.7.0
+
+      - name: Resolve Percy token availability
+        id: token
+        env:
+          PERCY_TOKEN: ${{ secrets.PERCY_TOKEN }}
+        run: |
+          if [ -n "${PERCY_TOKEN:-}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "## Percy Visual (Full)"
+              echo ""
+              echo "Skipped: \`PERCY_TOKEN\` is not configured."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Install frontend dependencies
+        if: steps.token.outputs.enabled == 'true'
+        run: |
+          cd frontend
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Build and start compose stack
+        if: steps.token.outputs.enabled == 'true'
+        env:
+          LOCKERS_USE_OVERPASS_FALLBACK: "0"
+          PAYMENTS_PROVIDER: "mock"
+        run: docker compose -f infra/docker-compose.yml up -d --build
+
+      - name: Wait for frontend/backend
+        if: steps.token.outputs.enabled == 'true'
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:8001/api/v1/health/ready >/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:4201 >/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+          curl -fsS http://localhost:4201 >/dev/null
+
+      - name: Percy full snapshot run (non-blocking)
+        if: steps.token.outputs.enabled == 'true'
+        env:
+          PERCY_TOKEN: ${{ secrets.PERCY_TOKEN }}
+          E2E_BASE_URL: http://localhost:4201
+        run: |
+          set +e
+          cd frontend
+          npx percy exec -- npm run e2e -- e2e/percy-full-routes.spec.ts --project=chromium --workers=1
+          status=$?
+          if [ "$status" -eq 0 ]; then
+            {
+              echo "## Percy Visual (Full)"
+              echo ""
+              echo "Full snapshot run completed."
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "## Percy Visual (Full)"
+              echo ""
+              echo "Full snapshot run reported failures (non-blocking)."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit 0
+
+      - name: Logs (on failure)
+        if: failure() && steps.token.outputs.enabled == 'true'
+        run: docker compose -f infra/docker-compose.yml logs --no-color --tail=200
+
+      - name: Tear down
+        if: always() && steps.token.outputs.enabled == 'true'
+        run: docker compose -f infra/docker-compose.yml down -v

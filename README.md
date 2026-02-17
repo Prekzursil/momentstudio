@@ -105,6 +105,56 @@ docker compose -f infra/docker-compose.yml exec -T backend python -m app.cli boo
 
 See `docs/ENVIRONMENT_PROFILES.md` for full details and troubleshooting.
 
+## Observability and Visual Regression
+
+Runtime env keys (frontend):
+
+- `FRONTEND_CLARITY_PROJECT_ID` — Microsoft Clarity project id.
+- `CLARITY_ENABLED` — enable/disable Clarity bootstrap.
+- `SENTRY_ENABLED` — global frontend Sentry switch (`1` by default).
+- `SENTRY_DSN` — shared Sentry DSN (frontend + backend).
+- `SENTRY_SEND_DEFAULT_PII` — defaults to `1` for this repository policy.
+- `SENTRY_TRACES_SAMPLE_RATE`, `SENTRY_REPLAY_SESSION_SAMPLE_RATE`, `SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE`.
+
+Runtime env keys (backend):
+
+- `SENTRY_DSN` — shared DSN.
+- `SENTRY_SEND_DEFAULT_PII` — defaults to `1`.
+- `SENTRY_TRACES_SAMPLE_RATE`, `SENTRY_PROFILES_SAMPLE_RATE`, `SENTRY_ENABLE_LOGS`, `SENTRY_LOG_LEVEL`.
+
+Recommended max-observability baseline (override per environment as needed):
+
+- backend: `SENTRY_TRACES_SAMPLE_RATE=1.0`, `SENTRY_PROFILES_SAMPLE_RATE=1.0`, `SENTRY_ENABLE_LOGS=1`, `SENTRY_LOG_LEVEL=info`
+- frontend: `SENTRY_ENABLED=1`, `SENTRY_TRACES_SAMPLE_RATE=1.0`, `SENTRY_REPLAY_SESSION_SAMPLE_RATE=0.25`, `SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE=1.0`
+
+Behavior policy:
+
+- Clarity initializes only when analytics opt-in is enabled, on public storefront routes, and never for authenticated sessions.
+- Sentry initializes only when `SENTRY_DSN` is configured.
+
+CI sourcemap + release upload:
+
+- Workflow: `.github/workflows/sentry-release.yml`
+- Required GitHub configuration:
+  - secret: `SENTRY_AUTH_TOKEN`
+  - variable: `SENTRY_ORG`
+  - variable: `SENTRY_PROJECT`
+  - optional variable: `SENTRY_URL` (for self-hosted Sentry)
+- Release identifier: full git SHA (`GITHUB_SHA`), aligned with production `APP_VERSION` stamping.
+- If required Sentry secret/variables are missing, the workflow exits green with an explicit skip summary.
+
+Percy workflows:
+
+- `Percy Visual` runs core snapshots on pull requests (non-blocking).
+- `Percy Visual` runs expanded snapshots on weekly schedule or manual dispatch (non-blocking).
+- If `PERCY_TOKEN` is not configured, Percy jobs are skipped with a summary note.
+
+Applitools workflows:
+
+- `Applitools Visual` runs Eyes snapshots on pull requests (non-blocking).
+- `Applitools Visual` also runs weekly and supports manual dispatch.
+- If `APPLITOOLS_API_KEY` is not configured, Applitools jobs are skipped with a summary note.
+
 ## Common commands
 
 ```bash
@@ -150,6 +200,14 @@ npm test -- --watch=false
 npm run build
 ```
 
+Frontend SSR smoke (initial HTML crawlability):
+
+```bash
+cd frontend
+npm run build:ssr
+PORT=4000 SSR_API_BASE_URL=http://127.0.0.1:8000/api/v1 npm run serve:ssr
+```
+
 Backend-only:
 
 ```bash
@@ -159,6 +217,13 @@ source .venv/bin/activate
 pip install -r requirements.txt
 alembic upgrade head
 pytest
+```
+
+Payment provider test parity:
+
+```bash
+# Local dev default is mock provider. For CI-like payment assertions:
+PAYMENTS_PROVIDER=providers PYTHONPATH=backend /home/prekzursil/AdrianaArt/backend/.venv/bin/pytest -q backend/tests/test_checkout_flow.py
 ```
 
 ## E2E tests (Playwright)
@@ -229,9 +294,9 @@ The UX/IA/correctness automation is split intentionally:
 
 Workflows:
 
-- `Audit PR Evidence` (required check): fast deterministic evidence on pull requests.
-- `Audit Weekly Evidence`: full weekly evidence pack.
-- `Audit Weekly Agent`: creates/updates rolling issue `Weekly UX/IA Audit Digest` and assigns `@copilot`.
+- `Audit PR Evidence` (required check): fast deterministic evidence on pull requests, captured against SSR output.
+- `Audit Weekly Evidence`: full weekly evidence pack + generated SEO content backlog, captured against SSR output.
+- `Audit Weekly Agent`: creates/updates rolling issue `Weekly UX/IA Audit Digest`, upserts `s1/s2` findings, and also upserts indexable-route `s3` SEO debt issues (`audit:seo`) with deterministic fingerprint dedupe.
 - `Audit PR Agent`: label a PR with `audit:agent` (or run the workflow manually) to open a Copilot-assigned audit issue against the latest PR evidence.
 - `Audit PR Deep Agent`: opt-in deep pass for PRs labeled `audit:deep`.
 
@@ -240,7 +305,8 @@ Quick usage:
 1. Open PR and review `audit-evidence-pack` artifact from `Audit PR Evidence`.
 2. Add label `audit:deep` to request a Copilot deep audit issue for that PR.
 3. Review weekly digest issue for severe findings + rolling lower-severity notes.
-4. Manual run helpers:
+4. Review route-level SEO debt issues labeled `audit:seo` + `ai:ready` (created from weekly evidence for indexable routes only).
+5. Manual run helpers:
    - Weekly chain: run `Audit Weekly Evidence`, then run `Audit Weekly Agent` (or let `workflow_run` trigger it automatically).
    - Deep agent: run `Audit PR Deep Agent` with `pr_number` (or leave blank to auto-detect when exactly one open PR targets `main`).
 

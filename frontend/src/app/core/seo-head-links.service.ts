@@ -10,15 +10,18 @@ export class SeoHeadLinksService {
   private readonly document = inject(DOCUMENT);
   private readonly managedAlternateSelector = 'link[rel="alternate"][data-seo-managed="true"]';
 
-  setLocalizedCanonical(path: string, currentLang: SeoLanguage, query: Record<string, SeoQueryValue>): string {
+  setLocalizedCanonical(path: string, currentLang: SeoLanguage, query: Record<string, SeoQueryValue> = {}): string {
     const lang = currentLang === 'ro' ? 'ro' : 'en';
-    const canonicalHref = this.buildHref(path, { ...query, lang });
+    const langAgnosticQuery = this.withoutLang(query);
+    const canonicalEn = this.buildHref(path, langAgnosticQuery);
+    const canonicalRo = this.buildHref(path, { ...langAgnosticQuery, lang: 'ro' });
+    const canonicalHref = lang === 'ro' ? canonicalRo : canonicalEn;
     this.upsertCanonical(canonicalHref);
 
     this.clearManagedAlternates();
-    this.upsertAlternate('en', this.buildHref(path, { ...query, lang: 'en' }));
-    this.upsertAlternate('ro', this.buildHref(path, { ...query, lang: 'ro' }));
-    this.upsertAlternate('x-default', this.buildHref(path, { ...query, lang: 'en' }));
+    this.upsertAlternate('en', canonicalEn);
+    this.upsertAlternate('ro', canonicalRo);
+    this.upsertAlternate('x-default', canonicalEn);
 
     return canonicalHref;
   }
@@ -66,6 +69,15 @@ export class SeoHeadLinksService {
     const trimmed = String(path || '').trim();
     if (!trimmed) return '/';
     return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+  }
+
+  private withoutLang(query: Record<string, SeoQueryValue>): Record<string, SeoQueryValue> {
+    const out: Record<string, SeoQueryValue> = {};
+    for (const [key, value] of Object.entries(query || {})) {
+      if (key === 'lang') continue;
+      out[key] = value;
+    }
+    return out;
   }
 
   private toSearchParams(query: Record<string, SeoQueryValue>): URLSearchParams {

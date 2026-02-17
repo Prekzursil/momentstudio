@@ -1,0 +1,78 @@
+{
+  "baseline_commit": "5e3b438520a023ae2f3d1ce3b27fa772e10aa627",
+  "head_commit": "dd589b6adcfcc295b14f0c9cae71abb949d1dbf7",
+  "generated_at": "2026-02-16T09:35:00Z",
+  "delta": {
+    "total_files_changed": 188,
+    "area_counts": {
+      "payments": 3,
+      "shipping": 16,
+      "media_dam": 16,
+      "checkout_auth": 2,
+      "frontend_storefront": 38,
+      "infra_ci": 54,
+      "governance": 16,
+      "other": 43
+    }
+  },
+  "high_risk_tracks": [
+    {
+      "id": "payments_checkout",
+      "reason": "Direct overlap with PR #199 webhook and checkout contract.",
+      "scenarios": [
+        "netopia_webhook_200_ack",
+        "paypal_capture_signed_in_flow",
+        "checkout_provider_mode_parity"
+      ],
+      "test_files": [
+        "backend/tests/test_netopia_webhook.py",
+        "backend/tests/test_checkout_flow.py",
+        "frontend/src/app/pages/checkout/checkout.component.spec.ts"
+      ]
+    },
+    {
+      "id": "shipping_lockers",
+      "reason": "Post-199 mirror architecture and provider fallback behavior.",
+      "scenarios": [
+        "fan_courier_lookup",
+        "sameday_mirror_lookup",
+        "city_autocomplete_snapshot_contract"
+      ],
+      "test_files": [
+        "backend/tests/test_shipping_lockers_api.py",
+        "backend/tests/test_lockers_official_selection.py",
+        "backend/tests/test_sameday_easybox_mirror.py",
+        "frontend/src/app/shared/locker-picker.component.spec.ts"
+      ]
+    },
+    {
+      "id": "media_dam_surfaces",
+      "reason": "Large media workflow expansion can impact admin upload/render behavior.",
+      "scenarios": [
+        "dam_api_contracts",
+        "asset_library_render",
+        "preview_and_visibility_gates"
+      ],
+      "test_files": [
+        "backend/tests/test_media_dam_api.py",
+        "frontend/src/app/pages/admin/shared/dam-asset-library.component.spec.ts",
+        "frontend/src/app/pages/admin/shared/asset-library.component.spec.ts"
+      ]
+    }
+  ],
+  "pre_fix_findings": [
+    {
+      "id": "env_parity.payment_provider_mode",
+      "severity": "S3",
+      "class": "environment_profile_mismatch",
+      "description": "A checkout flow assertion expected providers-mode capture IDs but dev defaults to mock provider."
+    },
+    {
+      "id": "env_parity.dev_locker_defaults",
+      "severity": "S3",
+      "class": "environment_profile_mismatch",
+      "description": "Dev profile could start with locker fallback disabled and mirror enabled, making locker APIs appear down."
+    }
+  ]
+}
+

@@ -83,12 +83,36 @@ Policy selection for this phase:
 
 Checks-only is the current steady-state policy for this repository. If contributor cadence changes in the future, review this document and explicitly update branch protection in a dedicated governance PR.
 
+## Non-blocking observability checks
+
+- `Percy Visual` runs visual snapshot coverage for storefront routes:
+  - PR core snapshot pass
+  - weekly/manual expanded snapshot pass
+- `Applitools Visual` runs Eyes snapshot coverage for storefront routes:
+  - PR core snapshot pass
+  - weekly/manual run
+- Percy is intentionally non-blocking in this phase and is not part of required branch-protection checks.
+- Applitools is intentionally non-blocking in this phase and is not part of required branch-protection checks.
+- If `PERCY_TOKEN` is missing, Percy workflows skip with an explicit summary message.
+- If `APPLITOOLS_API_KEY` is missing, Applitools workflows skip with an explicit summary message.
+- Copilot custom setup workflow must expose a single job named `copilot-setup-steps` for agent compatibility.
+
+## Production observability policy
+
+- Production backend startup requires `SENTRY_DSN` (fail-fast enforcement in startup checks).
+- `send_default_pii` is intentionally enabled repository-wide (`SENTRY_SEND_DEFAULT_PII=1` for backend/frontend).
+- Frontend Sentry remains runtime-gated (`SENTRY_ENABLED`) and DSN-gated (`SENTRY_DSN`).
+- GitHub Actions `Sentry Release` workflow publishes releases and uploads frontend sourcemaps when configured:
+  - secret: `SENTRY_AUTH_TOKEN`
+  - variables: `SENTRY_ORG`, `SENTRY_PROJECT` (optional `SENTRY_URL` for self-hosted)
+- Missing Sentry CI configuration is treated as a non-fatal skip with explicit workflow summary output.
+
 ## Evidence Pack vs Agent Pass
 
 This repository intentionally separates deterministic data collection from AI judgment:
 
 - Evidence Pack (deterministic CI):
-  - `Audit PR Evidence` and `Audit Weekly Evidence` collect route map, SEO snapshot, console/layout signals, screenshots, and deterministic findings.
+  - `Audit PR Evidence` and `Audit Weekly Evidence` collect route map, SEO snapshot, console/layout signals, screenshots, and deterministic findings from SSR-rendered pages.
   - No LLM/API calls are used in CI evidence collection.
 - Agent Pass (Copilot issue assignment):
   - `Audit Weekly Agent` updates the rolling issue `Weekly UX/IA Audit Digest`, upserts severe findings, and assigns `@copilot`.
@@ -114,11 +138,62 @@ Security constraints:
 
 - Severe findings (`severity:s1/s2`):
   - upsert as individual issues using deterministic fingerprint dedupe.
-- Lower-severity findings (`severity:s3/s4`):
+- Medium SEO debt findings (`severity:s3`, indexable storefront only):
+  - upsert as individual issues when labeled `audit:seo` and `indexable=true`.
+  - keep dedupe behavior identical (fingerprint marker in issue body).
+- Remaining lower-severity findings (`severity:s3/s4`) not eligible for direct issue upsert:
   - kept in the rolling digest issue.
+- Noindex storefront routes:
+  - excluded from strict SEO content gating and severe technical SEO issue creation.
 - Deep PR agent pass:
   - requires `audit:deep` label.
   - produces/updates one deep-audit issue for that PR.
+
+## AI Audit Phase 2: Roadmap Auto-Sync
+
+Phase 2 extends the weekly agent flow with optional project synchronization:
+
+- Source: severe issue upsert output from `scripts/audit/upsert_audit_issues.py` (`--severe-output`).
+- Target: `AdrianaArt Roadmap` (`Prekzursil` project `#2` by default, overridable via variables).
+- Behavior:
+  - upsert open severe issues into project items.
+  - enforce `Roadmap Lane=Now`.
+  - set `Status=Todo` only when status is empty or non-terminal.
+  - do not auto-remove/archive items in this phase.
+
+Configuration:
+
+- Secret: `ROADMAP_PROJECT_WRITE_TOKEN` (optional)
+- Variable: `ROADMAP_PROJECT_OWNER` (optional, default `Prekzursil`)
+- Variable: `ROADMAP_PROJECT_NUMBER` (optional, default `2`)
+
+Safety rules:
+
+- If project write token is missing, the sync step is skipped safely and workflow stays green.
+- Skip reason is emitted in weekly workflow summary.
+- No token value is printed in logs.
+
+## Sentry Observability Baseline
+
+Sentry remains opt-in and environment-driven:
+
+- Backend captures errors/traces/profiles with additive config keys:
+  - `SENTRY_DSN`
+  - `SENTRY_TRACES_SAMPLE_RATE`
+  - `SENTRY_PROFILES_SAMPLE_RATE`
+  - `SENTRY_ENABLE_LOGS`
+  - `SENTRY_LOG_LEVEL`
+- Frontend captures errors/traces/replays through runtime config:
+  - `SENTRY_DSN`
+  - `SENTRY_TRACES_SAMPLE_RATE`
+  - `SENTRY_REPLAY_SESSION_SAMPLE_RATE`
+  - `SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE`
+
+Operational guardrails:
+
+- Never hardcode DSNs in source-controlled files.
+- Keep sampling rates environment-specific.
+- If noise/cost spikes, set rates to `0` as first-line rollback.
 
 
 ## Agent Issue Watchdog

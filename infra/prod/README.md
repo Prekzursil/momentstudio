@@ -3,7 +3,8 @@
 This folder contains a production-oriented Docker Compose stack for **momentstudio.ro**:
 
 - Caddy (TLS termination, reverse proxy)
-- Frontend (Angular build served by nginx)
+- Frontend SSR (`frontend-ssr`, Angular server runtime)
+- Frontend static fallback (`frontend`, nginx-served Angular build)
 - Backend (FastAPI + Alembic migrations at startup)
 - Media worker (Redis-backed DAM job processor)
 - Postgres
@@ -58,15 +59,21 @@ Edit:
 - `infra/prod/.env`
   - set a strong `POSTGRES_PASSWORD`
   - optionally set `CADDY_EMAIL`
+  - optionally set `SSR_API_BASE_URL` (defaults to `http://backend:8000/api/v1` for `frontend-ssr`)
 - `backend/.env`
   - set `ENVIRONMENT=production`
   - set a strong `SECRET_KEY`
   - optional (recommended for multi-replica): set `REDIS_URL=redis://redis:6379/0`
+  - optional backend Sentry: set `SENTRY_DSN=...` and sample rates
+  - `SENTRY_SEND_DEFAULT_PII=1` is the default repository policy
   - optional CAPTCHA (Cloudflare Turnstile): set `CAPTCHA_ENABLED=1` and `TURNSTILE_SECRET_KEY=...`
   - configure Stripe/PayPal/Netopia + SMTP as needed
 - `frontend/.env`
   - set `APP_ENV=production`
   - keep `API_BASE_URL=/api/v1`
+  - optional Clarity: set `FRONTEND_CLARITY_PROJECT_ID=...` and `CLARITY_ENABLED=1`
+  - optional frontend Sentry: set `SENTRY_DSN=...` and replay/trace rates
+  - `SENTRY_SEND_DEFAULT_PII=1` is the default repository policy
   - optional CAPTCHA (Cloudflare Turnstile): set `CAPTCHA_SITE_KEY=...`
 
 ## 3) Deploy / update
@@ -78,6 +85,8 @@ Edit:
 Notes:
 
 - `deploy.sh` runs `docker compose up -d --build`. It **does not wipe** your database or uploads (volumes are preserved).
+- Caddy routes non-API traffic to `frontend-ssr:4000` by default.
+- The legacy static `frontend` service remains available as a rollback target.
 - After a VPS reboot, the stack starts automatically (`restart: unless-stopped`). You usually **do not** need to run `deploy.sh` again.
 - By default, `deploy.sh` exports `APP_VERSION=$(git rev-parse --short HEAD)` before recreating containers so backend/frontend diagnostics show the deployed revision.
 - `deploy.sh` waits for `media-worker` heartbeat health before running post-sync checks. If the worker is unhealthy, deploy exits non-zero and prints worker logs.
@@ -94,6 +103,20 @@ Useful helpers:
 - List services: `./infra/prod/ps.sh`
 - Verify live endpoints/headers manually: `./infra/prod/verify-live.sh`
 - Print Search Console indexing checklist manually: `./infra/prod/request-indexing-checklist.sh`
+
+SSR rollback switch (one release window):
+
+1. Edit `infra/prod/Caddyfile` and change `reverse_proxy frontend-ssr:4000` to `reverse_proxy frontend:80`.
+2. Reload only Caddy:
+
+   ```bash
+   ./infra/prod/reload-env.sh caddy
+   ```
+
+Clarity CSP note:
+
+- Production CSP already allows `https://www.clarity.ms` for scripts and `https://www.clarity.ms` / `https://c.clarity.ms` for network connections.
+- Keep Clarity consent-gated and storefront-only; do not initialize on authenticated/admin routes.
 
 Sameday mirror post-deploy check:
 

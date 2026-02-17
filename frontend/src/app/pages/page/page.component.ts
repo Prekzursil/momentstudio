@@ -14,6 +14,9 @@ import { PageBlock, pageBlocksToPlainText, parsePageBlocks } from '../../shared/
 import { ButtonComponent } from '../../shared/button.component';
 import { CmsPageBlocksComponent } from '../../shared/cms-page-blocks.component';
 import { StorefrontAdminModeService } from '../../core/storefront-admin-mode.service';
+import { SeoHeadLinksService } from '../../core/seo-head-links.service';
+import { resolveRouteSeoDescription } from '../../core/route-seo-defaults';
+import { SeoCopyFallbackService } from '../../core/seo-copy-fallback.service';
 
 interface ContentImage {
   url: string;
@@ -54,7 +57,11 @@ interface LegalIndexDoc {
       <app-breadcrumb [crumbs]="crumbs()"></app-breadcrumb>
 
       <div class="flex flex-wrap items-start justify-between gap-3">
-        <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">
+        <h1
+          class="text-2xl font-semibold text-slate-900 dark:text-slate-50"
+          data-route-heading="true"
+          tabindex="-1"
+        >
           {{ block()?.title || ('nav.page' | translate) }}
         </h1>
         <app-button
@@ -106,6 +113,12 @@ interface LegalIndexDoc {
               loading="lazy"
 	            />
 	            <div class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="bodyHtml()"></div>
+              <p
+                *ngIf="!hasMeaningfulBodyContent()"
+                class="text-base text-slate-700 leading-relaxed dark:text-slate-200"
+              >
+                {{ fallbackIntro() }}
+              </p>
 	          </ng-template>
 
 	          <div *ngIf="legalIndexLoading()" class="text-sm text-slate-600 dark:text-slate-300">
@@ -125,6 +138,25 @@ interface LegalIndexDoc {
 	          </div>
 	        </div>
 	      </app-card>
+
+      <div
+        *ngIf="!loading() && !hasError() && block() && showSeoLinkCluster()"
+        class="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900/40"
+      >
+        <h2 class="text-base font-semibold text-slate-900 dark:text-slate-50">{{ 'page.exploreMore' | translate }}</h2>
+        <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">{{ 'page.exploreMoreCopy' | translate }}</p>
+        <div class="mt-4 flex flex-wrap gap-3 text-sm">
+          <a class="font-medium text-indigo-600 hover:underline dark:text-indigo-300" [routerLink]="['/shop']">
+            {{ 'nav.shop' | translate }}
+          </a>
+          <a class="font-medium text-indigo-600 hover:underline dark:text-indigo-300" [routerLink]="['/blog']">
+            {{ 'nav.blog' | translate }}
+          </a>
+          <a class="font-medium text-indigo-600 hover:underline dark:text-indigo-300" [routerLink]="['/contact']">
+            {{ 'nav.contact' | translate }}
+          </a>
+        </div>
+      </div>
 	    </app-container>
 	  `
 })
@@ -134,6 +166,7 @@ export class CmsPageComponent implements OnInit, OnDestroy {
   hasError = signal<boolean>(false);
   requiresLogin = signal<boolean>(false);
   bodyHtml = signal<string>('');
+  fallbackIntro = signal<string>('');
   pageBlocks = signal<PageBlock[]>([]);
   legalIndexDocs = signal<LegalIndexDoc[]>([]);
   legalIndexLoading = signal<boolean>(false);
@@ -157,7 +190,9 @@ export class CmsPageComponent implements OnInit, OnDestroy {
     private translate: TranslateService,
     private title: Title,
     private meta: Meta,
-    private markdown: MarkdownService
+    private markdown: MarkdownService,
+    private seoHeadLinks: SeoHeadLinksService,
+    private seoCopyFallback: SeoCopyFallbackService
   ) {}
 
   canEditPage(): boolean {
@@ -211,6 +246,7 @@ export class CmsPageComponent implements OnInit, OnDestroy {
     this.loading.set(true);
     this.hasError.set(false);
     this.requiresLogin.set(false);
+    this.fallbackIntro.set('');
     this.pageBlocks.set([]);
     this.legalIndexDocs.set([]);
     this.legalIndexLoading.set(false);
@@ -227,6 +263,7 @@ export class CmsPageComponent implements OnInit, OnDestroy {
         const bodyMarkdown = canonicalSlug === 'terms' ? this.stripLegalIndexTable(block.body_markdown) : block.body_markdown;
         this.bodyHtml.set(this.markdown.render(bodyMarkdown));
         this.pageBlocks.set(parsePageBlocks(block.meta, lang, (md) => this.markdown.render(md)));
+        this.fallbackIntro.set(this.seoCopyFallback.pageIntro(lang, block.title || slug));
         this.loading.set(false);
         this.hasError.set(false);
         this.loadLegalIndexDocs(canonicalSlug, lang);
@@ -239,16 +276,17 @@ export class CmsPageComponent implements OnInit, OnDestroy {
           { label: 'nav.home', url: '/' },
           { label: block.title || slug }
         ]);
-        this.setMetaTags(block.title || slug, metaBody);
+        this.setMetaTags(block.title || slug, metaBody, canonicalSlug || slug);
       },
       error: (err) => {
         if (err?.status === 401) {
           this.block.set(null);
           this.bodyHtml.set('');
           this.pageBlocks.set([]);
-          this.loading.set(false);
-          this.hasError.set(false);
-          this.requiresLogin.set(true);
+        this.loading.set(false);
+        this.hasError.set(false);
+        this.requiresLogin.set(true);
+        this.fallbackIntro.set(this.seoCopyFallback.pageIntro(lang, slug));
           this.crumbs.set([
             { label: 'nav.home', url: '/' },
             { label: slug }
@@ -261,11 +299,12 @@ export class CmsPageComponent implements OnInit, OnDestroy {
         this.loading.set(false);
         this.hasError.set(true);
         this.requiresLogin.set(false);
+        this.fallbackIntro.set(this.seoCopyFallback.pageIntro(lang, slug));
         this.crumbs.set([
           { label: 'nav.home', url: '/' },
           { label: slug }
         ]);
-        this.setMetaTags(slug, this.translate.instant('about.metaDescription'));
+        this.setMetaTags(slug, this.translate.instant('about.metaDescription'), slug);
       }
     });
   }
@@ -353,14 +392,36 @@ export class CmsPageComponent implements OnInit, OnDestroy {
     return raw.startsWith('page.') ? raw.slice('page.'.length) : '';
   }
 
-  private setMetaTags(title: string, body: string): void {
+  private setMetaTags(title: string, body: string, slug: string): void {
     const pageTitle = title ? `${title} | momentstudio` : 'Page | momentstudio';
-    const description = (body || '').replace(/\s+/g, ' ').trim().slice(0, 160);
+    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
+    const description = resolveRouteSeoDescription(
+      'page',
+      lang,
+      (body || '').replace(/\s+/g, ' ').trim().slice(0, 160),
+      this.translate.instant('meta.descriptions.page'),
+      this.translate.instant('about.metaDescription')
+    );
+    const safeSlug = encodeURIComponent(String(slug || '').trim());
+    const path = safeSlug ? `/pages/${safeSlug}` : '/pages';
+    const canonical = this.seoHeadLinks.setLocalizedCanonical(path, lang, {});
     this.title.setTitle(pageTitle);
-    if (description) {
-      this.meta.updateTag({ name: 'description', content: description });
-      this.meta.updateTag({ property: 'og:description', content: description });
-    }
+    this.meta.updateTag({ name: 'description', content: description });
+    this.meta.updateTag({ property: 'og:description', content: description });
     this.meta.updateTag({ property: 'og:title', content: pageTitle });
+    this.meta.updateTag({ property: 'og:url', content: canonical });
+  }
+
+  hasMeaningfulBodyContent(): boolean {
+    const text = String(this.bodyHtml() || '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return text.length >= 80;
+  }
+
+  showSeoLinkCluster(): boolean {
+    if (this.requiresLogin()) return false;
+    return !this.legalIndexDocs().length;
   }
 }

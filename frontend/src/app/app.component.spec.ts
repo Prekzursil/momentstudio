@@ -6,6 +6,7 @@ import { TranslateModule } from '@ngx-translate/core';
 import { of } from 'rxjs';
 import { AuthService } from './core/auth.service';
 import { RouteRobotsService } from './core/route-robots.service';
+import { ClarityService } from './core/clarity.service';
 
 describe('AppComponent', () => {
   beforeEach(async () => {
@@ -29,6 +30,10 @@ describe('AppComponent', () => {
         },
         {
           provide: RouteRobotsService,
+          useValue: { start: () => void 0 }
+        },
+        {
+          provide: ClarityService,
           useValue: { start: () => void 0 }
         },
       ]

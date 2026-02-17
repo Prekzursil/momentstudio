@@ -18,6 +18,7 @@ import { CarouselBlockComponent } from '../../shared/carousel-block.component';
 import { CarouselSettings, ColumnsBreakpoint, ColumnsCount, Slide } from '../../shared/page-blocks';
 import { SeoHeadLinksService } from '../../core/seo-head-links.service';
 import { StructuredDataService } from '../../core/structured-data.service';
+import { resolveRouteSeoDescription } from '../../core/route-seo-defaults';
 
 type HomeSectionId =
   | 'featured_products'
@@ -179,7 +180,7 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
   ],
   template: `
     <section class="grid gap-10">
-      <h1 class="sr-only">{{ 'app.name' | translate }}</h1>
+      <h1 class="sr-only" data-route-heading="true" tabindex="-1">{{ 'app.name' | translate }}</h1>
       <ng-container *ngFor="let block of enabledBlocks()">
         <ng-container [ngSwitch]="block.type">
           <ng-container *ngSwitchCase="'banner'">
@@ -1183,12 +1184,17 @@ export class HomeComponent implements OnInit, OnDestroy {
   private setMetaTags(): void {
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     const title = this.translate.instant('home.metaTitle');
-    const description = this.translate.instant('home.metaDescription');
+    const description = resolveRouteSeoDescription(
+      'home',
+      lang,
+      this.translate.instant('meta.descriptions.home'),
+      this.translate.instant('home.metaDescription')
+    );
     this.title.setTitle(title);
     this.meta.updateTag({ name: 'description', content: description });
     this.meta.updateTag({ property: 'og:title', content: title });
     this.meta.updateTag({ property: 'og:description', content: description });
-    const canonical = this.seoHeadLinks.setLocalizedCanonical('/', lang, { lang });
+    const canonical = this.seoHeadLinks.setLocalizedCanonical('/', lang, {});
     this.meta.updateTag({ property: 'og:url', content: canonical });
     this.structuredData.setRouteSchemas([
       {

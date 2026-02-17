@@ -39,7 +39,7 @@ mkdir -p "${repo_root}/uploads" "${repo_root}/private_uploads"
 
 # Stamp backend/frontend runtime config with the deployed git revision unless overridden.
 if [[ -z "${APP_VERSION:-}" ]]; then
-  APP_VERSION="$(git rev-parse --short HEAD)"
+  APP_VERSION="$(git rev-parse HEAD)"
   export APP_VERSION
 fi
 

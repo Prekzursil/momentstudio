@@ -30,6 +30,7 @@ jobs:
             const labels = [
               { name: 'audit:ux', color: '0E8A16', description: 'UX audit finding.' },
               { name: 'audit:ia', color: '1D76DB', description: 'Information architecture audit finding.' },
+              { name: 'audit:seo', color: '0E8A16', description: 'SEO quality finding.' },
               { name: 'audit:correctness', color: 'B60205', description: 'Correctness or runtime quality finding.' },
               { name: 'ai:ready', color: '0366D6', description: 'Ready for AI agent execution.' },
               { name: 'ai:in-progress', color: 'FBCA04', description: 'AI agent is processing.' },
@@ -109,6 +110,7 @@ jobs:
 
       - name: Upsert severe findings (dedupe by fingerprint)
         if: steps.resolve.outputs.skip_followup != 'true'
+        id: severe_upsert
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -117,7 +119,61 @@ jobs:
           python3 scripts/audit/upsert_audit_issues.py \
             --findings artifacts/audit-evidence/deterministic-findings.json \
             --run-url "$RUN_URL" \
+            --include-s3-seo \
+            --close-stale \
+            --severe-output artifacts/audit-evidence/severe-issues-upserted.json \
             --skip-digest
+
+      - name: Sync severe issues to roadmap project
+        if: steps.resolve.outputs.skip_followup != 'true'
+        id: project_sync
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          ROADMAP_PROJECT_WRITE_TOKEN: ${{ secrets.ROADMAP_PROJECT_WRITE_TOKEN }}
+          ROADMAP_PROJECT_OWNER: ${{ vars.ROADMAP_PROJECT_OWNER }}
+          ROADMAP_PROJECT_NUMBER: ${{ vars.ROADMAP_PROJECT_NUMBER }}
+        run: |
+          set -euo pipefail
+          severe_count="$(jq 'length' artifacts/audit-evidence/severe-issues-upserted.json)"
+          echo "severe_count=${severe_count}" >> "$GITHUB_OUTPUT"
+
+          if [[ "${severe_count}" == "0" ]]; then
+            python3 - <<'PY'
+            import json
+            from pathlib import Path
+
+            Path("artifacts/audit-evidence/project-sync-summary.json").write_text(
+                json.dumps(
+                    {
+                        "scanned": 0,
+                        "added": 0,
+                        "updated": 0,
+                        "lane_updates": 0,
+                        "status_updates": 0,
+                        "skipped_run": True,
+                        "skip_reason": "no_severe_issues",
+                        "project_owner": "Prekzursil",
+                        "project_number": 2,
+                        "project_url": "",
+                    },
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            PY
+            exit 0
+          fi
+
+          python3 scripts/audit/sync_severe_issues_to_project.py \
+            --repo "${GITHUB_REPOSITORY}" \
+            --project-owner "${ROADMAP_PROJECT_OWNER:-Prekzursil}" \
+            --project-number "${ROADMAP_PROJECT_NUMBER:-2}" \
+            --issues-json artifacts/audit-evidence/severe-issues-upserted.json \
+            --lane-name "Now" \
+            --status-name "Todo" \
+            --summary-output artifacts/audit-evidence/project-sync-summary.json \
+            --allow-skip-missing-token
 
       - name: Build weekly digest issue body
         if: steps.resolve.outputs.skip_followup != 'true'
@@ -293,9 +349,25 @@ jobs:
           skip_followup="${{ steps.resolve.outputs.skip_followup }}"
           skip_reason="${{ steps.resolve.outputs.skip_reason }}"
           digest_issue="${{ steps.digest.outputs.issue_number }}"
-          severe_count="n/a"
+          severe_count="${{ steps.project_sync.outputs.severe_count }}"
+          seo_s3_count="n/a"
+          project_sync_added="n/a"
+          project_sync_updated="n/a"
+          project_sync_lane_updates="n/a"
+          project_sync_status_updates="n/a"
+          project_sync_skip_reason="n/a"
+          project_sync_url="n/a"
+
           if [[ -f artifacts/audit-evidence/deterministic-findings.json ]]; then
-            severe_count="$(jq '[.[] | select(.severity == "s1" or .severity == "s2")] | length' artifacts/audit-evidence/deterministic-findings.json)"
+            seo_s3_count="$(jq '[.[] | select(.severity == "s3" and (.labels // [] | index("audit:seo")) and (.indexable == true))] | length' artifacts/audit-evidence/deterministic-findings.json)"
+          fi
+          if [[ -f artifacts/audit-evidence/project-sync-summary.json ]]; then
+            project_sync_added="$(jq '.added // 0' artifacts/audit-evidence/project-sync-summary.json)"
+            project_sync_updated="$(jq '.updated // 0' artifacts/audit-evidence/project-sync-summary.json)"
+            project_sync_lane_updates="$(jq '.lane_updates // 0' artifacts/audit-evidence/project-sync-summary.json)"
+            project_sync_status_updates="$(jq '.status_updates // 0' artifacts/audit-evidence/project-sync-summary.json)"
+            project_sync_skip_reason="$(jq -r '.skip_reason // \"none\"' artifacts/audit-evidence/project-sync-summary.json)"
+            project_sync_url="$(jq -r '.project_url // \"\"' artifacts/audit-evidence/project-sync-summary.json)"
           fi
 
           {
@@ -313,7 +385,16 @@ jobs:
               echo "- Reason: ${skip_reason:-source run was not successful}"
             else
               echo "- Outcome: processed"
-              echo "- Severe findings considered: \`${severe_count}\`"
+              echo "- Severe findings considered: \`${severe_count:-n/a}\`"
+              echo "- Indexable SEO s3 findings considered: \`${seo_s3_count}\`"
               echo "- Digest issue number: \`${digest_issue:-n/a}\`"
+              echo "- Project sync added: \`${project_sync_added}\`"
+              echo "- Project sync updated: \`${project_sync_updated}\`"
+              echo "- Project lane updates: \`${project_sync_lane_updates}\`"
+              echo "- Project status updates: \`${project_sync_status_updates}\`"
+              echo "- Project sync skip reason: \`${project_sync_skip_reason}\`"
+              if [[ -n "${project_sync_url}" && "${project_sync_url}" != "n/a" ]]; then
+                echo "- Target roadmap project: ${project_sync_url}"
+              fi
             fi
           } >> "$GITHUB_STEP_SUMMARY"

@@ -15,6 +15,7 @@ import { Subscription } from 'rxjs';
 import { HttpErrorBusService, HttpErrorEvent } from './core/http-error-bus.service';
 import { RouteHeadingFocusService } from './core/route-heading-focus.service';
 import { RouteRobotsService } from './core/route-robots.service';
+import { ClarityService } from './core/clarity.service';
 
 @Component({
   selector: 'app-root',
@@ -68,13 +69,17 @@ export class AppComponent implements OnDestroy {
     private auth: AuthService,
     private route: ActivatedRoute,
     private analytics: AnalyticsService,
+    private clarity: ClarityService,
     private httpErrors: HttpErrorBusService,
     private routeHeadingFocus: RouteHeadingFocusService,
     private routeRobots: RouteRobotsService
   ) {
     // Language is handled by LanguageService (localStorage + preferred_language + browser fallback).
     // Revalidate any persisted session on startup to avoid "logged in but unauthorized" UI states.
-    this.auth.ensureAuthenticated({ silent: true }).subscribe({ error: () => void 0 });
+    this.auth.ensureAuthenticated({ silent: true }).subscribe({
+      next: () => this.clarity.start(),
+      error: () => this.clarity.start(),
+    });
     this.analytics.startSession();
 
     this.querySub = this.route.queryParams.subscribe((params) => {

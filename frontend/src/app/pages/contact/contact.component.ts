@@ -13,6 +13,7 @@ import { MarkdownService } from '../../core/markdown.service';
 import { SiteSocialLink, SiteSocialService } from '../../core/site-social.service';
 import { StorefrontAdminModeService } from '../../core/storefront-admin-mode.service';
 import { ContactSubmissionTopic, SupportService } from '../../core/support.service';
+import { SeoHeadLinksService } from '../../core/seo-head-links.service';
 import { ContainerComponent } from '../../layout/container.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../shared/button.component';
@@ -21,6 +22,7 @@ import { CardComponent } from '../../shared/card.component';
 import { CmsPageBlocksComponent } from '../../shared/cms-page-blocks.component';
 import { ImgFallbackDirective } from '../../shared/img-fallback.directive';
 import { PageBlock, pageBlocksToPlainText, parsePageBlocks } from '../../shared/page-blocks';
+import { resolveRouteSeoDescription } from '../../core/route-seo-defaults';
 
 interface ContentBlock {
   title: string;
@@ -48,7 +50,11 @@ interface ContentBlock {
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
 
       <div class="flex flex-wrap items-start justify-between gap-3">
-        <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">
+        <h1
+          class="text-2xl font-semibold text-slate-900 dark:text-slate-50"
+          data-route-heading="true"
+          tabindex="-1"
+        >
           {{ block()?.title || ('contact.title' | translate) }}
         </h1>
         <app-button
@@ -322,6 +328,7 @@ export class ContactComponent implements OnInit, OnDestroy {
     private translate: TranslateService,
     private title: Title,
     private meta: Meta,
+    private seoHeadLinks: SeoHeadLinksService,
     private markdown: MarkdownService,
     private social: SiteSocialService,
     private auth: AuthService,
@@ -386,13 +393,20 @@ export class ContactComponent implements OnInit, OnDestroy {
   private setMetaTags(title: string, body: string): void {
     const baseTitle = (title || '').includes('|') ? title : `${title} | momentstudio`;
     const pageTitle = title ? baseTitle : this.translate.instant('contact.metaTitle');
-    const description = (body || '').replace(/\s+/g, ' ').trim().slice(0, 160) || this.translate.instant('contact.metaDescription');
+    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
+    const description = resolveRouteSeoDescription(
+      'contact',
+      lang,
+      (body || '').replace(/\s+/g, ' ').trim().slice(0, 160),
+      this.translate.instant('meta.descriptions.contact'),
+      this.translate.instant('contact.metaDescription')
+    );
+    const canonical = this.seoHeadLinks.setLocalizedCanonical('/contact', lang, {});
     this.title.setTitle(pageTitle);
-    if (description) {
-      this.meta.updateTag({ name: 'description', content: description });
-      this.meta.updateTag({ property: 'og:description', content: description });
-    }
+    this.meta.updateTag({ name: 'description', content: description });
+    this.meta.updateTag({ property: 'og:description', content: description });
     this.meta.updateTag({ property: 'og:title', content: pageTitle });
+    this.meta.updateTag({ property: 'og:url', content: canonical });
   }
 
   initialsForLabel(label: string): string {

@@ -6,6 +6,7 @@ import { of } from 'rxjs';
 
 import { ApiService } from '../../core/api.service';
 import { MarkdownService } from '../../core/markdown.service';
+import { SeoHeadLinksService } from '../../core/seo-head-links.service';
 import { StorefrontAdminModeService } from '../../core/storefront-admin-mode.service';
 import { AboutComponent } from './about.component';
 
@@ -13,12 +14,15 @@ describe('AboutComponent', () => {
   let meta: jasmine.SpyObj<Meta>;
   let title: jasmine.SpyObj<Title>;
   let api: jasmine.SpyObj<ApiService>;
+  let seoHeadLinks: jasmine.SpyObj<SeoHeadLinksService>;
   let translate: TranslateService;
 
   beforeEach(() => {
     meta = jasmine.createSpyObj<Meta>('Meta', ['updateTag']);
     title = jasmine.createSpyObj<Title>('Title', ['setTitle']);
     api = jasmine.createSpyObj<ApiService>('ApiService', ['get']);
+    seoHeadLinks = jasmine.createSpyObj<SeoHeadLinksService>('SeoHeadLinksService', ['setLocalizedCanonical']);
+    seoHeadLinks.setLocalizedCanonical.and.returnValue('http://localhost:4200/about');
     api.get.and.callFake((path: string, params?: Record<string, unknown>) => {
       if (path !== '/content/pages/about') throw new Error(`Unexpected path: ${path}`);
       if (params?.['lang'] === 'ro') {
@@ -34,6 +38,7 @@ describe('AboutComponent', () => {
         { provide: Title, useValue: title },
         { provide: Meta, useValue: meta },
         { provide: ApiService, useValue: api },
+        { provide: SeoHeadLinksService, useValue: seoHeadLinks },
         { provide: StorefrontAdminModeService, useValue: { enabled: () => false } },
         { provide: MarkdownService, useValue: markdown }
       ]
@@ -65,6 +70,8 @@ describe('AboutComponent', () => {
     expect(meta.updateTag).toHaveBeenCalledWith({ name: 'description', content: 'Hello' });
     expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:description', content: 'Hello' });
     expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:title', content: 'About | momentstudio' });
+    expect(seoHeadLinks.setLocalizedCanonical).toHaveBeenCalledWith('/about', 'en', {});
+    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:url', content: 'http://localhost:4200/about' });
   });
 
   it('updates meta tags when language changes', () => {
@@ -73,6 +80,8 @@ describe('AboutComponent', () => {
 
     title.setTitle.calls.reset();
     meta.updateTag.calls.reset();
+    seoHeadLinks.setLocalizedCanonical.calls.reset();
+    seoHeadLinks.setLocalizedCanonical.and.returnValue('http://localhost:4200/about?lang=ro');
 
     translate.use('ro');
 
@@ -80,6 +89,8 @@ describe('AboutComponent', () => {
     expect(meta.updateTag).toHaveBeenCalledWith({ name: 'description', content: 'Salut' });
     expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:description', content: 'Salut' });
     expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:title', content: 'Despre noi | momentstudio' });
+    expect(seoHeadLinks.setLocalizedCanonical).toHaveBeenCalledWith('/about', 'ro', {});
+    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:url', content: 'http://localhost:4200/about?lang=ro' });
   });
 
   it('uses page blocks for meta description when present', () => {

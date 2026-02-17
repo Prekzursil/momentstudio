@@ -23,6 +23,8 @@ import { StorefrontAdminModeService } from '../../core/storefront-admin-mode.ser
 import { AdminService } from '../../core/admin.service';
 import { ProductImageManagerModalComponent } from '../../shared/product-image-manager-modal.component';
 import { SeoHeadLinksService } from '../../core/seo-head-links.service';
+import { resolveRouteSeoDescription } from '../../core/route-seo-defaults';
+import { SeoCopyFallbackService } from '../../core/seo-copy-fallback.service';
 
 @Component({
   selector: 'app-product-detail',
@@ -119,7 +121,9 @@ import { SeoHeadLinksService } from '../../core/seo-head-links.service';
             <div class="space-y-5">
               <div class="space-y-2">
                 <p class="text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">{{ 'product.handmade' | translate }}</p>
-                <h1 class="text-3xl font-semibold text-slate-900 dark:text-slate-50">{{ product.name }}</h1>
+                <h1 class="text-3xl font-semibold text-slate-900 dark:text-slate-50" data-route-heading="true" tabindex="-1">
+                  {{ product.name }}
+                </h1>
                 <div class="flex items-baseline gap-3">
                   <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">
                     {{ displayPrice(product) | localizedCurrency : product.currency }}
@@ -142,6 +146,12 @@ import { SeoHeadLinksService } from '../../core/seo-head-links.service';
                 *ngIf="descriptionHtml"
                 [innerHTML]="descriptionHtml"
               ></div>
+              <p
+                *ngIf="!descriptionHtml"
+                class="text-sm text-slate-700 leading-relaxed dark:text-slate-200"
+              >
+                {{ seoFallbackDescription }}
+              </p>
 
               <div class="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-amber-900 dark:bg-amber-950/30 dark:border-amber-900/40 dark:text-amber-100">
                 {{ 'product.uniqueness' | translate }}
@@ -309,7 +319,7 @@ import { SeoHeadLinksService } from '../../core/seo-head-links.service';
 		        </div>
 		      </div>
 
-		      <div *ngIf="recentlyViewed.length" class="mt-12 grid gap-4">
+	      <div *ngIf="recentlyViewed.length" class="mt-12 grid gap-4">
 		        <div class="flex items-center justify-between">
 		          <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'product.recentlyViewed' | translate }}</h3>
 		          <button
@@ -348,6 +358,25 @@ import { SeoHeadLinksService } from '../../core/seo-head-links.service';
 	          </app-button>
 	        </div>
 	      </div>
+
+        <div
+          *ngIf="showFallbackNavigationLinks()"
+          class="mt-10 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900/40"
+        >
+          <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">{{ 'product.exploreMore' | translate }}</h3>
+          <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">{{ 'product.exploreMoreCopy' | translate }}</p>
+          <div class="mt-4 flex flex-wrap gap-3 text-sm">
+            <a class="font-medium text-indigo-600 hover:underline dark:text-indigo-300" [routerLink]="['/shop']">
+              {{ 'nav.shop' | translate }}
+            </a>
+            <a class="font-medium text-indigo-600 hover:underline dark:text-indigo-300" [routerLink]="['/blog']">
+              {{ 'nav.blog' | translate }}
+            </a>
+            <a class="font-medium text-indigo-600 hover:underline dark:text-indigo-300" [routerLink]="['/contact']">
+              {{ 'nav.contact' | translate }}
+            </a>
+          </div>
+        </div>
 	
 	      <div
 	        *ngIf="previewOpen"
@@ -410,6 +439,7 @@ export class ProductComponent implements OnInit, OnDestroy {
   loading = true;
   loadError = false;
   descriptionHtml = '';
+  seoFallbackDescription = '';
   selectedVariantId: string | null = null;
   quantity = 1;
   activeImageIndex = 0;
@@ -450,7 +480,8 @@ export class ProductComponent implements OnInit, OnDestroy {
     private cdr: ChangeDetectorRef,
     private storefrontAdminMode: StorefrontAdminModeService,
     private admin: AdminService,
-    private seoHeadLinks: SeoHeadLinksService
+    private seoHeadLinks: SeoHeadLinksService,
+    private seoCopyFallback: SeoCopyFallbackService
   ) {}
 
   ngOnDestroy(): void {
@@ -561,6 +592,7 @@ export class ProductComponent implements OnInit, OnDestroy {
     this.loadError = false;
     this.product = null;
     this.descriptionHtml = '';
+    this.seoFallbackDescription = '';
     this.backInStockRequest = null;
     this.upsellProducts = [];
     this.relatedProducts = [];
@@ -586,6 +618,11 @@ export class ProductComponent implements OnInit, OnDestroy {
         }
         this.product = product;
         this.descriptionHtml = product.long_description ? this.markdown.render(product.long_description) : '';
+        this.seoFallbackDescription = this.seoCopyFallback.productIntro(
+          lang,
+          product.name,
+          product.tags?.[0]?.name ?? null
+        );
         this.selectedVariantId = product.variants?.[0]?.id ?? null;
         this.loading = false;
         this.loadError = false;
@@ -729,8 +766,15 @@ export class ProductComponent implements OnInit, OnDestroy {
 
   private updateMeta(product: Product): void {
     const title = this.translate.instant('product.metaTitle', { name: product.name });
-    const description =
-      product.short_description ?? this.translate.instant('product.metaDescriptionFallback', { name: product.name });
+    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
+    const description = resolveRouteSeoDescription(
+      'product',
+      lang,
+      product.short_description,
+      product.long_description,
+      this.translate.instant('meta.descriptions.product'),
+      this.translate.instant('product.metaDescriptionFallback', { name: product.name })
+    );
     this.title.setTitle(title);
     this.meta.updateTag({ name: 'description', content: description });
     this.meta.updateTag({ property: 'og:title', content: title });
@@ -792,8 +836,12 @@ export class ProductComponent implements OnInit, OnDestroy {
 
   private setCanonical(product: Product): void {
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
-    const href = this.seoHeadLinks.setLocalizedCanonical(`/products/${encodeURIComponent(product.slug)}`, lang, { lang });
+    const href = this.seoHeadLinks.setLocalizedCanonical(`/products/${encodeURIComponent(product.slug)}`, lang, {});
     this.meta.updateTag({ property: 'og:url', content: href });
+  }
+
+  showFallbackNavigationLinks(): boolean {
+    return !this.upsellProducts.length && !this.relatedProducts.length && !this.recentlyViewed.length;
   }
 
   isOutOfStock(): boolean {
