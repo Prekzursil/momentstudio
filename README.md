@@ -149,6 +149,12 @@ Percy workflows:
 - `Percy Visual` runs expanded snapshots on weekly schedule or manual dispatch (non-blocking).
 - If `PERCY_TOKEN` is not configured, Percy jobs are skipped with a summary note.
 
+Applitools workflows:
+
+- `Applitools Visual` runs Eyes snapshots on pull requests (non-blocking).
+- `Applitools Visual` also runs weekly and supports manual dispatch.
+- If `APPLITOOLS_API_KEY` is not configured, Applitools jobs are skipped with a summary note.
+
 ## Common commands
 
 ```bash
