@@ -110,6 +110,65 @@ jobs:
           fi
           exit 0
 
+      - name: Auto-approve Percy PR build (non-blocking)
+        if: steps.token.outputs.enabled == 'true' && github.event_name == 'pull_request'
+        env:
+          PERCY_TOKEN: ${{ secrets.PERCY_TOKEN }}
+          PERCY_AUTO_APPROVE_PR: ${{ vars.PERCY_AUTO_APPROVE_PR }}
+          PULL_REQUEST_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set +e
+          if [[ "${PERCY_AUTO_APPROVE_PR:-1}" != "1" ]]; then
+            {
+              echo "## Percy Visual (Core)"
+              echo ""
+              echo "Auto-approve skipped: \`PERCY_AUTO_APPROVE_PR\` is not set to \`1\`."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          sha="${PULL_REQUEST_HEAD_SHA:-${GITHUB_SHA}}"
+          output=""
+          status=0
+          for attempt in $(seq 1 12); do
+            output="$(python3 scripts/audit/percy_auto_approve.py --sha "${sha}" --branch "${GITHUB_HEAD_REF:-}")"
+            status=$?
+            echo "$output"
+            if [[ "$status" -ne 0 ]]; then
+              break
+            fi
+            if grep -q '^approved=true$' <<< "$output"; then
+              break
+            fi
+            if grep -q '^reason=no-approvable-build$' <<< "$output"; then
+              sleep 5
+              continue
+            fi
+            break
+          done
+          if [[ "$status" -ne 0 ]]; then
+            {
+              echo "## Percy Visual (Core)"
+              echo ""
+              echo "Auto-approve attempt failed (non-blocking)."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if grep -q '^approved=true$' <<< "$output"; then
+            {
+              echo "## Percy Visual (Core)"
+              echo ""
+              echo "Percy build was auto-approved for this PR commit."
+            } >> "$GITHUB_STEP_SUMMARY"
+          elif [[ "$status" -eq 0 ]]; then
+            reason="$(grep '^reason=' <<< "$output" | head -n1 | cut -d= -f2-)"
+            scanned="$(grep '^builds_scanned=' <<< "$output" | head -n1 | cut -d= -f2-)"
+            {
+              echo "## Percy Visual (Core)"
+              echo ""
+              echo "Auto-approve not applied: reason=\`${reason:-unknown}\`, builds_scanned=\`${scanned:-n/a}\`."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Logs (on failure)
         if: failure() && steps.token.outputs.enabled == 'true'
         run: docker compose -f infra/docker-compose.yml logs --no-color --tail=200
