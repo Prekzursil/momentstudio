@@ -105,6 +105,32 @@ docker compose -f infra/docker-compose.yml exec -T backend python -m app.cli boo
 
 See `docs/ENVIRONMENT_PROFILES.md` for full details and troubleshooting.
 
+## Sentry observability (backend + frontend)
+
+Sentry is optional and disabled unless DSNs are configured.
+
+Backend env keys (`backend/.env*`):
+
+- `SENTRY_DSN`
+- `SENTRY_TRACES_SAMPLE_RATE` (0.0-1.0)
+- `SENTRY_PROFILES_SAMPLE_RATE` (0.0-1.0)
+- `SENTRY_ENABLE_LOGS` (`0`/`1`)
+- `SENTRY_LOG_LEVEL` (for example `error`, `warning`, `info`)
+
+Frontend runtime keys (`frontend/.env*` -> `assets/app-config.js`):
+
+- `SENTRY_DSN`
+- `SENTRY_TRACES_SAMPLE_RATE` (0.0-1.0)
+- `SENTRY_REPLAY_SESSION_SAMPLE_RATE` (0.0-1.0)
+- `SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE` (0.0-1.0)
+
+Suggested production starting point (adjust with real traffic):
+
+- backend: traces `0.10`, profiles `0.05`, logs enabled at `error`
+- frontend: traces `0.10`, replay session `0.02`, replay-on-error `1.0`
+
+Rollback/noise guardrail: set all sample rates to `0` (and optionally clear DSN) to disable traffic quickly.
+
 ## Common commands
 
 ```bash
@@ -206,6 +232,7 @@ The `Release` GitHub Actions workflow builds/pushes images when you push a tag l
 - `docs/REPOSITORY_POLICY.md` — branch protection, labels, CI gates, and merge policy
 - `docs/PRODUCTION.md` — production deployment guide
 - `docs/ENVIRONMENT_PROFILES.md` — local dev/prod profile switching guide
+- `docs/AI_AUDIT_PHASES.md` — AI audit phase architecture and runbooks
 - `docs/GOOGLE_OAUTH.md` — Google OAuth setup (origins + redirect URIs)
 - `docs/DEV_PORTS.md` — dev ports + proxy/CORS expectations
 - `backend/README.md`, `frontend/README.md`, `infra/README.md`
@@ -241,6 +268,7 @@ Workflows:
 - `Audit Weekly Agent`: creates/updates rolling issue `Weekly UX/IA Audit Digest` and assigns `@copilot`.
 - `Audit PR Agent`: label a PR with `audit:agent` (or run the workflow manually) to open a Copilot-assigned audit issue against the latest PR evidence.
 - `Audit PR Deep Agent`: opt-in deep pass for PRs labeled `audit:deep`.
+- `Audit Agent Watchdog`: re-queues stale `ai:in-progress` audit issues.
 
 Quick usage:
 
@@ -251,9 +279,21 @@ Quick usage:
    - Weekly chain: run `Audit Weekly Evidence`, then run `Audit Weekly Agent` (or let `workflow_run` trigger it automatically).
    - Deep agent: run `Audit PR Deep Agent` with `pr_number` (or leave blank to auto-detect when exactly one open PR targets `main`).
 
+Phase 2 roadmap sync (optional, weekly severe issue auto-sync to lane `Now`):
+
+1. Configure repository secret `ROADMAP_PROJECT_WRITE_TOKEN` with ProjectV2 write access.
+2. Optional overrides:
+   - `ROADMAP_PROJECT_OWNER` (default: `Prekzursil`)
+   - `ROADMAP_PROJECT_NUMBER` (default: `2`)
+3. Run `Audit Weekly Evidence` then `Audit Weekly Agent`.
+4. Expected result:
+   - severe `s1/s2` audit issues are upserted and synced to `AdrianaArt Roadmap` lane `Now`
+   - if token is missing, workflow stays green and reports an explicit skip reason.
+
 Roadmap board:
 
 - `AdrianaArt Roadmap` — https://github.com/users/Prekzursil/projects/2
 - Structure: `Status` + `Roadmap Lane` (`Now`, `Next`, `Later`) with draft-first roadmap items.
 
 See `docs/REPOSITORY_POLICY.md` for required CI checks and merge expectations.
+See `docs/AI_AUDIT_PHASES.md` for full Phase 1 + Phase 2 architecture/runbooks.

@@ -34,6 +34,11 @@ def _resolve_repo_path(raw: str, *, allowed_prefixes: tuple[str, ...]) -> Path:
     return candidate
 
 
+def _write_json(path: Path, payload: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
 @dataclass(frozen=True)
 class GitHubContext:
     token: str
@@ -210,7 +215,11 @@ def _safe_create_issue(
         raise
 
 
-def _upsert_severe(ctx: GitHubContext, findings: list[dict[str, Any]], run_url: str | None) -> None:
+def _upsert_severe(
+    ctx: GitHubContext,
+    findings: list[dict[str, Any]],
+    run_url: str | None,
+) -> list[dict[str, Any]]:
     open_issues = _list_open_issues(ctx, labels=["audit:correctness"])
     by_marker: dict[str, dict[str, Any]] = {}
     for issue in open_issues:
@@ -226,10 +235,17 @@ def _upsert_severe(ctx: GitHubContext, findings: list[dict[str, Any]], run_url: 
         if marker:
             by_marker[marker] = issue
 
+    seen_fingerprints: set[str] = set()
+    results: list[dict[str, Any]] = []
+
     for finding in findings:
         fp = str(finding.get("fingerprint") or "")
         if not fp:
             continue
+        if fp in seen_fingerprints:
+            continue
+        seen_fingerprints.add(fp)
+
         issue_title = (
             f"[Audit][{finding.get('severity','s3').upper()}]"
             f"[{finding.get('surface','storefront')}] {finding.get('title','Audit finding')}"
@@ -245,10 +261,37 @@ def _upsert_severe(ctx: GitHubContext, findings: list[dict[str, Any]], run_url: 
                 f"/repos/{ctx.owner}/{ctx.repo}/issues/{existing['number']}",
                 payload={"title": issue_title, "body": body, "state": "open"},
             )
-            continue
+            issue_number = int(existing.get("number") or 0)
+            issue_node_id = str(existing.get("node_id") or "")
+            results.append(
+                {
+                    "issue_number": issue_number,
+                    "issue_node_id": issue_node_id,
+                    "fingerprint": fp,
+                    "route": str(finding.get("route") or "/"),
+                    "surface": str(finding.get("surface") or "storefront"),
+                    "severity": str(finding.get("severity") or "s2").lower(),
+                    "action": "updated",
+                }
+            )
+        else:
+            created = _safe_create_issue(ctx, title=issue_title, body=body, labels=labels)
+            by_marker[fp] = created
+            issue_number = int(created.get("number") or 0)
+            issue_node_id = str(created.get("node_id") or "")
+            results.append(
+                {
+                    "issue_number": issue_number,
+                    "issue_node_id": issue_node_id,
+                    "fingerprint": fp,
+                    "route": str(finding.get("route") or "/"),
+                    "surface": str(finding.get("surface") or "storefront"),
+                    "severity": str(finding.get("severity") or "s2").lower(),
+                    "action": "created",
+                }
+            )
 
-        created = _safe_create_issue(ctx, title=issue_title, body=body, labels=labels)
-        by_marker[fp] = created
+    return results
 
 
 def _upsert_digest(
@@ -303,6 +346,11 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="Only upsert severe findings; do not create/update rolling digest issue.",
     )
+    parser.add_argument(
+        "--severe-output",
+        default="",
+        help="Optional JSON output path for severe issue upsert results.",
+    )
     return parser.parse_args()
 
 
@@ -315,6 +363,13 @@ def main() -> int:
     if not findings_path.exists():
         raise FileNotFoundError(f"Findings file not found: {findings_path}")
 
+    severe_output_path = None
+    if args.severe_output:
+        severe_output_path = _resolve_repo_path(
+            args.severe_output,
+            allowed_prefixes=("artifacts/audit-evidence", "artifacts/audit-evidence-local"),
+        )
+
     findings = _load_findings(findings_path)
     severe = [row for row in findings if str(row.get("severity") or "").lower() in SEVERE_LEVELS]
     low = [row for row in findings if str(row.get("severity") or "").lower() not in SEVERE_LEVELS]
@@ -323,10 +378,14 @@ def main() -> int:
         ctx = _github_context(args.repo)
     except Exception as exc:
         print(f"Audit issue upsert skipped: {exc}")
+        if severe_output_path is not None:
+            _write_json(severe_output_path, [])
         return 0
 
     run_url = args.run_url.strip() or None
-    _upsert_severe(ctx, severe, run_url)
+    severe_results = _upsert_severe(ctx, severe, run_url)
+    if severe_output_path is not None:
+        _write_json(severe_output_path, severe_results)
     if not args.skip_digest:
         _upsert_digest(
             ctx,
@@ -336,7 +395,8 @@ def main() -> int:
         )
     print(
         f"Audit issue upsert complete: severe={len(severe)} "
-        f"low={len(low)} repo={ctx.owner}/{ctx.repo}"
+        f"low={len(low)} repo={ctx.owner}/{ctx.repo} "
+        f"severe_output={str(severe_output_path) if severe_output_path else 'disabled'}"
     )
     return 0
 
