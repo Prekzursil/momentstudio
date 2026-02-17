@@ -125,9 +125,24 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          output="$(python3 scripts/audit/percy_auto_approve.py --sha "${GITHUB_SHA}" --branch "${GITHUB_HEAD_REF:-}")"
-          status=$?
-          echo "$output"
+          output=""
+          status=0
+          for attempt in $(seq 1 12); do
+            output="$(python3 scripts/audit/percy_auto_approve.py --sha "${GITHUB_SHA}" --branch "${GITHUB_HEAD_REF:-}")"
+            status=$?
+            echo "$output"
+            if [[ "$status" -ne 0 ]]; then
+              break
+            fi
+            if grep -q '^approved=true$' <<< "$output"; then
+              break
+            fi
+            if grep -q '^builds_scanned=0$' <<< "$output"; then
+              sleep 5
+              continue
+            fi
+            break
+          done
           if [[ "$status" -ne 0 ]]; then
             {
               echo "## Percy Visual (Core)"
