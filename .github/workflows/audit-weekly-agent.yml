@@ -343,8 +343,8 @@ jobs:
             project_sync_updated="$(jq '.updated // 0' artifacts/audit-evidence/project-sync-summary.json)"
             project_sync_lane_updates="$(jq '.lane_updates // 0' artifacts/audit-evidence/project-sync-summary.json)"
             project_sync_status_updates="$(jq '.status_updates // 0' artifacts/audit-evidence/project-sync-summary.json)"
-            project_sync_skip_reason="$(jq -r '.skip_reason // \"none\"' artifacts/audit-evidence/project-sync-summary.json)"
-            project_sync_url="$(jq -r '.project_url // \"\"' artifacts/audit-evidence/project-sync-summary.json)"
+            project_sync_skip_reason="$(jq -r '.skip_reason // "none"' artifacts/audit-evidence/project-sync-summary.json)"
+            project_sync_url="$(jq -r '.project_url // ""' artifacts/audit-evidence/project-sync-summary.json)"
           fi
 
           {
