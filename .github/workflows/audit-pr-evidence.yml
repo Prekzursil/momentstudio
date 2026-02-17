@@ -35,6 +35,19 @@ jobs:
           npm ci
           npx playwright install --with-deps chromium
 
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          python -m venv .venv
+          .venv/bin/pip install --disable-pip-version-check --progress-bar off --upgrade pip
+          .venv/bin/pip install --disable-pip-version-check --progress-bar off -r requirements.txt
+
+      - name: Prepare backend database
+        run: |
+          cd backend
+          PYTHONPATH="$PWD" .venv/bin/python -m alembic upgrade head
+          PYTHONPATH="$PWD" .venv/bin/python -m app.seeds
+
       - name: Collect changed files
         shell: bash
         run: |
@@ -45,6 +58,24 @@ jobs:
           else
             : > artifacts/audit-evidence/changed-files.txt
           fi
+
+      - name: Start backend API for route capture
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd backend
+          PYTHONPATH="$PWD" .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > ../artifacts/audit-evidence/backend-audit.log 2>&1 &
+          echo $! > ../artifacts/audit-evidence/backend-audit.pid
+          cd ..
+          for i in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:8000/api/v1/health/ready >/dev/null; then
+              echo "Backend audit server is ready."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Backend audit server failed to start in time." >&2
+          exit 1
 
       - name: Start SSR frontend for route capture
         shell: bash
@@ -112,6 +143,7 @@ jobs:
       - name: Frontend logs (on failure)
         if: failure()
         run: |
+          test -f artifacts/audit-evidence/backend-audit.log && tail -n 200 artifacts/audit-evidence/backend-audit.log || true
           test -f artifacts/audit-evidence/frontend-audit.log && tail -n 200 artifacts/audit-evidence/frontend-audit.log || true
 
       - name: Stop frontend audit server
@@ -121,5 +153,15 @@ jobs:
           set -euo pipefail
           if [[ -f artifacts/audit-evidence/frontend-audit.pid ]]; then
             pid="$(cat artifacts/audit-evidence/frontend-audit.pid)"
+            kill "$pid" 2>/dev/null || true
+          fi
+
+      - name: Stop backend audit server
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f artifacts/audit-evidence/backend-audit.pid ]]; then
+            pid="$(cat artifacts/audit-evidence/backend-audit.pid)"
             kill "$pid" 2>/dev/null || true
           fi
