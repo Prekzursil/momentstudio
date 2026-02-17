@@ -64,7 +64,13 @@ function classifyConsoleMessage(message, level) {
     "response with status",
     "unexpected token '<'",
     "unexpected token <",
-    "is not valid json"
+    "is not valid json",
+    "challenges.cloudflare.com",
+    "private access token challenge",
+    "cloudflare",
+    "turnstile",
+    "executing inline script violates the following content security policy directive",
+    "the action has been blocked"
   ];
   if (noisyPatterns.some((pattern) => text.includes(pattern))) {
     return { skip: false, severity: "s4", level: normalizedLevel };

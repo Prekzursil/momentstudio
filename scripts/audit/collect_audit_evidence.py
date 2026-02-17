@@ -222,6 +222,12 @@ def _build_deterministic_findings(
             "unexpected token '<'",
             "unexpected token <",
             "is not valid json",
+            "challenges.cloudflare.com",
+            "private access token challenge",
+            "cloudflare",
+            "turnstile",
+            "executing inline script violates the following content security policy directive",
+            "the action has been blocked",
         )
         return any(pattern in text for pattern in patterns)
 
