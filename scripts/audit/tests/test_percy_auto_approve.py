@@ -1,3 +1,7 @@
+import base64
+
+import pytest
+
 from scripts.audit import percy_auto_approve
 
 
@@ -79,9 +83,77 @@ def test_changes_requested_review_state_is_not_auto_approved() -> None:
     assert percy_auto_approve.select_build_for_approval(builds) is None
 
 def test_run_rejects_non_positive_limit() -> None:
-    try:
+    with pytest.raises(ValueError, match="Limit must be >= 1"):
         percy_auto_approve.run(token="x", sha="abc1234", branch=None, dry_run=True, limit=0)
-    except ValueError as exc:
-        assert "Limit must be >= 1" in str(exc)
-    else:
-        raise AssertionError("Expected ValueError for non-positive limit")
+
+
+def test_request_json_uses_token_auth_and_omits_content_type_for_get(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    class _Response:
+        def __enter__(self) -> "_Response":
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> bool:
+            return False
+
+        def read(self) -> bytes:
+            return b"{}"
+
+    def fake_urlopen(req, timeout: int):  # noqa: ANN001
+        header_map = {k.lower(): v for k, v in req.header_items()}
+        captured["authorization"] = header_map.get("authorization")
+        captured["content_type"] = header_map.get("content-type")
+        captured["timeout"] = timeout
+        return _Response()
+
+    monkeypatch.setattr(percy_auto_approve.urllib.request, "urlopen", fake_urlopen)
+
+    payload = percy_auto_approve._request_json(
+        token="percy-token",
+        method="GET",
+        path="/builds",
+        query={"filter[sha]": "abc1234"},
+    )
+
+    assert payload == {}
+    assert captured["authorization"] == "Token token=percy-token"
+    assert captured["content_type"] is None
+    assert captured["timeout"] == 20
+
+
+def test_request_json_uses_basic_auth_for_review_post(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    class _Response:
+        def __enter__(self) -> "_Response":
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> bool:
+            return False
+
+        def read(self) -> bytes:
+            return b"{}"
+
+    def fake_urlopen(req, timeout: int):  # noqa: ANN001
+        header_map = {k.lower(): v for k, v in req.header_items()}
+        captured["authorization"] = header_map.get("authorization")
+        captured["content_type"] = header_map.get("content-type")
+        captured["timeout"] = timeout
+        return _Response()
+
+    monkeypatch.setattr(percy_auto_approve.urllib.request, "urlopen", fake_urlopen)
+
+    payload = percy_auto_approve._request_json(
+        token=None,
+        method="POST",
+        path="/reviews",
+        payload={"data": {"type": "reviews"}},
+        basic_auth=("user", "key"),
+    )
+
+    assert payload == {}
+    expected = base64.b64encode(b"user:key").decode("ascii")
+    assert captured["authorization"] == f"Basic {expected}"
+    assert captured["content_type"] == "application/json"
+    assert captured["timeout"] == 20
