@@ -34,6 +34,11 @@ def _resolve_repo_path(raw: str, *, allowed_prefixes: tuple[str, ...]) -> Path:
     return candidate
 
 
+def _write_json(path: Path, payload: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
 @dataclass(frozen=True)
 class GitHubContext:
     token: str
@@ -239,7 +244,7 @@ def _upsert_issues(
     run_url: str | None,
     *,
     include_s3_seo: bool,
-) -> tuple[int, int]:
+) -> tuple[int, int, list[dict[str, Any]]]:
     open_issues = _list_open_issues(ctx)
     by_marker: dict[str, dict[str, Any]] = {}
     for issue in open_issues:
@@ -250,12 +255,17 @@ def _upsert_issues(
 
     created_count = 0
     updated_count = 0
+    seen_fingerprints: set[str] = set()
+    issue_rows: list[dict[str, Any]] = []
     for finding in findings:
         if not _should_upsert_issue(finding, include_s3_seo=include_s3_seo):
             continue
         fp = str(finding.get("fingerprint") or "")
         if not fp:
             continue
+        if fp in seen_fingerprints:
+            continue
+        seen_fingerprints.add(fp)
         issue_title = (
             f"[Audit][{finding.get('severity','s3').upper()}]"
             f"[{finding.get('surface','storefront')}] {finding.get('title','Audit finding')}"
@@ -272,13 +282,35 @@ def _upsert_issues(
                 payload={"title": issue_title, "body": body, "state": "open"},
             )
             updated_count += 1
+            issue_rows.append(
+                {
+                    "issue_number": int(existing.get("number") or 0),
+                    "issue_node_id": str(existing.get("node_id") or ""),
+                    "fingerprint": fp,
+                    "route": str(finding.get("route") or "/"),
+                    "surface": str(finding.get("surface") or "storefront"),
+                    "severity": str(finding.get("severity") or "s2").lower(),
+                    "action": "updated",
+                }
+            )
             continue
 
         created = _safe_create_issue(ctx, title=issue_title, body=body, labels=labels)
         by_marker[fp] = created
         created_count += 1
+        issue_rows.append(
+            {
+                "issue_number": int(created.get("number") or 0),
+                "issue_node_id": str(created.get("node_id") or ""),
+                "fingerprint": fp,
+                "route": str(finding.get("route") or "/"),
+                "surface": str(finding.get("surface") or "storefront"),
+                "severity": str(finding.get("severity") or "s2").lower(),
+                "action": "created",
+            }
+        )
 
-    return created_count, updated_count
+    return created_count, updated_count, issue_rows
 
 
 def _close_stale_fingerprint_issues(
@@ -320,9 +352,9 @@ def _close_stale_fingerprint_issues(
     return closed_count
 
 
-def _upsert_severe(ctx: GitHubContext, findings: list[dict[str, Any]], run_url: str | None) -> None:
+def _upsert_severe(ctx: GitHubContext, findings: list[dict[str, Any]], run_url: str | None) -> list[dict[str, Any]]:
     # Backward-compatible test helper used by existing unit tests.
-    _upsert_issues(ctx, findings, run_url, include_s3_seo=False)
+    return _upsert_issues(ctx, findings, run_url, include_s3_seo=False)[2]
 
 
 def _upsert_digest(
@@ -387,6 +419,11 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="Close open fingerprinted audit issues not present in current upsert candidate set.",
     )
+    parser.add_argument(
+        "--severe-output",
+        default="",
+        help="Optional JSON output path for severe issue upsert results.",
+    )
     return parser.parse_args()
 
 
@@ -398,6 +435,13 @@ def main() -> int:
     )
     if not findings_path.exists():
         raise FileNotFoundError(f"Findings file not found: {findings_path}")
+
+    severe_output_path = None
+    if args.severe_output:
+        severe_output_path = _resolve_repo_path(
+            args.severe_output,
+            allowed_prefixes=("artifacts/audit-evidence", "artifacts/audit-evidence-local"),
+        )
 
     findings = _load_findings(findings_path)
     issue_candidate_fingerprints = {
@@ -412,15 +456,20 @@ def main() -> int:
         ctx = _github_context(args.repo)
     except Exception as exc:
         print(f"Audit issue upsert skipped: {exc}")
+        if severe_output_path is not None:
+            _write_json(severe_output_path, [])
         return 0
 
     run_url = args.run_url.strip() or None
-    created, updated = _upsert_issues(
+    created, updated, issue_rows = _upsert_issues(
         ctx,
         findings,
         run_url,
         include_s3_seo=bool(args.include_s3_seo),
     )
+    severe_rows = [row for row in issue_rows if str(row.get("severity") or "").lower() in SEVERE_LEVELS]
+    if severe_output_path is not None:
+        _write_json(severe_output_path, severe_rows)
     closed = 0
     if args.close_stale:
         closed = _close_stale_fingerprint_issues(
@@ -439,7 +488,8 @@ def main() -> int:
         f"Audit issue upsert complete: "
         f"issue_candidates={len(issue_candidates)} created={created} updated={updated} "
         f"closed={closed} low={len(low)} include_s3_seo={bool(args.include_s3_seo)} "
-        f"repo={ctx.owner}/{ctx.repo}"
+        f"repo={ctx.owner}/{ctx.repo} "
+        f"severe_output={str(severe_output_path) if severe_output_path else 'disabled'}"
     )
     return 0
 

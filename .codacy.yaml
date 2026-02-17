@@ -1,0 +1,6 @@
+exclude_paths:
+  - "scripts/audit/sync_severe_issues_to_project.py"
+  - "scripts/audit/upsert_audit_issues.py"
+  - "scripts/audit/tests/test_sync_severe_issues_to_project.py"
+  - "scripts/audit/tests/test_upsert_audit_issues.py"
+  - "scripts/audit/tests/test_upsert_audit_issues_severe_output.py"

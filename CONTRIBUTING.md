@@ -110,6 +110,20 @@ This repo uses an evidence-first AI pipeline:
 
 CI only collects deterministic evidence. Agent judgments happen through Copilot issue assignment (`@copilot`).
 
+### Maintainer weekly triage flow
+
+For the weekly cycle:
+
+1. Ensure `Audit Weekly Evidence` succeeds.
+2. Run/confirm `Audit Weekly Agent`.
+3. Verify severe findings (`severity:s1/s2`) were upserted.
+4. If `ROADMAP_PROJECT_WRITE_TOKEN` is configured:
+   - severe audit issues should be synced to `AdrianaArt Roadmap` lane `Now`.
+5. If token is not configured:
+   - workflow remains green and reports an explicit skip reason in the summary.
+
+The weekly project sync is additive-only in this phase: it does not auto-remove or archive project items when issues later close.
+
 ## Required checks for `main`
 
 Branch protection should enforce the checks defined in `docs/REPOSITORY_POLICY.md`:
