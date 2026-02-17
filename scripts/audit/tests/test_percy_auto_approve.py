@@ -70,3 +70,10 @@ def test_build_query_keeps_branch_optional() -> None:
         "filter[branch]": "feature/x",
         "page[limit]": "5",
     }
+
+def test_changes_requested_review_state_is_not_auto_approved() -> None:
+    builds = [
+        _build("41", state="finished", review_state="changes_requested", created_at="2026-02-17T12:10:00Z"),
+    ]
+
+    assert percy_auto_approve.select_build_for_approval(builds) is None

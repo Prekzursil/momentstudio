@@ -58,7 +58,7 @@ def _is_approvable_build(item: dict[str, Any]) -> bool:
         return False
     state = str(attrs.get("state") or "").lower()
     review_state = str(attrs.get("review-state") or "").lower()
-    return state == "finished" and review_state in {"unreviewed", "changes_requested", "requested"}
+    return state == "finished" and review_state == "unreviewed"
 
 
 def select_build_for_approval(builds: Iterable[dict[str, Any]]) -> dict[str, Any] | None:
@@ -186,7 +186,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Auto-approve Percy build for a SHA")
     parser.add_argument("--sha", default=os.environ.get("GITHUB_SHA", ""), help="Commit SHA to match (defaults to GITHUB_SHA)")
     parser.add_argument("--branch", default=os.environ.get("GITHUB_HEAD_REF") or os.environ.get("GITHUB_REF_NAME"), help="Optional branch filter")
-    parser.add_argument("--token", default=os.environ.get("PERCY_TOKEN", ""), help="Percy token (defaults to PERCY_TOKEN env)")
+    parser.add_argument("--token", help="Percy token (defaults to PERCY_TOKEN env)")
     parser.add_argument("--limit", type=int, default=25, help="How many recent builds to inspect")
     parser.add_argument("--dry-run", action="store_true", help="Report candidate without approving")
     return parser.parse_args(argv)
@@ -195,7 +195,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv or sys.argv[1:])
 
-    token = str(args.token or "").strip()
+    token = str(args.token or os.environ.get("PERCY_TOKEN", "")).strip()
     if not token:
         print("approved=false")
         print("reason=missing-token")
