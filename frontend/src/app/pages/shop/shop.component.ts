@@ -2225,10 +2225,17 @@ export class ShopComponent implements OnInit, OnDestroy {
 
   setMetaTags(): void {
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
-    const title = this.translate.instant('shop.metaTitle');
+    const categoryLabel = this.resolveActiveCategoryLabel();
+    const title = categoryLabel
+      ? this.translate.instant('shop.metaTitleCategory', { category: categoryLabel })
+      : this.translate.instant('shop.metaTitle');
+    const categoryDescription = categoryLabel
+      ? this.translate.instant('shop.metaDescriptionCategory', { category: categoryLabel })
+      : '';
     const description = resolveRouteSeoDescription(
       'shop',
       lang,
+      categoryDescription,
       this.translate.instant('meta.descriptions.shop'),
       this.translate.instant('shop.metaDescription')
     );
@@ -2251,6 +2258,21 @@ export class ShopComponent implements OnInit, OnDestroy {
         inLanguage: lang
       }
     ]);
+  }
+
+  private resolveActiveCategoryLabel(): string | null {
+    const slug = (this.activeCategorySlug || '').trim();
+    if (!slug) return null;
+    if (slug === 'sale') {
+      return this.translate.instant('shop.sale');
+    }
+    const categoryName = (this.categoriesBySlug.get(slug)?.name || '').trim();
+    if (categoryName) return categoryName;
+    const fallback = slug
+      .replace(/[-_]+/g, ' ')
+      .trim()
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+    return fallback || null;
   }
 
   private shouldKeepSubcategoryInCanonical(): boolean {

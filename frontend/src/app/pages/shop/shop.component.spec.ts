@@ -38,12 +38,26 @@ describe('ShopComponent i18n meta', () => {
     const translate = TestBed.inject(TranslateService);
     translate.setTranslation(
       'en',
-      { shop: { metaTitle: 'EN title', metaDescription: 'EN desc' } },
+      {
+        shop: {
+          metaTitle: 'EN title',
+          metaDescription: 'EN desc',
+          metaTitleCategory: 'EN title {{category}}',
+          metaDescriptionCategory: 'EN desc {{category}}'
+        }
+      },
       true
     );
     translate.setTranslation(
       'ro',
-      { shop: { metaTitle: 'RO title', metaDescription: 'RO desc' } },
+      {
+        shop: {
+          metaTitle: 'RO title',
+          metaDescription: 'RO desc',
+          metaTitleCategory: 'RO title {{category}}',
+          metaDescriptionCategory: 'RO desc {{category}}'
+        }
+      },
       true
     );
     translate.use('en');
@@ -59,6 +73,15 @@ describe('ShopComponent i18n meta', () => {
 
     meta.updateTag.calls.reset();
     title.setTitle.calls.reset();
+    cmp.activeCategorySlug = 'featured';
+    cmp.categoriesBySlug.set('featured', { slug: 'featured', name: 'Featured' } as any);
+    cmp.setMetaTags();
+    expect(title.setTitle).toHaveBeenCalledWith('EN title Featured');
+    expect(meta.updateTag).toHaveBeenCalledWith({ name: 'description', content: 'EN desc Featured' });
+
+    meta.updateTag.calls.reset();
+    title.setTitle.calls.reset();
+    cmp.activeCategorySlug = null;
     translate.use('ro');
     cmp.setMetaTags();
     expect(title.setTitle).toHaveBeenCalledWith('RO title');
