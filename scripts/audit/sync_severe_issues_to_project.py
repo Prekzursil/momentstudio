@@ -18,6 +18,136 @@ IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 TERMINAL_STATUS_NAMES = {"done", "closed", "completed"}
 GRAPHQL_URL = "https://api.github.com/graphql"
 
+RESOLVE_PROJECT_QUERY = """
+query ResolveProject($owner: String!, $number: Int!) {
+  user(login: $owner) {
+    projectV2(number: $number) {
+      id
+      url
+      closed
+      fields(first: 100) {
+        nodes {
+          __typename
+          ... on ProjectV2FieldCommon {
+            id
+            name
+          }
+          ... on ProjectV2SingleSelectField {
+            id
+            name
+            options {
+              id
+              name
+            }
+          }
+        }
+      }
+    }
+  }
+  organization(login: $owner) {
+    projectV2(number: $number) {
+      id
+      url
+      closed
+      fields(first: 100) {
+        nodes {
+          __typename
+          ... on ProjectV2FieldCommon {
+            id
+            name
+          }
+          ... on ProjectV2SingleSelectField {
+            id
+            name
+            options {
+              id
+              name
+            }
+          }
+        }
+      }
+    }
+  }
+}
+"""
+
+PROJECT_ITEMS_QUERY = """
+query ProjectItems($projectId: ID!, $after: String) {
+  node(id: $projectId) {
+    ... on ProjectV2 {
+      items(first: 100, after: $after) {
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+        nodes {
+          id
+          content {
+            __typename
+            ... on Issue {
+              id
+              number
+            }
+          }
+          fieldValues(first: 30) {
+            nodes {
+              __typename
+              ... on ProjectV2ItemFieldSingleSelectValue {
+                name
+                optionId
+                field {
+                  ... on ProjectV2FieldCommon {
+                    name
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+"""
+
+ISSUE_NODE_QUERY = """
+query IssueNodeId($owner: String!, $repo: String!, $number: Int!) {
+  repository(owner: $owner, name: $repo) {
+    issue(number: $number) {
+      id
+      number
+    }
+  }
+}
+"""
+
+ADD_PROJECT_ITEM_MUTATION = """
+mutation AddProjectItem($projectId: ID!, $contentId: ID!) {
+  addProjectV2ItemById(input: {projectId: $projectId, contentId: $contentId}) {
+    item {
+      id
+    }
+  }
+}
+"""
+
+SET_SINGLE_SELECT_MUTATION = """
+mutation SetSingleSelect($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+  updateProjectV2ItemFieldValue(
+    input: {
+      projectId: $projectId
+      itemId: $itemId
+      fieldId: $fieldId
+      value: { singleSelectOptionId: $optionId }
+    }
+  ) {
+    projectV2Item {
+      id
+    }
+  }
+}
+"""
+
 
 @dataclass(frozen=True)
 class RepoRef:
@@ -107,110 +237,43 @@ def _graphql_request(token: str, query: str, variables: dict[str, Any]) -> dict[
     return data
 
 
-def _resolve_project(
-    *,
-    token: str,
-    project_owner: str,
-    project_number: int,
-    lane_name: str,
-    status_name: str,
-    request_fn: Callable[[str, str, dict[str, Any]], dict[str, Any]],
-) -> ProjectRef:
-    query = """
-    query ResolveProject($owner: String!, $number: Int!) {
-      user(login: $owner) {
-        projectV2(number: $number) {
-          id
-          url
-          closed
-          fields(first: 100) {
-            nodes {
-              __typename
-              ... on ProjectV2FieldCommon {
-                id
-                name
-              }
-              ... on ProjectV2SingleSelectField {
-                id
-                name
-                options {
-                  id
-                  name
-                }
-              }
-            }
-          }
-        }
-      }
-      organization(login: $owner) {
-        projectV2(number: $number) {
-          id
-          url
-          closed
-          fields(first: 100) {
-            nodes {
-              __typename
-              ... on ProjectV2FieldCommon {
-                id
-                name
-              }
-              ... on ProjectV2SingleSelectField {
-                id
-                name
-                options {
-                  id
-                  name
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-    """
-    data = request_fn(token, query, {"owner": project_owner, "number": project_number})
-
-    project = None
+def _extract_project_node(data: dict[str, Any]) -> dict[str, Any] | None:
     user_node = data.get("user") if isinstance(data.get("user"), dict) else None
     org_node = data.get("organization") if isinstance(data.get("organization"), dict) else None
     if user_node and isinstance(user_node.get("projectV2"), dict):
-        project = user_node["projectV2"]
-    elif org_node and isinstance(org_node.get("projectV2"), dict):
-        project = org_node["projectV2"]
+        return user_node["projectV2"]
+    if org_node and isinstance(org_node.get("projectV2"), dict):
+        return org_node["projectV2"]
+    return None
 
-    if not isinstance(project, dict):
-        raise RuntimeError(f"Project not found for {project_owner} #{project_number}.")
-    if bool(project.get("closed")):
-        raise RuntimeError(f"Project {project_owner} #{project_number} is closed.")
 
-    fields_nodes = (
-        ((project.get("fields") or {}).get("nodes"))
-        if isinstance(project.get("fields"), dict)
-        else []
-    )
-    fields_nodes = fields_nodes if isinstance(fields_nodes, list) else []
+def _find_option_id(options: list[dict[str, Any]], expected_name: str) -> str:
+    for option in options:
+        if isinstance(option, dict) and str(option.get("name") or "") == expected_name:
+            return str(option.get("id") or "")
+    return ""
 
+
+def _resolve_project_fields(
+    fields_nodes: list[dict[str, Any]],
+    *,
+    lane_name: str,
+    status_name: str,
+) -> tuple[str, str, str, str]:
     lane_field_id = ""
     lane_option_id = ""
     status_field_id = ""
     status_option_id = ""
 
     for field in fields_nodes:
-        if not isinstance(field, dict):
-            continue
         name = str(field.get("name") or "")
+        options = field.get("options") if isinstance(field.get("options"), list) else []
         if name == "Roadmap Lane":
             lane_field_id = str(field.get("id") or "")
-            options = field.get("options") if isinstance(field.get("options"), list) else []
-            for option in options:
-                if isinstance(option, dict) and str(option.get("name") or "") == lane_name:
-                    lane_option_id = str(option.get("id") or "")
-        if name == "Status":
+            lane_option_id = _find_option_id(options, lane_name)
+        elif name == "Status":
             status_field_id = str(field.get("id") or "")
-            options = field.get("options") if isinstance(field.get("options"), list) else []
-            for option in options:
-                if isinstance(option, dict) and str(option.get("name") or "") == status_name:
-                    status_option_id = str(option.get("id") or "")
+            status_option_id = _find_option_id(options, status_name)
 
     if not lane_field_id:
         raise RuntimeError("Project field 'Roadmap Lane' not found.")
@@ -220,6 +283,33 @@ def _resolve_project(
         raise RuntimeError("Project field 'Status' not found.")
     if not status_option_id:
         raise RuntimeError(f"Status option '{status_name}' not found.")
+
+    return lane_field_id, lane_option_id, status_field_id, status_option_id
+
+
+def _resolve_project(
+    *,
+    token: str,
+    project_owner: str,
+    project_number: int,
+    lane_name: str,
+    status_name: str,
+    request_fn: Callable[[str, str, dict[str, Any]], dict[str, Any]],
+) -> ProjectRef:
+    data = request_fn(token, RESOLVE_PROJECT_QUERY, {"owner": project_owner, "number": project_number})
+    project = _extract_project_node(data)
+    if not isinstance(project, dict):
+        raise RuntimeError(f"Project not found for {project_owner} #{project_number}.")
+    if bool(project.get("closed")):
+        raise RuntimeError(f"Project {project_owner} #{project_number} is closed.")
+
+    fields = project.get("fields") if isinstance(project.get("fields"), dict) else {}
+    fields_nodes = fields.get("nodes") if isinstance(fields.get("nodes"), list) else []
+    lane_field_id, lane_option_id, status_field_id, status_option_id = _resolve_project_fields(
+        [field for field in fields_nodes if isinstance(field, dict)],
+        lane_name=lane_name,
+        status_name=status_name,
+    )
 
     return ProjectRef(
         project_id=str(project.get("id") or ""),
@@ -231,96 +321,65 @@ def _resolve_project(
     )
 
 
+def _parse_project_item(item: dict[str, Any]) -> tuple[str, dict[str, str]] | None:
+    content = item.get("content") if isinstance(item.get("content"), dict) else None
+    if not content or str(content.get("__typename") or "") != "Issue":
+        return None
+
+    issue_node_id = str(content.get("id") or "")
+    if not issue_node_id:
+        return None
+
+    status_name = ""
+    lane_name = ""
+    field_values = item.get("fieldValues") if isinstance(item.get("fieldValues"), dict) else {}
+    values_nodes = field_values.get("nodes") if isinstance(field_values.get("nodes"), list) else []
+
+    for value in values_nodes:
+        if str(value.get("__typename") or "") != "ProjectV2ItemFieldSingleSelectValue":
+            continue
+        field = value.get("field") if isinstance(value.get("field"), dict) else {}
+        field_name = str(field.get("name") or "")
+        selected_name = str(value.get("name") or "")
+        if field_name == "Status":
+            status_name = selected_name
+        elif field_name == "Roadmap Lane":
+            lane_name = selected_name
+
+    return issue_node_id, {
+        "item_id": str(item.get("id") or ""),
+        "status_name": status_name,
+        "lane_name": lane_name,
+    }
+
+
 def _list_project_issue_items(
     *,
     token: str,
     project_id: str,
     request_fn: Callable[[str, str, dict[str, Any]], dict[str, Any]],
 ) -> dict[str, dict[str, str]]:
-    query = """
-    query ProjectItems($projectId: ID!, $after: String) {
-      node(id: $projectId) {
-        ... on ProjectV2 {
-          items(first: 100, after: $after) {
-            pageInfo {
-              hasNextPage
-              endCursor
-            }
-            nodes {
-              id
-              content {
-                __typename
-                ... on Issue {
-                  id
-                  number
-                }
-              }
-              fieldValues(first: 30) {
-                nodes {
-                  __typename
-                  ... on ProjectV2ItemFieldSingleSelectValue {
-                    name
-                    optionId
-                    field {
-                      ... on ProjectV2FieldCommon {
-                        name
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-    """
-
     after: str | None = None
     mapping: dict[str, dict[str, str]] = {}
 
     while True:
-        payload = request_fn(token, query, {"projectId": project_id, "after": after})
+        payload = request_fn(token, PROJECT_ITEMS_QUERY, {"projectId": project_id, "after": after})
         node = payload.get("node") if isinstance(payload.get("node"), dict) else None
         if not node:
             break
+
         items = node.get("items") if isinstance(node.get("items"), dict) else {}
         nodes = items.get("nodes") if isinstance(items.get("nodes"), list) else []
-
         for item in nodes:
             if not isinstance(item, dict):
                 continue
-            content = item.get("content") if isinstance(item.get("content"), dict) else None
-            if not content or str(content.get("__typename") or "") != "Issue":
-                continue
-            issue_node_id = str(content.get("id") or "")
-            if not issue_node_id:
-                continue
-            status_name = ""
-            lane_name = ""
-            field_values = item.get("fieldValues") if isinstance(item.get("fieldValues"), dict) else {}
-            values_nodes = field_values.get("nodes") if isinstance(field_values.get("nodes"), list) else []
-            for value in values_nodes:
-                if not isinstance(value, dict):
-                    continue
-                if str(value.get("__typename") or "") != "ProjectV2ItemFieldSingleSelectValue":
-                    continue
-                field = value.get("field") if isinstance(value.get("field"), dict) else {}
-                field_name = str(field.get("name") or "")
-                selected_name = str(value.get("name") or "")
-                if field_name == "Status":
-                    status_name = selected_name
-                elif field_name == "Roadmap Lane":
-                    lane_name = selected_name
-            mapping[issue_node_id] = {
-                "item_id": str(item.get("id") or ""),
-                "status_name": status_name,
-                "lane_name": lane_name,
-            }
+            parsed = _parse_project_item(item)
+            if parsed:
+                issue_node_id, row = parsed
+                mapping[issue_node_id] = row
 
         page_info = items.get("pageInfo") if isinstance(items.get("pageInfo"), dict) else {}
-        has_next = bool(page_info.get("hasNextPage"))
-        if not has_next:
+        if not bool(page_info.get("hasNextPage")):
             break
         after = str(page_info.get("endCursor") or "")
         if not after:
@@ -336,19 +395,9 @@ def _resolve_issue_node_id(
     issue_number: int,
     request_fn: Callable[[str, str, dict[str, Any]], dict[str, Any]],
 ) -> str:
-    query = """
-    query IssueNodeId($owner: String!, $repo: String!, $number: Int!) {
-      repository(owner: $owner, name: $repo) {
-        issue(number: $number) {
-          id
-          number
-        }
-      }
-    }
-    """
     data = request_fn(
         token,
-        query,
+        ISSUE_NODE_QUERY,
         {"owner": repo.owner, "repo": repo.repo, "number": issue_number},
     )
     repository = data.get("repository") if isinstance(data.get("repository"), dict) else None
@@ -367,22 +416,9 @@ def _add_project_item(
     issue_node_id: str,
     request_fn: Callable[[str, str, dict[str, Any]], dict[str, Any]],
 ) -> str:
-    mutation = """
-    mutation AddProjectItem($projectId: ID!, $contentId: ID!) {
-      addProjectV2ItemById(input: {projectId: $projectId, contentId: $contentId}) {
-        item {
-          id
-        }
-      }
-    }
-    """
-    data = request_fn(token, mutation, {"projectId": project_id, "contentId": issue_node_id})
-    item = (
-        (((data.get("addProjectV2ItemById") or {}).get("item"))
-         if isinstance(data.get("addProjectV2ItemById"), dict)
-         else None)
-        or {}
-    )
+    data = request_fn(token, ADD_PROJECT_ITEM_MUTATION, {"projectId": project_id, "contentId": issue_node_id})
+    created = data.get("addProjectV2ItemById") if isinstance(data.get("addProjectV2ItemById"), dict) else {}
+    item = created.get("item") if isinstance(created.get("item"), dict) else {}
     item_id = str(item.get("id") or "")
     if not item_id:
         raise RuntimeError("Failed to add project item: missing item id.")
@@ -398,25 +434,9 @@ def _set_single_select_field(
     option_id: str,
     request_fn: Callable[[str, str, dict[str, Any]], dict[str, Any]],
 ) -> None:
-    mutation = """
-    mutation SetSingleSelect($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
-      updateProjectV2ItemFieldValue(
-        input: {
-          projectId: $projectId
-          itemId: $itemId
-          fieldId: $fieldId
-          value: { singleSelectOptionId: $optionId }
-        }
-      ) {
-        projectV2Item {
-          id
-        }
-      }
-    }
-    """
     request_fn(
         token,
-        mutation,
+        SET_SINGLE_SELECT_MUTATION,
         {
             "projectId": project_id,
             "itemId": item_id,
@@ -424,6 +444,28 @@ def _set_single_select_field(
             "optionId": option_id,
         },
     )
+
+
+def _normalize_issue_row(row: dict[str, Any]) -> dict[str, Any] | None:
+    issue_number_raw = row.get("issue_number")
+    if isinstance(issue_number_raw, bool):
+        return None
+    try:
+        issue_number = int(issue_number_raw)
+    except (TypeError, ValueError):
+        return None
+    if issue_number <= 0:
+        return None
+
+    return {
+        "issue_number": issue_number,
+        "issue_node_id": str(row.get("issue_node_id") or "").strip(),
+        "fingerprint": str(row.get("fingerprint") or "").strip(),
+        "severity": str(row.get("severity") or "").strip().lower(),
+        "route": str(row.get("route") or "").strip(),
+        "surface": str(row.get("surface") or "").strip(),
+        "action": str(row.get("action") or "").strip(),
+    }
 
 
 def _load_severe_issues(path: Path) -> list[dict[str, Any]]:
@@ -435,25 +477,9 @@ def _load_severe_issues(path: Path) -> list[dict[str, Any]]:
     for row in payload:
         if not isinstance(row, dict):
             continue
-        issue_number_raw = row.get("issue_number")
-        if isinstance(issue_number_raw, bool):
-            continue
-        try:
-            issue_number = int(issue_number_raw)
-        except (TypeError, ValueError):
-            continue
-        if issue_number <= 0:
-            continue
-        deduped[issue_number] = {
-            "issue_number": issue_number,
-            "issue_node_id": str(row.get("issue_node_id") or "").strip(),
-            "fingerprint": str(row.get("fingerprint") or "").strip(),
-            "severity": str(row.get("severity") or "").strip().lower(),
-            "route": str(row.get("route") or "").strip(),
-            "surface": str(row.get("surface") or "").strip(),
-            "action": str(row.get("action") or "").strip(),
-        }
-
+        normalized = _normalize_issue_row(row)
+        if normalized:
+            deduped[int(normalized["issue_number"])] = normalized
     return list(deduped.values())
 
 
@@ -464,6 +490,116 @@ def _should_set_status_todo(current_status: str, target_status: str) -> bool:
     if status.lower() in TERMINAL_STATUS_NAMES:
         return False
     return status != target_status
+
+
+def _initialize_summary(
+    *,
+    repo: RepoRef,
+    project_owner: str,
+    project_number: int,
+    lane_name: str,
+    status_name: str,
+    issue_count: int,
+) -> dict[str, Any]:
+    return {
+        "repo": f"{repo.owner}/{repo.repo}",
+        "project_owner": project_owner,
+        "project_number": project_number,
+        "project_url": "",
+        "lane_name": lane_name,
+        "status_name": status_name,
+        "scanned": issue_count,
+        "added": 0,
+        "updated": 0,
+        "lane_updates": 0,
+        "status_updates": 0,
+        "skipped": 0,
+        "errors": 0,
+        "results": [],
+    }
+
+
+def _resolve_issue_node(issue: dict[str, Any], *, token: str, repo: RepoRef, request_fn: Callable[[str, str, dict[str, Any]], dict[str, Any]]) -> str:
+    issue_node_id = str(issue.get("issue_node_id") or "")
+    if issue_node_id:
+        return issue_node_id
+    return _resolve_issue_node_id(
+        token=token,
+        repo=repo,
+        issue_number=int(issue["issue_number"]),
+        request_fn=request_fn,
+    )
+
+
+def _sync_project_item(
+    *,
+    token: str,
+    project: ProjectRef,
+    issue: dict[str, Any],
+    issue_node_id: str,
+    existing: dict[str, str] | None,
+    lane_name: str,
+    status_name: str,
+    dry_run: bool,
+    request_fn: Callable[[str, str, dict[str, Any]], dict[str, Any]],
+) -> tuple[dict[str, Any], dict[str, int]]:
+    issue_number = int(issue["issue_number"])
+    counters = {"added": 0, "updated": 0, "lane_updates": 0, "status_updates": 0}
+
+    lane_current = ""
+    status_current = ""
+    if existing:
+        item_id = str(existing.get("item_id") or "")
+        lane_current = str(existing.get("lane_name") or "")
+        status_current = str(existing.get("status_name") or "")
+        counters["updated"] = 1
+    else:
+        counters["added"] = 1
+        item_id = (
+            _add_project_item(
+                token=token,
+                project_id=project.project_id,
+                issue_node_id=issue_node_id,
+                request_fn=request_fn,
+            )
+            if not dry_run
+            else f"dry-run-{issue_number}"
+        )
+
+    lane_changed = lane_current != lane_name
+    if lane_changed:
+        counters["lane_updates"] = 1
+        if not dry_run:
+            _set_single_select_field(
+                token=token,
+                project_id=project.project_id,
+                item_id=item_id,
+                field_id=project.lane_field_id,
+                option_id=project.lane_option_id,
+                request_fn=request_fn,
+            )
+
+    status_changed = _should_set_status_todo(status_current, status_name)
+    if status_changed:
+        counters["status_updates"] = 1
+        if not dry_run:
+            _set_single_select_field(
+                token=token,
+                project_id=project.project_id,
+                item_id=item_id,
+                field_id=project.status_field_id,
+                option_id=project.status_option_id,
+                request_fn=request_fn,
+            )
+
+    result = {
+        "issue_number": issue_number,
+        "issue_node_id": issue_node_id,
+        "result": "added" if counters["added"] else "updated",
+        "lane_changed": lane_changed,
+        "status_changed": status_changed,
+    }
+    return result, counters
 
 
 def run_sync(
@@ -480,22 +616,14 @@ def run_sync(
     request_fn: Callable[[str, str, dict[str, Any]], dict[str, Any]],
 ) -> dict[str, Any]:
     issues = _load_severe_issues(issues_path)
-    summary: dict[str, Any] = {
-        "repo": f"{repo.owner}/{repo.repo}",
-        "project_owner": project_owner,
-        "project_number": project_number,
-        "project_url": "",
-        "lane_name": lane_name,
-        "status_name": status_name,
-        "scanned": len(issues),
-        "added": 0,
-        "updated": 0,
-        "lane_updates": 0,
-        "status_updates": 0,
-        "skipped": 0,
-        "errors": 0,
-        "results": [],
-    }
+    summary = _initialize_summary(
+        repo=repo,
+        project_owner=project_owner,
+        project_number=project_number,
+        lane_name=lane_name,
+        status_name=status_name,
+        issue_count=len(issues),
+    )
 
     if not token:
         if allow_skip_missing_token:
@@ -520,15 +648,8 @@ def run_sync(
     existing_items = _list_project_issue_items(token=token, project_id=project.project_id, request_fn=request_fn)
 
     for issue in issues:
+        issue_node_id = _resolve_issue_node(issue, token=token, repo=repo, request_fn=request_fn)
         issue_number = int(issue["issue_number"])
-        issue_node_id = str(issue.get("issue_node_id") or "")
-        if not issue_node_id:
-            issue_node_id = _resolve_issue_node_id(
-                token=token,
-                repo=repo,
-                issue_number=issue_number,
-                request_fn=request_fn,
-            )
         if not issue_node_id:
             summary["errors"] += 1
             summary["results"].append(
@@ -540,65 +661,20 @@ def run_sync(
             )
             continue
 
-        existing = existing_items.get(issue_node_id)
-        item_id = ""
-        was_added = False
-        status_current = ""
-        lane_current = ""
-
-        if existing:
-            item_id = str(existing.get("item_id") or "")
-            lane_current = str(existing.get("lane_name") or "")
-            status_current = str(existing.get("status_name") or "")
-            summary["updated"] += 1
-        else:
-            was_added = True
-            summary["added"] += 1
-            if not dry_run:
-                item_id = _add_project_item(
-                    token=token,
-                    project_id=project.project_id,
-                    issue_node_id=issue_node_id,
-                    request_fn=request_fn,
-                )
-            else:
-                item_id = f"dry-run-{issue_number}"
-
-        lane_changed = lane_current != lane_name
-        if lane_changed:
-            summary["lane_updates"] += 1
-            if not dry_run:
-                _set_single_select_field(
-                    token=token,
-                    project_id=project.project_id,
-                    item_id=item_id,
-                    field_id=project.lane_field_id,
-                    option_id=project.lane_option_id,
-                    request_fn=request_fn,
-                )
-
-        status_changed = _should_set_status_todo(status_current, status_name)
-        if status_changed:
-            summary["status_updates"] += 1
-            if not dry_run:
-                _set_single_select_field(
-                    token=token,
-                    project_id=project.project_id,
-                    item_id=item_id,
-                    field_id=project.status_field_id,
-                    option_id=project.status_option_id,
-                    request_fn=request_fn,
-                )
-
-        summary["results"].append(
-            {
-                "issue_number": issue_number,
-                "issue_node_id": issue_node_id,
-                "result": "added" if was_added else "updated",
-                "lane_changed": lane_changed,
-                "status_changed": status_changed,
-            }
+        result, counters = _sync_project_item(
+            token=token,
+            project=project,
+            issue=issue,
+            issue_node_id=issue_node_id,
+            existing=existing_items.get(issue_node_id),
+            lane_name=lane_name,
+            status_name=status_name,
+            dry_run=dry_run,
+            request_fn=request_fn,
         )
+        summary["results"].append(result)
+        for key in ("added", "updated", "lane_updates", "status_updates"):
+            summary[key] += counters[key]
 
     if summary["errors"] > 0:
         raise RuntimeError(
@@ -627,9 +703,7 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main() -> int:
-    args = _parse_args()
-
+def _parse_main_context(args: argparse.Namespace) -> tuple[RepoRef, str, int, Path, Path | None]:
     repo = _parse_repo(args.repo)
     project_owner = _validate_identifier(args.project_owner, label="project owner")
     project_number = int(args.project_number)
@@ -650,8 +724,14 @@ def main() -> int:
             allowed_prefixes=("artifacts/audit-evidence", "artifacts/audit-evidence-local"),
         )
 
-    token = (os.environ.get("ROADMAP_PROJECT_WRITE_TOKEN") or "").strip()
+    return repo, project_owner, project_number, issues_path, summary_path
 
+
+def main() -> int:
+    args = _parse_args()
+    repo, project_owner, project_number, issues_path, summary_path = _parse_main_context(args)
+
+    token = (os.environ.get("ROADMAP_PROJECT_WRITE_TOKEN") or "").strip()
     summary = run_sync(
         token=token,
         repo=repo,
