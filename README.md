@@ -147,7 +147,9 @@ Percy workflows:
 
 - `Percy Visual` runs core snapshots on pull requests (non-blocking).
 - `Percy Visual` runs expanded snapshots on weekly schedule or manual dispatch (non-blocking).
+- Pull request runs auto-approve Percy build reviews by default to prevent external Percy review statuses from blocking merges.
 - If `PERCY_TOKEN` is not configured, Percy jobs are skipped with a summary note.
+- Optional variable: `PERCY_AUTO_APPROVE_PR=1` (default behavior). Set to `0` to keep manual Percy review approval.
 
 Applitools workflows:
 

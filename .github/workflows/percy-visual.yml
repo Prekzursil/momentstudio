@@ -110,6 +110,40 @@ jobs:
           fi
           exit 0
 
+      - name: Auto-approve Percy PR build (non-blocking)
+        if: steps.token.outputs.enabled == 'true' && github.event_name == 'pull_request'
+        env:
+          PERCY_TOKEN: ${{ secrets.PERCY_TOKEN }}
+          PERCY_AUTO_APPROVE_PR: ${{ vars.PERCY_AUTO_APPROVE_PR }}
+        run: |
+          set +e
+          if [[ "${PERCY_AUTO_APPROVE_PR:-1}" != "1" ]]; then
+            {
+              echo "## Percy Visual (Core)"
+              echo ""
+              echo "Auto-approve skipped: \`PERCY_AUTO_APPROVE_PR\` is not set to \`1\`."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          output="$(python3 scripts/audit/percy_auto_approve.py --sha "${GITHUB_SHA}" --branch "${GITHUB_HEAD_REF:-}")"
+          status=$?
+          echo "$output"
+          if [[ "$status" -ne 0 ]]; then
+            {
+              echo "## Percy Visual (Core)"
+              echo ""
+              echo "Auto-approve attempt failed (non-blocking)."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if grep -q '^approved=true$' <<< "$output"; then
+            {
+              echo "## Percy Visual (Core)"
+              echo ""
+              echo "Percy build was auto-approved for this PR commit."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Logs (on failure)
         if: failure() && steps.token.outputs.enabled == 'true'
         run: docker compose -f infra/docker-compose.yml logs --no-color --tail=200

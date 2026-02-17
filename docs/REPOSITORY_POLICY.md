@@ -92,8 +92,10 @@ Checks-only is the current steady-state policy for this repository. If contribut
   - PR core snapshot pass
   - weekly/manual run
 - Percy is intentionally non-blocking in this phase and is not part of required branch-protection checks.
+- Percy PR runs auto-approve snapshot reviews by default (`PERCY_AUTO_APPROVE_PR=1`) so external Percy review status contexts do not block merges.
 - Applitools is intentionally non-blocking in this phase and is not part of required branch-protection checks.
 - If `PERCY_TOKEN` is missing, Percy workflows skip with an explicit summary message.
+- Set `PERCY_AUTO_APPROVE_PR=0` if manual Percy review approval is desired for pull requests.
 - If `APPLITOOLS_API_KEY` is missing, Applitools workflows skip with an explicit summary message.
 - Copilot custom setup workflow must expose a single job named `copilot-setup-steps` for agent compatibility.
 
