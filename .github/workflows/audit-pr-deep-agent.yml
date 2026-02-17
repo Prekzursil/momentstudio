@@ -105,7 +105,9 @@ jobs:
 
             const hasDeepLabel = (pr.labels || []).some((label) => label.name === 'audit:deep');
             const prHeadSha = pr.head?.sha || '';
-            const prClosed = context.eventName === 'pull_request_target' && context.payload.action === 'closed';
+            const prClosed =
+              String(pr.state || '').toLowerCase() === 'closed' ||
+              (context.eventName === 'pull_request_target' && context.payload.action === 'closed');
             core.setOutput('pr_number', String(pr.number));
             core.setOutput('pr_url', pr.html_url);
             core.setOutput('is_fork', pr.head?.repo?.fork ? 'true' : 'false');
