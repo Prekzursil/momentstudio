@@ -111,6 +111,7 @@ Runtime env keys (frontend):
 
 - `FRONTEND_CLARITY_PROJECT_ID` — Microsoft Clarity project id.
 - `CLARITY_ENABLED` — enable/disable Clarity bootstrap.
+- `SENTRY_ENABLED` — global frontend Sentry switch (`1` by default).
 - `SENTRY_DSN` — shared Sentry DSN (frontend + backend).
 - `SENTRY_SEND_DEFAULT_PII` — defaults to `1` for this repository policy.
 - `SENTRY_TRACES_SAMPLE_RATE`, `SENTRY_REPLAY_SESSION_SAMPLE_RATE`, `SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE`.
@@ -121,10 +122,26 @@ Runtime env keys (backend):
 - `SENTRY_SEND_DEFAULT_PII` — defaults to `1`.
 - `SENTRY_TRACES_SAMPLE_RATE`, `SENTRY_PROFILES_SAMPLE_RATE`, `SENTRY_ENABLE_LOGS`, `SENTRY_LOG_LEVEL`.
 
+Recommended max-observability baseline (override per environment as needed):
+
+- backend: `SENTRY_TRACES_SAMPLE_RATE=1.0`, `SENTRY_PROFILES_SAMPLE_RATE=1.0`, `SENTRY_ENABLE_LOGS=1`, `SENTRY_LOG_LEVEL=info`
+- frontend: `SENTRY_ENABLED=1`, `SENTRY_TRACES_SAMPLE_RATE=1.0`, `SENTRY_REPLAY_SESSION_SAMPLE_RATE=0.25`, `SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE=1.0`
+
 Behavior policy:
 
 - Clarity initializes only when analytics opt-in is enabled, on public storefront routes, and never for authenticated sessions.
 - Sentry initializes only when `SENTRY_DSN` is configured.
+
+CI sourcemap + release upload:
+
+- Workflow: `.github/workflows/sentry-release.yml`
+- Required GitHub configuration:
+  - secret: `SENTRY_AUTH_TOKEN`
+  - variable: `SENTRY_ORG`
+  - variable: `SENTRY_PROJECT`
+  - optional variable: `SENTRY_URL` (for self-hosted Sentry)
+- Release identifier: full git SHA (`GITHUB_SHA`), aligned with production `APP_VERSION` stamping.
+- If required Sentry secret/variables are missing, the workflow exits green with an explicit skip summary.
 
 Percy workflows:
 
