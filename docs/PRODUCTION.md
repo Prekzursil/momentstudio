@@ -122,6 +122,12 @@ Rollback/noise controls (without disabling Sentry entirely):
 - frontend: set `SENTRY_TRACES_SAMPLE_RATE=0` and `SENTRY_REPLAY_SESSION_SAMPLE_RATE=0`
 - keep `SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE=1.0` if you still want replay only for error sessions
 
+### Visual/a11y workflow sanity checks
+
+- Run `Percy Visual` and `Applitools Visual` manually after major UI/layout changes.
+- Run `Audit Weekly Evidence` before `Audit Weekly Agent` if testing manually.
+- If `Audit Weekly Agent` fails, check the `Sync severe issues to roadmap project` step first (token/config or script issues) before triaging findings.
+
 ### Cloudflare Turnstile (setup)
 
 1. Cloudflare Dashboard → **Turnstile** → **Add widget**.
