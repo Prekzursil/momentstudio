@@ -84,6 +84,7 @@
     "@toast-ui/editor": {
       "dompurify": "3.3.1"
     },
+    "fastify": "5.7.2",
     "hono": "4.11.7",
     "lodash": "4.17.23",
     "tar": "7.5.7",

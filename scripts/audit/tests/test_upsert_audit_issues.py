@@ -86,3 +86,47 @@ def test_upsert_issues_updates_existing_and_creates_new(monkeypatch) -> None:
     assert patched_numbers == [77]
     assert len(created_calls) == 1
     assert "ai:ready" in created_calls[0][2]
+
+
+def test_close_stale_fingerprint_issues_closes_only_non_active_and_not_in_progress(monkeypatch) -> None:
+    module = _load_module()
+    ctx = module.GitHubContext(token="token", owner="octo", repo="demo")
+
+    module._list_open_issues = lambda _ctx, labels=None: [
+        {
+            "number": 10,
+            "title": "Stale issue",
+            "body": "<!-- audit:fingerprint:fp-stale -->\nbody",
+            "labels": [{"name": "ai:ready"}],
+        },
+        {
+            "number": 11,
+            "title": "Active issue",
+            "body": "<!-- audit:fingerprint:fp-active -->\nbody",
+            "labels": [{"name": "ai:ready"}],
+        },
+        {
+            "number": 12,
+            "title": "In progress issue",
+            "body": "<!-- audit:fingerprint:fp-in-progress -->\nbody",
+            "labels": [{"name": "ai:in-progress"}],
+        },
+    ]
+
+    actions: list[tuple[str, str, dict | None]] = []
+
+    def fake_request(_ctx, method: str, path: str, payload=None):
+        actions.append((method, path, payload))
+        return {}
+
+    monkeypatch.setattr(module, "_request", fake_request)
+
+    closed = module._close_stale_fingerprint_issues(
+        ctx,
+        active_fingerprints={"fp-active"},
+        run_url="https://example.test/run",
+    )
+    assert closed == 1
+    assert any(method == "POST" and path.endswith("/issues/10/comments") for method, path, _ in actions)
+    assert any(method == "PATCH" and path.endswith("/issues/10") for method, path, _ in actions)
+    assert not any(path.endswith("/issues/12") for _, path, _ in actions)

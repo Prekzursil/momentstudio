@@ -110,6 +110,17 @@ def _list_open_issues(ctx: GitHubContext, *, labels: list[str] | None = None) ->
     return all_issues
 
 
+def _extract_fingerprint_marker(body: str) -> str:
+    marker_prefix = "<!-- audit:fingerprint:"
+    idx = body.find(marker_prefix)
+    if idx < 0:
+        return ""
+    end_idx = body.find("-->", idx)
+    if end_idx < 0:
+        return ""
+    return body[idx + len(marker_prefix) : end_idx].strip()
+
+
 def _issue_body_for_finding(finding: dict[str, Any], run_url: str | None) -> str:
     fingerprint = str(finding.get("fingerprint") or "")
     title = str(finding.get("title") or "Audit finding")
@@ -233,14 +244,7 @@ def _upsert_issues(
     by_marker: dict[str, dict[str, Any]] = {}
     for issue in open_issues:
         body = str(issue.get("body") or "")
-        marker_prefix = "<!-- audit:fingerprint:"
-        idx = body.find(marker_prefix)
-        if idx < 0:
-            continue
-        end_idx = body.find("-->", idx)
-        if end_idx < 0:
-            continue
-        marker = body[idx + len(marker_prefix) : end_idx].strip()
+        marker = _extract_fingerprint_marker(body)
         if marker:
             by_marker[marker] = issue
 
@@ -275,6 +279,45 @@ def _upsert_issues(
         created_count += 1
 
     return created_count, updated_count
+
+
+def _close_stale_fingerprint_issues(
+    ctx: GitHubContext,
+    *,
+    active_fingerprints: set[str],
+    run_url: str | None,
+) -> int:
+    closed_count = 0
+    for issue in _list_open_issues(ctx):
+        marker = _extract_fingerprint_marker(str(issue.get("body") or ""))
+        if not marker or marker in active_fingerprints:
+            continue
+        labels = [str(row.get("name") or "") for row in issue.get("labels") or []]
+        if "ai:in-progress" in labels:
+            # Never auto-close issues currently being worked by an agent.
+            continue
+
+        issue_number = int(issue["number"])
+        comment = (
+            "Automated audit reconciliation closed this issue because its fingerprint "
+            "was not present in the latest deterministic evidence pack."
+        )
+        if run_url:
+            comment += f"\n\nEvidence run: {run_url}"
+        _request(
+            ctx,
+            "POST",
+            f"/repos/{ctx.owner}/{ctx.repo}/issues/{issue_number}/comments",
+            payload={"body": comment},
+        )
+        _request(
+            ctx,
+            "PATCH",
+            f"/repos/{ctx.owner}/{ctx.repo}/issues/{issue_number}",
+            payload={"state": "closed"},
+        )
+        closed_count += 1
+    return closed_count
 
 
 def _upsert_severe(ctx: GitHubContext, findings: list[dict[str, Any]], run_url: str | None) -> None:
@@ -339,6 +382,11 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="Also upsert indexable SEO s3 findings as issues.",
     )
+    parser.add_argument(
+        "--close-stale",
+        action="store_true",
+        help="Close open fingerprinted audit issues not present in current upsert candidate set.",
+    )
     return parser.parse_args()
 
 
@@ -373,6 +421,13 @@ def main() -> int:
         run_url,
         include_s3_seo=bool(args.include_s3_seo),
     )
+    closed = 0
+    if args.close_stale:
+        closed = _close_stale_fingerprint_issues(
+            ctx,
+            active_fingerprints=issue_candidate_fingerprints,
+            run_url=run_url,
+        )
     if not args.skip_digest:
         _upsert_digest(
             ctx,
@@ -383,7 +438,8 @@ def main() -> int:
     print(
         f"Audit issue upsert complete: "
         f"issue_candidates={len(issue_candidates)} created={created} updated={updated} "
-        f"low={len(low)} include_s3_seo={bool(args.include_s3_seo)} repo={ctx.owner}/{ctx.repo}"
+        f"closed={closed} low={len(low)} include_s3_seo={bool(args.include_s3_seo)} "
+        f"repo={ctx.owner}/{ctx.repo}"
     )
     return 0
 
