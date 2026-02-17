@@ -2,7 +2,7 @@ name: Audit PR Deep Agent
 
 on:
   pull_request_target:
-    types: [labeled, reopened, synchronize, ready_for_review]
+    types: [labeled, reopened, synchronize, ready_for_review, closed]
   workflow_dispatch:
     inputs:
       pr_number:
@@ -105,13 +105,18 @@ jobs:
 
             const hasDeepLabel = (pr.labels || []).some((label) => label.name === 'audit:deep');
             const prHeadSha = pr.head?.sha || '';
+            const prClosed =
+              String(pr.state || '').toLowerCase() === 'closed' ||
+              (context.eventName === 'pull_request_target' && context.payload.action === 'closed');
             core.setOutput('pr_number', String(pr.number));
             core.setOutput('pr_url', pr.html_url);
             core.setOutput('is_fork', pr.head?.repo?.fork ? 'true' : 'false');
             core.setOutput('has_deep_label', hasDeepLabel ? 'true' : 'false');
             core.setOutput('pr_head_sha', prHeadSha);
-            const shouldRun = context.eventName === 'workflow_dispatch' || hasDeepLabel;
+            core.setOutput('pr_closed', prClosed ? 'true' : 'false');
+            const shouldRun = !prClosed && (context.eventName === 'workflow_dispatch' || hasDeepLabel);
             core.setOutput('should_run', shouldRun ? 'true' : 'false');
+            core.setOutput('should_close_issue', prClosed ? 'true' : 'false');
             core.setOutput('resolution_mode', context.eventName === 'workflow_dispatch' ? 'manual' : 'pull_request_target');
 
             let evidenceRunUrl = '';
@@ -143,14 +148,71 @@ jobs:
             core.setOutput('evidence_run_url', evidenceRunUrl);
             core.setOutput('evidence_run_sha', evidenceRunSha);
 
+            if (prClosed) {
+              core.notice(`PR #${pr.number} is closed; deep-agent create/update path will be skipped and close-out path will run.`);
+              return;
+            }
+
             if (context.eventName !== 'workflow_dispatch' && !hasDeepLabel) {
               core.notice('Skipping deep-agent flow: PR does not have audit:deep label.');
             }
 
+      - name: Close deep-audit issue when PR is closed
+        if: steps.guard.outputs.should_close_issue == 'true'
+        id: close_issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const prNumber = Number('${{ steps.guard.outputs.pr_number }}');
+            const prUrl = '${{ steps.guard.outputs.pr_url }}';
+            const title = `Deep UX/IA Audit - PR #${prNumber}`;
+            const aiStateLabels = new Set(['ai:ready', 'ai:in-progress']);
+
+            const openIssues = await github.paginate(github.rest.issues.listForRepo, {
+              owner,
+              repo,
+              state: 'open',
+              per_page: 100,
+            });
+            const existing = openIssues.find((issue) => !issue.pull_request && issue.title === title);
+            if (!existing) {
+              core.notice(`No open deep-audit issue found for PR #${prNumber}.`);
+              core.setOutput('closed_issue', 'false');
+              return;
+            }
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: existing.number,
+              body:
+                `Closing automatically because linked PR #${prNumber} is now closed/merged (${prUrl}). ` +
+                'Superseded by current weekly audit evidence and digest.',
+            });
+
+            const preservedLabels = (existing.labels || [])
+              .map((label) => (typeof label === 'string' ? label : label.name))
+              .filter((label) => label && !aiStateLabels.has(label));
+
+            await github.rest.issues.update({
+              owner,
+              repo,
+              issue_number: existing.number,
+              state: 'closed',
+              labels: Array.from(new Set(preservedLabels)),
+            });
+            core.setOutput('closed_issue', 'true');
+            core.setOutput('closed_issue_number', String(existing.number));
+
       - name: Stop when deep-audit label is not present
         if: steps.guard.outputs.should_run != 'true'
         run: |
-          echo "audit:deep label not present; skipping."
+          if [[ "${{ steps.guard.outputs.pr_closed }}" == "true" ]]; then
+            echo "PR is closed; create/update flow skipped."
+          else
+            echo "audit:deep label not present; skipping."
+          fi
           exit 0
 
       - name: Build deep-audit issue body
@@ -306,9 +368,12 @@ jobs:
           pr_number="${{ steps.guard.outputs.pr_number }}"
           pr_url="${{ steps.guard.outputs.pr_url }}"
           should_run="${{ steps.guard.outputs.should_run }}"
+          pr_closed="${{ steps.guard.outputs.pr_closed }}"
           evidence_url="${{ steps.guard.outputs.evidence_run_url }}"
           resolution_mode="${{ steps.guard.outputs.resolution_mode }}"
           issue_number="${{ steps.issue.outputs.issue_number }}"
+          closed_issue="${{ steps.close_issue.outputs.closed_issue }}"
+          closed_issue_number="${{ steps.close_issue.outputs.closed_issue_number }}"
 
           {
             echo "## Deep Agent Summary"
@@ -323,6 +388,12 @@ jobs:
             fi
             if [[ -z "${should_run}" ]]; then
               echo "- Outcome: failed during PR context resolution"
+            elif [[ "${pr_closed}" == "true" ]]; then
+              if [[ "${closed_issue}" == "true" ]]; then
+                echo "- Outcome: PR closed; deep issue \`#${closed_issue_number}\` auto-closed"
+              else
+                echo "- Outcome: PR closed; no open deep issue found to close"
+              fi
             elif [[ "${should_run}" == "true" ]]; then
               echo "- Outcome: processed"
               echo "- Deep issue number: \`${issue_number:-n/a}\`"

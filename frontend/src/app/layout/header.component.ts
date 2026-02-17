@@ -50,7 +50,7 @@ import { Subscription } from 'rxjs';
       </div>
       <app-cms-announcement-bar></app-cms-announcement-bar>
       <div class="max-w-7xl mx-auto px-4 sm:px-6">
-        <div class="py-4 grid grid-cols-[auto,1fr,auto] items-center gap-4">
+        <nav class="py-4 grid grid-cols-[auto,1fr,auto] items-center gap-4" aria-label="Header controls">
           <a routerLink="/" class="flex items-center gap-3 min-w-0">
           <img
             class="h-8 sm:h-10 w-auto shrink-0"
@@ -64,7 +64,9 @@ import { Subscription } from 'rxjs';
           </a>
           <form class="hidden lg:flex min-w-0" (submit)="submitSearch($event)">
             <div class="relative w-full max-w-2xl xl:max-w-3xl min-w-0 mx-auto">
+              <label class="sr-only" for="header-search-input">{{ 'shop.searchPlaceholder' | translate }}</label>
               <input
+                id="header-search-input"
                 name="q"
                 type="search"
                 class="w-full h-10 rounded-full border border-slate-200 bg-white px-4 pr-10 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
@@ -76,7 +78,8 @@ import { Subscription } from 'rxjs';
                 class="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 grid place-items-center rounded-full text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
                 aria-label="Search"
               >
-                🔎
+                <span aria-hidden="true">🔎</span>
+                <span class="sr-only">Search</span>
               </button>
             </div>
           </form>
@@ -88,7 +91,8 @@ import { Subscription } from 'rxjs';
               aria-label="Open navigation"
               [attr.aria-expanded]="drawerOpen"
             >
-              ☰
+              <span aria-hidden="true">☰</span>
+              <span class="sr-only">Open navigation</span>
             </button>
             <button
               type="button"
@@ -96,14 +100,16 @@ import { Subscription } from 'rxjs';
               aria-label="Search"
               (click)="openSearch()"
             >
-              🔎
+              <span aria-hidden="true">🔎</span>
+              <span class="sr-only">Search</span>
             </button>
             <a
               routerLink="/cart"
               class="relative inline-flex items-center justify-center h-10 w-10 rounded-full bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100"
               [attr.aria-label]="'Cart with ' + cartCount() + ' items'"
             >
-              🛒
+              <span aria-hidden="true">🛒</span>
+              <span class="sr-only">Cart</span>
               <span
                 *ngIf="cartCount() > 0"
                 class="absolute -top-1 -right-1 min-w-[20px] rounded-full bg-slate-900 px-1 text-[11px] font-semibold text-white text-center dark:bg-slate-50 dark:text-slate-900"
@@ -117,7 +123,8 @@ import { Subscription } from 'rxjs';
               class="inline-flex items-center justify-center h-10 w-10 rounded-full bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-100"
               [attr.aria-label]="'pwa.offlineBadge' | translate"
             >
-              ⚠️
+              <span aria-hidden="true">⚠️</span>
+              <span class="sr-only">{{ 'pwa.offlineBadge' | translate }}</span>
             </a>
             <a
               *ngIf="!isAuthenticated()"
@@ -137,61 +144,61 @@ import { Subscription } from 'rxjs';
                 <span class="truncate max-w-[160px]">{{ currentUser()?.username }}</span>
                 <span class="text-slate-500 dark:text-slate-300">▾</span>
               </button>
-	              <div
-	                *ngIf="userMenuOpen"
-	                class="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-slate-900 z-[110]"
-	                role="menu"
-	              >
-	                <a
-	                  routerLink="/account/profile"
-	                  role="menuitem"
-	                  class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
-	                  (click)="closeUserMenu()"
-	                >
-	                  {{ 'nav.myProfile' | translate }}
-	                </a>
-	                <a
-	                  routerLink="/account/orders"
-	                  role="menuitem"
-	                  class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
-	                  (click)="closeUserMenu()"
-	                >
-	                  {{ 'nav.myOrders' | translate }}
-	                </a>
-		                <a
-		                  routerLink="/account/wishlist"
-		                  role="menuitem"
-		                  class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
-		                  (click)="closeUserMenu()"
-		                >
-		                  {{ 'nav.myWishlist' | translate }}
-		                </a>
-		                <a
-		                  routerLink="/account/coupons"
-		                  role="menuitem"
-		                  class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
-		                  (click)="closeUserMenu()"
-		                >
-		                  {{ 'nav.myCoupons' | translate }}
-		                </a>
-		                <a
-		                  routerLink="/tickets"
-		                  role="menuitem"
-		                  class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
-		                  (click)="closeUserMenu()"
-	                >
-	                  {{ 'nav.helpCenter' | translate }}
-	                </a>
-	                <div class="my-1 border-t border-slate-200 dark:border-slate-800"></div>
-	                <button
-	                  type="button"
-	                  role="menuitem"
-	                  class="w-full text-left rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
-	                  (click)="signOut()"
-	                >
-	                  {{ (isImpersonating() ? 'nav.exitImpersonation' : 'nav.signOut') | translate }}
-	                </button>
-	              </div>
+                <div
+                  *ngIf="userMenuOpen"
+                  class="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-slate-900 z-[110]"
+                  role="menu"
+                >
+                  <a
+                    routerLink="/account/profile"
+                    role="menuitem"
+                    class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+                    (click)="closeUserMenu()"
+                  >
+                    {{ 'nav.myProfile' | translate }}
+                  </a>
+                  <a
+                    routerLink="/account/orders"
+                    role="menuitem"
+                    class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+                    (click)="closeUserMenu()"
+                  >
+                    {{ 'nav.myOrders' | translate }}
+                  </a>
+                    <a
+                      routerLink="/account/wishlist"
+                      role="menuitem"
+                      class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+                      (click)="closeUserMenu()"
+                    >
+                      {{ 'nav.myWishlist' | translate }}
+                    </a>
+                    <a
+                      routerLink="/account/coupons"
+                      role="menuitem"
+                      class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+                      (click)="closeUserMenu()"
+                    >
+                      {{ 'nav.myCoupons' | translate }}
+                    </a>
+                    <a
+                      routerLink="/tickets"
+                      role="menuitem"
+                      class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+                      (click)="closeUserMenu()"
+                  >
+                    {{ 'nav.helpCenter' | translate }}
+                  </a>
+                  <div class="my-1 border-t border-slate-200 dark:border-slate-800"></div>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    class="w-full text-left rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+                    (click)="signOut()"
+                  >
+                    {{ (isImpersonating() ? 'nav.exitImpersonation' : 'nav.signOut') | translate }}
+                  </button>
+                </div>
             </div>
             <div *ngIf="isAuthenticated()" class="relative">
               <button
@@ -202,7 +209,8 @@ import { Subscription } from 'rxjs';
                 [attr.aria-expanded]="notificationsOpen"
                 (click)="toggleNotifications()"
               >
-                🔔
+                <span aria-hidden="true">🔔</span>
+                <span class="sr-only">{{ 'notifications.title' | translate }}</span>
                 <span
                   *ngIf="unreadCount() > 0"
                   class="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-red-600 px-1 text-[10px] font-semibold text-white grid place-items-center"
@@ -271,8 +279,8 @@ import { Subscription } from 'rxjs';
                         </div>
                       </div>
                     </li>
-	                  </ul>
-	                </div>
+                    </ul>
+                  </div>
                 <div class="px-4 py-3 border-t border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between gap-3">
                   <a
                     routerLink="/account/notifications"
@@ -289,8 +297,8 @@ import { Subscription } from 'rxjs';
                     {{ 'notifications.settings' | translate }}
                   </a>
                 </div>
-	              </div>
-	            </div>
+                </div>
+              </div>
             <div class="hidden lg:flex items-center gap-2 rounded-full border border-slate-200 bg-white/70 px-2 py-1 shadow-sm dark:border-slate-700 dark:bg-slate-800/70">
               <app-theme-segmented-control
                 [preference]="themePreference"
@@ -315,8 +323,11 @@ import { Subscription } from 'rxjs';
               </label>
             </div>
           </div>
-        </div>
-	        <nav class="hidden lg:flex items-center gap-6 border-t border-slate-200/60 py-2 text-sm font-medium text-slate-700 dark:border-slate-800/60 dark:text-slate-200 overflow-x-auto whitespace-nowrap">
+        </nav>
+          <nav
+            class="hidden lg:flex items-center gap-6 border-t border-slate-200/60 py-2 text-sm font-medium text-slate-700 dark:border-slate-800/60 dark:text-slate-200 overflow-x-auto whitespace-nowrap"
+            aria-label="Primary storefront navigation"
+          >
             <ng-container *ngFor="let link of storefrontLinks(); trackBy: trackNavLink">
               <a *ngIf="!link.external; else externalStorefrontLink" [routerLink]="link.path" class="hover:text-slate-900 dark:hover:text-white">
                 {{ link.translate === false ? link.label : (link.label | translate) }}
@@ -332,26 +343,26 @@ import { Subscription } from 'rxjs';
                 </a>
               </ng-template>
             </ng-container>
-	          <button
-	            *ngIf="isAdmin() && !isImpersonating()"
-	            type="button"
-	            class="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition"
-	            [ngClass]="storefrontEditMode() ? 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'"
-	            (click)="toggleStorefrontEditMode()"
-	            [attr.aria-pressed]="storefrontEditMode()"
-	          >
-	            {{ 'nav.editMode' | translate }}
-	          </button>
-	          <a
-	            *ngIf="isStaff()"
-	            routerLink="/admin"
-	            class="hover:text-slate-900 dark:hover:text-white"
+            <button
+              *ngIf="isAdmin() && !isImpersonating()"
+              type="button"
+              class="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition"
+              [ngClass]="storefrontEditMode() ? 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'"
+              (click)="toggleStorefrontEditMode()"
+              [attr.aria-pressed]="storefrontEditMode()"
+            >
+              {{ 'nav.editMode' | translate }}
+            </button>
+            <a
+              *ngIf="isStaff()"
+              routerLink="/admin"
+              class="hover:text-slate-900 dark:hover:text-white"
           >
             {{ 'nav.viewAdmin' | translate }}
           </a>
         </nav>
       </div>
-	    </header>
+      </header>
     <div *ngIf="userMenuOpen || notificationsOpen" class="fixed inset-0 z-40" (click)="closeOverlays()"></div>
     <div *ngIf="searchOpen" class="fixed inset-0 z-50" (click)="closeSearch()">
       <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm dark:bg-black/60"></div>
@@ -362,7 +373,9 @@ import { Subscription } from 'rxjs';
         aria-modal="true"
       >
         <form class="flex gap-2" (submit)="submitSearch($event); closeSearch()">
+          <label class="sr-only" for="mobile-search-input">{{ 'shop.searchPlaceholder' | translate }}</label>
           <input
+            id="mobile-search-input"
             name="q"
             type="search"
             class="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
@@ -418,16 +431,16 @@ export class HeaderComponent implements OnDestroy {
   banner = signal<MaintenanceBannerPublic | null>(null);
   private cmsNavigation = signal<SiteNavigationData | null>(null);
 
-	  readonly isAuthenticated = computed(() => this.auth.isAuthenticated());
-	  readonly currentUser = computed(() => this.auth.user());
-	  readonly isStaff = computed(() => this.auth.isStaff());
-	  readonly isAdmin = computed(() => this.auth.isAdmin());
-	  readonly isImpersonating = computed(() => this.auth.isImpersonating());
-		  readonly storefrontEditMode = this.storefrontAdminMode.enabled;
-		  readonly notifications = computed(() => this.notificationsService.items());
-		  readonly notificationsLoading = computed(() => this.notificationsService.loading());
-		  readonly unreadCount = computed(() => this.notificationsService.unreadCount());
-	    readonly pwaOnline = computed(() => this.pwa.isOnline());
+    readonly isAuthenticated = computed(() => this.auth.isAuthenticated());
+    readonly currentUser = computed(() => this.auth.user());
+    readonly isStaff = computed(() => this.auth.isStaff());
+    readonly isAdmin = computed(() => this.auth.isAdmin());
+    readonly isImpersonating = computed(() => this.auth.isImpersonating());
+      readonly storefrontEditMode = this.storefrontAdminMode.enabled;
+      readonly notifications = computed(() => this.notificationsService.items());
+      readonly notificationsLoading = computed(() => this.notificationsService.loading());
+      readonly unreadCount = computed(() => this.notificationsService.unreadCount());
+      readonly pwaOnline = computed(() => this.pwa.isOnline());
 
   private readonly fallbackStorefrontLinks: NavLink[] = [
     { label: 'nav.home', path: '/' },
@@ -469,18 +482,18 @@ export class HeaderComponent implements OnDestroy {
     return links;
   });
 
-	  constructor(
-	    private cart: CartStore,
-	    private router: Router,
-	    private auth: AuthService,
+    constructor(
+      private cart: CartStore,
+      private router: Router,
+      private auth: AuthService,
       private navigation: SiteNavigationService,
-	    private storefrontAdminMode: StorefrontAdminModeService,
-	    private notificationsService: NotificationsService,
-	    private ops: OpsService,
-	      private pwa: PwaService,
-		    private toast: ToastService,
-		    private translate: TranslateService
-		  ) {
+      private storefrontAdminMode: StorefrontAdminModeService,
+      private notificationsService: NotificationsService,
+      private ops: OpsService,
+        private pwa: PwaService,
+        private toast: ToastService,
+        private translate: TranslateService
+      ) {
     if (!this.isBrowser) {
       return;
     }
@@ -505,47 +518,47 @@ export class HeaderComponent implements OnDestroy {
 
   cartCount = this.cart.count;
 
-	  onThemeChange(pref: ThemePreference): void {
-	    this.themeChange.emit(pref);
-	  }
+    onThemeChange(pref: ThemePreference): void {
+      this.themeChange.emit(pref);
+    }
 
-	  toggleStorefrontEditMode(): void {
-	    if (this.storefrontEditMode()) {
-	      this.storefrontAdminMode.setEnabled(false);
-	      return;
-	    }
-	    if (!this.auth.isAdmin() || this.auth.isImpersonating()) return;
+    toggleStorefrontEditMode(): void {
+      if (this.storefrontEditMode()) {
+        this.storefrontAdminMode.setEnabled(false);
+        return;
+      }
+      if (!this.auth.isAdmin() || this.auth.isImpersonating()) return;
 
-	    this.auth.checkAdminAccess({ silent: true }).subscribe({
-	      next: () => {
-	        this.storefrontAdminMode.setEnabled(true);
-	      },
-	      error: (err) => {
-	        const detail = err?.error?.detail;
-	        if (detail === 'Two-factor authentication or passkey required for admin access') {
-	          this.toast.error(this.translate.instant('adminUi.security.mfaRequired'));
-	          void this.router.navigateByUrl('/account/security');
-	          return;
-	        }
-	        if (
-	          detail === 'Admin access is blocked from this IP address' ||
-	          detail === 'Admin access is restricted to approved IP addresses'
-	        ) {
-	          this.toast.error(this.translate.instant('adminUi.ipBypass.restricted'));
-	          const nextUrl = encodeURIComponent(this.router.url || '/admin/dashboard');
-	          void this.router.navigateByUrl(`/admin/ip-bypass?returnUrl=${nextUrl}`);
-	          return;
-	        }
-	        this.toast.error(detail || this.translate.instant('adminUi.errors.generic'));
-	      }
-	    });
-	  }
+      this.auth.checkAdminAccess({ silent: true }).subscribe({
+        next: () => {
+          this.storefrontAdminMode.setEnabled(true);
+        },
+        error: (err) => {
+          const detail = err?.error?.detail;
+          if (detail === 'Two-factor authentication or passkey required for admin access') {
+            this.toast.error(this.translate.instant('adminUi.security.mfaRequired'));
+            void this.router.navigateByUrl('/account/security');
+            return;
+          }
+          if (
+            detail === 'Admin access is blocked from this IP address' ||
+            detail === 'Admin access is restricted to approved IP addresses'
+          ) {
+            this.toast.error(this.translate.instant('adminUi.ipBypass.restricted'));
+            const nextUrl = encodeURIComponent(this.router.url || '/admin/dashboard');
+            void this.router.navigateByUrl(`/admin/ip-bypass?returnUrl=${nextUrl}`);
+            return;
+          }
+          this.toast.error(detail || this.translate.instant('adminUi.errors.generic'));
+        }
+      });
+    }
 
-		  toggleDrawer(): void {
-		    this.drawerOpen = !this.drawerOpen;
-		    if (this.drawerOpen) {
-		      this.searchOpen = false;
-	      this.userMenuOpen = false;
+      toggleDrawer(): void {
+        this.drawerOpen = !this.drawerOpen;
+        if (this.drawerOpen) {
+          this.searchOpen = false;
+        this.userMenuOpen = false;
       this.notificationsOpen = false;
     }
   }

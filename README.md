@@ -155,6 +155,14 @@ Applitools workflows:
 - `Applitools Visual` also runs weekly and supports manual dispatch.
 - If `APPLITOOLS_API_KEY` is not configured, Applitools jobs are skipped with a summary note.
 
+Validation baseline snapshots:
+
+- Store reconciliation snapshots under `docs/reports/visual-a11y-reconciliation/` with run URLs for:
+  - `Percy Visual`
+  - `Applitools Visual`
+  - `Audit Weekly Evidence`
+  - `Audit Weekly Agent`
+
 ## Common commands
 
 ```bash

@@ -9,6 +9,10 @@ type ButtonType = 'button' | 'submit' | 'reset';
 @Component({
   selector: 'app-button',
   standalone: true,
+  host: {
+    role: 'none',
+    tabindex: '-1',
+  },
   imports: [NgIf, NgClass, RouterLink],
   template: `
     <ng-container *ngIf="routerLink; else linkTpl">
