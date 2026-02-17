@@ -56,6 +56,8 @@ jobs:
       - name: Checkout
         if: steps.config.outputs.enabled == 'true'
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         if: steps.config.outputs.enabled == 'true'
@@ -86,7 +88,7 @@ jobs:
           RELEASE: ${{ steps.config.outputs.release }}
         run: |
           set -euo pipefail
-          SENTRY_CLI="npx --yes @sentry/cli"
+          SENTRY_CLI="npx --yes @sentry/cli@2.57.0"
           ${SENTRY_CLI} releases new "$RELEASE"
           ${SENTRY_CLI} releases set-commits "$RELEASE" --auto
           ${SENTRY_CLI} sourcemaps inject frontend/dist/app/browser
