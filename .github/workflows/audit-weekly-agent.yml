@@ -138,30 +138,7 @@ jobs:
           echo "severe_count=${severe_count}" >> "$GITHUB_OUTPUT"
 
           if [[ "${severe_count}" == "0" ]]; then
-            python3 - <<'PY'
-            import json
-            from pathlib import Path
-
-            Path("artifacts/audit-evidence/project-sync-summary.json").write_text(
-                json.dumps(
-                    {
-                        "scanned": 0,
-                        "added": 0,
-                        "updated": 0,
-                        "lane_updates": 0,
-                        "status_updates": 0,
-                        "skipped_run": True,
-                        "skip_reason": "no_severe_issues",
-                        "project_owner": "Prekzursil",
-                        "project_number": 2,
-                        "project_url": "",
-                    },
-                    indent=2,
-                )
-                + "\n",
-                encoding="utf-8",
-            )
-            PY
+            python3 -c 'import json, pathlib; pathlib.Path("artifacts/audit-evidence/project-sync-summary.json").write_text(json.dumps({"scanned":0,"added":0,"updated":0,"lane_updates":0,"status_updates":0,"skipped_run":True,"skip_reason":"no_severe_issues","project_owner":"Prekzursil","project_number":2,"project_url":""}, indent=2) + "\n", encoding="utf-8")'
             exit 0
           fi
 
