@@ -50,7 +50,7 @@ import { Subscription } from 'rxjs';
       </div>
       <app-cms-announcement-bar></app-cms-announcement-bar>
       <div class="max-w-7xl mx-auto px-4 sm:px-6">
-        <div class="py-4 grid grid-cols-[auto,1fr,auto] items-center gap-4">
+        <nav class="py-4 grid grid-cols-[auto,1fr,auto] items-center gap-4" aria-label="Header controls">
           <a routerLink="/" class="flex items-center gap-3 min-w-0">
           <img
             class="h-8 sm:h-10 w-auto shrink-0"
@@ -64,7 +64,9 @@ import { Subscription } from 'rxjs';
           </a>
           <form class="hidden lg:flex min-w-0" (submit)="submitSearch($event)">
             <div class="relative w-full max-w-2xl xl:max-w-3xl min-w-0 mx-auto">
+              <label class="sr-only" for="header-search-input">{{ 'shop.searchPlaceholder' | translate }}</label>
               <input
+                id="header-search-input"
                 name="q"
                 type="search"
                 class="w-full h-10 rounded-full border border-slate-200 bg-white px-4 pr-10 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
@@ -76,7 +78,8 @@ import { Subscription } from 'rxjs';
                 class="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 grid place-items-center rounded-full text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
                 aria-label="Search"
               >
-                🔎
+                <span aria-hidden="true">🔎</span>
+                <span class="sr-only">Search</span>
               </button>
             </div>
           </form>
@@ -88,7 +91,8 @@ import { Subscription } from 'rxjs';
               aria-label="Open navigation"
               [attr.aria-expanded]="drawerOpen"
             >
-              ☰
+              <span aria-hidden="true">☰</span>
+              <span class="sr-only">Open navigation</span>
             </button>
             <button
               type="button"
@@ -96,14 +100,16 @@ import { Subscription } from 'rxjs';
               aria-label="Search"
               (click)="openSearch()"
             >
-              🔎
+              <span aria-hidden="true">🔎</span>
+              <span class="sr-only">Search</span>
             </button>
             <a
               routerLink="/cart"
               class="relative inline-flex items-center justify-center h-10 w-10 rounded-full bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100"
               [attr.aria-label]="'Cart with ' + cartCount() + ' items'"
             >
-              🛒
+              <span aria-hidden="true">🛒</span>
+              <span class="sr-only">Cart</span>
               <span
                 *ngIf="cartCount() > 0"
                 class="absolute -top-1 -right-1 min-w-[20px] rounded-full bg-slate-900 px-1 text-[11px] font-semibold text-white text-center dark:bg-slate-50 dark:text-slate-900"
@@ -117,7 +123,8 @@ import { Subscription } from 'rxjs';
               class="inline-flex items-center justify-center h-10 w-10 rounded-full bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-100"
               [attr.aria-label]="'pwa.offlineBadge' | translate"
             >
-              ⚠️
+              <span aria-hidden="true">⚠️</span>
+              <span class="sr-only">{{ 'pwa.offlineBadge' | translate }}</span>
             </a>
             <a
               *ngIf="!isAuthenticated()"
@@ -202,7 +209,8 @@ import { Subscription } from 'rxjs';
                 [attr.aria-expanded]="notificationsOpen"
                 (click)="toggleNotifications()"
               >
-                🔔
+                <span aria-hidden="true">🔔</span>
+                <span class="sr-only">{{ 'notifications.title' | translate }}</span>
                 <span
                   *ngIf="unreadCount() > 0"
                   class="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-red-600 px-1 text-[10px] font-semibold text-white grid place-items-center"
@@ -315,8 +323,11 @@ import { Subscription } from 'rxjs';
               </label>
             </div>
           </div>
-        </div>
-	        <nav class="hidden lg:flex items-center gap-6 border-t border-slate-200/60 py-2 text-sm font-medium text-slate-700 dark:border-slate-800/60 dark:text-slate-200 overflow-x-auto whitespace-nowrap">
+        </nav>
+	        <nav
+            class="hidden lg:flex items-center gap-6 border-t border-slate-200/60 py-2 text-sm font-medium text-slate-700 dark:border-slate-800/60 dark:text-slate-200 overflow-x-auto whitespace-nowrap"
+            aria-label="Primary storefront navigation"
+          >
             <ng-container *ngFor="let link of storefrontLinks(); trackBy: trackNavLink">
               <a *ngIf="!link.external; else externalStorefrontLink" [routerLink]="link.path" class="hover:text-slate-900 dark:hover:text-white">
                 {{ link.translate === false ? link.label : (link.label | translate) }}
@@ -362,7 +373,9 @@ import { Subscription } from 'rxjs';
         aria-modal="true"
       >
         <form class="flex gap-2" (submit)="submitSearch($event); closeSearch()">
+          <label class="sr-only" for="mobile-search-input">{{ 'shop.searchPlaceholder' | translate }}</label>
           <input
+            id="mobile-search-input"
             name="q"
             type="search"
             class="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"

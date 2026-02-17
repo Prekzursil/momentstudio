@@ -37,11 +37,12 @@ export interface NavDrawerUser {
       [ngClass]="{ '-translate-x-full': !open, 'translate-x-0': open }"
       [attr.role]="open ? 'dialog' : null"
       [attr.aria-modal]="open ? 'true' : null"
+      [attr.aria-labelledby]="open ? 'mobile-menu-title' : null"
       [attr.aria-hidden]="open ? null : 'true'"
       [attr.inert]="open ? null : ''"
     >
       <div class="p-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
-        <span class="font-semibold text-slate-900 dark:text-slate-50">{{ 'nav.menu' | translate }}</span>
+        <span id="mobile-menu-title" class="font-semibold text-slate-900 dark:text-slate-50">{{ 'nav.menu' | translate }}</span>
         <button
           class="text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
           (click)="onClose()"
@@ -70,7 +71,7 @@ export interface NavDrawerUser {
           </div>
         </div>
       </div>
-      <nav class="p-4 grid gap-3">
+      <nav class="p-4 grid gap-3" aria-label="Mobile drawer navigation">
         <ng-container *ngFor="let link of links">
           <a
             *ngIf="!link.external; else externalNavLink"

@@ -22,7 +22,7 @@ import { ClarityService } from './core/clarity.service';
   standalone: true,
   imports: [RouterOutlet, HeaderComponent, FooterComponent, ContainerComponent, CmsGlobalSectionBlocksComponent, ToastComponent],
   template: `
-    <a class="skip-link" href="#main-content">Skip to main content</a>
+    <a class="skip-link" href="#main-content" aria-label="Skip to main content" data-skip-link="true">Skip to main content</a>
     <div class="min-h-screen flex flex-col bg-gradient-to-b from-slate-50 to-white text-slate-900 dark:from-slate-950 dark:to-slate-900 dark:text-slate-50 transition-colors">
       <app-header
         [themePreference]="preference()"
