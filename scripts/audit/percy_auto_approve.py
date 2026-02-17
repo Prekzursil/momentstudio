@@ -126,6 +126,8 @@ def _validate_sha(sha: str) -> str:
 
 def run(*, token: str, sha: str, branch: str | None, dry_run: bool, limit: int) -> int:
     safe_sha = _validate_sha(sha)
+    if limit < 1:
+        raise ValueError("Limit must be >= 1")
 
     builds_payload = _request_json(
         token=token,

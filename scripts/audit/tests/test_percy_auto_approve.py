@@ -77,3 +77,11 @@ def test_changes_requested_review_state_is_not_auto_approved() -> None:
     ]
 
     assert percy_auto_approve.select_build_for_approval(builds) is None
+
+def test_run_rejects_non_positive_limit() -> None:
+    try:
+        percy_auto_approve.run(token="x", sha="abc1234", branch=None, dry_run=True, limit=0)
+    except ValueError as exc:
+        assert "Limit must be >= 1" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError for non-positive limit")

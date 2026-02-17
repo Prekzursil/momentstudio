@@ -139,7 +139,7 @@ jobs:
             if grep -q '^approved=true$' <<< "$output"; then
               break
             fi
-            if grep -q '^builds_scanned=0$' <<< "$output"; then
+            if grep -q '^reason=no-approvable-build$' <<< "$output"; then
               sleep 5
               continue
             fi
