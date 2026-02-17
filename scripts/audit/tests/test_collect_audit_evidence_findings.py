@@ -147,3 +147,41 @@ def test_indexable_missing_description_and_thin_content_rules() -> None:
     assert "seo_missing_description" in rules
     assert "seo_no_meaningful_text" in rules
     assert "seo_low_internal_links" in rules
+
+
+def test_no_meaningful_text_rule_skips_when_route_has_api_noise_console_error() -> None:
+    module = _load_module()
+    findings = module._build_deterministic_findings(
+        seo_snapshot=[
+            {
+                "route": "/about",
+                "route_template": "/about",
+                "resolved_route": "/about",
+                "surface": "storefront",
+                "title": "About",
+                "description": "About page",
+                "canonical": "https://momentstudio.ro/about",
+                "robots": "index,follow",
+                "h1_count": 1,
+                "word_count_initial_html": 0,
+                "meaningful_text_block_count": 0,
+                "internal_link_count": 0,
+                "indexable": True,
+            }
+        ],
+        console_errors=[
+            {
+                "route": "/about",
+                "route_template": "/about",
+                "resolved_route": "/about",
+                "surface": "storefront",
+                "severity": "s4",
+                "level": "error",
+                "text": "Unexpected token '<'",
+            }
+        ],
+        layout_signals=[],
+    )
+    rules = {row["rule_id"] for row in findings}
+    assert "seo_no_meaningful_text" not in rules
+    assert "seo_low_internal_links" not in rules

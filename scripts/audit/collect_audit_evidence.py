@@ -203,6 +203,37 @@ def _build_deterministic_findings(
 ) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
     indexable_rows: list[dict[str, str]] = []
+    noisy_routes: set[str] = set()
+
+    def _is_api_noise_message(message: str) -> bool:
+        text = " ".join(str(message or "").lower().split())
+        if not text:
+            return False
+        patterns = (
+            "/api/",
+            "net::err_connection_refused",
+            "failed to load resource",
+            "status of 404",
+            "httperrorresponse",
+            "failed to fetch",
+            "networkerror when attempting to fetch resource",
+            "xmlhttprequest",
+            "response with status",
+            "unexpected token '<'",
+            "unexpected token <",
+            "is not valid json",
+        )
+        return any(pattern in text for pattern in patterns)
+
+    for row in console_errors:
+        severity = str(row.get("severity") or "s3").lower()
+        text = str(row.get("text") or "")
+        if severity != "s4" and not _is_api_noise_message(text):
+            continue
+        for key in ("route", "route_template", "resolved_route"):
+            token = str(row.get(key) or "").strip()
+            if token:
+                noisy_routes.add(token)
 
     def _has_lang_query(url: str, lang: str) -> bool:
         parsed = urlparse(url)
@@ -227,6 +258,9 @@ def _build_deterministic_findings(
         noindex_route = "noindex" in robots
         indexable = bool(row.get("indexable")) if isinstance(row.get("indexable"), bool) else not noindex_route
         route_is_ro = _has_lang_query(route, "ro") or _has_lang_query(resolved_route, "ro")
+        route_has_console_noise = any(
+            candidate in noisy_routes for candidate in (route, route_template, resolved_route)
+        )
 
         if render_error:
             if unresolved_placeholder:
@@ -344,7 +378,7 @@ def _build_deterministic_findings(
                     )
                 )
 
-        if surface == "storefront" and indexable and not unresolved_placeholder:
+        if surface == "storefront" and indexable and not unresolved_placeholder and not route_has_console_noise:
             if not description_meta:
                 findings.append(
                     _finding(

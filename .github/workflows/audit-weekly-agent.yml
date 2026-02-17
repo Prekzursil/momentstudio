@@ -119,6 +119,7 @@ jobs:
             --findings artifacts/audit-evidence/deterministic-findings.json \
             --run-url "$RUN_URL" \
             --include-s3-seo \
+            --close-stale \
             --skip-digest
 
       - name: Build weekly digest issue body

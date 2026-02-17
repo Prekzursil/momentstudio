@@ -61,7 +61,10 @@ function classifyConsoleMessage(message, level) {
     "failed to fetch",
     "networkerror when attempting to fetch resource",
     "xmlhttprequest",
-    "response with status"
+    "response with status",
+    "unexpected token '<'",
+    "unexpected token <",
+    "is not valid json"
   ];
   if (noisyPatterns.some((pattern) => text.includes(pattern))) {
     return { skip: false, severity: "s4", level: normalizedLevel };
