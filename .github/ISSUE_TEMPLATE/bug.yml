@@ -8,6 +8,18 @@ body:
     attributes:
       value: |
         Please include enough detail to reproduce reliably.
+
+  - type: dropdown
+    id: risk
+    attributes:
+      label: Risk level
+      options:
+        - low
+        - medium
+        - high
+    validations:
+      required: true
+
   - type: input
     id: route
     attributes:
@@ -15,6 +27,7 @@ body:
       placeholder: /shop, /blog/some-slug, /admin/content/media
     validations:
       required: true
+
   - type: dropdown
     id: environment_profile
     attributes:
@@ -25,6 +38,7 @@ body:
         - dev-sandbox
     validations:
       required: true
+
   - type: dropdown
     id: payments_mode
     attributes:
@@ -36,12 +50,14 @@ body:
         - not related
     validations:
       required: true
+
   - type: textarea
     id: summary
     attributes:
       label: What happened?
     validations:
       required: true
+
   - type: textarea
     id: steps
     attributes:
@@ -49,14 +65,27 @@ body:
       description: List exact steps and inputs.
     validations:
       required: true
+
   - type: textarea
     id: expected
     attributes:
       label: Expected behavior
     validations:
       required: true
+
   - type: textarea
     id: diagnostics
     attributes:
       label: Diagnostics/logs/screenshots
       description: Include request IDs, console errors, and relevant logs.
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence_commands
+    attributes:
+      label: Evidence command list
+      value: |
+        make verify
+    validations:
+      required: true
