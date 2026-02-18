@@ -109,8 +109,8 @@ jobs:
           set -euo pipefail
           mkdir -p artifacts/audit-evidence
           cd frontend
-          npm run build:ssr
-          PORT=4300 SSR_API_BASE_URL=http://127.0.0.1:8000/api/v1 npm run serve:ssr > ../artifacts/audit-evidence/frontend-audit.log 2>&1 &
+          API_BASE_URL=http://127.0.0.1:8000/api/v1 npm run build:ssr
+          API_BASE_URL=http://127.0.0.1:8000/api/v1 PORT=4300 SSR_API_BASE_URL=http://127.0.0.1:8000/api/v1 npm run serve:ssr > ../artifacts/audit-evidence/frontend-audit.log 2>&1 &
           echo $! > ../artifacts/audit-evidence/frontend-audit.pid
           cd ..
           for i in $(seq 1 90); do
