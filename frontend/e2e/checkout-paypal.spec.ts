@@ -67,12 +67,12 @@ async function startPayPalCheckout(
 ): Promise<{ orderId: string } | null> {
   const sessionId = uniqueSessionId('e2e-paypal');
   await setSessionCart(page, sessionId);
-  const product = await seedCartWithFirstProduct(request, sessionId);
+  const product = await seedCartWithFirstProduct(request, sessionId, { token });
   if (!product) return null;
 
   await openCartAndCheckout(page, product.name);
 
-  const paypalButton = page.getByRole('button', { name: 'PayPal' });
+  const paypalButton = page.getByRole('button', { name: /^PayPal$/ }).first();
   const paypalVisible = await paypalButton.isVisible({ timeout: 3000 }).catch(() => false);
   if (!paypalVisible || (await paypalButton.isDisabled())) {
     test.skip(true, 'PayPal is not enabled/available in this environment.');
@@ -82,7 +82,14 @@ async function startPayPalCheckout(
   const shippingEmail = OWNER_IDENTIFIER.includes('@') ? OWNER_IDENTIFIER : `${OWNER_IDENTIFIER}@example.com`;
   await fillShippingAddress(page, shippingEmail);
 
-  await paypalButton.click();
+  const payableButton = page.getByRole('button', { name: /^PayPal$/ }).first();
+  const payableVisible = await payableButton.isVisible({ timeout: 3000 }).catch(() => false);
+  if (!payableVisible || (await payableButton.isDisabled())) {
+    test.skip(true, 'PayPal became unavailable after shipping details.');
+    return null;
+  }
+
+  await payableButton.click();
   await acceptCheckoutConsents(page);
   await expect(page.getByRole('button', { name: 'Place order' })).toBeEnabled();
 

@@ -84,7 +84,7 @@ export async function loginApi(request: APIRequestContext): Promise<string> {
 export async function seedCartWithFirstProduct(
   request: APIRequestContext,
   sessionId: string,
-  options: { skipMessage?: string } = {}
+  options: { skipMessage?: string; token?: string } = {}
 ): Promise<{ name: string } | null> {
   const listRes = await request.get('/api/v1/catalog/products?sort=newest&page=1&limit=25');
   expect(listRes.ok()).toBeTruthy();
@@ -106,8 +106,13 @@ export async function seedCartWithFirstProduct(
   const product = candidates[0];
   // Use a per-test session cart to avoid cross-test cart races (CI runs tests in parallel).
   // Authenticated pages will still pick up this session cart if no user cart exists.
+  const headers: Record<string, string> = { 'X-Session-Id': sessionId };
+  if (options.token) {
+    headers['Authorization'] = `Bearer ${options.token}`;
+  }
+
   const syncRes = await request.post('/api/v1/cart/sync', {
-    headers: { 'X-Session-Id': sessionId },
+    headers,
     data: {
       items: [
         {
