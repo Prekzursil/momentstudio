@@ -176,9 +176,39 @@ make env-doctor
 make dev-owner
 make lint
 make test
+make coverage
+make coverage-codacy
 make docker-up
 make docker-down
 make compose-smoke
+```
+
+## Codacy coverage (local + GitHub CI)
+
+This repository now includes a dedicated `Codacy Coverage` GitHub workflow (`.github/workflows/codacy-coverage.yml`) that:
+
+- runs backend tests and writes `backend/coverage.xml`
+- runs frontend tests with `--code-coverage` and writes `frontend/coverage/app/lcov.info`
+- uploads both reports to Codacy
+
+Required GitHub secret:
+
+- `CODACY_API_TOKEN` (from Codacy coverage settings)
+
+Optional environment values (defaults are already set in workflow and Makefile):
+
+- `CODACY_ORGANIZATION_PROVIDER=gh`
+- `CODACY_USERNAME=Prekzursil`
+- `CODACY_PROJECT_NAME=AdrianaArt`
+
+Run the same flow locally:
+
+```bash
+export CODACY_API_TOKEN="<your_token>"
+export CODACY_ORGANIZATION_PROVIDER=gh
+export CODACY_USERNAME=Prekzursil
+export CODACY_PROJECT_NAME=AdrianaArt
+make coverage-codacy
 ```
 
 ## Sameday mirror first sync (ops runbook)

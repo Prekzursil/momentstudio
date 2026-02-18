@@ -50,3 +50,11 @@ Thumbs.db
 
 # Docker
 *.log
+
+# Coverage artifacts
+backend/coverage.xml
+frontend/coverage/
+
+
+#Ignore vscode AI rules
+.github/instructions/codacy.instructions.md
