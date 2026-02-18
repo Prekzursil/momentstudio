@@ -205,7 +205,7 @@ jobs:
           set -euo pipefail
           findings_count="$(jq 'length' artifacts/audit-evidence/deterministic-findings.json)"
           severe_count="$(jq '[.[] | select(.severity == "s1" or .severity == "s2")] | length' artifacts/audit-evidence/deterministic-findings.json)"
-          visibility_count="$(jq '[.[] | select(.rule_id == \"ux_visibility_after_interaction\")] | length' artifacts/audit-evidence/deterministic-findings.json)"
+          visibility_count="$(jq '[.[] | select(.rule_id == "ux_visibility_after_interaction")] | length' artifacts/audit-evidence/deterministic-findings.json)"
           route_count="$(jq '.selected_route_count // 0' artifacts/audit-evidence/surface-map.json)"
           backlog_count="$(jq 'length' artifacts/audit-evidence/seo-content-backlog.json)"
           {
