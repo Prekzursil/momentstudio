@@ -330,9 +330,13 @@ def _build_deterministic_findings(
         endpoint_path: str,
         endpoint_class: str,
         status_code: int | None,
+        request_url: str,
+        message: str,
     ) -> bool:
         normalized_route = str(route or "").strip().lower()
         normalized_surface = str(surface or "").strip().lower()
+        normalized_request_url = str(request_url or "").strip().lower()
+        normalized_message = " ".join(str(message or "").lower().split())
         if not endpoint_path and endpoint_class == "unknown":
             return False
 
@@ -353,6 +357,29 @@ def _build_deterministic_findings(
                 and status_code == 404
             ):
                 return True
+
+        if (
+            normalized_surface == "admin"
+            and endpoint_path == "/api/v1/auth/admin/access"
+            and status_code in {401, 403}
+        ):
+            return True
+
+        if (
+            normalized_surface == "admin"
+            and endpoint_path == "/api/v1/admin/ui/favorites"
+            and status_code in {401, 403}
+        ):
+            return True
+
+        if endpoint_path.startswith("/api/v1/orders/receipt/") and status_code in {401, 403, 404}:
+            return True
+
+        if (
+            normalized_request_url.startswith("https://example.com/images/")
+            and "err_blocked_by_orb" in normalized_message
+        ):
+            return True
 
         return False
 
@@ -656,11 +683,18 @@ def _build_deterministic_findings(
                 endpoint_path=endpoint_path,
                 endpoint_class=endpoint_class,
                 status_code=status_code,
+                request_url=str(row.get("request_url") or ""),
+                message=text,
             ):
                 continue
             normalized_text = _normalize_console_noise_signature(text)
             if not normalized_text:
                 continue
+            if normalized_text == "unexpected_token_lt_json_parse":
+                # These signatures are expected in auth-gated shells and unresolved template routes
+                # where JSON parsing occurs against guarded/placeholder responses.
+                if surface in {"account", "admin"} or ":" in route:
+                    continue
             status_token = str(status_code) if status_code is not None else "none"
             key = (surface, severity, normalized_text, status_token, endpoint_class)
             cluster = console_noise_clusters.setdefault(
