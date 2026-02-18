@@ -77,8 +77,11 @@ def test_console_noise_finding_stays_non_severe() -> None:
         layout_signals=[],
     )
     assert len(findings) == 1
-    assert findings[0]["rule_id"] == "browser_console_error"
+    assert findings[0]["rule_id"] == "browser_console_noise_cluster"
     assert findings[0]["severity"] == "s4"
+    assert findings[0]["aggregated"] is True
+    assert findings[0]["cluster_count"] == 1
+    assert findings[0]["sample_routes"] == ["/shop"]
 
 
 def test_canonical_policy_requires_clean_en_and_lang_ro() -> None:

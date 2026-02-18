@@ -40,10 +40,6 @@ fi
 check_db_ready() {
   (
     cd "${BACKEND_DIR}"
-    set -a
-    # shellcheck source=backend/.env
-    source .env
-    set +a
     PYTHONPATH="${BACKEND_DIR}" "${BACKEND_PYTHON}" - <<'PY'
 import asyncio
 from urllib.parse import urlsplit
@@ -95,20 +91,12 @@ check_db_ready
 echo "==> Applying database migrations"
 (
   cd "${BACKEND_DIR}"
-  set -a
-  # shellcheck source=backend/.env
-  source .env
-  set +a
   PYTHONPATH="${BACKEND_DIR}" "${BACKEND_PYTHON}" -m alembic upgrade head
 )
 
 echo "==> Bootstrapping owner/admin account for local dev"
 (
   cd "${BACKEND_DIR}"
-  set -a
-  # shellcheck source=backend/.env
-  source .env
-  set +a
   PYTHONPATH="${BACKEND_DIR}" "${BACKEND_PYTHON}" -m app.cli bootstrap-owner \
     --email "${DEV_OWNER_EMAIL}" \
     --password "${DEV_OWNER_PASSWORD}" \

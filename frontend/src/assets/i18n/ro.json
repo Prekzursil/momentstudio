@@ -1184,7 +1184,9 @@
     "errorCopy": "Verifică conexiunea sau încearcă din nou.",
     "pageMeta": "Pagina {{page}} din {{totalPages}} · {{totalItems}} produse",
     "metaTitle": "Magazin ceramică lucrată manual | momentstudio",
-    "metaDescription": "Descoperă piesele ceramice momentstudio. Filtrează după categorie, preț și etichete."
+    "metaDescription": "Descoperă piesele ceramice momentstudio. Filtrează după categorie, preț și etichete.",
+    "metaTitleCategory": "Ceramică {{category}} | momentstudio",
+    "metaDescriptionCategory": "Explorează piese ceramice lucrate manual în categoria {{category}} de la momentstudio."
   },
   "product": {
     "viewDetails": "Vezi detalii",
