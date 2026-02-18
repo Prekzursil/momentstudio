@@ -4,7 +4,7 @@ This document describes a practical, production-oriented way to deploy the `mome
 
 At a high level:
 
-- **Backend**: FastAPI container (runs Alembic migrations at startup).
+- **Backend**: FastAPI container (migrations are executed explicitly during deploy).
 - **Database**: Postgres (managed service or container).
 - **Frontend**: static Angular build served by nginx (also reverse-proxies `/api/*` and `/media/*` to the backend).
 - **TLS / public ingress**: your reverse proxy (Caddy/nginx/Traefik) in front of the frontend.
@@ -168,13 +168,28 @@ Notes:
 
 ## 4) Database migrations
 
-The backend container runs `alembic upgrade head` on startup (see `backend/docker-entrypoint.sh`).
+Production deploy should apply migrations explicitly after services come up.
+For the `infra/prod` runbook, `infra/prod/deploy.sh` executes:
+
+- `docker compose up -d --build`
+- `docker compose exec -T backend alembic upgrade head` (controlled by `RUN_DB_MIGRATIONS_ON_DEPLOY=1`)
 
 If you need to run migrations manually:
 
 ```bash
 docker compose -f infra/docker-compose.yml exec -T backend alembic upgrade head
 ```
+
+Manual promote from GitHub Actions:
+
+- Workflow: `.github/workflows/deploy-production-manual.yml`
+- Trigger: `workflow_dispatch`
+- Inputs: `target_sha`, `run_backup`, `run_verify`
+- Required repository secrets/variables:
+  - `PROD_SSH_HOST`, `PROD_SSH_PORT`, `PROD_SSH_USER`
+  - `PROD_SSH_KEY` (secret)
+  - `PROD_DEPLOY_PATH`
+  - optional `PROD_KNOWN_HOSTS`
 
 ## 5) First-owner bootstrap
 

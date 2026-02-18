@@ -27,6 +27,9 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/adrianaart_audit
+      AUDIT_OWNER_IDENTIFIER: owner
+      AUDIT_OWNER_EMAIL: owner+audit@local.test
+      AUDIT_OWNER_PASSWORD: Password123
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
@@ -83,6 +86,11 @@ jobs:
           cd backend
           PYTHONPATH="$PWD" .venv/bin/python -m alembic upgrade head
           PYTHONPATH="$PWD" .venv/bin/python -m app.seeds
+          PYTHONPATH="$PWD" .venv/bin/python -m app.cli bootstrap-owner \
+            --email "${AUDIT_OWNER_EMAIL}" \
+            --password "${AUDIT_OWNER_PASSWORD}" \
+            --username "${AUDIT_OWNER_IDENTIFIER}" \
+            --display-name "Audit Owner"
 
       - name: Start backend API for weekly evidence
         shell: bash
@@ -130,6 +138,9 @@ jobs:
             --routes-file frontend/src/app/app.routes.ts \
             --output-dir artifacts/audit-evidence \
             --base-url http://127.0.0.1:4300 \
+            --api-base-url http://127.0.0.1:8000/api/v1 \
+            --owner-identifier "${AUDIT_OWNER_IDENTIFIER}" \
+            --owner-password "${AUDIT_OWNER_PASSWORD}" \
             --max-routes 120
 
       - name: Generate SEO content backlog
@@ -153,6 +164,7 @@ jobs:
           set -euo pipefail
           findings_count="$(jq 'length' artifacts/audit-evidence/deterministic-findings.json)"
           severe_count="$(jq '[.[] | select(.severity == "s1" or .severity == "s2")] | length' artifacts/audit-evidence/deterministic-findings.json)"
+          visibility_count="$(jq '[.[] | select(.rule_id == \"ux_visibility_after_interaction\")] | length' artifacts/audit-evidence/deterministic-findings.json)"
           route_count="$(jq '.selected_route_count // 0' artifacts/audit-evidence/surface-map.json)"
           backlog_count="$(jq 'length' artifacts/audit-evidence/seo-content-backlog.json)"
           {
@@ -161,6 +173,7 @@ jobs:
             echo "- Selected routes: \`${route_count}\`"
             echo "- Findings: \`${findings_count}\`"
             echo "- Severe (s1/s2): \`${severe_count}\`"
+            echo "- Visibility-after-interaction findings: \`${visibility_count}\`"
             echo "- SEO backlog items: \`${backlog_count}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 

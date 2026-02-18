@@ -1,0 +1,168 @@
+name: Deploy Production (Manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: "Commit SHA to deploy (defaults to current origin/main HEAD)"
+        required: false
+        type: string
+      run_backup:
+        description: "Run infra/prod/backup.sh before deploy"
+        required: true
+        default: true
+        type: boolean
+      run_verify:
+        description: "Run infra/prod/verify-live.sh after deploy + migration"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-production:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve target SHA
+        id: resolve
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --depth=1
+          target="${{ github.event.inputs.target_sha }}"
+          if [[ -z "${target}" ]]; then
+            target="$(git rev-parse origin/main)"
+          fi
+          if ! git rev-parse --verify "${target}^{commit}" >/dev/null 2>&1; then
+            echo "Invalid target SHA: ${target}" >&2
+            exit 1
+          fi
+          echo "target_sha=${target}" >> "$GITHUB_OUTPUT"
+
+      - name: Preflight production deploy configuration
+        shell: bash
+        env:
+          PROD_SSH_HOST_SECRET: ${{ secrets.PROD_SSH_HOST }}
+          PROD_SSH_HOST_VAR: ${{ vars.PROD_SSH_HOST }}
+          PROD_SSH_PORT_SECRET: ${{ secrets.PROD_SSH_PORT }}
+          PROD_SSH_PORT_VAR: ${{ vars.PROD_SSH_PORT }}
+          PROD_SSH_USER_SECRET: ${{ secrets.PROD_SSH_USER }}
+          PROD_SSH_USER_VAR: ${{ vars.PROD_SSH_USER }}
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          PROD_DEPLOY_PATH_SECRET: ${{ secrets.PROD_DEPLOY_PATH }}
+          PROD_DEPLOY_PATH_VAR: ${{ vars.PROD_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          PROD_SSH_HOST="${PROD_SSH_HOST_SECRET:-${PROD_SSH_HOST_VAR:-}}"
+          PROD_SSH_PORT="${PROD_SSH_PORT_SECRET:-${PROD_SSH_PORT_VAR:-}}"
+          PROD_SSH_USER="${PROD_SSH_USER_SECRET:-${PROD_SSH_USER_VAR:-}}"
+          PROD_DEPLOY_PATH="${PROD_DEPLOY_PATH_SECRET:-${PROD_DEPLOY_PATH_VAR:-}}"
+          missing=()
+          for key in PROD_SSH_HOST PROD_SSH_PORT PROD_SSH_USER PROD_SSH_KEY PROD_DEPLOY_PATH; do
+            if [[ -z "${!key:-}" ]]; then
+              missing+=("$key")
+            fi
+          done
+          if (( ${#missing[@]} > 0 )); then
+            {
+              echo "## Production Deploy Skipped"
+              echo
+              echo "Missing required repository secrets:"
+              for key in "${missing[@]}"; do
+                echo "- \`${key}\`"
+              done
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+      - name: Configure SSH key and known hosts
+        shell: bash
+        env:
+          PROD_SSH_HOST_SECRET: ${{ secrets.PROD_SSH_HOST }}
+          PROD_SSH_HOST_VAR: ${{ vars.PROD_SSH_HOST }}
+          PROD_SSH_PORT_SECRET: ${{ secrets.PROD_SSH_PORT }}
+          PROD_SSH_PORT_VAR: ${{ vars.PROD_SSH_PORT }}
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          PROD_KNOWN_HOSTS_SECRET: ${{ secrets.PROD_KNOWN_HOSTS }}
+          PROD_KNOWN_HOSTS_VAR: ${{ vars.PROD_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          PROD_SSH_HOST="${PROD_SSH_HOST_SECRET:-${PROD_SSH_HOST_VAR:-}}"
+          PROD_SSH_PORT="${PROD_SSH_PORT_SECRET:-${PROD_SSH_PORT_VAR:-}}"
+          PROD_KNOWN_HOSTS="${PROD_KNOWN_HOSTS_SECRET:-${PROD_KNOWN_HOSTS_VAR:-}}"
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${PROD_SSH_KEY}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          if [[ -n "${PROD_KNOWN_HOSTS:-}" ]]; then
+            printf '%s\n' "${PROD_KNOWN_HOSTS}" > ~/.ssh/known_hosts
+          else
+            ssh-keyscan -p "${PROD_SSH_PORT}" -H "${PROD_SSH_HOST}" > ~/.ssh/known_hosts
+          fi
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Deploy selected SHA over SSH
+        id: deploy
+        shell: bash
+        env:
+          TARGET_SHA: ${{ steps.resolve.outputs.target_sha }}
+          RUN_BACKUP: ${{ github.event.inputs.run_backup }}
+          RUN_VERIFY: ${{ github.event.inputs.run_verify }}
+          PROD_SSH_HOST_SECRET: ${{ secrets.PROD_SSH_HOST }}
+          PROD_SSH_HOST_VAR: ${{ vars.PROD_SSH_HOST }}
+          PROD_SSH_PORT_SECRET: ${{ secrets.PROD_SSH_PORT }}
+          PROD_SSH_PORT_VAR: ${{ vars.PROD_SSH_PORT }}
+          PROD_SSH_USER_SECRET: ${{ secrets.PROD_SSH_USER }}
+          PROD_SSH_USER_VAR: ${{ vars.PROD_SSH_USER }}
+          PROD_DEPLOY_PATH_SECRET: ${{ secrets.PROD_DEPLOY_PATH }}
+          PROD_DEPLOY_PATH_VAR: ${{ vars.PROD_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          PROD_SSH_HOST="${PROD_SSH_HOST_SECRET:-${PROD_SSH_HOST_VAR:-}}"
+          PROD_SSH_PORT="${PROD_SSH_PORT_SECRET:-${PROD_SSH_PORT_VAR:-}}"
+          PROD_SSH_USER="${PROD_SSH_USER_SECRET:-${PROD_SSH_USER_VAR:-}}"
+          PROD_DEPLOY_PATH="${PROD_DEPLOY_PATH_SECRET:-${PROD_DEPLOY_PATH_VAR:-}}"
+          ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes -p "${PROD_SSH_PORT}" "${PROD_SSH_USER}@${PROD_SSH_HOST}" \
+            "TARGET_SHA='${TARGET_SHA}' RUN_BACKUP='${RUN_BACKUP}' RUN_VERIFY='${RUN_VERIFY}' PROD_DEPLOY_PATH='${PROD_DEPLOY_PATH}' bash -s" <<'EOS'
+          set -euo pipefail
+          cd "${PROD_DEPLOY_PATH}"
+          git fetch origin --prune
+          git checkout --force "${TARGET_SHA}"
+
+          if [[ "${RUN_BACKUP}" == "true" ]]; then
+            ./infra/prod/backup.sh
+          fi
+
+          ./infra/prod/deploy.sh
+
+          docker compose --env-file infra/prod/.env -f infra/prod/docker-compose.yml exec -T backend alembic upgrade head
+
+          if [[ "${RUN_VERIFY}" == "true" ]]; then
+            EXPECTED_APP_VERSION="${TARGET_SHA}" ./infra/prod/verify-live.sh
+          fi
+
+          printf 'remote_deployed_sha=%s\n' "$(git rev-parse HEAD)"
+          EOS
+
+      - name: Deployment summary
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "## Manual Production Deploy"
+            echo
+            echo "- Requested SHA: \`${{ steps.resolve.outputs.target_sha }}\`"
+            echo "- Backup requested: \`${{ github.event.inputs.run_backup }}\`"
+            echo "- Verify requested: \`${{ github.event.inputs.run_verify }}\`"
+            echo "- Result: \`${{ job.status }}\`"
+            echo
+            echo "Rollback: rerun this workflow with a previous known-good SHA in \`target_sha\`."
+          } >> "$GITHUB_STEP_SUMMARY"
