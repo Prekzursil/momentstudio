@@ -231,7 +231,7 @@ def _build_deterministic_findings(
             return "unexpected_token_lt_json_parse"
         if "executing inline script violates the following content security policy directive" in text:
             return "csp_inline_script_blocked"
-        if "private access token challenge" in text or "turnstile" in text or "challenges.cloudflare.com" in text:
+        if "private access token challenge" in text or "turnstile" in text or "cloudflare challenge" in text:
             return "cloudflare_challenge_noise"
         if "was preloaded using link preload but not used within a few seconds" in text:
             return "unused_preload_warning"
@@ -260,7 +260,7 @@ def _build_deterministic_findings(
             "unexpected token '<'",
             "unexpected token <",
             "is not valid json",
-            "challenges.cloudflare.com",
+            "cloudflare challenge",
             "private access token challenge",
             "cloudflare",
             "turnstile",
