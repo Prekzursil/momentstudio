@@ -269,6 +269,7 @@ The `Release` GitHub Actions workflow builds/pushes images when you push a tag l
 ## Docs
 
 - `ARCHITECTURE.md` — high-level design notes
+- `docs/AI_NATIVE_ENGINEERING_PLAYBOOK.md` — AI-native execution model (intake, risk, evidence, rollback)
 - `CONTRIBUTING.md` — conventions and workflows
 - `SECURITY.md` — security disclosure policy
 - `docs/REPOSITORY_POLICY.md` — branch protection, labels, CI gates, and merge policy
@@ -277,6 +278,17 @@ The `Release` GitHub Actions workflow builds/pushes images when you push a tag l
 - `docs/GOOGLE_OAUTH.md` — Google OAuth setup (origins + redirect URIs)
 - `docs/DEV_PORTS.md` — dev ports + proxy/CORS expectations
 - `backend/README.md`, `frontend/README.md`, `infra/README.md`
+
+## AI-native working model
+
+This repository follows a soft-enforced AI-native workflow:
+
+- deterministic evidence before judgment,
+- explicit intake + risk + acceptance criteria in PRs/issues,
+- role-based execution (`Planner`, `Implementer`, `Verifier`, `Reviewer`, `Operator`),
+- explicit rollback notes for medium/high-risk changes.
+
+See `docs/AI_NATIVE_ENGINEERING_PLAYBOOK.md` for the canonical policy and rollout details.
 
 ## Repository governance
 

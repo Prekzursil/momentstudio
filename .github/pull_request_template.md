@@ -1,9 +1,29 @@
-## Summary
+## Problem / Outcome
 
-- What changed?
-- Why was it needed?
+- What problem is being solved?
+- What user/system outcome should change?
 
-## Scope
+## Scope and Success Criteria
+
+- In scope:
+- Out of scope:
+- Success criteria (measurable):
+
+## Risk Classification
+
+- [ ] `low`
+- [ ] `medium`
+- [ ] `high`
+
+## Role Ownership (AI-native)
+
+- Planner:
+- Implementer:
+- Verifier:
+- Reviewer:
+- Operator:
+
+## Surface Impact
 
 - [ ] Backend
 - [ ] Frontend
@@ -17,16 +37,26 @@
 - [ ] Frontend tests run (or N/A)
 - [ ] Frontend build run (or N/A)
 - [ ] Relevant E2E/compose smoke run (or N/A)
+- [ ] Security/privacy checks covered (or N/A)
 
 ### Commands / Results
 
 Paste key commands and outcomes (or concise summaries).
 
-## Risk & Rollback
+## Regression Surfaces Reviewed
+
+- List the areas that could regress and what was validated.
+
+## Rollback Plan
 
 - [ ] No migration/data risk
 - [ ] Migration/data risk documented
-- [ ] Rollback steps documented (if needed)
+- [ ] Rollback steps documented (required for medium/high risk)
+
+## Evidence Paths
+
+- Deterministic evidence/artifacts used:
+- Workflow run URLs (if any):
 
 ## Backlog Sync
 
