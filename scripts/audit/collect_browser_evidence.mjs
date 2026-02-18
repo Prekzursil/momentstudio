@@ -9,7 +9,17 @@ const require = createRequire(new URL("../../frontend/package.json", import.meta
 
 function parseArgs(argv) {
   const out = {};
-  const allowedKeys = new Set(["base-url", "routes-json", "output-dir", "max-routes", "route-samples"]);
+  const allowedKeys = new Set([
+    "base-url",
+    "routes-json",
+    "output-dir",
+    "max-routes",
+    "route-samples",
+    "api-base-url",
+    "auth-mode",
+    "owner-identifier",
+    "owner-password",
+  ]);
   for (let i = 2; i < argv.length; i += 1) {
     const token = argv[i];
     if (!token.startsWith("--")) {
@@ -23,6 +33,19 @@ function parseArgs(argv) {
     out[key] = value;
   }
   return out;
+}
+
+function normalizeUrl(raw) {
+  const value = String(raw || "").trim();
+  if (!value) return "";
+  return value.replace(/\/+$/, "");
+}
+
+function normalizeAuthMode(raw) {
+  const value = String(raw || "").trim().toLowerCase();
+  if (!value) return "none";
+  if (value === "none" || value === "owner") return value;
+  return "none";
 }
 
 function resolveMaxRoutes(value, logger = console) {
@@ -52,6 +75,9 @@ function toSeverity(level) {
 function classifyConsoleMessage(message, level) {
   const text = String(message || "").toLowerCase();
   const normalizedLevel = String(level || "").toLowerCase();
+  if (text.includes("was preloaded using link preload but not used within a few seconds from the window's load event")) {
+    return { skip: true, severity: "s4", level: normalizedLevel };
+  }
   const noisyPatterns = [
     "/api/",
     "net::err_connection_refused",
@@ -76,6 +102,29 @@ function classifyConsoleMessage(message, level) {
     return { skip: false, severity: "s4", level: normalizedLevel };
   }
   return { skip: false, severity: toSeverity(normalizedLevel), level: normalizedLevel };
+}
+
+function normalizeResourceFailureUrl(rawUrl) {
+  const value = String(rawUrl || "").trim();
+  if (!value) return "";
+  try {
+    const parsed = new URL(value);
+    parsed.hash = "";
+    return parsed.toString();
+  } catch {
+    return value.split("#", 1)[0];
+  }
+}
+
+function buildResourceFailureKey({ source, statusCode, url, resourceType, method, failureText }) {
+  return [
+    String(source || ""),
+    String(statusCode ?? ""),
+    normalizeResourceFailureUrl(url),
+    String(resourceType || ""),
+    String(method || ""),
+    String(failureText || ""),
+  ].join("|");
 }
 
 function placeholderKeys(pathTemplate) {
@@ -135,12 +184,222 @@ async function loadRouteSamples(routeSamplesPath) {
   }
 }
 
+function readSlugFromCollection(payload) {
+  if (Array.isArray(payload)) {
+    const first = payload.find((item) => item && typeof item === "object" && String(item.slug || "").trim());
+    return first ? String(first.slug).trim() : "";
+  }
+  const items = Array.isArray(payload?.items) ? payload.items : [];
+  const first = items.find((item) => item && typeof item === "object" && String(item.slug || "").trim());
+  return first ? String(first.slug).trim() : "";
+}
+
+function readSeriesSlug(payload) {
+  const items = Array.isArray(payload?.items) ? payload.items : [];
+  for (const item of items) {
+    if (!item || typeof item !== "object") continue;
+    const direct = String(item.series_slug || "").trim();
+    if (direct) return direct;
+    const nested = String(item.series?.slug || "").trim();
+    if (nested) return nested;
+    const rawSeries = String(item.series || "").trim();
+    if (rawSeries) return rawSeries;
+  }
+  return "";
+}
+
+function readOrderSample(payload) {
+  const items = Array.isArray(payload?.items) ? payload.items : [];
+  const first = items.find((item) => item && typeof item === "object");
+  if (!first) return { orderId: "", receiptToken: "" };
+  const orderId = String(first.id || first.order_id || "").trim();
+  const receiptToken = String(
+    first.receipt_share_token || first.receipt_token || first.token || first.share_token || ""
+  ).trim();
+  return { orderId, receiptToken };
+}
+
+async function fetchJson(context, url, accessToken = "") {
+  try {
+    const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined;
+    const response = await context.request.get(url, headers ? { headers } : undefined);
+    if (!response.ok()) {
+      return { ok: false, data: null };
+    }
+    const data = await response.json();
+    return { ok: true, data };
+  } catch {
+    return { ok: false, data: null };
+  }
+}
+
+async function hydrateRouteSamplesFromApi(context, { apiBaseUrl, routeSamples, accessToken }) {
+  const apiRoot = normalizeUrl(apiBaseUrl);
+  if (!apiRoot) return routeSamples;
+
+  const hydrated = { ...(routeSamples || {}) };
+  const setSample = (routeTemplate, key, value) => {
+    const token = String(value || "").trim();
+    if (!token) {
+      delete hydrated[routeTemplate];
+      return;
+    }
+    hydrated[routeTemplate] = { [key]: token };
+  };
+
+  const categories = await fetchJson(context, `${apiRoot}/catalog/categories`);
+  if (categories.ok) {
+    setSample("/shop/:category", "category", readSlugFromCollection(categories.data));
+  }
+
+  const products = await fetchJson(context, `${apiRoot}/catalog/products?limit=1`);
+  if (products.ok) {
+    setSample("/products/:slug", "slug", readSlugFromCollection(products.data));
+  }
+
+  const blogPosts = await fetchJson(context, `${apiRoot}/blog/posts?limit=20`);
+  if (blogPosts.ok) {
+    setSample("/blog/:slug", "slug", readSlugFromCollection(blogPosts.data));
+    setSample("/blog/series/:series", "series", readSeriesSlug(blogPosts.data));
+  }
+
+  if (accessToken) {
+    const adminOrders = await fetchJson(context, `${apiRoot}/orders/admin/search?limit=1`, accessToken);
+    if (adminOrders.ok) {
+      const sample = readOrderSample(adminOrders.data);
+      setSample("/admin/orders/:orderId", "orderId", sample.orderId);
+      setSample("/receipt/:token", "token", sample.receiptToken);
+    }
+  }
+
+  return hydrated;
+}
+
+async function installApiRewrite(context, { baseUrl, apiBaseUrl }) {
+  if (!baseUrl || !apiBaseUrl) return;
+  const baseOrigin = new URL(baseUrl).origin;
+  const apiOrigin = new URL(apiBaseUrl).origin;
+  const apiPrefix = "/api/v1/";
+  if (baseOrigin === apiOrigin) return;
+
+  await context.route("**/*", async (route) => {
+    const request = route.request();
+    const rawUrl = request.url();
+    let parsed;
+    try {
+      parsed = new URL(rawUrl);
+    } catch {
+      await route.continue();
+      return;
+    }
+
+    if (parsed.origin === baseOrigin && parsed.pathname.startsWith(apiPrefix)) {
+      const rewritten = `${apiOrigin}${parsed.pathname}${parsed.search}`;
+      await route.continue({ url: rewritten });
+      return;
+    }
+    await route.continue();
+  });
+}
+
+async function primeOwnerSession(context, { apiBaseUrl, ownerIdentifier, ownerPassword }) {
+  if (!apiBaseUrl || !ownerIdentifier || !ownerPassword) {
+    throw new Error("Owner auth mode requires --api-base-url, --owner-identifier, and --owner-password.");
+  }
+
+  const loginUrl = `${normalizeUrl(apiBaseUrl)}/auth/login`;
+  const response = await context.request.post(loginUrl, {
+    data: {
+      identifier: ownerIdentifier,
+      password: ownerPassword,
+      remember: false,
+      captcha_token: null,
+    },
+  });
+
+  let payload = null;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok()) {
+    const details = payload && typeof payload === "object" ? JSON.stringify(payload).slice(0, 500) : "";
+    throw new Error(`Owner login failed (${response.status()})${details ? `: ${details}` : ""}`);
+  }
+
+  const tokens = payload?.tokens;
+  if (!tokens?.access_token || !tokens?.refresh_token) {
+    if (payload?.two_factor_token) {
+      throw new Error("Owner login requires 2FA; configure the owner test profile without forced 2FA for audit crawls.");
+    }
+    throw new Error("Owner login did not return auth tokens.");
+  }
+
+  await context.addInitScript((authTokens) => {
+    try {
+      window.sessionStorage.setItem("auth_tokens", JSON.stringify(authTokens));
+    } catch {
+      // noop
+    }
+  }, tokens);
+
+  return {
+    accessToken: String(tokens.access_token || ""),
+    refreshToken: String(tokens.refresh_token || ""),
+  };
+}
+
+async function collectVisibilityProbe(page) {
+  return page.evaluate(() => {
+    const normalizeText = (value) => String(value || "").replace(/\s+/g, " ").trim();
+    const isVisiblyRendered = (el) => {
+      if (!el) return false;
+      const style = window.getComputedStyle(el);
+      if (style.display === "none" || style.visibility === "hidden") return false;
+      if (Number.parseFloat(style.opacity || "1") === 0) return false;
+      const rect = el.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    };
+
+    const main = document.querySelector("main");
+    const root = main || document.body;
+    const text = normalizeText(root?.textContent || "");
+    const words = text ? text.split(" ").filter(Boolean).length : 0;
+    const headings = root ? root.querySelectorAll("h1, h2").length : 0;
+
+    const controls = root ? Array.from(root.querySelectorAll("input, textarea, select, button")) : [];
+    const visibleControls = controls.filter((el) => isVisiblyRendered(el));
+
+    const loadingNodes = root
+      ? root.querySelectorAll(
+          "[aria-busy='true'], [data-loading-state='true'], [data-loading='true'], .animate-pulse, .spinner, .loading"
+        ).length
+      : 0;
+
+    return {
+      has_main: Boolean(main),
+      main_visible: isVisiblyRendered(main || document.body),
+      text_words: words,
+      heading_count: headings,
+      form_control_count: controls.length,
+      visible_form_control_count: visibleControls.length,
+      loading_indicator_count: loadingNodes,
+    };
+  });
+}
+
 async function main() {
   const args = parseArgs(process.argv);
-  const baseUrl = String(args["base-url"] || "").trim().replace(/\/$/, "");
+  const baseUrl = normalizeUrl(args["base-url"]);
+  const apiBaseUrl = normalizeUrl(args["api-base-url"] || "");
   const routesJsonPath = String(args["routes-json"] || "").trim();
   const outputDir = String(args["output-dir"] || "").trim();
   const routeSamplesPath = String(args["route-samples"] || "").trim();
+  const authMode = normalizeAuthMode(args["auth-mode"]);
+  const ownerIdentifier = String(args["owner-identifier"] || "").trim();
+  const ownerPassword = String(args["owner-password"] || "").trim();
   const maxRoutes = resolveMaxRoutes(args["max-routes"]);
 
   if (!baseUrl || !routesJsonPath || !outputDir) {
@@ -149,7 +408,7 @@ async function main() {
 
   const routesPayload = JSON.parse(await fs.readFile(routesJsonPath, "utf-8"));
   const routes = Array.isArray(routesPayload?.routes) ? routesPayload.routes.slice(0, maxRoutes) : [];
-  const routeSamples = await loadRouteSamples(routeSamplesPath);
+  let routeSamples = await loadRouteSamples(routeSamplesPath);
 
   await fs.mkdir(outputDir, { recursive: true });
   const screenshotDir = path.join(outputDir, "screenshots");
@@ -158,11 +417,29 @@ async function main() {
   const { chromium } = require("@playwright/test");
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  await installApiRewrite(context, {
+    baseUrl,
+    apiBaseUrl: apiBaseUrl || baseUrl,
+  });
+  let ownerAuth = null;
+  if (authMode === "owner") {
+    ownerAuth = await primeOwnerSession(context, {
+      apiBaseUrl: apiBaseUrl || baseUrl,
+      ownerIdentifier,
+      ownerPassword,
+    });
+  }
+  routeSamples = await hydrateRouteSamplesFromApi(context, {
+    apiBaseUrl: apiBaseUrl || baseUrl,
+    routeSamples,
+    accessToken: ownerAuth?.accessToken || "",
+  });
   const page = await context.newPage();
 
   const seoSnapshot = [];
   const consoleErrors = [];
   const layoutSignals = [];
+  const visibilitySignals = [];
 
   for (const route of routes) {
     const routeTemplate = String(route?.full_path || "/");
@@ -175,6 +452,8 @@ async function main() {
     const screenshotAbsPath = path.join(outputDir, screenshotPath);
     const routeConsole = [];
     const routePageErrors = [];
+    const routeResourceFailures = [];
+    const routeResourceFailureKeys = new Set();
 
     if (materialized.unresolvedPlaceholder) {
       seoSnapshot.push({
@@ -182,6 +461,7 @@ async function main() {
         route_template: routeTemplate,
         resolved_route: resolvedPath,
         unresolved_placeholder: true,
+        auth_mode: authMode,
         unresolved_keys: materialized.unresolvedKeys,
         url: null,
         screenshot: null,
@@ -204,11 +484,21 @@ async function main() {
         route_template: routeTemplate,
         resolved_route: resolvedPath,
         unresolved_placeholder: true,
+        auth_mode: authMode,
         surface,
         sticky_count: 0,
         scrollable_count: 0,
         nested_scrollables_count: 0,
         skipped_reason: "unresolved_placeholder"
+      });
+      visibilitySignals.push({
+        route: routeTemplate,
+        route_template: routeTemplate,
+        resolved_route: resolvedPath,
+        unresolved_placeholder: true,
+        surface,
+        auth_mode: authMode,
+        skipped_reason: "unresolved_placeholder",
       });
       continue;
     }
@@ -231,11 +521,63 @@ async function main() {
         text: String(err?.message || err || ""),
       });
     };
+    const onResponse = (response) => {
+      const statusCode = Number(response.status() || 0);
+      if (!Number.isFinite(statusCode) || statusCode < 400) return;
+      const request = response.request();
+      const resourceType = String(request.resourceType() || "");
+      const url = normalizeResourceFailureUrl(response.url());
+      const method = String(request.method() || "");
+      const item = {
+        source: "response",
+        route: routeTemplate,
+        route_template: routeTemplate,
+        resolved_route: resolvedPath,
+        status_code: statusCode,
+        request_url: url,
+        resource_type: resourceType,
+        method,
+        failure_text: "",
+      };
+      const dedupeKey = buildResourceFailureKey(item);
+      if (routeResourceFailureKeys.has(dedupeKey)) return;
+      routeResourceFailureKeys.add(dedupeKey);
+      routeResourceFailures.push(item);
+    };
+    const onRequestFailed = (request) => {
+      const failure = request.failure();
+      const item = {
+        source: "requestfailed",
+        route: routeTemplate,
+        route_template: routeTemplate,
+        resolved_route: resolvedPath,
+        status_code: null,
+        request_url: normalizeResourceFailureUrl(request.url()),
+        resource_type: String(request.resourceType() || ""),
+        method: String(request.method() || ""),
+        failure_text: String(failure?.errorText || ""),
+      };
+      const dedupeKey = buildResourceFailureKey(item);
+      if (routeResourceFailureKeys.has(dedupeKey)) return;
+      routeResourceFailureKeys.add(dedupeKey);
+      routeResourceFailures.push(item);
+    };
     page.on("console", onConsole);
     page.on("pageerror", onPageError);
+    page.on("response", onResponse);
+    page.on("requestfailed", onRequestFailed);
 
     try {
       await page.goto(url, { waitUntil: "networkidle", timeout: 45000 });
+      const visibilityInitial = await collectVisibilityProbe(page);
+      await page.waitForTimeout(2000);
+      const visibilitySettled = await collectVisibilityProbe(page);
+      await page.evaluate(() => {
+        window.dispatchEvent(new Event("scroll"));
+        window.dispatchEvent(new Event("resize"));
+      });
+      await page.waitForTimeout(250);
+      const visibilityAfterPassive = await collectVisibilityProbe(page);
       await page.screenshot({ path: screenshotAbsPath, fullPage: true });
 
       const seo = await page.evaluate(() => {
@@ -314,6 +656,7 @@ async function main() {
         route_template: routeTemplate,
         resolved_route: resolvedPath,
         unresolved_placeholder: false,
+        auth_mode: authMode,
         surface,
         url,
         screenshot: screenshotPath,
@@ -324,8 +667,45 @@ async function main() {
         route_template: routeTemplate,
         resolved_route: resolvedPath,
         unresolved_placeholder: false,
+        auth_mode: authMode,
         surface,
         ...layout,
+      });
+
+      const controlsUnlockedAfterPassive = visibilitySettled.visible_form_control_count === 0
+        && visibilityAfterPassive.visible_form_control_count > 0;
+      const textUnlockedAfterPassive = visibilitySettled.text_words < 20
+        && visibilityAfterPassive.text_words >= 40;
+      const controlsAppearedAfterSettleWithoutLoading = visibilityInitial.visible_form_control_count === 0
+        && visibilitySettled.visible_form_control_count > 0
+        && visibilitySettled.loading_indicator_count === 0;
+      const textAppearedAfterSettleWithoutLoading = visibilityInitial.text_words < 20
+        && visibilitySettled.text_words >= 40
+        && visibilitySettled.loading_indicator_count === 0;
+
+      visibilitySignals.push({
+        route: routeTemplate,
+        route_template: routeTemplate,
+        resolved_route: resolvedPath,
+        unresolved_placeholder: false,
+        surface,
+        auth_mode: authMode,
+        phases: {
+          initial: visibilityInitial,
+          settled: visibilitySettled,
+          after_passive_events: visibilityAfterPassive,
+        },
+        // Only promote as actionable when passive interaction unlocks hidden content.
+        // "After settle" deltas are tracked as telemetry, but are often benign async hydration.
+        visibility_issue: controlsUnlockedAfterPassive || textUnlockedAfterPassive,
+        issue_reasons: [
+          controlsUnlockedAfterPassive ? "form_controls_appear_after_passive_events" : null,
+          textUnlockedAfterPassive ? "text_appears_after_passive_events" : null,
+        ].filter(Boolean),
+        settle_only_reasons: [
+          controlsAppearedAfterSettleWithoutLoading ? "form_controls_appear_after_settle" : null,
+          textAppearedAfterSettleWithoutLoading ? "text_appears_after_settle_without_loading_state" : null,
+        ].filter(Boolean),
       });
     } catch (err) {
       const message = String(err?.message || err || "unknown browser error");
@@ -334,6 +714,7 @@ async function main() {
         route_template: routeTemplate,
         resolved_route: resolvedPath,
         unresolved_placeholder: false,
+        auth_mode: authMode,
         surface,
         url,
         screenshot: null,
@@ -356,10 +737,20 @@ async function main() {
         route_template: routeTemplate,
         resolved_route: resolvedPath,
         unresolved_placeholder: false,
+        auth_mode: authMode,
         surface,
         sticky_count: 0,
         scrollable_count: 0,
         nested_scrollables_count: 0,
+        error: message,
+      });
+      visibilitySignals.push({
+        route: routeTemplate,
+        route_template: routeTemplate,
+        resolved_route: resolvedPath,
+        unresolved_placeholder: false,
+        surface,
+        auth_mode: authMode,
         error: message,
       });
       routeConsole.push({
@@ -372,9 +763,39 @@ async function main() {
     } finally {
       page.off("console", onConsole);
       page.off("pageerror", onPageError);
+      page.off("response", onResponse);
+      page.off("requestfailed", onRequestFailed);
+    }
+
+    for (const item of routeResourceFailures) {
+      const statusLabel = item.status_code ? `status ${item.status_code}` : (item.failure_text || "requestfailed");
+      const descriptor = [statusLabel, item.resource_type || "resource", item.method || "GET", item.request_url || "(unknown-url)"]
+        .filter(Boolean)
+        .join(" | ");
+      consoleErrors.push({
+        route: item.route,
+        route_template: item.route_template,
+        resolved_route: item.resolved_route,
+        surface,
+        level: "error",
+        severity: "s4",
+        text: `Failed resource request: ${descriptor}`,
+        source: item.source,
+        request_url: item.request_url || null,
+        status_code: item.status_code,
+        resource_type: item.resource_type || null,
+        method: item.method || null,
+        failure_text: item.failure_text || null,
+      });
     }
 
     for (const item of routeConsole) {
+      const lowerText = String(item.text || "").toLowerCase();
+      if (lowerText.includes("failed to load resource")) {
+        // Prefer structured resource-failure events above; generic console messages
+        // are noisy and omit URL/status.
+        continue;
+      }
       const classification = classifyConsoleMessage(item.text, item.level);
       if (classification.skip) {
         continue;
@@ -390,6 +811,12 @@ async function main() {
       });
     }
     for (const item of routePageErrors) {
+      const lowerText = String(item.text || "").toLowerCase();
+      if (lowerText.includes("failed to load resource")) {
+        // Prefer structured resource-failure events above; generic page errors
+        // are noisy and omit URL/status.
+        continue;
+      }
       const classification = classifyConsoleMessage(item.text, item.level);
       if (classification.skip) {
         continue;
@@ -411,6 +838,20 @@ async function main() {
   await fs.writeFile(path.join(outputDir, "seo-snapshot.json"), `${JSON.stringify(seoSnapshot, null, 2)}\n`, "utf-8");
   await fs.writeFile(path.join(outputDir, "console-errors.json"), `${JSON.stringify(consoleErrors, null, 2)}\n`, "utf-8");
   await fs.writeFile(path.join(outputDir, "layout-signals.json"), `${JSON.stringify(layoutSignals, null, 2)}\n`, "utf-8");
+  await fs.writeFile(path.join(outputDir, "visibility-signals.json"), `${JSON.stringify(visibilitySignals, null, 2)}\n`, "utf-8");
+  await fs.writeFile(
+    path.join(outputDir, "browser-evidence-meta.json"),
+    `${JSON.stringify(
+      {
+        auth_mode: authMode,
+        base_url: baseUrl,
+        api_base_url: apiBaseUrl || baseUrl,
+      },
+      null,
+      2
+    )}\n`,
+    "utf-8"
+  );
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
