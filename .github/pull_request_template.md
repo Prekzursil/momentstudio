@@ -3,36 +3,37 @@
 - What changed?
 - Why was it needed?
 
-## Scope
+## Risk
 
-- [ ] Backend
-- [ ] Frontend
-- [ ] Infra/Deploy
-- [ ] CI/Tooling
-- [ ] Docs only
+- Risk level: `low | medium | high`
+- Regression surface (storefront/account/admin/backend/infra):
+- Payments/auth/security impact:
 
-## Validation Evidence
+## Evidence
 
-- [ ] Backend tests run (or N/A)
-- [ ] Frontend tests run (or N/A)
-- [ ] Frontend build run (or N/A)
-- [ ] Relevant E2E/compose smoke run (or N/A)
+- [ ] `make verify`
+- [ ] Additional targeted checks (if needed)
 
 ### Commands / Results
 
-Paste key commands and outcomes (or concise summaries).
+Paste exact commands and outcomes.
 
-## Risk & Rollback
+## Rollback
 
-- [ ] No migration/data risk
-- [ ] Migration/data risk documented
-- [ ] Rollback steps documented (if needed)
+- Rollback steps if this change causes regressions:
+
+## Scope Guard
+
+- [ ] Change is minimal and task-focused
+- [ ] Shell boundaries preserved (storefront/account/admin)
+- [ ] No secrets/tokens introduced
+- [ ] High-risk changes include explicit human-gate notes
 
 ## Backlog Sync
 
 - [ ] `TODO.md` updated with completed items
 - [ ] Evidence paths added for completed items
-- [ ] Follow-up unchecked items added (if needed)
+- [ ] Follow-up items added (if needed)
 
 ## Linked Issues
 
