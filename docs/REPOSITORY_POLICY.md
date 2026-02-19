@@ -60,6 +60,12 @@ The recommended labels are:
   - `ai:automerge`
   - `ai:blocked`
   - `ai:done`
+- Regression tracking (Phase 3):
+  - `regression:escaped` - Regression that escaped to production
+  - `regression:ci-gap` - Would have been caught by better CI coverage
+  - `regression:review-miss` - Escaped during human review
+  - `regression:spec-drift` - Behavior changed without explicit requirement
+  - `regression:edge-case` - Uncommon scenario not covered by tests
 
 Default GitHub labels (`bug`, `enhancement`, etc.) remain for compatibility.
 

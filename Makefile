@@ -1,4 +1,4 @@
-.PHONY: dev dev-owner test lint docker-up docker-down backend-test frontend-test backend-lint frontend-lint compose-smoke env-dev env-prod env-status env-doctor coverage coverage-backend coverage-frontend codacy-coverage-upload coverage-codacy
+.PHONY: dev dev-owner test lint verify docker-up docker-down backend-test frontend-test backend-lint frontend-lint compose-smoke env-dev env-prod env-status env-doctor coverage coverage-backend coverage-frontend codacy-coverage-upload coverage-codacy
 
 dev:
 	./start.sh
@@ -21,6 +21,8 @@ env-doctor:
 test: backend-test frontend-test
 
 lint: backend-lint frontend-lint
+
+verify: lint test
 
 coverage: coverage-backend coverage-frontend
 
