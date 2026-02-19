@@ -30,7 +30,12 @@ jobs:
               { name: "area:infra", color: "0366D6", description: "Infrastructure/CI/tooling related work." },
               { name: "area:docs", color: "0075CA", description: "Documentation/process related work." },
               { name: "area:security", color: "B60205", description: "Security hardening or vulnerability-related work." },
-              { name: "area:release", color: "C2E0C6", description: "Release/build/distribution related work." }
+              { name: "area:release", color: "C2E0C6", description: "Release/build/distribution related work." },
+              { name: "regression:escaped", color: "D93F0B", description: "Regression that escaped to production." },
+              { name: "regression:ci-gap", color: "FBCA04", description: "Would have been caught by better CI coverage." },
+              { name: "regression:review-miss", color: "FBCA04", description: "Escaped during human review." },
+              { name: "regression:spec-drift", color: "FBCA04", description: "Behavior changed without explicit requirement." },
+              { name: "regression:edge-case", color: "FBCA04", description: "Uncommon scenario not covered by tests." }
             ];
 
             for (const label of labels) {
