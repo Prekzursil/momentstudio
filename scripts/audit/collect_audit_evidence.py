@@ -17,6 +17,11 @@ from urllib.parse import parse_qs, urlparse
 
 
 SEVERITY_TO_IMPACT = {"s1": 5, "s2": 4, "s3": 2, "s4": 1}
+SEO_SNAPSHOT_FILE = "seo-snapshot.json"
+CONSOLE_ERRORS_FILE = "console-errors.json"
+LAYOUT_SIGNALS_FILE = "layout-signals.json"
+VISIBILITY_SIGNALS_FILE = "visibility-signals.json"
+DETERMINISTIC_FINDINGS_FILE = "deterministic-findings.json"
 
 
 def _repo_root() -> Path:
@@ -821,7 +826,7 @@ def _build_deterministic_findings(
             continue
         route = str(row.get("route_template") or row.get("route") or "/")
         surface = str(row.get("surface") or "storefront")
-        reasons = [str(reason) for reason in list(row.get("issue_reasons") or []) if str(reason).strip()]
+        reasons = [str(reason) for reason in (row.get("issue_reasons") or []) if str(reason).strip()]
         if not reasons:
             continue
         severity = "s2" if surface in {"account", "admin"} else "s3"
@@ -837,7 +842,7 @@ def _build_deterministic_findings(
                 surface=surface,
                 rule_id="ux_visibility_after_interaction",
                 primary_file="scripts/audit/collect_browser_evidence.mjs",
-                evidence_files=["visibility-signals.json"],
+                evidence_files=[VISIBILITY_SIGNALS_FILE],
                 effort="M",
                 audit_label="audit:ux",
             )
@@ -898,11 +903,11 @@ def _write_evidence_index(
         "",
         "- `route-map.json`",
         "- `surface-map.json`",
-        "- `seo-snapshot.json`",
-        "- `console-errors.json`",
-        "- `layout-signals.json`",
-        "- `visibility-signals.json`",
-        "- `deterministic-findings.json`",
+        f"- `{SEO_SNAPSHOT_FILE}`",
+        f"- `{CONSOLE_ERRORS_FILE}`",
+        f"- `{LAYOUT_SIGNALS_FILE}`",
+        f"- `{VISIBILITY_SIGNALS_FILE}`",
+        f"- `{DETERMINISTIC_FINDINGS_FILE}`",
         "- `screenshots/`",
     ]
     if browser_message:
@@ -922,6 +927,42 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--changed-files-file", default="")
     parser.add_argument("--max-routes", type=int, default=40)
     return parser.parse_args()
+
+
+def _as_rows(payload: Any) -> list[dict[str, Any]]:
+    return payload if isinstance(payload, list) else []
+
+
+def _ensure_browser_artifacts(output_dir: Path) -> None:
+    for file_name in (SEO_SNAPSHOT_FILE, CONSOLE_ERRORS_FILE, LAYOUT_SIGNALS_FILE, VISIBILITY_SIGNALS_FILE):
+        path = output_dir / file_name
+        if not path.exists():
+            _write_json(path, [])
+    (output_dir / "screenshots").mkdir(parents=True, exist_ok=True)
+
+
+def _load_browser_artifacts(output_dir: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    seo_snapshot = _as_rows(_load_json(output_dir / SEO_SNAPSHOT_FILE, default=[]))
+    console_errors = _as_rows(_load_json(output_dir / CONSOLE_ERRORS_FILE, default=[]))
+    layout_signals = _as_rows(_load_json(output_dir / LAYOUT_SIGNALS_FILE, default=[]))
+    visibility_signals = _as_rows(_load_json(output_dir / VISIBILITY_SIGNALS_FILE, default=[]))
+    return seo_snapshot, console_errors, layout_signals, visibility_signals
+
+
+def _collect_findings(output_dir: Path) -> list[dict[str, Any]]:
+    seo_snapshot, console_errors, layout_signals, visibility_signals = _load_browser_artifacts(output_dir)
+    findings = _build_deterministic_findings(
+        seo_snapshot=seo_snapshot,
+        console_errors=console_errors,
+        layout_signals=layout_signals,
+        visibility_signals=visibility_signals,
+    )
+    _write_json(output_dir / DETERMINISTIC_FINDINGS_FILE, findings)
+    return findings
+
+
+def _auth_profile(owner_identifier: str, owner_password: str) -> str:
+    return "owner" if owner_identifier.strip() and owner_password.strip() else "anonymous"
 
 
 def main() -> int:
@@ -977,34 +1018,15 @@ def main() -> int:
             owner_password=str(args.owner_password or ""),
         )
 
-    if not (output_dir / "seo-snapshot.json").exists():
-        _write_json(output_dir / "seo-snapshot.json", [])
-    if not (output_dir / "console-errors.json").exists():
-        _write_json(output_dir / "console-errors.json", [])
-    if not (output_dir / "layout-signals.json").exists():
-        _write_json(output_dir / "layout-signals.json", [])
-    if not (output_dir / "visibility-signals.json").exists():
-        _write_json(output_dir / "visibility-signals.json", [])
-    (output_dir / "screenshots").mkdir(parents=True, exist_ok=True)
-
-    seo_snapshot = _load_json(output_dir / "seo-snapshot.json", default=[])
-    console_errors = _load_json(output_dir / "console-errors.json", default=[])
-    layout_signals = _load_json(output_dir / "layout-signals.json", default=[])
-    visibility_signals = _load_json(output_dir / "visibility-signals.json", default=[])
-    findings = _build_deterministic_findings(
-        seo_snapshot=seo_snapshot if isinstance(seo_snapshot, list) else [],
-        console_errors=console_errors if isinstance(console_errors, list) else [],
-        layout_signals=layout_signals if isinstance(layout_signals, list) else [],
-        visibility_signals=visibility_signals if isinstance(visibility_signals, list) else [],
-    )
-    _write_json(output_dir / "deterministic-findings.json", findings)
+    _ensure_browser_artifacts(output_dir)
+    findings = _collect_findings(output_dir)
 
     _write_evidence_index(
         output_dir=output_dir,
         mode=args.mode,
         base_url=base_url or None,
         api_base_url=api_base_url or None,
-        auth_profile="owner" if str(args.owner_identifier).strip() and str(args.owner_password).strip() else "anonymous",
+        auth_profile=_auth_profile(str(args.owner_identifier or ""), str(args.owner_password or "")),
         route_map=route_map if isinstance(route_map, dict) else {},
         selected_routes=selected_routes,
         findings=findings,

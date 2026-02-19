@@ -240,7 +240,7 @@ async function hydrateRouteSamplesFromApi(context, { apiBaseUrl, routeSamples, a
   const apiRoot = normalizeUrl(apiBaseUrl);
   if (!apiRoot) return routeSamples;
 
-  const hydrated = { ...(routeSamples || {}) };
+  const hydrated = routeSamples && typeof routeSamples === "object" ? { ...routeSamples } : {};
   const setSample = (routeTemplate, key, value) => {
     const token = String(value || "").trim();
     if (!token) {
@@ -329,7 +329,8 @@ async function primeOwnerSession(context, { apiBaseUrl, ownerIdentifier, ownerPa
 
   if (!response.ok()) {
     const details = payload && typeof payload === "object" ? JSON.stringify(payload).slice(0, 500) : "";
-    throw new Error(`Owner login failed (${response.status()})${details ? `: ${details}` : ""}`);
+    const suffix = details ? `: ${details}` : "";
+    throw new Error(`Owner login failed (${response.status()})${suffix}`);
   }
 
   const tokens = payload?.tokens;
@@ -342,7 +343,7 @@ async function primeOwnerSession(context, { apiBaseUrl, ownerIdentifier, ownerPa
 
   await context.addInitScript((authTokens) => {
     try {
-      window.sessionStorage.setItem("auth_tokens", JSON.stringify(authTokens));
+      globalThis.sessionStorage.setItem("auth_tokens", JSON.stringify(authTokens));
     } catch {
       // noop
     }
@@ -356,10 +357,10 @@ async function primeOwnerSession(context, { apiBaseUrl, ownerIdentifier, ownerPa
 
 async function collectVisibilityProbe(page) {
   return page.evaluate(() => {
-    const normalizeText = (value) => String(value || "").replace(/\s+/g, " ").trim();
+    const normalizeText = (value) => String(value || "").replaceAll(/\s+/g, " ").trim();
     const isVisiblyRendered = (el) => {
       if (!el) return false;
-      const style = window.getComputedStyle(el);
+      const style = globalThis.getComputedStyle(el);
       if (style.display === "none" || style.visibility === "hidden") return false;
       if (Number.parseFloat(style.opacity || "1") === 0) return false;
       const rect = el.getBoundingClientRect();
@@ -576,8 +577,8 @@ async function main() {
       await page.waitForTimeout(2000);
       const visibilitySettled = await collectVisibilityProbe(page);
       await page.evaluate(() => {
-        window.dispatchEvent(new Event("scroll"));
-        window.dispatchEvent(new Event("resize"));
+        globalThis.dispatchEvent(new Event("scroll"));
+        globalThis.dispatchEvent(new Event("resize"));
       });
       await page.waitForTimeout(250);
       const visibilityAfterPassive = await collectVisibilityProbe(page);
@@ -593,10 +594,10 @@ async function main() {
         const h1Texts = h1Nodes.map((node) => (node.textContent || "").trim()).filter(Boolean);
         const routeHeadingCount = document.querySelectorAll("[data-route-heading='true']").length;
 
-        const bodyText = (document.body?.innerText || "").replace(/\s+/g, " ").trim();
+        const bodyText = (document.body?.innerText || "").replaceAll(/\s+/g, " ").trim();
         const wordCount = bodyText ? bodyText.split(" ").filter(Boolean).length : 0;
         const candidateBlocks = Array.from(document.querySelectorAll("main p, article p, section p, li, h2, h3"))
-          .map((node) => (node.textContent || "").replace(/\s+/g, " ").trim())
+          .map((node) => (node.textContent || "").replaceAll(/\s+/g, " ").trim())
           .filter((text) => text.length >= 40);
         const meaningfulTextBlocks = candidateBlocks.filter((text) => text.split(" ").filter(Boolean).length >= 8);
 
@@ -605,11 +606,11 @@ async function main() {
           if (!href) return false;
           if (href.startsWith("#")) return false;
           try {
-            const url = new URL(href, window.location.origin);
+            const url = new URL(href, globalThis.location.origin);
             if (url.protocol !== "http:" && url.protocol !== "https:") {
               return false;
             }
-            return url.origin === window.location.origin;
+            return url.origin === globalThis.location.origin;
           } catch {
             return false;
           }
