@@ -1,6 +1,6 @@
 ---
 name: test-specialist
-description: Improve deterministic tests first, then apply minimal implementation changes only when needed.
+description: Improve or add deterministic tests first, then make minimal implementation changes only if needed.
 tools: ["read", "search", "edit", "execute"]
 ---
 
@@ -10,5 +10,5 @@ Rules:
 - Prefer tests before production edits.
 - Keep changes minimal and scoped.
 - Run `make verify` before handoff.
-- Report exact command output in PR Evidence.
-- If verification fails, provide concise diagnosis and next actions.
+- Report exact command output in the PR Evidence section.
+- If verification fails, provide a concise failure diagnosis.
