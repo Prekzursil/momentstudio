@@ -63,13 +63,17 @@ jobs:
           npm test -- --watch=false --browsers=ChromeHeadlessNoSandbox --code-coverage || npm test -- --watch=false --code-coverage
 
       - name: Validate Codacy token
+        id: codacy_token
         run: |
           if [ -z "${CODACY_API_TOKEN}" ]; then
-            echo "::error::Missing CODACY_API_TOKEN secret. Configure it in GitHub Actions secrets."
-            exit 1
+            echo "::warning::Missing CODACY_API_TOKEN secret. Skipping Codacy upload."
+            echo "upload_enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "upload_enabled=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Upload coverage reports to Codacy
+        if: ${{ steps.codacy_token.outputs.upload_enabled == 'true' }}
         run: |
           bash <(curl -Ls https://coverage.codacy.com/get.sh) report \
             --api-token "${CODACY_API_TOKEN}" \

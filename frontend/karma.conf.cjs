@@ -8,6 +8,12 @@ module.exports = function (config) {
       // Fall back to system Chrome resolution via karma-chrome-launcher.
     }
   }
+
+  const enableJUnitReporter = process.env.KARMA_JUNIT === '1' || process.env.CI === 'true';
+  const reporters = enableJUnitReporter
+    ? ['progress', 'kjhtml', 'junit']
+    : ['progress', 'kjhtml'];
+
   config.set({
     basePath: '',
     frameworks: ['jasmine', '@angular-devkit/build-angular'],
@@ -16,12 +22,18 @@ module.exports = function (config) {
       require('karma-chrome-launcher'),
       require('karma-jasmine-html-reporter'),
       require('karma-coverage'),
+      require('karma-junit-reporter'),
       require('@angular-devkit/build-angular/plugins/karma')
     ],
     client: {
       clearContext: false
     },
-    reporters: ['progress', 'kjhtml'],
+    reporters,
+    junitReporter: {
+      outputDir: 'test-results',
+      outputFile: 'karma.junit.xml',
+      useBrowserName: false
+    },
     port: 9876,
     listenAddress: '127.0.0.1',
     colors: true,
