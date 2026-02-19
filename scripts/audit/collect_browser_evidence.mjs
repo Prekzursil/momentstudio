@@ -36,9 +36,12 @@ function parseArgs(argv) {
 }
 
 function normalizeUrl(raw) {
-  const value = String(raw || "").trim();
+  let value = String(raw || "").trim();
   if (!value) return "";
-  return value.replace(/\/+$/, "");
+  while (value.endsWith("/")) {
+    value = value.slice(0, -1);
+  }
+  return value;
 }
 
 function normalizeAuthMode(raw) {

@@ -33,10 +33,16 @@ jobs:
       - name: Resolve target SHA
         id: resolve
         shell: bash
+        env:
+          TARGET_SHA_INPUT: ${{ github.event.inputs.target_sha }}
         run: |
           set -euo pipefail
           git fetch origin main --depth=1
-          target="${{ github.event.inputs.target_sha }}"
+          target="${TARGET_SHA_INPUT:-}"
+          if [[ -n "${target}" ]] && [[ ! "${target}" =~ ^[0-9a-fA-F]{7,40}$ ]]; then
+            echo "Invalid target SHA format: ${target}" >&2
+            exit 1
+          fi
           if [[ -z "${target}" ]]; then
             target="$(git rev-parse origin/main)"
           fi
@@ -130,8 +136,12 @@ jobs:
           PROD_SSH_USER="${PROD_SSH_USER_SECRET:-${PROD_SSH_USER_VAR:-}}"
           PROD_DEPLOY_PATH="${PROD_DEPLOY_PATH_SECRET:-${PROD_DEPLOY_PATH_VAR:-}}"
           ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes -p "${PROD_SSH_PORT}" "${PROD_SSH_USER}@${PROD_SSH_HOST}" \
-            "TARGET_SHA='${TARGET_SHA}' RUN_BACKUP='${RUN_BACKUP}' RUN_VERIFY='${RUN_VERIFY}' PROD_DEPLOY_PATH='${PROD_DEPLOY_PATH}' bash -s" <<'EOS'
+            "bash -s --" "${TARGET_SHA}" "${RUN_BACKUP}" "${RUN_VERIFY}" "${PROD_DEPLOY_PATH}" <<'EOS'
           set -euo pipefail
+          TARGET_SHA="$1"
+          RUN_BACKUP="$2"
+          RUN_VERIFY="$3"
+          PROD_DEPLOY_PATH="$4"
           cd "${PROD_DEPLOY_PATH}"
           git fetch origin --prune
           git checkout --force "${TARGET_SHA}"
@@ -141,8 +151,6 @@ jobs:
           fi
 
           ./infra/prod/deploy.sh
-
-          docker compose --env-file infra/prod/.env -f infra/prod/docker-compose.yml exec -T backend alembic upgrade head
 
           if [[ "${RUN_VERIFY}" == "true" ]]; then
             EXPECTED_APP_VERSION="${TARGET_SHA}" ./infra/prod/verify-live.sh

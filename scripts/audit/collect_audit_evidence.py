@@ -222,6 +222,8 @@ def _build_deterministic_findings(
     findings: list[dict[str, Any]] = []
     indexable_rows: list[dict[str, str]] = []
     noisy_routes: set[str] = set()
+    url_scheme_pattern = re.compile(r"(?i)^[a-z][a-z0-9+.-]*://")
+    url_token_pattern = re.compile(r"(?:[a-zA-Z][a-zA-Z0-9+.-]*://[^\s|)]+|/api/[^\s|)]+)")
 
     def _normalize_console_noise_signature(message: str) -> str:
         text = " ".join(str(message or "").split()).lower()
@@ -237,7 +239,7 @@ def _build_deterministic_findings(
             return "unused_preload_warning"
         # Collapse route/url/path churn to keep low-noise clustering stable.
         compact = text
-        compact = compact.replace("http://", "url://").replace("https://", "url://")
+        compact = re.sub(r"\b[a-zA-Z][a-zA-Z0-9+.-]*://", "url://", compact)
         compact = compact.replace("127.0.0.1", "host").replace("localhost", "host")
         while "//" in compact:
             compact = compact.replace("//", "/")
@@ -294,11 +296,11 @@ def _build_deterministic_findings(
             except Exception:
                 return ""
         text = str(row.get("text") or "")
-        match = re.search(r"(?:https?://[^\s|)]+|/api/[^\s|)]+)", text)
+        match = url_token_pattern.search(text)
         if not match:
             return ""
         token = match.group(0).strip()
-        if token.startswith("http://") or token.startswith("https://"):
+        if url_scheme_pattern.match(token):
             try:
                 return (urlparse(token).path or "").strip().lower()
             except Exception:
@@ -375,11 +377,16 @@ def _build_deterministic_findings(
         if endpoint_path.startswith("/api/v1/orders/receipt/") and status_code in {401, 403, 404}:
             return True
 
-        if (
-            normalized_request_url.startswith("https://example.com/images/")
-            and "err_blocked_by_orb" in normalized_message
-        ):
-            return True
+        if "err_blocked_by_orb" in normalized_message:
+            try:
+                parsed_request = urlparse(normalized_request_url)
+                if (
+                    parsed_request.netloc == "example.com"
+                    and parsed_request.path.startswith("/images/")
+                ):
+                    return True
+            except Exception:
+                pass
 
         return False
 
