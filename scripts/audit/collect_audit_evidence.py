@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -16,6 +17,11 @@ from urllib.parse import parse_qs, urlparse
 
 
 SEVERITY_TO_IMPACT = {"s1": 5, "s2": 4, "s3": 2, "s4": 1}
+SEO_SNAPSHOT_FILE = "seo-snapshot.json"
+CONSOLE_ERRORS_FILE = "console-errors.json"
+LAYOUT_SIGNALS_FILE = "layout-signals.json"
+VISIBILITY_SIGNALS_FILE = "visibility-signals.json"
+DETERMINISTIC_FINDINGS_FILE = "deterministic-findings.json"
 
 
 def _repo_root() -> Path:
@@ -136,15 +142,20 @@ def _browser_collect(
     *,
     repo_root: Path,
     base_url: str,
+    api_base_url: str,
     selected_routes_path: Path,
     output_dir: Path,
     max_routes: int,
+    owner_identifier: str,
+    owner_password: str,
 ) -> tuple[bool, str]:
     script = repo_root / "scripts" / "audit" / "collect_browser_evidence.mjs"
     cmd = [
         str(script),
         "--base-url",
         base_url,
+        "--api-base-url",
+        api_base_url or base_url,
         "--routes-json",
         str(selected_routes_path),
         "--output-dir",
@@ -154,6 +165,17 @@ def _browser_collect(
         "--route-samples",
         str(repo_root / "scripts" / "audit" / "fixtures" / "route-samples.json"),
     ]
+    if owner_identifier.strip() and owner_password.strip():
+        cmd.extend(
+            [
+                "--auth-mode",
+                "owner",
+                "--owner-identifier",
+                owner_identifier.strip(),
+                "--owner-password",
+                owner_password.strip(),
+            ]
+        )
     try:
         proc = _run_node(cmd, cwd=repo_root)
         return True, (proc.stdout or "").strip()
@@ -200,10 +222,33 @@ def _build_deterministic_findings(
     seo_snapshot: list[dict[str, Any]],
     console_errors: list[dict[str, Any]],
     layout_signals: list[dict[str, Any]],
+    visibility_signals: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
     indexable_rows: list[dict[str, str]] = []
     noisy_routes: set[str] = set()
+    url_scheme_pattern = re.compile(r"(?i)^[a-z][a-z0-9+.-]*://")
+    url_token_pattern = re.compile(r"(?:[a-zA-Z][a-zA-Z0-9+.-]*://[^\s|)]+|/api/[^\s|)]+)")
+
+    def _normalize_console_noise_signature(message: str) -> str:
+        text = " ".join(str(message or "").split()).lower()
+        if not text:
+            return ""
+        if "unexpected token '<'" in text or "unexpected token <" in text:
+            return "unexpected_token_lt_json_parse"
+        if "executing inline script violates the following content security policy directive" in text:
+            return "csp_inline_script_blocked"
+        if "private access token challenge" in text or "turnstile" in text or "cloudflare challenge" in text:
+            return "cloudflare_challenge_noise"
+        if "was preloaded using link preload but not used within a few seconds" in text:
+            return "unused_preload_warning"
+        # Collapse route/url/path churn to keep low-noise clustering stable.
+        compact = text
+        compact = re.sub(r"\b[a-zA-Z][a-zA-Z0-9+.-]*://", "url://", compact)
+        compact = compact.replace("127.0.0.1", "host").replace("localhost", "host")
+        while "//" in compact:
+            compact = compact.replace("//", "/")
+        return compact
 
     def _is_api_noise_message(message: str) -> bool:
         text = " ".join(str(message or "").lower().split())
@@ -222,14 +267,133 @@ def _build_deterministic_findings(
             "unexpected token '<'",
             "unexpected token <",
             "is not valid json",
-            "challenges.cloudflare.com",
+            "cloudflare challenge",
             "private access token challenge",
             "cloudflare",
             "turnstile",
             "executing inline script violates the following content security policy directive",
             "the action has been blocked",
+            "was preloaded using link preload but not used within a few seconds from the window's load event",
         )
         return any(pattern in text for pattern in patterns)
+
+    def _extract_status_code(row: dict[str, Any]) -> int | None:
+        raw = row.get("status_code")
+        if isinstance(raw, int):
+            return raw
+        if isinstance(raw, str) and raw.strip().isdigit():
+            return int(raw.strip())
+        text = str(row.get("text") or "")
+        match = re.search(r"status(?: of)?\s+(\d{3})", text, flags=re.IGNORECASE)
+        if not match:
+            return None
+        try:
+            return int(match.group(1))
+        except Exception:
+            return None
+
+    def _extract_request_path(row: dict[str, Any]) -> str:
+        request_url = str(row.get("request_url") or "").strip()
+        if request_url:
+            try:
+                parsed = urlparse(request_url)
+                return (parsed.path or "").strip().lower()
+            except Exception:
+                return ""
+        text = str(row.get("text") or "")
+        match = url_token_pattern.search(text)
+        if not match:
+            return ""
+        token = match.group(0).strip()
+        if url_scheme_pattern.match(token):
+            try:
+                return (urlparse(token).path or "").strip().lower()
+            except Exception:
+                return ""
+        return token.lower()
+
+    def _classify_endpoint(path: str) -> str:
+        normalized = str(path or "").lower()
+        if not normalized:
+            return "unknown"
+        if normalized.startswith("/api/v1/auth/me/export/jobs/latest"):
+            return "account_export_latest"
+        if normalized.startswith("/api/v1/content/admin/site."):
+            return "admin_site_content"
+        if normalized.startswith("/api/v1/content/admin/page."):
+            return "admin_page_content"
+        if normalized.startswith("/api/v1/content/admin/"):
+            return "admin_content_api"
+        if normalized.startswith("/api/v1/content/"):
+            return "content_api"
+        if normalized.startswith("/api/v1/"):
+            return "first_party_api"
+        return "other"
+
+    def _is_expected_resource_noise(
+        *,
+        route: str,
+        surface: str,
+        endpoint_path: str,
+        endpoint_class: str,
+        status_code: int | None,
+        request_url: str,
+        message: str,
+    ) -> bool:
+        normalized_route = str(route or "").strip().lower()
+        normalized_surface = str(surface or "").strip().lower()
+        normalized_request_url = str(request_url or "").strip().lower()
+        normalized_message = " ".join(str(message or "").lower().split())
+        if not endpoint_path and endpoint_class == "unknown":
+            return False
+
+        if (
+            normalized_route.startswith("/account/privacy")
+            and normalized_surface == "account"
+            and endpoint_class == "account_export_latest"
+            and status_code == 404
+        ):
+            return True
+
+        if normalized_surface == "admin" and normalized_route in {"/admin/content/pages", "/admin/content/settings"}:
+            if endpoint_class == "admin_site_content" and status_code in {403, 404}:
+                return True
+            if (
+                normalized_route == "/admin/content/pages"
+                and endpoint_path == "/api/v1/content/admin/cms.snippets"
+                and status_code == 404
+            ):
+                return True
+
+        if (
+            normalized_surface == "admin"
+            and endpoint_path == "/api/v1/auth/admin/access"
+            and status_code in {401, 403}
+        ):
+            return True
+
+        if (
+            normalized_surface == "admin"
+            and endpoint_path == "/api/v1/admin/ui/favorites"
+            and status_code in {401, 403}
+        ):
+            return True
+
+        if endpoint_path.startswith("/api/v1/orders/receipt/") and status_code in {401, 403, 404}:
+            return True
+
+        if "err_blocked_by_orb" in normalized_message:
+            try:
+                parsed_request = urlparse(normalized_request_url)
+                if (
+                    parsed_request.netloc == "example.com"
+                    and parsed_request.path.startswith("/images/")
+                ):
+                    return True
+            except Exception:
+                pass
+
+        return False
 
     for row in console_errors:
         severity = str(row.get("severity") or "s3").lower()
@@ -280,7 +444,7 @@ def _build_deterministic_findings(
                     surface=surface,
                     rule_id="route_render_error",
                     primary_file="scripts/audit/collect_browser_evidence.mjs",
-                    evidence_files=["seo-snapshot.json", "console-errors.json"],
+                    evidence_files=[SEO_SNAPSHOT_FILE, CONSOLE_ERRORS_FILE],
                     effort="M",
                 )
             )
@@ -296,7 +460,7 @@ def _build_deterministic_findings(
                     surface=surface,
                     rule_id="seo_missing_title",
                     primary_file="frontend/src/app/app.routes.ts",
-                    evidence_files=["seo-snapshot.json"],
+                    evidence_files=[SEO_SNAPSHOT_FILE],
                     effort="S",
                     audit_label="audit:seo",
                     indexable=indexable,
@@ -313,13 +477,13 @@ def _build_deterministic_findings(
                     surface=surface,
                     rule_id="ux_missing_h1",
                     primary_file="frontend/src/app/app.routes.ts",
-                    evidence_files=["seo-snapshot.json"],
+                    evidence_files=[SEO_SNAPSHOT_FILE],
                     effort="M",
                     audit_label="audit:seo",
                     indexable=indexable,
                 )
             )
-        elif h1_count > 1 and not unresolved_placeholder:
+        elif surface == "storefront" and h1_count > 1 and indexable and not unresolved_placeholder:
             findings.append(
                 _finding(
                     title=f"Multiple H1 headings on `{route_template}`",
@@ -329,7 +493,7 @@ def _build_deterministic_findings(
                     surface=surface,
                     rule_id="ux_multiple_h1",
                     primary_file="frontend/src/app/app.routes.ts",
-                    evidence_files=["seo-snapshot.json"],
+                    evidence_files=[SEO_SNAPSHOT_FILE],
                     effort="M",
                     audit_label="audit:seo" if surface == "storefront" else "audit:correctness",
                     indexable=indexable if surface == "storefront" else None,
@@ -349,7 +513,7 @@ def _build_deterministic_findings(
                     surface=surface,
                     rule_id="seo_missing_canonical",
                     primary_file="frontend/src/app/core/seo-head-links.service.ts",
-                    evidence_files=["seo-snapshot.json"],
+                    evidence_files=[SEO_SNAPSHOT_FILE],
                     effort="S",
                     audit_label="audit:seo",
                     indexable=indexable,
@@ -377,7 +541,7 @@ def _build_deterministic_findings(
                         surface=surface,
                         rule_id="seo_canonical_policy_mismatch",
                         primary_file="frontend/src/app/core/seo-head-links.service.ts",
-                        evidence_files=["seo-snapshot.json"],
+                        evidence_files=[SEO_SNAPSHOT_FILE],
                         effort="S",
                         audit_label="audit:seo",
                         indexable=indexable,
@@ -395,7 +559,7 @@ def _build_deterministic_findings(
                         surface=surface,
                         rule_id="seo_missing_description",
                         primary_file="frontend/src/app/app.routes.ts",
-                        evidence_files=["seo-snapshot.json"],
+                        evidence_files=[SEO_SNAPSHOT_FILE],
                         effort="S",
                         audit_label="audit:seo",
                         indexable=indexable,
@@ -415,7 +579,7 @@ def _build_deterministic_findings(
                         surface=surface,
                         rule_id="seo_no_meaningful_text",
                         primary_file="frontend/src/app/app.routes.ts",
-                        evidence_files=["seo-snapshot.json"],
+                        evidence_files=[SEO_SNAPSHOT_FILE],
                         effort="M",
                         audit_label="audit:seo",
                         indexable=indexable,
@@ -435,7 +599,7 @@ def _build_deterministic_findings(
                         surface=surface,
                         rule_id="seo_low_internal_links",
                         primary_file="frontend/src/app/app.routes.ts",
-                        evidence_files=["seo-snapshot.json"],
+                        evidence_files=[SEO_SNAPSHOT_FILE],
                         effort="M",
                         audit_label="audit:seo",
                         indexable=indexable,
@@ -480,7 +644,7 @@ def _build_deterministic_findings(
                     surface="storefront",
                     rule_id="seo_duplicate_title",
                     primary_file="frontend/src/app/app.routes.ts",
-                    evidence_files=["seo-snapshot.json"],
+                    evidence_files=[SEO_SNAPSHOT_FILE],
                     effort="M",
                     audit_label="audit:seo",
                     indexable=True,
@@ -505,14 +669,14 @@ def _build_deterministic_findings(
                     surface="storefront",
                     rule_id="seo_duplicate_description",
                     primary_file="frontend/src/app/app.routes.ts",
-                    evidence_files=["seo-snapshot.json"],
+                    evidence_files=[SEO_SNAPSHOT_FILE],
                     effort="M",
                     audit_label="audit:seo",
                     indexable=True,
                 )
             )
 
-    console_noise_clusters: dict[tuple[str, str, str], dict[str, Any]] = {}
+    console_noise_clusters: dict[tuple[str, str, str, str, str], dict[str, Any]] = {}
     for row in console_errors:
         route = str(row.get("route") or "/")
         surface = str(row.get("surface") or "storefront")
@@ -522,20 +686,44 @@ def _build_deterministic_findings(
         severity = str(row.get("severity") or "s3").lower()
         severity = severity if severity in {"s1", "s2", "s3", "s4"} else "s3"
         if severity == "s4":
-            normalized_text = " ".join(text.split()).lower()
+            status_code = _extract_status_code(row)
+            endpoint_path = _extract_request_path(row)
+            endpoint_class = _classify_endpoint(endpoint_path)
+            if _is_expected_resource_noise(
+                route=route,
+                surface=surface,
+                endpoint_path=endpoint_path,
+                endpoint_class=endpoint_class,
+                status_code=status_code,
+                request_url=str(row.get("request_url") or ""),
+                message=text,
+            ):
+                continue
+            normalized_text = _normalize_console_noise_signature(text)
             if not normalized_text:
                 continue
-            key = (surface, severity, normalized_text)
+            if normalized_text == "unexpected_token_lt_json_parse":
+                # These signatures are expected in auth-gated shells and unresolved template routes
+                # where JSON parsing occurs against guarded/placeholder responses.
+                if surface in {"account", "admin"} or ":" in route:
+                    continue
+            status_token = str(status_code) if status_code is not None else "none"
+            key = (surface, severity, normalized_text, status_token, endpoint_class)
             cluster = console_noise_clusters.setdefault(
                 key,
                 {
                     "surface": surface,
                     "severity": severity,
                     "message": text[:500],
+                    "status_code": status_code,
+                    "endpoint_class": endpoint_class,
+                    "endpoint_path": endpoint_path,
                     "routes": set(),
                 },
             )
             cluster["routes"].add(route)
+            if endpoint_path and not cluster.get("endpoint_path"):
+                cluster["endpoint_path"] = endpoint_path
             continue
 
         findings.append(
@@ -547,21 +735,34 @@ def _build_deterministic_findings(
                 surface=surface,
                 rule_id="browser_console_error",
                 primary_file="scripts/audit/collect_browser_evidence.mjs",
-                evidence_files=["console-errors.json"],
+                evidence_files=[CONSOLE_ERRORS_FILE],
                 effort="M",
             )
         )
 
-    for (surface, severity, normalized_text), cluster in sorted(console_noise_clusters.items()):
+    for (surface, severity, normalized_text, status_token, endpoint_class), cluster in sorted(console_noise_clusters.items()):
         routes = sorted(str(route) for route in cluster.get("routes", set()) if str(route).strip())
         if not routes:
             continue
         sample_routes = routes[:8]
-        signature = hashlib.sha256(f"{surface}|{severity}|{normalized_text}".encode("utf-8")).hexdigest()[:12]
+        signature = hashlib.sha256(
+            f"{surface}|{severity}|{normalized_text}|{status_token}|{endpoint_class}".encode("utf-8")
+        ).hexdigest()[:12]
+        status_note = f"HTTP status: `{status_token}`" if status_token != "none" else "HTTP status: `unknown`"
+        endpoint_note = (
+            f"Endpoint class: `{endpoint_class}`"
+            + (
+                f"; sample endpoint: `{cluster.get('endpoint_path')}`"
+                if str(cluster.get("endpoint_path") or "").strip()
+                else ""
+            )
+        )
         noise_finding = _finding(
             title=f"Browser console noise cluster on `{surface}` ({len(routes)} routes)",
             description=(
                 f"Representative console message: {cluster.get('message','')}\n\n"
+                f"{status_note}\n"
+                f"{endpoint_note}\n\n"
                 f"Affected routes (sample): {', '.join(f'`{route}`' for route in sample_routes)}"
             ),
             severity=severity,
@@ -569,12 +770,16 @@ def _build_deterministic_findings(
             surface=surface,
             rule_id="browser_console_noise_cluster",
             primary_file="scripts/audit/collect_browser_evidence.mjs",
-            evidence_files=["console-errors.json"],
+            evidence_files=[CONSOLE_ERRORS_FILE],
             effort="S",
         )
         noise_finding["cluster_count"] = len(routes)
         noise_finding["sample_routes"] = sample_routes
         noise_finding["representative_message"] = cluster.get("message", "")
+        noise_finding["status_code"] = cluster.get("status_code")
+        noise_finding["endpoint_class"] = cluster.get("endpoint_class")
+        if str(cluster.get("endpoint_path") or "").strip():
+            noise_finding["endpoint_path"] = cluster.get("endpoint_path")
         noise_finding["aggregated"] = True
         findings.append(noise_finding)
 
@@ -593,7 +798,7 @@ def _build_deterministic_findings(
                     surface=surface,
                     rule_id="ux_nested_scrollables",
                     primary_file="scripts/audit/collect_browser_evidence.mjs",
-                    evidence_files=["layout-signals.json"],
+                    evidence_files=[LAYOUT_SIGNALS_FILE],
                     effort="M",
                 )
             )
@@ -607,11 +812,41 @@ def _build_deterministic_findings(
                     surface=surface,
                     rule_id="ux_sticky_overload",
                     primary_file="scripts/audit/collect_browser_evidence.mjs",
-                    evidence_files=["layout-signals.json"],
+                    evidence_files=[LAYOUT_SIGNALS_FILE],
                     effort="M",
                 )
             )
 
+    for row in visibility_signals or []:
+        if not bool(row.get("visibility_issue")):
+            continue
+        if bool(row.get("unresolved_placeholder")):
+            continue
+        if str(row.get("error") or "").strip():
+            continue
+        route = str(row.get("route_template") or row.get("route") or "/")
+        surface = str(row.get("surface") or "storefront")
+        reasons = [str(reason) for reason in (row.get("issue_reasons") or []) if str(reason).strip()]
+        if not reasons:
+            continue
+        severity = "s2" if surface in {"account", "admin"} else "s3"
+        findings.append(
+            _finding(
+                title=f"Content appears only after interaction on `{route}`",
+                description=(
+                    "Initial render visibility check detected delayed text/form discoverability. "
+                    f"Reasons: {', '.join(reasons)}."
+                ),
+                severity=severity,
+                route=route,
+                surface=surface,
+                rule_id="ux_visibility_after_interaction",
+                primary_file="scripts/audit/collect_browser_evidence.mjs",
+                evidence_files=[VISIBILITY_SIGNALS_FILE],
+                effort="M",
+                audit_label="audit:ux",
+            )
+        )
     deduped: dict[str, dict[str, Any]] = {}
     for item in findings:
         deduped[item["fingerprint"]] = item
@@ -632,6 +867,8 @@ def _write_evidence_index(
     output_dir: Path,
     mode: str,
     base_url: str | None,
+    api_base_url: str | None,
+    auth_profile: str,
     route_map: dict[str, Any],
     selected_routes: list[dict[str, Any]],
     findings: list[dict[str, Any]],
@@ -645,6 +882,8 @@ def _write_evidence_index(
         f"- Generated at: `{_now_iso()}`",
         f"- Mode: `{mode}`",
         f"- Base URL: `{base_url or 'n/a'}`",
+        f"- API base URL: `{api_base_url or 'n/a'}`",
+        f"- Auth profile: `{auth_profile}`",
         f"- Browser collection: `{'ok' if browser_ok else 'skipped_or_failed'}`",
         "",
         "## Route coverage",
@@ -664,10 +903,11 @@ def _write_evidence_index(
         "",
         "- `route-map.json`",
         "- `surface-map.json`",
-        "- `seo-snapshot.json`",
-        "- `console-errors.json`",
-        "- `layout-signals.json`",
-        "- `deterministic-findings.json`",
+        f"- `{SEO_SNAPSHOT_FILE}`",
+        f"- `{CONSOLE_ERRORS_FILE}`",
+        f"- `{LAYOUT_SIGNALS_FILE}`",
+        f"- `{VISIBILITY_SIGNALS_FILE}`",
+        f"- `{DETERMINISTIC_FINDINGS_FILE}`",
         "- `screenshots/`",
     ]
     if browser_message:
@@ -681,9 +921,48 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--routes-file", default="frontend/src/app/app.routes.ts")
     parser.add_argument("--output-dir", default="artifacts/audit-evidence")
     parser.add_argument("--base-url", default="")
+    parser.add_argument("--api-base-url", default="")
+    parser.add_argument("--owner-identifier", default="")
+    parser.add_argument("--owner-password", default="")
     parser.add_argument("--changed-files-file", default="")
     parser.add_argument("--max-routes", type=int, default=40)
     return parser.parse_args()
+
+
+def _as_rows(payload: Any) -> list[dict[str, Any]]:
+    return payload if isinstance(payload, list) else []
+
+
+def _ensure_browser_artifacts(output_dir: Path) -> None:
+    for file_name in (SEO_SNAPSHOT_FILE, CONSOLE_ERRORS_FILE, LAYOUT_SIGNALS_FILE, VISIBILITY_SIGNALS_FILE):
+        path = output_dir / file_name
+        if not path.exists():
+            _write_json(path, [])
+    (output_dir / "screenshots").mkdir(parents=True, exist_ok=True)
+
+
+def _load_browser_artifacts(output_dir: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    seo_snapshot = _as_rows(_load_json(output_dir / SEO_SNAPSHOT_FILE, default=[]))
+    console_errors = _as_rows(_load_json(output_dir / CONSOLE_ERRORS_FILE, default=[]))
+    layout_signals = _as_rows(_load_json(output_dir / LAYOUT_SIGNALS_FILE, default=[]))
+    visibility_signals = _as_rows(_load_json(output_dir / VISIBILITY_SIGNALS_FILE, default=[]))
+    return seo_snapshot, console_errors, layout_signals, visibility_signals
+
+
+def _collect_findings(output_dir: Path) -> list[dict[str, Any]]:
+    seo_snapshot, console_errors, layout_signals, visibility_signals = _load_browser_artifacts(output_dir)
+    findings = _build_deterministic_findings(
+        seo_snapshot=seo_snapshot,
+        console_errors=console_errors,
+        layout_signals=layout_signals,
+        visibility_signals=visibility_signals,
+    )
+    _write_json(output_dir / DETERMINISTIC_FINDINGS_FILE, findings)
+    return findings
+
+
+def _auth_profile(owner_identifier: str, owner_password: str) -> str:
+    return "owner" if owner_identifier.strip() and owner_password.strip() else "anonymous"
 
 
 def main() -> int:
@@ -726,37 +1005,28 @@ def main() -> int:
     browser_ok = False
     browser_message = ""
     base_url = _validate_base_url(args.base_url)
+    api_base_url = _validate_base_url(args.api_base_url) if args.api_base_url else base_url
     if base_url:
         browser_ok, browser_message = _browser_collect(
             repo_root=repo_root,
             base_url=base_url,
+            api_base_url=api_base_url,
             selected_routes_path=output_dir / "selected-routes.json",
             output_dir=output_dir,
             max_routes=max(1, int(args.max_routes)),
+            owner_identifier=str(args.owner_identifier or ""),
+            owner_password=str(args.owner_password or ""),
         )
 
-    if not (output_dir / "seo-snapshot.json").exists():
-        _write_json(output_dir / "seo-snapshot.json", [])
-    if not (output_dir / "console-errors.json").exists():
-        _write_json(output_dir / "console-errors.json", [])
-    if not (output_dir / "layout-signals.json").exists():
-        _write_json(output_dir / "layout-signals.json", [])
-    (output_dir / "screenshots").mkdir(parents=True, exist_ok=True)
-
-    seo_snapshot = _load_json(output_dir / "seo-snapshot.json", default=[])
-    console_errors = _load_json(output_dir / "console-errors.json", default=[])
-    layout_signals = _load_json(output_dir / "layout-signals.json", default=[])
-    findings = _build_deterministic_findings(
-        seo_snapshot=seo_snapshot if isinstance(seo_snapshot, list) else [],
-        console_errors=console_errors if isinstance(console_errors, list) else [],
-        layout_signals=layout_signals if isinstance(layout_signals, list) else [],
-    )
-    _write_json(output_dir / "deterministic-findings.json", findings)
+    _ensure_browser_artifacts(output_dir)
+    findings = _collect_findings(output_dir)
 
     _write_evidence_index(
         output_dir=output_dir,
         mode=args.mode,
         base_url=base_url or None,
+        api_base_url=api_base_url or None,
+        auth_profile=_auth_profile(str(args.owner_identifier or ""), str(args.owner_password or "")),
         route_map=route_map if isinstance(route_map, dict) else {},
         selected_routes=selected_routes,
         findings=findings,

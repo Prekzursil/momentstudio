@@ -86,10 +86,17 @@ If you have `make` available, common workflows are:
 - Include tests or a short note when skipping them.
 - Update docs/config when behavior changes (README, `.env.example`, `ARCHITECTURE.md`, `TODO.md`).
 - Note any breaking changes, data migrations, or manual steps in the PR description.
+- Follow the AI-native playbook: `docs/AI_NATIVE_ENGINEERING_PLAYBOOK.md`.
 
 ## PR template, labels, and dependency policy
 
 - PRs use `.github/pull_request_template.md`; keep its validation/risk/backlog sections filled.
+- Treat these fields as soft-required metadata:
+  - intake (`problem/scope/success criteria`),
+  - risk classification,
+  - role ownership map,
+  - verification evidence,
+  - rollback note for medium/high risk.
 - Labels are auto-applied from `.github/labeler.yml` via PR labeler workflow.
   - Common labels: `type:*`, `area:*`, `priority:*`.
   - Audit labels: `audit:*`, `surface:*`, `severity:*`, `ai:*`.

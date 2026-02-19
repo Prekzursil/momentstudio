@@ -10,9 +10,22 @@ body:
         Please include enough detail to reproduce reliably.
 
   - type: dropdown
-    id: risk
+    id: owner_role
     attributes:
-      label: Risk level
+      label: Intended owner role
+      options:
+        - implementer
+        - verifier
+        - operator
+        - reviewer
+        - planner
+    validations:
+      required: true
+
+  - type: dropdown
+    id: risk_level
+    attributes:
+      label: Risk classification
       options:
         - low
         - medium
@@ -59,6 +72,13 @@ body:
       required: true
 
   - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
     id: steps
     attributes:
       label: Reproduction steps
@@ -67,9 +87,19 @@ body:
       required: true
 
   - type: textarea
-    id: expected
+    id: evidence_expected
     attributes:
-      label: Expected behavior
+      label: Expected evidence artifacts
+      description: Which logs/tests/workflow artifacts should confirm the fix?
+      placeholder: artifacts/audit-evidence/*, backend test output, compose-smoke run URL
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Add measurable pass conditions.
     validations:
       required: true
 

@@ -46,6 +46,12 @@ fi
 echo "Starting (or updating) momentstudio production stack..."
 docker compose --env-file "${env_file}" -f "${compose_file}" up -d --build
 
+if [[ "${RUN_DB_MIGRATIONS_ON_DEPLOY:-1}" == "1" ]]; then
+  echo
+  echo "Running explicit backend migrations (alembic upgrade head)..."
+  docker compose --env-file "${env_file}" -f "${compose_file}" exec -T backend alembic upgrade head
+fi
+
 echo
 echo "Services:"
 docker compose --env-file "${env_file}" -f "${compose_file}" ps

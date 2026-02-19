@@ -67,7 +67,7 @@ async function startStripeCheckout(
 ): Promise<{ orderId: string } | null> {
   const sessionId = uniqueSessionId('e2e-stripe');
   await setSessionCart(page, sessionId);
-  const product = await seedCartWithFirstProduct(request, sessionId);
+  const product = await seedCartWithFirstProduct(request, sessionId, { token });
   if (!product) return null;
 
   await openCartAndCheckout(page, product.name);
@@ -75,14 +75,21 @@ async function startStripeCheckout(
   const shippingEmail = OWNER_IDENTIFIER.includes('@') ? OWNER_IDENTIFIER : `${OWNER_IDENTIFIER}@example.com`;
   await fillShippingAddress(page, shippingEmail);
 
-  const stripeButton = page.getByRole('button', { name: 'Stripe' });
+  const stripeButton = page.getByRole('button', { name: /^Stripe$/ }).first();
   const stripeVisible = await stripeButton.isVisible({ timeout: 3000 }).catch(() => false);
   if (!stripeVisible || (await stripeButton.isDisabled())) {
     test.skip(true, 'Stripe is not enabled/available in this environment.');
     return null;
   }
 
-  await stripeButton.click();
+  const payableButton = page.getByRole('button', { name: /^Stripe$/ }).first();
+  const payableVisible = await payableButton.isVisible({ timeout: 3000 }).catch(() => false);
+  if (!payableVisible || (await payableButton.isDisabled())) {
+    test.skip(true, 'Stripe became unavailable after shipping details.');
+    return null;
+  }
+
+  await payableButton.click();
   await acceptCheckoutConsents(page);
   await expect(page.getByRole('button', { name: 'Place order' })).toBeEnabled();
 

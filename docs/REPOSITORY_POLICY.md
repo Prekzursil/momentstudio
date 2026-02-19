@@ -2,6 +2,8 @@
 
 This document defines the collaboration baseline for `Prekzursil/AdrianaArt`.
 
+AI-native execution details live in `docs/AI_NATIVE_ENGINEERING_PLAYBOOK.md` and are applied repository-wide with soft enforcement.
+
 ## Governance Files
 
 The repository includes:
@@ -225,6 +227,18 @@ Policy:
 - Prefer PRs with focused scope and clear testing evidence.
 - Keep conventional commits and update `TODO.md` with evidence.
 - Avoid merging when required checks are pending or skipped without rationale.
+
+## AI-native soft enforcement
+
+The repository uses soft-enforced intake/execution metadata in PR and issue templates:
+
+- Intake: goal, scope boundaries, success criteria
+- Risk level: `low|medium|high`
+- Role ownership: planner/implementer/verifier/reviewer/operator
+- Evidence paths and verification commands
+- Rollback notes for medium/high-risk changes
+
+Workflows may emit summary warnings when metadata is missing, but do not fail builds in this phase.
 
 ## Roadmap Project
 

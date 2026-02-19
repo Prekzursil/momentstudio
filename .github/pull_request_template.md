@@ -1,9 +1,29 @@
-## Summary
+## Problem / Outcome
 
-- What changed?
-- Why was it needed?
+- What problem is being solved?
+- What user/system outcome should change?
 
-## Risk
+## Scope and Success Criteria
+
+- In scope:
+- Out of scope:
+- Success criteria (measurable):
+
+## Risk Classification
+
+- [ ] `low`
+- [ ] `medium`
+- [ ] `high`
+
+## Role Ownership (AI-native)
+
+- Planner:
+- Implementer:
+- Verifier:
+- Reviewer:
+- Operator:
+
+## Surface Impact
 
 - Risk level: `low | medium | high`
 - Regression surface (storefront/account/admin/backend/infra):
@@ -11,23 +31,30 @@
 
 ## Evidence
 
-- [ ] `make verify`
-- [ ] Additional targeted checks (if needed)
+- [ ] Backend tests run (or N/A)
+- [ ] Frontend tests run (or N/A)
+- [ ] Frontend build run (or N/A)
+- [ ] Relevant E2E/compose smoke run (or N/A)
+- [ ] Security/privacy checks covered (or N/A)
 
 ### Commands / Results
 
 Paste exact commands and outcomes.
 
-## Rollback
+## Regression Surfaces Reviewed
 
-- Rollback steps if this change causes regressions:
+- List the areas that could regress and what was validated.
 
-## Scope Guard
+## Rollback Plan
 
-- [ ] Change is minimal and task-focused
-- [ ] Shell boundaries preserved (storefront/account/admin)
-- [ ] No secrets/tokens introduced
-- [ ] High-risk changes include explicit human-gate notes
+- [ ] No migration/data risk
+- [ ] Migration/data risk documented
+- [ ] Rollback steps documented (required for medium/high risk)
+
+## Evidence Paths
+
+- Deterministic evidence/artifacts used:
+- Workflow run URLs (if any):
 
 ## Backlog Sync
 

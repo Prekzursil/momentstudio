@@ -4,6 +4,30 @@ title: "[Feature] "
 labels:
   - type:feature
 body:
+  - type: dropdown
+    id: owner_role
+    attributes:
+      label: Intended owner role
+      options:
+        - planner
+        - implementer
+        - verifier
+        - operator
+        - reviewer
+    validations:
+      required: true
+
+  - type: dropdown
+    id: risk_level
+    attributes:
+      label: Risk classification
+      options:
+        - low
+        - medium
+        - high
+    validations:
+      required: true
+
   - type: input
     id: objective
     attributes:
@@ -21,6 +45,14 @@ body:
       required: true
 
   - type: textarea
+    id: scope
+    attributes:
+      label: Scope boundaries
+      description: Explicitly list in-scope and out-of-scope.
+    validations:
+      required: true
+
+  - type: textarea
     id: acceptance
     attributes:
       label: Acceptance criteria
@@ -28,14 +60,12 @@ body:
     validations:
       required: true
 
-  - type: dropdown
-    id: risk
+  - type: textarea
+    id: evidence_expected
     attributes:
-      label: Risk level
-      options:
-        - low
-        - medium
-        - high
+      label: Expected evidence artifacts
+      description: Which tests/workflow artifacts must exist before merge?
+      placeholder: frontend build output, backend pytest, audit-evidence artifact paths
     validations:
       required: true
 

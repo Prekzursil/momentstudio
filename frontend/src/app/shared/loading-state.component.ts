@@ -5,6 +5,10 @@ import { SkeletonComponent } from './skeleton.component';
 @Component({
   selector: 'app-loading-state',
   standalone: true,
+  host: {
+    'data-loading-state': 'true',
+    'aria-busy': 'true',
+  },
   imports: [CommonModule, SkeletonComponent],
   template: `
     <div class="grid gap-3" [class.p-4]="padded">
@@ -27,4 +31,3 @@ export class LoadingStateComponent {
     return Array.from({ length: Math.max(1, this.rows) }, (_, idx) => idx);
   }
 }
-
