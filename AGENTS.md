@@ -29,3 +29,6 @@ make verify
 - Intake issues via `.github/ISSUE_TEMPLATE/agent_task.yml`.
 - Queue work by adding `agent:ready`.
 - Queue workflow posts execution packet and notifies `@copilot`.
+
+## Queue Trigger Warning
+Applying label `agent:ready` triggers the queue workflow immediately.
