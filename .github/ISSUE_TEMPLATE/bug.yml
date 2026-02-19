@@ -108,3 +108,14 @@ body:
     attributes:
       label: Diagnostics/logs/screenshots
       description: Include request IDs, console errors, and relevant logs.
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence_commands
+    attributes:
+      label: Evidence command list
+      value: |
+        make verify
+    validations:
+      required: true

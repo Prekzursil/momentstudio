@@ -176,9 +176,39 @@ make env-doctor
 make dev-owner
 make lint
 make test
+make coverage
+make coverage-codacy
 make docker-up
 make docker-down
 make compose-smoke
+```
+
+## Codacy coverage (local + GitHub CI)
+
+This repository now includes a dedicated `Codacy Coverage` GitHub workflow (`.github/workflows/codacy-coverage.yml`) that:
+
+- runs backend tests and writes `backend/coverage.xml`
+- runs frontend tests with `--code-coverage` and writes `frontend/coverage/app/lcov.info`
+- uploads both reports to Codacy
+
+Required GitHub secret:
+
+- `CODACY_API_TOKEN` (from Codacy coverage settings)
+
+Optional environment values (defaults are already set in workflow and Makefile):
+
+- `CODACY_ORGANIZATION_PROVIDER=gh`
+- `CODACY_USERNAME=Prekzursil`
+- `CODACY_PROJECT_NAME=AdrianaArt`
+
+Run the same flow locally:
+
+```bash
+export CODACY_API_TOKEN="<your_token>"
+export CODACY_ORGANIZATION_PROVIDER=gh
+export CODACY_USERNAME=Prekzursil
+export CODACY_PROJECT_NAME=AdrianaArt
+make coverage-codacy
 ```
 
 ## Sameday mirror first sync (ops runbook)
@@ -265,6 +295,78 @@ The `Release` GitHub Actions workflow builds/pushes images when you push a tag l
 
 - `ghcr.io/<owner>/<repo>/backend:<tag>`
 - `ghcr.io/<owner>/<repo>/frontend:<tag>`
+
+## Release Verification Checklist
+
+Before tagging a release, run through this hygiene checklist to ensure production readiness:
+
+### Pre-Release Verification
+
+1. **Run full verification suite:**
+   ```bash
+   make verify
+   ```
+   This executes both `make lint` and `make test` across backend and frontend.
+
+2. **Check environment profile status:**
+   ```bash
+   make env-status
+   make env-doctor
+   ```
+
+3. **Validate Docker stack health:**
+   ```bash
+   make docker-up
+   make compose-smoke
+   ```
+
+4. **Review audit evidence (if applicable):**
+   - Check latest `Audit PR Evidence` artifact for any regressions
+   - Review `Audit Weekly Agent` issue for unresolved `severity:s1/s2` findings
+   - Confirm no breaking changes in route/surface maps
+
+5. **Verify observability configuration:**
+   - Confirm `SENTRY_DSN` is set for production backend
+   - Validate frontend Sentry config (`SENTRY_ENABLED`, `SENTRY_DSN`, sample rates)
+   - Check Clarity config if enabled (`FRONTEND_CLARITY_PROJECT_ID`)
+
+6. **Database migration check:**
+   ```bash
+   cd backend && alembic check
+   ```
+
+7. **Test payment provider integration (if changed):**
+   ```bash
+   PAYMENTS_PROVIDER=providers PYTHONPATH=backend pytest backend/tests/test_checkout_flow.py
+   ```
+
+### Post-Release Validation
+
+1. **Verify GHCR images were published:**
+   - Check `ghcr.io/<owner>/<repo>/backend:<tag>`
+   - Check `ghcr.io/<owner>/<repo>/frontend:<tag>`
+
+2. **Confirm Sentry release creation:**
+   - Review `Sentry Release` workflow success
+   - Verify sourcemaps uploaded (frontend only)
+
+3. **Monitor production logs (first 30 minutes):**
+   - Backend startup health check
+   - No unexpected error spikes in Sentry
+   - Payment provider connectivity (if applicable)
+
+### Rollback Plan
+
+If post-release issues are detected:
+
+1. **Immediate rollback:**
+   - Revert to previous stable tag
+   - Roll back database migrations if schema changed: `alembic downgrade -1`
+
+2. **Incident documentation:**
+   - Open issue with `type:bug` + `priority:p0`
+   - Document incident timeline and root cause
+   - Update `TODO.md` with lessons learned
 
 ## Docs
 

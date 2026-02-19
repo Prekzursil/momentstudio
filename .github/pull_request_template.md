@@ -25,13 +25,11 @@
 
 ## Surface Impact
 
-- [ ] Backend
-- [ ] Frontend
-- [ ] Infra/Deploy
-- [ ] CI/Tooling
-- [ ] Docs only
+- Risk level: `low | medium | high`
+- Regression surface (storefront/account/admin/backend/infra):
+- Payments/auth/security impact:
 
-## Validation Evidence
+## Evidence
 
 - [ ] Backend tests run (or N/A)
 - [ ] Frontend tests run (or N/A)
@@ -41,7 +39,7 @@
 
 ### Commands / Results
 
-Paste key commands and outcomes (or concise summaries).
+Paste exact commands and outcomes.
 
 ## Regression Surfaces Reviewed
 
@@ -62,7 +60,7 @@ Paste key commands and outcomes (or concise summaries).
 
 - [ ] `TODO.md` updated with completed items
 - [ ] Evidence paths added for completed items
-- [ ] Follow-up unchecked items added (if needed)
+- [ ] Follow-up items added (if needed)
 
 ## Linked Issues
 

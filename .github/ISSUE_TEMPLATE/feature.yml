@@ -84,3 +84,12 @@ body:
         - dam
     validations:
       required: true
+
+  - type: textarea
+    id: evidence_commands
+    attributes:
+      label: Evidence command list
+      value: |
+        make verify
+    validations:
+      required: true
