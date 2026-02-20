@@ -22,6 +22,10 @@ CONSOLE_ERRORS_FILE = "console-errors.json"
 LAYOUT_SIGNALS_FILE = "layout-signals.json"
 VISIBILITY_SIGNALS_FILE = "visibility-signals.json"
 DETERMINISTIC_FINDINGS_FILE = "deterministic-findings.json"
+CONSOLE_NOISE_TELEMETRY_FILE = "console-noise-telemetry.json"
+UNEXPECTED_TOKEN_LT_QUOTED = "unexpected token '<'"
+UNEXPECTED_TOKEN_LT_RAW = "unexpected token <"
+API_PATH_TOKEN = "/api/"
 
 
 def _repo_root() -> Path:
@@ -100,6 +104,106 @@ def _load_json(path: Path, default: Any) -> Any:
 def _write_json(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def _normalize_whitespace_lower(value: str) -> str:
+    return " ".join(str(value or "").split()).lower()
+
+
+def _parse_optional_int(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if text.isdigit():
+        return int(text)
+    match = re.search(r"(\d{3})", text)
+    if not match:
+        return None
+    try:
+        return int(match.group(1))
+    except Exception:
+        return None
+
+
+def _has_unexpected_token_lt(text: str) -> bool:
+    return UNEXPECTED_TOKEN_LT_QUOTED in text or UNEXPECTED_TOKEN_LT_RAW in text
+
+
+def _has_benign_source_context(row: dict[str, Any]) -> bool:
+    source_url = str(row.get("source_url") or "").strip().lower()
+    source_looks_like_bundle = source_url.endswith(".js") or any(
+        token in source_url for token in ("/main.", "/polyfills.", "/runtime.", "/vendor.")
+    )
+    has_source_position = _parse_optional_int(row.get("line")) is not None and _parse_optional_int(row.get("column")) is not None
+    return source_looks_like_bundle or has_source_position
+
+
+def _has_benign_storefront_context(row: dict[str, Any], message: str) -> bool:
+    if str(row.get("surface") or "").strip().lower() != "storefront":
+        return False
+    if ":" in str(row.get("route") or "").strip():
+        return False
+    request_url = str(row.get("request_url") or "").strip().lower()
+    return API_PATH_TOKEN in request_url or API_PATH_TOKEN in message
+
+
+def _is_benign_storefront_unexpected_token(row: dict[str, Any]) -> bool:
+    message = _normalize_whitespace_lower(str(row.get("text") or ""))
+    if not _has_unexpected_token_lt(message):
+        return False
+    if not _has_benign_storefront_context(row, message):
+        return False
+    if not _has_benign_source_context(row):
+        return False
+    status_code = _parse_optional_int(row.get("status_code"))
+    return status_code is None or status_code >= 400
+
+
+def _build_console_noise_telemetry(console_errors: list[dict[str, Any]]) -> dict[str, Any]:
+    clusters: dict[str, dict[str, Any]] = {}
+    for row in console_errors:
+        if not _is_benign_storefront_unexpected_token(row):
+            continue
+        signature_payload = "||".join(
+            [
+                str(row.get("surface") or "storefront"),
+                _normalize_whitespace_lower(str(row.get("text") or "")),
+                str(_parse_optional_int(row.get("status_code")) or "none"),
+                str(row.get("request_url") or ""),
+            ]
+        )
+        signature = hashlib.sha256(signature_payload.encode("utf-8")).hexdigest()[:12]
+        cluster = clusters.setdefault(
+            signature,
+            {
+                "signature": signature,
+                "surface": "storefront",
+                "message": str(row.get("text") or "")[:500],
+                "status_code": _parse_optional_int(row.get("status_code")),
+                "request_url": str(row.get("request_url") or "") or None,
+                "sample_routes": [],
+                "cluster_count": 0,
+            },
+        )
+        route = str(row.get("route") or "").strip()
+        if route and route not in cluster["sample_routes"] and len(cluster["sample_routes"]) < 8:
+            cluster["sample_routes"].append(route)
+        cluster["cluster_count"] += 1
+
+    ordered = sorted(clusters.values(), key=lambda item: (-int(item["cluster_count"]), str(item["signature"])))
+    suppressed_count = sum(int(item["cluster_count"]) for item in ordered)
+    return {
+        "suppressed_finding_rule": "browser_console_noise_cluster",
+        "suppressed_cluster_count": len(ordered),
+        "suppressed_event_count": suppressed_count,
+        "clusters": ordered,
+    }
 
 
 def _load_changed_files(path: Path | None) -> list[str]:
@@ -234,7 +338,7 @@ def _build_deterministic_findings(
         text = " ".join(str(message or "").split()).lower()
         if not text:
             return ""
-        if "unexpected token '<'" in text or "unexpected token <" in text:
+        if _has_unexpected_token_lt(text):
             return "unexpected_token_lt_json_parse"
         if "executing inline script violates the following content security policy directive" in text:
             return "csp_inline_script_blocked"
@@ -255,7 +359,7 @@ def _build_deterministic_findings(
         if not text:
             return False
         patterns = (
-            "/api/",
+            API_PATH_TOKEN,
             "net::err_connection_refused",
             "failed to load resource",
             "status of 404",
@@ -264,8 +368,8 @@ def _build_deterministic_findings(
             "networkerror when attempting to fetch resource",
             "xmlhttprequest",
             "response with status",
-            "unexpected token '<'",
-            "unexpected token <",
+            UNEXPECTED_TOKEN_LT_QUOTED,
+            UNEXPECTED_TOKEN_LT_RAW,
             "is not valid json",
             "cloudflare challenge",
             "private access token challenge",
@@ -707,6 +811,19 @@ def _build_deterministic_findings(
                 # where JSON parsing occurs against guarded/placeholder responses.
                 if surface in {"account", "admin"} or ":" in route:
                     continue
+                if _is_benign_storefront_unexpected_token(
+                    {
+                        "route": route,
+                        "surface": surface,
+                        "text": text,
+                        "status_code": status_code,
+                        "request_url": str(row.get("request_url") or ""),
+                        "source_url": str(row.get("source_url") or ""),
+                        "line": row.get("line"),
+                        "column": row.get("column"),
+                    }
+                ):
+                    continue
             status_token = str(status_code) if status_code is not None else "none"
             key = (surface, severity, normalized_text, status_token, endpoint_class)
             cluster = console_noise_clusters.setdefault(
@@ -872,6 +989,7 @@ def _write_evidence_index(
     route_map: dict[str, Any],
     selected_routes: list[dict[str, Any]],
     findings: list[dict[str, Any]],
+    console_noise_telemetry: dict[str, Any],
     browser_ok: bool,
     browser_message: str,
 ) -> None:
@@ -898,6 +1016,8 @@ def _write_evidence_index(
         "",
         f"- Total findings: `{len(findings)}`",
         f"- Severe findings (s1/s2): `{sum(1 for f in findings if f.get('severity') in {'s1', 's2'})}`",
+        f"- Suppressed benign parser-noise clusters: `{console_noise_telemetry.get('suppressed_cluster_count', 0)}`",
+        f"- Suppressed benign parser-noise events: `{console_noise_telemetry.get('suppressed_event_count', 0)}`",
         "",
         "## Artifact files",
         "",
@@ -908,6 +1028,7 @@ def _write_evidence_index(
         f"- `{LAYOUT_SIGNALS_FILE}`",
         f"- `{VISIBILITY_SIGNALS_FILE}`",
         f"- `{DETERMINISTIC_FINDINGS_FILE}`",
+        f"- `{CONSOLE_NOISE_TELEMETRY_FILE}`",
         "- `screenshots/`",
     ]
     if browser_message:
@@ -949,7 +1070,7 @@ def _load_browser_artifacts(output_dir: Path) -> tuple[list[dict[str, Any]], lis
     return seo_snapshot, console_errors, layout_signals, visibility_signals
 
 
-def _collect_findings(output_dir: Path) -> list[dict[str, Any]]:
+def _collect_findings(output_dir: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     seo_snapshot, console_errors, layout_signals, visibility_signals = _load_browser_artifacts(output_dir)
     findings = _build_deterministic_findings(
         seo_snapshot=seo_snapshot,
@@ -957,8 +1078,10 @@ def _collect_findings(output_dir: Path) -> list[dict[str, Any]]:
         layout_signals=layout_signals,
         visibility_signals=visibility_signals,
     )
+    telemetry = _build_console_noise_telemetry(console_errors)
     _write_json(output_dir / DETERMINISTIC_FINDINGS_FILE, findings)
-    return findings
+    _write_json(output_dir / CONSOLE_NOISE_TELEMETRY_FILE, telemetry)
+    return findings, telemetry
 
 
 def _auth_profile(owner_identifier: str, owner_password: str) -> str:
@@ -1019,7 +1142,7 @@ def main() -> int:
         )
 
     _ensure_browser_artifacts(output_dir)
-    findings = _collect_findings(output_dir)
+    findings, console_noise_telemetry = _collect_findings(output_dir)
 
     _write_evidence_index(
         output_dir=output_dir,
@@ -1030,6 +1153,7 @@ def main() -> int:
         route_map=route_map if isinstance(route_map, dict) else {},
         selected_routes=selected_routes,
         findings=findings,
+        console_noise_telemetry=console_noise_telemetry,
         browser_ok=browser_ok,
         browser_message=browser_message,
     )

@@ -239,7 +239,30 @@ def test_unexpected_token_cluster_is_suppressed_for_admin_surface() -> None:
     assert findings == []
 
 
-def test_unexpected_token_cluster_remains_for_public_storefront() -> None:
+def test_unexpected_token_cluster_is_suppressed_for_storefront_json_parser_noise() -> None:
+    module = _load_module()
+    findings = module._build_deterministic_findings(
+        seo_snapshot=[],
+        console_errors=[
+            {
+                "route": "/shop",
+                "surface": "storefront",
+                "severity": "s4",
+                "level": "error",
+                "text": "Unexpected token '<'",
+                "request_url": "https://momentstudio.ro/api/v1/content/home.sections",
+                "status_code": 404,
+                "source_url": "https://momentstudio.ro/main.abc123.js",
+                "line": 1876,
+                "column": 22,
+            }
+        ],
+        layout_signals=[],
+    )
+    assert findings == []
+
+
+def test_unexpected_token_cluster_remains_for_storefront_without_benign_context() -> None:
     module = _load_module()
     findings = module._build_deterministic_findings(
         seo_snapshot=[],
