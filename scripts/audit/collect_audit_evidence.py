@@ -23,6 +23,9 @@ LAYOUT_SIGNALS_FILE = "layout-signals.json"
 VISIBILITY_SIGNALS_FILE = "visibility-signals.json"
 DETERMINISTIC_FINDINGS_FILE = "deterministic-findings.json"
 CONSOLE_NOISE_TELEMETRY_FILE = "console-noise-telemetry.json"
+UNEXPECTED_TOKEN_LT_QUOTED = "unexpected token '<'"
+UNEXPECTED_TOKEN_LT_RAW = "unexpected token <"
+API_PATH_TOKEN = "/api/"
 
 
 def _repo_root() -> Path:
@@ -128,37 +131,38 @@ def _parse_optional_int(value: Any) -> int | None:
         return None
 
 
-def _is_benign_storefront_unexpected_token(row: dict[str, Any]) -> bool:
-    message = _normalize_whitespace_lower(str(row.get("text") or ""))
-    if "unexpected token '<'" not in message and "unexpected token <" not in message:
-        return False
+def _has_unexpected_token_lt(text: str) -> bool:
+    return UNEXPECTED_TOKEN_LT_QUOTED in text or UNEXPECTED_TOKEN_LT_RAW in text
 
-    surface = str(row.get("surface") or "").strip().lower()
-    if surface != "storefront":
-        return False
 
-    route = str(row.get("route") or "").strip()
-    if ":" in route:
-        return False
-
-    request_url = str(row.get("request_url") or "").strip().lower()
-    has_api_context = "/api/" in request_url or "/api/" in message
-    if not has_api_context:
-        return False
-
+def _has_benign_source_context(row: dict[str, Any]) -> bool:
     source_url = str(row.get("source_url") or "").strip().lower()
     source_looks_like_bundle = source_url.endswith(".js") or any(
         token in source_url for token in ("/main.", "/polyfills.", "/runtime.", "/vendor.")
     )
     has_source_position = _parse_optional_int(row.get("line")) is not None and _parse_optional_int(row.get("column")) is not None
-    if not (source_looks_like_bundle or has_source_position):
-        return False
+    return source_looks_like_bundle or has_source_position
 
+
+def _has_benign_storefront_context(row: dict[str, Any], message: str) -> bool:
+    if str(row.get("surface") or "").strip().lower() != "storefront":
+        return False
+    if ":" in str(row.get("route") or "").strip():
+        return False
+    request_url = str(row.get("request_url") or "").strip().lower()
+    return API_PATH_TOKEN in request_url or API_PATH_TOKEN in message
+
+
+def _is_benign_storefront_unexpected_token(row: dict[str, Any]) -> bool:
+    message = _normalize_whitespace_lower(str(row.get("text") or ""))
+    if not _has_unexpected_token_lt(message):
+        return False
+    if not _has_benign_storefront_context(row, message):
+        return False
+    if not _has_benign_source_context(row):
+        return False
     status_code = _parse_optional_int(row.get("status_code"))
-    if status_code is not None and status_code < 400:
-        return False
-
-    return True
+    return status_code is None or status_code >= 400
 
 
 def _build_console_noise_telemetry(console_errors: list[dict[str, Any]]) -> dict[str, Any]:
@@ -334,7 +338,7 @@ def _build_deterministic_findings(
         text = " ".join(str(message or "").split()).lower()
         if not text:
             return ""
-        if "unexpected token '<'" in text or "unexpected token <" in text:
+        if _has_unexpected_token_lt(text):
             return "unexpected_token_lt_json_parse"
         if "executing inline script violates the following content security policy directive" in text:
             return "csp_inline_script_blocked"
@@ -355,7 +359,7 @@ def _build_deterministic_findings(
         if not text:
             return False
         patterns = (
-            "/api/",
+            API_PATH_TOKEN,
             "net::err_connection_refused",
             "failed to load resource",
             "status of 404",
@@ -364,8 +368,8 @@ def _build_deterministic_findings(
             "networkerror when attempting to fetch resource",
             "xmlhttprequest",
             "response with status",
-            "unexpected token '<'",
-            "unexpected token <",
+            UNEXPECTED_TOKEN_LT_QUOTED,
+            UNEXPECTED_TOKEN_LT_RAW,
             "is not valid json",
             "cloudflare challenge",
             "private access token challenge",
