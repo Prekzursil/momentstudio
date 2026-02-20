@@ -508,12 +508,20 @@ async function main() {
     }
 
     const onConsole = (msg) => {
+      const location = typeof msg.location === "function" ? msg.location() : null;
+      const line =
+        location && Number.isFinite(Number(location.lineNumber)) ? Number(location.lineNumber) : null;
+      const column =
+        location && Number.isFinite(Number(location.columnNumber)) ? Number(location.columnNumber) : null;
       routeConsole.push({
         route: routeTemplate,
         route_template: routeTemplate,
         resolved_route: resolvedPath,
         level: String(msg.type() || "info"),
         text: String(msg.text() || ""),
+        source_url: location && location.url ? String(location.url) : null,
+        line,
+        column,
       });
     };
     const onPageError = (err) => {
@@ -790,6 +798,9 @@ async function main() {
         resource_type: item.resource_type || null,
         method: item.method || null,
         failure_text: item.failure_text || null,
+        source_url: null,
+        line: null,
+        column: null,
       });
     }
 
@@ -812,6 +823,9 @@ async function main() {
         level: classification.level,
         severity: classification.severity,
         text: item.text,
+        source_url: item.source_url ?? null,
+        line: item.line ?? null,
+        column: item.column ?? null,
       });
     }
     for (const item of routePageErrors) {
@@ -833,6 +847,9 @@ async function main() {
         level: classification.level,
         severity: classification.severity === "s4" ? "s4" : "s2",
         text: item.text,
+        source_url: item.source_url ?? null,
+        line: item.line ?? null,
+        column: item.column ?? null,
       });
     }
   }
