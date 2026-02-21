@@ -1,0 +1,43 @@
+{
+  "categories": [
+    {"slug": "cups", "name": "Cups & Mugs", "description": "Handmade cups and mugs."},
+    {"slug": "plates", "name": "Plates", "description": "Dinner and side plates."},
+    {"slug": "bowls", "name": "Bowls", "description": "Serving and cereal bowls."}
+  ],
+  "products": [
+    {
+      "slug": "white-cup",
+      "name": "White Glazed Cup",
+      "category_slug": "cups",
+      "short_description": "Matte white glaze, comfortable handle.",
+      "long_description": "Wheel-thrown stoneware with white matte glaze and speckle.",
+      "base_price": "24.00",
+      "currency": "RON",
+      "stock_quantity": 10,
+      "is_featured": true,
+      "images": [
+        {"url": "https://example.com/images/white-cup-1.jpg", "alt_text": "White cup front", "sort_order": 1},
+        {"url": "https://example.com/images/white-cup-2.jpg", "alt_text": "White cup angle", "sort_order": 2}
+      ],
+      "variants": [
+        {"name": "250 ml", "additional_price_delta": "0.00", "stock_quantity": 5},
+        {"name": "350 ml", "additional_price_delta": "4.00", "stock_quantity": 5}
+      ]
+    },
+    {
+      "slug": "blue-bowl",
+      "name": "Blue Splash Bowl",
+      "category_slug": "bowls",
+      "short_description": "Splash glaze interior with raw exterior.",
+      "long_description": "Medium bowl perfect for ramen or salads.",
+      "base_price": "36.00",
+      "currency": "RON",
+      "stock_quantity": 6,
+      "is_featured": false,
+      "images": [
+        {"url": "https://example.com/images/blue-bowl-1.jpg", "alt_text": "Blue bowl top", "sort_order": 1}
+      ],
+      "variants": []
+    }
+  ]
+}

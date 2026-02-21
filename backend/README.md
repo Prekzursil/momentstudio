@@ -46,6 +46,25 @@ alembic upgrade head
 alembic revision --autogenerate -m "describe change"  # after models exist
 ```
 
+
+## Seed profiles (tenant bootstrap)
+
+Schema evolution stays in Alembic migrations, while tenant/business defaults are seeded from
+versioned profile packs under `app/seed_profiles/`.
+
+```bash
+python -m app.seeds --profile default
+python -m app.seeds --profile adrianaart
+# equivalent CLI wrapper
+python -m app.cli seed-data --profile default
+```
+
+To supply defaults for a new repo/tenant without changing migration history:
+1. Create `app/seed_profiles/<profile>/`.
+2. Add `catalog.json` and `content_blocks.json`.
+3. Add any referenced markdown assets (for example `legal/*.md`).
+4. Run with `--profile <profile>`.
+
 ## Tests
 
 ```bash
