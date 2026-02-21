@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Observable, of, shareReplay, map, catchError } from 'rxjs';
 
+import { appConfig } from './app-config';
 import { ApiService } from './api.service';
 
 export interface SiteSocialLink {
@@ -28,15 +29,12 @@ export interface SiteSocialData {
 }
 
 const DEFAULT_SOCIAL: SiteSocialData = {
-  contact: { phone: '+40723204204', email: 'momentstudio.ro@gmail.com' },
-  instagramPages: [
-    { label: 'Moments in Clay - Studio', url: 'https://www.instagram.com/moments_in_clay_studio?igsh=ZmdnZTdudnNieDQx' },
-    { label: 'adrianaartizanat', url: 'https://www.instagram.com/adrianaartizanat?igsh=ZmZmaDU1MGcxZHEy' }
-  ],
-  facebookPages: [
-    { label: 'Moments in Clay - Studio', url: 'https://www.facebook.com/share/17YqBmfX5x/' },
-    { label: 'adrianaartizanat', url: 'https://www.facebook.com/share/1APqKJM6Zi/' }
-  ]
+  contact: {
+    phone: appConfig.siteProfile.contact.phone,
+    email: appConfig.siteProfile.contact.email
+  },
+  instagramPages: appConfig.siteProfile.instagramPages.map((link) => ({ ...link })),
+  facebookPages: appConfig.siteProfile.facebookPages.map((link) => ({ ...link }))
 };
 
 interface ContentBlockRead {

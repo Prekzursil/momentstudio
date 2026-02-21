@@ -294,8 +294,8 @@ export class ContactComponent implements OnInit, OnDestroy {
   bodyHtml = signal<string>('');
   pageBlocks = signal<PageBlock[]>([]);
 
-  phone = signal<string>('+40723204204');
-  email = signal<string>('momentstudio.ro@gmail.com');
+  phone = signal<string>(appConfig.siteProfile.contact.phone);
+  email = signal<string>(appConfig.siteProfile.contact.email);
   instagramPages = signal<SiteSocialLink[]>([]);
   facebookPages = signal<SiteSocialLink[]>([]);
 
