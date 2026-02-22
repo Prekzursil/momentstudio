@@ -1,12 +1,11 @@
 [Unit]
-Description=momentstudio backup (DB + media)
+Description=<APP_SLUG> backup (DB + media)
 Wants=network-online.target
 After=network-online.target docker.service
 Requires=docker.service
 
 [Service]
 Type=oneshot
-# Update this path to match your deploy directory (example: /opt/momentstudio).
-WorkingDirectory=/opt/momentstudio
-ExecStart=/opt/momentstudio/infra/prod/backup.sh
-
+# Update this path to match your deploy directory (example: /opt/<APP_SLUG>). 
+WorkingDirectory=/opt/<APP_SLUG>
+ExecStart=/opt/<APP_SLUG>/infra/prod/backup.sh
