@@ -32,6 +32,7 @@ if [[ -z "${PUBLIC_DOMAIN:-}" ]]; then
   PUBLIC_DOMAIN="$(read_env_var "PUBLIC_DOMAIN" "${env_file}")"
 fi
 PUBLIC_DOMAIN="${PUBLIC_DOMAIN:-momentstudio.ro}"
+APP_SLUG="${APP_SLUG:-momentstudio}"
 
 verify_base_url="${VERIFY_BASE_URL:-https://${PUBLIC_DOMAIN}}"
 verify_base_url="${verify_base_url%/}"
@@ -64,7 +65,7 @@ if [[ -n "${product_slug}" ]]; then
   urls+=("${verify_base_url}/products/${product_slug}?lang=ro")
 fi
 
-echo "Search Console post-deploy indexing checklist"
+echo "Search Console post-deploy indexing checklist (${APP_SLUG})"
 echo "Property: ${PUBLIC_DOMAIN}"
 echo "Base URL: ${verify_base_url}"
 echo
