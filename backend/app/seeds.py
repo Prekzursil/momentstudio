@@ -16,6 +16,7 @@ from app.models.content import ContentBlock, ContentBlockTranslation, ContentBlo
 
 SEED_PROFILES_ROOT = (Path(__file__).resolve().parent / "seed_profiles").resolve()
 PROFILE_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
+NO_AVAILABLE_PROFILES = "<none>"
 
 
 class SeedImage(TypedDict):
@@ -64,6 +65,10 @@ def _list_available_profiles() -> list[str]:
     return sorted(p.name for p in SEED_PROFILES_ROOT.iterdir() if p.is_dir())
 
 
+def _available_profiles_display() -> str:
+    return ", ".join(_list_available_profiles()) or NO_AVAILABLE_PROFILES
+
+
 def _safe_profile_path(base_dir: Path, rel_path: str) -> Path:
     candidate = Path(str(rel_path or "")).expanduser()
     if candidate.is_absolute():
@@ -76,14 +81,14 @@ def _safe_profile_path(base_dir: Path, rel_path: str) -> Path:
 
 def _resolve_profile_dir(profile: str) -> Path:
     if not PROFILE_NAME_PATTERN.fullmatch(profile or ""):
-        available = ", ".join(_list_available_profiles()) or "<none>"
+        available = _available_profiles_display()
         raise SystemExit(f"Unknown seed profile '{profile}'. Available: {available}")
     profile_dir = (SEED_PROFILES_ROOT / profile).resolve()
     if SEED_PROFILES_ROOT != profile_dir and SEED_PROFILES_ROOT not in profile_dir.parents:
-        available = ", ".join(_list_available_profiles()) or "<none>"
+        available = _available_profiles_display()
         raise SystemExit(f"Unknown seed profile '{profile}'. Available: {available}")
     if not profile_dir.is_dir():
-        available = ", ".join(_list_available_profiles()) or "<none>"
+        available = _available_profiles_display()
         raise SystemExit(f"Unknown seed profile '{profile}'. Available: {available}")
     return profile_dir
 
