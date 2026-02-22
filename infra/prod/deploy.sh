@@ -7,6 +7,18 @@ env_file="${repo_root}/infra/prod/.env"
 
 cd "${repo_root}"
 
+if [[ -f "${env_file}" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "${env_file}"
+  set +a
+fi
+
+APP_SLUG="${APP_SLUG:-momentstudio}"
+PUBLIC_DOMAIN="${PUBLIC_DOMAIN:-momentstudio.ro}"
+COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-${APP_SLUG}}"
+export APP_SLUG PUBLIC_DOMAIN COMPOSE_PROJECT_NAME
+
 if ! command -v docker >/dev/null 2>&1; then
   echo "ERROR: docker is not installed. See infra/prod/README.md" >&2
   exit 1
@@ -43,7 +55,7 @@ if [[ -z "${APP_VERSION:-}" ]]; then
   export APP_VERSION
 fi
 
-echo "Starting (or updating) momentstudio production stack..."
+echo "Starting (or updating) ${APP_SLUG} production stack..."
 docker compose --env-file "${env_file}" -f "${compose_file}" up -d --build
 
 if [[ "${RUN_DB_MIGRATIONS_ON_DEPLOY:-1}" == "1" ]]; then
