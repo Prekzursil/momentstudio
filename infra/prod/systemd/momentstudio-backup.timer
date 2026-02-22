@@ -1,5 +1,5 @@
 [Unit]
-Description=Run momentstudio backups daily
+Description=Run <APP_SLUG> backups daily
 
 [Timer]
 OnCalendar=daily
@@ -8,4 +8,3 @@ RandomizedDelaySec=15m
 
 [Install]
 WantedBy=timers.target
-
