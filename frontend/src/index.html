@@ -15,7 +15,7 @@
     <script src="assets/theme-bootstrap.js"></script>
     <script>
       (function () {
-        var cfg = (typeof globalThis !== 'undefined' ? globalThis.__APP_CONFIG__ : undefined) || {};
+        var cfg = typeof globalThis === 'undefined' ? {} : globalThis.__APP_CONFIG__ || {};
         var siteName = String(cfg.siteName || 'momentstudio').trim() || 'momentstudio';
         var publicBaseUrl = String(cfg.publicBaseUrl || 'https://momentstudio.ro').trim() || 'https://momentstudio.ro';
         var defaultLocale = String(cfg.defaultLocale || 'en').trim() || 'en';
