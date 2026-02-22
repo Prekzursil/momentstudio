@@ -23,6 +23,7 @@ if [[ -z "${PUBLIC_DOMAIN:-}" ]]; then
   PUBLIC_DOMAIN="$(read_env_var "PUBLIC_DOMAIN" "${env_file}")"
 fi
 PUBLIC_DOMAIN="${PUBLIC_DOMAIN:-momentstudio.ro}"
+APP_SLUG="${APP_SLUG:-momentstudio}"
 
 verify_base_url="${VERIFY_BASE_URL:-https://${PUBLIC_DOMAIN}}"
 expected_manifest_mime="${VERIFY_MANIFEST_MIME:-application/manifest+json}"
@@ -60,7 +61,7 @@ extract_header() {
     | head -n 1
 }
 
-echo "Verifying production endpoints at ${verify_base_url}"
+echo "Verifying ${APP_SLUG} production endpoints at ${verify_base_url}"
 
 if curl -fsS "${verify_base_url}/api/v1/health" >/dev/null; then
   pass "GET /api/v1/health"
