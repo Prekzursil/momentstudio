@@ -22,9 +22,17 @@ if [[ ! -f "${env_file}" ]]; then
   exit 1
 fi
 
-echo "Stopping momentstudio production stack (keeps volumes/data)..."
+set -a
+# shellcheck disable=SC1090
+source "${env_file}"
+set +a
+
+APP_SLUG="${APP_SLUG:-momentstudio}"
+COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-${APP_SLUG}}"
+export APP_SLUG COMPOSE_PROJECT_NAME
+
+echo "Stopping ${APP_SLUG} production stack (keeps volumes/data)..."
 docker compose --env-file "${env_file}" -f "${compose_file}" stop "$@"
 
 echo
 docker compose --env-file "${env_file}" -f "${compose_file}" ps
-
