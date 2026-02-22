@@ -1,6 +1,6 @@
 # Production deploy (VPS, Docker Compose + Caddy)
 
-This folder contains a production-oriented Docker Compose stack for **momentstudio.ro**:
+This folder contains a production-oriented Docker Compose stack for a templated public domain (default: **momentstudio.ro**):
 
 - Caddy (TLS termination, reverse proxy)
 - Frontend SSR (`frontend-ssr`, Angular server runtime)
@@ -13,8 +13,8 @@ This folder contains a production-oriented Docker Compose stack for **momentstud
 ## 0) DNS + firewall prerequisites
 
 1. Point DNS to your VPS:
-   - `momentstudio.ro` **A** → `<VPS_IP>`
-   - `www.momentstudio.ro` **A** → `<VPS_IP>`
+   - `<PUBLIC_DOMAIN>` **A** → `<VPS_IP>`
+   - `www.<PUBLIC_DOMAIN>` **A** → `<VPS_IP>`
 2. Open firewall ports:
    - 80/tcp (Let’s Encrypt HTTP-01 + HTTP→HTTPS)
    - 443/tcp (HTTPS)
@@ -32,11 +32,11 @@ docker compose version
 
 ## 2) Bootstrap on the VPS
 
-From your deploy directory (example: `/opt/momentstudio`):
+From your deploy directory (example: `/opt/<APP_SLUG>`):
 
 ```bash
-git clone https://github.com/Prekzursil/AdrianaArt.git momentstudio
-cd momentstudio
+git clone https://github.com/Prekzursil/AdrianaArt.git <APP_SLUG>
+cd <APP_SLUG>
 git checkout main
 ```
 
@@ -53,6 +53,15 @@ Important:
 - The local profile tooling (`scripts/env/switch.sh`, `make env-dev`, `make env-prod`) is intended for local development machines.
 - Production deployment in this folder continues to use explicit VPS-side `backend/.env` and `frontend/.env` files.
 - Do not sync local development profile files (`*.development.local`) to the VPS.
+
+Template identity defaults (set in `infra/prod/.env`):
+
+- `APP_SLUG` (default `momentstudio`): shared slug for human-readable stack identity.
+- `PUBLIC_DOMAIN` (default `momentstudio.ro`): apex domain used by Caddy + verification scripts.
+- `SYSTEMD_SERVICE_PREFIX` (default `APP_SLUG`): prefix for generated backup systemd unit names.
+- `COMPOSE_PROJECT_NAME` (recommended: same value as `APP_SLUG`): Docker Compose project namespace.
+
+Keep these values aligned so compose operations and systemd backup units refer to the same deployment.
 
 Edit:
 
@@ -155,10 +164,10 @@ After first deploy (or after a DB reset):
 ./infra/prod/bootstrap-owner.sh --email owner@example.com --password 'Password123' --username owner --display-name Owner
 ```
 
-For momentstudio.ro (example/reminder):
+For your live domain (example/reminder):
 
 ```bash
-./infra/prod/bootstrap-owner.sh --email momentstudio.ro@gmail.com --password 'NEW_PASSWORD' --username owner --display-name Adriana
+./infra/prod/bootstrap-owner.sh --email owner@<PUBLIC_DOMAIN> --password 'NEW_PASSWORD' --username owner --display-name <OWNER_NAME>
 ```
 
 ## 5) Backups + restores
@@ -187,13 +196,13 @@ sudo ./infra/prod/install-backup-timer.sh
 Check schedules:
 
 ```bash
-systemctl list-timers momentstudio-backup.timer
+systemctl list-timers <SYSTEMD_SERVICE_PREFIX>-backup.timer
 ```
 
 View logs:
 
 ```bash
-journalctl -u momentstudio-backup.service -n 200 --no-pager
+journalctl -u <SYSTEMD_SERVICE_PREFIX>-backup.service -n 200 --no-pager
 ```
 
 Restore from a backup:
