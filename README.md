@@ -227,6 +227,12 @@ export CODACY_PROJECT_NAME=AdrianaArt
 make coverage-codacy
 ```
 
+## Codecov (GitHub App + uploads)
+
+- Install the Codecov GitHub App for this repository via https://github.com/settings/installations/110555522 (select the Prekzursil org and the `AdrianaArt` repo).
+- Ensure the repo is present in the Prekzursil Codecov org at https://app.codecov.io/gh/Prekzursil; if it is missing, add the repository from the dashboard and grab the repo upload token.
+- Add a GitHub Actions secret `CODECOV_TOKEN` (org- or repo-level). The token is required by `.github/workflows/codecov-analytics.yml` for coverage, test-results, and bundle analysis uploads; policy is in `codecov.yml`.
+
 ## Sameday mirror first sync (ops runbook)
 
 The checkout locker picker uses the local Sameday mirror snapshot from the database.

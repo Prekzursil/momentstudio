@@ -8,7 +8,7 @@ www.{$PUBLIC_DOMAIN} {
 	redir https://{$PUBLIC_DOMAIN}{uri} permanent
 }
 
-# momentstudio.ro (production)
+# {$PUBLIC_DOMAIN} (production)
 {$PUBLIC_DOMAIN} {
 	encode zstd gzip
 

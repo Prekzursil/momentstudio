@@ -22,13 +22,23 @@ if [[ ! -f "${env_file}" ]]; then
   exit 1
 fi
 
+set -a
+# shellcheck disable=SC1090
+source "${env_file}"
+set +a
+
+APP_SLUG="${APP_SLUG:-momentstudio}"
+PUBLIC_DOMAIN="${PUBLIC_DOMAIN:-momentstudio.ro}"
+COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-${APP_SLUG}}"
+export APP_SLUG PUBLIC_DOMAIN COMPOSE_PROJECT_NAME
+
 # Stamp runtime config with the deployed git revision unless overridden.
 if [[ -z "${APP_VERSION:-}" ]]; then
   APP_VERSION="$(git rev-parse --short HEAD)"
   export APP_VERSION
 fi
 
-echo "Starting momentstudio production stack (no rebuild)..."
+echo "Starting ${APP_SLUG} production stack (no rebuild)..."
 docker compose --env-file "${env_file}" -f "${compose_file}" up -d --no-build "$@"
 
 echo
