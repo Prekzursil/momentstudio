@@ -62,9 +62,9 @@ const defaults: AppConfig = {
 };
 
 export const appConfig: AppConfig = (() => {
-  const runtime = typeof window === 'undefined' ? undefined : window.__APP_CONFIG__;
+  const runtime = globalThis.window?.__APP_CONFIG__;
   const runtimeSiteProfile = runtime?.siteProfile as Partial<AppConfig['siteProfile']> | undefined;
-  if (typeof window === 'undefined') {
+  if (typeof globalThis.window === 'undefined') {
     const ssrApiBase =
       (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.['SSR_API_BASE_URL']?.trim() || '';
     return {
@@ -72,18 +72,10 @@ export const appConfig: AppConfig = (() => {
       ...(ssrApiBase ? { apiBaseUrl: ssrApiBase.replace(/\/$/, '') } : {}),
     };
   }
-  return {
-    ...defaults,
-    ...(runtime ?? {}),
-    siteProfile: {
-      ...defaults.siteProfile,
-      ...(runtimeSiteProfile ?? {}),
-      contact: {
-        ...defaults.siteProfile.contact,
-        ...(runtimeSiteProfile?.contact ?? {}),
-      },
-      instagramPages: runtimeSiteProfile?.instagramPages ?? defaults.siteProfile.instagramPages,
-      facebookPages: runtimeSiteProfile?.facebookPages ?? defaults.siteProfile.facebookPages,
-    }
-  };
+  const mergedSiteProfile = Object.assign({}, defaults.siteProfile, runtimeSiteProfile, {
+    contact: Object.assign({}, defaults.siteProfile.contact, runtimeSiteProfile?.contact),
+    instagramPages: runtimeSiteProfile?.instagramPages ?? defaults.siteProfile.instagramPages,
+    facebookPages: runtimeSiteProfile?.facebookPages ?? defaults.siteProfile.facebookPages,
+  });
+  return Object.assign({}, defaults, runtime, { siteProfile: mergedSiteProfile });
 })();
