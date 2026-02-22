@@ -1,6 +1,7 @@
 import asyncio
 import argparse
 import json
+import re
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -12,6 +13,9 @@ from sqlalchemy.future import select
 from app.core.config import settings
 from app.models.catalog import Category, Product, ProductImage, ProductStatus, ProductVariant
 from app.models.content import ContentBlock, ContentBlockTranslation, ContentBlockVersion, ContentStatus
+
+SEED_PROFILES_ROOT = (Path(__file__).resolve().parent / "seed_profiles").resolve()
+PROFILE_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
 
 
 class SeedImage(TypedDict):
@@ -57,23 +61,43 @@ class SeedContentBlock(TypedDict):
 
 
 def _list_available_profiles() -> list[str]:
-    root = Path(__file__).resolve().parent / "seed_profiles"
-    return sorted(p.name for p in root.iterdir() if p.is_dir())
+    return sorted(p.name for p in SEED_PROFILES_ROOT.iterdir() if p.is_dir())
+
+
+def _safe_profile_path(base_dir: Path, rel_path: str) -> Path:
+    candidate = Path(str(rel_path or "")).expanduser()
+    if candidate.is_absolute():
+        raise SystemExit(f"Invalid path '{rel_path}' in seed profile.")
+    resolved = (base_dir / candidate).resolve()
+    if base_dir != resolved and base_dir not in resolved.parents:
+        raise SystemExit(f"Invalid path '{rel_path}' in seed profile.")
+    return resolved
+
+
+def _resolve_profile_dir(profile: str) -> Path:
+    if not PROFILE_NAME_PATTERN.fullmatch(profile or ""):
+        available = ", ".join(_list_available_profiles()) or "<none>"
+        raise SystemExit(f"Unknown seed profile '{profile}'. Available: {available}")
+    profile_dir = (SEED_PROFILES_ROOT / profile).resolve()
+    if SEED_PROFILES_ROOT != profile_dir and SEED_PROFILES_ROOT not in profile_dir.parents:
+        available = ", ".join(_list_available_profiles()) or "<none>"
+        raise SystemExit(f"Unknown seed profile '{profile}'. Available: {available}")
+    if not profile_dir.is_dir():
+        available = ", ".join(_list_available_profiles()) or "<none>"
+        raise SystemExit(f"Unknown seed profile '{profile}'. Available: {available}")
+    return profile_dir
 
 
 def _load_md(base_dir: Path, rel_path: str) -> str:
-    text = (base_dir / rel_path).read_text(encoding="utf-8").replace("\r\n", "\n").strip()
+    text = _safe_profile_path(base_dir, rel_path).read_text(encoding="utf-8").replace("\r\n", "\n").strip()
     return f"{text}\n"
 
 
 def _load_profile(profile: str) -> tuple[list[dict[str, Any]], list[SeedProduct], list[SeedContentBlock]]:
-    profile_dir = Path(__file__).resolve().parent / "seed_profiles" / profile
-    if not profile_dir.is_dir():
-        available = ", ".join(_list_available_profiles()) or "<none>"
-        raise SystemExit(f"Unknown seed profile '{profile}'. Available: {available}")
+    profile_dir = _resolve_profile_dir(profile)
 
-    catalog = json.loads((profile_dir / "catalog.json").read_text(encoding="utf-8"))
-    content = json.loads((profile_dir / "content_blocks.json").read_text(encoding="utf-8"))
+    catalog = json.loads(_safe_profile_path(profile_dir, "catalog.json").read_text(encoding="utf-8"))
+    content = json.loads(_safe_profile_path(profile_dir, "content_blocks.json").read_text(encoding="utf-8"))
 
     categories = list(catalog.get("categories", []))
     products: list[SeedProduct] = []
