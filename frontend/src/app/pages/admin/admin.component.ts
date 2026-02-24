@@ -470,7 +470,7 @@ class CmsDraftManager<T> {
     const raw = window.localStorage.getItem(this.storageKey);
     if (!raw) return null;
     try {
-      const parsed = JSON.parse(raw) as Partial<CmsAutosaveEnvelope> | null;
+      const parsed: Partial<CmsAutosaveEnvelope> | null = JSON.parse(raw);
       if (!parsed || parsed.v !== 1) return null;
       const ts = typeof parsed.ts === 'string' ? parsed.ts : '';
       const stateJson = typeof parsed.state_json === 'string' ? parsed.state_json : '';
@@ -10561,7 +10561,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.admin.getContent(key).subscribe({
       next: (block) => {
         this.rememberContentVersion(key, block);
-        this.blogBaseLang = (block.lang === 'ro' ? 'ro' : 'en') as 'en' | 'ro';
+        this.blogBaseLang = block.lang === 'ro' ? 'ro' : 'en';
         this.blogEditLang = this.blogBaseLang;
         this.blogMeta = block.meta || {};
 	        this.blogForm = {
@@ -11801,7 +11801,7 @@ export class AdminComponent implements OnInit, OnDestroy {
         const enBlock = await firstValueFrom(this.admin.getContent(key, 'en'));
         this.rememberContentVersion(key, enBlock);
         next.en = enBlock.body_markdown || '';
-        meta = (enBlock as { meta?: Record<string, unknown> | null }).meta;
+        meta = enBlock.meta;
         this.infoForm[target] = { ...this.infoForm[target], en: next.en };
       } catch {
         delete this.contentVersions[key];
@@ -11810,9 +11810,7 @@ export class AdminComponent implements OnInit, OnDestroy {
       try {
         const roBlock = await firstValueFrom(this.admin.getContent(key, 'ro'));
         next.ro = roBlock.body_markdown || '';
-        if (!meta) {
-          meta = (roBlock as { meta?: Record<string, unknown> | null }).meta;
-        }
+        meta ??= roBlock.meta;
         this.infoForm[target] = { ...this.infoForm[target], ro: next.ro };
       } catch {
         // ignore
@@ -11929,7 +11927,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.admin.getContent(target).subscribe({
       next: (block) => {
         this.rememberContentVersion(target, block);
-        const currentMeta = ((block as { meta?: Record<string, unknown> | null }).meta || {}) as Record<string, unknown>;
+        const currentMeta = this.toRecord(block?.meta);
         const nextMeta: Record<string, unknown> = { ...currentMeta, hidden };
         const payload = this.withExpectedVersion(target, { meta: nextMeta });
         this.admin.updateContentBlock(target, payload).subscribe({
@@ -11995,13 +11993,11 @@ export class AdminComponent implements OnInit, OnDestroy {
         if (!enBlock && roBlock) this.rememberContentVersion(target, roBlock);
 
         this.legalPageForm = {
-          en: (enBlock?.body_markdown as string) || '',
-          ro: (roBlock?.body_markdown as string) || ''
+          en: enBlock?.body_markdown || '',
+          ro: roBlock?.body_markdown || ''
         };
-        const meta = ((enBlock?.meta as Record<string, unknown> | null | undefined) ??
-          (roBlock?.meta as Record<string, unknown> | null | undefined) ??
-          {}) as Record<string, unknown>;
-        this.legalPageMeta = { ...(meta && typeof meta === 'object' ? meta : {}) };
+        const meta = this.toRecord(enBlock?.meta ?? roBlock?.meta);
+        this.legalPageMeta = { ...meta };
         const lastUpdated = typeof this.legalPageMeta['last_updated'] === 'string' ? String(this.legalPageMeta['last_updated']) : '';
         this.legalPageLastUpdated = lastUpdated;
         this.legalPageLastUpdatedOriginal = lastUpdated;
@@ -12029,8 +12025,8 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.admin.updateContentBlock(key, this.withExpectedVersion(key, { meta })).subscribe({
       next: (updated) => {
         this.rememberContentVersion(key, updated);
-        const updatedMeta = ((updated as { meta?: Record<string, unknown> | null }).meta || {}) as Record<string, unknown>;
-        this.legalPageMeta = { ...(updatedMeta && typeof updatedMeta === 'object' ? updatedMeta : {}) };
+        const updatedMeta = this.toRecord(updated?.meta);
+        this.legalPageMeta = { ...updatedMeta };
         const lastUpdated = typeof this.legalPageMeta['last_updated'] === 'string' ? String(this.legalPageMeta['last_updated']) : '';
         this.legalPageLastUpdated = lastUpdated;
         this.legalPageLastUpdatedOriginal = lastUpdated;
@@ -12280,7 +12276,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.admin.getContent(this.reusableBlocksKey).subscribe({
       next: (block) => {
         this.rememberContentVersion(this.reusableBlocksKey, block);
-        this.reusableBlocksMeta = ((block as { meta?: Record<string, unknown> | null }).meta || {}) as Record<string, unknown>;
+        this.reusableBlocksMeta = this.toRecord(block?.meta);
         this.reusableBlocks = this.parseReusableBlocks(this.reusableBlocksMeta);
         this.reusableBlocksExists = true;
         this.reusableBlocksLoading = false;
@@ -12374,7 +12370,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 
     const onSaved = (block: { version?: number; meta?: Record<string, unknown> | null } | null | undefined) => {
       this.rememberContentVersion(this.reusableBlocksKey, block);
-      this.reusableBlocksMeta = ((block as { meta?: Record<string, unknown> | null }).meta || {}) as Record<string, unknown>;
+      this.reusableBlocksMeta = this.toRecord(block?.meta);
       this.reusableBlocks = this.parseReusableBlocks(this.reusableBlocksMeta);
       this.reusableBlocksExists = true;
       if (opts?.successKey) this.toast.success(this.t(opts.successKey));
@@ -12471,7 +12467,7 @@ export class AdminComponent implements OnInit, OnDestroy {
           safePageKey,
           block.published_until ? this.toLocalDateTime(block.published_until) : ''
         );
-	        const metaObj = ((block as { meta?: Record<string, unknown> | null }).meta || {}) as Record<string, unknown>;
+	        const metaObj = this.toRecord(block?.meta);
 	        this.setPageRecordValue(this.pageBlocksMeta, safePageKey, metaObj);
 	        this.setPageRecordValue(this.pageBlocksRequiresAuth, safePageKey, Boolean(metaObj['requires_auth']));
 	        this.pageBlocks[safePageKey] = this.parsePageBlocksDraft(metaObj);
@@ -12937,7 +12933,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   allowedPageBlockTypesForKey(pageKey: PageBuilderKey): PageBlockType[] {
     const allowed = cmsGlobalSectionAllowedTypes(pageKey);
-    if (allowed && allowed.length) return [...allowed] as PageBlockType[];
+    if (allowed?.length) return [...allowed];
     return this.allPageBlockTypes;
   }
 
@@ -13606,7 +13602,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 	    }
 
 	    const payload = this.readCmsBlockPayload(event);
-	    if (payload && payload.scope === 'page') {
+	    if (payload?.scope === 'page') {
 	      const current = [...(this.pageBlocks[safePageKey] || [])];
 	      const to = current.findIndex((b) => b.key === targetKey);
 	      if (to !== -1) {
@@ -14443,10 +14439,7 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.pageBlocksPublishedUntil[safePageKey] = block.published_until
           ? this.toLocalDateTime(block.published_until)
           : '';
-        this.pageBlocksMeta[safePageKey] = ((block as { meta?: Record<string, unknown> | null }).meta || {}) as Record<
-          string,
-          unknown
-        >;
+        this.pageBlocksMeta[safePageKey] = this.toRecord(block?.meta);
         this.pageBlocksRequiresAuth[safePageKey] = Boolean(this.pageBlocksMeta[safePageKey]?.['requires_auth']);
         this.pageBlocksMessage[safePageKey] = ok;
         this.pageBlocksError[safePageKey] = null;
@@ -14486,10 +14479,7 @@ export class AdminComponent implements OnInit, OnDestroy {
               this.pageBlocksPublishedUntil[safePageKey] = created.published_until
                 ? this.toLocalDateTime(created.published_until)
                 : '';
-              this.pageBlocksMeta[safePageKey] = ((created as { meta?: Record<string, unknown> | null }).meta || {}) as Record<
-                string,
-                unknown
-              >;
+              this.pageBlocksMeta[safePageKey] = this.toRecord(created?.meta);
               this.pageBlocksRequiresAuth[safePageKey] = Boolean(this.pageBlocksMeta[safePageKey]?.['requires_auth']);
               this.pageBlocksMessage[safePageKey] = ok;
               this.pageBlocksError[safePageKey] = null;
@@ -14565,6 +14555,13 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   private emptyLocalizedText(): LocalizedText {
     return { en: '', ro: '' };
+  }
+
+  private toRecord(value: unknown): Record<string, unknown> {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return {};
+    }
+    return value as Record<string, unknown>;
   }
 
   private toLocalizedText(value: unknown): LocalizedText {
@@ -14946,7 +14943,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 	    }
 
 	    const payload = this.readCmsBlockPayload(event);
-	    if (payload && payload.scope === 'home') {
+	    if (payload?.scope === 'home') {
 	      const to = this.homeBlocks.findIndex((b) => b.key === targetKey);
 	      if (to !== -1) {
 	          this.insertHomeBlockAt(payload.type, to, payload.template);
@@ -15430,7 +15427,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     const seen = new Set<HomeSectionId>();
     for (const block of this.homeBlocks) {
       if (!this.isHomeSectionId(block.type)) continue;
-      const id = block.type as HomeSectionId;
+      const id: HomeSectionId = block.type;
       if (seen.has(id)) continue;
       seen.add(id);
       sections.push({ id, enabled: block.enabled });

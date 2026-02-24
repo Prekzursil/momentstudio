@@ -1337,7 +1337,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   }
 
   private getDescendants(root: Category): Category[] {
-    const parentId = root?.id || '';
+    const parentId = root.id;
     const children = parentId ? this.childrenByParentId.get(parentId) ?? [] : [];
     const out: Category[] = [];
     for (const child of children) {
@@ -1613,7 +1613,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   mergeCategory(category: Category): void {
     if (!this.canEditCategories()) return;
     if (this.mergeSaving) return;
-    const sourceSlug = (category?.slug || '').trim();
+    const sourceSlug = category.slug.trim();
     const targetSlug = (this.mergeTargetSlug || '').trim();
     if (!sourceSlug || !targetSlug) return;
     if (!this.mergePreview || !this.mergePreview.can_merge) {
@@ -1622,7 +1622,7 @@ export class ShopComponent implements OnInit, OnDestroy {
     }
 
     const targetName = this.rootCategories.find((c) => c.slug === targetSlug)?.name ?? targetSlug;
-    const sourceName = category?.name ?? sourceSlug;
+    const sourceName = category.name || sourceSlug;
     const count = Number(this.mergePreview.product_count || 0);
     if (typeof window !== 'undefined') {
       const ok = window.confirm(
@@ -1685,10 +1685,10 @@ export class ShopComponent implements OnInit, OnDestroy {
       this.deleteError = this.translate.instant('adminUi.storefront.categories.deletePreviewRequired');
       return;
     }
-    const slug = (category?.slug || '').trim();
+    const slug = category.slug.trim();
     if (!slug) return;
 
-    const name = category?.name ?? slug;
+    const name = category.name || slug;
     if (typeof window !== 'undefined') {
       const ok = window.confirm(this.translate.instant('adminUi.storefront.categories.confirmDelete', { name }));
       if (!ok) return;

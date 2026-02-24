@@ -495,7 +495,14 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       const candidates = Array.from(container.querySelectorAll<HTMLElement>(selector));
       for (const candidate of candidates) {
         if (candidate instanceof HTMLInputElement && candidate.type === 'hidden') continue;
-        if ('disabled' in candidate && Boolean((candidate as any).disabled)) continue;
+        if (
+          candidate instanceof HTMLButtonElement ||
+          candidate instanceof HTMLInputElement ||
+          candidate instanceof HTMLSelectElement ||
+          candidate instanceof HTMLTextAreaElement
+        ) {
+          if (candidate.disabled) continue;
+        }
         if (!this.isElementVisible(candidate)) continue;
         return candidate;
       }
@@ -561,7 +568,14 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       const candidates = Array.from(container.querySelectorAll<HTMLElement>(selector));
       for (const candidate of candidates) {
         if (candidate instanceof HTMLInputElement && candidate.type === 'hidden') continue;
-        if ('disabled' in candidate && Boolean((candidate as any).disabled)) continue;
+        if (
+          candidate instanceof HTMLButtonElement ||
+          candidate instanceof HTMLInputElement ||
+          candidate instanceof HTMLSelectElement ||
+          candidate instanceof HTMLTextAreaElement
+        ) {
+          if (candidate.disabled) continue;
+        }
         if (!this.isElementVisible(candidate)) continue;
         return candidate;
       }
@@ -941,7 +955,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     const trimmed = (raw || '').trim();
     if (!trimmed) return null;
 
-    const codeMatch = trimmed.match(/^([A-Za-z]{2})\b/);
+    const codeMatch = /^([A-Za-z]{2})\b/.exec(trimmed);
     if (codeMatch) {
       const code = codeMatch[1].toUpperCase();
       if (this.countries.some((c) => c.code === code)) return code;

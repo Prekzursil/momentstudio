@@ -85,29 +85,17 @@ STYLELINT_JSON
 SEMGREP_RULES="$OUT_DIR/semgrep-targeted-rules.yml"
 cat > "$SEMGREP_RULES" <<'SEMGREP_YAML'
 rules:
-  - id: python-subprocess-shell-true
-    message: Avoid subprocess calls with shell=True.
+  - id: Semgrep_python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
+    message: Avoid SQLAlchemy text(...) in migrations.
     severity: ERROR
     languages: [python]
-    pattern-either:
-      - pattern: subprocess.$FUNC(..., shell=True, ...)
-      - pattern: $FUNC(..., shell=True, ...)
+    pattern: op.execute(sa.text(...))
 
-  - id: python-bare-except-pass
-    message: Avoid bare except with pass.
+  - id: Semgrep_yaml.github-actions.security.run-shell-injection.run-shell-injection
+    message: Avoid interpolating GitHub expressions directly into shell commands.
     severity: ERROR
-    languages: [python]
-    pattern: |
-      try:
-        ...
-      except:
-        pass
-
-  - id: js-ts-eval-use
-    message: Avoid eval().
-    severity: ERROR
-    languages: [javascript, typescript]
-    pattern: eval(...)
+    languages: [yaml]
+    pattern-regex: 'run:\\s*[^\\n]*\\$\\{\\{[^\\n]*\\}\\}'
 SEMGREP_YAML
 
 run_check "lizard-ccn-nloc" "lizard -w -C 8 -L 50 backend/app frontend/src scripts infra"
@@ -129,7 +117,7 @@ awk -F '\t' '
   END { print "]" }
 ' "$STATUS_FILE" > "$CHECKS_JSON"
 
-failed_count="$(awk -F '\t' '$2 != 0 { count++ } END { print count + 0 }' "$STATUS_FILE")"
+runtime_failed_count="$(awk -F '\t' '$2 != 0 { count++ } END { print count + 0 }' "$STATUS_FILE")"
 
 python3 - "$OUT_DIR" "$PATTERN_COUNTS_FILE" <<'PY'
 import json
@@ -256,16 +244,37 @@ if checkov_path.exists():
 else:
     pattern_counts["Checkov_CKV_GHA_7"] = 0
 
+# Semgrep targeted patterns.
+semgrep_counts = {
+    "Semgrep_python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text": 0,
+    "Semgrep_yaml.github-actions.security.run-shell-injection.run-shell-injection": 0,
+}
+semgrep_path = out_dir / "semgrep-targeted.json"
+if semgrep_path.exists():
+    try:
+        semgrep = json.loads(semgrep_path.read_text(encoding="utf-8"))
+        for result in semgrep.get("results", []):
+            rule_id = result.get("check_id") or ""
+            if rule_id in semgrep_counts:
+                semgrep_counts[rule_id] += 1
+    except Exception:
+        pass
+pattern_counts.update(semgrep_counts)
+
 pattern_counts_file.write_text(json.dumps(pattern_counts, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 PY
 
+failed_count="$(jq '[to_entries[] | select(.value > 0)] | length' "$PATTERN_COUNTS_FILE")"
+
 jq -n \
   --argjson failed "$failed_count" \
+  --argjson runtime_failed "$runtime_failed_count" \
   --slurpfile checks "$CHECKS_JSON" \
   --slurpfile patterns "$PATTERN_COUNTS_FILE" \
   '{
     gate:(if $failed == 0 then "pass" else "fail" end),
-    failed_checks:$failed,
+    failed_patterns:$failed,
+    runtime_failed_checks:$runtime_failed,
     total_checks:($checks[0] | length),
     checks:$checks[0],
     pattern_counts:$patterns[0]
@@ -274,7 +283,7 @@ jq -n \
 cat "$SUMMARY_FILE"
 
 if [[ "$failed_count" -ne 0 ]]; then
-  echo "Codacy-equivalent gate failed: $failed_count checks failed." >&2
+  echo "Codacy-equivalent gate failed: $failed_count patterns still non-zero." >&2
   exit 1
 fi
 

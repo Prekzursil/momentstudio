@@ -661,11 +661,11 @@ export class ProductComponent implements OnInit, OnDestroy {
     this.upsellsLoadSub?.unsubscribe();
     this.upsellsLoadSub = this.catalog.getUpsellProducts(slug, lang).subscribe({
       next: (items) => {
-        if (!this.product || this.product.slug !== slug) return;
+        if (this.product?.slug !== slug) return;
         this.upsellProducts = (items || []).filter((p) => p.slug !== slug).slice(0, 8);
       },
       error: () => {
-        if (!this.product || this.product.slug !== slug) return;
+        if (this.product?.slug !== slug) return;
         this.upsellProducts = [];
       }
     });
@@ -675,11 +675,11 @@ export class ProductComponent implements OnInit, OnDestroy {
     this.relatedLoadSub?.unsubscribe();
     this.relatedLoadSub = this.catalog.getRelatedProducts(slug, lang).subscribe({
       next: (items) => {
-        if (!this.product || this.product.slug !== slug) return;
+        if (this.product?.slug !== slug) return;
         this.relatedProducts = (items || []).filter((p) => p.slug !== slug).slice(0, 8);
       },
       error: () => {
-        if (!this.product || this.product.slug !== slug) return;
+        if (this.product?.slug !== slug) return;
         this.relatedProducts = [];
       }
     });
@@ -931,4 +931,3 @@ export class ProductComponent implements OnInit, OnDestroy {
   }
 
 }
-

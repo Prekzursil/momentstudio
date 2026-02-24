@@ -890,25 +890,31 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   });
   authorBio = computed(() => {
     const post = this.post();
-    const meta = (post?.meta as any) || {};
-    const author = meta?.author;
-    const bio = author?.bio;
+    const meta = this.toObjectRecord(post?.meta);
+    const author = this.toObjectRecord(meta['author']);
+    const bio = author['bio'];
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     if (typeof bio === 'string') return bio.trim();
-    if (bio && typeof bio === 'object' && typeof bio[lang] === 'string') return String(bio[lang]).trim();
+    if (bio && typeof bio === 'object' && !Array.isArray(bio)) {
+      const localized = this.toObjectRecord(bio)[lang];
+      if (typeof localized === 'string') return localized.trim();
+    }
     return '';
   });
   authorLinks = computed(() => {
     const post = this.post();
-    const meta = (post?.meta as any) || {};
-    const author = meta?.author;
-    const links = author?.links;
+    const meta = this.toObjectRecord(post?.meta);
+    const author = this.toObjectRecord(meta['author']);
+    const links = author['links'];
     if (!Array.isArray(links)) return [];
     return links
-      .map((row: any) => ({
-        label: typeof row?.label === 'string' ? row.label.trim() : '',
-        url: typeof row?.url === 'string' ? row.url.trim() : ''
-      }))
+      .map((row) => {
+        const rec = this.toObjectRecord(row);
+        return {
+          label: typeof rec['label'] === 'string' ? rec['label'].trim() : '',
+          url: typeof rec['url'] === 'string' ? rec['url'].trim() : ''
+        };
+      })
       .filter((row) => row.label && row.url);
   });
 
@@ -1305,7 +1311,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       this.quickEditUnpublishAt = this.toDateTimeLocal(block.published_until);
     }
 
-    const meta = (block?.meta || post?.meta || {}) as Record<string, unknown>;
+    const meta = this.toObjectRecord(block?.meta ?? post?.meta);
     const tags = (post?.tags?.length ? post.tags : this.normalizeTags(meta['tags'])) || [];
     this.quickEditTitle = String(post?.title ?? block?.title ?? '').trim();
     this.quickEditSummary = String(post?.summary ?? this.getMetaSummary(meta, lang) ?? '').trim();
@@ -1379,10 +1385,17 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     if (!raw) return '';
     if (typeof raw === 'string') return raw.trim();
     if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
-      const value = (raw as any)[lang];
+      const value = this.toObjectRecord(raw)[lang];
       if (typeof value === 'string') return value.trim();
     }
     return '';
+  }
+
+  private toObjectRecord(value: unknown): Record<string, unknown> {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return {};
+    }
+    return value as Record<string, unknown>;
   }
 
   private loadNeighbors(lang: string): void {
@@ -2214,7 +2227,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     const embedParas = Array.from(doc.body.querySelectorAll<HTMLElement>('p'));
     for (const para of embedParas) {
       const text = (para.textContent || '').trim();
-      const match = text.match(embedRe);
+      const match = embedRe.exec(text);
       if (!match) continue;
       const rawType = (match[1] || '').toLowerCase();
       const type = rawType === 'product' || rawType === 'category' || rawType === 'collection' ? rawType : null;
@@ -2278,7 +2291,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       const firstPara = blockquote.querySelector<HTMLElement>('p');
       if (!firstPara) continue;
       const text = (firstPara.textContent || '').trimStart();
-      const match = text.match(/^\[!(TIP|NOTE|WARNING|CAUTION|IMPORTANT|INFO)\]/i);
+      const match = /^\[!(TIP|NOTE|WARNING|CAUTION|IMPORTANT|INFO)\]/i.exec(text);
       if (!match) continue;
       const marker = match[1].toLowerCase();
       const kind = marker === 'tip' ? 'tip' : marker === 'warning' || marker === 'caution' ? 'warning' : 'note';
@@ -2321,7 +2334,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       const pre = codeEl.parentElement;
       if (!(pre instanceof HTMLElement)) continue;
       const raw = codeEl.textContent || '';
-      const langMatch = codeEl.className.match(/language-([a-z0-9_-]+)/i);
+      const langMatch = /language-([a-z0-9_-]+)/i.exec(codeEl.className);
       const rawLang = (langMatch?.[1] || '').trim().toLowerCase();
       const lang =
         rawLang === 'js'

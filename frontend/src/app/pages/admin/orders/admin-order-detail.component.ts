@@ -1734,6 +1734,23 @@ export class AdminOrderDetailComponent implements OnInit {
     'refunded'
   ];
 
+  private isOrderStatus(value: unknown): value is OrderStatus {
+    return (
+      value === 'pending' ||
+      value === 'pending_payment' ||
+      value === 'pending_acceptance' ||
+      value === 'paid' ||
+      value === 'shipped' ||
+      value === 'delivered' ||
+      value === 'cancelled' ||
+      value === 'refunded'
+    );
+  }
+
+  private normalizeOrderStatus(value: unknown, fallback: OrderStatus): OrderStatus {
+    return this.isOrderStatus(value) ? value : fallback;
+  }
+
   statusChipClass(status: string): string {
     return orderStatusChipClass(status);
   }
@@ -1753,7 +1770,7 @@ export class AdminOrderDetailComponent implements OnInit {
     const o = this.order();
     if (!o) return false;
     const method = (o.payment_method || '').toString().trim().toLowerCase();
-    const status = (o.status as OrderStatus) || this.statusValue;
+    const status = this.normalizeOrderStatus(o.status, this.statusValue);
     if (status !== 'pending_acceptance') return false;
     if (method !== 'stripe' && method !== 'paypal') return false;
     return !this.hasPaymentCaptured(o);
@@ -1794,7 +1811,7 @@ export class AdminOrderDetailComponent implements OnInit {
 
   statusOptions(): Array<{ value: OrderStatus; disabled: boolean }> {
     const o = this.order();
-    const current = (o?.status as OrderStatus) || this.statusValue;
+    const current = this.normalizeOrderStatus(o?.status, this.statusValue);
     const method = (o?.payment_method || '').toString().trim().toLowerCase();
     const allowed = this.allowedNextStatuses(current, method, o);
     return this.statusOrder.map((value) => ({ value, disabled: !allowed.has(value) }));
@@ -2438,7 +2455,7 @@ export class AdminOrderDetailComponent implements OnInit {
   }
 
   private fraudSignalParams(signal: AdminOrderFraudSignal): Record<string, unknown> {
-    const data = (signal.data ?? {}) as Record<string, unknown>;
+    const data = signal.data ?? {};
     if (signal.code === 'velocity_email' || signal.code === 'velocity_user') {
       return {
         count: data['count'],
@@ -2963,7 +2980,7 @@ export class AdminOrderDetailComponent implements OnInit {
   save(): void {
     const orderId = this.order()?.id;
     if (!orderId) return;
-    const currentStatus = (this.order()?.status as OrderStatus) || 'pending_acceptance';
+    const currentStatus = this.normalizeOrderStatus(this.order()?.status, 'pending_acceptance');
     const statusChanged = this.statusValue !== currentStatus;
     const isCancelling = statusChanged && this.statusValue === 'cancelled';
     const cancelReasonValue = this.cancelReason.trim();
