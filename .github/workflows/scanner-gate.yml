@@ -17,7 +17,7 @@ jobs:
           fetch-depth: 0
 
       - name: Sonar scan (PR branch)
-        uses: SonarSource/sonarqube-scan-action@v5
+        uses: SonarSource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602 # v6.0.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL || 'https://sonarcloud.io' }}
@@ -39,7 +39,7 @@ jobs:
 
       - name: Upload sonar gate artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: scanner-gate-sonar-branch-zero
           path: artifacts/scanner-gate/sonar-branch-zero
@@ -82,7 +82,7 @@ jobs:
 
       - name: Upload codacy-equivalent artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: scanner-gate-codacy-equivalent-zero
           path: artifacts/scanner-gate/codacy-equivalent-zero
