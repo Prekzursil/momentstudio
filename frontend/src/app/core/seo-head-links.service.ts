@@ -1,6 +1,8 @@
 import { DOCUMENT } from '@angular/common';
 import { Injectable, inject } from '@angular/core';
 
+import { appConfig } from './app-config';
+
 export type SeoLanguage = 'en' | 'ro';
 
 type SeoQueryValue = string | number | undefined;
@@ -62,7 +64,8 @@ export class SeoHeadLinksService {
     const fromDocument = this.document.defaultView?.location?.origin;
     if (fromDocument) return fromDocument;
     if (typeof window !== 'undefined' && window.location?.origin) return window.location.origin;
-    return 'https://momentstudio.ro';
+    const configured = String(appConfig.publicBaseUrl || '').trim().replace(/\/$/, '');
+    return configured || 'https://momentstudio.ro';
   }
 
   private normalizePath(path: string): string {

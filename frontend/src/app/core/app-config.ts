@@ -15,6 +15,11 @@ export interface AppConfig {
   sentryReplaySessionSampleRate: number;
   sentryReplayOnErrorSampleRate: number;
   captchaSiteKey: string;
+  siteName: string;
+  publicBaseUrl: string;
+  supportEmail: string;
+  defaultLocale: string;
+  supportedLocales: string[];
 }
 
 declare global {
@@ -39,7 +44,12 @@ const defaults: AppConfig = {
   sentryTracesSampleRate: 1,
   sentryReplaySessionSampleRate: 0.25,
   sentryReplayOnErrorSampleRate: 1,
-  captchaSiteKey: ''
+  captchaSiteKey: '',
+  siteName: 'momentstudio',
+  publicBaseUrl: 'https://momentstudio.ro',
+  supportEmail: 'momentstudio.ro@gmail.com',
+  defaultLocale: 'en',
+  supportedLocales: ['en', 'ro']
 };
 
 export const appConfig: AppConfig = (() => {
