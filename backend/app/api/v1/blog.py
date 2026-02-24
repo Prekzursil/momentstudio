@@ -51,6 +51,25 @@ BLOG_VIEW_COOKIE = "blog_viewed"
 BLOG_VIEW_COOKIE_TTL_SECONDS = 6 * 60 * 60
 
 
+def _site_base_url() -> str:
+    return str(settings.public_base_url or settings.frontend_origin or "").rstrip("/")
+
+
+def _site_locale(lang: str) -> str:
+    if lang == "ro":
+        return "ro-RO"
+    if lang == "en":
+        return "en-US"
+    return "en-US"
+
+
+def _site_description(lang: str) -> str:
+    site_name = str(settings.site_name or "").strip() or "momentstudio"
+    if lang == "ro":
+        return f"Ultimele articole de pe {site_name}."
+    return f"Latest posts from {site_name}."
+
+
 def _is_probable_bot(user_agent: str) -> bool:
     ua = (user_agent or "").strip().lower()
     if not ua:
@@ -152,8 +171,8 @@ async def blog_rss_feed(
     session: AsyncSession = Depends(get_session),
     lang: str | None = Query(default=None, pattern="^(en|ro)$"),
 ) -> Response:
-    base = settings.frontend_origin.rstrip("/")
-    chosen_lang = lang or "en"
+    base = _site_base_url()
+    chosen_lang = lang or settings.default_locale or "en"
     blocks, _ = await blog_service.list_published_posts(session, lang=lang, page=1, limit=50, sort="newest")
     blocks = sorted(
         blocks,
@@ -172,10 +191,10 @@ async def blog_rss_feed(
 
     feed_url = f"{base}/api/v1/blog/rss.xml?lang={chosen_lang}"
     ElementTree.SubElement(channel, f"{{{ns_atom}}}link", {"href": feed_url, "rel": "self", "type": "application/rss+xml"})
-    ElementTree.SubElement(channel, "title").text = "momentstudio Blog"
+    ElementTree.SubElement(channel, "title").text = f"{settings.site_name} Blog"
     ElementTree.SubElement(channel, "link").text = f"{base}/blog?lang={chosen_lang}"
-    ElementTree.SubElement(channel, "description").text = "Latest posts from momentstudio."
-    ElementTree.SubElement(channel, "language").text = "ro-RO" if chosen_lang == "ro" else "en-US"
+    ElementTree.SubElement(channel, "description").text = _site_description(chosen_lang)
+    ElementTree.SubElement(channel, "language").text = _site_locale(chosen_lang)
     if blocks:
         latest = max(
             (b.updated_at or b.published_at or datetime.now(timezone.utc) for b in blocks),
@@ -207,8 +226,8 @@ async def blog_json_feed(
     session: AsyncSession = Depends(get_session),
     lang: str | None = Query(default=None, pattern="^(en|ro)$"),
 ) -> Response:
-    base = settings.frontend_origin.rstrip("/")
-    chosen_lang = lang or "en"
+    base = _site_base_url()
+    chosen_lang = lang or settings.default_locale or "en"
     blocks, _ = await blog_service.list_published_posts(session, lang=lang, page=1, limit=50, sort="newest")
     blocks = sorted(
         blocks,
@@ -249,10 +268,11 @@ async def blog_json_feed(
 
     feed = {
         "version": "https://jsonfeed.org/version/1.1",
-        "title": "momentstudio Blog",
+        "title": f"{settings.site_name} Blog",
         "home_page_url": f"{base}/blog?lang={chosen_lang}",
         "feed_url": f"{base}/api/v1/blog/feed.json?lang={chosen_lang}",
-        "language": "ro-RO" if chosen_lang == "ro" else "en-US",
+        "description": _site_description(chosen_lang),
+        "language": _site_locale(chosen_lang),
         "items": items,
     }
     return Response(content=json.dumps(feed, ensure_ascii=False), media_type="application/feed+json; charset=utf-8")
