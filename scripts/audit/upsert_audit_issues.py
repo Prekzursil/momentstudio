@@ -27,10 +27,8 @@ SEVERE_OUTPUT_TARGETS = {
     "artifacts/audit-evidence/severe-issues.json": "repo",
     "artifacts/audit-evidence-local/severe-issues.json": "local",
 }
-SEVERE_OUTPUT_PATHS = {
-    "repo": "artifacts/audit-evidence/severe-issues.json",
-    "local": "artifacts/audit-evidence-local/severe-issues.json",
-}
+SEVERE_OUTPUT_REPO = "artifacts/audit-evidence/severe-issues.json"
+SEVERE_OUTPUT_LOCAL = "artifacts/audit-evidence-local/severe-issues.json"
 
 
 def _repo_root() -> Path:
@@ -59,19 +57,34 @@ def _resolve_findings_path(raw: str) -> Path:
 
 def _resolve_severe_output_target(raw: str) -> str:
     normalized = str(raw or "").strip().replace("\\", "/")
-    target = SEVERE_OUTPUT_TARGETS.get(normalized)
-    if target is None:
+    if normalized == SEVERE_OUTPUT_REPO:
+        return "repo"
+    if normalized == SEVERE_OUTPUT_LOCAL:
+        return "local"
+    else:
         allowed = ", ".join(sorted(SEVERE_OUTPUT_TARGETS))
         raise ValueError(f"Unsupported --severe-output path '{raw}'. Allowed: {allowed}")
-    return target
+
+
+def _write_repo_severe_json(payload: Any) -> None:
+    safe_path = _validated_repo_path(_repo_root() / SEVERE_OUTPUT_REPO, allowed_prefixes=ALLOWED_AUDIT_PATH_PREFIXES)
+    safe_path.parent.mkdir(parents=True, exist_ok=True)
+    safe_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def _write_local_severe_json(payload: Any) -> None:
+    safe_path = _validated_repo_path(_repo_root() / SEVERE_OUTPUT_LOCAL, allowed_prefixes=ALLOWED_AUDIT_PATH_PREFIXES)
+    safe_path.parent.mkdir(parents=True, exist_ok=True)
+    safe_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
 def _write_severe_json(target: str, payload: Any) -> None:
-    safe_path = _validated_repo_path(
-        _repo_root() / SEVERE_OUTPUT_PATHS[target], allowed_prefixes=ALLOWED_AUDIT_PATH_PREFIXES
-    )
-    safe_path.parent.mkdir(parents=True, exist_ok=True)
-    safe_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    if target == "repo":
+        _write_repo_severe_json(payload)
+    elif target == "local":
+        _write_local_severe_json(payload)
+    else:
+        raise ValueError(f"Unsupported severe output target: {target}")
 
 
 @dataclass(frozen=True)
