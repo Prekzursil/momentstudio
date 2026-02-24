@@ -252,10 +252,10 @@ export class TicketsComponent {
   });
 
   constructor(
-    private ticketsApi: TicketsService,
-    private account: AccountService,
-    private toast: ToastService,
-    private translate: TranslateService
+    private readonly ticketsApi: TicketsService,
+    private readonly account: AccountService,
+    private readonly toast: ToastService,
+    private readonly translate: TranslateService
   ) {
     this.refresh();
   }
@@ -359,4 +359,5 @@ export class TicketsComponent {
     return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200';
   }
 }
+
 

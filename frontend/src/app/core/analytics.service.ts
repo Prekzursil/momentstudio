@@ -22,11 +22,11 @@ export class AnalyticsService {
   private readonly tokenExpiresAtKey = 'analytics.token_expires_at.v1';
   private readonly attributionStorageKey = 'analytics.attribution.v1';
 
-  private enabledState = signal(this.readEnabled());
+  private readonly enabledState = signal(this.readEnabled());
   private sessionStarted = this.readSessionStarted();
   private tokenRequest$?: Observable<string | null>;
 
-  constructor(private api: ApiService) {}
+  constructor(private readonly api: ApiService) {}
 
   enabled(): boolean {
     return this.enabledState();
@@ -268,3 +268,4 @@ export class AnalyticsService {
     }
   }
 }
+

@@ -18,12 +18,12 @@ export class RichEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
   @Input() initialEditType: 'markdown' | 'wysiwyg' = 'markdown';
   @Input() ariaLabel = '';
 
-  private document: Document = inject(DOCUMENT);
+  private readonly document: Document = inject(DOCUMENT);
   private editor: Editor | null = null;
   private isApplyingExternalUpdate = false;
   private themeObserver?: MutationObserver;
   private destroyed = false;
-  private styles = inject(LazyStylesService);
+  private readonly styles = inject(LazyStylesService);
 
   ngAfterViewInit(): void {
     void this.initEditor();
@@ -108,3 +108,4 @@ export class RichEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
     this.editor = null;
   }
 }
+

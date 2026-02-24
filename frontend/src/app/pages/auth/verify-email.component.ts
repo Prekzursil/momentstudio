@@ -60,12 +60,12 @@ export class VerifyEmailComponent implements OnInit {
   private readonly allowedNextPrefixes = ['/checkout', '/account'];
 
   constructor(
-    private route: ActivatedRoute,
-    private router: Router,
-    private api: ApiService,
+    private readonly route: ActivatedRoute,
+    private readonly router: Router,
+    private readonly api: ApiService,
     public auth: AuthService,
-    private cartApi: CartApi,
-    private translate: TranslateService
+    private readonly cartApi: CartApi,
+    private readonly translate: TranslateService
   ) {}
 
   ngOnInit(): void {
@@ -178,3 +178,4 @@ export class VerifyEmailComponent implements OnInit {
     this.errorMessage = message;
   }
 }
+

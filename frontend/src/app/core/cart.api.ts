@@ -53,7 +53,7 @@ const CART_SESSION_ID_STORAGE_ITEM = 'cart_session_id';
 
 @Injectable({ providedIn: 'root' })
 export class CartApi {
-  constructor(private api: ApiService) {}
+  constructor(private readonly api: ApiService) {}
 
   getSessionId(): string {
     if (typeof localStorage === 'undefined') return '';
@@ -93,3 +93,4 @@ export class CartApi {
     return this.api.delete<void>(`/cart/items/${itemId}`, this.headers());
   }
 }
+

@@ -29,7 +29,7 @@ export class StructuredDataService {
 
   private upsertScript(id: string): HTMLScriptElement {
     const existing = this.document.getElementById(id);
-    if (existing && existing.tagName.toLowerCase() === 'script') {
+    if (existing?.tagName.toLowerCase() === 'script') {
       const asScript = existing as HTMLScriptElement;
       asScript.type = 'application/ld+json';
       asScript.setAttribute('data-seo-route-schema', 'true');

@@ -239,7 +239,7 @@ export class AdminSegmentsComponent implements OnInit {
   aovLoading = signal(true);
   aovError = signal<string | null>(null);
 
-  constructor(private usersApi: AdminUsersService, private router: Router, private translate: TranslateService) {}
+  constructor(private readonly usersApi: AdminUsersService, private router: Router, private translate: TranslateService) {}
 
   ngOnInit(): void {
     this.loadAll();
@@ -357,3 +357,4 @@ export class AdminSegmentsComponent implements OnInit {
       });
   }
 }
+

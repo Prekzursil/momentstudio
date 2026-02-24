@@ -73,13 +73,11 @@ def upgrade() -> None:
         return
 
     meta = _as_dict(row["meta"])
-    changed = False
-
-    def patch_page_list(key: str) -> None:
-        nonlocal changed
+    def patch_page_list(key: str) -> bool:
+        local_changed = False
         pages = _as_list(meta.get(key))
         if not pages:
-            return
+            return local_changed
 
         for page in pages:
             if not isinstance(page, dict):
@@ -94,12 +92,12 @@ def upgrade() -> None:
             if current_thumb:
                 continue
             page["thumbnail_url"] = desired
-            changed = True
+            local_changed = True
 
         meta[key] = pages
+        return local_changed
 
-    patch_page_list("instagram_pages")
-    patch_page_list("facebook_pages")
+    changed = patch_page_list("instagram_pages") or patch_page_list("facebook_pages")
 
     if not changed:
         return

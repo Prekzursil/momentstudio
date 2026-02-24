@@ -14,8 +14,7 @@ on:
         required: false
         default: "audit:*"
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   audit-agent-watchdog:

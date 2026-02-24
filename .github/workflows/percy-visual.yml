@@ -6,27 +6,19 @@ on:
   schedule:
     - cron: "0 6 * * 1"
   workflow_dispatch:
-    inputs:
-      scope:
-        description: "Snapshot scope"
-        required: false
-        type: choice
-        default: core
-        options:
-          - core
-          - full
-          - both
 
-permissions:
-  contents: read
+permissions: {}
+
+env:
+  PERCY_VISUAL_SCOPE: ${{ vars.PERCY_VISUAL_SCOPE || 'core' }}
 
 jobs:
   percy-core-pr:
-    if: (github.event_name == 'pull_request' && vars.PERCY_PR_ENABLED == '1') || (github.event_name == 'workflow_dispatch' && (github.event.inputs.scope == 'core' || github.event.inputs.scope == 'both' || github.event.inputs.scope == ''))
+    if: (github.event_name == 'pull_request' && vars.PERCY_PR_ENABLED == '1') || (github.event_name == 'workflow_dispatch' && (env.PERCY_VISUAL_SCOPE == 'core' || env.PERCY_VISUAL_SCOPE == 'both'))
     runs-on: ubuntu-latest
-    continue-on-error: true
     permissions:
       contents: read
+    continue-on-error: true
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
@@ -182,11 +174,11 @@ jobs:
         run: docker compose -f infra/docker-compose.yml down -v
 
   percy-full-nightly:
-    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.scope == 'full' || github.event.inputs.scope == 'both'))
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && (env.PERCY_VISUAL_SCOPE == 'full' || env.PERCY_VISUAL_SCOPE == 'both'))
     runs-on: ubuntu-latest
-    continue-on-error: true
     permissions:
       contents: read
+    continue-on-error: true
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 

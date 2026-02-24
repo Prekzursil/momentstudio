@@ -10,7 +10,7 @@ export class LazyImageDirective implements OnInit, OnDestroy {
 
   private observer?: IntersectionObserver;
 
-  constructor(private el: ElementRef<HTMLImageElement>, private renderer: Renderer2) {}
+  constructor(private readonly el: ElementRef<HTMLImageElement>, private renderer: Renderer2) {}
 
   ngOnInit(): void {
     if (!this.src) return;
@@ -43,3 +43,4 @@ export class LazyImageDirective implements OnInit, OnDestroy {
     this.renderer.addClass(this.el.nativeElement, 'opacity-100');
   }
 }
+

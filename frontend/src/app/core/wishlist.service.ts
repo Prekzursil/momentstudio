@@ -23,12 +23,12 @@ export class WishlistService {
 
   private readonly loadedSignal = signal(false);
   private readonly loadingSignal = signal(false);
-  private authEffect?: EffectRef;
+  private readonly authEffect?: EffectRef;
   private activeUserId: string | null = null;
 
   constructor(
-    private api: ApiService,
-    private auth: AuthService
+    private readonly api: ApiService,
+    private readonly auth: AuthService
   ) {
     this.authEffect = effect(() => {
       const userId = this.auth.user()?.id ?? null;
@@ -203,3 +203,4 @@ export class WishlistService {
     this.persistSnapshots(next);
   }
 }
+

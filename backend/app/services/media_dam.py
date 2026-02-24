@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import inspect
 import json
+import logging
 import mimetypes
 import random
 import re
@@ -78,6 +79,7 @@ from app.services import content as content_service
 from app.services import private_storage
 from app.services import storage
 
+logger = logging.getLogger(__name__)
 
 QUEUE_KEY = str(getattr(settings, "media_dam_queue_key", "media:jobs:queue") or "media:jobs:queue")
 TRASH_RETENTION_DAYS = int(getattr(settings, "media_dam_trash_retention_days", 30) or 30)
@@ -1586,8 +1588,12 @@ async def soft_delete_asset(session: AsyncSession, asset: MediaAsset, actor_id: 
             _move_file(old_path, new_path)
             asset.storage_key = trash_key
             asset.public_url = _public_url_from_storage_key(trash_key)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug(
+            "media_asset_soft_delete_move_failed",
+            extra={"asset_id": str(asset.id), "storage_key": str(asset.storage_key)},
+            exc_info=exc,
+        )
     _move_variant_file_roots(asset, to_public=False)
     session.add(asset)
     session.add(
@@ -1617,8 +1623,12 @@ async def restore_asset(session: AsyncSession, asset: MediaAsset, actor_id: UUID
             _move_file(old_path, new_path)
             asset.storage_key = restore_key
             asset.public_url = _public_url_from_storage_key(restore_key)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug(
+            "media_asset_restore_move_failed",
+            extra={"asset_id": str(asset.id), "storage_key": str(asset.storage_key)},
+            exc_info=exc,
+        )
     asset.status = MediaAssetStatus.draft
     asset.trashed_at = None
     _move_variant_file_roots(asset, to_public=False)
@@ -1643,8 +1653,12 @@ async def purge_asset(session: AsyncSession, asset: MediaAsset) -> None:
         path = _find_existing_storage_path(asset.storage_key)
         if path is not None:
             paths.append(path)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug(
+            "media_asset_purge_primary_path_resolve_failed",
+            extra={"asset_id": str(asset.id), "storage_key": str(asset.storage_key)},
+            exc_info=exc,
+        )
     for variant in asset.variants or []:
         try:
             path = _find_existing_storage_path(variant.storage_key)
@@ -1656,8 +1670,12 @@ async def purge_asset(session: AsyncSession, asset: MediaAsset) -> None:
         try:
             if p.exists():
                 p.unlink()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(
+                "media_asset_purge_unlink_failed",
+                extra={"asset_id": str(asset.id), "path": str(p)},
+                exc_info=exc,
+            )
     await session.delete(asset)
     await session.commit()
 

@@ -106,9 +106,9 @@ export class ContentRevisionsComponent implements OnChanges, OnDestroy {
   private lastLoadedKey: string | null = null;
 
   constructor(
-    private admin: AdminService,
-    private toast: ToastService,
-    private translate: TranslateService
+    private readonly admin: AdminService,
+    private readonly toast: ToastService,
+    private readonly translate: TranslateService
   ) {}
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -294,3 +294,4 @@ export class ContentRevisionsComponent implements OnChanges, OnDestroy {
     return this.translate.instant(key, params);
   }
 }
+

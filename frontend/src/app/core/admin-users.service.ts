@@ -150,7 +150,7 @@ export interface AdminUserSegmentResponse {
 
 @Injectable({ providedIn: 'root' })
 export class AdminUsersService {
-  constructor(private api: ApiService) {}
+  constructor(private readonly api: ApiService) {}
 
   search(params: {
     q?: string;
@@ -240,3 +240,4 @@ export class AdminUsersService {
     return this.api.get<AdminUserSegmentResponse>('/admin/dashboard/users/segments/high-aov', params as any);
   }
 }
+

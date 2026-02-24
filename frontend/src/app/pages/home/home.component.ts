@@ -571,17 +571,17 @@ export class HomeComponent implements OnInit, OnDestroy {
   private previewToken = '';
 
   constructor(
-    private catalog: CatalogService,
-    private recentlyViewedService: RecentlyViewedService,
-    private title: Title,
-    private meta: Meta,
-    private seoHeadLinks: SeoHeadLinksService,
-    private structuredData: StructuredDataService,
-    private translate: TranslateService,
-    private auth: AuthService,
-    private route: ActivatedRoute,
-    private api: ApiService,
-    private markdown: MarkdownService
+    private readonly catalog: CatalogService,
+    private readonly recentlyViewedService: RecentlyViewedService,
+    private readonly title: Title,
+    private readonly meta: Meta,
+    private readonly seoHeadLinks: SeoHeadLinksService,
+    private readonly structuredData: StructuredDataService,
+    private readonly translate: TranslateService,
+    private readonly auth: AuthService,
+    private readonly route: ActivatedRoute,
+    private readonly api: ApiService,
+    private readonly markdown: MarkdownService
   ) {}
 
   ngOnInit(): void {
@@ -1208,3 +1208,4 @@ export class HomeComponent implements OnInit, OnDestroy {
     ]);
   }
 }
+

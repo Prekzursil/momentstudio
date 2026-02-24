@@ -163,7 +163,7 @@ export interface BlogMyComment {
   post_title: string;
   parent_id?: string | null;
   body: string;
-  status: 'posted' | 'hidden' | 'deleted' | string;
+  status: string;
   created_at: string;
   updated_at: string;
   reply_count: number;
@@ -178,7 +178,7 @@ export interface BlogMyCommentListResponse {
 
 @Injectable({ providedIn: 'root' })
 export class BlogService {
-  constructor(private api: ApiService) {}
+  constructor(private readonly api: ApiService) {}
 
   private readonly cache = new Map<string, { expires_at: number; value$: Observable<any> }>();
   private readonly ttlMs = {

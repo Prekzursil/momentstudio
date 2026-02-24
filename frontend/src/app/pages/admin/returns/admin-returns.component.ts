@@ -430,9 +430,9 @@ export class AdminReturnsComponent implements OnInit, OnDestroy {
   private readonly routeSub?: Subscription;
 
   constructor(
-    private api: AdminReturnsService,
-    private toast: ToastService,
-    private translate: TranslateService,
+    private readonly api: AdminReturnsService,
+    private readonly toast: ToastService,
+    private readonly translate: TranslateService,
     route: ActivatedRoute
   ) {
     this.routeSub = route.queryParamMap.subscribe((params) => {
@@ -662,7 +662,7 @@ export class AdminReturnsComponent implements OnInit, OnDestroy {
     this.api.search(params).subscribe({
       next: (resp) => {
         this.items.set(resp.items || []);
-        this.meta.set(resp.meta as any);
+        this.meta.set(resp.meta);
         this.loading.set(false);
         if (clearSelection && this.selectedId()) {
           this.selectedId.set(null);
@@ -709,3 +709,4 @@ export class AdminReturnsComponent implements OnInit, OnDestroy {
     });
   }
 }
+

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import logging
 from decimal import Decimal
 from datetime import datetime, timezone
 from pathlib import Path
@@ -21,6 +22,7 @@ from app.core.config import settings
 
 NETOPIA_BASE_URL_LIVE = "https://secure.mobilpay.ro/pay"
 NETOPIA_BASE_URL_SANDBOX = "https://secure.sandbox.netopia-payments.com"
+logger = logging.getLogger(__name__)
 
 
 def _netopia_env() -> str:
@@ -300,8 +302,12 @@ async def start_payment(
             data = resp.json()
             if isinstance(data, dict):
                 detail = str(data.get("message") or data.get("error") or detail)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(
+                "netopia_start_payment_error_body_not_json",
+                extra={"status_code": resp.status_code},
+                exc_info=exc,
+            )
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=detail)
 
     try:
@@ -378,9 +384,9 @@ def verify_ipn(*, verification_token: str, payload: bytes) -> dict[str, Any]:
         header_alg = str((header or {}).get("alg") or "").strip().upper()
         if header_alg in allowed_algs and header_alg not in algs:
             algs.append(header_alg)
-    except Exception:
+    except Exception as exc:
         # Ignore invalid tokens; decode() below will raise a proper error.
-        pass
+        logger.debug("netopia_ipn_header_parse_failed", exc_info=exc)
 
     max_age_seconds = max(60, int(getattr(settings, "netopia_ipn_max_age_seconds", 60 * 60 * 24)))
     skew_seconds = 5 * 60

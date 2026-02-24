@@ -33,7 +33,7 @@ export class FxRatesService {
   private source?: string;
   private lastErrorAt = 0;
 
-  constructor(private api: ApiService) {}
+  constructor(private readonly api: ApiService) {}
 
   get snapshot(): FxRatesSnapshot {
     return {
@@ -69,3 +69,4 @@ export class FxRatesService {
     });
   }
 }
+

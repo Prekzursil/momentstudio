@@ -169,11 +169,11 @@ export class ProductQuickViewModalComponent implements OnChanges {
   private loadSub?: Subscription;
 
   constructor(
-    private catalog: CatalogService,
-    private cart: CartStore,
-    private toast: ToastService,
-    private translate: TranslateService,
-    private cdr: ChangeDetectorRef
+    private readonly catalog: CatalogService,
+    private readonly cart: CartStore,
+    private readonly toast: ToastService,
+    private readonly translate: TranslateService,
+    private readonly cdr: ChangeDetectorRef
   ) {}
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -326,3 +326,4 @@ export class ProductQuickViewModalComponent implements OnChanges {
     this.cdr.detectChanges();
   }
 }
+

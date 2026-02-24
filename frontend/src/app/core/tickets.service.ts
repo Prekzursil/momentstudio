@@ -37,7 +37,7 @@ export interface TicketCreateRequest {
 
 @Injectable({ providedIn: 'root' })
 export class TicketsService {
-  constructor(private api: ApiService) {}
+  constructor(private readonly api: ApiService) {}
 
   listMine(): Observable<TicketListItem[]> {
     return this.api.get<TicketListItem[]>('/support/me/submissions');
@@ -55,4 +55,5 @@ export class TicketsService {
     return this.api.post<TicketRead>(`/support/me/submissions/${id}/messages`, { message });
   }
 }
+
 

@@ -6,7 +6,7 @@ import { TranslateService } from '@ngx-translate/core';
 
 @Injectable({ providedIn: 'root' })
 export class ErrorHandlerService {
-  constructor(private toast: ToastService, private translate: TranslateService) {}
+  constructor(private readonly toast: ToastService, private translate: TranslateService) {}
 
   handle(error: unknown): void {
     if (error instanceof HttpErrorResponse) {
@@ -47,3 +47,4 @@ export class ErrorHandlerService {
     }
   }
 }
+

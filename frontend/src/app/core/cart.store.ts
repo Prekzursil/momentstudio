@@ -46,7 +46,7 @@ export class CartStore {
     this.itemsSignal().reduce((sum, item) => sum + item.quantity, 0)
   );
 
-  constructor(private api: CartApi) {}
+  constructor(private readonly api: CartApi) {}
 
   hydrateFromBackend(res: { items: any[]; totals: any }): void {
     const items = this.fromApi(res);
@@ -261,3 +261,4 @@ export class CartStore {
     }
   }
 }
+

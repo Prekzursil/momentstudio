@@ -325,11 +325,11 @@ export class AdminGdprComponent implements OnInit {
   executeDeletionModalError = '';
 
   constructor(
-    private usersApi: AdminUsersService,
-    private auth: AuthService,
-    private router: Router,
-    private toast: ToastService,
-    private translate: TranslateService
+    private readonly usersApi: AdminUsersService,
+    private readonly auth: AuthService,
+    private readonly router: Router,
+    private readonly toast: ToastService,
+    private readonly translate: TranslateService
   ) {}
 
   ngOnInit(): void {
@@ -584,3 +584,4 @@ export class AdminGdprComponent implements OnInit {
     return this.translate.instant(key) as string;
   }
 }
+

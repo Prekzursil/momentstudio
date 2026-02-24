@@ -4,7 +4,7 @@ import prettier from 'eslint-config-prettier';
 
 export default tseslint.config(
   {
-    ignores: ['**/*.js', '**/*.cjs', '**/*.mjs', 'node_modules', 'dist', 'coverage']
+    ignores: ['**/*.js', '**/*.cjs', '**/*.mjs', 'node_modules', 'dist', 'coverage'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
@@ -15,8 +15,8 @@ export default tseslint.config(
       parserOptions: {
         project: ['./tsconfig.eslint.json'],
         tsconfigRootDir: import.meta.dirname,
-        sourceType: 'module'
-      }
+        sourceType: 'module',
+      },
     },
     rules: {
       '@typescript-eslint/explicit-function-return-type': 'off',
@@ -29,13 +29,13 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-member-access': 'off',
       '@typescript-eslint/no-unsafe-argument': 'off',
       '@typescript-eslint/no-unsafe-return': 'off',
-      '@typescript-eslint/no-explicit-any': 'off'
-    }
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
   },
   {
     files: ['**/*.spec.ts'],
     rules: {
-      '@typescript-eslint/unbound-method': 'off'
-    }
-  }
+      '@typescript-eslint/unbound-method': 'off',
+    },
+  },
 );

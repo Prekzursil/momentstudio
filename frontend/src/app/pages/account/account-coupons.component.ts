@@ -111,9 +111,9 @@ export class AccountCouponsComponent implements OnInit {
   protected readonly error = signal<string | null>(null);
 
   constructor(
-    private couponsService: CouponsService,
-    private toast: ToastService,
-    private translate: TranslateService
+    private readonly couponsService: CouponsService,
+    private readonly toast: ToastService,
+    private readonly translate: TranslateService
   ) {}
 
   ngOnInit(): void {
@@ -182,4 +182,5 @@ export class AccountCouponsComponent implements OnInit {
     }
   }
 }
+
 

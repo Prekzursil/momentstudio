@@ -359,7 +359,7 @@ def test_coupon_eligibility_and_validation() -> None:
 def test_first_order_only_promotion_blocks_delivered_customers() -> None:
     client, SessionLocal = make_test_client()
     try:
-        token1, user1_id = create_user_token(SessionLocal, email="first-only-1@example.com", username="first_only_1")
+        token1, _user1_id = create_user_token(SessionLocal, email="first-only-1@example.com", username="first_only_1")
         token2, user2_id = create_user_token(SessionLocal, email="first-only-2@example.com", username="first_only_2")
 
         product_id = seed_product(SessionLocal, slug="first-only", sku="SKU-FIRST", base_price=Decimal("100.00"))
@@ -548,7 +548,7 @@ def test_coupon_reservation_redeem_and_void_flow() -> None:
     client, SessionLocal = make_test_client()
     try:
         token1, user1_id = create_user_token(SessionLocal, email="cap1@example.com", username="cap1")
-        token2, user2_id = create_user_token(SessionLocal, email="cap2@example.com", username="cap2")
+        token2, _user2_id = create_user_token(SessionLocal, email="cap2@example.com", username="cap2")
         product_id = seed_product(SessionLocal, slug="cap-item", sku="SKU-CAP", base_price=Decimal("100.00"))
 
         assert (
@@ -685,7 +685,7 @@ def test_per_customer_cap_blocks_reuse() -> None:
     client, SessionLocal = make_test_client()
     try:
         token1, user1_id = create_user_token(SessionLocal, email="percap1@example.com", username="percap1")
-        token2, user2_id = create_user_token(SessionLocal, email="percap2@example.com", username="percap2")
+        token2, _user2_id = create_user_token(SessionLocal, email="percap2@example.com", username="percap2")
         product_id = seed_product(SessionLocal, slug="percap-item", sku="SKU-PERCAP", base_price=Decimal("100.00"))
 
         assert (

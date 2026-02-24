@@ -51,7 +51,7 @@ export class CmsProductGridBlockComponent implements OnChanges, OnDestroy {
 
   private sub?: Subscription;
 
-  constructor(private catalog: CatalogService) {}
+  constructor(private readonly catalog: CatalogService) {}
 
   ngOnChanges(): void {
     this.load();
@@ -114,3 +114,4 @@ export class CmsProductGridBlockComponent implements OnChanges, OnDestroy {
     });
   }
 }
+

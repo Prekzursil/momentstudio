@@ -57,7 +57,7 @@ export interface ReturnRequestUpdatePayload {
 
 @Injectable({ providedIn: 'root' })
 export class AdminReturnsService {
-  constructor(private api: ApiService) {}
+  constructor(private readonly api: ApiService) {}
 
   search(params: {
     q?: string;
@@ -109,3 +109,4 @@ export class AdminReturnsService {
     return this.api.post<ReturnRequestRead>('/returns/admin', payload as any);
   }
 }
+

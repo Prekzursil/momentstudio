@@ -424,12 +424,12 @@ export class HeaderComponent implements OnDestroy {
   notificationsOpen = false;
   searchQuery = '';
   private unreadPoll?: number;
-  private bannerPoll?: number;
-  private authEffect?: EffectRef;
-  private navSub?: Subscription;
+  private readonly bannerPoll?: number;
+  private readonly authEffect?: EffectRef;
+  private readonly navSub?: Subscription;
 
   banner = signal<MaintenanceBannerPublic | null>(null);
-  private cmsNavigation = signal<SiteNavigationData | null>(null);
+  private readonly cmsNavigation = signal<SiteNavigationData | null>(null);
 
     readonly isAuthenticated = computed(() => this.auth.isAuthenticated());
     readonly currentUser = computed(() => this.auth.user());
@@ -483,16 +483,16 @@ export class HeaderComponent implements OnDestroy {
   });
 
     constructor(
-      private cart: CartStore,
-      private router: Router,
-      private auth: AuthService,
-      private navigation: SiteNavigationService,
-      private storefrontAdminMode: StorefrontAdminModeService,
-      private notificationsService: NotificationsService,
-      private ops: OpsService,
-        private pwa: PwaService,
-        private toast: ToastService,
-        private translate: TranslateService
+      private readonly cart: CartStore,
+      private readonly router: Router,
+      private readonly auth: AuthService,
+      private readonly navigation: SiteNavigationService,
+      private readonly storefrontAdminMode: StorefrontAdminModeService,
+      private readonly notificationsService: NotificationsService,
+      private readonly ops: OpsService,
+        private readonly pwa: PwaService,
+        private readonly toast: ToastService,
+        private readonly translate: TranslateService
       ) {
     if (!this.isBrowser) {
       return;
@@ -725,3 +725,4 @@ export class HeaderComponent implements OnDestroy {
     });
   }
 }
+

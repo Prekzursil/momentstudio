@@ -239,7 +239,7 @@ export class ReceiptComponent implements OnInit, OnDestroy {
 
   private sub?: Subscription;
 
-  constructor(private route: ActivatedRoute, private receipts: ReceiptService) {}
+  constructor(private readonly route: ActivatedRoute, private receipts: ReceiptService) {}
 
   paymentMethodLabel(): string {
     const method = (this.receipt?.payment_method ?? '').trim().toLowerCase();
@@ -292,3 +292,4 @@ export class ReceiptComponent implements OnInit, OnDestroy {
     this.sub?.unsubscribe();
   }
 }
+

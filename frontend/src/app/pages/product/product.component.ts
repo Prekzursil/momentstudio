@@ -465,23 +465,23 @@ export class ProductComponent implements OnInit, OnDestroy {
   ];
 
   constructor(
-    private route: ActivatedRoute,
-    private catalog: CatalogService,
-    private toast: ToastService,
-    private title: Title,
-    private meta: Meta,
-    private cartStore: CartStore,
-    private recentlyViewedService: RecentlyViewedService,
-    private translate: TranslateService,
-    private markdown: MarkdownService,
-    private wishlist: WishlistService,
-    private auth: AuthService,
-    private router: Router,
-    private cdr: ChangeDetectorRef,
-    private storefrontAdminMode: StorefrontAdminModeService,
-    private admin: AdminService,
-    private seoHeadLinks: SeoHeadLinksService,
-    private seoCopyFallback: SeoCopyFallbackService
+    private readonly route: ActivatedRoute,
+    private readonly catalog: CatalogService,
+    private readonly toast: ToastService,
+    private readonly title: Title,
+    private readonly meta: Meta,
+    private readonly cartStore: CartStore,
+    private readonly recentlyViewedService: RecentlyViewedService,
+    private readonly translate: TranslateService,
+    private readonly markdown: MarkdownService,
+    private readonly wishlist: WishlistService,
+    private readonly auth: AuthService,
+    private readonly router: Router,
+    private readonly cdr: ChangeDetectorRef,
+    private readonly storefrontAdminMode: StorefrontAdminModeService,
+    private readonly admin: AdminService,
+    private readonly seoHeadLinks: SeoHeadLinksService,
+    private readonly seoCopyFallback: SeoCopyFallbackService
   ) {}
 
   ngOnDestroy(): void {
@@ -575,7 +575,7 @@ export class ProductComponent implements OnInit, OnDestroy {
     this.admin.duplicateProduct(slug, { source: 'storefront' }).subscribe({
       next: (created) => {
         this.duplicateSaving = false;
-        const newSlug = String((created as any)?.slug || '').trim();
+        const newSlug = String((created)?.slug || '').trim();
         this.toast.success(this.translate.instant('adminUi.products.success.duplicate'));
         if (!newSlug) return;
         void this.router.navigate(['/admin/products'], { state: { editProductSlug: newSlug } });
@@ -931,3 +931,4 @@ export class ProductComponent implements OnInit, OnDestroy {
   }
 
 }
+

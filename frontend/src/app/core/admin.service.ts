@@ -314,6 +314,7 @@ export interface AdminProduct {
   currency: string;
   status: string;
   category: string;
+  sku?: string | null;
   stock_quantity: number;
   publish_at?: string | null;
   tags?: string[];
@@ -534,7 +535,7 @@ export interface AdminProductAuditEntry {
   created_at: string;
   user_id?: string | null;
   user_email?: string | null;
-  payload?: any | null;
+  payload?: any;
 }
 
 export interface AdminProductsImportResult {
@@ -1246,7 +1247,7 @@ export interface OwnerTransferResponse {
 
 @Injectable({ providedIn: 'root' })
 export class AdminService {
-  constructor(private api: ApiService) {}
+  constructor(private readonly api: ApiService) {}
 
   summary(params?: { range_days?: number; range_from?: string; range_to?: string }): Observable<AdminSummary> {
     return this.api.get<AdminSummary>('/admin/dashboard/summary', params);

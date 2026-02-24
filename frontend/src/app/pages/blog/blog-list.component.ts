@@ -416,19 +416,19 @@ export class BlogListComponent implements OnInit, OnDestroy {
 
   private sub?: Subscription;
   private langSub?: Subscription;
-  private document: Document = inject(DOCUMENT);
+  private readonly document: Document = inject(DOCUMENT);
 
   constructor(
-    private blog: BlogService,
-    private route: ActivatedRoute,
-    private router: Router,
-    private storefrontAdminMode: StorefrontAdminModeService,
-    private translate: TranslateService,
-    private title: Title,
-    private meta: Meta,
-    private seoHeadLinks: SeoHeadLinksService,
-    private structuredData: StructuredDataService,
-    private seoCopyFallback: SeoCopyFallbackService
+    private readonly blog: BlogService,
+    private readonly route: ActivatedRoute,
+    private readonly router: Router,
+    private readonly storefrontAdminMode: StorefrontAdminModeService,
+    private readonly translate: TranslateService,
+    private readonly title: Title,
+    private readonly meta: Meta,
+    private readonly seoHeadLinks: SeoHeadLinksService,
+    private readonly structuredData: StructuredDataService,
+    private readonly seoCopyFallback: SeoCopyFallbackService
   ) {}
 
   ngOnInit(): void {
@@ -703,7 +703,7 @@ export class BlogListComponent implements OnInit, OnDestroy {
 
   thumbUrl(src: string | null | undefined): string | null {
     const raw = String(src || '').trim();
-    if (!raw || !raw.startsWith('/media/')) return null;
+    if (!raw?.startsWith('/media/')) return null;
     const base = raw.split('?')[0].split('#')[0];
     const dot = base.lastIndexOf('.');
     const slash = base.lastIndexOf('/');

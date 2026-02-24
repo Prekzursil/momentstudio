@@ -50,8 +50,8 @@ export class PayPalMockComponent implements OnInit {
   token = '';
 
   constructor(
-    private route: ActivatedRoute,
-    private router: Router
+    private readonly route: ActivatedRoute,
+    private readonly router: Router
   ) {}
 
   ngOnInit(): void {
@@ -70,3 +70,4 @@ export class PayPalMockComponent implements OnInit {
     void this.router.navigate(['/checkout/paypal/cancel'], { queryParams: { token: this.token } });
   }
 }
+

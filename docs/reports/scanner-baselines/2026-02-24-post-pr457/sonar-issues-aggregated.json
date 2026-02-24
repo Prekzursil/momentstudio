@@ -1,0 +1,745 @@
+{
+  "total": 1173,
+  "by_rule": [
+    {
+      "rule": "typescript:S2933",
+      "count": 467
+    },
+    {
+      "rule": "python:S8410",
+      "count": 344
+    },
+    {
+      "rule": "typescript:S4325",
+      "count": 115
+    },
+    {
+      "rule": "python:S8409",
+      "count": 73
+    },
+    {
+      "rule": "python:S1192",
+      "count": 33
+    },
+    {
+      "rule": "typescript:S6582",
+      "count": 32
+    },
+    {
+      "rule": "python:S3776",
+      "count": 30
+    },
+    {
+      "rule": "typescript:S6571",
+      "count": 25
+    },
+    {
+      "rule": "python:S5717",
+      "count": 12
+    },
+    {
+      "rule": "python:S6546",
+      "count": 12
+    },
+    {
+      "rule": "typescript:S1874",
+      "count": 6
+    },
+    {
+      "rule": "typescript:S6594",
+      "count": 4
+    },
+    {
+      "rule": "typescript:S6606",
+      "count": 4
+    },
+    {
+      "rule": "typescript:S7755",
+      "count": 4
+    },
+    {
+      "rule": "python:S6796",
+      "count": 2
+    },
+    {
+      "rule": "pythonbugs:S2583",
+      "count": 2
+    },
+    {
+      "rule": "docker:S7031",
+      "count": 1
+    },
+    {
+      "rule": "javascript:S6582",
+      "count": 1
+    },
+    {
+      "rule": "python:S1481",
+      "count": 1
+    },
+    {
+      "rule": "python:S3626",
+      "count": 1
+    },
+    {
+      "rule": "python:S6794",
+      "count": 1
+    },
+    {
+      "rule": "python:S7496",
+      "count": 1
+    },
+    {
+      "rule": "typescript:S2301",
+      "count": 1
+    },
+    {
+      "rule": "typescript:S4043",
+      "count": 1
+    }
+  ],
+  "by_component": [
+    {
+      "component": "Prekzursil_AdrianaArt:backend/app/api/v1/admin_dashboard.py",
+      "count": 278
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:backend/app/api/v1/auth.py",
+      "count": 177
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/admin/admin.component.ts",
+      "count": 50
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/blog/blog-post.component.ts",
+      "count": 38
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/admin/orders/admin-order-detail.component.ts",
+      "count": 23
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/product/product.component.ts",
+      "count": 23
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/account/account.state.ts",
+      "count": 20
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/shop/shop.component.ts",
+      "count": 19
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/admin/products/admin-products.component.ts",
+      "count": 17
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/checkout/checkout.component.ts",
+      "count": 17
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/layout/header.component.ts",
+      "count": 14
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/admin/dashboard/admin-dashboard.component.ts",
+      "count": 14
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/app.component.ts",
+      "count": 13
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/admin/ops/admin-ops.component.ts",
+      "count": 13
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/blog/blog-list.component.ts",
+      "count": 12
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/cart/cart.component.ts",
+      "count": 12
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/contact/contact.component.ts",
+      "count": 12
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/admin/admin-layout.component.ts",
+      "count": 11
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/admin/orders/admin-orders.component.ts",
+      "count": 11
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/home/home.component.ts",
+      "count": 11
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/page/page.component.ts",
+      "count": 11
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/about/about.component.ts",
+      "count": 9
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/admin/users/admin-users.component.ts",
+      "count": 9
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:backend/app/api/v1/addresses.py",
+      "count": 8
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/admin-orders.service.ts",
+      "count": 8
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/shared/order-status.ts",
+      "count": 8
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/shared/product-card.component.ts",
+      "count": 8
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:backend/app/api/v1/analytics.py",
+      "count": 7
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/admin/shared/cms-editor-prefs.service.ts",
+      "count": 7
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:backend/app/api/v1/admin_ui.py",
+      "count": 6
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/layout/footer.component.ts",
+      "count": 6
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/admin/coupons/admin-coupons.component.ts",
+      "count": 6
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/admin/shared/customer-timeline.component.ts",
+      "count": 6
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/admin/support/admin-support.component.ts",
+      "count": 6
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/auth/google-callback.component.ts",
+      "count": 6
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/auth/login.component.ts",
+      "count": 6
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/auth/register.component.ts",
+      "count": 6
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/checkout/netopia-return.component.ts",
+      "count": 6
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/checkout/paypal-return.component.ts",
+      "count": 6
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/checkout/stripe-return.component.ts",
+      "count": 6
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/shared/legal-consent-modal.component.ts",
+      "count": 6
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/admin/ip-bypass/admin-ip-bypass.component.ts",
+      "count": 5
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/admin/orders/admin-order-exports.component.ts",
+      "count": 5
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/admin/users/admin-gdpr.component.ts",
+      "count": 5
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/auth/verify-email.component.ts",
+      "count": 5
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/shared/product-quick-view-modal.component.ts",
+      "count": 5
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:backend/alembic/versions/0152_create_media_dam_foundation.py",
+      "count": 4
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/admin-ui-prefs.service.ts",
+      "count": 4
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/blog.service.ts",
+      "count": 4
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/catalog.service.ts",
+      "count": 4
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/site-social.service.ts",
+      "count": 4
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/admin/inventory/admin-inventory.component.ts",
+      "count": 4
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/admin/returns/admin-returns.component.ts",
+      "count": 4
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/admin/shared/asset-library.component.ts",
+      "count": 4
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/admin/shared/dam-asset-library.component.ts",
+      "count": 4
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/auth/password-reset.component.ts",
+      "count": 4
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/auth/two-factor.component.ts",
+      "count": 4
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/checkout/netopia-cancel.component.ts",
+      "count": 4
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/tickets/tickets.component.ts",
+      "count": 4
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/shared/cms-announcement-bar.component.ts",
+      "count": 4
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/shared/cms-form-block.component.ts",
+      "count": 4
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/shared/cms-global-section-blocks.component.ts",
+      "count": 4
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:backend/alembic/versions/0024_preferred_language.py",
+      "count": 3
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:backend/alembic/versions/0025_product_category_translations.py",
+      "count": 3
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:backend/alembic/versions/0026_content_translations_and_lang.py",
+      "count": 3
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:backend/alembic/versions/0027_google_oauth_fields.py",
+      "count": 3
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:backend/alembic/versions/0142_seed_site_navigation_defaults.py",
+      "count": 3
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/admin-client-error-logger.service.ts",
+      "count": 3
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/admin-favorites.service.ts",
+      "count": 3
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/auth.service.ts",
+      "count": 3
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/http.interceptor.ts",
+      "count": 3
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/language.service.ts",
+      "count": 3
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/wishlist.service.ts",
+      "count": 3
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/account/account-coupons.component.ts",
+      "count": 3
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/account/account-wishlist.component.ts",
+      "count": 3
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/account/change-password.component.ts",
+      "count": 3
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/admin/shared/content-revisions.component.ts",
+      "count": 3
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/admin/users/admin-segments.component.ts",
+      "count": 3
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/auth/password-reset-request.component.ts",
+      "count": 3
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/newsletter/newsletter-confirm.component.ts",
+      "count": 3
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/newsletter/newsletter-unsubscribe.component.ts",
+      "count": 3
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/shared/locker-picker.component.ts",
+      "count": 3
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/shared/product-image-manager-modal.component.ts",
+      "count": 3
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:backend/alembic/versions/0042_fix_site_social_labels.py",
+      "count": 2
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:backend/alembic/versions/0050_support_inbox_returns_and_shipping_labels.py",
+      "count": 2
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:backend/alembic/versions/0072_coupons_v2.py",
+      "count": 2
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:backend/alembic/versions/0139_seed_site_social_thumbnails.py",
+      "count": 2
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/admin-recent.service.ts",
+      "count": 2
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/admin.service.ts",
+      "count": 2
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/analytics.service.ts",
+      "count": 2
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/api.service.ts",
+      "count": 2
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/coupons.service.ts",
+      "count": 2
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/ops.service.ts",
+      "count": 2
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/admin/content/admin-content-scheduling.component.ts",
+      "count": 2
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/checkout/paypal-mock.component.ts",
+      "count": 2
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/checkout/stripe-mock.component.ts",
+      "count": 2
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/checkout/success.component.ts",
+      "count": 2
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/pages/receipt/receipt.component.ts",
+      "count": 2
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/shared/address-form.component.ts",
+      "count": 2
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/shared/error-handler.service.ts",
+      "count": 2
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/shared/lazy-image.directive.ts",
+      "count": 2
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/shared/phone.ts",
+      "count": 2
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/shared/rich-editor.component.ts",
+      "count": 2
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/shared/toast.component.ts",
+      "count": 2
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:backend/Dockerfile",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:backend/alembic/versions/0009_product_tags_reviews_options.py",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:backend/alembic/versions/0033_blog_comment_moderation_and_notifications.py",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:backend/alembic/versions/0077_home_hero_to_banner_blocks.py",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:backend/alembic/versions/0145_strip_legal_index_table.py",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:backend/alembic/versions/0151_fix_homepage_hero_ro_translation.py",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:backend/alembic/versions/0154_media_job_retry_dead_letter_v2.py",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:backend/app/services/font_utils.py",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:backend/app/services/media_dam.py",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:backend/app/workers/media_worker.py",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/e2e/product-navigation.spec.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/account.service.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/admin-coupons-v2.service.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/admin-products.service.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/admin-returns.service.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/admin-support.service.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/admin-users.service.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/cart.api.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/cart.store.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/checkout-prefs.service.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/clarity.service.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/fx-admin.service.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/fx-rates.service.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/health.service.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/newsletter.service.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/notifications.service.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/receipt.service.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/shipping.service.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/site-company.service.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/site-navigation.service.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/storefront-admin-mode.service.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/structured-data.service.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/support.service.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/taxes-admin.service.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/theme.service.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/core/tickets.service.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/shared/captcha-turnstile.component.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/shared/cms-product-grid-block.component.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/shared/copy-button.component.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/shared/error-state.component.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/shared/form-messages.service.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/shared/http-error.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/shared/img-fallback.directive.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/shared/modal.component.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/shared/theme-segmented-control.component.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:frontend/src/app/shared/user-identity.ts",
+      "count": 1
+    },
+    {
+      "component": "Prekzursil_AdrianaArt:scripts/audit/collect_browser_evidence.mjs",
+      "count": 1
+    }
+  ],
+  "by_severity": [
+    {
+      "severity": "MAJOR",
+      "count": 519
+    },
+    {
+      "severity": "BLOCKER",
+      "count": 417
+    },
+    {
+      "severity": "MINOR",
+      "count": 162
+    },
+    {
+      "severity": "CRITICAL",
+      "count": 75
+    }
+  ],
+  "by_status": [
+    {
+      "status": "OPEN",
+      "count": 675
+    },
+    {
+      "status": "REOPENED",
+      "count": 498
+    }
+  ],
+  "by_type": [
+    {
+      "type": "CODE_SMELL",
+      "count": 1171
+    },
+    {
+      "type": "BUG",
+      "count": 2
+    }
+  ]
+}

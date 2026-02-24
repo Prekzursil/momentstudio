@@ -10,7 +10,7 @@ export class AdminUiPrefsService {
   preset = signal<AdminUiPreset>('custom');
   sidebarCompact = signal(false);
 
-  constructor(private auth: AuthService) {
+  constructor(private readonly auth: AuthService) {
     this.load();
   }
 
@@ -54,15 +54,15 @@ export class AdminUiPrefsService {
       const raw = localStorage.getItem(this.storageKey());
       if (!raw) return;
       const parsed = JSON.parse(raw);
-      const mode = (parsed as any)?.mode;
+      const mode = (parsed)?.mode;
       if (mode === 'simple' || mode === 'advanced') {
         this.mode.set(mode);
       }
-      const preset = (parsed as any)?.preset;
+      const preset = (parsed)?.preset;
       if (preset === 'custom' || preset === 'owner_basic') {
         this.preset.set(preset);
       }
-      const sidebarCompact = (parsed as any)?.sidebarCompact;
+      const sidebarCompact = (parsed)?.sidebarCompact;
       if (typeof sidebarCompact === 'boolean') {
         this.sidebarCompact.set(sidebarCompact);
       }
@@ -86,3 +86,4 @@ export class AdminUiPrefsService {
     }
   }
 }
+

@@ -62,7 +62,7 @@ export interface CouponEligibilityResponse {
 
 @Injectable({ providedIn: 'root' })
 export class CouponsService {
-  constructor(private api: ApiService, private cartApi: CartApi) {}
+  constructor(private readonly api: ApiService, private cartApi: CartApi) {}
 
   eligibility(shippingMethodId?: string | null): Observable<CouponEligibilityResponse> {
     const params = shippingMethodId ? { shipping_method_id: shippingMethodId } : undefined;
@@ -78,3 +78,4 @@ export class CouponsService {
     return this.api.get<CouponRead[]>('/coupons/me');
   }
 }
+

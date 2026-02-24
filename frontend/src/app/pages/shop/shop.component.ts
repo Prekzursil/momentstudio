@@ -868,9 +868,9 @@ export class ShopComponent implements OnInit, OnDestroy {
   activeCategorySlug = '';
   activeSubcategorySlug = '';
   rootCategories: Category[] = [];
-  private categoriesBySlug = new Map<string, Category>();
-  private categoriesById = new Map<string, Category>();
-  private childrenByParentId = new Map<string, Category[]>();
+  private readonly categoriesBySlug = new Map<string, Category>();
+  private readonly categoriesById = new Map<string, Category>();
+  private readonly childrenByParentId = new Map<string, Category[]>();
 
   readonly priceMinBound = 1;
   priceMaxBound = 500;
@@ -940,21 +940,21 @@ export class ShopComponent implements OnInit, OnDestroy {
   ];
 
 	  private langSub?: Subscription;
-	  private storefrontEditModeEffect?: EffectRef;
+	  private readonly storefrontEditModeEffect?: EffectRef;
 	  private lastStorefrontEditMode: boolean | null = null;
 
   constructor(
-    private catalog: CatalogService,
-    private route: ActivatedRoute,
-    private router: Router,
-    private admin: AdminService,
-    private storefrontAdminMode: StorefrontAdminModeService,
-    private toast: ToastService,
-    private translate: TranslateService,
-    private title: Title,
-    private metaService: Meta,
-    private seoHeadLinks: SeoHeadLinksService,
-    private structuredData: StructuredDataService
+    private readonly catalog: CatalogService,
+    private readonly route: ActivatedRoute,
+    private readonly router: Router,
+    private readonly admin: AdminService,
+    private readonly storefrontAdminMode: StorefrontAdminModeService,
+    private readonly toast: ToastService,
+    private readonly translate: TranslateService,
+    private readonly title: Title,
+    private readonly metaService: Meta,
+    private readonly seoHeadLinks: SeoHeadLinksService,
+    private readonly structuredData: StructuredDataService
   ) {
     this.storefrontEditModeEffect = effect(() => {
       const enabled = this.storefrontAdminMode.enabled();
@@ -2652,3 +2652,4 @@ export class ShopComponent implements OnInit, OnDestroy {
     requestAnimationFrame(() => window.scrollTo({ top: y, behavior: 'auto' }));
   }
 }
+

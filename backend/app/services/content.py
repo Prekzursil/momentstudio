@@ -1354,7 +1354,7 @@ def _extract_block_refs(meta: dict | None) -> list[tuple[str, str, str, str]]:
         elif block_type == "gallery":
             images = block.get("images")
             if isinstance(images, list):
-                for img_idx, img in enumerate(images):
+                for img in images:
                     if not isinstance(img, dict):
                         continue
                     urls.append(("image", str(img.get("url") or "")))
@@ -1366,7 +1366,7 @@ def _extract_block_refs(meta: dict | None) -> list[tuple[str, str, str, str]]:
         elif block_type == "carousel":
             slides = block.get("slides")
             if isinstance(slides, list):
-                for slide_idx, slide in enumerate(slides):
+                for slide in slides:
                     if not isinstance(slide, dict):
                         continue
                     urls.append(("image", str(slide.get("image_url") or "")))

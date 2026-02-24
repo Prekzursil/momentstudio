@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from uuid import UUID
 
@@ -22,6 +23,7 @@ from app.schemas.analytics import (
 
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
+logger = logging.getLogger(__name__)
 
 analytics_rate_limit = per_identifier_limiter(
     lambda r: r.client.host if r.client else "anon",
@@ -83,8 +85,8 @@ async def mint_analytics_token(
     # Best-effort: browsers may disconnect early.
     try:
         await request.body()
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("analytics_token_request_body_read_failed", exc_info=exc)
 
     return AnalyticsTokenResponse(token=token, expires_in=max(ttl_seconds, 60))
 
@@ -128,7 +130,7 @@ async def ingest_analytics_event(
         if isinstance(raw_order_id, str):
             try:
                 order_id = UUID(raw_order_id)
-            except Exception:
+            except ValueError:
                 order_id = None
 
     record = AnalyticsEvent(
@@ -145,7 +147,7 @@ async def ingest_analytics_event(
     # Best-effort: browsers may disconnect early.
     try:
         await request.body()
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("analytics_event_request_body_read_failed", exc_info=exc)
 
     return AnalyticsEventIngestResponse(received=True)

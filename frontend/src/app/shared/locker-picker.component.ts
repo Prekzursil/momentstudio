@@ -203,7 +203,7 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
   private searchTimer: number | null = null;
   private searchAbort: AbortController | null = null;
 
-  constructor(private shipping: ShippingService, private translate: TranslateService, private styles: LazyStylesService) {}
+  constructor(private readonly shipping: ShippingService, private translate: TranslateService, private styles: LazyStylesService) {}
 
   ngAfterViewInit(): void {
     void this.initMap();
@@ -537,3 +537,4 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
     }
   }
 }
+

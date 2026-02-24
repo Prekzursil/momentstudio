@@ -60,7 +60,7 @@ export type ReceiptRead = {
 export class ReceiptService {
   private readonly apiBaseUrl = appConfig.apiBaseUrl.replace(/\/$/, '');
 
-  constructor(private api: ApiService) {}
+  constructor(private readonly api: ApiService) {}
 
   getByToken(token: string, opts?: { reveal?: boolean }): Observable<ReceiptRead> {
     const params = opts?.reveal ? { reveal: true } : undefined;
@@ -90,3 +90,4 @@ export class ReceiptService {
     return opts?.reveal ? `${base}?reveal=true` : base;
   }
 }
+

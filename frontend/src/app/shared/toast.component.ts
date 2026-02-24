@@ -52,7 +52,7 @@ export class ToastComponent implements OnChanges {
   livePolite = '';
   liveAssertive = '';
 
-  constructor(private toastService: ToastService) {}
+  constructor(private readonly toastService: ToastService) {}
 
   ngOnChanges(changes: SimpleChanges): void {
     if (!('messages' in changes)) return;
@@ -78,3 +78,4 @@ export class ToastComponent implements OnChanges {
     handler();
   }
 }
+

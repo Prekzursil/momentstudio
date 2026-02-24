@@ -80,7 +80,7 @@ export interface SupportSlaSettings {
 
 @Injectable({ providedIn: 'root' })
 export class AdminSupportService {
-  constructor(private api: ApiService) {}
+  constructor(private readonly api: ApiService) {}
 
   submitFeedback(payload: { message: string; context?: string | null }): Observable<AdminContactSubmissionRead> {
     return this.api.post<AdminContactSubmissionRead>('/support/admin/feedback', payload);
@@ -156,3 +156,4 @@ export class AdminSupportService {
     return this.api.patch<SupportSlaSettings>('/support/admin/sla-settings', payload);
   }
 }
+

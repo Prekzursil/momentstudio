@@ -140,7 +140,7 @@ export interface ReceiptShareToken {
 
 @Injectable({ providedIn: 'root' })
 export class AccountService {
-  constructor(private api: ApiService) {}
+  constructor(private readonly api: ApiService) {}
 
   private normalizeOrder(order: any): Order {
     return {
@@ -274,3 +274,4 @@ export class AccountService {
     return this.api.delete<void>(`/me/addresses/${id}`);
   }
 }
+

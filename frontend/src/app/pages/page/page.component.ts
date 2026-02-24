@@ -183,16 +183,16 @@ export class CmsPageComponent implements OnInit, OnDestroy {
   private suppressNextLoad = false;
 
   constructor(
-    private api: ApiService,
-    private route: ActivatedRoute,
-    private router: Router,
-    private storefrontAdminMode: StorefrontAdminModeService,
-    private translate: TranslateService,
-    private title: Title,
-    private meta: Meta,
-    private markdown: MarkdownService,
-    private seoHeadLinks: SeoHeadLinksService,
-    private seoCopyFallback: SeoCopyFallbackService
+    private readonly api: ApiService,
+    private readonly route: ActivatedRoute,
+    private readonly router: Router,
+    private readonly storefrontAdminMode: StorefrontAdminModeService,
+    private readonly translate: TranslateService,
+    private readonly title: Title,
+    private readonly meta: Meta,
+    private readonly markdown: MarkdownService,
+    private readonly seoHeadLinks: SeoHeadLinksService,
+    private readonly seoCopyFallback: SeoCopyFallbackService
   ) {}
 
   canEditPage(): boolean {
@@ -425,3 +425,4 @@ export class CmsPageComponent implements OnInit, OnDestroy {
     return !this.legalIndexDocs().length;
   }
 }
+

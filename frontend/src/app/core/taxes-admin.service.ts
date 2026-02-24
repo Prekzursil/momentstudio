@@ -42,7 +42,7 @@ export interface TaxRateUpsert {
 
 @Injectable({ providedIn: 'root' })
 export class TaxesAdminService {
-  constructor(private api: ApiService) {}
+  constructor(private readonly api: ApiService) {}
 
   listGroups(): Observable<TaxGroupRead[]> {
     return this.api.get<TaxGroupRead[]>('/taxes/admin/groups');
@@ -68,3 +68,4 @@ export class TaxesAdminService {
     return this.api.delete<void>(`/taxes/admin/groups/${groupId}/rates/${encodeURIComponent(countryCode)}`);
   }
 }
+

@@ -128,8 +128,8 @@ export class SuccessComponent {
   summary: CheckoutSuccessSummary | null = null;
 
   constructor(
-    private cart: CartStore,
-    private analytics: AnalyticsService
+    private readonly cart: CartStore,
+    private readonly analytics: AnalyticsService
   ) {
     // Keep the cart in sync in case the backend cleared it while we were paying.
     this.cart.loadFromBackend();
@@ -196,3 +196,4 @@ export class SuccessComponent {
     return detail || null;
   }
 }
+

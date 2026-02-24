@@ -1578,7 +1578,7 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
     const ids = Array.from(this.selectedQueueJobIds());
     if (!ids.length) return;
     const value = window.prompt('Tag to add to selected jobs', '');
-    if (!value || !value.trim()) return;
+    if (!value?.trim()) return;
     try {
       await Promise.all(
         ids.map((jobId) => firstValueFrom(this.admin.updateMediaJobTriage(jobId, { add_tags: [value.trim()] })))
@@ -1594,7 +1594,7 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
     const ids = Array.from(this.selectedQueueJobIds());
     if (!ids.length) return;
     const value = window.prompt('Tag to remove from selected jobs', '');
-    if (!value || !value.trim()) return;
+    if (!value?.trim()) return;
     try {
       await Promise.all(
         ids.map((jobId) => firstValueFrom(this.admin.updateMediaJobTriage(jobId, { remove_tags: [value.trim()] })))
@@ -1656,13 +1656,13 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
 
   async addJobTag(job: MediaJob): Promise<void> {
     const value = window.prompt('Tag to add', '');
-    if (!value || !value.trim()) return;
+    if (!value?.trim()) return;
     await this.patchJobTriage(job, { add_tags: [value.trim()] }, 'Tag added.');
   }
 
   async removeJobTag(job: MediaJob): Promise<void> {
     const value = window.prompt('Tag to remove', '');
-    if (!value || !value.trim()) return;
+    if (!value?.trim()) return;
     await this.patchJobTriage(job, { remove_tags: [value.trim()] }, 'Tag removed.');
   }
 

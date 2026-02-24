@@ -2,6 +2,7 @@ import csv
 import httpx
 from datetime import datetime, timedelta, timezone
 from io import StringIO
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
@@ -88,6 +89,7 @@ from app.services import structured_data as structured_data_service
 from app.services import social_thumbnails
 
 router = APIRouter(prefix="/content", tags=["content"])
+logger = logging.getLogger(__name__)
 
 
 def _requires_auth(block: ContentBlock) -> bool:
@@ -1135,8 +1137,12 @@ async def admin_upload_media_asset(
             await media_dam.process_job_inline(session, job)
             asset = await media_dam.get_asset_or_404(session, result.asset.id)
             return media_dam.asset_to_read(asset)
-        except ValueError:
-            pass
+        except ValueError as exc:
+            logger.debug(
+                "content_media_auto_finalize_failed",
+                extra={"asset_id": str(result.asset.id), "job_id": str(result.ingest_job_id)},
+                exc_info=exc,
+            )
     return result.asset
 
 
@@ -1196,7 +1202,8 @@ async def _run_media_job_in_background(job_id: UUID) -> None:
         try:
             job = await media_dam.get_job_or_404(session, job_id)
             await media_dam.process_job_inline(session, job)
-        except Exception:
+        except Exception as exc:
+            logger.debug("content_media_background_job_failed", extra={"job_id": str(job_id)}, exc_info=exc)
             return
 
 

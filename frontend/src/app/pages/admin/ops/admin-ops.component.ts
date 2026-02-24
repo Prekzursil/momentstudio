@@ -994,12 +994,12 @@ export class AdminOpsComponent implements OnInit {
   webhookRetrying = signal<string | null>(null);
 
   constructor(
-    private adminService: AdminService,
-    private health: HealthService,
-    private ops: OpsService,
-    private toast: ToastService,
-    private translate: TranslateService,
-    private route: ActivatedRoute
+    private readonly adminService: AdminService,
+    private readonly health: HealthService,
+    private readonly ops: OpsService,
+    private readonly toast: ToastService,
+    private readonly translate: TranslateService,
+    private readonly route: ActivatedRoute
   ) {}
 
   ngOnInit(): void {
@@ -1031,17 +1031,17 @@ export class AdminOpsComponent implements OnInit {
         this.backendReady.set(Boolean(res.ready));
 
         if (res.webhooksFailed) {
-          const count = Number((res.webhooksFailed as any)?.failed ?? 0);
+          const count = Number((res.webhooksFailed)?.failed ?? 0);
           this.webhookFailures24h.set(Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0);
         }
         if (res.webhooksBacklog) {
-          const totalCount = Number((res.webhooksBacklog as any)?.pending ?? 0);
-          const recentCount = Number((res.webhooksBacklog as any)?.pending_recent ?? 0);
+          const totalCount = Number((res.webhooksBacklog)?.pending ?? 0);
+          const recentCount = Number((res.webhooksBacklog)?.pending_recent ?? 0);
           this.webhookBacklogTotal.set(Number.isFinite(totalCount) ? Math.max(0, Math.floor(totalCount)) : 0);
           this.webhookBacklogRecent24h.set(Number.isFinite(recentCount) ? Math.max(0, Math.floor(recentCount)) : 0);
         }
         if (res.emailsFailed) {
-          const count = Number((res.emailsFailed as any)?.failed ?? 0);
+          const count = Number((res.emailsFailed)?.failed ?? 0);
           this.emailFailures24h.set(Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0);
         }
 
@@ -1106,7 +1106,7 @@ export class AdminOpsComponent implements OnInit {
     }).subscribe({
       next: (res) => {
         this.samedaySyncStatus.set((res.status as SamedaySyncStatusRead | null) ?? null);
-        this.samedaySyncRuns.set((res.runs as any)?.items || []);
+        this.samedaySyncRuns.set((res.runs)?.items || []);
         if (!res.status || !res.runs) {
           this.samedaySyncError.set(this.translate.instant('adminUi.ops.samedaySync.errors.load'));
         }
@@ -1439,7 +1439,7 @@ export class AdminOpsComponent implements OnInit {
   }
 
   private maybeFocusSection(): void {
-    const state = history.state as any;
+    const state = history.state;
     const focus = (state?.focusOpsSection || '').toString();
     const id =
       focus === 'emails' ? 'admin-ops-email-failures' : focus === 'webhooks' ? 'admin-ops-webhooks' : '';
@@ -1448,7 +1448,7 @@ export class AdminOpsComponent implements OnInit {
       if (typeof document === 'undefined') return;
       document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       try {
-        const nextState = { ...(history.state as any) };
+        const nextState = { ...(history.state) };
         delete nextState.focusOpsSection;
         history.replaceState(nextState, '');
       } catch {
@@ -1489,3 +1489,4 @@ export class AdminOpsComponent implements OnInit {
     return d.toISOString();
   }
 }
+

@@ -27,12 +27,12 @@ export class GoogleCallbackComponent implements OnInit {
   error = signal<string | null>(null);
 
   constructor(
-    private route: ActivatedRoute,
-    private router: Router,
-    private auth: AuthService,
-    private googleLinkPending: GoogleLinkPendingService,
-    private toast: ToastService,
-    private translate: TranslateService
+    private readonly route: ActivatedRoute,
+    private readonly router: Router,
+    private readonly auth: AuthService,
+    private readonly googleLinkPending: GoogleLinkPendingService,
+    private readonly toast: ToastService,
+    private readonly translate: TranslateService
   ) {}
 
   ngOnInit(): void {
@@ -105,3 +105,4 @@ export class GoogleCallbackComponent implements OnInit {
     void this.router.navigateByUrl('/account/security');
   }
 }
+

@@ -1695,7 +1695,7 @@ export class AdminOrderDetailComponent implements OnInit {
   shippingLabelFile: File | null = null;
   shippingLabelError = signal<string | null>(null);
 
-  private tagColorOverrides: Record<string, TagColor> = loadTagColorOverrides();
+  private readonly tagColorOverrides: Record<string, TagColor> = loadTagColorOverrides();
 
   private orderId: string | null = null;
   private navContext:
@@ -1715,13 +1715,13 @@ export class AdminOrderDetailComponent implements OnInit {
   private readonly e164PhoneRe = /^\+[1-9]\d{7,14}$/;
 
   constructor(
-    private route: ActivatedRoute,
-    private router: Router,
-    private api: AdminOrdersService,
-    private returnsApi: AdminReturnsService,
-    private toast: ToastService,
-    private translate: TranslateService,
-    private recent: AdminRecentService
+    private readonly route: ActivatedRoute,
+    private readonly router: Router,
+    private readonly api: AdminOrdersService,
+    private readonly returnsApi: AdminReturnsService,
+    private readonly toast: ToastService,
+    private readonly translate: TranslateService,
+    private readonly recent: AdminRecentService
   ) {}
 
   private readonly statusOrder: OrderStatus[] = [
@@ -1802,7 +1802,7 @@ export class AdminOrderDetailComponent implements OnInit {
 
   ngOnInit(): void {
     this.route.queryParamMap.subscribe((params) => {
-      this.applyNavContext(params as any);
+      this.applyNavContext(params);
     });
 
     this.route.paramMap.subscribe((params) => {
@@ -2491,15 +2491,15 @@ export class AdminOrderDetailComponent implements OnInit {
     const rawChanges = (data as any).changes;
     if (!rawChanges || typeof rawChanges !== 'object' || Array.isArray(rawChanges)) return null;
 
-    const shipping = (rawChanges as any).shipping_address;
-    const billing = (rawChanges as any).billing_address;
+    const shipping = (rawChanges).shipping_address;
+    const billing = (rawChanges).billing_address;
     const result: { shipping?: { from: unknown; to: unknown }; billing?: { from: unknown; to: unknown } } = {};
 
     if (shipping && typeof shipping === 'object' && !Array.isArray(shipping)) {
-      result.shipping = { from: (shipping as any).from ?? null, to: (shipping as any).to ?? null };
+      result.shipping = { from: (shipping).from ?? null, to: (shipping).to ?? null };
     }
     if (billing && typeof billing === 'object' && !Array.isArray(billing)) {
-      result.billing = { from: (billing as any).from ?? null, to: (billing as any).to ?? null };
+      result.billing = { from: (billing).from ?? null, to: (billing).to ?? null };
     }
 
     return result.shipping || result.billing ? result : null;
@@ -2539,10 +2539,10 @@ export class AdminOrderDetailComponent implements OnInit {
 
     const rows: Array<{ label: string; from: string; to: string }> = [];
     for (const field of Object.keys(rawChanges)) {
-      const change = (rawChanges as any)[field];
+      const change = (rawChanges)[field];
       if (!change || typeof change !== 'object') continue;
-      const from = this.diffValue(field, (change as any).from);
-      const to = this.diffValue(field, (change as any).to);
+      const from = this.diffValue(field, (change).from);
+      const to = this.diffValue(field, (change).to);
       if (from === to) continue;
       rows.push({ label: this.diffLabel(field), from, to });
     }
@@ -2807,8 +2807,8 @@ export class AdminOrderDetailComponent implements OnInit {
       if (!Array.isArray(items)) continue;
       for (const row of items) {
         if (!row) continue;
-        if (String((row as any).order_item_id ?? '') !== orderItemId) continue;
-        const q = Number((row as any).quantity ?? 0);
+        if (String((row).order_item_id ?? '') !== orderItemId) continue;
+        const q = Number((row).quantity ?? 0);
         if (Number.isFinite(q) && q > 0) qty += Math.trunc(q);
       }
     }
@@ -3443,3 +3443,4 @@ export class AdminOrderDetailComponent implements OnInit {
     });
   }
 }
+

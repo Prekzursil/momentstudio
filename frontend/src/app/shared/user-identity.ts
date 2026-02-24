@@ -37,6 +37,7 @@ export function initialsFromIdentity(identity: IdentityLike | null | undefined, 
     .filter(Boolean)
     .map((p) => p[0]?.toUpperCase())
     .filter(Boolean);
-  return (letters.slice(0, 2).join('') || src.slice(0, 1).toUpperCase()) as string;
+  return (letters.slice(0, 2).join('') || src.slice(0, 1).toUpperCase());
 }
+
 

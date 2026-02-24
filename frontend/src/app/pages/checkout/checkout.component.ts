@@ -433,19 +433,19 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
   private checkoutFlowCompleted = false;
 
   constructor(
-    private cart: CartStore,
-    private router: Router,
-    private route: ActivatedRoute,
-    private cartApi: CartApi,
-    private api: ApiService,
-    private accountService: AccountService,
-    private couponsService: CouponsService,
-    private translate: TranslateService,
-    private checkoutPrefs: CheckoutPrefsService,
-    private analytics: AnalyticsService,
+    private readonly cart: CartStore,
+    private readonly router: Router,
+    private readonly route: ActivatedRoute,
+    private readonly cartApi: CartApi,
+    private readonly api: ApiService,
+    private readonly accountService: AccountService,
+    private readonly couponsService: CouponsService,
+    private readonly translate: TranslateService,
+    private readonly checkoutPrefs: CheckoutPrefsService,
+    private readonly analytics: AnalyticsService,
     public auth: AuthService,
-    private zone: NgZone,
-    private cdr: ChangeDetectorRef
+    private readonly zone: NgZone,
+    private readonly cdr: ChangeDetectorRef
   ) {
     const prefs = this.checkoutPrefs.tryLoadDeliveryPrefs();
     if (prefs) {
@@ -1208,17 +1208,21 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     return best;
   }
 
-	  private couponShippingDiscount(): number {
-	    const offer = this.appliedCouponOffer;
-	    if (!offer || !offer.eligible) return 0;
-	    const currentCode = (this.promo || '').trim().toUpperCase();
-	    if (!currentCode || offer.coupon.code.toUpperCase() !== currentCode) return 0;
-	    return parseMoney(offer.estimated_shipping_discount_ron);
-	  }
+  private couponShippingDiscount(): number {
+    const offer = this.appliedCouponOffer;
+    if (!offer?.eligible) {
+      return 0;
+    }
+    const currentCode = (this.promo || '').trim().toUpperCase();
+    if (!currentCode || offer.coupon.code.toUpperCase() !== currentCode) {
+      return 0;
+    }
+    return parseMoney(offer.estimated_shipping_discount_ron);
+  }
 
-	  private couponOfferSavings(offer: CouponOffer): number {
-	    return parseMoney(offer.estimated_discount_ron) + parseMoney(offer.estimated_shipping_discount_ron);
-	  }
+  private couponOfferSavings(offer: CouponOffer): number {
+    return parseMoney(offer.estimated_discount_ron) + parseMoney(offer.estimated_shipping_discount_ron);
+  }
 
   private buildSuccessSummary(orderId: string, referenceCode: string | null, paymentMethod: CheckoutPaymentMethod): CheckoutSuccessSummary {
     const quote = this.quote ?? { subtotal: this.subtotal(), fee: 0, tax: 0, shipping: 0, total: this.subtotal(), currency: this.currency };
@@ -1443,7 +1447,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
 	    const tax = parseMoney(totals.tax);
 	    const shipping = parseMoney(totals.shipping);
 	    const total = parseMoney(totals.total);
-	    const currency = (totals.currency ?? 'RON') as string;
+	    const currency = (totals.currency ?? 'RON');
 	    this.quote = { subtotal, fee, tax, shipping, total, currency };
       this.phoneRequiredHome = parseBool((totals as any).phone_required_home, true);
       this.phoneRequiredLocker = parseBool((totals as any).phone_required_locker, true);

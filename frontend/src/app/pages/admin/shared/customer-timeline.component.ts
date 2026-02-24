@@ -131,12 +131,12 @@ export class CustomerTimelineComponent implements OnChanges, OnDestroy {
   private lastKey: string | null = null;
 
   constructor(
-    private auth: AuthService,
-    private ordersApi: AdminOrdersService,
-    private supportApi: AdminSupportService,
-    private opsApi: OpsService,
-    private router: Router,
-    private translate: TranslateService
+    private readonly auth: AuthService,
+    private readonly ordersApi: AdminOrdersService,
+    private readonly supportApi: AdminSupportService,
+    private readonly opsApi: OpsService,
+    private readonly router: Router,
+    private readonly translate: TranslateService
   ) {}
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -289,3 +289,4 @@ export class CustomerTimelineComponent implements OnChanges, OnDestroy {
     );
   }
 }
+

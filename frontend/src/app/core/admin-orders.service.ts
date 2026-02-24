@@ -22,12 +22,12 @@ export interface AdminOrderListItem {
   customer_email?: string | null;
   customer_username?: string | null;
   tags?: string[];
-  sla_kind?: 'accept' | 'ship' | string | null;
+  sla_kind?: string | null;
   sla_started_at?: string | null;
   sla_due_at?: string | null;
   sla_overdue?: boolean;
   fraud_flagged?: boolean;
-  fraud_severity?: 'low' | 'medium' | 'high' | string | null;
+  fraud_severity?: string | null;
 }
 
 export interface AdminOrderListResponse {
@@ -79,7 +79,7 @@ export interface AdminOrderEmailEvent {
   id: string;
   to_email: string;
   subject: string;
-  status: 'sent' | 'failed' | string;
+  status: string;
   error_message?: string | null;
   created_at: string;
 }
@@ -146,7 +146,7 @@ export interface AdminOrderDetail extends Order {
 
 @Injectable({ providedIn: 'root' })
 export class AdminOrdersService {
-  constructor(private api: ApiService) {}
+  constructor(private readonly api: ApiService) {}
 
   search(params: {
     q?: string;

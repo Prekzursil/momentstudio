@@ -66,12 +66,12 @@ export class StripeReturnComponent implements OnInit, OnDestroy {
   private confirmSubscription: Subscription | null = null;
 
   constructor(
-    private route: ActivatedRoute,
-    private api: ApiService,
-    private router: Router,
-    private translate: TranslateService,
-    private cart: CartStore,
-    private analytics: AnalyticsService
+    private readonly route: ActivatedRoute,
+    private readonly api: ApiService,
+    private readonly router: Router,
+    private readonly translate: TranslateService,
+    private readonly cart: CartStore,
+    private readonly analytics: AnalyticsService
   ) {}
 
   ngOnInit(): void {
@@ -149,3 +149,4 @@ export class StripeReturnComponent implements OnInit, OnDestroy {
     return this.translate.instant(fallbackKey);
   }
 }
+

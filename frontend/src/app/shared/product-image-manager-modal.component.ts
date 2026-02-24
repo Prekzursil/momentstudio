@@ -189,7 +189,7 @@ export class ProductImageManagerModalComponent implements OnChanges {
   imageMeta: ImageMetaByLang = this.blankImageMeta();
   metaExists: Record<'en' | 'ro', boolean> = { en: false, ro: false };
 
-  constructor(private admin: AdminService, private toast: ToastService, private translate: TranslateService) {}
+  constructor(private readonly admin: AdminService, private toast: ToastService, private translate: TranslateService) {}
 
   ngOnChanges(changes: SimpleChanges): void {
     if (!('open' in changes) && !('images' in changes)) return;
@@ -496,3 +496,4 @@ export class ProductImageManagerModalComponent implements OnChanges {
     this.clearMeta();
   }
 }
+

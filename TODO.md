@@ -4,10 +4,11 @@ Below is a structured checklist you can turn into issues.
 
 ## v1.0.0 Release Gates (tracked across PRs)
 
-This section mirrors the “PR 0..PR 10” release-gate checklist and records *evidence* (paths + commands)
+This section mirrors the “PR 0..PR 10” release-gate checklist and records _evidence_ (paths + commands)
 showing what is already implemented.
 
 ### PR0 — Release plumbing + guardrails (CI + startup validation)
+
 - [x] CI gates exist and block merge.
   - Evidence (CI): `.github/workflows/backend.yml`, `.github/workflows/frontend.yml`, `.github/workflows/compose-smoke.yml`
   - Evidence (startup checks): `backend/app/core/startup_checks.py`, `backend/app/main.py`
@@ -16,38 +17,46 @@ showing what is already implemented.
     - `npm -C frontend run lint && npm -C frontend run build`
 
 ### PR1 — Email is deterministic + non-blocking
+
 - [x] Remove remaining float/PII fallbacks and keep template tests green.
   - Evidence (deps): `backend/requirements.txt` (`jinja2==3.1.4`)
   - Evidence (off-thread send): `backend/app/services/email.py` (`anyio.to_thread.run_sync(...)`)
   - Evidence (tests): `backend/tests/test_email_templates.py`, `backend/tests/test_email_service.py`
 
 ### PR2 — Background schedulers: single leader + avoid DB pool starvation
+
 - [x] Leader-locked schedulers with a dedicated lock DB pool.
   - Evidence: `backend/app/services/leader_lock.py`, `backend/app/services/*_scheduler.py`, `backend/app/main.py`
 
 ### PR3 — Maintenance mode must not break payment webhooks
+
 - [x] Maintenance allowlist includes Stripe/PayPal/Netopia callbacks + health.
   - Evidence: `backend/app/middleware/backpressure.py`, `backend/tests/test_backpressure_maintenance.py`
 
 ### PR4 — Inventory correctness: prevent oversell under concurrency
+
 - [x] Treat open orders as reservations (lock + recheck) + TTL auto-cancel for `pending_payment`.
   - Evidence (service): `backend/app/services/order.py`, `backend/app/services/order_expiration_scheduler.py`
   - Evidence (integration test): `backend/tests/test_integration_postgres.py`
 
 ### PR5 — Remove sync heavy work from the event loop (uploads + PDFs)
+
 - [x] Offload uploads/image processing and PDF rendering off-thread.
   - Evidence: `backend/app/services/content.py`, `backend/app/services/email.py`, `backend/app/api/v1/orders.py`
 
 ### PR7 — Proxy trust + rate limiting correctness
+
 - [x] Restrict `FORWARDED_ALLOW_IPS` defaults in prod configs/docs (avoid `*`).
   - Evidence: `infra/prod/.env.example`, `infra/prod/docker-compose.yml`, `infra/prod/README.md`
 
 ### PR9 — Money representation: remove floats, standardize boundaries
+
 - [x] Remove remaining float conversions in payment/email boundaries (Netopia + email formatting).
   - Evidence: `backend/app/services/netopia.py` (`order.amount`), `backend/tests/test_netopia_start_payment_decimal.py`
   - Evidence: `backend/app/services/email.py` (`_money_str`), `backend/tests/test_email_service.py`
 
 ### PR10 — Frontend UX polish sweep (i18n, loading states, error codes)
+
 - [x] Verify i18n coverage and remove remaining hardcoded user strings in critical flows.
   - Evidence (guards/toasts): `frontend/src/app/core/auth.guard.ts`, `frontend/src/app/shared/error-handler.service.ts`
   - Evidence (auth UX): `frontend/src/app/pages/auth/password-reset-request.component.ts`, `frontend/src/app/pages/auth/password-reset.component.ts`, `frontend/src/app/pages/auth/register.component.ts`
@@ -55,6 +64,7 @@ showing what is already implemented.
   - Verify locally: `npm -C frontend run i18n:check`
 
 ## Pre-sync production audit roadmap (current batch)
+
 - [x] Post-sync: verify live deployment version, header deduplication, and manifest MIME (`application/manifest+json`).
   - Evidence (script): `infra/prod/verify-live.sh`
   - Run: `EXPECTED_APP_VERSION=3ae6cb6 ./infra/prod/verify-live.sh` (run on 2026-02-12; passed)
@@ -68,6 +78,7 @@ showing what is already implemented.
   - Evidence: `infra/prod/deploy.sh`, `infra/prod/docker-compose.yml`, `frontend/nginx/99-runtime-config.sh`, `frontend/src/app/pages/admin/ops/admin-ops.component.ts`, `backend/app/services/ops.py`
 
 ## UI/UX Mid-Scale Refactor (single big release)
+
 - [x] UX foundation: implement shared `PageHeader`, `InlineErrorCard`, `LoadingState`, `EmptyState`, `ActionBar`, `FormSection`, and `StatusBadge` primitives.
   - Evidence: `frontend/src/app/shared/page-header.component.ts`, `frontend/src/app/shared/inline-error-card.component.ts`, `frontend/src/app/shared/loading-state.component.ts`, `frontend/src/app/shared/empty-state.component.ts`, `frontend/src/app/shared/action-bar.component.ts`, `frontend/src/app/shared/form-section.component.ts`, `frontend/src/app/shared/status-badge.component.ts`
 - [x] Storefront UX: apply shared primitives to critical conversion pages (`shop`, `cart`, `checkout`).
@@ -96,6 +107,7 @@ showing what is already implemented.
   - Evidence: `frontend/e2e/admin-dashboard-freeze.spec.ts`, `.github/workflows/compose-smoke.yml`, `frontend/playwright.config.ts`
 
 ## High priority (next)
+
 - [x] Main vs PR #199: complete parity audit + remediation with production-safe smoke checks and env-profile hardening.
   - Evidence: `docs/reports/main-vs-pr199/baseline-contracts.md`, `docs/reports/main-vs-pr199/main-delta-risk-map.md`, `docs/reports/main-vs-pr199/local-matrix-results.md`, `docs/reports/main-vs-pr199/production-safe-smoke.md`, `docs/reports/main-vs-pr199/final-audit-scorecard.md`, `backend/tests/test_checkout_flow.py`, `scripts/env/bootstrap.sh`, `scripts/env/doctor.sh`, `docs/ENVIRONMENT_PROFILES.md`
 - [x] Repository governance: add license/security/codeowners/code-of-conduct baseline files.
@@ -251,7 +263,9 @@ showing what is already implemented.
 - [x] Frontend infra: serve `manifest.webmanifest` with the correct MIME type and avoid duplicate security headers between layers.
 - [x] Backend deps: upgrade core packages to clear `pip-audit` CVEs and migrate JWT from `python-jose` → `PyJWT`.
 - [x] Admin uploads: remove strict file size caps (stream uploads to disk; allow large admin uploads in local nginx).
+
 ### Admin Dashboard & Subpages — Curated Improvements (50)
+
 - [x] Admin Products: cleanup pending timers on destroy – Clear debounce/poll timeouts and cancel in-flight searches to prevent stale UI updates.
 - [x] Admin Tables: translate selection a11y labels – Replace hard-coded admin `aria-label`s (select all/row/base price/stock qty) with RO/EN i18n keys.
 - [x] Admin UI: include requestId in error states – Surface backend request IDs on failures and add a one-click “copy requestId” action for support.
@@ -314,9 +328,10 @@ showing what is already implemented.
 - [x] Uploads: add additional upload hardening (max dimensions, image-bomb protection, safe serving headers, storage outside web root).
 
 ## Project & Infra
+
 - [x] Initialize monorepo with `backend/`, `frontend/`, `infra/`.
 - [x] Add `docker-compose.yml` for API, frontend, Postgres.
-- [x] Add backend `.env.example` (DATABASE_URL, SECRET_KEY, STRIPE_ENV + Stripe keys, SMTP_*, FRONTEND_ORIGIN).
+- [x] Add backend `.env.example` (DATABASE*URL, SECRET_KEY, STRIPE_ENV + Stripe keys, SMTP*\*, FRONTEND_ORIGIN).
 - [x] Add frontend `.env.example` (API_BASE_URL, STRIPE_ENV + publishable keys, APP_ENV).
 - [x] Payments config: add `STRIPE_ENV` toggle (sandbox/live) + env-specific keys for backend/frontend/docker.
 - [x] Payments config: allow `PAYPAL_CURRENCY=RON` (skip FX conversion when using RON).
@@ -346,6 +361,7 @@ showing what is already implemented.
 - [x] Infra: add production Docker Compose (Caddy) + VPS deploy/backup/restore scripts (`infra/prod/`).
 
 ## Legal & Compliance (NETOPIA/ANPC/GDPR)
+
 - [x] Legal pages: add CMS-backed pages `page.terms` (index), `page.terms-and-conditions`, `page.privacy-policy`, `page.anpc` (RO+EN required).
 - [x] Legal content: ensure Terms & Conditions covers payment methods + delivery + return/cancellation policy (NETOPIA requirement), or clearly links to those sections/pages.
 - [x] CMS enforcement: block publishing legal pages unless **both RO + EN** are present (no fallback) + ensure version history/rollback works.
@@ -364,6 +380,7 @@ showing what is already implemented.
 - [x] Admin CMS: make legal pages editable (Terms index, Terms & Conditions, Privacy Policy, ANPC).
 
 ## Backend - Core & Auth
+
 - [x] Scaffold FastAPI app with versioned `/api/v1` router.
 - [x] Settings via `pydantic-settings`.
 - [x] SQLAlchemy engine/session for Postgres.
@@ -393,6 +410,7 @@ showing what is already implemented.
 - [x] Profile: add “use Google photo” + “remove avatar” endpoints; default to local placeholder avatar (Google photo opt-in).
 
 ## Backend - Catalog & Products
+
 - [x] Category model + migration.
 - [x] Categories: add parent/child hierarchy (subcategories) and include descendants when filtering products by category.
 - [x] Product model + migration.
@@ -435,6 +453,7 @@ showing what is already implemented.
 - [x] Catalog: restrict public product list/detail/bounds/feed to published + active only (admin can still access drafts/archived).
 
 ## Backend - Cart & Checkout
+
 - [x] Cart + CartItem models + migrations.
 - [x] Guest cart support (session_id).
 - [x] GET /cart (guest or user).
@@ -468,6 +487,7 @@ showing what is already implemented.
 - [x] Checkout: add idempotency guard to prevent duplicate orders from the same cart (double-submit/retry).
 
 ## Backend - Orders, Payment, Addresses
+
 - [x] Address model + migration; CRUD /me/addresses.
 - [x] Order + OrderItem models + migrations.
 - [x] Service to build order from cart (price snapshot).
@@ -520,6 +540,7 @@ showing what is already implemented.
 - [x] Payments: add backend payment capabilities endpoint and use it to disable Netopia checkout until configured (still visible for review).
 
 ## Backend - CMS & Content
+
 - [x] ContentBlock model + migration.
 - [x] Seed default blocks (home hero, about, FAQ, shipping/returns, care).
 - [x] GET /content/{key} public.
@@ -547,6 +568,7 @@ showing what is already implemented.
 - [x] Admin CMS: add hide/unhide controls for custom pages (meta flag; hidden pages excluded from sitemap/SEO and return 404 publicly).
 
 ## Backend - Email & Notifications
+
 - [x] Email settings (SMTP).
 - [x] Generic email service (text + HTML).
 - [x] Order confirmation email.
@@ -571,6 +593,7 @@ showing what is already implemented.
 - [x] Newsletter: add admin export of confirmed subscribers (CSV) for marketing ops.
 
 ## Backend - Security, Observability, Testing
+
 - [x] CORS config for dev/prod.
 - [x] Rate limiting on login/register/password reset.
 - [x] Validate file types/sizes for uploads.
@@ -601,6 +624,7 @@ showing what is already implemented.
 - [x] Reliability: standardize 429 responses (Retry-After + request_id) for rate limits and backpressure.
 
 ## Frontend - Shell & Shared
+
 - [x] Scaffold Angular app with routing + strict TS.
 - [x] Tailwind CSS and design tokens.
 - [x] Main layout (header/footer/responsive nav).
@@ -655,6 +679,7 @@ showing what is already implemented.
 - [x] DX: eliminate frontend lint/build warnings (no-floating-promises, tsconfig entrypoints, serve config, bundle budgets).
 
 ## Frontend - Storefront
+
 - [x] Homepage hero with "Shop now" CTA.
 - [x] Featured products grid on homepage.
 - [x] Category listing with grid + pagination.
@@ -698,6 +723,7 @@ showing what is already implemented.
 - [x] A11y: localize shop filter aria labels and improve keyboard affordances for price range inputs.
 
 ### Storefront Catalog – Next Improvements (Backlog)
+
 - [x] Shop: active filter chips – Show selected category/price/tags as removable chips + “Clear all”.
 - [x] Shop: preserve scroll position – When returning from product detail, restore catalog scroll and filters.
 - [x] Shop: result count – Display “X results” and current page range above the grid.
@@ -710,6 +736,7 @@ showing what is already implemented.
 - [x] Storefront: fix product detail page loading on first navigation (NgOptimizedImage sizing + change detection).
 
 ### Storefront Admin Quick Edit (No Dashboard) – Next Improvements (Backlog)
+
 - [x] Storefront Admin Mode: toggle – Add an “Edit mode” toggle for admins (header button) that reveals inline controls.
 - [x] Storefront Admin Mode: permissions – Gate edit mode behind admin role + require recent auth for sensitive actions.
 - [x] Storefront Categories: drag reorder – Reorder nav categories via drag-and-drop directly in the header/category grid.
@@ -739,6 +766,7 @@ showing what is already implemented.
 - [x] Product detail: recently viewed – Harden rendering for legacy cached entries (missing currency/images).
 
 ### Storefront – Homepage & PWA
+
 - [x] Storefront: remove product share controls from product pages (Share button + share/copy logic).
 - [x] Storefront: add offline fallback page (`/offline`) + online/offline indicator.
 - [x] Storefront: remove borders and adjust sizing on the homepage hero banner image.
@@ -748,6 +776,7 @@ showing what is already implemented.
 - [x] Storefront: remove PWA install prompt button and related code.
 
 ## Blog & Community
+
 - [x] Nav: add “Blog” link between Home and Shop (header + drawer).
 - [x] Backend: add public blog endpoints (list + detail) backed by ContentBlocks with optional translations (fallback to available language).
 - [x] Backend: add blog comments/discussion model and endpoints (list/create/delete) with auth + basic moderation.
@@ -774,6 +803,7 @@ showing what is already implemented.
 - [x] Notifications: localize account notification settings UI + improve email templates.
 
 ### Blog – Next Improvements (Backlog)
+
 - [x] Blog list: featured hero – Highlight the newest/pinned post with a large, image-forward hero card.
 - [x] Blog list: pinned posts – Allow pinning 1–3 posts to the top of `/blog` (admin-managed ordering).
 - [x] Blog list: sort controls – Add sorting (newest/oldest/most viewed/most commented) with persisted selection.
@@ -818,7 +848,9 @@ showing what is already implemented.
 - [x] Blog list: pinned posts – Prevent conflicting pin slots (1–3) and surface warnings in admin UI.
 - [x] Blog stats: view counting – De-dupe per session + bot filtering (current counter increments on each page view).
 - [x] Blog list: image loading polish – Add real LQIP/blurhash placeholders for cover images (optional).
+
 ## Frontend - Cart & Checkout
+
 - [x] Cart page/drawer with quantities and totals.
 - [x] Cart UX: make cart item image/title link to the product page (`/products/:slug`).
 - [x] Update quantity/remove items; stock error messaging.
@@ -862,7 +894,9 @@ showing what is already implemented.
 - [x] Checkout: add courier selection (home delivery vs locker) and show it in order details/emails.
 - [x] Payments UX: add PayPal (optional) and show all payment options with icons + clear copy.
 - [x] Shipping: integrate official locker APIs for Sameday + Fan Courier (env-configured; optional Overpass fallback for local dev).
+
 ### Cart & Checkout – Next Improvements (Backlog)
+
 - [x] Cart/Checkout: translate remaining hard-coded UI strings and error messages (no raw English).
 - [x] Cart: show quantity validation errors per item (avoid a single global error banner).
 - [x] Cart: add “Clear cart” action with confirmation (keep backend in sync).
@@ -920,6 +954,7 @@ showing what is already implemented.
 - [x] Checkout: remove unused checkout shipping methods resolver call (shipping is fixed) to reduce network + confusion.
 
 ## Frontend - Auth & Account
+
 - [x] Login page with validation.
 - [x] Registration page.
 - [x] Password reset request + reset form.
@@ -964,7 +999,9 @@ showing what is already implemented.
 - [x] Account UX: translate Security page strings (remove hard-coded English).
 - [x] Security: show QR code during 2FA setup and prompt for 2FA inline on login.
 - [x] Payments: remove `/payment-methods` API + DB table (reduce storage/compliance scope).
+
 ### Account UX – Next Improvements (Backlog)
+
 - [x] Account UX: lazy-load per-section data (don’t fetch orders/addresses/comments on every Account route).
 - [x] Account UX: add “Retry” actions for section load failures (per card, not just global error).
 - [x] Account i18n: translate remaining hard-coded AccountState strings (toasts/prompts/labels).
@@ -1017,6 +1054,7 @@ showing what is already implemented.
 - [x] Support: show recent tickets inside Account (overview or dedicated section).
 
 ## Frontend - Admin Dashboard
+
 - [x] /admin layout with sidebar + guard.
 - [x] Admin UX: refactor `/admin` to a route-based layout (Option B) with dedicated pages (start with Orders).
 - [x] Admin UX: add `/admin/products` page (catalog workflows) and wire it into the admin sidebar.
@@ -1072,6 +1110,7 @@ showing what is already implemented.
 - [x] Admin UI: add a compact “sidebar mode” (tighter spacing + optional section collapse) for long admin pages.
 
 ## UX, Performance, SEO & Accessibility
+
 - [x] Mobile-first responsive design across pages(full mobile compatibility).
 - [x] Loading skeletons/spinners for lists and details.
 - [x] Toast notifications for key actions.
@@ -1091,6 +1130,7 @@ showing what is already implemented.
 - [x] Perf budget and bundle analysis (Angular).
 
 ## Internationalization & Localization (RO/EN)
+
 - [x] Pick frontend i18n strategy (Angular i18n vs ngx-translate) and set up RO/EN language switching.
 - [x] Base translation files for `en` and `ro` (navigation, footer, auth, cart, checkout, admin).
 - [x] Language toggle in header with persisted choice (localStorage/cookie).
@@ -1108,6 +1148,7 @@ showing what is already implemented.
 - [x] Tests rendering pages in RO/EN to verify translations/directionality.
 
 ## Auth – Google OAuth & Account Linking
+
 - [x] Add Google identity fields to `User` (google_sub, google_email, google_picture_url) + migration.
 - [x] Settings for Google OAuth client ID/secret, redirect URI, allowed domains.
 - [x] `/auth/google/start` builds consent URL and redirects.
@@ -1128,6 +1169,7 @@ showing what is already implemented.
 - [x] README docs for Google OAuth setup/testing (console steps, redirect URLs).
 
 ## Admin Dashboard – CMS & UX Enhancements
+
 - [x] Admin UI for editing homepage hero per language (headline, subtitle, CTA, hero image).
 - [x] Admin sidebar: add a dedicated `/admin/content` entry/route for CMS + blog tooling.
 - [x] Admin i18n: localize blog/CMS admin UI strings (RO/EN) to avoid hardcoded English.
@@ -1148,6 +1190,7 @@ showing what is already implemented.
 - [x] Admin audit log page listing important events (login, product changes, content updates, Google linking).
 
 ### Admin Dashboard – Next Improvements (Backlog)
+
 - [x] Admin Dashboard: add “Today” KPI strip – Show today’s orders/GMV/refunds vs yesterday with percent deltas.
 - [x] Admin Dashboard: add configurable date ranges – Allow last 7/30/90/custom ranges across all widgets.
 - [x] Admin Dashboard: widget personalization – Let admins hide/reorder dashboard widgets and persist per user.
@@ -1254,6 +1297,7 @@ showing what is already implemented.
 - [x] Admin UX: saved table layouts – Persist column visibility/order/density per admin table (orders/products/users).
 
 ### Admin Dashboard UX – Simplification (Backlog)
+
 - [x] Admin UX: simplified mode – Add a “Simple / Advanced” toggle (default Simple) to hide advanced settings and jargon.
 - [x] Admin UX: progressive disclosure – Collapse rarely used fields behind “Show advanced” per form section.
 - [x] Admin UX: plain-language labels – Replace technical labels (slug/SKU) with friendly copy + examples and tooltips.
@@ -1267,6 +1311,7 @@ showing what is already implemented.
 - [x] Admin UX: help panel screenshots – Add optional screenshot/example media for help panels (products/orders/users/categories).
 
 ### Admin Catalog – Next Improvements (Backlog)
+
 - [x] Admin Products: status selector – Expose draft/published/archived on create/edit with confirmation and audit entry.
 - [x] Admin Products: status badges – Add table badges for status (draft/published/archived) and active/inactive.
 - [x] Admin Products: status filters – Filter products list by status and include an “Archived” tab/view.
@@ -1282,6 +1327,7 @@ showing what is already implemented.
 - [x] Admin Categories: CSV export/template – Download a template/export of categories to streamline bulk edits + re-import.
 
 ### Admin Dashboard – UX & Workflow (Backlog)
+
 - [x] Admin UI: command palette – Add Ctrl/Cmd+K quick launcher for navigation + common actions.
 - [x] Admin sidebar: nav search – Filter sidebar entries and highlight matches (keyboard friendly).
 - [x] Admin navigation: breadcrumbs – Add a breadcrumb bar across admin pages with quick back/parent links.
@@ -1308,6 +1354,7 @@ showing what is already implemented.
 - [x] Admin ops: email failures – Add recipient filter UI + deep-link support (uses `to_email` filter).
 
 ### Admin CMS – Visual & Intuitive Editing (Backlog)
+
 - [x] CMS editor: simple/advanced toggle – Default to Simple mode and hide SEO/meta/scheduling behind Advanced.
 - [x] CMS editor: device preview frames – Desktop/tablet/mobile preview with quick toggles and responsive breakpoints.
 - [x] CMS editor: split-view editing – Edit on the left, live preview on the right (with scroll sync).
@@ -1351,6 +1398,7 @@ showing what is already implemented.
 - [x] CMS assets: delete original w/ versions – Add a “delete all versions” option for original assets (cascade, with usage safety checks).
 
 ## Data Portability & Backups (Extended)
+
 - [x] CLI command `python -m app.cli export-data` exporting users (no passwords), products, categories, orders, addresses to JSON.
 - [x] CLI command `import-data` to bootstrap a new DB from JSON exports with idempotent upserts.
 - [x] Infra helper script to archive DB dump + JSON exports + media into timestamped `.tar.gz`.
@@ -1360,6 +1408,7 @@ showing what is already implemented.
 - [x] Admin-triggered “Download my data” export endpoint with auth/logging.
 
 ## Media & File Handling Improvements
+
 - [x] `storage.save_upload` generates unique filenames (UUID + extension) to avoid collisions/traversal.
 - [x] Server-side validation for uploaded image type and size across endpoints.
 - [x] Store relative media paths and derive full URLs via MEDIA_ROOT/CDN base.
@@ -1368,6 +1417,7 @@ showing what is already implemented.
 - [x] Ensure product/image deletes remove files from disk/S3 and log the operation.
 
 ## Bugs / Technical Debt / Misc Features
+
 - [x] Config option to enforce Decimal end-to-end for prices; tests for exact totals.
 - [x] Pagination metadata (total items/pages) in product list API responses.
 - [x] Standardize error response format across APIs.

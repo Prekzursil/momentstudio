@@ -71,10 +71,10 @@ export class NetopiaCancelComponent implements OnInit, OnDestroy {
   private confirmSubscription: Subscription | null = null;
 
   constructor(
-    private route: ActivatedRoute,
-    private api: ApiService,
-    private router: Router,
-    private cart: CartStore
+    private readonly route: ActivatedRoute,
+    private readonly api: ApiService,
+    private readonly router: Router,
+    private readonly cart: CartStore
   ) {
     if (typeof localStorage === 'undefined') return;
     try {
@@ -126,3 +126,4 @@ export class NetopiaCancelComponent implements OnInit, OnDestroy {
       });
   }
 }
+

@@ -37,7 +37,7 @@ interface ContentBlockRead {
 export class SiteNavigationService {
   private cached$?: Observable<SiteNavigationData | null>;
 
-  constructor(private api: ApiService) {}
+  constructor(private readonly api: ApiService) {}
 
   get(): Observable<SiteNavigationData | null> {
     if (this.cached$) return this.cached$;
@@ -90,4 +90,5 @@ export class SiteNavigationService {
     return out;
   }
 }
+
 
