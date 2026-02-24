@@ -130,6 +130,35 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     assert items[0]["reading_time_minutes"] == 7
     assert items[0]["cover_image_url"] == "https://example.com/cover.jpg"
 
+    rss_en = client.get("/api/v1/blog/rss.xml", params={"lang": "en"})
+    assert rss_en.status_code == 200, rss_en.text
+    assert rss_en.headers.get("content-type", "").startswith("application/rss+xml")
+    assert "<title>momentstudio Blog</title>" in rss_en.text
+    assert "<description>Latest posts from momentstudio.</description>" in rss_en.text
+    assert "<language>en-US</language>" in rss_en.text
+    assert "/api/v1/blog/rss.xml?lang=en" in rss_en.text
+
+    rss_ro = client.get("/api/v1/blog/rss.xml", params={"lang": "ro"})
+    assert rss_ro.status_code == 200, rss_ro.text
+    assert "<description>Ultimele articole de pe momentstudio.</description>" in rss_ro.text
+    assert "<language>ro-RO</language>" in rss_ro.text
+    assert "/api/v1/blog/rss.xml?lang=ro" in rss_ro.text
+
+    feed_en = client.get("/api/v1/blog/feed.json", params={"lang": "en"})
+    assert feed_en.status_code == 200, feed_en.text
+    feed_en_json = feed_en.json()
+    assert feed_en_json["title"] == "momentstudio Blog"
+    assert feed_en_json["description"] == "Latest posts from momentstudio."
+    assert feed_en_json["language"] == "en-US"
+    assert feed_en_json["feed_url"].endswith("/api/v1/blog/feed.json?lang=en")
+
+    feed_ro = client.get("/api/v1/blog/feed.json", params={"lang": "ro"})
+    assert feed_ro.status_code == 200, feed_ro.text
+    feed_ro_json = feed_ro.json()
+    assert feed_ro_json["description"] == "Ultimele articole de pe momentstudio."
+    assert feed_ro_json["language"] == "ro-RO"
+    assert feed_ro_json["feed_url"].endswith("/api/v1/blog/feed.json?lang=ro")
+
     detail_en = client.get("/api/v1/blog/posts/first-post", params={"lang": "en"})
     assert detail_en.status_code == 200, detail_en.text
     assert detail_en.json()["title"] == "Hello"

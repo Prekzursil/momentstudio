@@ -45,6 +45,11 @@ SENTRY_TRACES_SAMPLE_RATE="${SENTRY_TRACES_SAMPLE_RATE:-1.0}"
 SENTRY_REPLAY_SESSION_SAMPLE_RATE="${SENTRY_REPLAY_SESSION_SAMPLE_RATE:-0.25}"
 SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE="${SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE:-1.0}"
 CAPTCHA_SITE_KEY="${CAPTCHA_SITE_KEY:-}"
+SITE_NAME="${SITE_NAME:-momentstudio}"
+PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-https://momentstudio.ro}"
+SUPPORT_EMAIL="${SUPPORT_EMAIL:-momentstudio.ro@gmail.com}"
+DEFAULT_LOCALE="${DEFAULT_LOCALE:-en}"
+SUPPORTED_LOCALES="${SUPPORTED_LOCALES:-en,ro}"
 
 stripe_enabled="$(truthy "$STRIPE_ENABLED_RAW")"
 
@@ -77,6 +82,11 @@ window.__APP_CONFIG__ = {
   "sentryTracesSampleRate": $(decimal_or_default "$SENTRY_TRACES_SAMPLE_RATE" "1.0"),
   "sentryReplaySessionSampleRate": $(decimal_or_default "$SENTRY_REPLAY_SESSION_SAMPLE_RATE" "0.25"),
   "sentryReplayOnErrorSampleRate": $(decimal_or_default "$SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE" "1.0"),
-  "captchaSiteKey": "$(escape "$CAPTCHA_SITE_KEY")"
+  "captchaSiteKey": "$(escape "$CAPTCHA_SITE_KEY")",
+  "siteName": "$(escape "$SITE_NAME")",
+  "publicBaseUrl": "$(escape "$PUBLIC_BASE_URL")",
+  "supportEmail": "$(escape "$SUPPORT_EMAIL")",
+  "defaultLocale": "$(escape "$DEFAULT_LOCALE")",
+  "supportedLocales": [$(printf '%s' "$SUPPORTED_LOCALES" | awk -F',' '{for (i=1;i<=NF;i++){gsub(/^ +| +$/,"",$i); if(length($i)){printf "%s\"%s\"", (count++?",":""), $i}}}') ]
 };
 EOF

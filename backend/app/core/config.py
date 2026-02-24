@@ -192,6 +192,11 @@ class Settings(BaseSettings):
     newsletter_rate_limit_subscribe: int = 30
 
     frontend_origin: str = "http://localhost:4200"
+    site_name: str = "momentstudio"
+    public_base_url: str = "https://momentstudio.ro"
+    support_email: str = "momentstudio.ro@gmail.com"
+    default_locale: str = "en"
+    supported_locales: list[str] = ["en", "ro"]
     content_preview_token: str = ""
     error_alert_email: str | None = None
     admin_alert_email: str | None = None

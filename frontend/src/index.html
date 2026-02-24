@@ -13,6 +13,57 @@
     />
     <script src="assets/app-config.js"></script>
     <script src="assets/theme-bootstrap.js"></script>
+    <script>
+      (function () {
+        var cfg = typeof globalThis === 'undefined' ? {} : globalThis.__APP_CONFIG__ || {};
+        var siteName = String(cfg.siteName || 'momentstudio').trim() || 'momentstudio';
+        var publicBaseUrl = String(cfg.publicBaseUrl || 'https://momentstudio.ro').trim() || 'https://momentstudio.ro';
+        var defaultLocale = String(cfg.defaultLocale || 'en').trim() || 'en';
+        var supportedLocales = Array.isArray(cfg.supportedLocales) && cfg.supportedLocales.length ? cfg.supportedLocales : ['en', 'ro'];
+        var description = 'Discover handmade jewelry, curated gifts, and thoughtful pieces crafted for meaningful moments.';
+        var origin = publicBaseUrl.replace(/\/$/, '');
+        var canonical = origin + '/';
+        document.title = siteName;
+        var descMeta = document.querySelector('meta[name="description"]');
+        if (descMeta) descMeta.setAttribute('content', description);
+        var ogSiteName = document.querySelector('meta[property="og:site_name"]');
+        if (ogSiteName) ogSiteName.setAttribute('content', siteName);
+        var ogTitle = document.querySelector('meta[property="og:title"]');
+        if (ogTitle) ogTitle.setAttribute('content', siteName);
+        var twitterTitle = document.querySelector('meta[name="twitter:title"]');
+        if (twitterTitle) twitterTitle.setAttribute('content', siteName);
+        var ogUrl = document.querySelector('meta[property="og:url"]');
+        if (ogUrl) ogUrl.setAttribute('content', canonical);
+        var canonicalLink = document.querySelector('link[rel="canonical"]');
+        if (canonicalLink) canonicalLink.setAttribute('href', canonical);
+
+        var orgNode = document.getElementById('seo-default-organization');
+        if (orgNode) {
+          orgNode.textContent = JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'Organization',
+            name: siteName,
+            url: origin,
+            logo: origin + '/assets/home/banner_image.jpeg'
+          });
+        }
+        var websiteNode = document.getElementById('seo-default-website');
+        if (websiteNode) {
+          websiteNode.textContent = JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'WebSite',
+            name: siteName,
+            url: origin,
+            inLanguage: supportedLocales,
+            potentialAction: {
+              '@type': 'SearchAction',
+              target: origin + '/shop?lang=' + defaultLocale + '&q={search_term_string}',
+              'query-input': 'required name=search_term_string'
+            }
+          });
+        }
+      })();
+    </script>
     <title>momentstudio</title>
     <meta
       name="description"
