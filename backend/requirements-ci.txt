@@ -1,5 +1,5 @@
-ruff==0.15.1
+ruff==0.15.2
 mypy==1.19.1
 pip-audit==2.10.0
 types-simplejson==3.20.0.20250822
-coverage==7.11.0
+coverage==7.13.4
