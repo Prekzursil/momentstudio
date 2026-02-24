@@ -23,12 +23,14 @@ ALLOWED_FINDINGS_FILES = frozenset(
         "artifacts/audit-evidence-local/deterministic-findings.json",
     }
 )
-ALLOWED_SEVERE_OUTPUT_FILES = frozenset(
-    {
-        "artifacts/audit-evidence/severe-issues.json",
-        "artifacts/audit-evidence-local/severe-issues.json",
-    }
-)
+SEVERE_OUTPUT_TARGETS = {
+    "artifacts/audit-evidence/severe-issues.json": "repo",
+    "artifacts/audit-evidence-local/severe-issues.json": "local",
+}
+SEVERE_OUTPUT_PATHS = {
+    "repo": "artifacts/audit-evidence/severe-issues.json",
+    "local": "artifacts/audit-evidence-local/severe-issues.json",
+}
 
 
 def _repo_root() -> Path:
@@ -55,16 +57,19 @@ def _resolve_findings_path(raw: str) -> Path:
     return _validated_repo_path(_repo_root() / normalized, allowed_prefixes=ALLOWED_AUDIT_PATH_PREFIXES)
 
 
-def _resolve_severe_output_path(raw: str) -> Path:
+def _resolve_severe_output_target(raw: str) -> str:
     normalized = str(raw or "").strip().replace("\\", "/")
-    if normalized not in ALLOWED_SEVERE_OUTPUT_FILES:
-        allowed = ", ".join(sorted(ALLOWED_SEVERE_OUTPUT_FILES))
+    target = SEVERE_OUTPUT_TARGETS.get(normalized)
+    if target is None:
+        allowed = ", ".join(sorted(SEVERE_OUTPUT_TARGETS))
         raise ValueError(f"Unsupported --severe-output path '{raw}'. Allowed: {allowed}")
-    return _validated_repo_path(_repo_root() / normalized, allowed_prefixes=ALLOWED_AUDIT_PATH_PREFIXES)
+    return target
 
 
-def _write_json(path: Path, payload: Any) -> None:
-    safe_path = _validated_repo_path(path, allowed_prefixes=ALLOWED_AUDIT_PATH_PREFIXES)
+def _write_severe_json(target: str, payload: Any) -> None:
+    safe_path = _validated_repo_path(
+        _repo_root() / SEVERE_OUTPUT_PATHS[target], allowed_prefixes=ALLOWED_AUDIT_PATH_PREFIXES
+    )
     safe_path.parent.mkdir(parents=True, exist_ok=True)
     safe_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
@@ -463,9 +468,9 @@ def main() -> int:
     if not findings_path.exists():
         raise FileNotFoundError(f"Findings file not found: {findings_path}")
 
-    severe_output_path = None
+    severe_output_target = None
     if args.severe_output:
-        severe_output_path = _resolve_severe_output_path(args.severe_output)
+        severe_output_target = _resolve_severe_output_target(args.severe_output)
 
     findings = _load_findings(findings_path)
     issue_candidate_fingerprints = {
@@ -480,8 +485,8 @@ def main() -> int:
         ctx = _github_context(args.repo)
     except Exception as exc:
         print(f"Audit issue upsert skipped: {exc}")
-        if severe_output_path is not None:
-            _write_json(severe_output_path, [])
+        if severe_output_target is not None:
+            _write_severe_json(severe_output_target, [])
         return 0
 
     run_url = args.run_url.strip() or None
@@ -492,8 +497,8 @@ def main() -> int:
         include_s3_seo=bool(args.include_s3_seo),
     )
     severe_rows = [row for row in issue_rows if str(row.get("severity") or "").lower() in SEVERE_LEVELS]
-    if severe_output_path is not None:
-        _write_json(severe_output_path, severe_rows)
+    if severe_output_target is not None:
+        _write_severe_json(severe_output_target, severe_rows)
     closed = 0
     if args.close_stale:
         closed = _close_stale_fingerprint_issues(
@@ -513,7 +518,7 @@ def main() -> int:
         f"issue_candidates={len(issue_candidates)} created={created} updated={updated} "
         f"closed={closed} low={len(low)} include_s3_seo={bool(args.include_s3_seo)} "
         f"repo={ctx.owner}/{ctx.repo} "
-        f"severe_output={str(severe_output_path) if severe_output_path else 'disabled'}"
+        f"severe_output={severe_output_target or 'disabled'}"
     )
     return 0
 
