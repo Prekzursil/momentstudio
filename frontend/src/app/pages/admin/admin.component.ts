@@ -12453,11 +12453,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 		        this.rememberContentVersion(safePageKey, block);
 		        this.setPageRecordValue(this.pageBlocksNeedsTranslationEn, safePageKey, Boolean(block?.needs_translation_en));
 		        this.setPageRecordValue(this.pageBlocksNeedsTranslationRo, safePageKey, Boolean(block?.needs_translation_ro));
-        this.setPageRecordValue(
-          this.pageBlocksStatus,
-          safePageKey,
-	          block?.status === 'published' ? 'published' : block?.status === 'review' ? 'review' : 'draft'
-	        );
+	        this.setPageRecordValue(this.pageBlocksStatus, safePageKey, this.normalizeContentStatus(block?.status));
 	        this.setPageRecordValue(
 	          this.pageBlocksPublishedAt,
 	          safePageKey,
@@ -14434,8 +14430,7 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.rememberContentVersion(safePageKey, block);
         this.pageBlocksNeedsTranslationEn[safePageKey] = Boolean(block?.needs_translation_en);
         this.pageBlocksNeedsTranslationRo[safePageKey] = Boolean(block?.needs_translation_ro);
-        this.pageBlocksStatus[safePageKey] =
-          block?.status === 'published' ? 'published' : block?.status === 'review' ? 'review' : 'draft';
+        this.pageBlocksStatus[safePageKey] = this.normalizeContentStatus(block?.status);
         this.pageBlocksPublishedAt[safePageKey] = block?.published_at ? this.toLocalDateTime(block.published_at) : '';
         this.pageBlocksPublishedUntil[safePageKey] = block?.published_until
           ? this.toLocalDateTime(block.published_until)
@@ -14472,8 +14467,7 @@ export class AdminComponent implements OnInit, OnDestroy {
               this.rememberContentVersion(safePageKey, created);
               this.pageBlocksNeedsTranslationEn[safePageKey] = Boolean(created?.needs_translation_en);
               this.pageBlocksNeedsTranslationRo[safePageKey] = Boolean(created?.needs_translation_ro);
-              this.pageBlocksStatus[safePageKey] =
-                created?.status === 'published' ? 'published' : created?.status === 'review' ? 'review' : 'draft';
+              this.pageBlocksStatus[safePageKey] = this.normalizeContentStatus(created?.status);
               this.pageBlocksPublishedAt[safePageKey] = created?.published_at
                 ? this.toLocalDateTime(created.published_at)
                 : '';
@@ -14521,6 +14515,12 @@ export class AdminComponent implements OnInit, OnDestroy {
       return 'page.about';
     }
     return value as PageBuilderKey;
+  }
+
+  private normalizeContentStatus(value: unknown): ContentStatusUi {
+    if (value === 'published') return 'published';
+    if (value === 'review') return 'review';
+    return 'draft';
   }
 
   private safeRecordKey(key: string, fallback = 'unknown'): string {
