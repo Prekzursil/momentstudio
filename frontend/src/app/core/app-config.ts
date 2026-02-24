@@ -20,6 +20,14 @@ export interface AppConfig {
   supportEmail: string;
   defaultLocale: string;
   supportedLocales: string[];
+  siteProfile: {
+    contact: {
+      phone: string;
+      email: string;
+    };
+    instagramPages: Array<{ label: string; url: string }>;
+    facebookPages: Array<{ label: string; url: string }>;
+  };
 }
 
 declare global {
@@ -49,11 +57,24 @@ const defaults: AppConfig = {
   publicBaseUrl: 'https://momentstudio.ro',
   supportEmail: 'momentstudio.ro@gmail.com',
   defaultLocale: 'en',
-  supportedLocales: ['en', 'ro']
+  supportedLocales: ['en', 'ro'],
+  siteProfile: {
+    contact: { phone: '+40723204204', email: 'momentstudio.ro@gmail.com' },
+    instagramPages: [
+      { label: 'Moments in Clay - Studio', url: 'https://www.instagram.com/moments_in_clay_studio?igsh=ZmdnZTdudnNieDQx' },
+      { label: 'adrianaartizanat', url: 'https://www.instagram.com/adrianaartizanat?igsh=ZmZmaDU1MGcxZHEy' }
+    ],
+    facebookPages: [
+      { label: 'Moments in Clay - Studio', url: 'https://www.facebook.com/share/17YqBmfX5x/' },
+      { label: 'adrianaartizanat', url: 'https://www.facebook.com/share/1APqKJM6Zi/' }
+    ]
+  }
 };
 
 export const appConfig: AppConfig = (() => {
-  if (typeof window === 'undefined') {
+  const runtime = globalThis.window?.__APP_CONFIG__;
+  const runtimeSiteProfile = runtime?.siteProfile as Partial<AppConfig['siteProfile']> | undefined;
+  if (globalThis.window === undefined) {
     const ssrApiBase =
       (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.['SSR_API_BASE_URL']?.trim() || '';
     return {
@@ -61,5 +82,19 @@ export const appConfig: AppConfig = (() => {
       ...(ssrApiBase ? { apiBaseUrl: ssrApiBase.replace(/\/$/, '') } : {}),
     };
   }
-  return { ...defaults, ...(window.__APP_CONFIG__ ?? {}) };
+  const mergedSiteProfile = {
+    ...defaults.siteProfile,
+    ...runtimeSiteProfile,
+    contact: {
+      ...defaults.siteProfile.contact,
+      ...runtimeSiteProfile?.contact,
+    },
+    instagramPages: runtimeSiteProfile?.instagramPages ?? defaults.siteProfile.instagramPages,
+    facebookPages: runtimeSiteProfile?.facebookPages ?? defaults.siteProfile.facebookPages,
+  };
+  return {
+    ...defaults,
+    ...runtime,
+    siteProfile: mergedSiteProfile,
+  };
 })();
