@@ -1,6 +1,6 @@
 Ne dorim o relație corectă și transparentă cu clienții noștri. Dacă întâmpini o problemă legată de o comandă, te rugăm să ne contactezi mai întâi și vom încerca să o soluționăm cât mai rapid.
 
-- **E-mail suport clienți:** momentstudio.ro@gmail.com
+- **E-mail suport clienți:** <momentstudio.ro@gmail.com>
 - **Telefon:** +40723204204
 
 ---
@@ -11,11 +11,11 @@ Consumatorii din România pot apela la **SAL (Soluționarea Alternativă a Litig
 
 Informații despre SAL:
 
-- https://anpc.ro/ce-este-sal/
+- <https://anpc.ro/ce-este-sal/>
 
 Platforma SAL (depunere cerere):
 
-- https://reclamatiisal.anpc.ro/
+- <https://reclamatiisal.anpc.ro/>
 
 ---
 
@@ -23,17 +23,17 @@ Platforma SAL (depunere cerere):
 
 În trecut, Comisia Europeană a pus la dispoziție platforma **ODR** pentru soluționarea online a litigiilor:
 
-- https://ec.europa.eu/consumers/odr
+- <https://ec.europa.eu/consumers/odr>
 
 Notă: Comisia Europeană a anunțat încetarea platformei ODR (linkul vechi poate redirecționa). Poți consulta resursele actualizate pentru consumatori aici:
 
-- https://consumer-redress.ec.europa.eu/
+- <https://consumer-redress.ec.europa.eu/>
 
 ---
 
 ## 3) Încercăm mai întâi soluționarea amiabilă
 
-Înainte de a apela la canale formale, te rugăm să ne contactezi la momentstudio.ro@gmail.com și să incluzi:
+Înainte de a apela la canale formale, te rugăm să ne contactezi la <momentstudio.ro@gmail.com> și să incluzi:
 
 - numărul comenzii,
 - descrierea problemei,

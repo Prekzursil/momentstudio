@@ -8,7 +8,7 @@ This document is provided for transparency and to help you understand your right
 
 **Data controller:** IONITA M.D. ADRIANA PFA
 **Registered office:** Soldat Marin Nicolae 44, Bucharest
-**Email:** momentstudio.ro@gmail.com
+**Email:** <momentstudio.ro@gmail.com>
 **Phone:** +40723204204
 
 ---
@@ -86,10 +86,10 @@ If you choose to pay online by card via **NETOPIA Payments**:
 - NETOPIA may implement anti-fraud/security mechanisms on its payment page.
 
 We recommend reading NETOPIA’s GDPR information for payers here:
-https://netopia-payments.com/nota-de-informare-gdpr-platitori/
+<https://netopia-payments.com/nota-de-informare-gdpr-platitori/>
 
 If you need to contact NETOPIA regarding your data in the context of payment processing, their GDPR contact is:
-suport@netopia.ro
+<suport@netopia.ro>
 
 ---
 
@@ -140,12 +140,12 @@ Subject to legal conditions, you may have the right to:
 - data portability,
 - withdraw consent (where consent is the basis).
 
-To exercise your rights, contact us at: momentstudio.ro@gmail.com.
+To exercise your rights, contact us at: <momentstudio.ro@gmail.com>.
 
 You also have the right to lodge a complaint with the Romanian data protection authority (ANSPDCP):
 
-- Website: https://www.dataprotection.ro
-- Email: anspdcp@dataprotection.ro
+- Website: <https://www.dataprotection.ro>
+- Email: <anspdcp@dataprotection.ro>
 
 ---
 

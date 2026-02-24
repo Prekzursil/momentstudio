@@ -12,7 +12,7 @@ Site‑ul este operat de:
 - **Nr. Registrul Comerțului:** F40/91/17012018
 - **CUI / CIF:** 38708340
 - **Sediu social:** Soldat Marin Nicolae 44, București
-- **E-mail:** momentstudio.ro@gmail.com
+- **E-mail:** <momentstudio.ro@gmail.com>
 - **Telefon:** +40723204204
 
 (denumiți în continuare „Vânzătorul”, „noi”, „al nostru”.)
@@ -116,7 +116,7 @@ Dacă plata eșuează sau este reversată, comanda poate rămâne neachitată ș
 4. **Transferul riscului.** Riscul de pierdere/deteriorare se transferă către tine la momentul în care tu (sau o persoană desemnată de tine) intri în posesia fizică a produselor.
 5. **Colet deteriorat.** Dacă ambalajul este deteriorat la livrare:
    - fă fotografii, și
-   - anunță-ne în maximum 14 zile lucrătoare de la primirea coletului la momentstudio.ro@gmail.com.
+   - anunță-ne în maximum 14 zile lucrătoare de la primirea coletului la <momentstudio.ro@gmail.com>.
 
 ---
 
@@ -130,7 +130,7 @@ Dacă ești **Consumator**, ai, în general, dreptul să te retragi din Contract
 
 Pentru retragere, transmite-ne o declarație neechivocă la:
 
-- E-mail: momentstudio.ro@gmail.com
+- E-mail: <momentstudio.ro@gmail.com>
 
 Include: numărul comenzii, numele, produsele returnate și data.
 
@@ -172,7 +172,7 @@ Dacă vinzi astfel de produse, acestea trebuie marcate clar în pagina produsulu
 
 ## 11) Produse neconforme/defecte, garanții și reclamații
 
-1. **Produs defect / produs greșit.** Dacă primești un produs defect sau diferit, contactează-ne la momentstudio.ro@gmail.com în termen de 14 zile lucrătoare de la primirea coletului și atașează fotografii + numărul comenzii.
+1. **Produs defect / produs greșit.** Dacă primești un produs defect sau diferit, contactează-ne la <momentstudio.ro@gmail.com> în termen de 14 zile lucrătoare de la primirea coletului și atașează fotografii + numărul comenzii.
 2. **Drepturi legale de conformitate.** Consumatorii beneficiază de drepturi legale privind conformitatea. Vom asigura reparare/înlocuire/reducere/rambursare conform legii, în funcție de situație.
 
 ---
@@ -199,11 +199,11 @@ Nu răspundem pentru pierderi indirecte (profit nerealizat, oportunități pierd
 
 Acești Termeni sunt guvernați de legea din România.
 
-Dacă ai o reclamație, te rugăm să ne contactezi mai întâi la momentstudio.ro@gmail.com pentru o soluționare amiabilă.
+Dacă ai o reclamație, te rugăm să ne contactezi mai întâi la <momentstudio.ro@gmail.com> pentru o soluționare amiabilă.
 
 Consumatorii pot utiliza și:
 
-- informații despre **SAL (Soluționarea Alternativă a Litigiilor) – ANPC**: https://anpc.ro/
+- informații despre **SAL (Soluționarea Alternativă a Litigiilor) – ANPC**: <https://anpc.ro/>
 
 ---
 
@@ -217,5 +217,5 @@ Putem actualiza acești Termeni periodic. Versiunea actualizată va fi publicat�
 
 Pentru întrebări legate de acești Termeni:
 
-- E-mail: momentstudio.ro@gmail.com
+- E-mail: <momentstudio.ro@gmail.com>
 - Telefon: +40723204204

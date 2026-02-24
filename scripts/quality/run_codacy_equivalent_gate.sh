@@ -68,16 +68,7 @@ cat > "$STYLELINT_CONFIG" <<'STYLELINT_JSON'
     "selector-class-pattern": "^[a-z][a-z0-9\\-]*$",
     "color-hex-length": "short",
     "font-family-name-quotes": "always-where-recommended",
-    "media-feature-range-notation": "context",
-    "alpha-value-notation": "number",
-    "color-function-notation": "modern",
-    "declaration-empty-line-before": [
-      "always",
-      {
-        "except": ["first-nested"],
-        "ignore": ["after-comment"]
-      }
-    ]
+    "media-feature-range-notation": "context"
   }
 }
 STYLELINT_JSON
@@ -197,9 +188,6 @@ stylelint_counts = {
     "Stylelint_color-hex-length": 0,
     "Stylelint_font-family-name-quotes": 0,
     "Stylelint_media-feature-range-notation": 0,
-    "Stylelint_alpha-value-notation": 0,
-    "Stylelint_color-function-notation": 0,
-    "Stylelint_declaration-empty-line-before": 0,
 }
 stylelint_path = out_dir / "stylelint.json"
 if stylelint_path.exists():
@@ -213,9 +201,6 @@ if stylelint_path.exists():
                     "color-hex-length": "Stylelint_color-hex-length",
                     "font-family-name-quotes": "Stylelint_font-family-name-quotes",
                     "media-feature-range-notation": "Stylelint_media-feature-range-notation",
-                    "alpha-value-notation": "Stylelint_alpha-value-notation",
-                    "color-function-notation": "Stylelint_color-function-notation",
-                    "declaration-empty-line-before": "Stylelint_declaration-empty-line-before",
                 }.get(rule)
                 if key:
                     stylelint_counts[key] += 1

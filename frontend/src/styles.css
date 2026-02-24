@@ -445,7 +445,7 @@ video {
 }
 
 .shadow-soft {
-  box-shadow: 0 10px 40px rgb(15 23 42 / 8%);
+  box-shadow: 0 10px 40px rgb(15 23 42 / 0.08);
 }
 
 :root {
