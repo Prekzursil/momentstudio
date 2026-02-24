@@ -85,8 +85,12 @@ async def mint_analytics_token(
     # Best-effort: browsers may disconnect early.
     try:
         await request.body()
-    except Exception:
-        logger.debug("Ignoring analytics token request body read failure", exc_info=True)
+    except Exception as exc:
+        logger.debug(
+            "analytics_token_request_body_read_failed",
+            extra={"session_id": session_id},
+            exc_info=exc,
+        )
 
     return AnalyticsTokenResponse(token=token, expires_in=max(ttl_seconds, 60))
 
@@ -130,7 +134,7 @@ async def ingest_analytics_event(
         if isinstance(raw_order_id, str):
             try:
                 order_id = UUID(raw_order_id)
-            except Exception:
+            except ValueError:
                 order_id = None
 
     record = AnalyticsEvent(
@@ -147,7 +151,11 @@ async def ingest_analytics_event(
     # Best-effort: browsers may disconnect early.
     try:
         await request.body()
-    except Exception:
-        logger.debug("Ignoring analytics event request body read failure", exc_info=True)
+    except Exception as exc:
+        logger.debug(
+            "analytics_event_request_body_read_failed",
+            extra={"session_id": session_id, "event": event},
+            exc_info=exc,
+        )
 
     return AnalyticsEventIngestResponse(received=True)

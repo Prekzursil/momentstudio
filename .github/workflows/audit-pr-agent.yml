@@ -4,9 +4,13 @@ on:
   pull_request_target:
     types: [labeled, reopened, synchronize, ready_for_review]
   workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to request an agent audit for"
+        required: false
+        type: string
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   pr-agent:
@@ -44,20 +48,18 @@ jobs:
       - name: Resolve PR context and guard conditions
         id: guard
         uses: actions/github-script@v7
-        env:
-          AUDIT_PR_NUMBER: ${{ vars.AUDIT_PR_NUMBER || '' }}
         with:
           script: |
             const { owner, repo } = context.repo;
             let pr = null;
 
             if (context.eventName === 'workflow_dispatch') {
-              const rawNumber = String(process.env.AUDIT_PR_NUMBER || '').trim();
+              const rawNumber = (core.getInput('pr_number') || '').trim();
               const parsedNumber = rawNumber ? Number(rawNumber) : 0;
               if (rawNumber && (!Number.isInteger(parsedNumber) || parsedNumber <= 0)) {
                 core.setFailed(
-                  `Invalid AUDIT_PR_NUMBER variable value: "${rawNumber}". ` +
-                  'Set repository variable AUDIT_PR_NUMBER to a positive integer.'
+                  `Invalid pr_number input: "${rawNumber}". ` +
+                  'Use a positive integer. Example: gh workflow run "Audit PR Agent" -f pr_number=207'
                 );
                 return;
               }
@@ -79,7 +81,7 @@ jobs:
                 } else if (openPulls.length === 0) {
                   core.setFailed(
                     'No open PR targeting main was found for workflow_dispatch auto-detect. ' +
-                    'Open a PR first or set repository variable AUDIT_PR_NUMBER.'
+                    'Open a PR first or re-run with -f pr_number=<number>.'
                   );
                   return;
                 } else {
@@ -90,7 +92,7 @@ jobs:
                   core.setFailed(
                     'Multiple open PRs target main; cannot auto-select safely. ' +
                     `Candidates: ${candidates}. ` +
-                    'Set repository variable AUDIT_PR_NUMBER to an explicit PR number.'
+                    'Re-run with an explicit value, e.g. gh workflow run "Audit PR Agent" -f pr_number=<number>.'
                   );
                   return;
                 }

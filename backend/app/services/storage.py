@@ -2,7 +2,6 @@ import logging
 import uuid
 from io import BytesIO
 from pathlib import Path, PurePosixPath
-from typing import Tuple
 
 from PIL import Image
 from fastapi import HTTPException, UploadFile, status
@@ -30,7 +29,7 @@ def save_upload(
     allowed_content_types: tuple[str, ...] | None = ("image/png", "image/jpeg", "image/webp", "image/gif"),
     max_bytes: int | None = 5 * 1024 * 1024,
     generate_thumbnails: bool = False,
-) -> Tuple[str, str]:
+) -> tuple[str, str]:
     base_root = Path(settings.media_root).resolve()
     dest_root = Path(root or base_root).resolve()
     dest_root.mkdir(parents=True, exist_ok=True)
@@ -234,8 +233,12 @@ def get_media_image_stats(url: str) -> dict[str, int | None]:
                 width, height = img.size
                 stats["width"] = int(width)
                 stats["height"] = int(height)
-        except Exception:  # pragma: no cover
-            pass
+        except Exception as exc:  # pragma: no cover
+            logger.debug(
+                "media_image_dimension_read_failed",
+                extra={"url": url, "path": str(path)},
+                exc_info=exc,
+            )
 
     for suffix in ("sm", "md", "lg"):
         thumb_path = path.with_name(f"{path.stem}-{suffix}{path.suffix}")

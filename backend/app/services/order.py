@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from collections import defaultdict
+import logging
 from typing import Sequence
 from uuid import UUID
 import secrets
@@ -42,6 +43,7 @@ from app.services import payments
 from app.services import paypal
 from app.services import promo_usage
 
+logger = logging.getLogger(__name__)
 
 _ORDER_STOCK_COMMIT_EVENT = "stock_committed"
 _ORDER_STOCK_RESTORE_EVENT = "stock_restored"
@@ -583,9 +585,9 @@ async def build_order_from_cart(
         from app.core import metrics
 
         metrics.record_order_created()
-    except Exception:
+    except Exception as exc:
         # metrics should never break order creation
-        pass
+        logger.debug("order_created_metric_emit_failed", extra={"order_id": str(order.id)}, exc_info=exc)
     hydrated = await get_order_by_id(session, order.id)
     return hydrated or order
 

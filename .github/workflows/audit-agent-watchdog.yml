@@ -4,9 +4,17 @@ on:
   schedule:
     - cron: "15 6 * * *"
   workflow_dispatch:
+    inputs:
+      stale_days:
+        description: "Staleness threshold in days"
+        required: false
+        default: "5"
+      audit_filter:
+        description: "Issue filter (all, audit:*, audit-only, or exact audit label)"
+        required: false
+        default: "audit:*"
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   audit-agent-watchdog:
@@ -26,14 +34,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          WATCHDOG_STALE_DAYS: ${{ vars.AUDIT_AGENT_STALE_DAYS || '5' }}
-          WATCHDOG_AUDIT_FILTER: ${{ vars.AUDIT_AGENT_FILTER || 'audit:*' }}
         run: |
           set -euo pipefail
           WATCHDOG_LOG="$(mktemp)"
           python3 scripts/audit/agent_issue_watchdog.py \
-            --stale-days "${WATCHDOG_STALE_DAYS}" \
-            --audit-filter "${WATCHDOG_AUDIT_FILTER}" | tee "$WATCHDOG_LOG"
+            --stale-days "${{ inputs.stale_days || '5' }}" \
+            --audit-filter "${{ inputs.audit_filter || 'audit:*' }}" | tee "$WATCHDOG_LOG"
 
           scanned="$(awk -F '=' '/^scanned=/{value=$2} END{print value}' "$WATCHDOG_LOG")"
           stale="$(awk -F '=' '/^stale=/{value=$2} END{print value}' "$WATCHDOG_LOG")"

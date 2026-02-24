@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import csv
 import io
 import json
+import logging
 import secrets
 import string
 import unicodedata
@@ -67,6 +68,8 @@ from app.services import notifications as notifications_service
 from app.services import pricing
 from app.core.config import settings
 from app.models.user import User
+
+logger = logging.getLogger(__name__)
 
 _SEARCH_CHAR_MAP: tuple[tuple[str, str], ...] = (
     ("ă", "a"),
@@ -2697,9 +2700,17 @@ async def create_back_in_stock_request(
                 body="A customer asked to be notified when this product is back in stock.",
                 url=f"/admin/products?search={product.slug}",
             )
-        except Exception:
+        except Exception as exc:
             # Notifications are best-effort; the request should still succeed.
-            pass
+            logger.debug(
+                "back_in_stock_owner_notification_failed",
+                extra={
+                    "request_user_id": str(user_id),
+                    "owner_user_id": str(owner.id),
+                    "product_id": str(product.id),
+                },
+                exc_info=exc,
+            )
     return record
 
 
