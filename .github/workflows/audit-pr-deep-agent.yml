@@ -4,11 +4,6 @@ on:
   pull_request_target:
     types: [labeled, reopened, synchronize, ready_for_review, closed]
   workflow_dispatch:
-    inputs:
-      pr_number:
-        description: "PR number to run deep audit issue flow for"
-        required: false
-        type: string
 
 permissions:
   actions: read
@@ -57,48 +52,33 @@ jobs:
             let pr = null;
 
             if (context.eventName === 'workflow_dispatch') {
-              const rawNumber = (core.getInput('pr_number') || '').trim();
-              const parsedNumber = rawNumber ? Number(rawNumber) : 0;
-              if (rawNumber && (!Number.isInteger(parsedNumber) || parsedNumber <= 0)) {
+              const openPulls = await github.paginate(github.rest.pulls.list, {
+                owner,
+                repo,
+                state: 'open',
+                base: 'main',
+                per_page: 100,
+              });
+              if (openPulls.length === 1) {
+                pr = openPulls[0];
+                core.notice(`workflow_dispatch auto-selected PR #${pr.number}.`);
+              } else if (openPulls.length === 0) {
                 core.setFailed(
-                  `Invalid pr_number input: "${rawNumber}". ` +
-                  'Use a positive integer. Example: gh workflow run "Audit PR Deep Agent" -f pr_number=207'
+                  'No open PR targeting main was found for workflow_dispatch auto-detect. ' +
+                  'Open a PR first and rerun this workflow.'
                 );
                 return;
-              }
-
-              if (parsedNumber) {
-                const fetched = await github.rest.pulls.get({ owner, repo, pull_number: parsedNumber });
-                pr = fetched.data;
               } else {
-                const openPulls = await github.paginate(github.rest.pulls.list, {
-                  owner,
-                  repo,
-                  state: 'open',
-                  base: 'main',
-                  per_page: 100,
-                });
-                if (openPulls.length === 1) {
-                  pr = openPulls[0];
-                  core.notice(`workflow_dispatch auto-selected PR #${pr.number}.`);
-                } else if (openPulls.length === 0) {
-                  core.setFailed(
-                    'No open PR targeting main was found for workflow_dispatch auto-detect. ' +
-                    'Open a PR first or re-run with -f pr_number=<number>.'
-                  );
-                  return;
-                } else {
-                  const candidates = openPulls
-                    .slice(0, 15)
-                    .map((candidate) => `#${candidate.number} (${candidate.head?.ref || 'unknown'} -> ${candidate.base?.ref || 'main'})`)
-                    .join(', ');
-                  core.setFailed(
-                    'Multiple open PRs target main; cannot auto-select safely. ' +
-                    `Candidates: ${candidates}. ` +
-                    'Re-run with an explicit value, e.g. gh workflow run "Audit PR Deep Agent" -f pr_number=<number>.'
-                  );
-                  return;
-                }
+                const candidates = openPulls
+                  .slice(0, 15)
+                  .map((candidate) => `#${candidate.number} (${candidate.head?.ref || 'unknown'} -> ${candidate.base?.ref || 'main'})`)
+                  .join(', ');
+                core.setFailed(
+                  'Multiple open PRs target main; cannot auto-select safely. ' +
+                  `Candidates: ${candidates}. ` +
+                  'Close or merge non-target PRs, then rerun this workflow.'
+                );
+                return;
               }
             } else {
               pr = context.payload.pull_request;

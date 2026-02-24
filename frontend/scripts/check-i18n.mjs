@@ -31,16 +31,17 @@ function flattenKeys(value, prefix = '', out = new Set()) {
   return out;
 }
 
-function listFiles(rootDir, dir, exts, out = []) {
-  const scanDir = resolvePathUnderBase(rootDir, dir, 'scan directory');
+function listFiles(rootDir, relativeDir, exts, out = []) {
+  const scanDir = resolvePathUnderBase(rootDir, relativeDir, 'scan directory');
   for (const entry of fs.readdirSync(scanDir, { withFileTypes: true })) {
-    const fullPath = resolvePathUnderBase(rootDir, path.join(scanDir, entry.name), `entry "${entry.name}"`);
+    const nextRelativePath = path.join(relativeDir, entry.name);
+    resolvePathUnderBase(rootDir, nextRelativePath, `entry "${entry.name}"`);
     if (entry.isDirectory()) {
-      listFiles(rootDir, fullPath, exts, out);
+      listFiles(rootDir, nextRelativePath, exts, out);
       continue;
     }
     if (entry.isFile() && exts.includes(path.extname(entry.name))) {
-      out.push(fullPath);
+      out.push(nextRelativePath);
     }
   }
   return out;
@@ -77,8 +78,8 @@ function collectKeyMatches(contents, regex) {
 
 const scriptsDir = path.dirname(fileURLToPath(import.meta.url));
 const frontendRoot = path.resolve(scriptsDir, '..');
-const i18nDir = resolvePathUnderBase(frontendRoot, path.join(frontendRoot, 'src', 'assets', 'i18n'), 'i18n directory');
-const appDir = resolvePathUnderBase(frontendRoot, path.join(frontendRoot, 'src', 'app'), 'app directory');
+const i18nDir = resolvePathUnderBase(frontendRoot, path.join('src', 'assets', 'i18n'), 'i18n directory');
+const appDir = resolvePathUnderBase(frontendRoot, path.join('src', 'app'), 'app directory');
 
 const i18nFiles = fs.existsSync(i18nDir)
   ? fs
@@ -96,7 +97,7 @@ const baseLangFile = i18nFiles.includes('en.json') ? 'en.json' : i18nFiles[0];
 const translations = new Map();
 
 for (const name of i18nFiles) {
-  const filePath = resolvePathUnderBase(i18nDir, path.join(i18nDir, name), `i18n file "${name}"`);
+  const filePath = resolvePathUnderBase(i18nDir, name, `i18n file "${name}"`);
   const json = readJson(i18nDir, filePath);
   translations.set(name, flattenKeys(json));
 }
@@ -129,7 +130,7 @@ for (const [name, keys] of translations.entries()) {
   }
 }
 
-const codeFiles = fs.existsSync(appDir) ? listFiles(appDir, appDir, ['.ts', '.html']) : [];
+const codeFiles = fs.existsSync(appDir) ? listFiles(appDir, '.', ['.ts', '.html']) : [];
 const codeKeys = [];
 
 for (const filePath of codeFiles) {

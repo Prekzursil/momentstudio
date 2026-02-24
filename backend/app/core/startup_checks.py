@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import logging
+
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 def _is_production() -> bool:
@@ -88,7 +92,10 @@ def validate_production_settings() -> None:
                 problems.append("STRIPE_ENV=live but STRIPE secret key looks like a test key (sk_test...).")
     except Exception:
         # Never crash production checks due to optional Stripe library issues; missing Stripe config is handled elsewhere.
-        pass
+        logger.debug(
+            "Skipping Stripe live-key validation because Stripe dependencies/config could not be loaded.",
+            exc_info=True,
+        )
 
     if problems:
         raise RuntimeError("Production configuration checks failed:\n- " + "\n- ".join(problems))

@@ -3244,9 +3244,10 @@ export class AdminOrderDetailComponent implements OnInit {
     const orderId = this.orderId;
     if (!orderId) return;
     const cached = this.receiptShare();
-    const expiresAt = cached?.expires_at ? new Date(cached.expires_at) : null;
-    if (cached?.receipt_url && expiresAt?.getTime() > Date.now() + 30_000) {
-      void this.copyToClipboard(cached.receipt_url).then((ok) => {
+    const receiptUrl = cached?.receipt_url;
+    const expiresAtMillis = cached?.expires_at ? new Date(cached.expires_at).getTime() : null;
+    if (receiptUrl && typeof expiresAtMillis === 'number' && expiresAtMillis > Date.now() + 30_000) {
+      void this.copyToClipboard(receiptUrl).then((ok) => {
         this.toast.success(
           ok ? this.translate.instant('adminUi.orders.receiptLinks.copied') : this.translate.instant('adminUi.orders.receiptLinks.ready')
         );

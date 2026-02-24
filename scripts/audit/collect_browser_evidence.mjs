@@ -55,11 +55,17 @@ function resolvePathUnderBase(rootPath, ...segments) {
 }
 
 function resolvePathUnderAllowedBases(rawPath, allowedRoots, label) {
-  const token = rawPath instanceof URL ? fileURLToPath(rawPath) : String(rawPath || "");
-  const candidate = path.resolve(token);
+  const token = rawPath instanceof URL ? fileURLToPath(rawPath) : String(rawPath || "").trim();
+  if (!token) {
+    throw new Error(`${label} path cannot be empty.`);
+  }
   const normalizedRoots = allowedRoots.map((root) => path.resolve(root));
-  if (!normalizedRoots.some((root) => isPathWithinRoot(root, candidate))) {
-    throw new Error(`${label} must be within allowed roots (${normalizedRoots.join(", ")}): ${candidate}`);
+  const candidatePaths = path.isAbsolute(token)
+    ? [path.resolve(token)]
+    : normalizedRoots.map((root) => path.resolve(root, token));
+  const candidate = candidatePaths.find((item) => normalizedRoots.some((root) => isPathWithinRoot(root, item)));
+  if (!candidate) {
+    throw new Error(`${label} must be within allowed roots (${normalizedRoots.join(", ")}): ${token}`);
   }
   return candidate;
 }
@@ -455,7 +461,11 @@ async function main() {
     throw new Error("Required args: --base-url --routes-json --output-dir");
   }
 
-  const allowedRoots = Array.from(new Set([repoRoot, path.resolve(process.cwd())]));
+  const allowedRoots = [repoRoot];
+  const cwdPath = path.resolve(process.cwd());
+  if (isPathWithinRoot(repoRoot, cwdPath)) {
+    allowedRoots.push(cwdPath);
+  }
   const routesJsonAbsPath = resolvePathUnderAllowedBases(routesJsonPath, allowedRoots, "--routes-json");
   const outputDirAbsPath = resolvePathUnderAllowedBases(outputDir, allowedRoots, "--output-dir");
 

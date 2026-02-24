@@ -28,43 +28,45 @@ jobs:
         id: meta
         env:
           INPUT_TAG: ${{ env.RELEASE_TAG }}
+          INPUT_REPOSITORY: ${{ github.repository }}
+          INPUT_REF: ${{ github.ref }}
+          INPUT_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
 
-          repo="$(printf '%s' "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
+          repo="$(printf '%s' "${INPUT_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
 
-          validate_tag() {
+          assert_valid_tag() {
             local candidate="$1"
             if [[ ! "$candidate" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]]; then
               echo "Invalid image tag '${candidate}'. Allowed chars: [A-Za-z0-9._-], max length 128." >&2
               exit 1
             fi
-            printf '%s' "$candidate"
           }
 
-          validate_repo_name() {
+          assert_valid_repo_name() {
             local candidate="$1"
             if [[ ! "$candidate" =~ ^[a-z0-9][a-z0-9._-]*/[a-z0-9][a-z0-9._-]*$ ]]; then
               echo "Invalid repository coordinate '${candidate}' for image prefix." >&2
               exit 1
             fi
-            printf '%s' "$candidate"
           }
 
-          repo="$(validate_repo_name "${repo}")"
+          assert_valid_repo_name "${repo}"
 
           if [[ -n "${INPUT_TAG}" ]]; then
-            tag="$(validate_tag "${INPUT_TAG}")"
-          elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            tag="$(validate_tag "${GITHUB_REF#refs/tags/}")"
+            tag="${INPUT_TAG}"
+            assert_valid_tag "${tag}"
+          elif [[ "${INPUT_REF}" == refs/tags/* ]]; then
+            tag="${INPUT_REF#refs/tags/}"
+            assert_valid_tag "${tag}"
           else
-            tag="${GITHUB_SHA::7}"
+            tag="${INPUT_SHA::7}"
+            assert_valid_tag "${tag}"
           fi
 
-          {
-            echo "prefix=${REGISTRY}/${repo}"
-            echo "tag=${tag}"
-          } >> "${GITHUB_OUTPUT}"
+          printf 'prefix=%s\n' "${REGISTRY}/${repo}" >> "${GITHUB_OUTPUT}"
+          printf 'tag=%s\n' "${tag}" >> "${GITHUB_OUTPUT}"
 
       - name: Log in to GHCR
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
