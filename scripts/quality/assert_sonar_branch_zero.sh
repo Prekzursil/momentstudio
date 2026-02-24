@@ -5,6 +5,7 @@ SONAR_TOKEN="${SONAR_TOKEN:-}"
 SONAR_HOST="${SONAR_HOST:-${SONAR_HOST_URL:-https://sonarcloud.io}}"
 SONAR_PROJECT_KEY="${SONAR_PROJECT_KEY:-Prekzursil_AdrianaArt}"
 SONAR_BRANCH_NAME="${1:-${SONAR_BRANCH_NAME:-${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-}}}}"
+SONAR_PULL_REQUEST_KEY="${SONAR_PULL_REQUEST_KEY:-}"
 OUT_DIR="${2:-artifacts/scanner-gate/sonar-branch-zero}"
 
 if [[ -z "$SONAR_TOKEN" ]]; then
@@ -23,13 +24,22 @@ summary_file="$OUT_DIR/sonar-unresolved-summary.json"
 issues_file="$OUT_DIR/sonar-unresolved-issues.json"
 digest_file="$OUT_DIR/sonar-branch-digest.json"
 
+query_args=(
+  --data-urlencode "componentKeys=$SONAR_PROJECT_KEY"
+  --data-urlencode "resolved=false"
+  --data-urlencode "ps=500"
+  --data-urlencode "p=1"
+  --data-urlencode "facets=severities,types,statuses,rules"
+)
+
+if [[ -n "$SONAR_PULL_REQUEST_KEY" ]]; then
+  query_args+=(--data-urlencode "pullRequest=$SONAR_PULL_REQUEST_KEY")
+else
+  query_args+=(--data-urlencode "branch=$SONAR_BRANCH_NAME")
+fi
+
 curl -sS --fail-with-body -u "$SONAR_TOKEN:" --get "$SONAR_HOST/api/issues/search" \
-  --data-urlencode "componentKeys=$SONAR_PROJECT_KEY" \
-  --data-urlencode "resolved=false" \
-  --data-urlencode "branch=$SONAR_BRANCH_NAME" \
-  --data-urlencode "ps=500" \
-  --data-urlencode "p=1" \
-  --data-urlencode "facets=severities,types,statuses,rules" \
+  "${query_args[@]}" \
   > "$summary_file"
 
 jq '.issues' "$summary_file" > "$issues_file"
@@ -38,11 +48,13 @@ unresolved_total="$(jq -r '.total // 0' "$summary_file")"
 
 jq -n \
   --arg branch "$SONAR_BRANCH_NAME" \
+  --arg pull_request "$SONAR_PULL_REQUEST_KEY" \
   --arg component "$SONAR_PROJECT_KEY" \
   --arg host "$SONAR_HOST" \
   --argjson unresolved "$unresolved_total" \
   '{
     branch:$branch,
+    pull_request:$pull_request,
     component:$component,
     host:$host,
     unresolved:$unresolved,

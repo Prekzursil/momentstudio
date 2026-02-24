@@ -16,6 +16,7 @@ require_cmd() {
     echo "Required command not found: $cmd" >&2
     exit 1
   fi
+  return 0
 }
 
 run_check() {
@@ -37,6 +38,7 @@ run_check() {
   else
     echo "[$name] FAIL (exit $rc, see $log_file)" | tee -a "$RUN_LOG"
   fi
+  return 0
 }
 
 require_cmd jq

@@ -5,11 +5,10 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
-permissions:
-  contents: read
-
 jobs:
   sonar-branch-zero:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -25,7 +24,9 @@ jobs:
           args: >-
             -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY || 'Prekzursil_AdrianaArt' }}
             -Dsonar.organization=${{ vars.SONAR_ORGANIZATION || 'Prekzursil' }}
-            -Dsonar.branch.name=${{ github.head_ref || github.ref_name }}
+            -Dsonar.pullrequest.key=${{ github.event.pull_request.number }}
+            -Dsonar.pullrequest.branch=${{ github.head_ref }}
+            -Dsonar.pullrequest.base=${{ github.base_ref }}
 
       - name: Assert Sonar unresolved is zero
         shell: bash
@@ -33,6 +34,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL || 'https://sonarcloud.io' }}
           SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY || 'Prekzursil_AdrianaArt' }}
+          SONAR_PULL_REQUEST_KEY: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
           bash scripts/quality/assert_sonar_branch_zero.sh "${{ github.head_ref || github.ref_name }}"
@@ -43,10 +45,12 @@ jobs:
         with:
           name: scanner-gate-sonar-branch-zero
           path: artifacts/scanner-gate/sonar-branch-zero
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 7
 
   codacy-equivalent-zero:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4

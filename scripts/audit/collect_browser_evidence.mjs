@@ -220,9 +220,7 @@ function materializeRoute(routeTemplate, routeSamples) {
 
 async function loadRouteSamples(routeSamplesPath, allowedRoots) {
   const fallbackPath = new URL("./fixtures/route-samples.json", import.meta.url);
-  const target = routeSamplesPath
-    ? routeSamplesPath
-    : fallbackPath;
+  const target = routeSamplesPath || fallbackPath;
   try {
     const payload = JSON.parse(await readUtf8FileUnderAllowedBases(target, allowedRoots, "--route-samples"));
     if (!payload || typeof payload !== "object") {
@@ -466,7 +464,7 @@ async function main() {
   let routeSamples = await loadRouteSamples(routeSamplesPath, allowedRoots);
 
   await ensureDirectoryUnderBase(outputDirAbsPath);
-  const screenshotDir = await ensureDirectoryUnderBase(outputDirAbsPath, "screenshots");
+  await ensureDirectoryUnderBase(outputDirAbsPath, "screenshots");
 
   const { chromium } = require("@playwright/test");
   const browser = await chromium.launch({ headless: true });
