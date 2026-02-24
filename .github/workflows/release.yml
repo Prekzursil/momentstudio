@@ -2,17 +2,13 @@ name: Release
 
 on:
   workflow_dispatch:
-    inputs:
-      tag:
-        description: "Optional tag for images (defaults to git tag or commit SHA)"
-        required: false
-        type: string
   push:
     tags:
       - "v*"
 
 env:
   REGISTRY: ghcr.io
+  RELEASE_TAG: ${{ vars.RELEASE_TAG || '' }}
 
 permissions:
   contents: read
@@ -31,7 +27,7 @@ jobs:
       - name: Compute image metadata
         id: meta
         env:
-          INPUT_TAG: ${{ github.event.inputs.tag || '' }}
+          INPUT_TAG: ${{ env.RELEASE_TAG }}
         run: |
           set -euo pipefail
 

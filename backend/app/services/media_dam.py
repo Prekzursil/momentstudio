@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import inspect
 import json
+import logging
 import mimetypes
 import random
 import re
@@ -110,6 +111,8 @@ PROFILE_DIMENSIONS: dict[str, tuple[int, int]] = {
     "web-1280": (1280, 1280),
     "social-1200": (1200, 1200),
 }
+
+logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
@@ -1587,7 +1590,7 @@ async def soft_delete_asset(session: AsyncSession, asset: MediaAsset, actor_id: 
             asset.storage_key = trash_key
             asset.public_url = _public_url_from_storage_key(trash_key)
     except Exception:
-        pass
+        logger.debug("Unable to move media asset to trash location", exc_info=True)
     _move_variant_file_roots(asset, to_public=False)
     session.add(asset)
     session.add(
@@ -1618,7 +1621,7 @@ async def restore_asset(session: AsyncSession, asset: MediaAsset, actor_id: UUID
             asset.storage_key = restore_key
             asset.public_url = _public_url_from_storage_key(restore_key)
     except Exception:
-        pass
+        logger.debug("Unable to restore media asset file location", exc_info=True)
     asset.status = MediaAssetStatus.draft
     asset.trashed_at = None
     _move_variant_file_roots(asset, to_public=False)
@@ -1644,7 +1647,7 @@ async def purge_asset(session: AsyncSession, asset: MediaAsset) -> None:
         if path is not None:
             paths.append(path)
     except Exception:
-        pass
+        logger.debug("Unable to resolve primary media asset storage path", exc_info=True)
     for variant in asset.variants or []:
         try:
             path = _find_existing_storage_path(variant.storage_key)
@@ -1657,7 +1660,7 @@ async def purge_asset(session: AsyncSession, asset: MediaAsset) -> None:
             if p.exists():
                 p.unlink()
         except Exception:
-            pass
+            logger.debug("Unable to delete media asset file during purge", exc_info=True)
     await session.delete(asset)
     await session.commit()
 

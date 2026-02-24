@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import logging
 from decimal import Decimal
 from datetime import datetime, timezone
 from pathlib import Path
@@ -21,6 +22,7 @@ from app.core.config import settings
 
 NETOPIA_BASE_URL_LIVE = "https://secure.mobilpay.ro/pay"
 NETOPIA_BASE_URL_SANDBOX = "https://secure.sandbox.netopia-payments.com"
+logger = logging.getLogger(__name__)
 
 
 def _netopia_env() -> str:
@@ -301,7 +303,7 @@ async def start_payment(
             if isinstance(data, dict):
                 detail = str(data.get("message") or data.get("error") or detail)
         except Exception:
-            pass
+            logger.debug("Unable to parse Netopia error payload as JSON", exc_info=True)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=detail)
 
     try:

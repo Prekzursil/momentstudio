@@ -21,13 +21,18 @@ depends_on: Sequence[str] | None = None
 
 def upgrade() -> None:
     conn = op.get_bind()
+    products = sa.table("products", sa.column("currency", sa.String()))
+    orders = sa.table("orders", sa.column("currency", sa.String()))
+    promo_codes = sa.table("promo_codes", sa.column("currency", sa.String()), sa.column("amount_off", sa.Numeric()))
+    table_map = {"products": products, "orders": orders, "promo_codes": promo_codes}
 
     def count_non_ron(table: str) -> int:
+        table_ref = table_map[table]
+        condition = sa.and_(table_ref.c.currency.is_not(None), table_ref.c.currency != "RON")
         if table == "promo_codes":
-            condition = "amount_off IS NOT NULL AND currency IS NOT NULL AND currency <> 'RON'"
-        else:
-            condition = "currency IS NOT NULL AND currency <> 'RON'"
-        return int(conn.execute(sa.text(f"SELECT COUNT(*) FROM {table} WHERE {condition}")).scalar_one())
+            condition = sa.and_(table_ref.c.amount_off.is_not(None), condition)
+        stmt = sa.select(sa.func.count()).select_from(table_ref).where(condition)
+        return int(conn.execute(stmt).scalar_one())
 
     # Normalize casing to avoid treating "ron" as a foreign currency.
     op.execute("UPDATE products SET currency='RON' WHERE currency IS NOT NULL AND UPPER(currency)='RON'")

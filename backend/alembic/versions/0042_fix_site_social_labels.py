@@ -41,13 +41,11 @@ def upgrade() -> None:
 
     block_id, meta = row
     meta = meta or {}
-    changed = False
-
-    def update_pages(key: str) -> None:
-        nonlocal changed
+    def update_pages(key: str) -> bool:
+        local_changed = False
         pages = meta.get(key)
         if not isinstance(pages, list):
-            return
+            return local_changed
         for page in pages:
             if not isinstance(page, dict):
                 continue
@@ -57,10 +55,10 @@ def upgrade() -> None:
                 continue
             if "adrianaartizanat" in url and label == "momentstudio":
                 page["label"] = "adrianaartizanat"
-                changed = True
+                local_changed = True
+        return local_changed
 
-    update_pages("instagram_pages")
-    update_pages("facebook_pages")
+    changed = update_pages("instagram_pages") or update_pages("facebook_pages")
 
     if not changed:
         return

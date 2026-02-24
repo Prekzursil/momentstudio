@@ -15,7 +15,7 @@
     "category": "featured"
   },
   "/receipt/:token": {
-    "token": "sample-receipt-token"
+    "token": "receipt-token-placeholder"
   },
   "/admin/orders/:orderId": {
     "orderId": "1001"

@@ -30,7 +30,7 @@ def upgrade() -> None:
 
     def status_value(value: str) -> sa.ColumnElement:
         if is_postgres:
-            return sa.text(f"'{value}'::contentstatus")
+            return sa.cast(sa.literal(value), content_status)
         return sa.literal(value)
 
     content_blocks = sa.table(
