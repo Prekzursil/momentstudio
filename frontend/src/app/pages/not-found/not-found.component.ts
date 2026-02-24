@@ -29,7 +29,7 @@ export class NotFoundComponent implements OnInit, OnDestroy {
   contactHref = signal('mailto:');
   private socialSub?: Subscription;
 
-  constructor(private social: SiteSocialService) {}
+  constructor(private readonly social: SiteSocialService) {}
 
   ngOnInit(): void {
     this.socialSub = this.social.get().subscribe((data) => {

@@ -17,6 +17,12 @@ from typing import Any
 
 SEVERE_LEVELS = {"s1", "s2"}
 ALLOWED_AUDIT_PATH_PREFIXES = ("artifacts/audit-evidence", "artifacts/audit-evidence-local")
+ALLOWED_SEVERE_OUTPUT_FILES = frozenset(
+    {
+        "artifacts/audit-evidence/severe-issues.json",
+        "artifacts/audit-evidence-local/severe-issues.json",
+    }
+)
 
 
 def _repo_root() -> Path:
@@ -39,6 +45,14 @@ def _resolve_repo_path(raw: str, *, allowed_prefixes: tuple[str, ...]) -> Path:
     root = _repo_root()
     candidate = root / raw
     return _validated_repo_path(candidate, allowed_prefixes=allowed_prefixes)
+
+
+def _resolve_severe_output_path(raw: str) -> Path:
+    normalized = str(raw or "").strip().replace("\\", "/")
+    if normalized not in ALLOWED_SEVERE_OUTPUT_FILES:
+        allowed = ", ".join(sorted(ALLOWED_SEVERE_OUTPUT_FILES))
+        raise ValueError(f"Unsupported --severe-output path '{raw}'. Allowed: {allowed}")
+    return _validated_repo_path(_repo_root() / normalized, allowed_prefixes=ALLOWED_AUDIT_PATH_PREFIXES)
 
 
 def _write_json(path: Path, payload: Any) -> None:
@@ -446,10 +460,7 @@ def main() -> int:
 
     severe_output_path = None
     if args.severe_output:
-        severe_output_path = _resolve_repo_path(
-            args.severe_output,
-            allowed_prefixes=ALLOWED_AUDIT_PATH_PREFIXES,
-        )
+        severe_output_path = _resolve_severe_output_path(args.severe_output)
 
     findings = _load_findings(findings_path)
     issue_candidate_fingerprints = {
