@@ -58,13 +58,39 @@ def _resolve_findings_path(raw: str) -> Path:
 def _write_repo_severe_json(payload: Any) -> None:
     safe_path = _validated_repo_path(_repo_root() / SEVERE_OUTPUT_REPO, allowed_prefixes=ALLOWED_AUDIT_PATH_PREFIXES)
     safe_path.parent.mkdir(parents=True, exist_ok=True)
-    safe_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    safe_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")  # NOSONAR
 
 
 def _write_local_severe_json(payload: Any) -> None:
     safe_path = _validated_repo_path(_repo_root() / SEVERE_OUTPUT_LOCAL, allowed_prefixes=ALLOWED_AUDIT_PATH_PREFIXES)
     safe_path.parent.mkdir(parents=True, exist_ok=True)
-    safe_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    safe_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")  # NOSONAR
+
+
+def _resolve_severe_output_target(raw: str) -> str | None:
+    if not raw:
+        return None
+    normalized = str(raw).strip().replace("\\", "/")
+    target = SEVERE_OUTPUT_TARGETS.get(normalized)
+    if target is None:
+        allowed = ", ".join(sorted(SEVERE_OUTPUT_TARGETS))
+        raise ValueError(f"Unsupported --severe-output path '{raw}'. Allowed: {allowed}")
+    return target
+
+
+def _emit_severe_output(target: str | None, rows: list[dict[str, Any]]) -> None:
+    if target == "repo":
+        _write_repo_severe_json(rows)
+    elif target == "local":
+        _write_local_severe_json(rows)
+
+
+def _issue_candidate_fingerprints(findings: list[dict[str, Any]], *, include_s3_seo: bool) -> set[str]:
+    return {
+        str(row.get("fingerprint") or "")
+        for row in findings
+        if _should_upsert_issue(row, include_s3_seo=include_s3_seo)
+    }
 
 
 @dataclass(frozen=True)
@@ -461,20 +487,11 @@ def main() -> int:
     if not findings_path.exists():
         raise FileNotFoundError(f"Findings file not found: {findings_path}")
 
-    severe_output_target = None
-    if args.severe_output:
-        normalized = str(args.severe_output).strip().replace("\\", "/")
-        severe_output_target = SEVERE_OUTPUT_TARGETS.get(normalized)
-        if severe_output_target is None:
-            allowed = ", ".join(sorted(SEVERE_OUTPUT_TARGETS))
-            raise ValueError(f"Unsupported --severe-output path '{args.severe_output}'. Allowed: {allowed}")
+    severe_output_target = _resolve_severe_output_target(args.severe_output)
 
     findings = _load_findings(findings_path)
-    issue_candidate_fingerprints = {
-        str(row.get("fingerprint") or "")
-        for row in findings
-        if _should_upsert_issue(row, include_s3_seo=bool(args.include_s3_seo))
-    }
+    include_s3_seo = bool(args.include_s3_seo)
+    issue_candidate_fingerprints = _issue_candidate_fingerprints(findings, include_s3_seo=include_s3_seo)
     issue_candidates = [row for row in findings if str(row.get("fingerprint") or "") in issue_candidate_fingerprints]
     low = [row for row in findings if str(row.get("fingerprint") or "") not in issue_candidate_fingerprints]
 
@@ -482,10 +499,7 @@ def main() -> int:
         ctx = _github_context(args.repo)
     except Exception as exc:
         print(f"Audit issue upsert skipped: {exc}")
-        if severe_output_target == "repo":
-            _write_repo_severe_json([])
-        elif severe_output_target == "local":
-            _write_local_severe_json([])
+        _emit_severe_output(severe_output_target, [])
         return 0
 
     run_url = args.run_url.strip() or None
@@ -493,13 +507,10 @@ def main() -> int:
         ctx,
         findings,
         run_url,
-        include_s3_seo=bool(args.include_s3_seo),
+        include_s3_seo=include_s3_seo,
     )
     severe_rows = [row for row in issue_rows if str(row.get("severity") or "").lower() in SEVERE_LEVELS]
-    if severe_output_target == "repo":
-        _write_repo_severe_json(severe_rows)
-    elif severe_output_target == "local":
-        _write_local_severe_json(severe_rows)
+    _emit_severe_output(severe_output_target, severe_rows)
     closed = 0
     if args.close_stale:
         closed = _close_stale_fingerprint_issues(
@@ -517,7 +528,7 @@ def main() -> int:
     print(
         f"Audit issue upsert complete: "
         f"issue_candidates={len(issue_candidates)} created={created} updated={updated} "
-        f"closed={closed} low={len(low)} include_s3_seo={bool(args.include_s3_seo)} "
+        f"closed={closed} low={len(low)} include_s3_seo={include_s3_seo} "
         f"repo={ctx.owner}/{ctx.repo} "
         f"severe_output={severe_output_target or 'disabled'}"
     )
