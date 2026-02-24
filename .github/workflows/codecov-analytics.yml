@@ -106,7 +106,7 @@ jobs:
         id: upload_coverage
         if: ${{ !cancelled() }}
         continue-on-error: true
-        uses: codecov/codecov-action@0561704f0f02c16a585d4c7555e57fa2e44cf909 # v5.5.2
+        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: backend/coverage.xml,frontend/coverage/**/lcov.info
@@ -118,7 +118,7 @@ jobs:
         id: upload_test_results
         if: ${{ !cancelled() }}
         continue-on-error: true
-        uses: codecov/test-results-action@6ba3fdeec616fb91fd6a389b788a2366835a0fa2 # v1.2.1
+        uses: codecov/test-results-action@0fa95f0e1eeaafde2c782583b36b28ad0d8c77d3 # v1.2.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: backend/test-results/pytest.junit.xml,frontend/test-results/karma.junit.xml
