@@ -11,6 +11,7 @@ from sqlalchemy import func, select
 
 from app.db.session import SessionLocal
 from app.core import security
+from app import seeds as app_seeds
 from app.models.user import User, UserDisplayNameHistory, UserEmailHistory, UserRole, UserUsernameHistory
 from app.models.address import Address
 from app.models.catalog import Category, Product, ProductImage, ProductOption, ProductVariant, Tag
@@ -598,6 +599,8 @@ def main():
         action="store_true",
         help="Mark the owner email as verified (useful when SMTP is disabled in local dev)",
     )
+    seed_data = sub.add_parser("seed-data", help="Seed bootstrap catalog/content data")
+    seed_data.add_argument("--profile", default="default", help="Seed profile (e.g. default, adrianaart)")
     args = parser.parse_args()
 
     if args.command == "export-data":
@@ -625,6 +628,12 @@ def main():
                 verify_email=bool(args.verify_email),
             )
         )
+    elif args.command == "seed-data":
+        async def _seed_data() -> None:
+            async with SessionLocal() as session:
+                await app_seeds.seed(session, profile=args.profile)
+
+        asyncio.run(_seed_data())
     else:
         parser.print_help()
 

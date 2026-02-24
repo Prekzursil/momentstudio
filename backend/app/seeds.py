@@ -1,6 +1,10 @@
 import asyncio
+import argparse
+import json
+import re
 from datetime import datetime, timezone
 from decimal import Decimal
+from pathlib import Path
 from typing import Any, TypedDict
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -8,6 +12,11 @@ from sqlalchemy.future import select
 
 from app.core.config import settings
 from app.models.catalog import Category, Product, ProductImage, ProductStatus, ProductVariant
+from app.models.content import ContentBlock, ContentBlockTranslation, ContentBlockVersion, ContentStatus
+
+SEED_PROFILES_ROOT = (Path(__file__).resolve().parent / "seed_profiles").resolve()
+PROFILE_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
+NO_AVAILABLE_PROFILES = "<none>"
 
 
 class SeedImage(TypedDict):
@@ -36,53 +45,129 @@ class SeedProduct(TypedDict):
     variants: list[SeedVariant]
 
 
-SEED_CATEGORIES: list[dict[str, Any]] = [
-    {"slug": "cups", "name": "Cups & Mugs", "description": "Handmade cups and mugs."},
-    {"slug": "plates", "name": "Plates", "description": "Dinner and side plates."},
-    {"slug": "bowls", "name": "Bowls", "description": "Serving and cereal bowls."},
-]
-
-SEED_PRODUCTS: list[SeedProduct] = [
-    {
-        "slug": "white-cup",
-        "name": "White Glazed Cup",
-        "category_slug": "cups",
-        "short_description": "Matte white glaze, comfortable handle.",
-        "long_description": "Wheel-thrown stoneware with white matte glaze and speckle.",
-        "base_price": Decimal("24.00"),
-        "currency": "RON",
-        "stock_quantity": 10,
-        "is_featured": True,
-        "images": [
-            {"url": "https://example.com/images/white-cup-1.jpg", "alt_text": "White cup front", "sort_order": 1},
-            {"url": "https://example.com/images/white-cup-2.jpg", "alt_text": "White cup angle", "sort_order": 2},
-        ],
-        "variants": [
-            {"name": "250 ml", "additional_price_delta": Decimal("0.00"), "stock_quantity": 5},
-            {"name": "350 ml", "additional_price_delta": Decimal("4.00"), "stock_quantity": 5},
-        ],
-    },
-    {
-        "slug": "blue-bowl",
-        "name": "Blue Splash Bowl",
-        "category_slug": "bowls",
-        "short_description": "Splash glaze interior with raw exterior.",
-        "long_description": "Medium bowl perfect for ramen or salads.",
-        "base_price": Decimal("36.00"),
-        "currency": "RON",
-        "stock_quantity": 6,
-        "is_featured": False,
-        "images": [
-            {"url": "https://example.com/images/blue-bowl-1.jpg", "alt_text": "Blue bowl top", "sort_order": 1},
-        ],
-        "variants": [],
-    },
-]
+class SeedTranslation(TypedDict):
+    lang: str
+    title: str
+    body_markdown: str
 
 
-async def seed(session: AsyncSession) -> None:
+class SeedContentBlock(TypedDict):
+    key: str
+    title: str
+    body_markdown: str
+    status: str
+    meta: dict[str, Any] | None
+    lang: str | None
+    translations: list[SeedTranslation]
+
+
+def _list_available_profiles() -> list[str]:
+    return sorted(p.name for p in SEED_PROFILES_ROOT.iterdir() if p.is_dir())
+
+
+def _available_profiles_display() -> str:
+    return ", ".join(_list_available_profiles()) or NO_AVAILABLE_PROFILES
+
+
+def _safe_profile_path(base_dir: Path, rel_path: str) -> Path:
+    candidate = Path(str(rel_path or "")).expanduser()
+    if candidate.is_absolute():
+        raise SystemExit(f"Invalid path '{rel_path}' in seed profile.")
+    resolved = (base_dir / candidate).resolve()
+    if base_dir != resolved and base_dir not in resolved.parents:
+        raise SystemExit(f"Invalid path '{rel_path}' in seed profile.")
+    return resolved
+
+
+def _resolve_profile_dir(profile: str) -> Path:
+    if not PROFILE_NAME_PATTERN.fullmatch(profile or ""):
+        available = _available_profiles_display()
+        raise SystemExit(f"Unknown seed profile '{profile}'. Available: {available}")
+    profile_dir = (SEED_PROFILES_ROOT / profile).resolve()
+    if SEED_PROFILES_ROOT != profile_dir and SEED_PROFILES_ROOT not in profile_dir.parents:
+        available = _available_profiles_display()
+        raise SystemExit(f"Unknown seed profile '{profile}'. Available: {available}")
+    if not profile_dir.is_dir():
+        available = _available_profiles_display()
+        raise SystemExit(f"Unknown seed profile '{profile}'. Available: {available}")
+    return profile_dir
+
+
+def _load_md(base_dir: Path, rel_path: str) -> str:
+    text = _safe_profile_path(base_dir, rel_path).read_text(encoding="utf-8").replace("\r\n", "\n").strip()
+    return f"{text}\n"
+
+
+def _load_profile(profile: str) -> tuple[list[dict[str, Any]], list[SeedProduct], list[SeedContentBlock]]:
+    profile_dir = _resolve_profile_dir(profile)
+
+    catalog = json.loads(_safe_profile_path(profile_dir, "catalog.json").read_text(encoding="utf-8"))
+    content = json.loads(_safe_profile_path(profile_dir, "content_blocks.json").read_text(encoding="utf-8"))
+
+    categories = list(catalog.get("categories", []))
+    products: list[SeedProduct] = []
+    for prod in catalog.get("products", []):
+        parsed_product: SeedProduct = {
+            "slug": str(prod["slug"]),
+            "name": str(prod["name"]),
+            "category_slug": str(prod["category_slug"]),
+            "short_description": str(prod["short_description"]),
+            "long_description": str(prod["long_description"]),
+            "base_price": Decimal(str(prod["base_price"])),
+            "currency": str(prod["currency"]),
+            "stock_quantity": int(prod["stock_quantity"]),
+            "is_featured": bool(prod["is_featured"]),
+            "images": list(prod.get("images", [])),
+            "variants": [
+                {
+                    "name": str(variant["name"]),
+                    "additional_price_delta": Decimal(str(variant["additional_price_delta"])),
+                    "stock_quantity": int(variant["stock_quantity"]),
+                }
+                for variant in prod.get("variants", [])
+            ],
+        }
+        products.append(parsed_product)
+
+    blocks: list[SeedContentBlock] = []
+    for block in content.get("content_blocks", []):
+        body_markdown = block.get("body_markdown")
+        if body_markdown is None and block.get("body_markdown_file"):
+            body_markdown = _load_md(profile_dir, block["body_markdown_file"])
+
+        translations: list[SeedTranslation] = []
+        for translation in block.get("translations", []):
+            translation_body = translation.get("body_markdown")
+            if translation_body is None and translation.get("body_markdown_file"):
+                translation_body = _load_md(profile_dir, translation["body_markdown_file"])
+            translations.append(
+                {
+                    "lang": translation["lang"],
+                    "title": translation["title"],
+                    "body_markdown": translation_body or "",
+                }
+            )
+
+        blocks.append(
+            {
+                "key": block["key"],
+                "title": block["title"],
+                "body_markdown": body_markdown or "",
+                "status": block.get("status", "draft"),
+                "meta": block.get("meta"),
+                "lang": block.get("lang"),
+                "translations": translations,
+            }
+        )
+
+    return categories, products, blocks
+
+
+async def seed(session: AsyncSession, *, profile: str = "default") -> None:
+    categories, products, blocks = _load_profile(profile)
+
     # Categories
-    for cat in SEED_CATEGORIES:
+    for cat in categories:
         existing = await session.execute(select(Category).where(Category.slug == cat["slug"]))
         if existing.scalar_one_or_none():
             continue
@@ -90,7 +175,7 @@ async def seed(session: AsyncSession) -> None:
     await session.commit()
 
     # Products
-    for prod in SEED_PRODUCTS:
+    for prod in products:
         result = await session.execute(select(Product).where(Product.slug == prod["slug"]))
         if result.scalar_one_or_none():
             continue
@@ -118,14 +203,52 @@ async def seed(session: AsyncSession) -> None:
 
     await session.commit()
 
+    # Content blocks
+    for block in blocks:
+        existing = await session.execute(select(ContentBlock).where(ContentBlock.key == block["key"]))
+        if existing.scalar_one_or_none():
+            continue
 
-async def main() -> None:
+        status = ContentStatus(block["status"])
+        published_at = datetime.now(timezone.utc) if status == ContentStatus.published else None
+        content_block = ContentBlock(
+            key=block["key"],
+            title=block["title"],
+            body_markdown=block["body_markdown"],
+            status=status,
+            version=1,
+            meta=block["meta"],
+            lang=block["lang"],
+            published_at=published_at,
+        )
+        content_block.translations = [ContentBlockTranslation(**translation) for translation in block["translations"]]
+        content_block.versions = [
+            ContentBlockVersion(
+                version=1,
+                title=block["title"],
+                body_markdown=block["body_markdown"],
+                status=status,
+                meta=block["meta"],
+                lang=block["lang"],
+                published_at=published_at,
+                translations=list(block["translations"]),
+            )
+        ]
+        session.add(content_block)
+
+    await session.commit()
+
+
+async def main(profile: str) -> None:
     engine = create_async_engine(settings.database_url, future=True, echo=False)
     SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
     async with SessionLocal() as session:
-        await seed(session)
+        await seed(session, profile=profile)
     await engine.dispose()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    parser = argparse.ArgumentParser(description="Seed catalog/content bootstrap data")
+    parser.add_argument("--profile", default="default", help="Seed profile (e.g. default, adrianaart)")
+    args = parser.parse_args()
+    asyncio.run(main(args.profile))

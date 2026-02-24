@@ -12,6 +12,7 @@ OWNER_EMAIL="${OWNER_EMAIL:-owner@local.test}"
 OWNER_PASSWORD="${OWNER_PASSWORD:-OwnerDev!123}"
 OWNER_USERNAME="${OWNER_USERNAME:-owner}"
 OWNER_DISPLAY_NAME="${OWNER_DISPLAY_NAME:-Owner Local}"
+SEED_PROFILE="${SEED_PROFILE:-default}"
 
 if [[ -z "${OWNER_PASSWORD}" ]]; then
   echo "[compose-smoke] ERROR: OWNER_PASSWORD cannot be empty." >&2
@@ -83,7 +84,7 @@ curl -fsS "${FRONTEND_URL}" >/dev/null
 
 echo "[compose-smoke] Preparing DB (migrations + seeds + owner)..."
 docker compose -f "${COMPOSE_FILE}" exec -T backend alembic upgrade head
-docker compose -f "${COMPOSE_FILE}" exec -T backend python -m app.seeds
+docker compose -f "${COMPOSE_FILE}" exec -T backend python -m app.seeds --profile "${SEED_PROFILE}"
 docker compose -f "${COMPOSE_FILE}" exec -T backend python -m app.cli bootstrap-owner \
   --email "${OWNER_EMAIL}" --password "${OWNER_PASSWORD}" --username "${OWNER_USERNAME}" --display-name "${OWNER_DISPLAY_NAME}"
 
