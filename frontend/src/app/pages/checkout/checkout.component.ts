@@ -303,7 +303,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
 	    @ViewChild('checkoutFormEl') checkoutFormEl?: ElementRef<HTMLFormElement>;
       readonly vm = this;
 
-		  crumbs = [
+	  readonly crumbs = [
 		    { label: 'nav.home', url: '/' },
 		    { label: 'nav.cart', url: '/cart' },
 	    { label: 'checkout.title' }
@@ -443,7 +443,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     private readonly translate: TranslateService,
     private readonly checkoutPrefs: CheckoutPrefsService,
     private readonly analytics: AnalyticsService,
-    public auth: AuthService,
+    public readonly auth: AuthService,
     private readonly zone: NgZone,
     private readonly cdr: ChangeDetectorRef
   ) {
@@ -473,7 +473,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
 	  scrollToStep(id: string): void {
       if (typeof document === 'undefined') return;
       try {
-        const step = document.getElementById(id) as HTMLElement | null;
+        const step = document.getElementById(id);
         if (!step) return;
         step.scrollIntoView({ behavior: 'smooth', block: 'start' });
         setTimeout(() => {
@@ -541,7 +541,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     private focusElementById(id: string): void {
       if (typeof document === 'undefined') return;
       setTimeout(() => {
-        const el = document.getElementById(id) as HTMLElement | null;
+        const el = document.getElementById(id);
         if (!el) return;
         this.scrollAndFocus(el);
       });
@@ -1117,7 +1117,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     try {
       const raw = localStorage.getItem(CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY);
       if (!raw) return false;
-      const parsed = JSON.parse(raw) as unknown;
+      const parsed = JSON.parse(raw);
       return parsed === true;
     } catch {
       return false;
@@ -1401,7 +1401,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     if (!items.length) return;
     this.checkoutStartTracked = true;
     const units = items.reduce((sum, item) => sum + (item.quantity || 0), 0);
-    const currency = (this.currency || items[0]?.currency || 'RON') as string;
+    const currency = this.currency || items[0]?.currency || 'RON';
     this.analytics.track('checkout_start', {
       line_items: items.length,
       units,
@@ -1416,7 +1416,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     if (this.checkoutFlowCompleted) return;
     const items = this.items();
     const units = items.reduce((sum, item) => sum + (item.quantity || 0), 0);
-    const currency = (this.currency || items[0]?.currency || 'RON') as string;
+    const currency = this.currency || items[0]?.currency || 'RON';
     this.analytics.track('checkout_abandon', {
       line_items: items.length,
       units,

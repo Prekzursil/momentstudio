@@ -1,0 +1,90 @@
+name: Scanner Gate
+
+on:
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sonar-branch-zero:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Sonar scan (PR branch)
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL || 'https://sonarcloud.io' }}
+        with:
+          args: >-
+            -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY || 'Prekzursil_AdrianaArt' }}
+            -Dsonar.organization=${{ vars.SONAR_ORGANIZATION || 'Prekzursil' }}
+            -Dsonar.branch.name=${{ github.head_ref || github.ref_name }}
+
+      - name: Assert Sonar unresolved is zero
+        shell: bash
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL || 'https://sonarcloud.io' }}
+          SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY || 'Prekzursil_AdrianaArt' }}
+        run: |
+          set -euo pipefail
+          bash scripts/quality/assert_sonar_branch_zero.sh "${{ github.head_ref || github.ref_name }}"
+
+      - name: Upload sonar gate artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scanner-gate-sonar-branch-zero
+          path: artifacts/scanner-gate/sonar-branch-zero
+          if-no-files-found: error
+          retention-days: 7
+
+  codacy-equivalent-zero:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Install analyzer dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install --disable-pip-version-check --progress-bar off lizard bandit checkov semgrep
+          npm i -g markdownlint-cli2 stylelint
+
+      - name: Run codacy-equivalent zero gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/quality/run_codacy_equivalent_gate.sh
+
+      - name: Upload codacy-equivalent artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scanner-gate-codacy-equivalent-zero
+          path: artifacts/scanner-gate/codacy-equivalent-zero
+          if-no-files-found: error
+          retention-days: 7

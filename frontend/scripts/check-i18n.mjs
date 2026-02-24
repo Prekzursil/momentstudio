@@ -9,9 +9,10 @@ function isPathWithinRoot(rootPath, candidatePath) {
   return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 }
 
-function assertPathWithinRoot(rootPath, candidatePath, label) {
-  const candidate = path.resolve(candidatePath);
-  if (!isPathWithinRoot(rootPath, candidate)) {
+function resolvePathUnderBase(rootPath, candidatePath, label) {
+  const base = path.resolve(rootPath);
+  const candidate = path.resolve(base, candidatePath);
+  if (!isPathWithinRoot(base, candidate)) {
     throw new Error(`[i18n] Refusing ${label} outside allowed root: ${candidate}`);
   }
   return candidate;
@@ -31,9 +32,9 @@ function flattenKeys(value, prefix = '', out = new Set()) {
 }
 
 function listFiles(rootDir, dir, exts, out = []) {
-  const scanDir = assertPathWithinRoot(rootDir, dir, 'scan directory');
+  const scanDir = resolvePathUnderBase(rootDir, dir, 'scan directory');
   for (const entry of fs.readdirSync(scanDir, { withFileTypes: true })) {
-    const fullPath = assertPathWithinRoot(rootDir, path.join(scanDir, entry.name), `entry "${entry.name}"`);
+    const fullPath = resolvePathUnderBase(rootDir, path.join(scanDir, entry.name), `entry "${entry.name}"`);
     if (entry.isDirectory()) {
       listFiles(rootDir, fullPath, exts, out);
       continue;
@@ -46,7 +47,7 @@ function listFiles(rootDir, dir, exts, out = []) {
 }
 
 function readJson(rootDir, filePath) {
-  const safeFilePath = assertPathWithinRoot(rootDir, filePath, 'JSON file');
+  const safeFilePath = resolvePathUnderBase(rootDir, filePath, 'JSON file');
   return JSON.parse(fs.readFileSync(safeFilePath, 'utf8'));
 }
 
@@ -76,8 +77,8 @@ function collectKeyMatches(contents, regex) {
 
 const scriptsDir = path.dirname(fileURLToPath(import.meta.url));
 const frontendRoot = path.resolve(scriptsDir, '..');
-const i18nDir = assertPathWithinRoot(frontendRoot, path.join(frontendRoot, 'src', 'assets', 'i18n'), 'i18n directory');
-const appDir = assertPathWithinRoot(frontendRoot, path.join(frontendRoot, 'src', 'app'), 'app directory');
+const i18nDir = resolvePathUnderBase(frontendRoot, path.join(frontendRoot, 'src', 'assets', 'i18n'), 'i18n directory');
+const appDir = resolvePathUnderBase(frontendRoot, path.join(frontendRoot, 'src', 'app'), 'app directory');
 
 const i18nFiles = fs.existsSync(i18nDir)
   ? fs
@@ -95,7 +96,7 @@ const baseLangFile = i18nFiles.includes('en.json') ? 'en.json' : i18nFiles[0];
 const translations = new Map();
 
 for (const name of i18nFiles) {
-  const filePath = assertPathWithinRoot(i18nDir, path.join(i18nDir, name), `i18n file "${name}"`);
+  const filePath = resolvePathUnderBase(i18nDir, path.join(i18nDir, name), `i18n file "${name}"`);
   const json = readJson(i18nDir, filePath);
   translations.set(name, flattenKeys(json));
 }
@@ -132,7 +133,7 @@ const codeFiles = fs.existsSync(appDir) ? listFiles(appDir, appDir, ['.ts', '.ht
 const codeKeys = [];
 
 for (const filePath of codeFiles) {
-  const safeFilePath = assertPathWithinRoot(appDir, filePath, 'code file');
+  const safeFilePath = resolvePathUnderBase(appDir, filePath, 'code file');
   const contents = fs.readFileSync(safeFilePath, 'utf8');
 
   codeKeys.push(...collectKeyMatches(contents, /\bthis\.t\(\s*(['"])(.*?)\1\s*\)/g));

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -70,11 +71,11 @@ def _sanitize_payload(value: dict | None) -> dict | None:
     return trimmed or None
 
 
-@router.post("/token", response_model=AnalyticsTokenResponse)
+@router.post("/token")
 async def mint_analytics_token(
     payload: AnalyticsTokenRequest,
     request: Request,
-    _: None = Depends(analytics_rate_limit),
+    _: Annotated[None, Depends(analytics_rate_limit)],
 ) -> AnalyticsTokenResponse:
     session_id = _normalize_session_id(payload.session_id)
     if not session_id:
@@ -91,13 +92,13 @@ async def mint_analytics_token(
     return AnalyticsTokenResponse(token=token, expires_in=max(ttl_seconds, 60))
 
 
-@router.post("/events", response_model=AnalyticsEventIngestResponse)
+@router.post("/events")
 async def ingest_analytics_event(
     payload: AnalyticsEventCreate,
     request: Request,
-    session: AsyncSession = Depends(get_session),
-    user: User | None = Depends(get_current_user_optional),
-    _: None = Depends(analytics_rate_limit),
+    session: Annotated[AsyncSession, Depends(get_session)],
+    user: Annotated[User | None, Depends(get_current_user_optional)],
+    _: Annotated[None, Depends(analytics_rate_limit)],
 ) -> AnalyticsEventIngestResponse:
     event = _normalize_event(payload.event)
     if not _EVENT_RE.match(event) or event not in _ALLOWED_EVENTS:

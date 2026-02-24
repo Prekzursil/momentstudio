@@ -3,6 +3,7 @@ import re
 from datetime import datetime, timedelta, timezone, date
 from functools import partial
 from pathlib import Path
+from typing import Annotated
 from urllib.parse import urlencode
 from uuid import UUID
 
@@ -506,13 +507,13 @@ class UserCooldownsResponse(BaseModel):
     email: CooldownInfo
 
 
-@router.post("/register", status_code=status.HTTP_201_CREATED, response_model=AuthResponse)
+@router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(
     payload: RegisterRequest,
     request: Request,
     background_tasks: BackgroundTasks,
-    session: AsyncSession = Depends(get_session),
-    _: None = Depends(register_rate_limit),
+    session: Annotated[AsyncSession, Depends(get_session)],
+    _: Annotated[None, Depends(register_rate_limit)],
     response: Response = None,
 ) -> AuthResponse:
     await captcha_service.verify(payload.captcha_token, remote_ip=request.client.host if request.client else None)
@@ -582,7 +583,7 @@ async def register(
 
 @router.post(
     "/login",
-    response_model=AuthResponse | TwoFactorChallengeResponse,
+
     summary="Login with email or username",
     description=(
         "Accepts an `identifier` field (email or username). For backward compatibility, an `email` field is also "
@@ -593,8 +594,8 @@ async def login(
     payload: LoginRequest,
     request: Request,
     background_tasks: BackgroundTasks,
-    session: AsyncSession = Depends(get_session),
-    _: None = Depends(login_rate_limit),
+    session: Annotated[AsyncSession, Depends(get_session)],
+    _: Annotated[None, Depends(login_rate_limit)],
     response: Response = None,
 ) -> AuthResponse | TwoFactorChallengeResponse:
     await captcha_service.verify(payload.captcha_token, remote_ip=request.client.host if request.client else None)
@@ -657,13 +658,13 @@ async def login(
     return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
 
 
-@router.post("/login/2fa", response_model=AuthResponse, summary="Complete login with two-factor code")
+@router.post("/login/2fa", summary="Complete login with two-factor code")
 async def login_two_factor(
     payload: TwoFactorLoginRequest,
     request: Request,
     background_tasks: BackgroundTasks,
-    session: AsyncSession = Depends(get_session),
-    _: None = Depends(two_factor_rate_limit),
+    session: Annotated[AsyncSession, Depends(get_session)],
+    _: Annotated[None, Depends(two_factor_rate_limit)],
     response: Response = None,
 ) -> AuthResponse:
     token_payload = security.decode_token(payload.two_factor_token)
@@ -742,13 +743,13 @@ async def login_two_factor(
 
 @router.post(
     "/passkeys/login/options",
-    response_model=PasskeyAuthenticationOptionsResponse,
+
     summary="Get WebAuthn options for passkey login",
 )
 async def passkey_login_options(
     payload: PasskeyLoginOptionsRequest,
-    session: AsyncSession = Depends(get_session),
-    _: None = Depends(login_rate_limit),
+    session: Annotated[AsyncSession, Depends(get_session)],
+    _: Annotated[None, Depends(login_rate_limit)],
 ) -> PasskeyAuthenticationOptionsResponse:
     identifier = (payload.identifier or "").strip()
     user: User | None = None
@@ -774,15 +775,15 @@ async def passkey_login_options(
 
 @router.post(
     "/passkeys/login/verify",
-    response_model=AuthResponse,
+
     summary="Verify a passkey assertion and start a session",
 )
 async def passkey_login_verify(
     payload: PasskeyLoginVerifyRequest,
     request: Request,
     background_tasks: BackgroundTasks,
-    session: AsyncSession = Depends(get_session),
-    _: None = Depends(login_rate_limit),
+    session: Annotated[AsyncSession, Depends(get_session)],
+    _: Annotated[None, Depends(login_rate_limit)],
     response: Response = None,
 ) -> AuthResponse:
     token_payload = security.decode_token(payload.authentication_token)
@@ -863,10 +864,10 @@ async def passkey_login_verify(
     return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
 
 
-@router.get("/me/passkeys", response_model=list[PasskeyResponse], summary="List my passkeys")
+@router.get("/me/passkeys", summary="List my passkeys")
 async def list_my_passkeys(
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> list[PasskeyResponse]:
     passkeys = await passkeys_service.list_passkeys(session, current_user.id)
     return [PasskeyResponse.model_validate(p) for p in passkeys]
@@ -874,13 +875,13 @@ async def list_my_passkeys(
 
 @router.post(
     "/me/passkeys/register/options",
-    response_model=PasskeyRegistrationOptionsResponse,
+
     summary="Start passkey registration (generates WebAuthn options)",
 )
 async def passkey_register_options(
     payload: PasskeyRegistrationOptionsRequest,
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> PasskeyRegistrationOptionsResponse:
     if not security.verify_password(payload.password, current_user.hashed_password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
@@ -900,14 +901,14 @@ async def passkey_register_options(
 
 @router.post(
     "/me/passkeys/register/verify",
-    response_model=PasskeyResponse,
+
     summary="Finalize passkey registration",
 )
 async def passkey_register_verify(
     payload: PasskeyRegistrationVerifyRequest,
     request: Request,
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> PasskeyResponse:
     token_payload = security.decode_token(payload.registration_token)
     if not token_payload or token_payload.get("type") != "webauthn" or token_payload.get("purpose") != "register":
@@ -945,8 +946,8 @@ async def passkey_delete(
     passkey_id: UUID,
     payload: ConfirmPasswordRequest,
     request: Request,
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> None:
     if not security.verify_password(payload.password, current_user.hashed_password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
@@ -967,8 +968,8 @@ async def passkey_delete(
 async def refresh_tokens(
     refresh_request: RefreshRequest,
     request: Request,
-    session: AsyncSession = Depends(get_session),
-    _: None = Depends(refresh_rate_limit),
+    session: Annotated[AsyncSession, Depends(get_session)],
+    _: Annotated[None, Depends(refresh_rate_limit)],
     response: Response = None,
 ) -> TokenPair | Response:
     silent_header = str(request.headers.get("X-Silent") or "").strip().lower()
@@ -1100,7 +1101,7 @@ async def refresh_tokens(
 async def logout(
     payload: RefreshRequest,
     request: Request,
-    session: AsyncSession = Depends(get_session),
+    session: Annotated[AsyncSession, Depends(get_session)],
     response: Response = None,
 ) -> None:
     refresh_token = (payload.refresh_token or "").strip()
@@ -1123,8 +1124,8 @@ class AdminIpBypassRequest(BaseModel):
 async def admin_ip_bypass(
     payload: AdminIpBypassRequest,
     request: Request,
-    session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(require_admin),
+    session: Annotated[AsyncSession, Depends(get_session)],
+    current_user: Annotated[User, Depends(require_admin)],
     response: Response = None,
 ) -> None:
     secret = (settings.admin_ip_bypass_token or "").strip()
@@ -1153,17 +1154,17 @@ async def clear_admin_ip_bypass(response: Response = None) -> None:
 
 
 @router.get("/admin/access", status_code=status.HTTP_200_OK, summary="Check whether this session can access the admin UI")
-async def admin_access(_: User = Depends(require_admin_section("dashboard"))) -> dict:
+async def admin_access(_: Annotated[User, Depends(require_admin_section("dashboard"))]) -> dict:
     return {"allowed": True}
 
 
-@router.post("/step-up", response_model=StepUpResponse, status_code=status.HTTP_200_OK)
+@router.post("/step-up", status_code=status.HTTP_200_OK)
 async def step_up(
     payload: StepUpRequest,
     request: Request,
-    _: None = Depends(step_up_rate_limit),
-    session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(require_admin_section("dashboard")),
+    _: Annotated[None, Depends(step_up_rate_limit)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    current_user: Annotated[User, Depends(require_admin_section("dashboard"))],
 ) -> StepUpResponse:
     hashed_password = (getattr(current_user, "hashed_password", None) or "").strip()
     if not hashed_password:
@@ -1191,8 +1192,8 @@ async def change_password(
     payload: ChangePasswordRequest,
     request: Request,
     background_tasks: BackgroundTasks,
-    session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    session: Annotated[AsyncSession, Depends(get_session)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> dict:
     if not security.verify_password(payload.current_password, current_user.hashed_password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
@@ -1233,19 +1234,19 @@ async def request_email_verification(
 @router.post("/verify/confirm", status_code=status.HTTP_200_OK)
 async def confirm_email_verification(
     payload: EmailVerificationConfirm,
-    session: AsyncSession = Depends(get_session),
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> dict:
     user = await auth_service.confirm_email_verification(session, payload.token)
     return {"detail": "Email verified", "email_verified": user.email_verified}
 
 
-@router.get("/me", response_model=UserResponse)
-async def read_me(current_user: User = Depends(get_current_user)) -> UserResponse:
+@router.get("/me")
+async def read_me(current_user: Annotated[User, Depends(get_current_user)]) -> UserResponse:
     return UserResponse.model_validate(current_user)
 
 
-@router.get("/me/2fa", response_model=TwoFactorStatusResponse, summary="Get my two-factor status")
-async def two_factor_status(current_user: User = Depends(get_current_user)) -> TwoFactorStatusResponse:
+@router.get("/me/2fa", summary="Get my two-factor status")
+async def two_factor_status(current_user: Annotated[User, Depends(get_current_user)]) -> TwoFactorStatusResponse:
     confirmed_at = getattr(current_user, "two_factor_confirmed_at", None)
     if confirmed_at and confirmed_at.tzinfo is None:
         confirmed_at = confirmed_at.replace(tzinfo=timezone.utc)
@@ -1257,12 +1258,12 @@ async def two_factor_status(current_user: User = Depends(get_current_user)) -> T
     )
 
 
-@router.post("/me/2fa/setup", response_model=TwoFactorSetupResponse, summary="Start two-factor setup")
+@router.post("/me/2fa/setup", summary="Start two-factor setup")
 async def two_factor_setup(
     payload: TwoFactorSetupRequest,
     request: Request,
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> TwoFactorSetupResponse:
     if not security.verify_password(payload.password, current_user.hashed_password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
@@ -1277,12 +1278,12 @@ async def two_factor_setup(
     return TwoFactorSetupResponse(secret=secret, otpauth_url=otpauth_url)
 
 
-@router.post("/me/2fa/enable", response_model=TwoFactorEnableResponse, summary="Enable two-factor authentication")
+@router.post("/me/2fa/enable", summary="Enable two-factor authentication")
 async def two_factor_enable(
     payload: TwoFactorEnableRequest,
     request: Request,
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> TwoFactorEnableResponse:
     codes = await auth_service.enable_two_factor(session, current_user, payload.code)
     await auth_service.record_security_event(
@@ -1295,12 +1296,12 @@ async def two_factor_enable(
     return TwoFactorEnableResponse(recovery_codes=codes)
 
 
-@router.post("/me/2fa/disable", response_model=TwoFactorStatusResponse, summary="Disable two-factor authentication")
+@router.post("/me/2fa/disable", summary="Disable two-factor authentication")
 async def two_factor_disable(
     payload: TwoFactorDisableRequest,
     request: Request,
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> TwoFactorStatusResponse:
     if not security.verify_password(payload.password, current_user.hashed_password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
@@ -1321,14 +1322,14 @@ async def two_factor_disable(
 
 @router.post(
     "/me/2fa/recovery-codes/regenerate",
-    response_model=TwoFactorEnableResponse,
+
     summary="Regenerate two-factor recovery codes",
 )
 async def two_factor_regenerate_codes(
     payload: TwoFactorDisableRequest,
     request: Request,
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> TwoFactorEnableResponse:
     if not security.verify_password(payload.password, current_user.hashed_password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
@@ -1349,13 +1350,13 @@ async def two_factor_regenerate_codes(
 
 @router.get(
     "/me/aliases",
-    response_model=UserAliasesResponse,
+
     summary="Get my username and display name history",
     description="Returns the full history of your username changes and display-name tags (name#N).",
 )
 async def read_aliases(
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> UserAliasesResponse:
     usernames = await auth_service.list_username_history(session, current_user.id)
     display_names = await auth_service.list_display_name_history(session, current_user.id)
@@ -1369,12 +1370,12 @@ async def read_aliases(
 
 @router.get(
     "/me/cooldowns",
-    response_model=UserCooldownsResponse,
+
     summary="Get my profile/email change cooldowns",
 )
 async def read_cooldowns(
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> UserCooldownsResponse:
     now = datetime.now(timezone.utc)
 
@@ -1429,14 +1430,14 @@ async def read_cooldowns(
 
 @router.patch(
     "/me/username",
-    response_model=UserResponse,
+
     summary="Update my username",
     description="Updates your unique username and stores an entry in your username history.",
 )
 async def update_username(
     payload: UsernameUpdateRequest,
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> UserResponse:
     if not security.verify_password(payload.password, current_user.hashed_password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
@@ -1446,7 +1447,7 @@ async def update_username(
 
 @router.patch(
     "/me/email",
-    response_model=UserResponse,
+
     summary="Update my email address",
     description="Updates your email (password required) and sends a new verification token. Disabled while Google is linked.",
 )
@@ -1454,8 +1455,8 @@ async def update_email(
     payload: EmailUpdateRequest,
     request: Request,
     background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> UserResponse:
     if not security.verify_password(payload.password, current_user.hashed_password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
@@ -1477,13 +1478,13 @@ async def update_email(
 
 @router.get(
     "/me/emails",
-    response_model=UserEmailsResponse,
+
     summary="List my emails",
     description="Returns primary email and any secondary emails (verified/unverified).",
 )
 async def list_my_emails(
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> UserEmailsResponse:
     secondary = await auth_service.list_secondary_emails(session, current_user.id)
     return UserEmailsResponse(
@@ -1495,15 +1496,15 @@ async def list_my_emails(
 
 @router.post(
     "/me/emails",
-    response_model=SecondaryEmailResponse,
+
     status_code=status.HTTP_201_CREATED,
     summary="Add a secondary email",
 )
 async def add_my_secondary_email(
     payload: SecondaryEmailCreateRequest,
     background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> SecondaryEmailResponse:
     secondary, token = await auth_service.add_secondary_email(session, current_user, str(payload.email))
     background_tasks.add_task(
@@ -1545,12 +1546,12 @@ async def request_secondary_email_verification(
 
 @router.post(
     "/me/emails/verify/confirm",
-    response_model=SecondaryEmailResponse,
+
     summary="Confirm secondary email verification",
 )
 async def confirm_secondary_email_verification(
     payload: SecondaryEmailConfirmRequest,
-    session: AsyncSession = Depends(get_session),
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> SecondaryEmailResponse:
     secondary = await auth_service.confirm_secondary_email_verification(session, payload.token)
     return SecondaryEmailResponse.model_validate(secondary)
@@ -1558,15 +1559,15 @@ async def confirm_secondary_email_verification(
 
 @router.post(
     "/me/emails/{secondary_email_id}/make-primary",
-    response_model=UserResponse,
+
     summary="Make a verified secondary email the primary email",
 )
 async def make_secondary_email_primary(
     secondary_email_id: UUID,
     payload: SecondaryEmailMakePrimaryRequest,
     request: Request,
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> UserResponse:
     if not security.verify_password(payload.password, current_user.hashed_password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
@@ -1589,8 +1590,8 @@ async def make_secondary_email_primary(
 async def delete_secondary_email(
     secondary_email_id: UUID,
     payload: ConfirmPasswordRequest,
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> None:
     if not security.verify_password(payload.password, current_user.hashed_password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
@@ -1599,8 +1600,8 @@ async def delete_secondary_email(
 
 @router.get("/me/export")
 async def export_me(
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> Response:
     data = await self_service.export_user_data(session, current_user)
     filename = f"moment-studio-export-{current_user.id}.json"
@@ -1610,11 +1611,11 @@ async def export_me(
     )
 
 
-@router.post("/me/export/jobs", response_model=UserDataExportJobResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/me/export/jobs", status_code=status.HTTP_201_CREATED)
 async def start_export_job(
     background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> UserDataExportJobResponse:
     latest = (
         (
@@ -1655,10 +1656,10 @@ async def start_export_job(
     return UserDataExportJobResponse.model_validate(job, from_attributes=True)
 
 
-@router.get("/me/export/jobs/latest", response_model=UserDataExportJobResponse)
+@router.get("/me/export/jobs/latest")
 async def latest_export_job(
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> UserDataExportJobResponse:
     job = (
         (
@@ -1677,11 +1678,11 @@ async def latest_export_job(
     return UserDataExportJobResponse.model_validate(job, from_attributes=True)
 
 
-@router.get("/me/export/jobs/{job_id}", response_model=UserDataExportJobResponse)
+@router.get("/me/export/jobs/{job_id}")
 async def get_export_job(
     job_id: UUID,
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> UserDataExportJobResponse:
     job = await session.get(UserDataExportJob, job_id)
     if not job or job.user_id != current_user.id:
@@ -1692,8 +1693,8 @@ async def get_export_job(
 @router.get("/me/export/jobs/{job_id}/download")
 async def download_export_job(
     job_id: UUID,
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> FileResponse:
     job = await session.get(UserDataExportJob, job_id)
     if not job or job.user_id != current_user.id:
@@ -1716,8 +1717,8 @@ async def download_export_job(
     return FileResponse(path, media_type="application/json", filename=filename, headers={"Cache-Control": "no-store"})
 
 
-@router.get("/me/delete/status", response_model=AccountDeletionStatus)
-async def account_delete_status(current_user: User = Depends(get_current_user)) -> AccountDeletionStatus:
+@router.get("/me/delete/status")
+async def account_delete_status(current_user: Annotated[User, Depends(get_current_user)]) -> AccountDeletionStatus:
     return AccountDeletionStatus(
         requested_at=current_user.deletion_requested_at,
         scheduled_for=current_user.deletion_scheduled_for,
@@ -1726,11 +1727,11 @@ async def account_delete_status(current_user: User = Depends(get_current_user)) 
     )
 
 
-@router.post("/me/delete", response_model=AccountDeletionStatus)
+@router.post("/me/delete")
 async def request_account_deletion(
     payload: AccountDeletionRequest,
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> AccountDeletionStatus:
     if payload.confirm.strip().upper() != "DELETE":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Type "DELETE" to confirm')
@@ -1758,10 +1759,10 @@ async def request_account_deletion(
     )
 
 
-@router.post("/me/delete/cancel", response_model=AccountDeletionStatus)
+@router.post("/me/delete/cancel")
 async def cancel_account_deletion(
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> AccountDeletionStatus:
     current_user.deletion_requested_at = None
     current_user.deletion_scheduled_for = None
@@ -1776,11 +1777,11 @@ async def cancel_account_deletion(
     )
 
 
-@router.patch("/me/language", response_model=UserResponse)
+@router.patch("/me/language")
 async def update_language(
     payload: PreferredLanguageUpdate,
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> UserResponse:
     current_user.preferred_language = payload.preferred_language
     session.add(current_user)
@@ -1789,11 +1790,11 @@ async def update_language(
     return UserResponse.model_validate(current_user)
 
 
-@router.patch("/me/notifications", response_model=UserResponse)
+@router.patch("/me/notifications")
 async def update_notification_preferences(
     payload: NotificationPreferencesUpdate,
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> UserResponse:
     if payload.notify_blog_comments is not None:
         current_user.notify_blog_comments = bool(payload.notify_blog_comments)
@@ -1807,11 +1808,11 @@ async def update_notification_preferences(
     return UserResponse.model_validate(current_user)
 
 
-@router.patch("/me/training-mode", response_model=UserResponse)
+@router.patch("/me/training-mode")
 async def update_training_mode(
     payload: TrainingModeUpdateRequest,
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> UserResponse:
     if current_user.role not in (
         UserRole.owner,
@@ -1830,14 +1831,14 @@ async def update_training_mode(
 
 @router.get(
     "/me/sessions",
-    response_model=list[RefreshSessionResponse],
+
     summary="List my active sessions",
     description="Returns active refresh sessions for the current account so you can revoke other devices.",
 )
 async def list_my_sessions(
     request: Request,
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> list[RefreshSessionResponse]:
     candidate_jti = _extract_refresh_session_jti(request)
     current_jti = await _resolve_active_refresh_session_jti(session, current_user.id, candidate_jti)
@@ -1878,15 +1879,15 @@ async def list_my_sessions(
 
 @router.post(
     "/me/sessions/revoke-others",
-    response_model=RefreshSessionsRevokeResponse,
+
     summary="Revoke other active sessions",
     description="Revokes all other active refresh sessions, keeping only the current device signed in.",
 )
 async def revoke_other_sessions(
     payload: ConfirmPasswordRequest,
     request: Request,
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> RefreshSessionsRevokeResponse:
     if not security.verify_password(payload.password, current_user.hashed_password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
@@ -1924,13 +1925,13 @@ async def revoke_other_sessions(
 
 @router.get(
     "/me/security-events",
-    response_model=list[UserSecurityEventResponse],
+
     summary="List my recent security activity",
     description="Returns recent security-related events like logins and credential changes.",
 )
 async def list_security_events(
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
     limit: int = Query(default=30, ge=1, le=100),
 ) -> list[UserSecurityEventResponse]:
     rows = (
@@ -1959,11 +1960,11 @@ async def list_security_events(
     return events
 
 
-@router.patch("/me", response_model=UserResponse)
+@router.patch("/me")
 async def update_me(
     payload: ProfileUpdate,
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> UserResponse:
     data = payload.model_dump(exclude_unset=True)
     if "phone" in data and payload.phone is None:
@@ -1994,7 +1995,7 @@ async def update_me(
     return UserResponse.model_validate(current_user)
 
 
-@router.post("/me/avatar", response_model=UserResponse)
+@router.post("/me/avatar")
 async def upload_avatar(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
@@ -2020,10 +2021,10 @@ async def upload_avatar(
     return UserResponse.model_validate(current_user)
 
 
-@router.post("/me/avatar/use-google", response_model=UserResponse)
+@router.post("/me/avatar/use-google")
 async def use_google_avatar(
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> UserResponse:
     if not current_user.google_picture_url:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No Google profile picture available")
@@ -2034,10 +2035,10 @@ async def use_google_avatar(
     return UserResponse.model_validate(current_user)
 
 
-@router.delete("/me/avatar", response_model=UserResponse)
+@router.delete("/me/avatar")
 async def remove_avatar(
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> UserResponse:
     current_user.avatar_url = None
     session.add(current_user)
@@ -2046,14 +2047,14 @@ async def remove_avatar(
     return UserResponse.model_validate(current_user)
 
 
-@router.get("/admin/ping", response_model=dict[str, str])
-async def admin_ping(admin_user: User = Depends(require_admin)) -> dict[str, str]:
+@router.get("/admin/ping")
+async def admin_ping(admin_user: Annotated[User, Depends(require_admin)]) -> dict[str, str]:
     return {"status": "admin-ok", "user": str(admin_user.id)}
 
 
 @router.post(
     "/admin/cleanup/incomplete-google",
-    response_model=dict[str, int],
+
     summary="Cleanup abandoned incomplete Google accounts",
     description="Soft-deletes Google-created accounts that never completed required profile fields after a grace period.",
 )
@@ -2070,8 +2071,8 @@ async def admin_cleanup_incomplete_google_accounts(
 async def request_password_reset(
     payload: PasswordResetRequest,
     background_tasks: BackgroundTasks,
-    session: AsyncSession = Depends(get_session),
-    _: None = Depends(reset_request_rate_limit),
+    session: Annotated[AsyncSession, Depends(get_session)],
+    _: Annotated[None, Depends(reset_request_rate_limit)],
 ) -> dict[str, str]:
     email = (payload.email or "").strip().lower()
     reset = await auth_service.create_reset_token(session, email)
@@ -2091,8 +2092,8 @@ async def confirm_password_reset(
     payload: PasswordResetConfirm,
     request: Request,
     background_tasks: BackgroundTasks,
-    session: AsyncSession = Depends(get_session),
-    _: None = Depends(reset_confirm_rate_limit),
+    session: Annotated[AsyncSession, Depends(get_session)],
+    _: Annotated[None, Depends(reset_confirm_rate_limit)],
 ) -> dict[str, str]:
     user = await auth_service.confirm_reset_token(session, payload.token, payload.new_password)
     background_tasks.add_task(email_service.send_password_changed, user.email, lang=user.preferred_language)
@@ -2106,8 +2107,8 @@ async def confirm_password_reset(
     return {"status": "updated"}
 
 
-@router.get("/google/start", response_model=dict)
-async def google_start(_: None = Depends(google_rate_limit)) -> dict:
+@router.get("/google/start")
+async def google_start(_: Annotated[None, Depends(google_rate_limit)]) -> dict:
     if not settings.google_client_id or not settings.google_redirect_uri:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Google OAuth not configured")
     state = _build_google_state("google_state")
@@ -2124,12 +2125,12 @@ async def google_start(_: None = Depends(google_rate_limit)) -> dict:
     return {"auth_url": url}
 
 
-@router.post("/google/callback", response_model=GoogleCallbackResponse)
+@router.post("/google/callback")
 async def google_callback(
     payload: GoogleCallback,
     request: Request,
     background_tasks: BackgroundTasks,
-    session: AsyncSession = Depends(get_session),
+    session: Annotated[AsyncSession, Depends(get_session)],
     response: Response = None,
     _: None = Depends(google_rate_limit),
 ) -> GoogleCallbackResponse:
@@ -2291,13 +2292,13 @@ class GoogleCompleteRequest(BaseModel):
         return value
 
 
-@router.post("/google/complete", response_model=AuthResponse)
+@router.post("/google/complete")
 async def google_complete_registration(
     payload: GoogleCompleteRequest,
     request: Request,
     background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_google_completion_user),
-    session: AsyncSession = Depends(get_session),
+    current_user: Annotated[User, Depends(get_google_completion_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
     response: Response = None,
 ) -> AuthResponse:
     if not payload.accept_terms or not payload.accept_privacy:
@@ -2356,8 +2357,8 @@ async def google_complete_registration(
     return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
 
 
-@router.get("/google/link/start", response_model=dict)
-async def google_link_start(current_user: User = Depends(get_current_user), _: None = Depends(google_rate_limit)) -> dict:
+@router.get("/google/link/start")
+async def google_link_start(current_user: Annotated[User, Depends(get_current_user)], _: Annotated[None, Depends(google_rate_limit)]) -> dict:
     if not settings.google_client_id or not settings.google_redirect_uri:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Google OAuth not configured")
     state = _build_google_state("google_link", str(current_user.id))
@@ -2380,12 +2381,12 @@ class GoogleLinkCallback(BaseModel):
     password: str
 
 
-@router.post("/google/link", response_model=UserResponse)
+@router.post("/google/link")
 async def google_link(
     payload: GoogleLinkCallback,
-    current_user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
-    _: None = Depends(google_rate_limit),
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    _: Annotated[None, Depends(google_rate_limit)],
 ) -> UserResponse:
     _validate_google_state(payload.state, "google_link", str(current_user.id))
     if not security.verify_password(payload.password, current_user.hashed_password):
@@ -2420,12 +2421,12 @@ class UnlinkRequest(BaseModel):
     password: str
 
 
-@router.post("/google/unlink", response_model=UserResponse)
+@router.post("/google/unlink")
 async def google_unlink(
     payload: UnlinkRequest,
-    current_user: User = Depends(require_complete_profile),
-    session: AsyncSession = Depends(get_session),
-    _: None = Depends(google_rate_limit),
+    current_user: Annotated[User, Depends(require_complete_profile)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    _: Annotated[None, Depends(google_rate_limit)],
 ) -> UserResponse:
     if not security.verify_password(payload.password, current_user.hashed_password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")

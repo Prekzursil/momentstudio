@@ -42,6 +42,17 @@ jobs:
             printf '%s' "$candidate"
           }
 
+          validate_repo_name() {
+            local candidate="$1"
+            if [[ ! "$candidate" =~ ^[a-z0-9][a-z0-9._-]*/[a-z0-9][a-z0-9._-]*$ ]]; then
+              echo "Invalid repository coordinate '${candidate}' for image prefix." >&2
+              exit 1
+            fi
+            printf '%s' "$candidate"
+          }
+
+          repo="$(validate_repo_name "${repo}")"
+
           if [[ -n "${INPUT_TAG}" ]]; then
             tag="$(validate_tag "${INPUT_TAG}")"
           elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then

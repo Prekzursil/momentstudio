@@ -7526,7 +7526,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     private readonly fxAdmin: FxAdminService,
     private readonly taxesAdmin: TaxesAdminService,
     private readonly auth: AuthService,
-    public cmsPrefs: CmsEditorPrefsService,
+    public readonly cmsPrefs: CmsEditorPrefsService,
     private readonly toast: ToastService,
     private readonly translate: TranslateService,
     private readonly markdown: MarkdownService,

@@ -930,7 +930,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   productReorderSaving = signal<boolean>(false);
   private productsLoadSeq = 0;
 
-  sortOptions: { label: string; value: SortOption }[] = [
+  readonly sortOptions: { label: string; value: SortOption }[] = [
     { label: 'shop.sortRecommended', value: 'recommended' },
     { label: 'shop.sortNew', value: 'newest' },
     { label: 'shop.sortPriceAsc', value: 'price_asc' },
@@ -986,7 +986,7 @@ export class ShopComponent implements OnInit, OnDestroy {
 	      this.loadProducts(false);
 	    });
 	    this.initScrollRestoreFromSession();
-	    const dataCategories = (this.route.snapshot.data['categories'] as Category[]) ?? [];
+	    const dataCategories: Category[] = this.route.snapshot.data['categories'] ?? [];
     if (dataCategories.length) {
       this.categories = dataCategories;
       this.rebuildCategoryTree();
@@ -1731,8 +1731,10 @@ export class ShopComponent implements OnInit, OnDestroy {
     if (!el) return;
     el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     setTimeout(() => {
-      const select = document.getElementById('shop-sort-select') as HTMLSelectElement | null;
-      select?.focus();
+      const select = document.getElementById('shop-sort-select');
+      if (select instanceof HTMLSelectElement) {
+        select.focus();
+      }
     }, 350);
   }
 
@@ -2429,7 +2431,7 @@ export class ShopComponent implements OnInit, OnDestroy {
     this.filters.max_price = max ?? this.priceMaxBound;
     const rawSort = typeof params['sort'] === 'string' ? params['sort'].trim() : '';
     const allowedSorts: SortOption[] = ['recommended', 'newest', 'price_asc', 'price_desc', 'name_asc', 'name_desc'];
-    this.filters.sort = allowedSorts.includes(rawSort as SortOption) ? (rawSort as SortOption) : 'recommended';
+    this.filters.sort = allowedSorts.find((option) => option === rawSort) ?? 'recommended';
     this.filters.page = params['page'] ? Number(params['page']) : 1;
     const tagParam = params['tags'];
     this.filters.tags = new Set<string>(
@@ -2652,4 +2654,3 @@ export class ShopComponent implements OnInit, OnDestroy {
     requestAnimationFrame(() => window.scrollTo({ top: y, behavior: 'auto' }));
   }
 }
-

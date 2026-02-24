@@ -1794,7 +1794,7 @@ export class AdminOrderDetailComponent implements OnInit {
 
   statusOptions(): Array<{ value: OrderStatus; disabled: boolean }> {
     const o = this.order();
-    const current = ((o?.status as OrderStatus) || this.statusValue) as OrderStatus;
+    const current = (o?.status as OrderStatus) || this.statusValue;
     const method = (o?.payment_method || '').toString().trim().toLowerCase();
     const allowed = this.allowedNextStatuses(current, method, o);
     return this.statusOrder.map((value) => ({ value, disabled: !allowed.has(value) }));
@@ -2963,7 +2963,7 @@ export class AdminOrderDetailComponent implements OnInit {
   save(): void {
     const orderId = this.order()?.id;
     if (!orderId) return;
-    const currentStatus = ((this.order()?.status as OrderStatus) || 'pending_acceptance') as OrderStatus;
+    const currentStatus = (this.order()?.status as OrderStatus) || 'pending_acceptance';
     const statusChanged = this.statusValue !== currentStatus;
     const isCancelling = statusChanged && this.statusValue === 'cancelled';
     const cancelReasonValue = this.cancelReason.trim();
@@ -3245,7 +3245,7 @@ export class AdminOrderDetailComponent implements OnInit {
     if (!orderId) return;
     const cached = this.receiptShare();
     const expiresAt = cached?.expires_at ? new Date(cached.expires_at) : null;
-    if (cached?.receipt_url && expiresAt && expiresAt.getTime() > Date.now() + 30_000) {
+    if (cached?.receipt_url && expiresAt?.getTime() > Date.now() + 30_000) {
       void this.copyToClipboard(cached.receipt_url).then((ok) => {
         this.toast.success(
           ok ? this.translate.instant('adminUi.orders.receiptLinks.copied') : this.translate.instant('adminUi.orders.receiptLinks.ready')
@@ -3443,4 +3443,3 @@ export class AdminOrderDetailComponent implements OnInit {
     });
   }
 }
-
