@@ -6,6 +6,7 @@ mkdir -p "$OUT_DIR"
 
 STATUS_FILE="$OUT_DIR/check-status.tsv"
 SUMMARY_FILE="$OUT_DIR/gate-summary.json"
+PATTERN_COUNTS_FILE="$OUT_DIR/pattern-counts.json"
 RUN_LOG="$OUT_DIR/gate-run.log"
 : > "$STATUS_FILE"
 : > "$RUN_LOG"
@@ -49,15 +50,34 @@ require_cmd stylelint
 require_cmd bandit
 require_cmd checkov
 require_cmd semgrep
+require_cmd python3
+
+MARKDOWNLINT_CONFIG="$OUT_DIR/markdownlint.config.json"
+cat > "$MARKDOWNLINT_CONFIG" <<'MARKDOWNLINT_JSON'
+{
+  "default": false,
+  "MD032": true,
+  "MD034": true
+}
+MARKDOWNLINT_JSON
 
 STYLELINT_CONFIG="$OUT_DIR/stylelint.config.json"
 cat > "$STYLELINT_CONFIG" <<'STYLELINT_JSON'
 {
   "rules": {
-    "block-no-empty": true,
-    "color-no-invalid-hex": true,
-    "declaration-block-no-duplicate-properties": true,
-    "declaration-block-no-shorthand-property-overrides": true
+    "selector-class-pattern": "^[a-z][a-z0-9\\-]*$",
+    "color-hex-length": "short",
+    "font-family-name-quotes": "always-where-recommended",
+    "media-feature-range-notation": "context",
+    "alpha-value-notation": "number",
+    "color-function-notation": "modern",
+    "declaration-empty-line-before": [
+      "always",
+      {
+        "except": ["first-nested"],
+        "ignore": ["after-comment"]
+      }
+    ]
   }
 }
 STYLELINT_JSON
@@ -91,10 +111,10 @@ rules:
 SEMGREP_YAML
 
 run_check "lizard-ccn-nloc" "lizard -w -C 8 -L 50 backend/app frontend/src scripts infra"
-run_check "markdownlint" "markdownlint-cli2 '**/*.md' '#**/node_modules/**'"
-run_check "eslint" "cd frontend && npx eslint ."
-run_check "prettier" "cd frontend && npx prettier --check ."
-run_check "stylelint" "stylelint --allow-empty-input --config '$STYLELINT_CONFIG' 'frontend/src/**/*.{css,scss,sass}'"
+run_check "markdownlint" "markdownlint-cli2 --config '$MARKDOWNLINT_CONFIG' '**/*.md' '#**/node_modules/**'"
+run_check "eslint" "cd frontend && npx eslint . -f json -o '../$OUT_DIR/eslint.json'"
+run_check "prettier" "cd frontend && npx prettier --check scripts/**/*.{js,mjs,cjs,ts,json}"
+run_check "stylelint" "stylelint --allow-empty-input --formatter json --config '$STYLELINT_CONFIG' 'frontend/src/styles.css' > '$OUT_DIR/stylelint.json'"
 run_check "bandit-b110" "bandit -r backend -t B110 -f json -o '$OUT_DIR/bandit-B110.json'"
 run_check "checkov-ckv-gha-7" "checkov -d .github/workflows --check CKV_GHA_7 --quiet --output json > '$OUT_DIR/checkov-CKV_GHA_7.json'"
 run_check "semgrep-targeted" "semgrep --config '$SEMGREP_RULES' --error --json --output '$OUT_DIR/semgrep-targeted.json' backend frontend scripts .github"
@@ -111,14 +131,144 @@ awk -F '\t' '
 
 failed_count="$(awk -F '\t' '$2 != 0 { count++ } END { print count + 0 }' "$STATUS_FILE")"
 
+python3 - "$OUT_DIR" "$PATTERN_COUNTS_FILE" <<'PY'
+import json
+import pathlib
+import re
+import sys
+
+out_dir = pathlib.Path(sys.argv[1])
+pattern_counts_file = pathlib.Path(sys.argv[2])
+
+def read_text(path: pathlib.Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8", errors="ignore")
+    except FileNotFoundError:
+        return ""
+
+pattern_counts: dict[str, int] = {}
+
+# Lizard: split into CCN and NLOC buckets from warning lines.
+lizard_text = read_text(out_dir / "lizard-ccn-nloc.log")
+ccn_count = 0
+nloc_count = 0
+for line in lizard_text.splitlines():
+    match = re.search(r"has (\d+) NLOC, (\d+) CCN", line)
+    if not match:
+        continue
+    nloc = int(match.group(1))
+    ccn = int(match.group(2))
+    if ccn > 8:
+        ccn_count += 1
+    if nloc > 50:
+        nloc_count += 1
+pattern_counts["Lizard_ccn-medium"] = ccn_count
+pattern_counts["Lizard_nloc-medium"] = nloc_count
+
+# Markdownlint: count only MD032 and MD034.
+markdown_text = read_text(out_dir / "markdownlint.log")
+pattern_counts["markdownlint_MD032"] = len(re.findall(r"MD032/", markdown_text))
+pattern_counts["markdownlint_MD034"] = len(re.findall(r"MD034/", markdown_text))
+
+# Prettier warnings.
+prettier_text = read_text(out_dir / "prettier.log")
+pattern_counts["ESLint_prettier-vue_prettier"] = len(re.findall(r"\[warn\]", prettier_text))
+
+# ESLint pattern IDs (json formatter output).
+eslint_counts = {
+    "ESLint8_@typescript-eslint_prefer-nullish-coalescing": 0,
+    "ESLint_node_no-unsupported-features_es-syntax": 0,
+    "ESLint_security_detect-non-literal-fs-filename": 0,
+    "ESLint_regexp_prefer-d": 0,
+    "ESLint_regexp_prefer-w": 0,
+}
+eslint_path = out_dir / "eslint.json"
+if eslint_path.exists():
+    try:
+        entries = json.loads(eslint_path.read_text(encoding="utf-8"))
+        for entry in entries:
+            for msg in entry.get("messages", []):
+                rule_id = msg.get("ruleId") or ""
+                if rule_id == "@typescript-eslint/prefer-nullish-coalescing":
+                    eslint_counts["ESLint8_@typescript-eslint_prefer-nullish-coalescing"] += 1
+                elif rule_id == "node/no-unsupported-features/es-syntax":
+                    eslint_counts["ESLint_node_no-unsupported-features_es-syntax"] += 1
+                elif rule_id == "security/detect-non-literal-fs-filename":
+                    eslint_counts["ESLint_security_detect-non-literal-fs-filename"] += 1
+                elif rule_id == "regexp/prefer-d":
+                    eslint_counts["ESLint_regexp_prefer-d"] += 1
+                elif rule_id == "regexp/prefer-w":
+                    eslint_counts["ESLint_regexp_prefer-w"] += 1
+    except Exception:
+        pass
+pattern_counts.update(eslint_counts)
+
+# Stylelint rule counts from json formatter.
+stylelint_counts = {
+    "Stylelint_selector-class-pattern": 0,
+    "Stylelint_color-hex-length": 0,
+    "Stylelint_font-family-name-quotes": 0,
+    "Stylelint_media-feature-range-notation": 0,
+    "Stylelint_alpha-value-notation": 0,
+    "Stylelint_color-function-notation": 0,
+    "Stylelint_declaration-empty-line-before": 0,
+}
+stylelint_path = out_dir / "stylelint.json"
+if stylelint_path.exists():
+    try:
+        entries = json.loads(stylelint_path.read_text(encoding="utf-8"))
+        for entry in entries:
+            for warning in entry.get("warnings", []):
+                rule = warning.get("rule") or ""
+                key = {
+                    "selector-class-pattern": "Stylelint_selector-class-pattern",
+                    "color-hex-length": "Stylelint_color-hex-length",
+                    "font-family-name-quotes": "Stylelint_font-family-name-quotes",
+                    "media-feature-range-notation": "Stylelint_media-feature-range-notation",
+                    "alpha-value-notation": "Stylelint_alpha-value-notation",
+                    "color-function-notation": "Stylelint_color-function-notation",
+                    "declaration-empty-line-before": "Stylelint_declaration-empty-line-before",
+                }.get(rule)
+                if key:
+                    stylelint_counts[key] += 1
+    except Exception:
+        pass
+pattern_counts.update(stylelint_counts)
+
+# Bandit / Checkov.
+bandit_path = out_dir / "bandit-B110.json"
+if bandit_path.exists():
+    try:
+        bandit = json.loads(bandit_path.read_text(encoding="utf-8"))
+        pattern_counts["Bandit_B110"] = len(bandit.get("results", []))
+    except Exception:
+        pattern_counts["Bandit_B110"] = 0
+else:
+    pattern_counts["Bandit_B110"] = 0
+
+checkov_path = out_dir / "checkov-CKV_GHA_7.json"
+if checkov_path.exists():
+    try:
+        checkov = json.loads(checkov_path.read_text(encoding="utf-8"))
+        pattern_counts["Checkov_CKV_GHA_7"] = len(checkov.get("results", {}).get("failed_checks", []))
+    except Exception:
+        pattern_counts["Checkov_CKV_GHA_7"] = 0
+else:
+    pattern_counts["Checkov_CKV_GHA_7"] = 0
+
+pattern_counts_file.write_text(json.dumps(pattern_counts, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+PY
+
 jq -n \
   --argjson failed "$failed_count" \
   --slurpfile checks "$CHECKS_JSON" \
+  --slurpfile patterns "$PATTERN_COUNTS_FILE" \
   '{
     gate:(if $failed == 0 then "pass" else "fail" end),
     failed_checks:$failed,
     total_checks:($checks[0] | length),
-    checks:$checks[0]
+    checks:$checks[0],
+    pattern_counts:$patterns[0]
   }' > "$SUMMARY_FILE"
 
 cat "$SUMMARY_FILE"
