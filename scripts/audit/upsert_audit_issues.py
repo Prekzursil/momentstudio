@@ -16,27 +16,35 @@ from typing import Any
 
 
 SEVERE_LEVELS = {"s1", "s2"}
+ALLOWED_AUDIT_PATH_PREFIXES = ("artifacts/audit-evidence", "artifacts/audit-evidence-local")
 
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+def _validated_repo_path(candidate: Path, *, allowed_prefixes: tuple[str, ...]) -> Path:
+    root = _repo_root()
+    resolved = candidate.resolve()
+    try:
+        rel = resolved.relative_to(root).as_posix()
+    except ValueError as exc:
+        raise ValueError(f"Path must stay inside repository: {candidate}") from exc
+    if not any(rel == prefix or rel.startswith(f"{prefix}/") for prefix in allowed_prefixes):
+        raise ValueError(f"Path is outside allowed audit roots: {candidate}")
+    return resolved
+
+
 def _resolve_repo_path(raw: str, *, allowed_prefixes: tuple[str, ...]) -> Path:
     root = _repo_root()
-    candidate = (root / raw).resolve()
-    try:
-        rel = candidate.relative_to(root).as_posix()
-    except ValueError as exc:
-        raise ValueError(f"Path must stay inside repository: {raw}") from exc
-    if not any(rel == prefix or rel.startswith(f"{prefix}/") for prefix in allowed_prefixes):
-        raise ValueError(f"Path is outside allowed audit roots: {raw}")
-    return candidate
+    candidate = root / raw
+    return _validated_repo_path(candidate, allowed_prefixes=allowed_prefixes)
 
 
 def _write_json(path: Path, payload: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    safe_path = _validated_repo_path(path, allowed_prefixes=ALLOWED_AUDIT_PATH_PREFIXES)
+    safe_path.parent.mkdir(parents=True, exist_ok=True)
+    safe_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
 @dataclass(frozen=True)
@@ -431,7 +439,7 @@ def main() -> int:
     args = _parse_args()
     findings_path = _resolve_repo_path(
         args.findings,
-        allowed_prefixes=("artifacts/audit-evidence", "artifacts/audit-evidence-local"),
+        allowed_prefixes=ALLOWED_AUDIT_PATH_PREFIXES,
     )
     if not findings_path.exists():
         raise FileNotFoundError(f"Findings file not found: {findings_path}")
@@ -440,7 +448,7 @@ def main() -> int:
     if args.severe_output:
         severe_output_path = _resolve_repo_path(
             args.severe_output,
-            allowed_prefixes=("artifacts/audit-evidence", "artifacts/audit-evidence-local"),
+            allowed_prefixes=ALLOWED_AUDIT_PATH_PREFIXES,
         )
 
     findings = _load_findings(findings_path)

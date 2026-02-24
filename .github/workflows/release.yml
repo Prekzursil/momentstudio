@@ -30,17 +30,32 @@ jobs:
 
       - name: Compute image metadata
         id: meta
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag || '' }}
         run: |
-          repo="$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
-          if [ -n "${{ github.event.inputs.tag }}" ]; then
-            tag="${{ github.event.inputs.tag }}"
+          set -euo pipefail
+
+          repo="$(printf '%s' "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
+
+          validate_tag() {
+            local candidate="$1"
+            if [[ ! "$candidate" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]]; then
+              echo "Invalid image tag '${candidate}'. Allowed chars: [A-Za-z0-9._-], max length 128." >&2
+              exit 1
+            fi
+            printf '%s' "$candidate"
+          }
+
+          if [[ -n "${INPUT_TAG}" ]]; then
+            tag="$(validate_tag "${INPUT_TAG}")"
           elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            tag="${GITHUB_REF#refs/tags/}"
+            tag="$(validate_tag "${GITHUB_REF#refs/tags/}")"
           else
             tag="${GITHUB_SHA::7}"
           fi
+
           {
-            echo "prefix=${{ env.REGISTRY }}/${repo}"
+            echo "prefix=${REGISTRY}/${repo}"
             echo "tag=${tag}"
           } >> "${GITHUB_OUTPUT}"
 

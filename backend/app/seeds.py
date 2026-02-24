@@ -4,7 +4,7 @@ import json
 import re
 from datetime import datetime, timezone
 from decimal import Decimal
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, TypedDict
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -16,6 +16,8 @@ from app.models.content import ContentBlock, ContentBlockTranslation, ContentBlo
 
 SEED_PROFILES_ROOT = (Path(__file__).resolve().parent / "seed_profiles").resolve()
 PROFILE_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
+PROFILE_CONTENT_PATH_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]*$")
+SEED_JSON_ALLOWLIST = frozenset({"catalog.json", "content_blocks.json"})
 NO_AVAILABLE_PROFILES = "<none>"
 
 
@@ -69,11 +71,26 @@ def _available_profiles_display() -> str:
     return ", ".join(_list_available_profiles()) or NO_AVAILABLE_PROFILES
 
 
-def _safe_profile_path(base_dir: Path, rel_path: str) -> Path:
-    candidate = Path(str(rel_path or "")).expanduser()
-    if candidate.is_absolute():
+def _normalize_profile_rel_path(rel_path: str) -> str:
+    raw = str(rel_path or "").strip().replace("\\", "/")
+    while raw.startswith("./"):
+        raw = raw[2:]
+    if not raw:
         raise SystemExit(f"Invalid path '{rel_path}' in seed profile.")
-    resolved = (base_dir / candidate).resolve()
+    candidate = PurePosixPath(raw)
+    if candidate.is_absolute() or ".." in candidate.parts:
+        raise SystemExit(f"Invalid path '{rel_path}' in seed profile.")
+    normalized = candidate.as_posix()
+    if not PROFILE_CONTENT_PATH_PATTERN.fullmatch(normalized):
+        raise SystemExit(f"Invalid path '{rel_path}' in seed profile.")
+    return normalized
+
+
+def _safe_profile_path(base_dir: Path, rel_path: str, *, allowed_paths: set[str] | frozenset[str]) -> Path:
+    normalized_rel_path = _normalize_profile_rel_path(rel_path)
+    if normalized_rel_path not in allowed_paths:
+        raise SystemExit(f"Invalid path '{rel_path}' in seed profile.")
+    resolved = (base_dir / normalized_rel_path).resolve()
     if base_dir != resolved and base_dir not in resolved.parents:
         raise SystemExit(f"Invalid path '{rel_path}' in seed profile.")
     return resolved
@@ -93,16 +110,30 @@ def _resolve_profile_dir(profile: str) -> Path:
     return profile_dir
 
 
-def _load_md(base_dir: Path, rel_path: str) -> str:
-    text = _safe_profile_path(base_dir, rel_path).read_text(encoding="utf-8").replace("\r\n", "\n").strip()
+def _load_md(base_dir: Path, rel_path: str, *, allowed_markdown_paths: set[str]) -> str:
+    text = (
+        _safe_profile_path(base_dir, rel_path, allowed_paths=allowed_markdown_paths)
+        .read_text(encoding="utf-8")
+        .replace("\r\n", "\n")
+        .strip()
+    )
     return f"{text}\n"
 
 
 def _load_profile(profile: str) -> tuple[list[dict[str, Any]], list[SeedProduct], list[SeedContentBlock]]:
     profile_dir = _resolve_profile_dir(profile)
+    allowed_markdown_paths = {
+        path.relative_to(profile_dir).as_posix() for path in profile_dir.rglob("*.md") if path.is_file()
+    }
 
-    catalog = json.loads(_safe_profile_path(profile_dir, "catalog.json").read_text(encoding="utf-8"))
-    content = json.loads(_safe_profile_path(profile_dir, "content_blocks.json").read_text(encoding="utf-8"))
+    catalog = json.loads(
+        _safe_profile_path(profile_dir, "catalog.json", allowed_paths=SEED_JSON_ALLOWLIST).read_text(encoding="utf-8")
+    )
+    content = json.loads(
+        _safe_profile_path(profile_dir, "content_blocks.json", allowed_paths=SEED_JSON_ALLOWLIST).read_text(
+            encoding="utf-8"
+        )
+    )
 
     categories = list(catalog.get("categories", []))
     products: list[SeedProduct] = []
@@ -133,13 +164,17 @@ def _load_profile(profile: str) -> tuple[list[dict[str, Any]], list[SeedProduct]
     for block in content.get("content_blocks", []):
         body_markdown = block.get("body_markdown")
         if body_markdown is None and block.get("body_markdown_file"):
-            body_markdown = _load_md(profile_dir, block["body_markdown_file"])
+            body_markdown = _load_md(
+                profile_dir, block["body_markdown_file"], allowed_markdown_paths=allowed_markdown_paths
+            )
 
         translations: list[SeedTranslation] = []
         for translation in block.get("translations", []):
             translation_body = translation.get("body_markdown")
             if translation_body is None and translation.get("body_markdown_file"):
-                translation_body = _load_md(profile_dir, translation["body_markdown_file"])
+                translation_body = _load_md(
+                    profile_dir, translation["body_markdown_file"], allowed_markdown_paths=allowed_markdown_paths
+                )
             translations.append(
                 {
                     "lang": translation["lang"],

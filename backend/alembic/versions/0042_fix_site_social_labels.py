@@ -36,7 +36,7 @@ def upgrade() -> None:
     row = conn.execute(
         sa.select(content_blocks.c.id, content_blocks.c.meta).where(content_blocks.c.key == "site.social")
     ).first()
-    if not row:
+    if row is None:
         return
 
     block_id, meta = row
@@ -75,4 +75,3 @@ def upgrade() -> None:
 def downgrade() -> None:
     # Intentionally no-op: this corrects seeded labels, but users may have edited them.
     return
-

@@ -2,6 +2,21 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+function isPathWithinRoot(rootPath, candidatePath) {
+  const root = path.resolve(rootPath);
+  const candidate = path.resolve(candidatePath);
+  const relative = path.relative(root, candidate);
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
+function assertPathWithinRoot(rootPath, candidatePath, label) {
+  const candidate = path.resolve(candidatePath);
+  if (!isPathWithinRoot(rootPath, candidate)) {
+    throw new Error(`[i18n] Refusing ${label} outside allowed root: ${candidate}`);
+  }
+  return candidate;
+}
+
 function flattenKeys(value, prefix = '', out = new Set()) {
   if (value && typeof value === 'object' && !Array.isArray(value)) {
     for (const [key, nested] of Object.entries(value)) {
@@ -15,11 +30,12 @@ function flattenKeys(value, prefix = '', out = new Set()) {
   return out;
 }
 
-function listFiles(dir, exts, out = []) {
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const fullPath = path.join(dir, entry.name);
+function listFiles(rootDir, dir, exts, out = []) {
+  const scanDir = assertPathWithinRoot(rootDir, dir, 'scan directory');
+  for (const entry of fs.readdirSync(scanDir, { withFileTypes: true })) {
+    const fullPath = assertPathWithinRoot(rootDir, path.join(scanDir, entry.name), `entry "${entry.name}"`);
     if (entry.isDirectory()) {
-      listFiles(fullPath, exts, out);
+      listFiles(rootDir, fullPath, exts, out);
       continue;
     }
     if (entry.isFile() && exts.includes(path.extname(entry.name))) {
@@ -29,8 +45,9 @@ function listFiles(dir, exts, out = []) {
   return out;
 }
 
-function readJson(filePath) {
-  return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+function readJson(rootDir, filePath) {
+  const safeFilePath = assertPathWithinRoot(rootDir, filePath, 'JSON file');
+  return JSON.parse(fs.readFileSync(safeFilePath, 'utf8'));
 }
 
 function uniqSorted(items) {
@@ -59,8 +76,8 @@ function collectKeyMatches(contents, regex) {
 
 const scriptsDir = path.dirname(fileURLToPath(import.meta.url));
 const frontendRoot = path.resolve(scriptsDir, '..');
-const i18nDir = path.join(frontendRoot, 'src', 'assets', 'i18n');
-const appDir = path.join(frontendRoot, 'src', 'app');
+const i18nDir = assertPathWithinRoot(frontendRoot, path.join(frontendRoot, 'src', 'assets', 'i18n'), 'i18n directory');
+const appDir = assertPathWithinRoot(frontendRoot, path.join(frontendRoot, 'src', 'app'), 'app directory');
 
 const i18nFiles = fs.existsSync(i18nDir)
   ? fs
@@ -78,8 +95,8 @@ const baseLangFile = i18nFiles.includes('en.json') ? 'en.json' : i18nFiles[0];
 const translations = new Map();
 
 for (const name of i18nFiles) {
-  const filePath = path.join(i18nDir, name);
-  const json = readJson(filePath);
+  const filePath = assertPathWithinRoot(i18nDir, path.join(i18nDir, name), `i18n file "${name}"`);
+  const json = readJson(i18nDir, filePath);
   translations.set(name, flattenKeys(json));
 }
 
@@ -111,11 +128,12 @@ for (const [name, keys] of translations.entries()) {
   }
 }
 
-const codeFiles = fs.existsSync(appDir) ? listFiles(appDir, ['.ts', '.html']) : [];
+const codeFiles = fs.existsSync(appDir) ? listFiles(appDir, appDir, ['.ts', '.html']) : [];
 const codeKeys = [];
 
 for (const filePath of codeFiles) {
-  const contents = fs.readFileSync(filePath, 'utf8');
+  const safeFilePath = assertPathWithinRoot(appDir, filePath, 'code file');
+  const contents = fs.readFileSync(safeFilePath, 'utf8');
 
   codeKeys.push(...collectKeyMatches(contents, /\bthis\.t\(\s*(['"])(.*?)\1\s*\)/g));
   codeKeys.push(...collectKeyMatches(contents, /\btranslate\.instant\(\s*(['"])(.*?)\1\s*\)/g));
