@@ -23,38 +23,66 @@ function asNumber(v) {
   return Number.isFinite(n) ? n : null;
 }
 
+function isObjectRecord(value) {
+  return Boolean(value) && typeof value === 'object';
+}
+
+function readPath(source, path) {
+  let current = source;
+  for (const key of path) {
+    if (!isObjectRecord(current)) return undefined;
+    current = current[key];
+  }
+  return current;
+}
+
+function firstNumeric(source, paths) {
+  for (const path of paths) {
+    const value = asNumber(readPath(source, path));
+    if (value !== null) return value;
+  }
+  return null;
+}
+
 function hasLatLng(obj) {
-  if (!obj || typeof obj !== 'object') return false;
-  const lat =
-    asNumber(obj.lat) ??
-    asNumber(obj.latitude) ??
-    asNumber(obj?.location?.lat) ??
-    asNumber(obj?.geometry?.coordinates?.[1]);
-  const lng =
-    asNumber(obj.lng) ??
-    asNumber(obj.lon) ??
-    asNumber(obj.longitude) ??
-    asNumber(obj?.location?.lng) ??
-    asNumber(obj?.location?.lon) ??
-    asNumber(obj?.geometry?.coordinates?.[0]);
+  if (!isObjectRecord(obj)) return false;
+  const lat = firstNumeric(obj, [
+    ['lat'],
+    ['latitude'],
+    ['location', 'lat'],
+    ['geometry', 'coordinates', 1],
+  ]);
+  const lng = firstNumeric(obj, [
+    ['lng'],
+    ['lon'],
+    ['longitude'],
+    ['location', 'lng'],
+    ['location', 'lon'],
+    ['geometry', 'coordinates', 0],
+  ]);
   return lat !== null && lng !== null && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+}
+
+function collectLockerRows(node, rows) {
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      if (isObjectRecord(item) && hasLatLng(item)) {
+        rows.push(item);
+        continue;
+      }
+      collectLockerRows(item, rows);
+    }
+    return;
+  }
+  if (!isObjectRecord(node)) return;
+  for (const value of Object.values(node)) {
+    collectLockerRows(value, rows);
+  }
 }
 
 function findLockerRows(payload) {
   const rows = [];
-  const walk = (node) => {
-    if (Array.isArray(node)) {
-      for (const item of node) {
-        if (item && typeof item === 'object' && hasLatLng(item)) rows.push(item);
-        else walk(item);
-      }
-      return;
-    }
-    if (node && typeof node === 'object') {
-      for (const value of Object.values(node)) walk(value);
-    }
-  };
-  walk(payload);
+  collectLockerRows(payload, rows);
   return rows;
 }
 
@@ -66,7 +94,7 @@ async function run() {
     viewport: { width: 1365, height: 768 },
     locale: 'ro-RO',
     userAgent:
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36'
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36',
   });
   const page = await context.newPage();
 
@@ -82,7 +110,8 @@ async function run() {
         captured = payload;
         sourceUrl = url;
       }
-    } catch {
+    } catch (error) {
+      void error;
       // Ignore and continue listening for the next response.
     }
   };
@@ -99,22 +128,26 @@ async function run() {
   });
 
   try {
-    await page.goto('https://sameday.ro/easybox/', { waitUntil: 'domcontentloaded', timeout: timeoutMs });
+    await page.goto('https://sameday.ro/easybox/', {
+      waitUntil: 'domcontentloaded',
+      timeout: timeoutMs,
+    });
 
     // Try direct same-origin fetch from a challenge-solved browser context.
     await page.evaluate(async () => {
       const urls = [
         '/wp-admin/admin-ajax.php?action=get_ooh_lockers_request&country=Romania',
-        '/api/easybox/locations?search=Bucuresti&limit=1000&type=locker'
+        '/api/easybox/locations?search=Bucuresti&limit=1000&type=locker',
       ];
       for (const url of urls) {
         try {
           await fetch(url, {
             method: 'GET',
             credentials: 'include',
-            headers: { accept: 'application/json,text/plain,*/*' }
+            headers: { accept: 'application/json,text/plain,*/*' },
           });
-        } catch {
+        } catch (error) {
+          void error;
           // Keep trying the next URL.
         }
       }
@@ -133,11 +166,11 @@ async function run() {
       JSON.stringify(
         {
           source_url: sourceUrl || 'https://sameday.ro/easybox/',
-          payload: captured
+          payload: captured,
         },
         null,
-        2
-      )
+        2,
+      ),
     );
   } finally {
     await context.close();

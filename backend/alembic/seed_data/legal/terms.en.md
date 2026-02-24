@@ -32,6 +32,7 @@ The Website is operated by:
 ## 3) Scope and applicability
 
 These Terms apply to:
+
 - browsing the Website,
 - creating and using an account (if available),
 - placing orders and purchasing Products,
@@ -80,7 +81,7 @@ Mandatory consumer rights under applicable law remain unaffected.
 ## 7) Prices, currency, and invoicing
 
 1. **Currency.** Prices are displayed in RON.
-2. **Taxes.** Prices are  “VAT included” / “VAT not applicable”.
+2. **Taxes.** Prices are “VAT included” / “VAT not applicable”.
 3. **Delivery fees.** Delivery fees are shown at checkout and depend on courier delivery fees.
 4. **Invoicing.** If you request an invoice on company details, you must provide correct invoicing data (e.g., company name, VAT ID). We are not responsible for errors caused by incorrect data submitted by you.
 
@@ -96,7 +97,9 @@ Available payment methods are displayed at checkout and may include:
 - **Stripe / card payment** (if enabled)
 
 ### 8.1 Online card payments via NETOPIA Payments
+
 If you choose card payment via **NETOPIA Payments**:
+
 - the payment is processed on a secure NETOPIA environment (you may be redirected to a NETOPIA secure payment page),
 - **we do not store your full card details**,
 - we receive confirmation and limited transaction details necessary to confirm your Order and issue a receipt/invoice.
@@ -120,34 +123,45 @@ If the payment fails or is reversed, the Order may remain unpaid and can be canc
 ## 10) Right of withdrawal (Consumers) & return policy
 
 ### 10.1 Withdrawal right (distance selling)
+
 If you are a **Consumer**, you generally have the right to withdraw from the Contract **within 14 days** from the day you (or a third party indicated by you) receive the Products, **without giving any reason**, except for statutory exceptions.
 
 ### 10.2 How to exercise withdrawal
+
 To withdraw, please send an unequivocal statement to:
+
 - Email: momentstudio.ro@gmail.com
 
 Include: order number, name, the Products you want to return, and the date.
 
 ### 10.3 Returning the Products
+
 - You must send the Products back within **14 days** from the date you informed us of withdrawal.
 - Return address: Communicated during the dispute by email.
 - Products should be returned in the same condition as received, ideally with original packaging and accessories.
 
 ### 10.4 Return shipping costs
+
 Return shipping costs are:
+
 - borne by the Customer unless the Product is defective or we agree otherwise.
 
 ### 10.5 Refunds
+
 If you withdraw:
+
 - we will refund the price paid for the Products and the transport cost,
 - refunds are made using the same payment method, unless you agree otherwise,
 - we may withhold reimbursement until we receive the Products back or you provide proof of return (whichever is earlier).
 
 ### 10.6 Diminished value
+
 You are responsible only for diminished value resulting from handling beyond what is necessary to establish the nature, characteristics, and functioning of the Products.
 
 ### 10.7 Exceptions (important)
+
 The withdrawal right may not apply to certain Products, including (where applicable):
+
 - **custom-made or clearly personalized products**,
 - sealed goods not suitable for return due to health/hygiene if unsealed after delivery,
 - other legal exceptions under applicable law.
@@ -188,6 +202,7 @@ These Terms are governed by the laws of Romania.
 If you have a complaint, please contact us first at momentstudio.ro@gmail.com and we will try to resolve it amicably.
 
 Consumers may also use:
+
 - **ANPC SAL (Alternative Dispute Resolution)** information: https://anpc.ro/
 
 ---
@@ -201,5 +216,6 @@ We may update these Terms from time to time. The updated version will be publish
 ## 17) Contact
 
 For any questions about these Terms:
+
 - Email: momentstudio.ro@gmail.com
 - Phone: +40723204204

@@ -32,6 +32,7 @@ Site‑ul este operat de:
 ## 3) Domeniul de aplicare
 
 Acești Termeni se aplică pentru:
+
 - navigarea pe Site,
 - crearea și utilizarea contului (dacă este disponibil),
 - plasarea comenzilor și cumpărarea produselor,
@@ -96,7 +97,9 @@ Metodele de plată disponibile sunt afișate în checkout și pot include:
 - **Stripe / plată cu cardul** (dacă este activă)
 
 ### 8.1 Plăți online cu cardul prin NETOPIA Payments
+
 Dacă alegi plata cu cardul prin **NETOPIA Payments**:
+
 - plata este procesată într-un mediu securizat NETOPIA (poți fi redirecționat către o pagină securizată NETOPIA),
 - **nu stocăm datele complete ale cardului tău**,
 - primim confirmarea și datele strict necesare pentru confirmarea comenzii și emiterea documentelor fiscale (după caz).
@@ -120,34 +123,45 @@ Dacă plata eșuează sau este reversată, comanda poate rămâne neachitată ș
 ## 10) Dreptul de retragere (Consumatori) & politica de retur
 
 ### 10.1 Dreptul de retragere (contracte la distanță)
+
 Dacă ești **Consumator**, ai, în general, dreptul să te retragi din Contract **în 14 zile** de la data la care primești produsele (tu sau o persoană desemnată de tine), **fără a invoca un motiv**, cu excepția situațiilor prevăzute de lege.
 
 ### 10.2 Cum îți exerciți retragerea
+
 Pentru retragere, transmite-ne o declarație neechivocă la:
+
 - E-mail: momentstudio.ro@gmail.com
 
 Include: numărul comenzii, numele, produsele returnate și data.
 
 ### 10.3 Trimiterea produselor înapoi
+
 - Produsele trebuie expediate înapoi în **14 zile** de la data la care ne-ai informat despre retragere.
 - Adresa de retur: Se va comunica la momentul disputei.
 - Produsele trebuie returnate în aceeași stare în care au fost primite, ideal cu ambalajul și accesoriile originale.
 
 ### 10.4 Costul transportului de retur
+
 Costul returului este:
+
 - suportat de Client, cu excepția produselor defecte sau dacă agream altfel.
 
 ### 10.5 Rambursări
+
 În cazul retragerii:
+
 - rambursăm contravaloarea produselor și costul transportului,
 - rambursarea se face prin aceeași metodă de plată, dacă nu agream altfel,
 - putem amâna rambursarea până la primirea produselor sau până la prezentarea dovezii de expediere (oricare intervine primul).
 
 ### 10.6 Diminuarea valorii
+
 Ești responsabil(ă) doar pentru diminuarea valorii produselor rezultată din manipularea acestora peste ceea ce este necesar pentru a determina natura, caracteristicile și funcționarea lor.
 
 ### 10.7 Excepții (important)
+
 Dreptul de retragere poate fi exclus pentru anumite produse, inclusiv (după caz):
+
 - **produse personalizate sau realizate după specificațiile Clientului**,
 - produse sigilate ce nu pot fi returnate din motive de protecție a sănătății/igienă dacă au fost desigilate,
 - alte excepții prevăzute de lege.
@@ -188,6 +202,7 @@ Acești Termeni sunt guvernați de legea din România.
 Dacă ai o reclamație, te rugăm să ne contactezi mai întâi la momentstudio.ro@gmail.com pentru o soluționare amiabilă.
 
 Consumatorii pot utiliza și:
+
 - informații despre **SAL (Soluționarea Alternativă a Litigiilor) – ANPC**: https://anpc.ro/
 
 ---
@@ -201,5 +216,6 @@ Putem actualiza acești Termeni periodic. Versiunea actualizată va fi publicat�
 ## 17) Contact
 
 Pentru întrebări legate de acești Termeni:
+
 - E-mail: momentstudio.ro@gmail.com
 - Telefon: +40723204204

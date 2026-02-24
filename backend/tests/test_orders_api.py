@@ -1465,7 +1465,7 @@ def test_admin_accept_requires_payment_capture_and_cancel_reason(
     monkeypatch.setattr(email_service, "send_shipping_update", fake_email)
     monkeypatch.setattr(email_service, "send_delivery_confirmation", fake_email)
 
-    token, user_id = create_user_token(SessionLocal, email="buyer-paycap@example.com")
+    _token, user_id = create_user_token(SessionLocal, email="buyer-paycap@example.com")
     admin_token, _ = create_user_token(SessionLocal, email="admin-paycap@example.com", admin=True)
 
     async def seed_stripe_order() -> UUID:
