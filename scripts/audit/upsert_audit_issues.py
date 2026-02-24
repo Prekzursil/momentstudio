@@ -17,6 +17,12 @@ from typing import Any
 
 SEVERE_LEVELS = {"s1", "s2"}
 ALLOWED_AUDIT_PATH_PREFIXES = ("artifacts/audit-evidence", "artifacts/audit-evidence-local")
+ALLOWED_FINDINGS_FILES = frozenset(
+    {
+        "artifacts/audit-evidence/deterministic-findings.json",
+        "artifacts/audit-evidence-local/deterministic-findings.json",
+    }
+)
 ALLOWED_SEVERE_OUTPUT_FILES = frozenset(
     {
         "artifacts/audit-evidence/severe-issues.json",
@@ -41,10 +47,12 @@ def _validated_repo_path(candidate: Path, *, allowed_prefixes: tuple[str, ...]) 
     return resolved
 
 
-def _resolve_repo_path(raw: str, *, allowed_prefixes: tuple[str, ...]) -> Path:
-    root = _repo_root()
-    candidate = root / raw
-    return _validated_repo_path(candidate, allowed_prefixes=allowed_prefixes)
+def _resolve_findings_path(raw: str) -> Path:
+    normalized = str(raw or "").strip().replace("\\", "/")
+    if normalized not in ALLOWED_FINDINGS_FILES:
+        allowed = ", ".join(sorted(ALLOWED_FINDINGS_FILES))
+        raise ValueError(f"Unsupported --findings path '{raw}'. Allowed: {allowed}")
+    return _validated_repo_path(_repo_root() / normalized, allowed_prefixes=ALLOWED_AUDIT_PATH_PREFIXES)
 
 
 def _resolve_severe_output_path(raw: str) -> Path:
@@ -451,10 +459,7 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = _parse_args()
-    findings_path = _resolve_repo_path(
-        args.findings,
-        allowed_prefixes=ALLOWED_AUDIT_PATH_PREFIXES,
-    )
+    findings_path = _resolve_findings_path(args.findings)
     if not findings_path.exists():
         raise FileNotFoundError(f"Findings file not found: {findings_path}")
 
