@@ -86,11 +86,7 @@ async def mint_analytics_token(
     try:
         await request.body()
     except Exception as exc:
-        logger.debug(
-            "analytics_token_request_body_read_failed",
-            extra={"session_id": session_id},
-            exc_info=exc,
-        )
+        logger.debug("analytics_token_request_body_read_failed", exc_info=exc)
 
     return AnalyticsTokenResponse(token=token, expires_in=max(ttl_seconds, 60))
 
@@ -152,10 +148,6 @@ async def ingest_analytics_event(
     try:
         await request.body()
     except Exception as exc:
-        logger.debug(
-            "analytics_event_request_body_read_failed",
-            extra={"session_id": session_id, "event": event},
-            exc_info=exc,
-        )
+        logger.debug("analytics_event_request_body_read_failed", exc_info=exc)
 
     return AnalyticsEventIngestResponse(received=True)
