@@ -1364,11 +1364,11 @@ export class AdminOrdersComponent implements OnInit {
   private tagColorOverrides: Record<string, TagColor> = {};
 
   constructor(
-    private ordersApi: AdminOrdersService,
-    private router: Router,
-    private toast: ToastService,
-    private translate: TranslateService,
-    private auth: AuthService,
+    private readonly ordersApi: AdminOrdersService,
+    private readonly router: Router,
+    private readonly toast: ToastService,
+    private readonly translate: TranslateService,
+    private readonly auth: AuthService,
     public favorites: AdminFavoritesService
   ) {}
 
@@ -1502,7 +1502,7 @@ export class AdminOrdersComponent implements OnInit {
       )
       .subscribe({
         next: (updated) => {
-          order.status = (updated?.status ?? targetStatus) as any;
+          order.status = (updated?.status ?? targetStatus);
           this.toast.success(this.translate.instant('adminUi.orders.kanban.success.updated'));
         },
         error: () => {
@@ -1603,7 +1603,7 @@ export class AdminOrdersComponent implements OnInit {
   savedViews(): AdminFavoriteItem[] {
     return this.favorites
       .items()
-      .filter((item) => item?.type === 'filter' && (item?.state as any)?.adminFilterScope === 'orders');
+      .filter((item) => item?.type === 'filter' && (item?.state)?.adminFilterScope === 'orders');
   }
 
   applySavedView(key: string): void {
@@ -1660,7 +1660,7 @@ export class AdminOrdersComponent implements OnInit {
   }
 
   private maybeApplyFiltersFromState(): void {
-    const state = history.state as any;
+    const state = history.state;
     const scope = (state?.adminFilterScope || '').toString();
     if (scope !== 'orders') return;
     const filters = state?.adminFilters;
@@ -2002,7 +2002,7 @@ export class AdminOrdersComponent implements OnInit {
             this.updateShippingLabelUpload(result.index, { status: 'success', error: null });
             continue;
           }
-          const requestId = extractRequestId((result as any).err);
+          const requestId = extractRequestId((result).err);
           const suffix = requestId ? ` (${requestId})` : '';
           this.updateShippingLabelUpload(result.index, {
             status: 'error',
@@ -2070,7 +2070,7 @@ export class AdminOrdersComponent implements OnInit {
         this.shippingLabelsBusy = false;
       },
       error: (err) => {
-        const detail = (err?.error?.detail ?? null) as any;
+        const detail = (err?.error?.detail ?? null);
         const missing: string[] = Array.isArray(detail?.missing_shipping_label_order_ids)
           ? detail.missing_shipping_label_order_ids
           : [];
@@ -2636,7 +2636,7 @@ export class AdminOrdersComponent implements OnInit {
             }
             itemsByStatus[result.status] = [];
             totalsByStatus[result.status] = 0;
-            if (!firstError) firstError = (result as any).err;
+            if (!firstError) firstError = (result).err;
           }
 
           this.kanbanItemsByStatus.set(itemsByStatus);
@@ -2804,3 +2804,4 @@ export class AdminOrdersComponent implements OnInit {
     }
   }
 }
+

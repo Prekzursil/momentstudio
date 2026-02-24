@@ -122,10 +122,10 @@ export class AdminOrderExportsComponent implements OnInit {
   ];
 
   constructor(
-    private api: AdminOrdersService,
-    private toast: ToastService,
-    private translate: TranslateService,
-    private router: Router
+    private readonly api: AdminOrdersService,
+    private readonly toast: ToastService,
+    private readonly translate: TranslateService,
+    private readonly router: Router
   ) {}
 
   ngOnInit(): void {
@@ -148,7 +148,7 @@ export class AdminOrderExportsComponent implements OnInit {
     this.api.listDocumentExports({ page: this.page, limit: this.limit }).subscribe({
       next: (res) => {
         this.items.set(res?.items || []);
-        this.meta.set((res as any)?.meta || null);
+        this.meta.set((res)?.meta || null);
         this.loading.set(false);
       },
       error: (err) => {
@@ -206,3 +206,4 @@ export class AdminOrderExportsComponent implements OnInit {
     });
   }
 }
+

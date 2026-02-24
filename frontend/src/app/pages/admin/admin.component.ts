@@ -7491,9 +7491,9 @@ export class AdminComponent implements OnInit, OnDestroy {
 	  pageInsertDragActive = false;
 	  cmsAriaAnnouncement = '';
 	  private cmsDraftPoller: number | null = null;
-	  private cmsHomeDraft = new CmsDraftManager<HomeBlockDraft[]>('adrianaart.cms.autosave.home.sections');
-	  private cmsPageDrafts = new Map<string, CmsDraftManager<PageBlocksDraftState>>();
-	  private cmsBlogDrafts = new Map<string, CmsDraftManager<BlogDraftState>>();
+	  private readonly cmsHomeDraft = new CmsDraftManager<HomeBlockDraft[]>('adrianaart.cms.autosave.home.sections');
+	  private readonly cmsPageDrafts = new Map<string, CmsDraftManager<PageBlocksDraftState>>();
+	  private readonly cmsBlogDrafts = new Map<string, CmsDraftManager<BlogDraftState>>();
 	  coupons: AdminCoupon[] = [];
 	  newCoupon: Partial<AdminCoupon> = { code: '', percentage_off: 0, active: true, currency: 'RON' };
 	  stockEdits: Record<string, number> = {};
@@ -7519,18 +7519,18 @@ export class AdminComponent implements OnInit, OnDestroy {
   ownerTransferError: string | null = null;
 
   constructor(
-    private route: ActivatedRoute,
-    private admin: AdminService,
-    private adminProducts: AdminProductsService,
-    private blog: BlogService,
-    private fxAdmin: FxAdminService,
-    private taxesAdmin: TaxesAdminService,
-    private auth: AuthService,
+    private readonly route: ActivatedRoute,
+    private readonly admin: AdminService,
+    private readonly adminProducts: AdminProductsService,
+    private readonly blog: BlogService,
+    private readonly fxAdmin: FxAdminService,
+    private readonly taxesAdmin: TaxesAdminService,
+    private readonly auth: AuthService,
     public cmsPrefs: CmsEditorPrefsService,
-    private toast: ToastService,
-    private translate: TranslateService,
-    private markdown: MarkdownService,
-    private sanitizer: DomSanitizer
+    private readonly toast: ToastService,
+    private readonly translate: TranslateService,
+    private readonly markdown: MarkdownService,
+    private readonly sanitizer: DomSanitizer
   ) {}
 
 	  private t(key: string, params?: Record<string, unknown>): string {
@@ -8319,13 +8319,13 @@ export class AdminComponent implements OnInit, OnDestroy {
           price: prod.price,
           stock: prod.stock_quantity,
           status: prod.status,
-          sku: (prod as any).sku || '',
+          sku: (prod).sku || '',
           image: '',
           description: prod.long_description || '',
           publish_at: prod.publish_at ? this.toLocalDateTime(prod.publish_at) : '',
           is_bestseller: (prod.tags || []).includes('bestseller')
         };
-        this.productImages.set((prod as any).images || []);
+        this.productImages.set((prod).images || []);
       },
       error: () => this.toast.error(this.t('adminUi.products.errors.load'))
     });
@@ -8878,7 +8878,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     if (!file) return;
     this.admin.uploadProductImage(this.editingId, file).subscribe({
       next: (prod) => {
-        this.productImages.set((prod as any).images || []);
+        this.productImages.set((prod).images || []);
         this.toast.success(this.t('adminUi.products.success.imageUpload'));
       },
       error: () => this.toast.error(this.t('adminUi.products.errors.image'))
@@ -8889,7 +8889,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     if (!this.editingId) return;
     this.admin.deleteProductImage(this.editingId, id).subscribe({
       next: (prod) => {
-        this.productImages.set((prod as any).images || []);
+        this.productImages.set((prod).images || []);
         this.toast.success(this.t('adminUi.products.success.imageDelete'));
       },
       error: () => this.toast.error(this.t('adminUi.products.errors.deleteImage'))
@@ -11653,9 +11653,9 @@ export class AdminComponent implements OnInit, OnDestroy {
     return raw
       .map((item) => {
         if (!item || typeof item !== 'object') return null;
-        const label = String((item as any).label ?? '').trim();
-        const url = String((item as any).url ?? '').trim();
-        const thumb = String((item as any).thumbnail_url ?? '').trim();
+        const label = String((item).label ?? '').trim();
+        const url = String((item).url ?? '').trim();
+        const thumb = String((item).thumbnail_url ?? '').trim();
         return { label, url, thumbnail_url: thumb };
       })
       .filter((x): x is { label: string; url: string; thumbnail_url: string } => !!x);
@@ -11984,10 +11984,10 @@ export class AdminComponent implements OnInit, OnDestroy {
       this.admin.getContent(target, 'ro').pipe(catchError((err) => (err?.status === 404 ? of(null) : of(err))))
     ]).subscribe({
       next: ([enRes, roRes]) => {
-        const enBlock = (enRes && typeof enRes === 'object' && 'body_markdown' in enRes) ? (enRes as any) : null;
-        const roBlock = (roRes && typeof roRes === 'object' && 'body_markdown' in roRes) ? (roRes as any) : null;
+        const enBlock = (enRes && typeof enRes === 'object' && 'body_markdown' in enRes) ? (enRes) : null;
+        const roBlock = (roRes && typeof roRes === 'object' && 'body_markdown' in roRes) ? (roRes) : null;
 
-        if (!enBlock && enRes && (enRes as any)?.status && (enRes as any)?.status !== 404) {
+        if (!enBlock && enRes && (enRes)?.status && (enRes)?.status !== 404) {
           this.legalPageError = this.t('adminUi.site.pages.errors.load');
         }
 
@@ -13452,7 +13452,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     const raw = event.dataTransfer?.getData('text/plain');
     if (!raw) return null;
     try {
-      const parsed = JSON.parse(raw) as any;
+      const parsed = JSON.parse(raw);
       if (!parsed || typeof parsed !== 'object') return null;
       if (parsed.kind !== 'cms-block') return null;
       const scope = parsed.scope;
@@ -13674,7 +13674,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 	  private lastUploadedContentImage(block: any): { url: string; focal_x: number; focal_y: number } | null {
 	    const images = Array.isArray(block?.images) ? block.images : [];
 	    if (!images.length) return null;
-	    const last = images[images.length - 1] as any;
+	    const last = images[images.length - 1];
 	    const url = typeof last?.url === 'string' ? String(last.url).trim() : '';
 	    if (!url) return null;
 	    return {
@@ -15547,3 +15547,4 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 }
+

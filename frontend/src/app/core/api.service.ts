@@ -5,9 +5,9 @@ import { appConfig } from './app-config';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
-  private baseUrl = appConfig.apiBaseUrl.replace(/\/$/, '');
+  private readonly baseUrl = appConfig.apiBaseUrl.replace(/\/$/, '');
 
-  constructor(private http: HttpClient) {}
+  constructor(private readonly http: HttpClient) {}
 
   get<T>(path: string, params?: Record<string, string | number | boolean | string[] | number[] | undefined>, headers?: Record<string, string>): Observable<T> {
     const httpParams = this.buildParams(params);
@@ -105,3 +105,4 @@ export class ApiService {
     return httpParams;
   }
 }
+

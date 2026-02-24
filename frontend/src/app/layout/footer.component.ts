@@ -299,12 +299,12 @@ export class FooterComponent implements OnInit, OnDestroy {
   private navSub?: Subscription;
 
   constructor(
-    private elementRef: ElementRef<HTMLElement>,
-    private social: SiteSocialService,
-    private company: SiteCompanyService,
-    private navigation: SiteNavigationService,
-    private translate: TranslateService,
-    private cdr: ChangeDetectorRef
+    private readonly elementRef: ElementRef<HTMLElement>,
+    private readonly social: SiteSocialService,
+    private readonly company: SiteCompanyService,
+    private readonly navigation: SiteNavigationService,
+    private readonly translate: TranslateService,
+    private readonly cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
@@ -436,3 +436,4 @@ export class FooterComponent implements OnInit, OnDestroy {
     }
   }
 }
+

@@ -326,7 +326,7 @@ export class AccountWishlistComponent {
 
   stockChange(item: Product): 'back' | 'out' | null {
     const baseline = this.account.wishlist.getBaseline(item.id);
-    if (!baseline || baseline.stock_quantity == null) return null;
+    if (baseline?.stock_quantity == null) return null;
     const savedInStock = baseline.stock_quantity > 0;
     const currentInStock = (item.stock_quantity ?? 0) > 0 || Boolean(item.allow_backorder);
     if (savedInStock && !currentInStock) return 'out';

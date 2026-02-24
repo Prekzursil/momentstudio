@@ -7,7 +7,7 @@ export type ThemeMode = 'light' | 'dark';
 export class ThemeService {
   private readonly preferenceSignal = signal<ThemePreference>('system');
   private readonly modeSignal = signal<ThemeMode>('light');
-  private mediaQuery: MediaQueryList | null = null;
+  private readonly mediaQuery: MediaQueryList | null = null;
 
   constructor() {
     if (typeof window !== 'undefined' && 'matchMedia' in window) {
@@ -87,3 +87,4 @@ export class ThemeService {
     return 'system';
   }
 }
+

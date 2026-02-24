@@ -17,13 +17,13 @@ export type AdminRecentItem = {
 export class AdminRecentService {
   private readonly storageKeyBase = 'admin_recent_v1';
   private readonly maxItems = 12;
-  private authEffect?: EffectRef;
+  private readonly authEffect?: EffectRef;
   private activeUserId: string | null = null;
   private pending: AdminRecentItem[] = [];
 
   readonly items = signal<AdminRecentItem[]>([]);
 
-  constructor(private auth: AuthService) {
+  constructor(private readonly auth: AuthService) {
     this.authEffect = effect(() => {
       const userId = this.auth.user()?.id ?? null;
       if (userId === this.activeUserId) return;
@@ -140,3 +140,4 @@ export class AdminRecentService {
     }
   }
 }
+

@@ -442,17 +442,17 @@ export class CartComponent implements OnInit {
   private cartViewTracked = false;
 
   constructor(
-    private cart: CartStore,
+    private readonly cart: CartStore,
     public auth: AuthService,
-    private cartApi: CartApi,
-    private coupons: CouponsService,
-    private wishlist: WishlistService,
-    private toast: ToastService,
-    private catalog: CatalogService,
-    private checkoutPrefs: CheckoutPrefsService,
-    private translate: TranslateService,
-    private route: ActivatedRoute,
-    private analytics: AnalyticsService
+    private readonly cartApi: CartApi,
+    private readonly coupons: CouponsService,
+    private readonly wishlist: WishlistService,
+    private readonly toast: ToastService,
+    private readonly catalog: CatalogService,
+    private readonly checkoutPrefs: CheckoutPrefsService,
+    private readonly translate: TranslateService,
+    private readonly route: ActivatedRoute,
+    private readonly analytics: AnalyticsService
   ) {
     const prefs = this.checkoutPrefs.loadDeliveryPrefs();
     this.courier = prefs.courier;
@@ -551,7 +551,7 @@ export class CartComponent implements OnInit {
 
   private couponShippingDiscount(): number {
     const offer = this.appliedCouponOffer;
-    if (!offer || !offer.eligible) return 0;
+    if (!offer?.eligible) return 0;
     const currentCode = (this.promo || '').trim().toUpperCase();
     if (!currentCode || offer.coupon.code.toUpperCase() !== currentCode) return 0;
     return parseMoney(offer.estimated_shipping_discount_ron);
@@ -759,7 +759,7 @@ export class CartComponent implements OnInit {
     try {
       const raw = localStorage.getItem(SAVED_FOR_LATER_KEY);
       if (!raw) return [];
-      const parsed = JSON.parse(raw) as any;
+      const parsed = JSON.parse(raw);
       if (!Array.isArray(parsed)) return [];
       return parsed
         .map((entry) => ({

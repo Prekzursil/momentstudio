@@ -32,7 +32,7 @@ export class NotificationsService {
   unreadCount = () => this.unreadCountSignal();
   loading = () => this.loadingSignal();
 
-  constructor(private api: ApiService) {}
+  constructor(private readonly api: ApiService) {}
 
   reset(): void {
     this.itemsSignal.set([]);
@@ -93,3 +93,4 @@ export class NotificationsService {
     });
   }
 }
+

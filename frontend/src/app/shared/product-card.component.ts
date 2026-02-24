@@ -196,14 +196,14 @@ export class ProductCardComponent implements OnChanges {
   inlineError = '';
   private lastInlineProductId: string | null = null;
   constructor(
-    private translate: TranslateService,
-    private wishlist: WishlistService,
-    private auth: AuthService,
-    private toast: ToastService,
-    private router: Router,
-    private storefrontAdminMode: StorefrontAdminModeService,
-    private admin: AdminService,
-    private cart: CartStore
+    private readonly translate: TranslateService,
+    private readonly wishlist: WishlistService,
+    private readonly auth: AuthService,
+    private readonly toast: ToastService,
+    private readonly router: Router,
+    private readonly storefrontAdminMode: StorefrontAdminModeService,
+    private readonly admin: AdminService,
+    private readonly cart: CartStore
   ) {
     this.wishlist.ensureLoaded();
   }
@@ -594,3 +594,4 @@ export class ProductCardComponent implements OnChanges {
     }
   }
 }
+

@@ -13,9 +13,9 @@ export class AdminClientErrorLoggerService {
   private readonly recent = new Map<string, number>();
 
   constructor(
-    private admin: AdminService,
-    private auth: AuthService,
-    private router: Router
+    private readonly admin: AdminService,
+    private readonly auth: AuthService,
+    private readonly router: Router
   ) {}
 
   init(): void {
@@ -105,4 +105,5 @@ export class AdminClientErrorLoggerService {
     this.send(this.buildBasePayload('unhandled_rejection', message || 'Unhandled rejection', stack));
   }
 }
+
 

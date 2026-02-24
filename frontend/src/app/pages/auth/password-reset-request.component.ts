@@ -38,7 +38,7 @@ export class PasswordResetRequestComponent {
   email = '';
   loading = false;
 
-  constructor(private toast: ToastService, private auth: AuthService, private translate: TranslateService) {}
+  constructor(private readonly toast: ToastService, private auth: AuthService, private translate: TranslateService) {}
 
   onSubmit(form: NgForm): void {
     if (!form.valid) return;
@@ -63,3 +63,4 @@ export class PasswordResetRequestComponent {
       });
   }
 }
+

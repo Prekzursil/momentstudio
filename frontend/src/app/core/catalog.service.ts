@@ -52,7 +52,7 @@ export interface Product {
   sale_type?: 'percent' | 'amount' | null;
   sale_value?: number | null;
   currency: string;
-  status?: 'draft' | 'published' | 'archived' | string;
+  status?: string;
   is_active?: boolean;
   is_featured?: boolean;
   stock_quantity?: number | null;
@@ -123,7 +123,7 @@ export interface BackInStockStatus {
 
 @Injectable({ providedIn: 'root' })
 export class CatalogService {
-  constructor(private api: ApiService) {}
+  constructor(private readonly api: ApiService) {}
 
   private normalizeProduct(raw: any): Product {
     return {

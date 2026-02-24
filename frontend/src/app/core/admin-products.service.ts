@@ -51,7 +51,7 @@ export interface AdminProductDuplicateCheckResponse {
 
 @Injectable({ providedIn: 'root' })
 export class AdminProductsService {
-  constructor(private api: ApiService) {}
+  constructor(private readonly api: ApiService) {}
 
   search(params: {
     q?: string;
@@ -82,3 +82,4 @@ export class AdminProductsService {
     return this.api.get<AdminProductDuplicateCheckResponse>('/admin/dashboard/products/duplicate-check', params as any);
   }
 }
+

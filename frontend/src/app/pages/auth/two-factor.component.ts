@@ -63,7 +63,7 @@ export class TwoFactorComponent implements OnInit {
   private token: string | null = null;
   private remember = false;
 
-  constructor(private auth: AuthService, private toast: ToastService, private router: Router, private translate: TranslateService) {}
+  constructor(private readonly auth: AuthService, private toast: ToastService, private router: Router, private translate: TranslateService) {}
 
   ngOnInit(): void {
     if (typeof sessionStorage === 'undefined') {
@@ -135,3 +135,4 @@ export class TwoFactorComponent implements OnInit {
       });
   }
 }
+

@@ -29,9 +29,10 @@ export interface ContactSubmissionRead {
 
 @Injectable({ providedIn: 'root' })
 export class SupportService {
-  constructor(private api: ApiService) {}
+  constructor(private readonly api: ApiService) {}
 
   submitContact(payload: ContactSubmissionCreate): Observable<ContactSubmissionRead> {
     return this.api.post<ContactSubmissionRead>('/support/contact', payload);
   }
 }
+

@@ -920,13 +920,13 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   private previewToken = '';
   private langSub?: Subscription;
   private routeSub?: Subscription;
-  private document: Document = inject(DOCUMENT);
+  private readonly document: Document = inject(DOCUMENT);
   private scrollStartY = 0;
   private scrollEndY = 1;
   private tocHeadingEls: HTMLElement[] = [];
   private embedRevision = 0;
   private previousBodyOverflow: string | null = null;
-  private lightboxKeyListener = (event: KeyboardEvent) => {
+  private readonly lightboxKeyListener = (event: KeyboardEvent) => {
     if (!this.lightboxOpen()) return;
     if (event.key === 'Escape') {
       event.preventDefault();
@@ -943,26 +943,26 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       this.prevLightbox();
     }
   };
-  private scrollListener = () => this.updateReadingProgress();
-  private resizeListener = () => this.measureReadingProgressSoon();
+  private readonly scrollListener = () => this.updateReadingProgress();
+  private readonly resizeListener = () => this.measureReadingProgressSoon();
 
   constructor(
-    private blog: BlogService,
-    private route: ActivatedRoute,
-    private router: Router,
-    private admin: AdminService,
-    private storefrontAdminMode: StorefrontAdminModeService,
-    private translate: TranslateService,
-    private title: Title,
-    private meta: Meta,
-    private seoHeadLinks: SeoHeadLinksService,
-    private structuredData: StructuredDataService,
-    private newsletter: NewsletterService,
-    private toast: ToastService,
-    private markdown: MarkdownService,
-    private catalog: CatalogService,
+    private readonly blog: BlogService,
+    private readonly route: ActivatedRoute,
+    private readonly router: Router,
+    private readonly admin: AdminService,
+    private readonly storefrontAdminMode: StorefrontAdminModeService,
+    private readonly translate: TranslateService,
+    private readonly title: Title,
+    private readonly meta: Meta,
+    private readonly seoHeadLinks: SeoHeadLinksService,
+    private readonly structuredData: StructuredDataService,
+    private readonly newsletter: NewsletterService,
+    private readonly toast: ToastService,
+    private readonly markdown: MarkdownService,
+    private readonly catalog: CatalogService,
     public auth: AuthService,
-    private seoCopyFallback: SeoCopyFallbackService
+    private readonly seoCopyFallback: SeoCopyFallbackService
   ) {}
 
   ngOnInit(): void {
@@ -1417,7 +1417,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
             .filter((item) => item.slug !== post.slug)
             .map((item) => {
               let score = 0;
-              if (series && item.series && item.series.toLowerCase() === series) score += 10;
+      if (series && item.series?.toLowerCase() === series) score += 10;
               const sharedTags = (item.tags || []).reduce((acc, t) => acc + (tagSet.has(t.toLowerCase()) ? 1 : 0), 0);
               score += sharedTags;
               return { item, score };
@@ -1840,8 +1840,8 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         this.submitting.set(false);
         this.commentCaptchaToken = null;
         this.commentCaptcha?.reset();
-        const statusCode = typeof (err as any)?.status === 'number' ? (err as any).status : 0;
-        const detail = (err as any)?.error?.detail;
+        const statusCode = typeof (err)?.status === 'number' ? (err).status : 0;
+        const detail = (err)?.error?.detail;
         if (statusCode === 429) {
           this.toast.error(this.translate.instant('blog.comments.rateLimitedTitle'), this.translate.instant('blog.comments.rateLimitedCopy'));
           return;

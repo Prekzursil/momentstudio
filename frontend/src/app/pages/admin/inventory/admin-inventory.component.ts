@@ -492,10 +492,10 @@ export class AdminInventoryComponent implements OnInit {
   bulkAdjustNote = '';
 
   constructor(
-    private admin: AdminService,
-    private toast: ToastService,
-    private translate: TranslateService,
-    private router: Router
+    private readonly admin: AdminService,
+    private readonly toast: ToastService,
+    private readonly translate: TranslateService,
+    private readonly router: Router
   ) {}
 
   ngOnInit(): void {
@@ -830,3 +830,4 @@ export class AdminInventoryComponent implements OnInit {
     this.load();
   }
 }
+

@@ -56,23 +56,23 @@ export class AppComponent implements OnDestroy {
   toasts = this.toast.messages();
   preference = this.theme.preference();
   language = this.lang.language;
-  private querySub?: Subscription;
-  private httpErrorSub?: Subscription;
+  private readonly querySub?: Subscription;
+  private readonly httpErrorSub?: Subscription;
   private lastGlobalNetworkToastAt = 0;
   private lastGlobalServerToastAt = 0;
 
   constructor(
-    private toast: ToastService,
-    private theme: ThemeService,
-    private translate: TranslateService,
-    private lang: LanguageService,
-    private auth: AuthService,
-    private route: ActivatedRoute,
-    private analytics: AnalyticsService,
-    private clarity: ClarityService,
-    private httpErrors: HttpErrorBusService,
-    private routeHeadingFocus: RouteHeadingFocusService,
-    private routeRobots: RouteRobotsService
+    private readonly toast: ToastService,
+    private readonly theme: ThemeService,
+    private readonly translate: TranslateService,
+    private readonly lang: LanguageService,
+    private readonly auth: AuthService,
+    private readonly route: ActivatedRoute,
+    private readonly analytics: AnalyticsService,
+    private readonly clarity: ClarityService,
+    private readonly httpErrors: HttpErrorBusService,
+    private readonly routeHeadingFocus: RouteHeadingFocusService,
+    private readonly routeRobots: RouteRobotsService
   ) {
     // Language is handled by LanguageService (localStorage + preferred_language + browser fallback).
     // Revalidate any persisted session on startup to avoid "logged in but unauthorized" UI states.
@@ -143,3 +143,4 @@ export class AppComponent implements OnDestroy {
     }
   }
 }
+

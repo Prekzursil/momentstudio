@@ -8,7 +8,7 @@ export interface HealthResponse {
 
 @Injectable({ providedIn: 'root' })
 export class HealthService {
-  constructor(private api: ApiService) {}
+  constructor(private readonly api: ApiService) {}
 
   health(): Observable<HealthResponse> {
     return this.api.get<HealthResponse>('/health');
@@ -18,4 +18,5 @@ export class HealthService {
     return this.api.get<HealthResponse>('/health/ready');
   }
 }
+
 

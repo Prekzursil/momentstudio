@@ -228,10 +228,10 @@ export class CmsFormBlockComponent implements OnChanges {
   @ViewChild('newsletterCaptcha') newsletterCaptcha?: CaptchaTurnstileComponent;
 
   constructor(
-    private auth: AuthService,
-    private support: SupportService,
-    private newsletter: NewsletterService,
-    private translate: TranslateService
+    private readonly auth: AuthService,
+    private readonly support: SupportService,
+    private readonly newsletter: NewsletterService,
+    private readonly translate: TranslateService
   ) {}
 
   ngOnChanges(): void {
@@ -358,3 +358,4 @@ export class CmsFormBlockComponent implements OnChanges {
     if (name) this.formName = name;
   }
 }
+

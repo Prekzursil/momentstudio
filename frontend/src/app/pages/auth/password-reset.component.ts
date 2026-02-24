@@ -98,10 +98,10 @@ export class PasswordResetComponent implements OnInit {
   loading = false;
 
   constructor(
-    private toast: ToastService,
-    private auth: AuthService,
-    private translate: TranslateService,
-    private route: ActivatedRoute
+    private readonly toast: ToastService,
+    private readonly auth: AuthService,
+    private readonly translate: TranslateService,
+    private readonly route: ActivatedRoute
   ) {}
 
   ngOnInit(): void {
@@ -138,3 +138,4 @@ export class PasswordResetComponent implements OnInit {
       });
   }
 }
+

@@ -110,7 +110,7 @@ export interface WebhookEventRead {
 }
 
 export interface WebhookEventDetail extends WebhookEventRead {
-  payload?: any | null;
+  payload?: any;
 }
 
 export interface EmailFailureRead {
@@ -199,7 +199,7 @@ export interface SamedaySyncRunListResponse {
 
 @Injectable({ providedIn: 'root' })
 export class OpsService {
-  constructor(private api: ApiService) {}
+  constructor(private readonly api: ApiService) {}
 
   getActiveBanner(): Observable<MaintenanceBannerPublic | null> {
     return this.api.get<MaintenanceBannerPublic | null>('/ops/banner').pipe(

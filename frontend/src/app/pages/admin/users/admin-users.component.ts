@@ -1136,20 +1136,20 @@ export class AdminUsersComponent implements OnInit {
   private autoSelectAfterLoad = false;
 
   constructor(
-    private usersApi: AdminUsersService,
-    private couponsApi: AdminCouponsV2Service,
-    private admin: AdminService,
-    private auth: AuthService,
-    private recent: AdminRecentService,
-    private toast: ToastService,
-    private translate: TranslateService,
+    private readonly usersApi: AdminUsersService,
+    private readonly couponsApi: AdminCouponsV2Service,
+    private readonly admin: AdminService,
+    private readonly auth: AuthService,
+    private readonly recent: AdminRecentService,
+    private readonly toast: ToastService,
+    private readonly translate: TranslateService,
     public favorites: AdminFavoritesService
   ) {}
 
   ngOnInit(): void {
     this.favorites.init();
     this.tableLayout.set(loadAdminTableLayout(this.tableLayoutStorageKey(), this.tableColumns, this.tableDefaults));
-    const state = history.state as any;
+    const state = history.state;
     const appliedSavedView = this.maybeApplyFiltersFromState(state);
     if (!appliedSavedView) {
       const prefill = typeof state?.prefillUserSearch === 'string' ? state.prefillUserSearch : '';
@@ -1224,7 +1224,7 @@ export class AdminUsersComponent implements OnInit {
   savedViews(): AdminFavoriteItem[] {
     return this.favorites
       .items()
-      .filter((item) => item?.type === 'filter' && (item?.state as any)?.adminFilterScope === 'users');
+      .filter((item) => item?.type === 'filter' && (item?.state)?.adminFilterScope === 'users');
   }
 
   applySavedView(key: string): void {
@@ -1944,3 +1944,4 @@ export class AdminUsersComponent implements OnInit {
     });
   }
 }
+

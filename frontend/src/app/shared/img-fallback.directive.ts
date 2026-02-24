@@ -7,7 +7,7 @@ import { Directive, ElementRef, HostListener, Input } from '@angular/core';
 export class ImgFallbackDirective {
   @Input('appImgFallback') fallbackSrc?: string;
 
-  constructor(private el: ElementRef<HTMLImageElement>) {}
+  constructor(private readonly el: ElementRef<HTMLImageElement>) {}
 
   @HostListener('error')
   onError(): void {
@@ -20,3 +20,4 @@ export class ImgFallbackDirective {
     img.removeAttribute('srcset');
   }
 }
+

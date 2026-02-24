@@ -45,7 +45,7 @@ interface ContentBlockRead {
 export class SiteSocialService {
   private cached$?: Observable<SiteSocialData>;
 
-  constructor(private api: ApiService) {}
+  constructor(private readonly api: ApiService) {}
 
   get(): Observable<SiteSocialData> {
     if (this.cached$) return this.cached$;
@@ -74,9 +74,9 @@ export class SiteSocialService {
     const items: SiteSocialLink[] = [];
     for (const raw of value) {
       if (!raw || typeof raw !== 'object') continue;
-      const label = String((raw as any).label ?? '').trim();
-      const url = String((raw as any).url ?? '').trim();
-      const thumbnail_url = (raw as any).thumbnail_url;
+      const label = String((raw).label ?? '').trim();
+      const url = String((raw).url ?? '').trim();
+      const thumbnail_url = (raw).thumbnail_url;
       const thumb = typeof thumbnail_url === 'string' ? thumbnail_url.trim() : null;
       if (!label || !url) continue;
       items.push({ label, url, thumbnail_url: thumb || null });
@@ -92,3 +92,4 @@ export class SiteSocialService {
     return { phone: phone || null, email: email || null };
   }
 }
+

@@ -52,8 +52,8 @@ export class StripeMockComponent implements OnInit {
   sessionId = '';
 
   constructor(
-    private route: ActivatedRoute,
-    private router: Router
+    private readonly route: ActivatedRoute,
+    private readonly router: Router
   ) {}
 
   ngOnInit(): void {
@@ -72,3 +72,4 @@ export class StripeMockComponent implements OnInit {
     void this.router.navigate(['/checkout/stripe/cancel'], { queryParams: { session_id: this.sessionId } });
   }
 }
+

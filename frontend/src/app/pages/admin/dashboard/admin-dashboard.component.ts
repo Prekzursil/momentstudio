@@ -2173,22 +2173,22 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
   ownerTransferError = '';
 
   constructor(
-    private admin: AdminService,
-    private ordersApi: AdminOrdersService,
-    private usersApi: AdminUsersService,
-    private couponsApi: AdminCouponsV2Service,
-    private auth: AuthService,
+    private readonly admin: AdminService,
+    private readonly ordersApi: AdminOrdersService,
+    private readonly usersApi: AdminUsersService,
+    private readonly couponsApi: AdminCouponsV2Service,
+    private readonly auth: AuthService,
     public favorites: AdminFavoritesService,
     public recent: AdminRecentService,
-    private router: Router,
-    private toast: ToastService,
-    private translate: TranslateService,
-    private http: HttpClient,
-    private markdown: MarkdownService
+    private readonly router: Router,
+    private readonly toast: ToastService,
+    private readonly translate: TranslateService,
+    private readonly http: HttpClient,
+    private readonly markdown: MarkdownService
   ) {}
 
   ngAfterViewInit(): void {
-    const shouldFocus = Boolean((history.state as any)?.focusGlobalSearch);
+    const shouldFocus = Boolean((history.state)?.focusGlobalSearch);
     if (!shouldFocus) return;
 
     window.setTimeout(() => {
@@ -2196,7 +2196,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
       this.globalSearchInput?.nativeElement?.select();
       this.openGlobalSearch();
       try {
-        const nextState = { ...(history.state as any) };
+        const nextState = { ...(history.state) };
         delete nextState.focusGlobalSearch;
         history.replaceState(nextState, '');
       } catch {
@@ -2853,7 +2853,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
       const raw = localStorage.getItem(this.liveRefreshStorageKey);
       if (!raw) return;
       const parsed = JSON.parse(raw);
-      const enabled = Boolean((parsed as any)?.enabled);
+      const enabled = Boolean((parsed)?.enabled);
       this.liveRefreshEnabled.set(enabled);
       if (enabled) this.startLiveRefresh();
     } catch {
@@ -2867,7 +2867,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
       const raw = localStorage.getItem(this.salesMetricStorageKey);
       if (!raw) return;
       const parsed = JSON.parse(raw);
-      const metric = (parsed as any)?.metric;
+      const metric = (parsed)?.metric;
       if (metric === 'gross' || metric === 'net') this.salesMetric.set(metric);
     } catch {
       // ignore
@@ -3668,3 +3668,4 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
       });
   }
 }
+

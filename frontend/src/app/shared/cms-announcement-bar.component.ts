@@ -32,9 +32,9 @@ export class CmsAnnouncementBarComponent implements OnInit, OnDestroy {
   private langSub?: Subscription;
 
   constructor(
-    private api: ApiService,
-    private markdown: MarkdownService,
-    private translate: TranslateService
+    private readonly api: ApiService,
+    private readonly markdown: MarkdownService,
+    private readonly translate: TranslateService
   ) {}
 
   ngOnInit(): void {
@@ -63,3 +63,4 @@ export class CmsAnnouncementBarComponent implements OnInit, OnDestroy {
     });
   }
 }
+

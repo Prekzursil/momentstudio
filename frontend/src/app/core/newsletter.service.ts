@@ -17,7 +17,7 @@ export interface NewsletterUnsubscribeResponse {
 
 @Injectable({ providedIn: 'root' })
 export class NewsletterService {
-  constructor(private api: ApiService) {}
+  constructor(private readonly api: ApiService) {}
 
   subscribe(email: string, params: { source?: string; captcha_token?: string | null } = {}): Observable<NewsletterSubscribeResponse> {
     return this.api.post<NewsletterSubscribeResponse>(
@@ -39,3 +39,4 @@ export class NewsletterService {
     return this.api.post<NewsletterUnsubscribeResponse>('/newsletter/unsubscribe', { token }, { 'X-Silent': '1' });
   }
 }
+

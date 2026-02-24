@@ -195,3 +195,4 @@ export class ThemeSegmentedControlComponent {
     buttons[index]?.focus();
   }
 }
+

@@ -9,7 +9,7 @@ export class StorefrontAdminModeService {
   readonly enabled = this.enabledSignal.asReadonly();
   readonly available = computed(() => this.isAdmin() && !this.isImpersonating());
 
-  constructor(private auth: AuthService) {
+  constructor(private readonly auth: AuthService) {
     const saved = this.loadSaved();
     this.enabledSignal.set(saved && this.available());
     effect(() => {
@@ -66,3 +66,4 @@ export class StorefrontAdminModeService {
     return Boolean(value);
   }
 }
+

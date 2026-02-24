@@ -120,3 +120,4 @@ export class CaptchaTurnstileComponent implements AfterViewInit, OnDestroy {
     }
   }
 }
+

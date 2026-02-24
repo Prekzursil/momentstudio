@@ -18,7 +18,7 @@ function extractErrorCode(err: HttpErrorResponse): string {
   if (typeof body === 'string') {
     try {
       const data = JSON.parse(body || '{}');
-      return String((data as any)?.code || '');
+      return String((data)?.code || '');
     } catch {
       // ignore
     }
@@ -33,7 +33,7 @@ function extractErrorCodeFromBinary(err: HttpErrorResponse) {
       map((text) => {
         try {
           const data = JSON.parse(text || '{}');
-          return String((data as any)?.code || '');
+          return String((data)?.code || '');
         } catch {
           return '';
         }
@@ -47,7 +47,7 @@ function extractErrorCodeFromBinary(err: HttpErrorResponse) {
       const decoder = typeof TextDecoder !== 'undefined' ? new TextDecoder() : null;
       const text = decoder ? decoder.decode(new Uint8Array(body)) : '';
       const data = JSON.parse(text || '{}');
-      return of(String((data as any)?.code || ''));
+      return of(String((data)?.code || ''));
     } catch {
       return of('');
     }
@@ -181,3 +181,4 @@ export const authAndErrorInterceptor: HttpInterceptorFn = (req, next) => {
     })
   );
 };
+

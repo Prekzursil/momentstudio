@@ -157,11 +157,11 @@ export class LoginComponent {
   @ViewChild(CaptchaTurnstileComponent) captcha: CaptchaTurnstileComponent | undefined;
 
   constructor(
-    private toast: ToastService,
-    private auth: AuthService,
-    private router: Router,
-    private route: ActivatedRoute,
-    private translate: TranslateService
+    private readonly toast: ToastService,
+    private readonly auth: AuthService,
+    private readonly router: Router,
+    private readonly route: ActivatedRoute,
+    private readonly translate: TranslateService
   ) {
     this.nextUrl = this.normalizeNextUrl(this.route.snapshot.queryParamMap.get('next'));
   }
@@ -335,7 +335,7 @@ export class LoginComponent {
       )
 	      .subscribe({
 	        next: (res) => {
-	          const anyRes = res as any;
+	          const anyRes = res;
 	          if (anyRes?.requires_two_factor && anyRes?.two_factor_token) {
             this.twoFactorToken = anyRes.two_factor_token;
             this.twoFactorUserEmail = anyRes?.user?.email || null;
@@ -370,3 +370,4 @@ export class LoginComponent {
 	      });
 	  }
 }
+

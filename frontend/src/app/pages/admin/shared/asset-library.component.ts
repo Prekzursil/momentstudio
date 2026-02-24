@@ -664,7 +664,7 @@ export class AssetLibraryComponent implements OnInit, OnChanges {
 	  errorRequestId = signal<string | null>(null);
 	  images = signal<ContentImageAssetRead[]>([]);
 	  assetGroups = computed<AssetGroup[]>(() => this.buildAssetGroups(this.images()));
-	  private totalPages = signal(1);
+	  private readonly totalPages = signal(1);
 
 	  usageImage: ContentImageAssetRead | null = null;
 	  usageLoading = signal(false);
@@ -688,9 +688,9 @@ export class AssetLibraryComponent implements OnInit, OnChanges {
   editSaving = signal(false);
 
   constructor(
-    private admin: AdminService,
-    private toast: ToastService,
-    private translate: TranslateService
+    private readonly admin: AdminService,
+    private readonly toast: ToastService,
+    private readonly translate: TranslateService
   ) {}
 
   ngOnInit(): void {
@@ -1181,3 +1181,4 @@ export class AssetLibraryComponent implements OnInit, OnChanges {
     return this.translate.instant(key, params);
   }
 }
+

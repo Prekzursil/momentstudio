@@ -104,15 +104,15 @@ export class AboutComponent implements OnInit, OnDestroy {
   private previewToken = '';
 
   constructor(
-    private api: ApiService,
-    private route: ActivatedRoute,
-    private router: Router,
-    private storefrontAdminMode: StorefrontAdminModeService,
-    private translate: TranslateService,
-    private title: Title,
-    private meta: Meta,
-    private markdown: MarkdownService,
-    private seoHeadLinks: SeoHeadLinksService
+    private readonly api: ApiService,
+    private readonly route: ActivatedRoute,
+    private readonly router: Router,
+    private readonly storefrontAdminMode: StorefrontAdminModeService,
+    private readonly translate: TranslateService,
+    private readonly title: Title,
+    private readonly meta: Meta,
+    private readonly markdown: MarkdownService,
+    private readonly seoHeadLinks: SeoHeadLinksService
   ) {}
 
   ngOnInit(): void {
@@ -189,3 +189,4 @@ export class AboutComponent implements OnInit, OnDestroy {
     this.meta.updateTag({ property: 'og:url', content: canonical });
   }
 }
+

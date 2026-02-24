@@ -57,14 +57,14 @@ export class AdminIpBypassComponent {
     { label: 'adminUi.nav.title', url: '/admin/dashboard' },
     { label: 'adminUi.ipBypass.title', url: '/admin/ip-bypass' }
   ]);
-  private returnUrl: string;
+  private readonly returnUrl: string;
 
   constructor(
-    private auth: AuthService,
-    private toast: ToastService,
-    private router: Router,
+    private readonly auth: AuthService,
+    private readonly toast: ToastService,
+    private readonly router: Router,
     route: ActivatedRoute,
-    private translate: TranslateService
+    private readonly translate: TranslateService
   ) {
     this.returnUrl = route.snapshot.queryParamMap.get('returnUrl') || '/admin/dashboard';
   }
@@ -102,3 +102,4 @@ export class AdminIpBypassComponent {
     });
   }
 }
+

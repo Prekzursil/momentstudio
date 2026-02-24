@@ -377,16 +377,16 @@ export class RegisterComponent implements OnInit, OnDestroy {
   error = '';
   loading = false;
   private googleCompletionToken: string | null = null;
-  private langSub?: Subscription;
+  private readonly langSub?: Subscription;
 
   @ViewChild(CaptchaTurnstileComponent) captcha: CaptchaTurnstileComponent | undefined;
 
   constructor(
-    private toast: ToastService,
-    private auth: AuthService,
-    private router: Router,
-    private translate: TranslateService,
-    private route: ActivatedRoute
+    private readonly toast: ToastService,
+    private readonly auth: AuthService,
+    private readonly router: Router,
+    private readonly translate: TranslateService,
+    private readonly route: ActivatedRoute
   ) {
     this.countries = listPhoneCountries(this.translate.currentLang || 'en');
     this.langSub = this.translate.onLangChange.subscribe((evt) => {
@@ -614,3 +614,4 @@ export class RegisterComponent implements OnInit, OnDestroy {
 	      });
 	  }
 }
+

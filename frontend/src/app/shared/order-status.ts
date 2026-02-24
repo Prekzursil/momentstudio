@@ -1,13 +1,4 @@
-export type OrderStatusValue =
-  | 'pending'
-  | 'pending_payment'
-  | 'pending_acceptance'
-  | 'paid'
-  | 'shipped'
-  | 'delivered'
-  | 'cancelled'
-  | 'refunded'
-  | string;
+export type OrderStatusValue = string;
 
 export function orderStatusChipClass(status: OrderStatusValue): string {
   const styles: Record<string, string> = {

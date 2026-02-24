@@ -170,7 +170,7 @@ type StorageMode = 'local' | 'session';
 export class AuthService {
   private static readonly IMPERSONATION_TOKEN_KEY = 'impersonation_access_token';
   private storageMode: StorageMode = 'session';
-  private userSignal = signal<AuthUser | null>(null);
+  private readonly userSignal = signal<AuthUser | null>(null);
   private tokens: AuthTokens | null = null;
   private stepUpToken: string | null = null;
   private refreshInFlight: Observable<AuthTokens | null> | null = null;
@@ -178,7 +178,7 @@ export class AuthService {
   private stepUpInFlight: Observable<string | null> | null = null;
   private lastRevalidateAt = 0;
 
-  constructor(private api: ApiService, private router: Router) {
+  constructor(private readonly api: ApiService, private router: Router) {
     this.bootstrap();
     this.installRevalidationHooks();
   }
@@ -959,3 +959,4 @@ export class AuthService {
     }
   }
 }
+

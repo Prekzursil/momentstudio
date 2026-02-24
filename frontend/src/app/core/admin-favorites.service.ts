@@ -28,9 +28,9 @@ export class AdminFavoritesService {
   readonly error = signal<string | null>(null);
 
   constructor(
-    private api: ApiService,
-    private toast: ToastService,
-    private translate: TranslateService
+    private readonly api: ApiService,
+    private readonly toast: ToastService,
+    private readonly translate: TranslateService
   ) {}
 
   init(): void {
@@ -124,4 +124,5 @@ export class AdminFavoritesService {
     return value === key ? key : value;
   }
 }
+
 

@@ -21,7 +21,7 @@ export class CheckoutPrefsService {
     try {
       const raw = localStorage.getItem(DELIVERY_PREFS_KEY);
       if (!raw) return null;
-      const parsed = JSON.parse(raw) as any;
+      const parsed = JSON.parse(raw);
       const courier: LockerProvider = parsed?.courier === 'fan_courier' ? 'fan_courier' : 'sameday';
       const deliveryType: CheckoutDeliveryType = parsed?.deliveryType === 'locker' ? 'locker' : 'home';
       return { courier, deliveryType };
@@ -58,3 +58,4 @@ export class CheckoutPrefsService {
     localStorage.setItem(PAYMENT_PREFS_KEY, value);
   }
 }
+

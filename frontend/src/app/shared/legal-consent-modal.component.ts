@@ -140,13 +140,13 @@ export class LegalConsentModalComponent implements OnChanges, OnDestroy {
   pageBlocks: PageBlock[] = [];
   private images: ContentImage[] = [];
   private needsScroll = false;
-  private langSub?: Subscription;
+  private readonly langSub?: Subscription;
 
   constructor(
-    private api: ApiService,
-    private translate: TranslateService,
-    private markdown: MarkdownService,
-    private sanitizer: DomSanitizer
+    private readonly api: ApiService,
+    private readonly translate: TranslateService,
+    private readonly markdown: MarkdownService,
+    private readonly sanitizer: DomSanitizer
   ) {
     this.langSub = this.translate.onLangChange.subscribe(() => {
       if (this.open) this.load();
@@ -247,7 +247,7 @@ export class LegalConsentModalComponent implements OnChanges, OnDestroy {
         this.title = block?.title || this.translate.instant('legal.modal.title');
         this.images = Array.isArray(block?.images) ? block.images : [];
         this.bodyHtml = this.markdown.render(String(block?.body_markdown || ''));
-        this.pageBlocks = parsePageBlocks((block?.meta as any) || null, lang, (md) => this.markdown.render(md));
+        this.pageBlocks = parsePageBlocks((block?.meta) || null, lang, (md) => this.markdown.render(md));
         this.subtitle = this.translate.instant('legal.modal.scrollToAccept');
         setTimeout(() => this.modal?.emitBodyScroll());
       },
@@ -264,3 +264,4 @@ export class LegalConsentModalComponent implements OnChanges, OnDestroy {
     });
   }
 }
+

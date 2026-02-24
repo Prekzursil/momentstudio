@@ -29,7 +29,7 @@ export interface FxOverrideAuditEntry {
 
 @Injectable({ providedIn: 'root' })
 export class FxAdminService {
-  constructor(private api: ApiService) {}
+  constructor(private readonly api: ApiService) {}
 
   getStatus(): Observable<FxAdminStatus> {
     return this.api.get<FxAdminStatus>('/fx/admin/status');
@@ -51,3 +51,4 @@ export class FxAdminService {
     return this.api.post<FxAdminStatus>(`/fx/admin/override/audit/${id}/revert`, {});
   }
 }
+

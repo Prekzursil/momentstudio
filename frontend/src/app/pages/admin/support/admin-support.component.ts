@@ -634,12 +634,12 @@ export class AdminSupportComponent implements OnInit {
   replyMessage = '';
 
   constructor(
-    private api: AdminSupportService,
-    private auth: AuthService,
-    private toast: ToastService,
-    private translate: TranslateService,
-    private route: ActivatedRoute,
-    private router: Router
+    private readonly api: AdminSupportService,
+    private readonly auth: AuthService,
+    private readonly toast: ToastService,
+    private readonly translate: TranslateService,
+    private readonly route: ActivatedRoute,
+    private readonly router: Router
   ) {}
 
   ngOnInit(): void {
@@ -1059,3 +1059,4 @@ export class AdminSupportComponent implements OnInit {
     this.load();
   }
 }
+

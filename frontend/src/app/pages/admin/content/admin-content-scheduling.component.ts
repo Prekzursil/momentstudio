@@ -167,8 +167,8 @@ export class AdminContentSchedulingComponent implements OnInit {
   private readonly pageSize = 50;
 
   constructor(
-    private admin: AdminService,
-    private translate: TranslateService
+    private readonly admin: AdminService,
+    private readonly translate: TranslateService
   ) {}
 
   ngOnInit(): void {
@@ -332,3 +332,4 @@ export class AdminContentSchedulingComponent implements OnInit {
     return row.key;
   }
 }
+

@@ -321,18 +321,18 @@ export class ContactComponent implements OnInit, OnDestroy {
   private previewToken = '';
 
   constructor(
-    private api: ApiService,
-    private route: ActivatedRoute,
-    private router: Router,
-    private storefrontAdminMode: StorefrontAdminModeService,
-    private translate: TranslateService,
-    private title: Title,
-    private meta: Meta,
-    private seoHeadLinks: SeoHeadLinksService,
-    private markdown: MarkdownService,
-    private social: SiteSocialService,
-    private auth: AuthService,
-    private support: SupportService
+    private readonly api: ApiService,
+    private readonly route: ActivatedRoute,
+    private readonly router: Router,
+    private readonly storefrontAdminMode: StorefrontAdminModeService,
+    private readonly translate: TranslateService,
+    private readonly title: Title,
+    private readonly meta: Meta,
+    private readonly seoHeadLinks: SeoHeadLinksService,
+    private readonly markdown: MarkdownService,
+    private readonly social: SiteSocialService,
+    private readonly auth: AuthService,
+    private readonly support: SupportService
   ) {}
 
   ngOnInit(): void {
@@ -475,3 +475,4 @@ export class ContactComponent implements OnInit, OnDestroy {
       });
   }
 }
+

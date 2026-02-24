@@ -3183,7 +3183,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
 	  imageMetaExists: Record<'en' | 'ro', boolean> = { en: false, ro: false };
 	  imageStats: AdminProductImageOptimizationStats | null = null;
 	  imageUploads = signal<AdminProductImageUploadItem[]>([]);
-	  private imageUploadFiles = new Map<string, File>();
+	  private readonly imageUploadFiles = new Map<string, File>();
 	  private imageUploadActiveId: string | null = null;
 	  private imageUploadSub: Subscription | null = null;
 	  adminCategories = signal<Array<{ id: string; name: string }>>([]);
@@ -3319,22 +3319,22 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
   private pendingEditProductSlug: string | null = null;
 
   constructor(
-    private productsApi: AdminProductsService,
-    private catalog: CatalogService,
-    private admin: AdminService,
-    private auth: AuthService,
-    private recent: AdminRecentService,
+    private readonly productsApi: AdminProductsService,
+    private readonly catalog: CatalogService,
+    private readonly admin: AdminService,
+    private readonly auth: AuthService,
+    private readonly recent: AdminRecentService,
     public uiPrefs: AdminUiPrefsService,
-    private markdown: MarkdownService,
-    private toast: ToastService,
-    private translate: TranslateService,
+    private readonly markdown: MarkdownService,
+    private readonly toast: ToastService,
+    private readonly translate: TranslateService,
     public favorites: AdminFavoritesService
   ) {}
 
   ngOnInit(): void {
     this.favorites.init();
     this.tableLayout.set(loadAdminTableLayout(this.tableLayoutStorageKey(), this.tableColumns, this.tableDefaults));
-    const state = history.state as any;
+    const state = history.state;
     const editSlug = typeof state?.editProductSlug === 'string' ? state.editProductSlug : '';
     this.pendingEditProductSlug = editSlug.trim() ? editSlug.trim() : null;
     this.autoStartNewProduct = !this.pendingEditProductSlug && Boolean(state?.openNewProduct);
@@ -3666,7 +3666,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
   savedViews(): AdminFavoriteItem[] {
     return this.favorites
       .items()
-      .filter((item) => item?.type === 'filter' && (item?.state as any)?.adminFilterScope === 'products');
+      .filter((item) => item?.type === 'filter' && (item?.state)?.adminFilterScope === 'products');
   }
 
   applySavedView(key: string): void {
@@ -5187,7 +5187,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
           stock_quantity: Number(prod.stock_quantity || 0),
           low_stock_threshold:
             prod.low_stock_threshold === null || prod.low_stock_threshold === undefined ? '' : String(prod.low_stock_threshold),
-          status: (prod.status as any) || 'draft',
+          status: (prod.status) || 'draft',
           is_active: prod.is_active !== false,
           is_featured: !!prod.is_featured,
           sku: (prod.sku || '').toString(),
@@ -5251,7 +5251,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
     const existing = this.editingSlug();
     if (existing) return existing;
     const suggested = this.duplicateCheck()?.suggested_slug;
-    return suggested && suggested.trim() ? suggested : null;
+    return suggested?.trim() ? suggested : null;
   }
 
   duplicateHasWarnings(): boolean {
@@ -6806,7 +6806,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       const after = this.parseAuditMoney(base?.after);
       if (before === null || after === null) continue;
       if (before === after) continue;
-      const user = (entry.user_email || entry.user_id || null) as string | null;
+      const user = (entry.user_email || entry.user_id || null) | null;
       out.push({ at: entry.created_at, before, after, user });
     }
     out.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());

@@ -94,7 +94,7 @@ const GOOGLE_FLOW_KEY = 'google_flow';
 
 @Directive()
 export class AccountState implements OnInit, OnDestroy {
-  private now = signal<number>(Date.now());
+  private readonly now = signal<number>(Date.now());
   private nowInterval?: ReturnType<typeof setInterval>;
 
   emailVerified = signal<boolean>(false);
@@ -134,7 +134,7 @@ export class AccountState implements OnInit, OnDestroy {
   loading = signal<boolean>(false);
   error = signal<string | null>(null);
 
-  private phoneCountriesEffect?: EffectRef;
+  private readonly phoneCountriesEffect?: EffectRef;
   showAddressForm = false;
   editingAddressId: string | null = null;
   addressModel: AddressCreateRequest = {
@@ -298,22 +298,22 @@ export class AccountState implements OnInit, OnDestroy {
   cooldownsError = signal<string | null>(null);
 
   constructor(
-    private toast: ToastService,
-    private auth: AuthService,
-    private account: AccountService,
-    private blog: BlogService,
-    private cart: CartStore,
-    private router: Router,
-    private route: ActivatedRoute,
-    private api: ApiService,
+    private readonly toast: ToastService,
+    private readonly auth: AuthService,
+    private readonly account: AccountService,
+    private readonly blog: BlogService,
+    private readonly cart: CartStore,
+    private readonly router: Router,
+    private readonly route: ActivatedRoute,
+    private readonly api: ApiService,
     public wishlist: WishlistService,
-    private notificationsService: NotificationsService,
-    private ticketsService: TicketsService,
-    private couponsService: CouponsService,
-    private theme: ThemeService,
-    private lang: LanguageService,
-    private translate: TranslateService,
-    private googleLinkPendingService: GoogleLinkPendingService
+    private readonly notificationsService: NotificationsService,
+    private readonly ticketsService: TicketsService,
+    private readonly couponsService: CouponsService,
+    private readonly theme: ThemeService,
+    private readonly lang: LanguageService,
+    private readonly translate: TranslateService,
+    private readonly googleLinkPendingService: GoogleLinkPendingService
   ) {
     this.phoneCountriesEffect = effect(() => {
       this.phoneCountries = listPhoneCountries(this.lang.language());
@@ -3019,3 +3019,4 @@ export class AccountState implements OnInit, OnDestroy {
     return this.translate.instant(key, params);
   }
 }
+

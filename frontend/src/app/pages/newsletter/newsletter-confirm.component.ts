@@ -66,9 +66,9 @@ export class NewsletterConfirmComponent implements OnInit {
   errorMessage = '';
 
   constructor(
-    private route: ActivatedRoute,
-    private newsletter: NewsletterService,
-    private translate: TranslateService
+    private readonly route: ActivatedRoute,
+    private readonly newsletter: NewsletterService,
+    private readonly translate: TranslateService
   ) {}
 
   ngOnInit(): void {
@@ -93,3 +93,4 @@ export class NewsletterConfirmComponent implements OnInit {
     });
   }
 }
+

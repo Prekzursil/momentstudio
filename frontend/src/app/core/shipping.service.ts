@@ -45,7 +45,7 @@ export type LockerCitySearchResponse = {
 
 @Injectable({ providedIn: 'root' })
 export class ShippingService {
-  constructor(private api: ApiService) {}
+  constructor(private readonly api: ApiService) {}
 
   listLockers(params: {
     provider: LockerProvider;
@@ -65,3 +65,4 @@ export class ShippingService {
     return this.api.get<LockerCitySearchResponse>('/shipping/lockers/cities', params);
   }
 }
+

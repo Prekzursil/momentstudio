@@ -106,7 +106,7 @@ export class ChangePasswordComponent {
   showNew = false;
   showConfirm = false;
 
-  constructor(private toast: ToastService, private auth: AuthService, private translate: TranslateService) {}
+  constructor(private readonly toast: ToastService, private auth: AuthService, private translate: TranslateService) {}
 
   onSubmit(form: NgForm): void {
     if (!form.valid) {
@@ -141,3 +141,4 @@ export class ChangePasswordComponent {
     });
   }
 }
+

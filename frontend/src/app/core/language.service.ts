@@ -15,9 +15,9 @@ export class LanguageService {
   readonly language = this.languageSignal.asReadonly();
 
   constructor(
-    private translate: TranslateService,
-    private auth: AuthService,
-    private toast: ToastService
+    private readonly translate: TranslateService,
+    private readonly auth: AuthService,
+    private readonly toast: ToastService
   ) {
     this.translate.addLangs(['en', 'ro']);
     this.translate.setDefaultLang('en');
@@ -66,3 +66,4 @@ export class LanguageService {
     }
   }
 }
+

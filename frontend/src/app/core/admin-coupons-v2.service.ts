@@ -168,7 +168,7 @@ export interface CouponAnalyticsResponse {
 
 @Injectable({ providedIn: 'root' })
 export class AdminCouponsV2Service {
-  constructor(private api: ApiService) {}
+  constructor(private readonly api: ApiService) {}
 
   listPromotions(): Observable<PromotionRead[]> {
     return this.api.get<PromotionRead[]>('/coupons/admin/promotions');
@@ -307,3 +307,4 @@ export class AdminCouponsV2Service {
     return this.api.post<CouponBulkJobRead>(`/coupons/admin/coupons/bulk-jobs/${jobId}/retry`, {});
   }
 }
+

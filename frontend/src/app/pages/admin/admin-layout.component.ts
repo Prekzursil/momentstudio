@@ -411,15 +411,15 @@ type AdminNavItemView = AdminNavItem & {
 export class AdminLayoutComponent implements OnInit, OnDestroy {
   constructor(
     public auth: AuthService,
-    private router: Router,
-    private translate: TranslateService,
+    private readonly router: Router,
+    private readonly translate: TranslateService,
     public favorites: AdminFavoritesService,
     public uiPrefs: AdminUiPrefsService,
-    private recent: AdminRecentService,
-    private admin: AdminService,
-    private ops: OpsService,
-    private support: AdminSupportService,
-    private toast: ToastService
+    private readonly recent: AdminRecentService,
+    private readonly admin: AdminService,
+    private readonly ops: OpsService,
+    private readonly support: AdminSupportService,
+    private readonly toast: ToastService
   ) {}
 
   private readonly injector = inject(Injector);
@@ -840,7 +840,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
       pending += 1;
       this.admin.summary({ range_days: 30 }).subscribe({
         next: (res) => {
-          const count = Number((res as any)?.low_stock ?? 0);
+          const count = Number((res)?.low_stock ?? 0);
           this.lowStockCount = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
         },
         error: () => {
@@ -858,7 +858,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
       pending += 1;
       this.ops.getWebhookFailureStats({ since_hours: 24 }).subscribe({
         next: (res) => {
-          const count = Number((res as any)?.failed ?? 0);
+          const count = Number((res)?.failed ?? 0);
           this.failedWebhooksCount = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
         },
         error: () => {
@@ -872,7 +872,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
       pending += 1;
       this.ops.getEmailFailureStats({ since_hours: 24 }).subscribe({
         next: (res) => {
-          const count = Number((res as any)?.failed ?? 0);
+          const count = Number((res)?.failed ?? 0);
           this.failedEmailsCount = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
         },
         error: () => {
@@ -928,3 +928,4 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
     });
   }
 }
+
