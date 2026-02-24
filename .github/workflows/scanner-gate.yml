@@ -38,7 +38,7 @@ jobs:
         with:
           args: >-
             -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY || 'Prekzursil_AdrianaArt' }}
-            -Dsonar.organization=${{ vars.SONAR_ORGANIZATION || 'Prekzursil' }}
+            -Dsonar.organization=${{ vars.SONAR_ORGANIZATION || 'prekzursil' }}
             -Dsonar.pullrequest.key=${{ github.event.pull_request.number }}
             -Dsonar.pullrequest.branch=${{ github.head_ref }}
             -Dsonar.pullrequest.base=${{ github.base_ref }}
@@ -52,7 +52,7 @@ jobs:
         with:
           args: >-
             -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY || 'Prekzursil_AdrianaArt' }}
-            -Dsonar.organization=${{ vars.SONAR_ORGANIZATION || 'Prekzursil' }}
+            -Dsonar.organization=${{ vars.SONAR_ORGANIZATION || 'prekzursil' }}
             -Dsonar.branch.name=${{ github.ref_name }}
 
       - name: Assert Sonar unresolved is zero
