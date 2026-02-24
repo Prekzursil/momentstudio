@@ -314,6 +314,7 @@ export interface AdminProduct {
   currency: string;
   status: string;
   category: string;
+  sku?: string | null;
   stock_quantity: number;
   publish_at?: string | null;
   tags?: string[];
