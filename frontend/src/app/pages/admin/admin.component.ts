@@ -12449,22 +12449,26 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.setPageRecordValue(this.pageBlocksMessage, safePageKey, null);
     this.setPageRecordValue(this.pageBlocksError, safePageKey, null);
     this.admin.getContent(safePageKey).subscribe({
-	      next: (block) => {
-	        this.rememberContentVersion(safePageKey, block);
-	        this.setPageRecordValue(this.pageBlocksNeedsTranslationEn, safePageKey, Boolean(block.needs_translation_en));
-	        this.setPageRecordValue(this.pageBlocksNeedsTranslationRo, safePageKey, Boolean(block.needs_translation_ro));
+		      next: (block) => {
+		        this.rememberContentVersion(safePageKey, block);
+		        this.setPageRecordValue(this.pageBlocksNeedsTranslationEn, safePageKey, Boolean(block?.needs_translation_en));
+		        this.setPageRecordValue(this.pageBlocksNeedsTranslationRo, safePageKey, Boolean(block?.needs_translation_ro));
         this.setPageRecordValue(
           this.pageBlocksStatus,
           safePageKey,
-          block.status === 'published' ? 'published' : block.status === 'review' ? 'review' : 'draft'
-        );
-        this.setPageRecordValue(this.pageBlocksPublishedAt, safePageKey, block.published_at ? this.toLocalDateTime(block.published_at) : '');
-        this.setPageRecordValue(
-          this.pageBlocksPublishedUntil,
-          safePageKey,
-          block.published_until ? this.toLocalDateTime(block.published_until) : ''
-        );
-	        const metaObj = this.toRecord(block?.meta);
+	          block?.status === 'published' ? 'published' : block?.status === 'review' ? 'review' : 'draft'
+	        );
+	        this.setPageRecordValue(
+	          this.pageBlocksPublishedAt,
+	          safePageKey,
+	          block?.published_at ? this.toLocalDateTime(block.published_at) : ''
+	        );
+	        this.setPageRecordValue(
+	          this.pageBlocksPublishedUntil,
+	          safePageKey,
+	          block?.published_until ? this.toLocalDateTime(block.published_until) : ''
+	        );
+		        const metaObj = this.toRecord(block?.meta);
 	        this.setPageRecordValue(this.pageBlocksMeta, safePageKey, metaObj);
 	        this.setPageRecordValue(this.pageBlocksRequiresAuth, safePageKey, Boolean(metaObj['requires_auth']));
 	        this.pageBlocks[safePageKey] = this.parsePageBlocksDraft(metaObj);
@@ -14428,12 +14432,12 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.admin.updateContentBlock(safePageKey, this.withExpectedVersion(safePageKey, payload)).subscribe({
       next: (block) => {
         this.rememberContentVersion(safePageKey, block);
-        this.pageBlocksNeedsTranslationEn[safePageKey] = Boolean(block.needs_translation_en);
-        this.pageBlocksNeedsTranslationRo[safePageKey] = Boolean(block.needs_translation_ro);
+        this.pageBlocksNeedsTranslationEn[safePageKey] = Boolean(block?.needs_translation_en);
+        this.pageBlocksNeedsTranslationRo[safePageKey] = Boolean(block?.needs_translation_ro);
         this.pageBlocksStatus[safePageKey] =
-          block.status === 'published' ? 'published' : block.status === 'review' ? 'review' : 'draft';
-        this.pageBlocksPublishedAt[safePageKey] = block.published_at ? this.toLocalDateTime(block.published_at) : '';
-        this.pageBlocksPublishedUntil[safePageKey] = block.published_until
+          block?.status === 'published' ? 'published' : block?.status === 'review' ? 'review' : 'draft';
+        this.pageBlocksPublishedAt[safePageKey] = block?.published_at ? this.toLocalDateTime(block.published_at) : '';
+        this.pageBlocksPublishedUntil[safePageKey] = block?.published_until
           ? this.toLocalDateTime(block.published_until)
           : '';
         this.pageBlocksMeta[safePageKey] = this.toRecord(block?.meta);
@@ -14466,14 +14470,14 @@ export class AdminComponent implements OnInit, OnDestroy {
           this.admin.createContent(safePageKey, createPayload).subscribe({
             next: (created) => {
               this.rememberContentVersion(safePageKey, created);
-              this.pageBlocksNeedsTranslationEn[safePageKey] = Boolean(created.needs_translation_en);
-              this.pageBlocksNeedsTranslationRo[safePageKey] = Boolean(created.needs_translation_ro);
+              this.pageBlocksNeedsTranslationEn[safePageKey] = Boolean(created?.needs_translation_en);
+              this.pageBlocksNeedsTranslationRo[safePageKey] = Boolean(created?.needs_translation_ro);
               this.pageBlocksStatus[safePageKey] =
-                created.status === 'published' ? 'published' : created.status === 'review' ? 'review' : 'draft';
-              this.pageBlocksPublishedAt[safePageKey] = created.published_at
+                created?.status === 'published' ? 'published' : created?.status === 'review' ? 'review' : 'draft';
+              this.pageBlocksPublishedAt[safePageKey] = created?.published_at
                 ? this.toLocalDateTime(created.published_at)
                 : '';
-              this.pageBlocksPublishedUntil[safePageKey] = created.published_until
+              this.pageBlocksPublishedUntil[safePageKey] = created?.published_until
                 ? this.toLocalDateTime(created.published_until)
                 : '';
               this.pageBlocksMeta[safePageKey] = this.toRecord(created?.meta);

@@ -1055,7 +1055,7 @@ def _stripe_session_value(checkout_session: Any, key: str) -> Any:
     return getattr(checkout_session, key, None) or (checkout_session.get(key) if hasattr(checkout_session, "get") else None)
 
 
-async def _retrieve_paid_stripe_session(session_id: str, *, mock_mode: bool) -> Any | None:
+def _retrieve_paid_stripe_session(session_id: str, *, mock_mode: bool) -> Any | None:
     if mock_mode:
         return None
     if not payments.is_stripe_configured():
@@ -1260,7 +1260,7 @@ async def confirm_stripe_checkout(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Session id is required")
 
     mock_mode = is_mock_payments()
-    checkout_session = await _retrieve_paid_stripe_session(session_id, mock_mode=mock_mode)
+    checkout_session = _retrieve_paid_stripe_session(session_id, mock_mode=mock_mode)
     order = await _get_order_by_stripe_session_id(session, session_id)
     _assert_confirmation_order_match(order, payload.order_id)
     _assert_confirmation_access(order, current_user, payload.order_id)
