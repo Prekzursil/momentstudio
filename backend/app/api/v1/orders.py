@@ -1008,6 +1008,246 @@ async def capture_paypal_order(
     )
 
 
+def _payment_confirmation_query(stmt):
+    return stmt.options(
+        selectinload(Order.user),
+        selectinload(Order.items).selectinload(OrderItem.product),
+        selectinload(Order.events),
+        selectinload(Order.shipping_address),
+        selectinload(Order.billing_address),
+    )
+
+
+async def _get_order_by_stripe_session_id(session: AsyncSession, session_id: str) -> Order:
+    result = await session.execute(
+        _payment_confirmation_query(select(Order).where(Order.stripe_checkout_session_id == session_id))
+    )
+    order = result.scalars().first()
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    return order
+
+
+async def _get_order_by_id_for_confirmation(session: AsyncSession, order_id: UUID) -> Order:
+    result = await session.execute(_payment_confirmation_query(select(Order).where(Order.id == order_id)))
+    order = result.scalars().first()
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    return order
+
+
+def _assert_confirmation_order_match(order: Order, payload_order_id: UUID | None) -> None:
+    if payload_order_id and order.id != payload_order_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order mismatch")
+
+
+def _assert_confirmation_access(order: Order, current_user: User | None, payload_order_id: UUID | None) -> None:
+    if not order.user_id:
+        return
+    same_user = current_user and order.user_id == getattr(current_user, "id", None)
+    guest_return = bool(payload_order_id and order.id == payload_order_id)
+    if same_user or guest_return:
+        return
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
+
+
+def _stripe_session_value(checkout_session: Any, key: str) -> Any:
+    return getattr(checkout_session, key, None) or (checkout_session.get(key) if hasattr(checkout_session, "get") else None)
+
+
+async def _retrieve_paid_stripe_session(session_id: str, *, mock_mode: bool) -> Any | None:
+    if mock_mode:
+        return None
+    if not payments.is_stripe_configured():
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe not configured")
+    payments.init_stripe()
+    try:
+        checkout_session = payments.stripe.checkout.Session.retrieve(session_id)  # type: ignore[attr-defined]
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Stripe session lookup failed") from exc
+    if str(_stripe_session_value(checkout_session, "payment_status") or "").lower() != "paid":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment not completed")
+    return checkout_session
+
+
+def _apply_stripe_confirmation_outcome(
+    payload: StripeConfirmRequest, *, mock_mode: bool, order: Order, checkout_session: Any | None
+) -> None:
+    if mock_mode:
+        outcome = str(payload.mock or "success").strip().lower()
+        if outcome == "decline":
+            raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail="Payment declined")
+        return
+    payment_intent_id = _stripe_session_value(checkout_session, "payment_intent")
+    if payment_intent_id and not order.stripe_payment_intent_id:
+        order.stripe_payment_intent_id = str(payment_intent_id)
+
+
+def _order_has_payment_captured(order: Order) -> bool:
+    return any(getattr(evt, "event", None) == "payment_captured" for evt in (order.events or []))
+
+
+async def _finalize_order_after_payment_capture(
+    session: AsyncSession, order: Order, *, note: str, add_capture_event: bool
+) -> bool:
+    captured_added = False
+    if add_capture_event:
+        session.add(OrderEvent(order_id=order.id, event="payment_captured", note=note))
+        captured_added = True
+        await promo_usage.record_promo_usage(session, order=order, note=note)
+    if order.status == OrderStatus.pending_payment:
+        order.status = OrderStatus.pending_acceptance
+        session.add(OrderEvent(order_id=order.id, event="status_change", note="pending_payment -> pending_acceptance"))
+    session.add(order)
+    await session.commit()
+    await session.refresh(order)
+    return captured_added
+
+
+async def _payment_capture_receipt_share_days(
+    session: AsyncSession,
+    *,
+    include_receipt_share_days: bool,
+) -> int | None:
+    if not include_receipt_share_days:
+        return None
+    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
+    return checkout_settings.receipt_share_days
+
+
+def _payment_capture_contact(order: Order) -> tuple[str | None, str | None]:
+    customer_to = (order.user.email if order.user and order.user.email else None) or getattr(order, "customer_email", None)
+    customer_lang = order.user.preferred_language if order.user else None
+    return customer_to, customer_lang
+
+
+def _queue_payment_capture_customer_email(
+    background_tasks: BackgroundTasks,
+    order: Order,
+    *,
+    customer_to: str | None,
+    customer_lang: str | None,
+    receipt_share_days: int | None,
+) -> None:
+    if not customer_to:
+        return
+    if receipt_share_days is None:
+        background_tasks.add_task(email_service.send_order_confirmation, customer_to, order, order.items, customer_lang)
+        return
+    background_tasks.add_task(
+        email_service.send_order_confirmation,
+        customer_to,
+        order,
+        order.items,
+        customer_lang,
+        receipt_share_days=receipt_share_days,
+    )
+
+
+async def _queue_payment_capture_admin_email(
+    session: AsyncSession,
+    background_tasks: BackgroundTasks,
+    order: Order,
+    *,
+    customer_to: str | None,
+) -> None:
+    owner = await auth_service.get_owner_user(session)
+    admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+    if not admin_to:
+        return
+    background_tasks.add_task(
+        email_service.send_new_order_notification,
+        admin_to,
+        order,
+        customer_to,
+        owner.preferred_language if owner else None,
+    )
+
+
+async def _notify_payment_capture_user(session: AsyncSession, order: Order) -> None:
+    if not (order.user and order.user.id):
+        return
+    await notification_service.create_notification(
+        session,
+        user_id=order.user.id,
+        type="order",
+        title="Payment received" if (order.user.preferred_language or "en") != "ro" else "Plată confirmată",
+        body=f"Reference {order.reference_code}" if order.reference_code else None,
+        url=_account_orders_url(order),
+    )
+
+
+async def _queue_payment_capture_notifications(
+    session: AsyncSession,
+    background_tasks: BackgroundTasks,
+    order: Order,
+    *,
+    include_receipt_share_days: bool,
+) -> None:
+    receipt_share_days = await _payment_capture_receipt_share_days(
+        session,
+        include_receipt_share_days=include_receipt_share_days,
+    )
+    customer_to, customer_lang = _payment_capture_contact(order)
+    _queue_payment_capture_customer_email(
+        background_tasks,
+        order,
+        customer_to=customer_to,
+        customer_lang=customer_lang,
+        receipt_share_days=receipt_share_days,
+    )
+    await _queue_payment_capture_admin_email(
+        session,
+        background_tasks,
+        order,
+        customer_to=customer_to,
+    )
+    await _notify_payment_capture_user(session, order)
+
+
+def _netopia_confirmation_transaction_id(order: Order, payload_ntp_id: str | None) -> str:
+    if payload_ntp_id and order.netopia_ntp_id and payload_ntp_id != order.netopia_ntp_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Transaction mismatch")
+    ntp_id = (order.netopia_ntp_id or "").strip()
+    if not ntp_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing Netopia transaction id")
+    return ntp_id
+
+
+def _assert_netopia_status_completed(status_data: dict[str, Any]) -> None:
+    payment = status_data.get("payment") if isinstance(status_data, dict) else None
+    payment_status_raw = payment.get("status") if isinstance(payment, dict) else None
+    try:
+        payment_status = int(payment_status_raw) if payment_status_raw is not None else None
+    except Exception:
+        payment_status = None
+    if payment_status not in {3, 5}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment not completed")
+
+
+def _netopia_error_details(status_data: dict[str, Any]) -> tuple[str, str]:
+    error = status_data.get("error")
+    if not isinstance(error, dict):
+        return "", ""
+    raw_code = error.get("code")
+    raw_message = error.get("message")
+    error_code = str(raw_code).strip() if raw_code is not None else ""
+    error_message = str(raw_message).strip() if raw_message is not None else ""
+    return error_code, error_message
+
+
+def _assert_netopia_error_success(status_data: dict[str, Any]) -> None:
+    error_code, error_message = _netopia_error_details(status_data)
+    if not error_code:
+        return
+    if error_code.lower() in {"00", "0", "approved"}:
+        return
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=error_message or f"Payment not completed (Netopia {error_code})",
+    )
+
+
 @router.post("/stripe/confirm", response_model=StripeConfirmResponse)
 async def confirm_stripe_checkout(
     payload: StripeConfirmRequest,
@@ -1020,120 +1260,27 @@ async def confirm_stripe_checkout(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Session id is required")
 
     mock_mode = is_mock_payments()
-    checkout_session = None
-    if not mock_mode:
-        if not payments.is_stripe_configured():
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe not configured")
+    checkout_session = await _retrieve_paid_stripe_session(session_id, mock_mode=mock_mode)
+    order = await _get_order_by_stripe_session_id(session, session_id)
+    _assert_confirmation_order_match(order, payload.order_id)
+    _assert_confirmation_access(order, current_user, payload.order_id)
+    _apply_stripe_confirmation_outcome(payload, mock_mode=mock_mode, order=order, checkout_session=checkout_session)
 
-        payments.init_stripe()
-        try:
-            checkout_session = payments.stripe.checkout.Session.retrieve(session_id)  # type: ignore[attr-defined]
-        except Exception as exc:
-            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Stripe session lookup failed") from exc
-
-        payment_status = (
-            getattr(checkout_session, "payment_status", None)
-            or (checkout_session.get("payment_status") if hasattr(checkout_session, "get") else None)
-        )
-        if str(payment_status or "").lower() != "paid":
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment not completed")
-
-    order = (
-        (
-            await session.execute(
-                select(Order)
-                .options(
-                    selectinload(Order.user),
-                    selectinload(Order.items).selectinload(OrderItem.product),
-                    selectinload(Order.events),
-                    selectinload(Order.shipping_address),
-                    selectinload(Order.billing_address),
-                )
-                .where(Order.stripe_checkout_session_id == session_id)
-            )
-        )
-        .scalars()
-        .first()
+    note = f"Stripe session {session_id}"
+    captured_added = await _finalize_order_after_payment_capture(
+        session,
+        order,
+        note=note,
+        add_capture_event=not _order_has_payment_captured(order),
     )
-    if not order:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
-    if payload.order_id and order.id != payload.order_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order mismatch")
-
-    # For signed-in checkouts, keep confirmation bound to the same user.
-    if order.user_id:
-        if current_user and order.user_id == getattr(current_user, "id", None):
-            pass
-        elif payload.order_id and order.id == payload.order_id:
-            # Allow guest checkout return flows (including "create account" during guest checkout).
-            pass
-        else:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
-
-    if mock_mode:
-        outcome = str(payload.mock or "success").strip().lower()
-        if outcome == "decline":
-            raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail="Payment declined")
-    else:
-        payment_intent_id = (
-            getattr(checkout_session, "payment_intent", None)
-            or (checkout_session.get("payment_intent") if hasattr(checkout_session, "get") else None)
-        )
-        if payment_intent_id and not order.stripe_payment_intent_id:
-            order.stripe_payment_intent_id = str(payment_intent_id)
-
-    already_captured = any(getattr(evt, "event", None) == "payment_captured" for evt in (order.events or []))
-    captured_added = False
-    if not already_captured:
-        session.add(
-            OrderEvent(
-                order_id=order.id,
-                event="payment_captured",
-                note=f"Stripe session {session_id}",
-            )
-        )
-        captured_added = True
-        await promo_usage.record_promo_usage(session, order=order, note=f"Stripe session {session_id}")
-    if order.status == OrderStatus.pending_payment:
-        order.status = OrderStatus.pending_acceptance
-        session.add(OrderEvent(order_id=order.id, event="status_change", note="pending_payment -> pending_acceptance"))
-    session.add(order)
-    await session.commit()
-    await session.refresh(order)
-    await coupons_service.redeem_coupon_for_order(session, order=order, note=f"Stripe session {session_id}")
-
+    await coupons_service.redeem_coupon_for_order(session, order=order, note=note)
     if captured_added:
-        customer_to = (order.user.email if order.user and order.user.email else None) or getattr(order, "customer_email", None)
-        customer_lang = order.user.preferred_language if order.user else None
-        if customer_to:
-            background_tasks.add_task(
-                email_service.send_order_confirmation,
-                customer_to,
-                order,
-                order.items,
-                customer_lang,
-            )
-        owner = await auth_service.get_owner_user(session)
-        admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
-        if admin_to:
-            background_tasks.add_task(
-                email_service.send_new_order_notification,
-                admin_to,
-                order,
-                customer_to,
-                owner.preferred_language if owner else None,
-            )
-        if order.user and order.user.id:
-            await notification_service.create_notification(
-                session,
-                user_id=order.user.id,
-                type="order",
-                title="Payment received"
-                if (order.user.preferred_language or "en") != "ro"
-                else "Plată confirmată",
-                body=f"Reference {order.reference_code}" if order.reference_code else None,
-                url=_account_orders_url(order),
-            )
+        await _queue_payment_capture_notifications(
+            session,
+            background_tasks,
+            order,
+            include_receipt_share_days=False,
+        )
 
     return StripeConfirmResponse(order_id=order.id, reference_code=order.reference_code, status=order.status)
 
@@ -1145,119 +1292,28 @@ async def confirm_netopia_payment(
     session: AsyncSession = Depends(get_session),
     current_user=Depends(get_current_user_optional),
 ) -> NetopiaConfirmResponse:
-    order = (
-        (
-            await session.execute(
-                select(Order)
-                .options(
-                    selectinload(Order.user),
-                    selectinload(Order.items).selectinload(OrderItem.product),
-                    selectinload(Order.events),
-                    selectinload(Order.shipping_address),
-                    selectinload(Order.billing_address),
-                )
-                .where(Order.id == payload.order_id)
-            )
-        )
-        .scalars()
-        .first()
-    )
-    if not order:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    order = await _get_order_by_id_for_confirmation(session, payload.order_id)
     if (order.payment_method or "").strip().lower() != "netopia":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order is not a Netopia order")
+    _assert_confirmation_access(order, current_user, payload.order_id)
 
-    # Keep confirmation bound to the same user for signed-in checkouts.
-    if order.user_id:
-        if current_user and order.user_id == getattr(current_user, "id", None):
-            pass
-        elif payload.order_id and order.id == payload.order_id:
-            # Allow guest checkout return flows (including "create account" during guest checkout).
-            pass
-        else:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
-
-    if payload.ntp_id and order.netopia_ntp_id and payload.ntp_id != order.netopia_ntp_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Transaction mismatch")
-
-    ntp_id = (order.netopia_ntp_id or "").strip()
-    if not ntp_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing Netopia transaction id")
-
-    already_captured = any(getattr(evt, "event", None) == "payment_captured" for evt in (order.events or []))
-    if already_captured:
+    ntp_id = _netopia_confirmation_transaction_id(order, payload.ntp_id)
+    if _order_has_payment_captured(order):
         return NetopiaConfirmResponse(order_id=order.id, reference_code=order.reference_code, status=order.status)
 
     status_data = await netopia_service.get_status(ntp_id=ntp_id, order_id=str(order.id))
-    payment = status_data.get("payment") if isinstance(status_data, dict) else None
-    payment_status_raw = payment.get("status") if isinstance(payment, dict) else None
-    try:
-        payment_status = int(payment_status_raw) if payment_status_raw is not None else None
-    except Exception:
-        payment_status = None
-
-    paid_statuses = {3, 5}  # STATUS_PAID / STATUS_CONFIRMED
-    if payment_status not in paid_statuses:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment not completed")
-
-    error = status_data.get("error") if isinstance(status_data, dict) else None
-    error_code = str(error.get("code") or "").strip() if isinstance(error, dict) else ""
-    error_message = str(error.get("message") or "").strip() if isinstance(error, dict) else ""
-    success_codes = {"00", "0", "approved"}
-    if error_code and error_code.strip().lower() not in success_codes:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error_message or f"Payment not completed (Netopia {error_code})",
-        )
+    _assert_netopia_status_completed(status_data if isinstance(status_data, dict) else {})
+    _assert_netopia_error_success(status_data if isinstance(status_data, dict) else {})
 
     note = f"Netopia {ntp_id}".strip()
-    session.add(OrderEvent(order_id=order.id, event="payment_captured", note=note))
-    captured_added = True
-    await promo_usage.record_promo_usage(session, order=order, note=note)
-
-    if order.status == OrderStatus.pending_payment:
-        order.status = OrderStatus.pending_acceptance
-        session.add(OrderEvent(order_id=order.id, event="status_change", note="pending_payment -> pending_acceptance"))
-
-    session.add(order)
-    await session.commit()
-    await session.refresh(order)
-    await coupons_service.redeem_coupon_for_order(session, order=order, note=f"Netopia {ntp_id}".strip())
-
-    if captured_added:
-        checkout_settings = await checkout_settings_service.get_checkout_settings(session)
-        customer_to = (order.user.email if order.user and order.user.email else None) or getattr(order, "customer_email", None)
-        customer_lang = order.user.preferred_language if order.user else None
-        if customer_to:
-            background_tasks.add_task(
-                email_service.send_order_confirmation,
-                customer_to,
-                order,
-                order.items,
-                customer_lang,
-                receipt_share_days=checkout_settings.receipt_share_days,
-            )
-        owner = await auth_service.get_owner_user(session)
-        admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
-        if admin_to:
-            background_tasks.add_task(
-                email_service.send_new_order_notification,
-                admin_to,
-                order,
-                customer_to,
-                owner.preferred_language if owner else None,
-            )
-        if order.user and order.user.id:
-            await notification_service.create_notification(
-                session,
-                user_id=order.user.id,
-                type="order",
-                title="Payment received"
-                if (order.user.preferred_language or "en") != "ro"
-                else "Plată confirmată",
-                body=f"Reference {order.reference_code}" if order.reference_code else None,
-                url=_account_orders_url(order),
-            )
+    await _finalize_order_after_payment_capture(session, order, note=note, add_capture_event=True)
+    await coupons_service.redeem_coupon_for_order(session, order=order, note=note)
+    await _queue_payment_capture_notifications(
+        session,
+        background_tasks,
+        order,
+        include_receipt_share_days=True,
+    )
 
     return NetopiaConfirmResponse(order_id=order.id, reference_code=order.reference_code, status=order.status)
 
@@ -2214,6 +2270,171 @@ async def guest_checkout(
     )
 
 
+async def _resolve_shipping_method_for_order_update(session: AsyncSession, payload: OrderUpdate):
+    if not payload.shipping_method_id:
+        return None
+    shipping_method = await order_service.get_shipping_method(session, payload.shipping_method_id)
+    if not shipping_method:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping method not found")
+    return shipping_method
+
+
+async def _release_coupon_for_status_change(session: AsyncSession, order: Order, payload: OrderUpdate) -> None:
+    if order.status == OrderStatus.cancelled:
+        await coupons_service.release_coupon_for_order(session, order=order, reason=(payload.cancel_reason or "cancelled")[:255])
+    elif order.status == OrderStatus.refunded:
+        await coupons_service.release_coupon_for_order(session, order=order, reason="refunded")
+
+
+def _cancelled_order_refund_method(order: Order) -> str | None:
+    payment_method = (order.payment_method or "").strip().lower()
+    if payment_method == "paypal":
+        if order.paypal_capture_id:
+            return payment_method
+        return None
+    if payment_method == "stripe":
+        if order.stripe_payment_intent_id and _order_has_payment_captured(order):
+            return payment_method
+    return None
+
+
+def _owner_prefers_romanian(owner: User) -> bool:
+    return (owner.preferred_language or "en") == "ro"
+
+
+def _manual_refund_notification_title(owner: User) -> str:
+    if _owner_prefers_romanian(owner):
+        return "Rambursare necesară"
+    return "Refund required"
+
+
+def _manual_refund_notification_body(order: Order, *, payment_method: str, owner: User) -> str:
+    if _owner_prefers_romanian(owner):
+        return f"Comanda {order.reference_code or order.id} a fost anulată și necesită o rambursare manuală ({payment_method})."
+    return f"Order {order.reference_code or order.id} was cancelled and needs a manual refund ({payment_method})."
+
+
+async def _notify_owner_manual_refund_required(session: AsyncSession, order: Order) -> None:
+    if order.status != OrderStatus.cancelled:
+        return
+    payment_method = _cancelled_order_refund_method(order)
+    if not payment_method:
+        return
+    owner = await auth_service.get_owner_user(session)
+    if not owner:
+        return
+    if not owner.id:
+        return
+    await notification_service.create_notification(
+        session,
+        user_id=owner.id,
+        type="admin",
+        title=_manual_refund_notification_title(owner),
+        body=_manual_refund_notification_body(order, payment_method=payment_method, owner=owner),
+        url=f"/admin/orders/{order.id}",
+    )
+
+
+def _order_customer_contact(order: Order) -> tuple[str | None, str | None]:
+    customer_email = (order.user.email if order.user and order.user.email else None) or getattr(order, "customer_email", None)
+    customer_lang = order.user.preferred_language if order.user else None
+    return customer_email, customer_lang
+
+
+async def _queue_first_order_reward_email(
+    session: AsyncSession,
+    background_tasks: BackgroundTasks,
+    order: Order,
+    *,
+    customer_lang: str | None,
+) -> None:
+    if not (order.user and order.user.email):
+        return
+    coupon = await coupons_service.issue_first_order_reward_if_eligible(
+        session,
+        user=order.user,
+        order=order,
+        validity_days=int(getattr(settings, "first_order_reward_coupon_validity_days", 30) or 30),
+    )
+    if coupon:
+        background_tasks.add_task(
+            email_service.send_coupon_assigned,
+            order.user.email,
+            coupon_code=coupon.code,
+            promotion_name="First order reward",
+            promotion_description="20% off your next order (one-time).",
+            ends_at=getattr(coupon, "ends_at", None),
+            lang=customer_lang,
+        )
+
+
+async def _queue_customer_status_email(
+    session: AsyncSession,
+    background_tasks: BackgroundTasks,
+    order: Order,
+) -> None:
+    customer_email, customer_lang = _order_customer_contact(order)
+    if not customer_email:
+        return
+    if order.status == OrderStatus.paid:
+        background_tasks.add_task(email_service.send_order_processing_update, customer_email, order, lang=customer_lang)
+    elif order.status == OrderStatus.shipped:
+        background_tasks.add_task(
+            email_service.send_shipping_update,
+            customer_email,
+            order,
+            order.tracking_number,
+            customer_lang,
+        )
+    elif order.status == OrderStatus.delivered:
+        background_tasks.add_task(email_service.send_delivery_confirmation, customer_email, order, customer_lang)
+        await _queue_first_order_reward_email(session, background_tasks, order, customer_lang=customer_lang)
+    elif order.status == OrderStatus.cancelled:
+        background_tasks.add_task(email_service.send_order_cancelled_update, customer_email, order, lang=customer_lang)
+    elif order.status == OrderStatus.refunded:
+        background_tasks.add_task(email_service.send_order_refunded_update, customer_email, order, lang=customer_lang)
+
+
+def _order_update_notification_title(order: Order) -> str:
+    language = (order.user.preferred_language if order.user else None) or "en"
+    titles = {
+        OrderStatus.paid: ("Order processing", "Comandă în procesare"),
+        OrderStatus.shipped: ("Order shipped", "Comandă expediată"),
+        OrderStatus.delivered: ("Order complete", "Comandă finalizată"),
+        OrderStatus.cancelled: ("Order cancelled", "Comandă anulată"),
+        OrderStatus.refunded: ("Order refunded", "Comandă rambursată"),
+    }
+    en_title, ro_title = titles.get(order.status, ("Order update", "Actualizare comandă"))
+    if language == "ro":
+        return ro_title
+    return en_title
+
+
+async def _notify_user_order_status_change(session: AsyncSession, order: Order) -> None:
+    if not (order.user and order.user.id):
+        return
+    await notification_service.create_notification(
+        session,
+        user_id=order.user.id,
+        type="order",
+        title=_order_update_notification_title(order),
+        body=f"Reference {order.reference_code}" if order.reference_code else None,
+        url=_account_orders_url(order),
+    )
+
+
+async def _handle_admin_order_status_change(
+    session: AsyncSession,
+    background_tasks: BackgroundTasks,
+    order: Order,
+    payload: OrderUpdate,
+) -> None:
+    await _release_coupon_for_status_change(session, order, payload)
+    await _notify_owner_manual_refund_required(session, order)
+    await _queue_customer_status_email(session, background_tasks, order)
+    await _notify_user_order_status_change(session, order)
+
+
 @router.patch("/admin/{order_id}", response_model=AdminOrderRead)
 async def admin_update_order(
     background_tasks: BackgroundTasks,
@@ -2230,124 +2451,10 @@ async def admin_update_order(
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
     previous_status = order.status
-    shipping_method = None
-    if payload.shipping_method_id:
-        shipping_method = await order_service.get_shipping_method(session, payload.shipping_method_id)
-        if not shipping_method:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping method not found")
+    shipping_method = await _resolve_shipping_method_for_order_update(session, payload)
     updated = await order_service.update_order(session, order, payload, shipping_method=shipping_method)
     if previous_status != updated.status:
-        if updated.status == OrderStatus.cancelled:
-            await coupons_service.release_coupon_for_order(
-                session, order=updated, reason=(payload.cancel_reason or "cancelled")[:255]
-            )
-        elif updated.status == OrderStatus.refunded:
-            await coupons_service.release_coupon_for_order(session, order=updated, reason="refunded")
-
-        if updated.status == OrderStatus.cancelled:
-            payment_method = (updated.payment_method or "").strip().lower()
-            refund_needed = False
-            if payment_method == "paypal" and updated.paypal_capture_id:
-                refund_needed = True
-            if payment_method == "stripe" and updated.stripe_payment_intent_id:
-                refund_needed = any(evt.event == "payment_captured" for evt in updated.events or [])
-            if refund_needed:
-                owner = await auth_service.get_owner_user(session)
-                if owner and owner.id:
-                    await notification_service.create_notification(
-                        session,
-                        user_id=owner.id,
-                        type="admin",
-                        title="Refund required"
-                        if (owner.preferred_language or "en") != "ro"
-                        else "Rambursare necesară",
-                        body=(
-                            f"Order {updated.reference_code or updated.id} was cancelled and needs a manual refund ({payment_method})."
-                            if (owner.preferred_language or "en") != "ro"
-                            else f"Comanda {updated.reference_code or updated.id} a fost anulată și necesită o rambursare manuală ({payment_method})."
-                        ),
-                        url=f"/admin/orders/{updated.id}",
-                    )
-        customer_email = (updated.user.email if updated.user and updated.user.email else None) or getattr(
-            updated, "customer_email", None
-        )
-        customer_lang = updated.user.preferred_language if updated.user else None
-        if customer_email:
-            if updated.status == OrderStatus.paid:
-                background_tasks.add_task(
-                    email_service.send_order_processing_update,
-                    customer_email,
-                    updated,
-                    lang=customer_lang,
-                )
-            elif updated.status == OrderStatus.shipped:
-                background_tasks.add_task(
-                    email_service.send_shipping_update,
-                    customer_email,
-                    updated,
-                    updated.tracking_number,
-                    customer_lang,
-                )
-            elif updated.status == OrderStatus.delivered:
-                background_tasks.add_task(
-                    email_service.send_delivery_confirmation,
-                    customer_email,
-                    updated,
-                    customer_lang,
-                )
-                if updated.user and updated.user.email:
-                    coupon = await coupons_service.issue_first_order_reward_if_eligible(
-                        session,
-                        user=updated.user,
-                        order=updated,
-                        validity_days=int(getattr(settings, "first_order_reward_coupon_validity_days", 30) or 30),
-                    )
-                    if coupon:
-                        background_tasks.add_task(
-                            email_service.send_coupon_assigned,
-                            updated.user.email,
-                            coupon_code=coupon.code,
-                            promotion_name="First order reward",
-                            promotion_description="20% off your next order (one-time).",
-                            ends_at=getattr(coupon, "ends_at", None),
-                            lang=customer_lang,
-                        )
-            elif updated.status == OrderStatus.cancelled:
-                background_tasks.add_task(
-                    email_service.send_order_cancelled_update,
-                    customer_email,
-                    updated,
-                    lang=customer_lang,
-                )
-            elif updated.status == OrderStatus.refunded:
-                background_tasks.add_task(
-                    email_service.send_order_refunded_update,
-                    customer_email,
-                    updated,
-                    lang=customer_lang,
-                )
-
-        if updated.user and updated.user.id:
-            if updated.status == OrderStatus.paid:
-                title = "Order processing" if (updated.user.preferred_language or "en") != "ro" else "Comandă în procesare"
-            elif updated.status == OrderStatus.shipped:
-                title = "Order shipped" if (updated.user.preferred_language or "en") != "ro" else "Comandă expediată"
-            elif updated.status == OrderStatus.delivered:
-                title = "Order complete" if (updated.user.preferred_language or "en") != "ro" else "Comandă finalizată"
-            elif updated.status == OrderStatus.cancelled:
-                title = "Order cancelled" if (updated.user.preferred_language or "en") != "ro" else "Comandă anulată"
-            elif updated.status == OrderStatus.refunded:
-                title = "Order refunded" if (updated.user.preferred_language or "en") != "ro" else "Comandă rambursată"
-            else:
-                title = "Order update" if (updated.user.preferred_language or "en") != "ro" else "Actualizare comandă"
-            await notification_service.create_notification(
-                session,
-                user_id=updated.user.id,
-                type="order",
-                title=title,
-                body=f"Reference {updated.reference_code}" if updated.reference_code else None,
-                url=_account_orders_url(updated),
-            )
+        await _handle_admin_order_status_change(session, background_tasks, updated, payload)
     full = await order_service.get_order_by_id_admin(session, order_id)
     if not full:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
