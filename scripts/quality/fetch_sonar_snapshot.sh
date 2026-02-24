@@ -6,7 +6,7 @@ SONAR_HOST="${SONAR_HOST:-https://sonarcloud.io}"
 SONAR_PROJECT_KEY="${SONAR_PROJECT_KEY:-Prekzursil_AdrianaArt}"
 OUT_DIR="${1:-docs/reports/scanner-baselines/latest}"
 
-if [ -z "$SONAR_TOKEN" ]; then
+if [[ -z "$SONAR_TOKEN" ]]; then
   echo "SONAR_TOKEN is required" >&2
   exit 1
 fi

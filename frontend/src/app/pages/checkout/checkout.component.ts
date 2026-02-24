@@ -1208,17 +1208,21 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     return best;
   }
 
-	  private couponShippingDiscount(): number {
-	    const offer = this.appliedCouponOffer;
-    if (!offer?.eligible) return 0;
-	    const currentCode = (this.promo || '').trim().toUpperCase();
-	    if (!currentCode || offer.coupon.code.toUpperCase() !== currentCode) return 0;
-	    return parseMoney(offer.estimated_shipping_discount_ron);
-	  }
+  private couponShippingDiscount(): number {
+    const offer = this.appliedCouponOffer;
+    if (!offer?.eligible) {
+      return 0;
+    }
+    const currentCode = (this.promo || '').trim().toUpperCase();
+    if (!currentCode || offer.coupon.code.toUpperCase() !== currentCode) {
+      return 0;
+    }
+    return parseMoney(offer.estimated_shipping_discount_ron);
+  }
 
-	  private couponOfferSavings(offer: CouponOffer): number {
-	    return parseMoney(offer.estimated_discount_ron) + parseMoney(offer.estimated_shipping_discount_ron);
-	  }
+  private couponOfferSavings(offer: CouponOffer): number {
+    return parseMoney(offer.estimated_discount_ron) + parseMoney(offer.estimated_shipping_discount_ron);
+  }
 
   private buildSuccessSummary(orderId: string, referenceCode: string | null, paymentMethod: CheckoutPaymentMethod): CheckoutSuccessSummary {
     const quote = this.quote ?? { subtotal: this.subtotal(), fee: 0, tax: 0, shipping: 0, total: this.subtotal(), currency: this.currency };

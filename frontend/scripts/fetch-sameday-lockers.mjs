@@ -110,8 +110,7 @@ async function run() {
         captured = payload;
         sourceUrl = url;
       }
-    } catch (error) {
-      void error;
+    } catch {
       // Ignore and continue listening for the next response.
     }
   };
@@ -146,8 +145,7 @@ async function run() {
             credentials: 'include',
             headers: { accept: 'application/json,text/plain,*/*' },
           });
-        } catch (error) {
-          void error;
+        } catch {
           // Keep trying the next URL.
         }
       }

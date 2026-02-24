@@ -11987,7 +11987,7 @@ export class AdminComponent implements OnInit, OnDestroy {
         const enBlock = (enRes && typeof enRes === 'object' && 'body_markdown' in enRes) ? (enRes) : null;
         const roBlock = (roRes && typeof roRes === 'object' && 'body_markdown' in roRes) ? (roRes) : null;
 
-        if (!enBlock && enRes && (enRes)?.status && (enRes)?.status !== 404) {
+        if (!enBlock && enRes?.status && enRes.status !== 404) {
           this.legalPageError = this.t('adminUi.site.pages.errors.load');
         }
 
@@ -15547,4 +15547,3 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 }
-

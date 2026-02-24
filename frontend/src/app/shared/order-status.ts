@@ -1,6 +1,4 @@
-export type OrderStatusValue = string;
-
-export function orderStatusChipClass(status: OrderStatusValue): string {
+export function orderStatusChipClass(status: string): string {
   const styles: Record<string, string> = {
     pending: 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-100',
     pending_payment: 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-100',

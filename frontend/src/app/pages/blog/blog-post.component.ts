@@ -1417,7 +1417,9 @@ export class BlogPostComponent implements OnInit, OnDestroy {
             .filter((item) => item.slug !== post.slug)
             .map((item) => {
               let score = 0;
-      if (series && item.series?.toLowerCase() === series) score += 10;
+              if (series && item.series?.toLowerCase() === series) {
+                score += 10;
+              }
               const sharedTags = (item.tags || []).reduce((acc, t) => acc + (tagSet.has(t.toLowerCase()) ? 1 : 0), 0);
               score += sharedTags;
               return { item, score };

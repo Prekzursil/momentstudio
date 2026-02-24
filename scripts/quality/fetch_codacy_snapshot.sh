@@ -8,7 +8,7 @@ CODACY_REPO="${CODACY_REPO:-AdrianaArt}"
 CODACY_HOST="${CODACY_HOST:-https://app.codacy.com}"
 OUT_DIR="${1:-docs/reports/scanner-baselines/latest}"
 
-if [ -z "$CODACY_API_TOKEN" ]; then
+if [[ -z "$CODACY_API_TOKEN" ]]; then
   echo "CODACY_API_TOKEN is required" >&2
   exit 1
 fi
@@ -22,7 +22,7 @@ base_url="$CODACY_HOST/api/v3/analysis/organizations/$CODACY_PROVIDER/$CODACY_OR
 rm -f "$issues_jsonl"
 cursor=''
 for i in $(seq 1 30); do
-  if [ -n "$cursor" ]; then
+  if [[ -n "$cursor" ]]; then
     url="$base_url&cursor=$cursor"
   else
     url="$base_url"
@@ -35,7 +35,7 @@ for i in $(seq 1 30); do
 
   next_cursor=$(jq -r '.pagination.cursor // empty' "$page_file")
   page_count=$(jq '.data | length' "$page_file")
-  if [ -z "$next_cursor" ] || [ "$page_count" -eq 0 ]; then
+  if [[ -z "$next_cursor" ]] || [[ "$page_count" -eq 0 ]]; then
     break
   fi
   cursor="$next_cursor"
