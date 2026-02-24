@@ -3,9 +3,12 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { createRequire } from "node:module";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const require = createRequire(new URL("../../frontend/package.json", import.meta.url));
+const scriptPath = fileURLToPath(import.meta.url);
+const scriptDir = path.dirname(scriptPath);
+const repoRoot = path.resolve(scriptDir, "..", "..");
 
 function parseArgs(argv) {
   const out = {};
@@ -33,6 +36,32 @@ function parseArgs(argv) {
     out[key] = value;
   }
   return out;
+}
+
+function isPathWithinRoot(rootPath, candidatePath) {
+  const root = path.resolve(rootPath);
+  const candidate = path.resolve(candidatePath);
+  const relative = path.relative(root, candidate);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
+function resolvePathWithinRoot(rootPath, ...segments) {
+  const root = path.resolve(rootPath);
+  const candidate = path.resolve(root, ...segments);
+  if (!isPathWithinRoot(root, candidate)) {
+    throw new Error(`Refusing path outside root "${root}": ${candidate}`);
+  }
+  return candidate;
+}
+
+function resolvePathInAllowedRoots(rawPath, allowedRoots, label) {
+  const token = rawPath instanceof URL ? fileURLToPath(rawPath) : String(rawPath || "");
+  const candidate = path.resolve(token);
+  const normalizedRoots = allowedRoots.map((root) => path.resolve(root));
+  if (!normalizedRoots.some((root) => isPathWithinRoot(root, candidate))) {
+    throw new Error(`${label} must be within allowed roots (${normalizedRoots.join(", ")}): ${candidate}`);
+  }
+  return candidate;
 }
 
 function normalizeUrl(raw) {
@@ -173,9 +202,11 @@ function materializeRoute(routeTemplate, routeSamples) {
   };
 }
 
-async function loadRouteSamples(routeSamplesPath) {
+async function loadRouteSamples(routeSamplesPath, allowedRoots) {
   const fallbackPath = new URL("./fixtures/route-samples.json", import.meta.url);
-  const target = routeSamplesPath ? path.resolve(routeSamplesPath) : fallbackPath;
+  const target = routeSamplesPath
+    ? resolvePathInAllowedRoots(routeSamplesPath, allowedRoots, "--route-samples")
+    : resolvePathInAllowedRoots(fallbackPath, allowedRoots, "route samples");
   try {
     const payload = JSON.parse(await fs.readFile(target, "utf-8"));
     if (!payload || typeof payload !== "object") {
@@ -410,12 +441,19 @@ async function main() {
     throw new Error("Required args: --base-url --routes-json --output-dir");
   }
 
-  const routesPayload = JSON.parse(await fs.readFile(routesJsonPath, "utf-8"));
-  const routes = Array.isArray(routesPayload?.routes) ? routesPayload.routes.slice(0, maxRoutes) : [];
-  let routeSamples = await loadRouteSamples(routeSamplesPath);
+  const allowedRoots = Array.from(new Set([repoRoot, path.resolve(process.cwd())]));
+  const routesJsonAbsPath = resolvePathInAllowedRoots(routesJsonPath, allowedRoots, "--routes-json");
+  const outputDirAbsPath = resolvePathInAllowedRoots(outputDir, allowedRoots, "--output-dir");
+  const routeSamplesAbsPath = routeSamplesPath
+    ? resolvePathInAllowedRoots(routeSamplesPath, allowedRoots, "--route-samples")
+    : "";
 
-  await fs.mkdir(outputDir, { recursive: true });
-  const screenshotDir = path.join(outputDir, "screenshots");
+  const routesPayload = JSON.parse(await fs.readFile(routesJsonAbsPath, "utf-8"));
+  const routes = Array.isArray(routesPayload?.routes) ? routesPayload.routes.slice(0, maxRoutes) : [];
+  let routeSamples = await loadRouteSamples(routeSamplesAbsPath, allowedRoots);
+
+  await fs.mkdir(outputDirAbsPath, { recursive: true });
+  const screenshotDir = resolvePathWithinRoot(outputDirAbsPath, "screenshots");
   await fs.mkdir(screenshotDir, { recursive: true });
 
   const { chromium } = require("@playwright/test");
@@ -453,7 +491,7 @@ async function main() {
     const url = `${baseUrl}${resolvedPath}`;
     const slug = routeSlug(resolvedPath || routeTemplate);
     const screenshotPath = path.join("screenshots", `${slug}.png`);
-    const screenshotAbsPath = path.join(outputDir, screenshotPath);
+    const screenshotAbsPath = resolvePathWithinRoot(outputDirAbsPath, screenshotPath);
     const routeConsole = [];
     const routePageErrors = [];
     const routeResourceFailures = [];
@@ -856,12 +894,12 @@ async function main() {
 
   await browser.close();
 
-  await fs.writeFile(path.join(outputDir, "seo-snapshot.json"), `${JSON.stringify(seoSnapshot, null, 2)}\n`, "utf-8");
-  await fs.writeFile(path.join(outputDir, "console-errors.json"), `${JSON.stringify(consoleErrors, null, 2)}\n`, "utf-8");
-  await fs.writeFile(path.join(outputDir, "layout-signals.json"), `${JSON.stringify(layoutSignals, null, 2)}\n`, "utf-8");
-  await fs.writeFile(path.join(outputDir, "visibility-signals.json"), `${JSON.stringify(visibilitySignals, null, 2)}\n`, "utf-8");
+  await fs.writeFile(resolvePathWithinRoot(outputDirAbsPath, "seo-snapshot.json"), `${JSON.stringify(seoSnapshot, null, 2)}\n`, "utf-8");
+  await fs.writeFile(resolvePathWithinRoot(outputDirAbsPath, "console-errors.json"), `${JSON.stringify(consoleErrors, null, 2)}\n`, "utf-8");
+  await fs.writeFile(resolvePathWithinRoot(outputDirAbsPath, "layout-signals.json"), `${JSON.stringify(layoutSignals, null, 2)}\n`, "utf-8");
+  await fs.writeFile(resolvePathWithinRoot(outputDirAbsPath, "visibility-signals.json"), `${JSON.stringify(visibilitySignals, null, 2)}\n`, "utf-8");
   await fs.writeFile(
-    path.join(outputDir, "browser-evidence-meta.json"),
+    resolvePathWithinRoot(outputDirAbsPath, "browser-evidence-meta.json"),
     `${JSON.stringify(
       {
         auth_mode: authMode,

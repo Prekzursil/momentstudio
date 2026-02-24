@@ -16,11 +16,13 @@ on:
 
 permissions:
   contents: read
-  issues: write
 
 jobs:
   audit-agent-watchdog:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
     outputs:
       scanned: ${{ steps.watchdog.outputs.scanned }}
       stale: ${{ steps.watchdog.outputs.stale }}

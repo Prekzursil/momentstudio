@@ -25,6 +25,8 @@ jobs:
     if: (github.event_name == 'pull_request' && vars.PERCY_PR_ENABLED == '1') || (github.event_name == 'workflow_dispatch' && (github.event.inputs.scope == 'core' || github.event.inputs.scope == 'both' || github.event.inputs.scope == ''))
     runs-on: ubuntu-latest
     continue-on-error: true
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
@@ -183,6 +185,8 @@ jobs:
     if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.scope == 'full' || github.event.inputs.scope == 'both'))
     runs-on: ubuntu-latest
     continue-on-error: true
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 

@@ -73,10 +73,26 @@ cd infra && docker compose up --build
 After first boot / after a DB reset, seed data and bootstrap the owner:
 
 ```bash
-docker compose -f infra/docker-compose.yml exec -T backend python -m app.seeds
+docker compose -f infra/docker-compose.yml exec -T backend python -m app.seeds --profile default
 docker compose -f infra/docker-compose.yml exec -T backend python -m app.cli bootstrap-owner \
   --email owner@example.com --password Password123 --username owner --display-name Owner
 ```
+
+
+Seed profiles:
+
+```bash
+# explicit profile via seeds module
+python -m app.seeds --profile default
+python -m app.seeds --profile adrianaart
+
+# same behavior via CLI command
+python -m app.cli seed-data --profile default
+```
+
+To add tenant-specific bootstrap content without editing migration history, add a new folder under
+`backend/app/seed_profiles/<your-profile>/` with `catalog.json`, `content_blocks.json`, and any
+referenced markdown assets (for example under `legal/`), then run seeding with `--profile <your-profile>`.
 
 ## Configuration
 

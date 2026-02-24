@@ -2459,7 +2459,7 @@ export class AdminOrdersComponent implements OnInit {
       next: (tags) => {
         const merged = new Set<string>(['vip', 'fraud_risk', 'fraud_approved', 'fraud_denied', 'gift', 'test']);
         for (const t of tags) merged.add(t);
-        this.tagOptions.set(Array.from(merged).sort());
+        this.tagOptions.set(Array.from(merged).sort((a, b) => a.localeCompare(b, 'en')));
       },
       error: () => {
         // ignore

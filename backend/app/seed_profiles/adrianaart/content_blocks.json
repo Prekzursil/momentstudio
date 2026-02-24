@@ -1,0 +1,91 @@
+{
+  "content_blocks": [
+    {
+      "key": "site.company",
+      "title": "Company information",
+      "body_markdown": "Company identification details (used in footer).",
+      "status": "published",
+      "meta": {
+        "version": 1,
+        "company": {
+          "name": "",
+          "registration_number": "",
+          "cui": "",
+          "address": "",
+          "phone": "",
+          "email": ""
+        }
+      }
+    },
+    {
+      "key": "site.navigation",
+      "title": "Site navigation",
+      "body_markdown": "Navigation links for header/footer.",
+      "status": "published",
+      "meta": {"version": 1, "header_links": [], "footer_handcrafted_links": [], "footer_legal_links": []}
+    },
+    {
+      "key": "site.header-banners",
+      "title": "Header banners",
+      "body_markdown": "Optional header banner blocks.",
+      "status": "published",
+      "meta": {"blocks": []}
+    },
+    {
+      "key": "site.announcement",
+      "title": "Announcement bar",
+      "body_markdown": "Optional announcement bar blocks.",
+      "status": "published",
+      "meta": {"blocks": []}
+    },
+    {
+      "key": "site.footer-promo",
+      "title": "Footer promo",
+      "body_markdown": "Optional footer promo blocks.",
+      "status": "published",
+      "meta": {"blocks": []}
+    },
+    {
+      "key": "site.reports",
+      "title": "Reports settings",
+      "body_markdown": "Reports settings used by admin.",
+      "status": "draft",
+      "meta": {}
+    },
+    {"key": "seo.home", "title": "SEO · home", "body_markdown": "SEO settings.", "status": "draft", "meta": {}},
+    {"key": "seo.shop", "title": "SEO · shop", "body_markdown": "SEO settings.", "status": "draft", "meta": {}},
+    {"key": "seo.product", "title": "SEO · product", "body_markdown": "SEO settings.", "status": "draft", "meta": {}},
+    {"key": "seo.category", "title": "SEO · category", "body_markdown": "SEO settings.", "status": "draft", "meta": {}},
+    {"key": "seo.about", "title": "SEO · about", "body_markdown": "SEO settings.", "status": "draft", "meta": {}},
+    {
+      "key": "page.terms-and-conditions",
+      "title": "Terms & Conditions",
+      "body_markdown_file": "legal/terms.en.md",
+      "status": "published",
+      "lang": "en",
+      "translations": [
+        {"lang": "ro", "title": "Termeni și condiții", "body_markdown_file": "legal/terms.ro.md"}
+      ]
+    },
+    {
+      "key": "page.privacy-policy",
+      "title": "Privacy Policy",
+      "body_markdown_file": "legal/privacy.en.md",
+      "status": "published",
+      "lang": "en",
+      "translations": [
+        {"lang": "ro", "title": "Politica de confidențialitate", "body_markdown_file": "legal/privacy.ro.md"}
+      ]
+    },
+    {
+      "key": "page.anpc",
+      "title": "ANPC / Consumer information",
+      "body_markdown_file": "legal/anpc.en.md",
+      "status": "published",
+      "lang": "en",
+      "translations": [
+        {"lang": "ro", "title": "ANPC / Informații pentru consumatori", "body_markdown_file": "legal/anpc.ro.md"}
+      ]
+    }
+  ]
+}

@@ -69,7 +69,7 @@ def upgrade() -> None:
         .mappings()
         .first()
     )
-    if not row:
+    if row is None:
         return
 
     meta = _as_dict(row["meta"])
@@ -117,4 +117,3 @@ def upgrade() -> None:
 def downgrade() -> None:
     # Intentionally no-op: removing thumbnails would overwrite user edits.
     return
-
