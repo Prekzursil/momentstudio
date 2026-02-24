@@ -11795,13 +11795,11 @@ export class AdminComponent implements OnInit, OnDestroy {
   loadInfo(): void {
     const loadKey = async (key: string, target: 'about' | 'faq' | 'shipping' | 'contact'): Promise<void> => {
       const next: LocalizedText = { ...this.infoForm[target] };
-      let meta: Record<string, unknown> | null | undefined;
 
       try {
         const enBlock = await firstValueFrom(this.admin.getContent(key, 'en'));
         this.rememberContentVersion(key, enBlock);
         next.en = enBlock.body_markdown || '';
-        meta = enBlock.meta;
         this.infoForm[target] = { ...this.infoForm[target], en: next.en };
       } catch {
         delete this.contentVersions[key];
@@ -11810,7 +11808,6 @@ export class AdminComponent implements OnInit, OnDestroy {
       try {
         const roBlock = await firstValueFrom(this.admin.getContent(key, 'ro'));
         next.ro = roBlock.body_markdown || '';
-        meta ??= roBlock.meta;
         this.infoForm[target] = { ...this.infoForm[target], ro: next.ro };
       } catch {
         // ignore
