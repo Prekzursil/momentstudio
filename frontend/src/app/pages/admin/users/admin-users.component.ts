@@ -1224,7 +1224,7 @@ export class AdminUsersComponent implements OnInit {
   savedViews(): AdminFavoriteItem[] {
     return this.favorites
       .items()
-      .filter((item) => item?.type === 'filter' && (item?.state)?.adminFilterScope === 'users');
+      .filter((item) => item?.type === 'filter' && (item?.state)?.['adminFilterScope'] === 'users');
   }
 
   applySavedView(key: string): void {
@@ -1944,4 +1944,3 @@ export class AdminUsersComponent implements OnInit {
     });
   }
 }
-

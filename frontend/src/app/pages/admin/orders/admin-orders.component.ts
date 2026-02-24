@@ -1603,7 +1603,7 @@ export class AdminOrdersComponent implements OnInit {
   savedViews(): AdminFavoriteItem[] {
     return this.favorites
       .items()
-      .filter((item) => item?.type === 'filter' && (item?.state)?.adminFilterScope === 'orders');
+      .filter((item) => item?.type === 'filter' && (item?.state)?.['adminFilterScope'] === 'orders');
   }
 
   applySavedView(key: string): void {
@@ -2002,7 +2002,7 @@ export class AdminOrdersComponent implements OnInit {
             this.updateShippingLabelUpload(result.index, { status: 'success', error: null });
             continue;
           }
-          const requestId = extractRequestId((result).err);
+          const requestId = 'err' in result ? extractRequestId(result.err) : null;
           const suffix = requestId ? ` (${requestId})` : '';
           this.updateShippingLabelUpload(result.index, {
             status: 'error',
@@ -2636,7 +2636,7 @@ export class AdminOrdersComponent implements OnInit {
             }
             itemsByStatus[result.status] = [];
             totalsByStatus[result.status] = 0;
-            if (!firstError) firstError = (result).err;
+            if (!firstError && 'err' in result) firstError = result.err;
           }
 
           this.kanbanItemsByStatus.set(itemsByStatus);
@@ -2804,4 +2804,3 @@ export class AdminOrdersComponent implements OnInit {
     }
   }
 }
-

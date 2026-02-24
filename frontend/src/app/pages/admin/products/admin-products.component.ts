@@ -3666,7 +3666,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
   savedViews(): AdminFavoriteItem[] {
     return this.favorites
       .items()
-      .filter((item) => item?.type === 'filter' && (item?.state)?.adminFilterScope === 'products');
+      .filter((item) => item?.type === 'filter' && (item?.state)?.['adminFilterScope'] === 'products');
   }
 
   applySavedView(key: string): void {
@@ -6806,7 +6806,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       const after = this.parseAuditMoney(base?.after);
       if (before === null || after === null) continue;
       if (before === after) continue;
-      const user = (entry.user_email || entry.user_id || null) | null;
+      const user = String(entry.user_email || entry.user_id || '').trim() || null;
       out.push({ at: entry.created_at, before, after, user });
     }
     out.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());

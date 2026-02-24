@@ -333,15 +333,15 @@ export class LoginComponent {
           this.loading = false;
         })
       )
-	      .subscribe({
-	        next: (res) => {
-	          const anyRes = res;
-	          if (anyRes?.requires_two_factor && anyRes?.two_factor_token) {
-            this.twoFactorToken = anyRes.two_factor_token;
-            this.twoFactorUserEmail = anyRes?.user?.email || null;
-            this.twoFactorCode = '';
-            if (typeof sessionStorage !== 'undefined') {
-              sessionStorage.setItem('two_factor_token', anyRes.two_factor_token);
+		      .subscribe({
+		        next: (res) => {
+		          const anyRes = res;
+		          if ('requires_two_factor' in anyRes && anyRes.requires_two_factor && 'two_factor_token' in anyRes && anyRes.two_factor_token) {
+	            this.twoFactorToken = anyRes.two_factor_token;
+	            this.twoFactorUserEmail = anyRes?.user?.email || null;
+	            this.twoFactorCode = '';
+	            if (typeof sessionStorage !== 'undefined') {
+	              sessionStorage.setItem('two_factor_token', anyRes.two_factor_token);
               sessionStorage.setItem('two_factor_user', JSON.stringify(anyRes.user ?? null));
               sessionStorage.setItem('two_factor_remember', JSON.stringify(this.keepSignedIn));
             }
@@ -370,4 +370,3 @@ export class LoginComponent {
 	      });
 	  }
 }
-
