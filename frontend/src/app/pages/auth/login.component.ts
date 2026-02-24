@@ -335,23 +335,32 @@ export class LoginComponent {
       )
 		      .subscribe({
 		        next: (res) => {
-		          const anyRes = res;
-		          if ('requires_two_factor' in anyRes && anyRes.requires_two_factor && 'two_factor_token' in anyRes && anyRes.two_factor_token) {
-	            this.twoFactorToken = anyRes.two_factor_token;
-	            this.twoFactorUserEmail = anyRes?.user?.email || null;
-	            this.twoFactorCode = '';
-	            if (typeof sessionStorage !== 'undefined') {
-	              sessionStorage.setItem('two_factor_token', anyRes.two_factor_token);
-              sessionStorage.setItem('two_factor_user', JSON.stringify(anyRes.user ?? null));
-              sessionStorage.setItem('two_factor_remember', JSON.stringify(this.keepSignedIn));
-            }
-	            this.toast.info(this.translate.instant('auth.twoFactorRequired'));
-	            return;
-	          }
-	          this.error = '';
-	          this.toast.success(this.translate.instant('auth.successLogin'), anyRes?.user?.email);
-	          this.navigateAfterLogin();
-	        },
+		          const anyRes = (res && typeof res === 'object')
+		            ? (res as {
+		                requires_two_factor?: boolean;
+		                two_factor_token?: string;
+		                user?: {
+		                  email?: string | null;
+		                } | null;
+		              })
+		            : null;
+
+		          if (anyRes?.requires_two_factor && anyRes.two_factor_token) {
+		            this.twoFactorToken = anyRes.two_factor_token;
+		            this.twoFactorUserEmail = anyRes.user?.email || null;
+		            this.twoFactorCode = '';
+		            if (typeof sessionStorage !== 'undefined') {
+		              sessionStorage.setItem('two_factor_token', anyRes.two_factor_token);
+		              sessionStorage.setItem('two_factor_user', JSON.stringify(anyRes.user ?? null));
+		              sessionStorage.setItem('two_factor_remember', JSON.stringify(this.keepSignedIn));
+		            }
+		            this.toast.info(this.translate.instant('auth.twoFactorRequired'));
+		            return;
+		          }
+		          this.error = '';
+		          this.toast.success(this.translate.instant('auth.successLogin'), anyRes?.user?.email ?? undefined);
+		          this.navigateAfterLogin();
+		        },
 	        error: (err) => {
 	          this.resetCaptcha();
 	          if (err?.status === 401) {
