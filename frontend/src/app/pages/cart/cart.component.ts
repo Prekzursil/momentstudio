@@ -454,11 +454,20 @@ export class CartComponent implements OnInit {
     private readonly route: ActivatedRoute,
     private readonly analytics: AnalyticsService
   ) {
+    this.initializeDeliveryPrefs();
+    this.savedForLater = this.loadSavedForLater();
+    this.setupPromoRefreshEffect();
+    this.setupRecommendationsEffect();
+    this.setupCartViewTrackingEffect();
+  }
+
+  private initializeDeliveryPrefs(): void {
     const prefs = this.checkoutPrefs.loadDeliveryPrefs();
     this.courier = prefs.courier;
     this.deliveryType = prefs.deliveryType;
-    this.savedForLater = this.loadSavedForLater();
+  }
 
+  private setupPromoRefreshEffect(): void {
     effect(() => {
       if (this.cart.syncing()) return;
       if (!this.pendingPromoRefresh) return;
@@ -468,7 +477,9 @@ export class CartComponent implements OnInit {
       this.pendingPromoRefresh = false;
       this.refreshPromoQuote(code);
     });
+  }
 
+  private setupRecommendationsEffect(): void {
     effect(() => {
       const productIds = this.items()
         .map((i) => i.product_id)
@@ -486,7 +497,9 @@ export class CartComponent implements OnInit {
       this.recommendationsKey = productIds;
       this.loadRecommendations(new Set(productIds.split(',')));
     });
+  }
 
+  private setupCartViewTrackingEffect(): void {
     effect(() => {
       if (this.cartViewTracked) return;
       if (this.syncing()) return;

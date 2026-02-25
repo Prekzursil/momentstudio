@@ -79,25 +79,11 @@ describe('AboutComponent content + lifecycle', () => {
   });
 });
 
-function setupAboutSpec(): void {
-  aboutMeta = jasmine.createSpyObj<Meta>('Meta', ['updateTag']);
-  aboutTitle = jasmine.createSpyObj<Title>('Title', ['setTitle']);
-  aboutApi = jasmine.createSpyObj<ApiService>('ApiService', ['get']);
-  aboutSeoHeadLinks = jasmine.createSpyObj<SeoHeadLinksService>('SeoHeadLinksService', ['setLocalizedCanonical']);
-  aboutSeoHeadLinks.setLocalizedCanonical.and.returnValue('http://localhost:4200/about');
-  aboutApi.get.and.callFake(aboutPageCallFake);
-  const markdown = { render: (s: string) => s } as unknown as MarkdownService;
-  configureAboutTestingModule(aboutMeta, aboutTitle, aboutApi, aboutSeoHeadLinks, markdown);
-  aboutTranslate = TestBed.inject(TranslateService);
-  seedAboutTranslations(aboutTranslate);
-  aboutTranslate.use('en');
-}
-
 function configureAboutTestingModule(
-  meta: jasmine.SpyObj<Meta>,
-  title: jasmine.SpyObj<Title>,
-  api: jasmine.SpyObj<ApiService>,
-  seoHeadLinks: jasmine.SpyObj<SeoHeadLinksService>,
+  meta: Meta,
+  title: Title,
+  api: ApiService,
+  seoHeadLinks: SeoHeadLinksService,
   markdown: MarkdownService
 ): void {
   TestBed.configureTestingModule({
@@ -158,4 +144,19 @@ function aboutPageBlocksCallFake(path: string, params?: Record<string, unknown>)
     },
     images: []
   } as any);
+}
+
+function setupAboutSpec(): void {
+  aboutMeta = jasmine.createSpyObj<Meta>('Meta', ['updateTag']);
+  aboutTitle = jasmine.createSpyObj<Title>('Title', ['setTitle']);
+  aboutApi = jasmine.createSpyObj<ApiService>('ApiService', ['get']);
+  aboutSeoHeadLinks = jasmine.createSpyObj<SeoHeadLinksService>('SeoHeadLinksService', ['setLocalizedCanonical']);
+  aboutSeoHeadLinks.setLocalizedCanonical.and.returnValue('http://localhost:4200/about');
+  aboutApi.get.and.callFake(aboutPageCallFake);
+  const markdown = jasmine.createSpyObj('MarkdownService', ['render']) as jasmine.SpyObj<MarkdownService>;
+  markdown.render.and.callFake((s: string) => s);
+  configureAboutTestingModule(aboutMeta, aboutTitle, aboutApi, aboutSeoHeadLinks, markdown);
+  aboutTranslate = TestBed.inject(TranslateService);
+  seedAboutTranslations(aboutTranslate);
+  aboutTranslate.use('en');
 }

@@ -5,27 +5,23 @@ import { AdminOrdersService } from './admin-orders.service';
 let adminOrdersService: AdminOrdersService;
 let adminOrdersHttpMock: HttpTestingController;
 
-describe('AdminOrdersService', () => {
-  beforeEach(() => {
-    TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule],
-      providers: [AdminOrdersService]
-    });
-    adminOrdersService = TestBed.inject(AdminOrdersService);
-    adminOrdersHttpMock = TestBed.inject(HttpTestingController);
+function configureAdminOrdersServiceSpec(): void {
+  TestBed.configureTestingModule({
+    imports: [HttpClientTestingModule],
+    providers: [AdminOrdersService]
   });
+  adminOrdersService = TestBed.inject(AdminOrdersService);
+  adminOrdersHttpMock = TestBed.inject(HttpTestingController);
+}
 
-  afterEach(() => {
-    adminOrdersHttpMock.verify();
-  });
+function verifyAdminOrdersHttpMock(): void {
+  adminOrdersHttpMock.verify();
+}
 
-  defineSearchOrdersSpec();
-  defineGetOrderSpec();
-  defineUpdateOrderSpec();
-  defineDownloadOrderExportSpec();
-});
+describe('AdminOrdersService search', () => {
+  beforeEach(configureAdminOrdersServiceSpec);
+  afterEach(verifyAdminOrdersHttpMock);
 
-function defineSearchOrdersSpec(): void {
   it('searches orders', () => {
     adminOrdersService.search({ q: 'ref', status: 'paid', page: 2, limit: 10 }).subscribe((res) => {
       expect(res.meta.page).toBe(2);
@@ -40,9 +36,12 @@ function defineSearchOrdersSpec(): void {
     expect(req.request.params.get('limit')).toBe('10');
     req.flush({ items: [], meta: { total_items: 0, total_pages: 1, page: 2, limit: 10 } });
   });
-}
+});
 
-function defineGetOrderSpec(): void {
+describe('AdminOrdersService get', () => {
+  beforeEach(configureAdminOrdersServiceSpec);
+  afterEach(verifyAdminOrdersHttpMock);
+
   it('fetches an order', () => {
     adminOrdersService.get('o1').subscribe((res) => {
       expect(res.id).toBe('o1');
@@ -61,9 +60,12 @@ function defineGetOrderSpec(): void {
       items: []
     });
   });
-}
+});
 
-function defineUpdateOrderSpec(): void {
+describe('AdminOrdersService update', () => {
+  beforeEach(configureAdminOrdersServiceSpec);
+  afterEach(verifyAdminOrdersHttpMock);
+
   it('updates an order', () => {
     adminOrdersService.update('o1', { status: 'paid', tracking_number: 'T123' }).subscribe((res) => {
       expect(res.status).toBe('paid');
@@ -83,9 +85,12 @@ function defineUpdateOrderSpec(): void {
       items: []
     });
   });
-}
+});
 
-function defineDownloadOrderExportSpec(): void {
+describe('AdminOrdersService export', () => {
+  beforeEach(configureAdminOrdersServiceSpec);
+  afterEach(verifyAdminOrdersHttpMock);
+
   it('downloads order export', () => {
     adminOrdersService.downloadExport().subscribe((blob) => {
       expect(blob.size).toBe(3);
@@ -97,4 +102,4 @@ function defineDownloadOrderExportSpec(): void {
     expect(req.request.responseType).toBe('blob');
     req.flush(new Blob(['csv'], { type: 'text/csv' }));
   });
-}
+});
