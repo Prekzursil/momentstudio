@@ -965,103 +965,139 @@ async def admin_payments_health(
     now = datetime.now(timezone.utc)
     since = now - timedelta(hours=int(since_hours))
     successful_statuses = (OrderStatus.paid, OrderStatus.shipped, OrderStatus.delivered)
+    exclude_test_orders = _exclude_test_orders_clause()
+    success_map = await _payments_method_counts(
+        session,
+        since,
+        now,
+        exclude_test_orders,
+        Order.status.in_(successful_statuses),
+    )
+    pending_map = await _payments_method_counts(
+        session,
+        since,
+        now,
+        exclude_test_orders,
+        Order.status == OrderStatus.pending_payment,
+    )
+    webhook_counts = await _payments_webhook_counts(session, since)
+    stripe_recent_rows = await _payments_recent_webhook_rows(session, since, StripeWebhookEvent)
+    paypal_recent_rows = await _payments_recent_webhook_rows(session, since, PayPalWebhookEvent)
+    return {
+        "window_hours": int(since_hours),
+        "window_start": since,
+        "window_end": now,
+        "providers": _payments_provider_rows(success_map, pending_map, webhook_counts),
+        "recent_webhook_errors": _payments_recent_webhook_errors(stripe_recent_rows, paypal_recent_rows),
+    }
 
+
+def _exclude_test_orders_clause() -> Any:
     test_order_ids = select(OrderTag.order_id).where(OrderTag.tag == "test")
-    exclude_test_orders = Order.id.notin_(test_order_ids)
+    return Order.id.notin_(test_order_ids)
 
+
+def _payments_success_rate(success: int, pending: int) -> float | None:
+    denominator = success + pending
+    if denominator <= 0:
+        return None
+    return success / denominator
+
+
+async def _payments_method_counts(
+    session: AsyncSession,
+    since: datetime,
+    now: datetime,
+    exclude_test_orders: Any,
+    status_clause: Any,
+) -> dict[str, int]:
     method_col = func.lower(func.coalesce(Order.payment_method, literal("unknown")))
-    success_rows = await session.execute(
+    rows = await session.execute(
         select(method_col, func.count().label("count"))
         .select_from(Order)
         .where(
             Order.created_at >= since,
             Order.created_at < now,
-            Order.status.in_(successful_statuses),
+            status_clause,
             exclude_test_orders,
         )
         .group_by(method_col)
     )
-    pending_rows = await session.execute(
-        select(method_col, func.count().label("count"))
-        .select_from(Order)
-        .where(
-            Order.created_at >= since,
-            Order.created_at < now,
-            Order.status == OrderStatus.pending_payment,
-            exclude_test_orders,
-        )
-        .group_by(method_col)
+    return {str(method or "unknown"): int(count or 0) for method, count in rows.all()}
+
+
+def _payments_error_filter(model: Any, since: datetime) -> tuple[Any, ...]:
+    return (
+        model.last_attempt_at >= since,
+        model.last_error.is_not(None),
+        model.last_error != "",
     )
-    success_map = {str(row[0] or "unknown"): int(row[1] or 0) for row in success_rows.all()}
-    pending_map = {str(row[0] or "unknown"): int(row[1] or 0) for row in pending_rows.all()}
 
-    def _safe_int(value: int | None) -> int:
-        return int(value or 0)
 
-    def _success_rate(success: int, pending: int) -> float | None:
-        denom = success + pending
-        if denom <= 0:
-            return None
-        return success / denom
+def _payments_backlog_filter(model: Any, since: datetime) -> tuple[Any, ...]:
+    return (
+        model.last_attempt_at >= since,
+        model.processed_at.is_(None),
+        or_(model.last_error.is_(None), model.last_error == ""),
+    )
 
-    def _error_filter(model) -> Any:
-        return (
-            model.last_attempt_at >= since,
-            model.last_error.is_not(None),
-            model.last_error != "",
-        )
 
-    def _backlog_filter(model) -> Any:
-        return (
-            model.last_attempt_at >= since,
-            model.processed_at.is_(None),
-            or_(model.last_error.is_(None), model.last_error == ""),
-        )
+async def _payments_webhook_count(session: AsyncSession, model: Any, *filters: Any) -> int:
+    value = await session.scalar(select(func.count()).select_from(model).where(*filters))
+    return int(value or 0)
 
-    stripe_errors = await session.scalar(select(func.count()).select_from(StripeWebhookEvent).where(*_error_filter(StripeWebhookEvent)))
-    stripe_backlog = await session.scalar(select(func.count()).select_from(StripeWebhookEvent).where(*_backlog_filter(StripeWebhookEvent)))
-    paypal_errors = await session.scalar(select(func.count()).select_from(PayPalWebhookEvent).where(*_error_filter(PayPalWebhookEvent)))
-    paypal_backlog = await session.scalar(select(func.count()).select_from(PayPalWebhookEvent).where(*_backlog_filter(PayPalWebhookEvent)))
 
-    stripe_recent_rows = (
+async def _payments_webhook_counts(session: AsyncSession, since: datetime) -> dict[str, dict[str, int]]:
+    return {
+        "stripe": {
+            "errors": await _payments_webhook_count(session, StripeWebhookEvent, *_payments_error_filter(StripeWebhookEvent, since)),
+            "backlog": await _payments_webhook_count(
+                session,
+                StripeWebhookEvent,
+                *_payments_backlog_filter(StripeWebhookEvent, since),
+            ),
+        },
+        "paypal": {
+            "errors": await _payments_webhook_count(session, PayPalWebhookEvent, *_payments_error_filter(PayPalWebhookEvent, since)),
+            "backlog": await _payments_webhook_count(
+                session,
+                PayPalWebhookEvent,
+                *_payments_backlog_filter(PayPalWebhookEvent, since),
+            ),
+        },
+    }
+
+
+async def _payments_recent_webhook_rows(session: AsyncSession, since: datetime, model: Any) -> list[Any]:
+    rows = (
         (
             await session.execute(
-                select(StripeWebhookEvent)
-                .where(*_error_filter(StripeWebhookEvent))
-                .order_by(StripeWebhookEvent.last_attempt_at.desc())
+                select(model)
+                .where(*_payments_error_filter(model, since))
+                .order_by(model.last_attempt_at.desc())
                 .limit(8)
             )
         )
         .scalars()
         .all()
     )
-    paypal_recent_rows = (
-        (
-            await session.execute(
-                select(PayPalWebhookEvent)
-                .where(*_error_filter(PayPalWebhookEvent))
-                .order_by(PayPalWebhookEvent.last_attempt_at.desc())
-                .limit(8)
-            )
-        )
-        .scalars()
-        .all()
-    )
+    return list(rows)
 
-    recent_errors: list[dict] = []
-    for row in stripe_recent_rows:
-        recent_errors.append(
-            {
-                "provider": "stripe",
-                "event_id": row.stripe_event_id,
-                "event_type": row.event_type,
-                "attempts": int(row.attempts or 0),
-                "last_attempt_at": row.last_attempt_at,
-                "last_error": row.last_error,
-            }
-        )
-    for row in paypal_recent_rows:
-        recent_errors.append(
+
+def _payments_recent_webhook_errors(stripe_recent_rows: list[Any], paypal_recent_rows: list[Any]) -> list[dict]:
+    recent_errors = [
+        {
+            "provider": "stripe",
+            "event_id": row.stripe_event_id,
+            "event_type": row.event_type,
+            "attempts": int(row.attempts or 0),
+            "last_attempt_at": row.last_attempt_at,
+            "last_error": row.last_error,
+        }
+        for row in stripe_recent_rows
+    ]
+    recent_errors.extend(
+        [
             {
                 "provider": "paypal",
                 "event_id": row.paypal_event_id,
@@ -1070,46 +1106,58 @@ async def admin_payments_health(
                 "last_attempt_at": row.last_attempt_at,
                 "last_error": row.last_error,
             }
-        )
-    recent_errors.sort(key=lambda item: item.get("last_attempt_at") or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
-    recent_errors = recent_errors[:12]
+            for row in paypal_recent_rows
+        ]
+    )
+    recent_errors.sort(
+        key=lambda item: item.get("last_attempt_at") or datetime.min.replace(tzinfo=timezone.utc),
+        reverse=True,
+    )
+    return recent_errors[:12]
 
+
+def _payments_sorted_methods(success_map: dict[str, int], pending_map: dict[str, int]) -> list[str]:
     preferred_order = ["stripe", "paypal", "netopia", "cod", "unknown"]
     methods = list({*success_map.keys(), *pending_map.keys(), *preferred_order})
-    methods.sort(key=lambda key: (preferred_order.index(key) if key in preferred_order else len(preferred_order), key))
-
-    providers: list[dict] = []
-    for method in methods:
-        success = _safe_int(success_map.get(method))
-        pending = _safe_int(pending_map.get(method))
-        if method == "stripe":
-            webhook_error_count = _safe_int(int(stripe_errors or 0))
-            webhook_backlog_count = _safe_int(int(stripe_backlog or 0))
-        elif method == "paypal":
-            webhook_error_count = _safe_int(int(paypal_errors or 0))
-            webhook_backlog_count = _safe_int(int(paypal_backlog or 0))
-        else:
-            webhook_error_count = 0
-            webhook_backlog_count = 0
-
-        providers.append(
-            {
-                "provider": method,
-                "successful_orders": success,
-                "pending_payment_orders": pending,
-                "success_rate": _success_rate(success, pending),
-                "webhook_errors": webhook_error_count,
-                "webhook_backlog": webhook_backlog_count,
-            }
+    methods.sort(
+        key=lambda key: (
+            preferred_order.index(key) if key in preferred_order else len(preferred_order),
+            key,
         )
+    )
+    return methods
 
+
+def _payments_provider_row(
+    method: str,
+    success_map: dict[str, int],
+    pending_map: dict[str, int],
+    webhook_counts: dict[str, dict[str, int]],
+) -> dict:
+    success = int(success_map.get(method) or 0)
+    pending = int(pending_map.get(method) or 0)
+    webhook_entry = webhook_counts.get(method, {})
+    webhook_error_count = int(webhook_entry.get("errors", 0) or 0)
+    webhook_backlog_count = int(webhook_entry.get("backlog", 0) or 0)
     return {
-        "window_hours": int(since_hours),
-        "window_start": since,
-        "window_end": now,
-        "providers": providers,
-        "recent_webhook_errors": recent_errors,
+        "provider": method,
+        "successful_orders": success,
+        "pending_payment_orders": pending,
+        "success_rate": _payments_success_rate(success, pending),
+        "webhook_errors": webhook_error_count,
+        "webhook_backlog": webhook_backlog_count,
     }
+
+
+def _payments_provider_rows(
+    success_map: dict[str, int],
+    pending_map: dict[str, int],
+    webhook_counts: dict[str, dict[str, int]],
+) -> list[dict]:
+    return [
+        _payments_provider_row(method, success_map, pending_map, webhook_counts)
+        for method in _payments_sorted_methods(success_map, pending_map)
+    ]
 
 
 @router.get("/refunds-breakdown")
@@ -1545,32 +1593,68 @@ async def admin_channel_attribution(
     limit: int = Query(default=12, ge=1, le=50),
 ) -> dict:
     now = datetime.now(timezone.utc)
-    successful_statuses = (OrderStatus.paid, OrderStatus.shipped, OrderStatus.delivered)
-    sales_statuses = (*successful_statuses, OrderStatus.refunded)
-
-    if (range_from is None) != (range_to is None):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="range_from and range_to must be provided together",
+    sales_statuses = (
+        OrderStatus.paid,
+        OrderStatus.shipped,
+        OrderStatus.delivered,
+        OrderStatus.refunded,
+    )
+    start, end, effective_range_days = _summary_resolve_range(
+        now,
+        int(range_days),
+        range_from,
+        range_to,
+    )
+    exclude_test_orders = _exclude_test_orders_clause()
+    total_orders, total_gross_sales = await _channel_totals(
+        session,
+        start,
+        end,
+        sales_statuses,
+        exclude_test_orders,
+    )
+    order_to_session, session_ids = await _channel_order_to_session_map(session, start, end)
+    if not order_to_session:
+        return _channel_attribution_response(
+            effective_range_days=effective_range_days,
+            start=start,
+            end=end,
+            total_orders=total_orders,
+            total_gross_sales=total_gross_sales,
+            tracked_orders=0,
+            tracked_gross_sales=0.0,
+            coverage_pct=None if total_orders == 0 else 0.0,
+            channels=[],
         )
+    channels, tracked_orders, tracked_gross_sales = await _channel_tracked_data(
+        session,
+        order_to_session,
+        session_ids,
+        start,
+        end,
+        sales_statuses,
+        exclude_test_orders,
+    )
+    return _channel_attribution_response(
+        effective_range_days=effective_range_days,
+        start=start,
+        end=end,
+        total_orders=total_orders,
+        total_gross_sales=total_gross_sales,
+        tracked_orders=tracked_orders,
+        tracked_gross_sales=tracked_gross_sales,
+        coverage_pct=_channel_coverage_pct(tracked_orders, total_orders),
+        channels=channels[: int(limit)],
+    )
 
-    if range_from is not None and range_to is not None:
-        if range_to < range_from:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="range_to must be on/after range_from",
-            )
-        start = datetime.combine(range_from, datetime.min.time(), tzinfo=timezone.utc)
-        end = datetime.combine(range_to + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc)
-        effective_range_days = (range_to - range_from).days + 1
-    else:
-        start = now - timedelta(days=range_days)
-        end = now
-        effective_range_days = range_days
 
-    test_order_ids = select(OrderTag.order_id).where(OrderTag.tag == "test")
-    exclude_test_orders = Order.id.notin_(test_order_ids)
-
+async def _channel_totals(
+    session: AsyncSession,
+    start: datetime,
+    end: datetime,
+    sales_statuses: tuple[OrderStatus, ...],
+    exclude_test_orders: Any,
+) -> tuple[int, float]:
     total_orders = await session.scalar(
         select(func.count())
         .select_from(Order)
@@ -1591,7 +1675,14 @@ async def admin_channel_attribution(
             exclude_test_orders,
         )
     )
+    return int(total_orders or 0), float(total_gross_sales or 0)
 
+
+async def _channel_order_to_session_map(
+    session: AsyncSession,
+    start: datetime,
+    end: datetime,
+) -> tuple[dict[UUID, str], set[str]]:
     checkout_rows = await session.execute(
         select(AnalyticsEvent.session_id, AnalyticsEvent.order_id)
         .select_from(AnalyticsEvent)
@@ -1608,25 +1699,24 @@ async def admin_channel_attribution(
     for session_id, order_id in checkout_rows.all():
         if not session_id or not order_id:
             continue
+        session_key = str(session_id)
         if order_id in order_to_session:
             continue
-        order_to_session[order_id] = str(session_id)
-        session_ids.add(str(session_id))
+        order_to_session[order_id] = session_key
+        session_ids.add(session_key)
+    return order_to_session, session_ids
 
-    if not order_to_session:
-        return {
-            "range_days": int(effective_range_days),
-            "range_from": start.date().isoformat(),
-            "range_to": (end - timedelta(microseconds=1)).date().isoformat(),
-            "total_orders": int(total_orders or 0),
-            "total_gross_sales": float(total_gross_sales or 0),
-            "tracked_orders": 0,
-            "tracked_gross_sales": 0.0,
-            "coverage_pct": None if not total_orders else 0.0,
-            "channels": [],
-        }
 
-    order_ids = list(order_to_session.keys())
+async def _channel_order_amounts(
+    session: AsyncSession,
+    order_ids: list[UUID],
+    start: datetime,
+    end: datetime,
+    sales_statuses: tuple[OrderStatus, ...],
+    exclude_test_orders: Any,
+) -> dict[UUID, float]:
+    if not order_ids:
+        return {}
     order_rows = await session.execute(
         select(Order.id, Order.total_amount)
         .select_from(Order)
@@ -1638,8 +1728,33 @@ async def admin_channel_attribution(
             exclude_test_orders,
         )
     )
-    order_amounts = {row[0]: float(row[1] or 0) for row in order_rows.all()}
+    return {order_id: float(total_amount or 0) for order_id, total_amount in order_rows.all()}
 
+
+async def _channel_tracked_data(
+    session: AsyncSession,
+    order_to_session: dict[UUID, str],
+    session_ids: set[str],
+    start: datetime,
+    end: datetime,
+    sales_statuses: tuple[OrderStatus, ...],
+    exclude_test_orders: Any,
+) -> tuple[list[dict], int, float]:
+    order_amounts = await _channel_order_amounts(
+        session,
+        list(order_to_session.keys()),
+        start,
+        end,
+        sales_statuses,
+        exclude_test_orders,
+    )
+    session_payload = await _channel_session_payloads(session, session_ids)
+    return _channel_aggregate(order_to_session, order_amounts, session_payload)
+
+
+async def _channel_session_payloads(session: AsyncSession, session_ids: set[str]) -> dict[str, dict | None]:
+    if not session_ids:
+        return {}
     session_start_rows = await session.execute(
         select(AnalyticsEvent.session_id, AnalyticsEvent.payload, AnalyticsEvent.created_at)
         .select_from(AnalyticsEvent)
@@ -1651,67 +1766,90 @@ async def admin_channel_attribution(
     )
     session_payload: dict[str, dict | None] = {}
     for session_id, payload, _created_at in session_start_rows.all():
-        key = str(session_id)
-        if key in session_payload:
+        session_key = str(session_id)
+        if session_key in session_payload:
             continue
-        session_payload[key] = payload if isinstance(payload, dict) else None
+        session_payload[session_key] = payload if isinstance(payload, dict) else None
+    return session_payload
 
-    def _normalize(value: object) -> str:
-        if not isinstance(value, str):
-            return ""
-        return value.strip()
 
-    def _extract_channel(payload: dict | None) -> tuple[str, str | None, str | None]:
-        src = _normalize((payload or {}).get("utm_source")).lower()
-        med = _normalize((payload or {}).get("utm_medium")).lower() or None
-        camp = _normalize((payload or {}).get("utm_campaign")) or None
-        if not src:
-            return ("direct", None, None)
-        return (src, med, camp)
+def _channel_normalize_value(value: object) -> str:
+    if not isinstance(value, str):
+        return ""
+    return value.strip()
 
+
+def _channel_extract(payload: dict | None) -> tuple[str, str | None, str | None]:
+    source = _channel_normalize_value((payload or {}).get("utm_source")).lower()
+    medium = _channel_normalize_value((payload or {}).get("utm_medium")).lower() or None
+    campaign = _channel_normalize_value((payload or {}).get("utm_campaign")) or None
+    if not source:
+        return "direct", None, None
+    return source, medium, campaign
+
+
+def _channel_aggregate(
+    order_to_session: dict[UUID, str],
+    order_amounts: dict[UUID, float],
+    session_payload: dict[str, dict | None],
+) -> tuple[list[dict], int, float]:
     channels: dict[tuple[str, str | None, str | None], dict[str, float]] = {}
     tracked_orders = 0
-    tracked_sales = 0.0
+    tracked_gross_sales = 0.0
     for order_id, session_id in order_to_session.items():
         amount = order_amounts.get(order_id)
         if amount is None:
             continue
         tracked_orders += 1
-        tracked_sales += float(amount)
-        payload = session_payload.get(session_id)
-        src, med, camp = _extract_channel(payload)
-        key = (src, med, camp)
+        tracked_gross_sales += float(amount)
+        key = _channel_extract(session_payload.get(session_id))
         entry = channels.setdefault(key, {"orders": 0.0, "gross_sales": 0.0})
         entry["orders"] += 1.0
         entry["gross_sales"] += float(amount)
+    rows = [
+        {
+            "source": source,
+            "medium": medium,
+            "campaign": campaign,
+            "orders": int(entry.get("orders", 0) or 0),
+            "gross_sales": float(entry.get("gross_sales", 0) or 0),
+        }
+        for (source, medium, campaign), entry in channels.items()
+    ]
+    rows.sort(
+        key=lambda row: (row.get("gross_sales", 0), row.get("orders", 0)),
+        reverse=True,
+    )
+    return rows, tracked_orders, tracked_gross_sales
 
-    channel_rows: list[dict] = []
-    for (src, med, camp), entry in channels.items():
-        channel_rows.append(
-            {
-                "source": src,
-                "medium": med,
-                "campaign": camp,
-                "orders": int(entry.get("orders", 0) or 0),
-                "gross_sales": float(entry.get("gross_sales", 0) or 0),
-            }
-        )
-    channel_rows.sort(key=lambda row: (row.get("gross_sales", 0), row.get("orders", 0)), reverse=True)
 
-    coverage_pct = None
-    if total_orders:
-        coverage_pct = tracked_orders / int(total_orders or 1)
+def _channel_coverage_pct(tracked_orders: int, total_orders: int) -> float | None:
+    if total_orders <= 0:
+        return None
+    return tracked_orders / int(total_orders or 1)
 
+
+def _channel_attribution_response(
+    effective_range_days: int,
+    start: datetime,
+    end: datetime,
+    total_orders: int,
+    total_gross_sales: float,
+    tracked_orders: int,
+    tracked_gross_sales: float,
+    coverage_pct: float | None,
+    channels: list[dict],
+) -> dict:
     return {
         "range_days": int(effective_range_days),
         "range_from": start.date().isoformat(),
         "range_to": (end - timedelta(microseconds=1)).date().isoformat(),
-        "total_orders": int(total_orders or 0),
-        "total_gross_sales": float(total_gross_sales or 0),
         "tracked_orders": int(tracked_orders),
-        "tracked_gross_sales": float(tracked_sales),
+        "tracked_gross_sales": float(tracked_gross_sales),
         "coverage_pct": coverage_pct,
-        "channels": channel_rows[: int(limit)],
+        "channels": channels,
+        "total_orders": int(total_orders),
+        "total_gross_sales": float(total_gross_sales),
     }
 
 
@@ -1728,60 +1866,90 @@ async def admin_global_search(
         return AdminDashboardSearchResponse(items=[])
     if include_pii:
         pii_service.require_pii_reveal(current_user, request=request)
-
-    parsed_uuid: UUID | None = None
-    try:
-        parsed_uuid = UUID(needle)
-    except ValueError:
-        parsed_uuid = None
-
-    results: list[AdminDashboardSearchResult] = []
-
+    parsed_uuid = _global_search_parse_uuid(needle)
     if parsed_uuid is not None:
-        order = await session.get(Order, parsed_uuid)
-        if order:
-            subtitle = (order.customer_email or "").strip() or None
-            if not include_pii:
-                subtitle = pii_service.mask_email(subtitle)
-            results.append(
-                AdminDashboardSearchResult(
-                    type="order",
-                    id=str(order.id),
-                    label=(order.reference_code or str(order.id)),
-                    subtitle=subtitle,
-                )
-            )
+        return AdminDashboardSearchResponse(
+            items=await _global_search_by_uuid(session, parsed_uuid, include_pii)
+        )
+    return AdminDashboardSearchResponse(
+        items=await _global_search_by_text(session, needle, include_pii)
+    )
 
-        product = await session.get(Product, parsed_uuid)
-        if product and not product.is_deleted:
-            results.append(
-                AdminDashboardSearchResult(
-                    type="product",
-                    id=str(product.id),
-                    slug=product.slug,
-                    label=product.name,
-                    subtitle=product.slug,
-                )
-            )
 
-        user = await session.get(User, parsed_uuid)
-        if user and user.deleted_at is None:
-            email_value = user.email if include_pii else (pii_service.mask_email(user.email) or user.email)
-            subtitle = (user.username or "").strip() or None
-            results.append(
-                AdminDashboardSearchResult(
-                    type="user",
-                    id=str(user.id),
-                    email=email_value,
-                    label=email_value,
-                    subtitle=subtitle,
-                )
-            )
+def _global_search_parse_uuid(value: str) -> UUID | None:
+    try:
+        return UUID(value)
+    except ValueError:
+        return None
 
-        return AdminDashboardSearchResponse(items=results)
 
-    like = f"%{needle.lower()}%"
+def _global_search_order_subtitle(order: Order, include_pii: bool) -> str | None:
+    subtitle = (order.customer_email or "").strip() or None
+    if include_pii:
+        return subtitle
+    return pii_service.mask_email(subtitle)
 
+
+def _global_search_user_email(user: User, include_pii: bool) -> str:
+    if include_pii:
+        return user.email
+    return pii_service.mask_email(user.email) or user.email
+
+
+def _global_search_order_result(order: Order, include_pii: bool) -> AdminDashboardSearchResult:
+    return AdminDashboardSearchResult(
+        type="order",
+        id=str(order.id),
+        label=(order.reference_code or str(order.id)),
+        subtitle=_global_search_order_subtitle(order, include_pii),
+    )
+
+
+def _global_search_product_result(product: Product) -> AdminDashboardSearchResult:
+    return AdminDashboardSearchResult(
+        type="product",
+        id=str(product.id),
+        slug=product.slug,
+        label=product.name,
+        subtitle=product.slug,
+    )
+
+
+def _global_search_user_result(user: User, include_pii: bool) -> AdminDashboardSearchResult:
+    email_value = _global_search_user_email(user, include_pii)
+    subtitle = (user.username or "").strip() or None
+    return AdminDashboardSearchResult(
+        type="user",
+        id=str(user.id),
+        email=email_value,
+        label=email_value,
+        subtitle=subtitle,
+    )
+
+
+async def _global_search_by_uuid(
+    session: AsyncSession,
+    parsed_uuid: UUID,
+    include_pii: bool,
+) -> list[AdminDashboardSearchResult]:
+    results: list[AdminDashboardSearchResult] = []
+    order = await session.get(Order, parsed_uuid)
+    if order:
+        results.append(_global_search_order_result(order, include_pii))
+    product = await session.get(Product, parsed_uuid)
+    if product and not product.is_deleted:
+        results.append(_global_search_product_result(product))
+    user = await session.get(User, parsed_uuid)
+    if user and user.deleted_at is None:
+        results.append(_global_search_user_result(user, include_pii))
+    return results
+
+
+async def _global_search_orders_by_text(
+    session: AsyncSession,
+    like: str,
+    include_pii: bool,
+) -> list[AdminDashboardSearchResult]:
     orders = (
         (
             await session.execute(
@@ -1799,19 +1967,13 @@ async def admin_global_search(
         .scalars()
         .all()
     )
-    for order in orders:
-        subtitle = (order.customer_email or "").strip() or None
-        if not include_pii:
-            subtitle = pii_service.mask_email(subtitle)
-        results.append(
-            AdminDashboardSearchResult(
-                type="order",
-                id=str(order.id),
-                label=(order.reference_code or str(order.id)),
-                subtitle=subtitle,
-            )
-        )
+    return [_global_search_order_result(order, include_pii) for order in orders]
 
+
+async def _global_search_products_by_text(
+    session: AsyncSession,
+    like: str,
+) -> list[AdminDashboardSearchResult]:
     products = (
         (
             await session.execute(
@@ -1831,17 +1993,14 @@ async def admin_global_search(
         .scalars()
         .all()
     )
-    for product in products:
-        results.append(
-            AdminDashboardSearchResult(
-                type="product",
-                id=str(product.id),
-                slug=product.slug,
-                label=product.name,
-                subtitle=product.slug,
-            )
-        )
+    return [_global_search_product_result(product) for product in products]
 
+
+async def _global_search_users_by_text(
+    session: AsyncSession,
+    like: str,
+    include_pii: bool,
+) -> list[AdminDashboardSearchResult]:
     users = (
         (
             await session.execute(
@@ -1861,20 +2020,20 @@ async def admin_global_search(
         .scalars()
         .all()
     )
-    for user in users:
-        email_value = user.email if include_pii else (pii_service.mask_email(user.email) or user.email)
-        subtitle = (user.username or "").strip() or None
-        results.append(
-            AdminDashboardSearchResult(
-                type="user",
-                id=str(user.id),
-                email=email_value,
-                label=email_value,
-                subtitle=subtitle,
-            )
-        )
+    return [_global_search_user_result(user, include_pii) for user in users]
 
-    return AdminDashboardSearchResponse(items=results)
+
+async def _global_search_by_text(
+    session: AsyncSession,
+    needle: str,
+    include_pii: bool,
+) -> list[AdminDashboardSearchResult]:
+    like = f"%{needle.lower()}%"
+    results: list[AdminDashboardSearchResult] = []
+    results.extend(await _global_search_orders_by_text(session, like, include_pii))
+    results.extend(await _global_search_products_by_text(session, like))
+    results.extend(await _global_search_users_by_text(session, like, include_pii))
+    return results
 
 
 @router.get("/products")
