@@ -2770,21 +2770,22 @@ export class AdminOrdersComponent implements OnInit {
   }
 
   private coercePreset(candidate: any): AdminOrdersFilterPreset {
-    const filters = candidate?.filters;
+    const source = candidate && typeof candidate === 'object' ? candidate : {};
+    const filters = source.filters && typeof source.filters === 'object' ? source.filters : {};
     return {
-      id: String(candidate?.id ?? ''),
-      name: String(candidate?.name ?? ''),
-      createdAt: String(candidate.createdAt ?? ''),
+      id: String(source.id ?? ''),
+      name: String(source.name ?? ''),
+      createdAt: String(source.createdAt ?? ''),
       filters: {
-        q: String(filters?.q ?? ''),
-        status: (filters?.status ?? 'all') as OrderStatusFilter,
-        sla: this.coercePresetSlaFilter(filters?.sla),
-        fraud: this.coercePresetFraudFilter(filters?.fraud),
-        tag: String(filters?.tag ?? ''),
-        fromDate: String(filters?.fromDate ?? ''),
-        toDate: String(filters?.toDate ?? ''),
-        includeTestOrders: this.coercePresetIncludeTestOrders(filters?.includeTestOrders),
-        limit: this.coercePresetLimit(filters?.limit)
+        q: String(filters.q ?? ''),
+        status: (filters.status ?? 'all') as OrderStatusFilter,
+        sla: this.coercePresetSlaFilter(filters.sla),
+        fraud: this.coercePresetFraudFilter(filters.fraud),
+        tag: String(filters.tag ?? ''),
+        fromDate: String(filters.fromDate ?? ''),
+        toDate: String(filters.toDate ?? ''),
+        includeTestOrders: this.coercePresetIncludeTestOrders(filters.includeTestOrders),
+        limit: this.coercePresetLimit(filters.limit)
       }
     };
   }

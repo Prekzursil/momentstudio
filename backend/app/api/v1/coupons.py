@@ -92,13 +92,13 @@ SessionDep = Annotated[AsyncSession, Depends(get_session)]
 CurrentUserDep = Annotated[User, Depends(get_current_user)]
 AdminCouponsDep = Annotated[User, Depends(_admin_coupons_dependency)]
 SessionHeaderDep = Annotated[str | None, Depends(cart_api.session_header)]
-ShippingMethodIdQuery = Annotated[UUID | None, Query(default=None)]
-PromotionIdFilterQuery = Annotated[UUID | None, Query(default=None)]
-SearchQuery = Annotated[str | None, Query(default=None)]
-CouponIdFilterQuery = Annotated[UUID | None, Query(default=None)]
-AnalyticsDaysQuery = Annotated[int, Query(default=30, ge=1, le=365)]
-AnalyticsTopLimitQuery = Annotated[int, Query(default=10, ge=1, le=50)]
-BulkJobsLimitQuery = Annotated[int, Query(default=10, ge=1, le=50)]
+ShippingMethodIdQuery = Annotated[UUID | None, Query()]
+PromotionIdFilterQuery = Annotated[UUID | None, Query()]
+SearchQuery = Annotated[str | None, Query()]
+CouponIdFilterQuery = Annotated[UUID | None, Query()]
+AnalyticsDaysQuery = Annotated[int, Query(ge=1, le=365)]
+AnalyticsTopLimitQuery = Annotated[int, Query(ge=1, le=50)]
+BulkJobsLimitQuery = Annotated[int, Query(ge=1, le=50)]
 
 
 async def _get_shipping_method(session: AsyncSession, shipping_method_id: UUID | None) -> ShippingMethod | None:
@@ -289,8 +289,8 @@ def _partition_coupon_offers(
 async def coupon_eligibility(
     session: SessionDep,
     current_user: CurrentUserDep,
-    shipping_method_id: ShippingMethodIdQuery,
-    session_id: SessionHeaderDep,
+    shipping_method_id: ShippingMethodIdQuery = None,
+    session_id: SessionHeaderDep = None,
 ) -> CouponEligibilityResponse:
     user_cart = await cart_service.get_cart(session, current_user.id, session_id)
     checkout = await checkout_settings_service.get_checkout_settings(session)
@@ -313,8 +313,8 @@ async def validate_coupon(
     payload: CouponValidateRequest,
     session: SessionDep,
     current_user: CurrentUserDep,
-    shipping_method_id: ShippingMethodIdQuery,
-    session_id: SessionHeaderDep,
+    shipping_method_id: ShippingMethodIdQuery = None,
+    session_id: SessionHeaderDep = None,
 ) -> CouponOffer:
     code = (payload.code or "").strip().upper()
     coupon = await coupons_service.get_coupon_by_code(session, code=code)
@@ -511,8 +511,8 @@ async def admin_update_promotion(
 async def admin_list_coupons(
     session: SessionDep,
     _: AdminCouponsDep,
-    promotion_id: PromotionIdFilterQuery,
-    q: SearchQuery,
+    promotion_id: PromotionIdFilterQuery = None,
+    q: SearchQuery = None,
 ) -> list[CouponRead]:
     query = select(Coupon).options(selectinload(Coupon.promotion).selectinload(Promotion.scopes))
     if promotion_id:
@@ -960,9 +960,9 @@ async def admin_coupon_analytics(
     promotion_id: UUID,
     session: SessionDep,
     _: AdminCouponsDep,
-    coupon_id: CouponIdFilterQuery,
-    days: AnalyticsDaysQuery,
-    top_limit: AnalyticsTopLimitQuery,
+    coupon_id: CouponIdFilterQuery = None,
+    days: AnalyticsDaysQuery = 30,
+    top_limit: AnalyticsTopLimitQuery = 10,
 ) -> CouponAnalyticsResponse:
     promotion = await session.get(Promotion, promotion_id)
     if not promotion:
@@ -2173,8 +2173,8 @@ async def admin_get_bulk_job(
 @router.get("/admin/coupons/bulk-jobs")
 async def admin_list_bulk_jobs_global(
     session: SessionDep,
-    limit: BulkJobsLimitQuery,
     _: AdminCouponsDep,
+    limit: BulkJobsLimitQuery = 10,
 ) -> list[CouponBulkJobRead]:
     jobs = (
         (
@@ -2194,8 +2194,8 @@ async def admin_list_bulk_jobs_global(
 async def admin_list_bulk_jobs(
     coupon_id: UUID,
     session: SessionDep,
-    limit: BulkJobsLimitQuery,
     _: AdminCouponsDep,
+    limit: BulkJobsLimitQuery = 10,
 ) -> list[CouponBulkJobRead]:
     jobs = (
         (
