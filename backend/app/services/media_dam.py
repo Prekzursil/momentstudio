@@ -1260,16 +1260,22 @@ def _job_tag_clause(raw_tag: str) -> ColumnElement[bool] | None:
 
 
 def _job_base_filter_clauses(filters: MediaJobListFilters) -> list[ColumnElement[bool]]:
-    simple_filters: tuple[ColumnElement[bool] | None, ...] = (
-        MediaJob.status == MediaJobStatus(filters.status) if filters.status else None,
-        MediaJob.job_type == MediaJobType(filters.job_type) if filters.job_type else None,
-        MediaJob.asset_id == filters.asset_id if filters.asset_id else None,
-        MediaJob.created_at >= filters.created_from if filters.created_from else None,
-        MediaJob.created_at <= filters.created_to if filters.created_to else None,
-        MediaJob.assigned_to_user_id == filters.assigned_to_user_id if filters.assigned_to_user_id else None,
-        MediaJob.status == MediaJobStatus.dead_letter if filters.dead_letter_only else None,
-    )
-    return [clause for clause in simple_filters if clause is not None]
+    clauses: list[ColumnElement[bool]] = []
+    if filters.status:
+        clauses.append(MediaJob.status == MediaJobStatus(filters.status))
+    if filters.job_type:
+        clauses.append(MediaJob.job_type == MediaJobType(filters.job_type))
+    if filters.asset_id:
+        clauses.append(MediaJob.asset_id == filters.asset_id)
+    if filters.created_from:
+        clauses.append(MediaJob.created_at >= filters.created_from)
+    if filters.created_to:
+        clauses.append(MediaJob.created_at <= filters.created_to)
+    if filters.assigned_to_user_id:
+        clauses.append(MediaJob.assigned_to_user_id == filters.assigned_to_user_id)
+    if filters.dead_letter_only:
+        clauses.append(MediaJob.status == MediaJobStatus.dead_letter)
+    return clauses
 
 
 def _build_job_filter_clauses(filters: MediaJobListFilters, *, now: datetime) -> list[ColumnElement[bool]]:
@@ -2113,14 +2119,13 @@ async def _mark_job_failed_or_retrying(
     job.error_code = "processing_failed"
     job.error_message = str(exc)
     job.completed_at = now
-    note = str(exc)
     if delay is None:
         _set_dead_letter_state(job, now=now)
         await _record_job_event(
             session,
             job=job,
             action="dead_lettered",
-            note=note,
+            note=str(exc),
             meta=_retry_policy_event_meta(
                 job=job,
                 retry_policy=retry_policy,
@@ -2133,7 +2138,7 @@ async def _mark_job_failed_or_retrying(
         session,
         job=job,
         action="retry_scheduled",
-        note=note,
+        note=str(exc),
         meta=_retry_policy_event_meta(
             job=job,
             retry_policy=retry_policy,
@@ -2295,6 +2300,10 @@ def _auto_tags_from_filename(filename: str) -> set[str]:
     return tags
 
 
+def _existing_asset_tag_values(asset: MediaAsset) -> set[str]:
+    return {tag.tag.value for tag in (asset.tags or []) if tag.tag}
+
+
 async def _process_ai_tag_job(session: AsyncSession, job: MediaJob) -> None:
     if not job.asset_id:
         return
@@ -2306,7 +2315,7 @@ async def _process_ai_tag_job(session: AsyncSession, job: MediaJob) -> None:
     auto_tags = _auto_tags_from_filename(str(asset.original_filename or ""))
     if asset.width and asset.height:
         auto_tags.add("landscape" if asset.width >= asset.height else "portrait")
-    await _replace_asset_tags(session, asset, sorted({*(tag.tag.value for tag in (asset.tags or []) if tag.tag), *auto_tags}))
+    await _replace_asset_tags(session, asset, sorted({*_existing_asset_tag_values(asset), *auto_tags}))
 
 
 async def _process_duplicate_scan_job(session: AsyncSession, job: MediaJob) -> None:
