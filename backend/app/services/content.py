@@ -268,6 +268,42 @@ async def get_block_by_key(session: AsyncSession, key: str, lang: str | None = N
     return block
 
 
+async def _require_renamable_page_block(session: AsyncSession, old_slug: str) -> tuple[str, str, ContentBlock]:
+    old_norm = slugify_page_slug(old_slug)
+    if not old_norm:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page not found")
+    old_key = f"page.{old_norm}"
+    block = await session.scalar(select(ContentBlock).where(ContentBlock.key == old_key))
+    if not block:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page not found")
+    if old_norm in _LOCKED_PAGE_SLUGS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This page URL cannot be changed")
+    return old_norm, old_key, block
+
+
+async def _resolve_available_page_key(
+    session: AsyncSession,
+    *,
+    old_norm: str,
+    old_key: str,
+    new_slug: str,
+) -> tuple[str, str]:
+    new_norm = _validate_page_slug(new_slug)
+    if old_norm == new_norm:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="New page slug must be different")
+    new_key = f"page.{new_norm}"
+    existing = await session.scalar(select(ContentBlock.id).where(ContentBlock.key == new_key))
+    if existing:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Page slug already exists")
+    reserved_by_redirect = await session.scalar(select(ContentRedirect.id).where(ContentRedirect.from_key == new_key))
+    if reserved_by_redirect:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Page slug is reserved by a redirect")
+    resolved_target = await resolve_redirect_key(session, new_key)
+    if resolved_target == old_key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Page slug would create a redirect loop")
+    return new_norm, new_key
+
+
 async def rename_page_slug(
     session: AsyncSession,
     *,
@@ -275,34 +311,13 @@ async def rename_page_slug(
     new_slug: str,
     actor_id: UUID | None = None,
 ) -> tuple[str, str, str, str]:
-    old_norm = slugify_page_slug(old_slug)
-    if not old_norm:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page not found")
-
-    old_key = f"page.{old_norm}"
-    block = await session.scalar(select(ContentBlock).where(ContentBlock.key == old_key))
-    if not block:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page not found")
-    if old_norm in _LOCKED_PAGE_SLUGS:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This page URL cannot be changed")
-
-    new_norm = _validate_page_slug(new_slug)
-    if old_norm == new_norm:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="New page slug must be different")
-
-    new_key = f"page.{new_norm}"
-
-    existing = await session.scalar(select(ContentBlock.id).where(ContentBlock.key == new_key))
-    if existing:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Page slug already exists")
-
-    reserved_by_redirect = await session.scalar(select(ContentRedirect.id).where(ContentRedirect.from_key == new_key))
-    if reserved_by_redirect:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Page slug is reserved by a redirect")
-
-    resolved_target = await resolve_redirect_key(session, new_key)
-    if resolved_target == old_key:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Page slug would create a redirect loop")
+    old_norm, old_key, block = await _require_renamable_page_block(session, old_slug)
+    new_norm, new_key = await _resolve_available_page_key(
+        session,
+        old_norm=old_norm,
+        old_key=old_key,
+        new_slug=new_slug,
+    )
 
     block.key = new_key
     session.add(block)
