@@ -221,6 +221,36 @@ def _append_optional_labeled_line(
     lines.append(f"{_localized_text(lang=lang, ro=label_ro, en=label_en)}: {cleaned}")
 
 
+def _contact_submission_notification_fallback_bodies(
+    *,
+    topic: str,
+    from_name: str,
+    from_email: str,
+    message: str,
+    order_reference: str | None,
+    admin_url: str | None,
+) -> tuple[str, str]:
+    ro_lines = [
+        "Mesaj nou de contact",
+        f"Subiect: {topic}",
+        f"De la: {from_name} <{from_email}>",
+    ]
+    en_lines = [
+        "New contact submission",
+        f"Topic: {topic}",
+        f"From: {from_name} <{from_email}>",
+    ]
+    if order_reference:
+        ro_lines.append(f"Comandă: {order_reference}")
+        en_lines.append(f"Order: {order_reference}")
+    ro_lines.extend(["", message])
+    en_lines.extend(["", message])
+    if admin_url:
+        ro_lines.extend(["", f"Vezi în admin: {admin_url}"])
+        en_lines.extend(["", f"View in admin: {admin_url}"])
+    return "\n".join(ro_lines), "\n".join(en_lines)
+
+
 def _refund_requested_lines(
     *,
     lang: str,
@@ -1231,6 +1261,22 @@ async def send_stripe_dispute_notification(
     dispute_status: str | None = None,
     lang: str | None = None,
 ) -> bool:
+    def _detail_lines(lng: str) -> list[str]:
+        amount_detail = f"{amount / 100:.2f} {currency.upper()}" if amount is not None and currency else None
+        detail_rows: list[tuple[str | None, str, str]] = [
+            (dispute_id, "Dispută", "Dispute"),
+            (charge_id, "Plată", "Charge"),
+            (amount_detail, "Sumă", "Amount"),
+            (reason, "Motiv", "Reason"),
+            (dispute_status, "Stare", "Status"),
+        ]
+        lines: list[str] = []
+        for value, label_ro, label_en in detail_rows:
+            if value:
+                label = label_ro if lng == "ro" else label_en
+                lines.append(f"{label}: {value}")
+        return lines
+
     def _lines(lng: str) -> list[str]:
         lines = [
             "A fost primit un eveniment de dispută Stripe."
@@ -1238,16 +1284,7 @@ async def send_stripe_dispute_notification(
             else "A Stripe dispute event was received.",
             f"Event: {event_type}",
         ]
-        if dispute_id:
-            lines.append(f"Dispută: {dispute_id}" if lng == "ro" else f"Dispute: {dispute_id}")
-        if charge_id:
-            lines.append(f"Plată: {charge_id}" if lng == "ro" else f"Charge: {charge_id}")
-        if amount is not None and currency:
-            lines.append(f"Sumă: {amount / 100:.2f} {currency.upper()}" if lng == "ro" else f"Amount: {amount / 100:.2f} {currency.upper()}")
-        if reason:
-            lines.append(f"Motiv: {reason}" if lng == "ro" else f"Reason: {reason}")
-        if dispute_status:
-            lines.append(f"Stare: {dispute_status}" if lng == "ro" else f"Status: {dispute_status}")
+        lines.extend(_detail_lines(lng))
         return lines
 
     subject = _bilingual_subject(f"Dispută Stripe: {event_type}", f"Stripe dispute: {event_type}", preferred_language=lang)
@@ -1370,26 +1407,14 @@ async def send_contact_submission_notification(
 ) -> bool:
     subject = _bilingual_subject("Mesaj nou de contact", "New contact submission", preferred_language=lang)
     if env is None:
-        ro_lines = [
-            "Mesaj nou de contact",
-            f"Subiect: {topic}",
-            f"De la: {from_name} <{from_email}>",
-        ]
-        en_lines = [
-            "New contact submission",
-            f"Topic: {topic}",
-            f"From: {from_name} <{from_email}>",
-        ]
-        if order_reference:
-            ro_lines.append(f"Comandă: {order_reference}")
-            en_lines.append(f"Order: {order_reference}")
-        ro_lines.extend(["", message])
-        en_lines.extend(["", message])
-        if admin_url:
-            ro_lines.extend(["", f"Vezi în admin: {admin_url}"])
-            en_lines.extend(["", f"View in admin: {admin_url}"])
-        text_ro = "\n".join(ro_lines)
-        text_en = "\n".join(en_lines)
+        text_ro, text_en = _contact_submission_notification_fallback_bodies(
+            topic=topic,
+            from_name=from_name,
+            from_email=from_email,
+            message=message,
+            order_reference=order_reference,
+            admin_url=admin_url,
+        )
         text_body, html_body = _bilingual_sections(
             text_ro=text_ro,
             text_en=text_en,
