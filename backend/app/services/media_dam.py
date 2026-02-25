@@ -12,6 +12,7 @@ import shutil
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from functools import partial
 from pathlib import Path
 from typing import Any, Literal, TypeVar, cast
 from uuid import UUID, uuid4
@@ -156,6 +157,15 @@ class RetryPolicyResolved:
     version_ts: str
 
 
+@dataclass(slots=True)
+class MediaEditOptions:
+    rotate_cw: int
+    crop_aspect_w: Any
+    crop_aspect_h: Any
+    resize_max_width: Any
+    resize_max_height: Any
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -229,21 +239,48 @@ def _retry_policy_from_payload(payload: dict[str, Any], *, job_type: MediaJobTyp
     raw = payload.get(RETRY_POLICY_PAYLOAD_KEY)
     if not isinstance(raw, dict):
         return None
+    return _retry_policy_from_raw(raw)
+
+
+def _parse_positive_int(value: Any) -> int | None:
     try:
-        schedule = [max(1, int(v)) for v in list(raw.get("schedule") or [])]
-        attempts = int(raw.get("max_attempts") or 0)
-        jitter = float(raw.get("jitter_ratio") or 0.0)
-        if attempts < 1 or not schedule:
-            return None
-        return RetryPolicyResolved(
-            max_attempts=max(1, min(MAX_RETRY_POLICY_ATTEMPTS, attempts)),
-            schedule=schedule,
-            jitter_ratio=max(0.0, min(1.0, jitter)),
-            enabled=bool(raw.get("enabled", True)),
-            version_ts=str(raw.get("version_ts") or "snapshot"),
-        )
+        parsed = int(value)
     except Exception:
         return None
+    return parsed if parsed > 0 else None
+
+
+def _parse_ratio(value: Any) -> float:
+    try:
+        parsed = float(value)
+    except Exception:
+        parsed = 0.0
+    return max(0.0, min(1.0, parsed))
+
+
+def _parse_retry_schedule(raw: Any) -> list[int]:
+    if not isinstance(raw, list):
+        return []
+    out: list[int] = []
+    for value in raw:
+        parsed = _parse_positive_int(value)
+        if parsed is not None:
+            out.append(parsed)
+    return out
+
+
+def _retry_policy_from_raw(raw: dict[str, Any]) -> RetryPolicyResolved | None:
+    attempts = _parse_positive_int(raw.get("max_attempts") or 0)
+    schedule = _parse_retry_schedule(raw.get("schedule") or [])
+    if attempts is None or not schedule:
+        return None
+    return RetryPolicyResolved(
+        max_attempts=max(1, min(MAX_RETRY_POLICY_ATTEMPTS, attempts)),
+        schedule=schedule,
+        jitter_ratio=_parse_ratio(raw.get("jitter_ratio") or 0.0),
+        enabled=bool(raw.get("enabled", True)),
+        version_ts=str(raw.get("version_ts") or "snapshot"),
+    )
 
 
 def _retry_delay_seconds(
@@ -556,19 +593,34 @@ async def _record_job_event(
     await session.flush()
 
 
-def _parse_schedule_json(value: str | None, *, fallback: list[int]) -> list[int]:
+def _parse_json_list(value: str | None) -> list[Any]:
     try:
         raw = json.loads(value or "[]")
     except Exception:
-        raw = []
+        return []
+    if isinstance(raw, list):
+        return raw
+    return []
+
+
+def _schedule_item_to_int(item: Any) -> int | None:
+    if not isinstance(item, (int, float, str)):
+        return None
+    if not str(item).strip():
+        return None
+    try:
+        return max(1, int(item))
+    except Exception:
+        return None
+
+
+def _parse_schedule_json(value: str | None, *, fallback: list[int]) -> list[int]:
+    raw = _parse_json_list(value)
     out: list[int] = []
-    for item in raw if isinstance(raw, list) else []:
-        if not isinstance(item, (int, float, str)) or not str(item).strip():
-            continue
-        try:
-            out.append(max(1, int(item)))
-        except Exception:
-            continue
+    for item in raw:
+        parsed = _schedule_item_to_int(item)
+        if parsed is not None:
+            out.append(parsed)
     return out or list(fallback)
 
 
@@ -1357,15 +1409,27 @@ def _parse_heartbeat_timestamp(value: Any) -> datetime | None:
     return parsed
 
 
+def _optional_int(value: Any) -> int | None:
+    raw = str(value or "").strip()
+    if not raw.isdigit():
+        return None
+    return int(raw)
+
+
+def _worker_id_from_payload(payload: dict[str, Any], *, key: object) -> str:
+    configured = _optional_stripped(str(payload.get("worker_id") or ""))
+    return configured or str(key).split(":")[-1]
+
+
 def _heartbeat_payload_to_worker(payload: dict[str, Any], *, key: object, now: datetime) -> MediaTelemetryWorkerRead | None:
     last_seen = _parse_heartbeat_timestamp(payload.get("last_seen_at"))
     if last_seen is None:
         return None
     lag = max(0, int((now - last_seen).total_seconds()))
     return MediaTelemetryWorkerRead(
-        worker_id=str(payload.get("worker_id") or str(key).split(":")[-1]),
-        hostname=str(payload.get("hostname") or "") or None,
-        pid=int(payload["pid"]) if str(payload.get("pid") or "").isdigit() else None,
+        worker_id=_worker_id_from_payload(payload, key=key),
+        hostname=_optional_stripped(str(payload.get("hostname") or "")),
+        pid=_optional_int(payload.get("pid")),
         app_version=str(payload.get("app_version") or "") or None,
         last_seen_at=last_seen,
         lag_seconds=lag,
@@ -1822,35 +1886,51 @@ async def restore_asset(session: AsyncSession, asset: MediaAsset, actor_id: UUID
     return asset
 
 
-async def purge_asset(session: AsyncSession, asset: MediaAsset) -> None:
-    paths: list[Path] = []
+def _append_existing_storage_path(paths: list[Path], *, storage_key: str, context: dict[str, str], event_name: str) -> None:
     try:
-        path = _find_existing_storage_path(asset.storage_key)
-        if path is not None:
-            paths.append(path)
+        path = _find_existing_storage_path(storage_key)
     except Exception as exc:
-        logger.debug(
-            "media_asset_purge_primary_path_resolve_failed",
-            extra={"asset_id": str(asset.id), "storage_key": str(asset.storage_key)},
-            exc_info=exc,
-        )
+        logger.debug(event_name, extra=context, exc_info=exc)
+        return
+    if path is not None:
+        paths.append(path)
+
+
+def _purge_candidate_paths(asset: MediaAsset) -> list[Path]:
+    context = {"asset_id": str(asset.id), "storage_key": str(asset.storage_key)}
+    paths: list[Path] = []
+    _append_existing_storage_path(
+        paths,
+        storage_key=asset.storage_key,
+        context=context,
+        event_name="media_asset_purge_primary_path_resolve_failed",
+    )
     for variant in asset.variants or []:
+        _append_existing_storage_path(
+            paths,
+            storage_key=variant.storage_key,
+            context=context,
+            event_name="media_asset_purge_variant_path_resolve_failed",
+        )
+    return paths
+
+
+def _unlink_purge_paths(paths: list[Path], *, asset_id: UUID) -> None:
+    for path in paths:
         try:
-            path = _find_existing_storage_path(variant.storage_key)
-            if path is not None:
-                paths.append(path)
-        except Exception:
-            continue
-    for p in paths:
-        try:
-            if p.exists():
-                p.unlink()
+            if path.exists():
+                path.unlink()
         except Exception as exc:
             logger.debug(
                 "media_asset_purge_unlink_failed",
-                extra={"asset_id": str(asset.id), "path": str(p)},
+                extra={"asset_id": str(asset_id), "path": str(path)},
                 exc_info=exc,
             )
+
+
+async def purge_asset(session: AsyncSession, asset: MediaAsset) -> None:
+    paths = _purge_candidate_paths(asset)
+    _unlink_purge_paths(paths, asset_id=asset.id)
     await session.delete(asset)
     await session.commit()
 
@@ -1925,40 +2005,78 @@ async def _collect_usage_refs_for_url(
     url: str,
 ) -> list[tuple[str, str, str | None, str, str | None]]:
     refs: list[tuple[str, str, str | None, str, str | None]] = []
-    keys = await content_service.get_asset_usage_keys(session, url=url)
-    refs.extend([("content_block", key, None, "auto_scan", None) for key in keys])
+    refs.extend(await _usage_refs_from_content_blocks(session, url=url))
+    refs.extend(await _usage_refs_from_content_images(session, url=url))
+    refs.extend(await _usage_refs_from_product_images(session, url=url))
+    refs.extend(await _usage_refs_from_content_translations(session, url=url))
+    refs.extend(await _usage_refs_from_site_social(session, url=url))
+    return refs
 
-    content_rows = (
+
+async def _usage_refs_from_content_blocks(
+    session: AsyncSession,
+    *,
+    url: str,
+) -> list[tuple[str, str, str | None, str, str | None]]:
+    keys = await content_service.get_asset_usage_keys(session, url=url)
+    return [("content_block", key, None, "auto_scan", None) for key in keys]
+
+
+async def _usage_refs_from_content_images(
+    session: AsyncSession,
+    *,
+    url: str,
+) -> list[tuple[str, str, str | None, str, str | None]]:
+    rows = (
         await session.execute(
             select(ContentImage.id, ContentBlock.key)
             .join(ContentBlock, ContentBlock.id == ContentImage.content_block_id)
             .where(ContentImage.url == url)
         )
     ).all()
-    refs.extend([("content_image", block_key, str(image_id), "content_images.url", None) for image_id, block_key in content_rows])
+    return [("content_image", block_key, str(image_id), "content_images.url", None) for image_id, block_key in rows]
 
-    product_rows = (
+
+async def _usage_refs_from_product_images(
+    session: AsyncSession,
+    *,
+    url: str,
+) -> list[tuple[str, str, str | None, str, str | None]]:
+    rows = (
         await session.execute(
             select(ProductImage.id, Product.slug)
             .join(Product, Product.id == ProductImage.product_id)
             .where(ProductImage.url == url, ProductImage.is_deleted.is_(False))
         )
     ).all()
-    refs.extend([("product_image", slug, str(image_id), "product_images.url", None) for image_id, slug in product_rows])
+    return [("product_image", slug, str(image_id), "product_images.url", None) for image_id, slug in rows]
 
-    like = f"%{url}%"
-    tr_rows = (
+
+async def _usage_refs_from_content_translations(
+    session: AsyncSession,
+    *,
+    url: str,
+) -> list[tuple[str, str, str | None, str, str | None]]:
+    rows = (
         await session.execute(
             select(ContentBlock.key, ContentBlockTranslation.lang)
             .join(ContentBlock, ContentBlock.id == ContentBlockTranslation.content_block_id)
-            .where(ContentBlockTranslation.body_markdown.ilike(like))
+            .where(ContentBlockTranslation.body_markdown.ilike(f"%{url}%"))
         )
     ).all()
-    refs.extend(
-        [("content_translation", block_key, None, "translations.body_markdown", str(lang or "")) for block_key, lang in tr_rows]
-    )
+    return [
+        ("content_translation", block_key, None, "translations.body_markdown", str(lang or ""))
+        for block_key, lang in rows
+    ]
 
-    social_rows = (
+
+async def _usage_refs_from_site_social(
+    session: AsyncSession,
+    *,
+    url: str,
+) -> list[tuple[str, str, str | None, str, str | None]]:
+    like = f"%{url}%"
+    rows = (
         await session.execute(
             select(ContentBlock.key).where(
                 ContentBlock.key == "site.social",
@@ -1969,8 +2087,7 @@ async def _collect_usage_refs_for_url(
             )
         )
     ).all()
-    refs.extend([("site_social", block_key, None, "site.social", None) for (block_key,) in social_rows])
-    return refs
+    return [("site_social", block_key, None, "site.social", None) for (block_key,) in rows]
 
 
 async def _collect_usage_refs(
@@ -2236,6 +2353,60 @@ async def _process_variant_job(session: AsyncSession, job: MediaJob) -> None:
     session.add(row)
 
 
+def _edit_options_from_payload(payload: dict[str, Any]) -> MediaEditOptions:
+    return MediaEditOptions(
+        rotate_cw=int(payload.get("rotate_cw") or 0),
+        crop_aspect_w=payload.get("crop_aspect_w"),
+        crop_aspect_h=payload.get("crop_aspect_h"),
+        resize_max_width=payload.get("resize_max_width"),
+        resize_max_height=payload.get("resize_max_height"),
+    )
+
+
+def _apply_edit_rotation(img: Image.Image, *, rotate_cw: int) -> Image.Image:
+    if rotate_cw in (90, 180, 270):
+        return img.rotate(-rotate_cw, expand=True)
+    return img
+
+
+def _crop_to_aspect(img: Image.Image, *, crop_w: Any, crop_h: Any) -> Image.Image:
+    if not crop_w or not crop_h:
+        return img
+    iw, ih = img.size
+    target_ratio = float(crop_w) / float(crop_h)
+    current_ratio = float(iw) / float(ih) if ih else target_ratio
+    if current_ratio > target_ratio:
+        new_w = int(ih * target_ratio)
+        left = max(0, (iw - new_w) // 2)
+        return img.crop((left, 0, left + new_w, ih))
+    if current_ratio < target_ratio:
+        new_h = int(iw / target_ratio)
+        top = max(0, (ih - new_h) // 2)
+        return img.crop((0, top, iw, top + new_h))
+    return img
+
+
+def _apply_edit_resize(img: Image.Image, *, max_w: Any, max_h: Any) -> Image.Image:
+    if max_w or max_h:
+        img.thumbnail((int(max_w or 12000), int(max_h or 12000)))
+    return img
+
+
+def _render_edited_image(
+    *,
+    src_path: Path,
+    edited_path: Path,
+    options: MediaEditOptions,
+) -> tuple[int, int]:
+    with Image.open(src_path) as img:
+        out = img.convert("RGB")
+        out = _apply_edit_rotation(out, rotate_cw=options.rotate_cw)
+        out = _crop_to_aspect(out, crop_w=options.crop_aspect_w, crop_h=options.crop_aspect_h)
+        out = _apply_edit_resize(out, max_w=options.resize_max_width, max_h=options.resize_max_height)
+        out.save(edited_path, format="JPEG", optimize=True, quality=88)
+        return out.size
+
+
 async def _process_edit_job(session: AsyncSession, job: MediaJob) -> None:
     payload = _job_payload(job)
     if not job.asset_id:
@@ -2247,38 +2418,14 @@ async def _process_edit_job(session: AsyncSession, job: MediaJob) -> None:
     if not src_path.exists():
         raise FileNotFoundError(f"Missing media file for {asset.public_url}")
 
-    rotate_cw = int(payload.get("rotate_cw") or 0)
-    crop_w = payload.get("crop_aspect_w")
-    crop_h = payload.get("crop_aspect_h")
-    max_w = payload.get("resize_max_width")
-    max_h = payload.get("resize_max_height")
+    edit_options = _edit_options_from_payload(payload)
     edited_key = f"variants/{asset.id}/edit-{job.id}.jpg"
     edited_path = _storage_path_for_key(edited_key, public_root=_is_publicly_servable(asset))
     edited_path.parent.mkdir(parents=True, exist_ok=True)
 
-    def _render_edit() -> tuple[int, int]:
-        with Image.open(src_path) as img:
-            out = img.convert("RGB")
-            if rotate_cw in (90, 180, 270):
-                out = out.rotate(-rotate_cw, expand=True)
-            if crop_w and crop_h:
-                iw, ih = out.size
-                target_ratio = float(crop_w) / float(crop_h)
-                current_ratio = float(iw) / float(ih) if ih else target_ratio
-                if current_ratio > target_ratio:
-                    new_w = int(ih * target_ratio)
-                    left = max(0, (iw - new_w) // 2)
-                    out = out.crop((left, 0, left + new_w, ih))
-                elif current_ratio < target_ratio:
-                    new_h = int(iw / target_ratio)
-                    top = max(0, (ih - new_h) // 2)
-                    out = out.crop((0, top, iw, top + new_h))
-            if max_w or max_h:
-                out.thumbnail((int(max_w or 12000), int(max_h or 12000)))
-            out.save(edited_path, format="JPEG", optimize=True, quality=88)
-            return out.size
-
-    width, height = await anyio.to_thread.run_sync(_render_edit)
+    width, height = await anyio.to_thread.run_sync(
+        partial(_render_edited_image, src_path=src_path, edited_path=edited_path, options=edit_options)
+    )
     row = MediaVariant(
         asset_id=asset.id,
         profile=f"edit-{job.id}",
