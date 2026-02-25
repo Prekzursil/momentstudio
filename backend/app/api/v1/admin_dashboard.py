@@ -2988,9 +2988,17 @@ async def admin_audit(
 
 
 def _audit_union_subquery() -> object:
+    return union_all(
+        _audit_products_union_query(),
+        _audit_content_union_query(),
+        _audit_security_union_query(),
+    ).subquery()
+
+
+def _audit_products_union_query() -> object:
     prod_actor = aliased(User)
     prod = aliased(Product)
-    products_q = (
+    return (
         select(
             literal("product").label("entity"),
             cast(ProductAuditLog.id, String()).label("id"),
@@ -3011,9 +3019,11 @@ def _audit_union_subquery() -> object:
         .join(prod, ProductAuditLog.product_id == prod.id, isouter=True)
     )
 
+
+def _audit_content_union_query() -> object:
     content_actor = aliased(User)
     block = aliased(ContentBlock)
-    content_q = (
+    return (
         select(
             literal("content").label("entity"),
             cast(ContentAuditLog.id, String()).label("id"),
@@ -3034,9 +3044,11 @@ def _audit_union_subquery() -> object:
         .join(block, ContentAuditLog.content_block_id == block.id, isouter=True)
     )
 
+
+def _audit_security_union_query() -> object:
     actor = aliased(User)
     subject = aliased(User)
-    security_q = (
+    return (
         select(
             literal("security").label("entity"),
             cast(AdminAuditLog.id, String()).label("id"),
@@ -3057,7 +3069,49 @@ def _audit_union_subquery() -> object:
         .join(subject, AdminAuditLog.subject_user_id == subject.id, isouter=True)
     )
 
-    return union_all(products_q, content_q, security_q).subquery()
+
+def _audit_entity_filter(audit: object, entity: str | None) -> object | None:
+    if not entity:
+        return None
+    normalized = entity.strip().lower()
+    if not normalized or normalized == "all":
+        return None
+    return getattr(audit.c, "entity") == normalized  # type: ignore[attr-defined]
+
+
+def _audit_action_filter(audit: object, action: str | None) -> object | None:
+    if not action:
+        return None
+    needle = action.strip().lower()
+    if not needle:
+        return None
+    tokens = [token.strip() for token in re.split(r"[|,]+", needle) if token.strip()]
+    action_col = func.lower(getattr(audit.c, "action"))  # type: ignore[attr-defined]
+    if len(tokens) <= 1:
+        return action_col.like(f"%{needle}%")
+    return or_(*[action_col.like(f"%{token}%") for token in tokens])
+
+
+def _audit_user_filter(audit: object, user: str | None) -> object | None:
+    if not user:
+        return None
+    needle = user.strip().lower()
+    if not needle:
+        return None
+    actor_email = func.lower(func.coalesce(getattr(audit.c, "actor_email"), ""))  # type: ignore[attr-defined]
+    actor_username = func.lower(func.coalesce(getattr(audit.c, "actor_username"), ""))  # type: ignore[attr-defined]
+    subject_email = func.lower(func.coalesce(getattr(audit.c, "subject_email"), ""))  # type: ignore[attr-defined]
+    subject_username = func.lower(func.coalesce(getattr(audit.c, "subject_username"), ""))  # type: ignore[attr-defined]
+    actor_user_id = func.lower(func.coalesce(getattr(audit.c, "actor_user_id"), ""))  # type: ignore[attr-defined]
+    subject_user_id = func.lower(func.coalesce(getattr(audit.c, "subject_user_id"), ""))  # type: ignore[attr-defined]
+    return or_(
+        actor_email.like(f"%{needle}%"),
+        actor_username.like(f"%{needle}%"),
+        subject_email.like(f"%{needle}%"),
+        subject_username.like(f"%{needle}%"),
+        actor_user_id.like(f"%{needle}%"),
+        subject_user_id.like(f"%{needle}%"),
+    )
 
 
 def _audit_filters(
@@ -3068,54 +3122,15 @@ def _audit_filters(
     user: str | None,
 ) -> list:
     filters: list = []
-
-    if entity:
-        normalized = entity.strip().lower()
-        if normalized and normalized != "all":
-            filters.append(getattr(audit.c, "entity") == normalized)  # type: ignore[attr-defined]
-
-    if action:
-        needle = action.strip().lower()
-        if needle:
-            tokens = [token.strip() for token in re.split(r"[|,]+", needle) if token.strip()]
-            if len(tokens) <= 1:
-                filters.append(
-                    func.lower(getattr(audit.c, "action")).like(f"%{needle}%")  # type: ignore[attr-defined]
-                )
-            else:
-                action_col = func.lower(getattr(audit.c, "action"))  # type: ignore[attr-defined]
-                filters.append(or_(*[action_col.like(f"%{token}%") for token in tokens]))
-
-    if user:
-        needle = user.strip().lower()
-        if needle:
-            actor_email = func.lower(func.coalesce(getattr(audit.c, "actor_email"), ""))  # type: ignore[attr-defined]
-            actor_username = func.lower(
-                func.coalesce(getattr(audit.c, "actor_username"), "")
-            )  # type: ignore[attr-defined]
-            subject_email = func.lower(
-                func.coalesce(getattr(audit.c, "subject_email"), "")
-            )  # type: ignore[attr-defined]
-            subject_username = func.lower(
-                func.coalesce(getattr(audit.c, "subject_username"), "")
-            )  # type: ignore[attr-defined]
-            actor_user_id = func.lower(
-                func.coalesce(getattr(audit.c, "actor_user_id"), "")
-            )  # type: ignore[attr-defined]
-            subject_user_id = func.lower(
-                func.coalesce(getattr(audit.c, "subject_user_id"), "")
-            )  # type: ignore[attr-defined]
-            filters.append(
-                or_(
-                    actor_email.like(f"%{needle}%"),
-                    actor_username.like(f"%{needle}%"),
-                    subject_email.like(f"%{needle}%"),
-                    subject_username.like(f"%{needle}%"),
-                    actor_user_id.like(f"%{needle}%"),
-                    subject_user_id.like(f"%{needle}%"),
-                )
-            )
-
+    entity_filter = _audit_entity_filter(audit, entity)
+    if entity_filter is not None:
+        filters.append(entity_filter)
+    action_filter = _audit_action_filter(audit, action)
+    if action_filter is not None:
+        filters.append(action_filter)
+    user_filter = _audit_user_filter(audit, user)
+    if user_filter is not None:
+        filters.append(user_filter)
     return filters
 
 
@@ -3158,6 +3173,39 @@ def _audit_csv_cell(value: str) -> str:
     return cleaned
 
 
+def _audit_total_pages(total_items: int, limit: int) -> int:
+    if not total_items:
+        return 1
+    return max(1, (total_items + limit - 1) // limit)
+
+
+def _audit_entries_query(audit: object, filters: list, *, page: int, limit: int) -> object:
+    offset = (page - 1) * limit
+    return (
+        select(audit)
+        .where(*filters)
+        .order_by(getattr(audit.c, "created_at").desc())
+        .offset(offset)
+        .limit(limit)
+    )  # type: ignore[attr-defined]
+
+
+def _audit_entry_item(row: Any) -> dict[str, Any]:
+    return {
+        "entity": row.get("entity"),
+        "id": row.get("id"),
+        "action": row.get("action"),
+        "created_at": row.get("created_at"),
+        "actor_user_id": row.get("actor_user_id"),
+        "actor_email": row.get("actor_email"),
+        "subject_user_id": row.get("subject_user_id"),
+        "subject_email": row.get("subject_email"),
+        "ref_id": row.get("ref_id"),
+        "ref_key": row.get("ref_key"),
+        "data": row.get("data"),
+    }
+
+
 @router.get("/audit/entries")
 async def admin_audit_entries(
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -3172,37 +3220,12 @@ async def admin_audit_entries(
 ) -> dict:
     audit = _audit_union_subquery()
     filters = _audit_filters(audit, entity=entity, action=action, user=user)
-    total = await session.scalar(
-        select(func.count()).select_from(audit).where(*filters)
-    )
+    total = await session.scalar(select(func.count()).select_from(audit).where(*filters))
     total_items = int(total or 0)
-    total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
-
-    offset = (page - 1) * limit
-    q = (
-        select(audit)
-        .where(*filters)
-        .order_by(getattr(audit.c, "created_at").desc())
-        .offset(offset)
-        .limit(limit)
-    )  # type: ignore[attr-defined]
+    total_pages = _audit_total_pages(total_items, limit)
+    q = _audit_entries_query(audit, filters, page=page, limit=limit)
     rows = (await session.execute(q)).mappings().all()
-    items = [
-        {
-            "entity": row.get("entity"),
-            "id": row.get("id"),
-            "action": row.get("action"),
-            "created_at": row.get("created_at"),
-            "actor_user_id": row.get("actor_user_id"),
-            "actor_email": row.get("actor_email"),
-            "subject_user_id": row.get("subject_user_id"),
-            "subject_email": row.get("subject_email"),
-            "ref_id": row.get("ref_id"),
-            "ref_key": row.get("ref_key"),
-            "data": row.get("data"),
-        }
-        for row in rows
-    ]
+    items = [_audit_entry_item(row) for row in rows]
 
     return {
         "items": items,

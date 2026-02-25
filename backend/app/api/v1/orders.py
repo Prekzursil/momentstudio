@@ -204,63 +204,58 @@ def _cart_item_name(item, lang: str | None) -> str:
     return base
 
 
+def _stripe_line_item(*, unit_amount: int, name: str, quantity: int) -> dict[str, object]:
+    return {
+        "price_data": {
+            "currency": "ron",
+            "unit_amount": unit_amount,
+            "product_data": {"name": name},
+        },
+        "quantity": quantity,
+    }
+
+
+def _stripe_cart_line_item(item, *, lang: str | None) -> dict[str, object] | None:
+    unit_price = _as_decimal(getattr(item, "unit_price_at_add", 0))
+    unit_amount = _money_to_cents(unit_price)
+    quantity = int(getattr(item, "quantity", 0) or 0)
+    if quantity <= 0:
+        return None
+    return _stripe_line_item(unit_amount=unit_amount, name=_cart_item_name(item, lang), quantity=quantity)
+
+
+def _append_stripe_charge_line_item(
+    items: list[dict[str, object]], *, amount_cents: int, charge_kind: str, lang: str | None
+) -> None:
+    if amount_cents:
+        items.append(_stripe_line_item(unit_amount=amount_cents, name=_charge_label(charge_kind, lang), quantity=1))
+
+
 def _build_stripe_line_items(cart: Cart, totals: Totals, *, lang: str | None) -> list[dict[str, object]]:
     items: list[dict[str, object]] = []
     for item in cart.items:
-        unit_price = _as_decimal(getattr(item, "unit_price_at_add", 0))
-        unit_amount = _money_to_cents(unit_price)
-        quantity = int(getattr(item, "quantity", 0) or 0)
-        if quantity <= 0:
-            continue
-        items.append(
-            {
-                "price_data": {
-                    "currency": "ron",
-                    "unit_amount": unit_amount,
-                    "product_data": {"name": _cart_item_name(item, lang)},
-                },
-                "quantity": quantity,
-            }
-        )
+        line_item = _stripe_cart_line_item(item, lang=lang)
+        if line_item is not None:
+            items.append(line_item)
 
-    shipping_cents = _money_to_cents(totals.shipping)
-    if shipping_cents:
-        items.append(
-            {
-                "price_data": {
-                    "currency": "ron",
-                    "unit_amount": shipping_cents,
-                    "product_data": {"name": _charge_label("shipping", lang)},
-                },
-                "quantity": 1,
-            }
-        )
-
-    fee_cents = _money_to_cents(totals.fee)
-    if fee_cents:
-        items.append(
-            {
-                "price_data": {
-                    "currency": "ron",
-                    "unit_amount": fee_cents,
-                    "product_data": {"name": _charge_label("fee", lang)},
-                },
-                "quantity": 1,
-            }
-        )
-
-    vat_cents = _money_to_cents(totals.tax)
-    if vat_cents:
-        items.append(
-            {
-                "price_data": {
-                    "currency": "ron",
-                    "unit_amount": vat_cents,
-                    "product_data": {"name": _charge_label("vat", lang)},
-                },
-                "quantity": 1,
-            }
-        )
+    _append_stripe_charge_line_item(
+        items,
+        amount_cents=_money_to_cents(totals.shipping),
+        charge_kind="shipping",
+        lang=lang,
+    )
+    _append_stripe_charge_line_item(
+        items,
+        amount_cents=_money_to_cents(totals.fee),
+        charge_kind="fee",
+        lang=lang,
+    )
+    _append_stripe_charge_line_item(
+        items,
+        amount_cents=_money_to_cents(totals.tax),
+        charge_kind="vat",
+        lang=lang,
+    )
 
     return items
 
@@ -336,37 +331,58 @@ def _netopia_address_payload(*, email: str, phone: str | None, first_name: str, 
     }
 
 
-def _build_netopia_products(order: Order, *, lang: str | None) -> list[dict[str, Any]]:
-    lines: list[dict[str, Any]] = []
-    for item in order.items or []:
-        product = getattr(item, "product", None)
-        name = (getattr(product, "name", None) or "").strip() or "Item"
-        code = (getattr(product, "sku", None) or "").strip() or str(getattr(product, "id", "") or "")
-        category = (getattr(getattr(product, "category", None), "name", None) or "").strip() or "Product"
-        subtotal = pricing.quantize_money(_as_decimal(getattr(item, "subtotal", 0)))
-        if subtotal <= 0:
-            continue
-        lines.append({"name": name, "code": code, "category": category, "price": subtotal, "vat": 0})
+def _netopia_product_name(product: Any) -> str:
+    name = (getattr(product, "name", None) or "").strip()
+    if name:
+        return name
+    return "Item"
 
-    shipping = pricing.quantize_money(_as_decimal(getattr(order, "shipping_amount", 0)))
-    if shipping > 0:
-        lines.append({"name": _charge_label("shipping", lang), "code": "shipping", "category": "Shipping", "price": shipping, "vat": 0})
 
-    fee = pricing.quantize_money(_as_decimal(getattr(order, "fee_amount", 0)))
-    if fee > 0:
-        lines.append({"name": _charge_label("fee", lang), "code": "fee", "category": "Fee", "price": fee, "vat": 0})
+def _netopia_product_code(product: Any) -> str:
+    code = (getattr(product, "sku", None) or "").strip()
+    if code:
+        return code
+    return str(getattr(product, "id", "") or "")
 
-    tax = pricing.quantize_money(_as_decimal(getattr(order, "tax_amount", 0)))
-    if tax > 0:
-        lines.append({"name": _charge_label("vat", lang), "code": "vat", "category": "VAT", "price": tax, "vat": 0})
 
-    target = pricing.quantize_money(_as_decimal(getattr(order, "total_amount", 0)))
+def _netopia_product_category(product: Any) -> str:
+    category = (getattr(getattr(product, "category", None), "name", None) or "").strip()
+    if category:
+        return category
+    return "Product"
+
+
+def _netopia_order_item_line(item) -> dict[str, Any] | None:
+    product = getattr(item, "product", None)
+    subtotal = pricing.quantize_money(_as_decimal(getattr(item, "subtotal", 0)))
+    if subtotal <= 0:
+        return None
+    return {
+        "name": _netopia_product_name(product),
+        "code": _netopia_product_code(product),
+        "category": _netopia_product_category(product),
+        "price": subtotal,
+        "vat": 0,
+    }
+
+
+def _append_netopia_charge_line(
+    lines: list[dict[str, Any]], *, amount_value: object, charge_kind: str, code: str, category: str, lang: str | None
+) -> None:
+    amount = pricing.quantize_money(_as_decimal(amount_value))
+    if amount > 0:
+        lines.append({"name": _charge_label(charge_kind, lang), "code": code, "category": category, "price": amount, "vat": 0})
+
+
+def _rebalance_netopia_lines_total(lines: list[dict[str, Any]], *, target: Decimal) -> None:
     current = sum((row["price"] for row in lines), Decimal("0.00"))
     diff = current - target
     if diff > Decimal("0.00"):
         idx = max(range(len(lines)), key=lambda i: lines[i]["price"])
         lines[idx]["price"] = pricing.quantize_money(max(Decimal("0.00"), lines[idx]["price"] - diff))
 
+
+def _serialize_netopia_products(lines: list[dict[str, Any]]) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for row in lines:
         out.append(
@@ -379,6 +395,45 @@ def _build_netopia_products(order: Order, *, lang: str | None) -> list[dict[str,
             }
         )
     return out
+
+
+def _build_netopia_products(order: Order, *, lang: str | None) -> list[dict[str, Any]]:
+    lines: list[dict[str, Any]] = []
+    for item in order.items or []:
+        line = _netopia_order_item_line(item)
+        if line is not None:
+            lines.append(line)
+
+    _append_netopia_charge_line(
+        lines,
+        amount_value=getattr(order, "shipping_amount", 0),
+        charge_kind="shipping",
+        code="shipping",
+        category="Shipping",
+        lang=lang,
+    )
+    _append_netopia_charge_line(
+        lines,
+        amount_value=getattr(order, "fee_amount", 0),
+        charge_kind="fee",
+        code="fee",
+        category="Fee",
+        lang=lang,
+    )
+    _append_netopia_charge_line(
+        lines,
+        amount_value=getattr(order, "tax_amount", 0),
+        charge_kind="vat",
+        code="vat",
+        category="VAT",
+        lang=lang,
+    )
+
+    _rebalance_netopia_lines_total(
+        lines,
+        target=pricing.quantize_money(_as_decimal(getattr(order, "total_amount", 0))),
+    )
+    return _serialize_netopia_products(lines)
 
 
 def _delivery_from_payload(
