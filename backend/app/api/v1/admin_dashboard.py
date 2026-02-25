@@ -229,26 +229,29 @@ async def admin_update_alert_thresholds(
     return AdminDashboardAlertThresholdsResponse(**_dashboard_alert_thresholds_payload(record))
 
 
-@router.get("/summary")
-async def admin_summary(
-    session: Annotated[AsyncSession, Depends(get_session)],
-    _: Annotated[User, Depends(require_admin_section("dashboard"))],
-    range_days: int = Query(default=30, ge=1, le=365),
-    range_from: date | None = Query(default=None),
-    range_to: date | None = Query(default=None),
-) -> dict:
-    now = datetime.now(timezone.utc)
-    successful_statuses = (OrderStatus.paid, OrderStatus.shipped, OrderStatus.delivered)
-    sales_statuses = (*successful_statuses, OrderStatus.refunded)
-    test_order_ids = select(OrderTag.order_id).where(OrderTag.tag == "test")
-    exclude_test_orders = Order.id.notin_(test_order_ids)
+def _summary_delta_pct(current: float, previous: float) -> float | None:
+    if previous == 0:
+        return None
+    return (current - previous) / previous * 100.0
 
+
+def _summary_rate_pct(numerator: float, denominator: float) -> float | None:
+    if denominator <= 0:
+        return None
+    return numerator / denominator * 100.0
+
+
+def _summary_resolve_range(
+    now: datetime,
+    range_days: int,
+    range_from: date | None,
+    range_to: date | None,
+) -> tuple[datetime, datetime, int]:
     if (range_from is None) != (range_to is None):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="range_from and range_to must be provided together",
         )
-
     if range_from is not None and range_to is not None:
         if range_to < range_from:
             raise HTTPException(
@@ -256,23 +259,17 @@ async def admin_summary(
                 detail="range_to must be on/after range_from",
             )
         start = datetime.combine(range_from, datetime.min.time(), tzinfo=timezone.utc)
-        end = datetime.combine(
-            range_to + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc
-        )
-        effective_range_days = (range_to - range_from).days + 1
-    else:
-        start = now - timedelta(days=range_days)
-        end = now
-        effective_range_days = range_days
+        end = datetime.combine(range_to + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc)
+        return start, end, (range_to - range_from).days + 1
+    return now - timedelta(days=range_days), now, range_days
 
+
+async def _summary_totals(session: AsyncSession, exclude_test_orders: Any) -> dict[str, int]:
     products_total = await session.scalar(
         select(func.count()).select_from(Product).where(Product.is_deleted.is_(False))
     )
-    orders_total = await session.scalar(
-        select(func.count()).select_from(Order).where(exclude_test_orders)
-    )
+    orders_total = await session.scalar(select(func.count()).select_from(Order).where(exclude_test_orders))
     users_total = await session.scalar(select(func.count()).select_from(User))
-
     low_stock_threshold = func.coalesce(
         Product.low_stock_threshold,
         Category.low_stock_threshold,
@@ -288,242 +285,140 @@ async def admin_summary(
             Product.stock_quantity < low_stock_threshold,
         )
     )
+    return {
+        "products": int(products_total or 0),
+        "orders": int(orders_total or 0),
+        "users": int(users_total or 0),
+        "low_stock": int(low_stock or 0),
+    }
 
-    since = now - timedelta(days=30)
-    sales_30d = await session.scalar(
+
+async def _summary_sales_metrics(
+    session: AsyncSession,
+    start: datetime,
+    end: datetime,
+    successful_statuses: tuple[OrderStatus, ...],
+    sales_statuses: tuple[OrderStatus, ...],
+    exclude_test_orders: Any,
+) -> dict[str, float | int]:
+    window_filters = (Order.created_at >= start, Order.created_at < end, exclude_test_orders)
+    sales = await session.scalar(
         select(func.coalesce(func.sum(Order.total_amount), 0)).where(
-            Order.created_at >= since,
-            Order.status.in_(successful_statuses),
-            exclude_test_orders,
+            *window_filters, Order.status.in_(successful_statuses)
         )
     )
-    gross_sales_30d = await session.scalar(
+    gross_sales = await session.scalar(
         select(func.coalesce(func.sum(Order.total_amount), 0)).where(
-            Order.created_at >= since,
-            Order.status.in_(sales_statuses),
-            exclude_test_orders,
+            *window_filters, Order.status.in_(sales_statuses)
         )
     )
-    refunds_30d = await session.scalar(
+    refunds = await session.scalar(
         select(func.coalesce(func.sum(OrderRefund.amount), 0))
         .select_from(OrderRefund)
         .join(Order, OrderRefund.order_id == Order.id)
-        .where(
-            Order.created_at >= since,
-            Order.status.in_(sales_statuses),
-            exclude_test_orders,
-        )
+        .where(*window_filters, Order.status.in_(sales_statuses))
     )
-    missing_refunds_30d = await session.scalar(
+    missing_refunds = await session.scalar(
         select(func.coalesce(func.sum(Order.total_amount), 0))
         .select_from(Order)
         .outerjoin(OrderRefund, OrderRefund.order_id == Order.id)
-        .where(
-            Order.created_at >= since,
-            Order.status == OrderStatus.refunded,
-            OrderRefund.id.is_(None),
-            exclude_test_orders,
-        )
+        .where(*window_filters, Order.status == OrderStatus.refunded, OrderRefund.id.is_(None))
     )
-    net_sales_30d = (
-        (gross_sales_30d or 0)
-        - (refunds_30d or 0)
-        - (missing_refunds_30d or 0)
-    )
-    orders_30d = await session.scalar(
-        select(func.count()).select_from(Order).where(Order.created_at >= since, exclude_test_orders)
-    )
+    orders = await session.scalar(select(func.count()).select_from(Order).where(*window_filters))
+    gross_sales_value = float(gross_sales or 0)
+    refunds_value = float(refunds or 0)
+    missing_refunds_value = float(missing_refunds or 0)
+    return {
+        "sales": float(sales or 0),
+        "gross_sales": gross_sales_value,
+        "net_sales": gross_sales_value - refunds_value - missing_refunds_value,
+        "orders": int(orders or 0),
+    }
 
-    sales_range = await session.scalar(
-        select(func.coalesce(func.sum(Order.total_amount), 0)).where(
-            Order.created_at >= start,
-            Order.created_at < end,
-            Order.status.in_(successful_statuses),
-            exclude_test_orders,
-        )
-    )
-    gross_sales_range = await session.scalar(
-        select(func.coalesce(func.sum(Order.total_amount), 0)).where(
-            Order.created_at >= start,
-            Order.created_at < end,
-            Order.status.in_(sales_statuses),
-            exclude_test_orders,
-        )
-    )
-    refunds_range = await session.scalar(
-        select(func.coalesce(func.sum(OrderRefund.amount), 0))
-        .select_from(OrderRefund)
-        .join(Order, OrderRefund.order_id == Order.id)
-        .where(
-            Order.created_at >= start,
-            Order.created_at < end,
-            Order.status.in_(sales_statuses),
-            exclude_test_orders,
-        )
-    )
-    missing_refunds_range = await session.scalar(
-        select(func.coalesce(func.sum(Order.total_amount), 0))
-        .select_from(Order)
-        .outerjoin(OrderRefund, OrderRefund.order_id == Order.id)
-        .where(
-            Order.created_at >= start,
-            Order.created_at < end,
-            Order.status == OrderStatus.refunded,
-            OrderRefund.id.is_(None),
-            exclude_test_orders,
-        )
-    )
-    net_sales_range = (
-        (gross_sales_range or 0)
-        - (refunds_range or 0)
-        - (missing_refunds_range or 0)
-    )
-    orders_range = await session.scalar(
+
+async def _summary_refunded_order_count(
+    session: AsyncSession,
+    start: datetime,
+    end: datetime,
+    exclude_test_orders: Any,
+) -> int:
+    refunded_orders = await session.scalar(
         select(func.count())
         .select_from(Order)
-        .where(Order.created_at >= start, Order.created_at < end, exclude_test_orders)
+        .where(
+            Order.status == OrderStatus.refunded,
+            Order.updated_at >= start,
+            Order.updated_at < end,
+            exclude_test_orders,
+        )
     )
+    return int(refunded_orders or 0)
 
+
+async def _summary_day_metrics(
+    session: AsyncSession,
+    now: datetime,
+    successful_statuses: tuple[OrderStatus, ...],
+    sales_statuses: tuple[OrderStatus, ...],
+    exclude_test_orders: Any,
+) -> dict[str, float | int | None]:
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     yesterday_start = today_start - timedelta(days=1)
+    today_metrics = await _summary_sales_metrics(
+        session, today_start, now, successful_statuses, sales_statuses, exclude_test_orders
+    )
+    yesterday_metrics = await _summary_sales_metrics(
+        session, yesterday_start, today_start, successful_statuses, sales_statuses, exclude_test_orders
+    )
+    today_refunds = await _summary_refunded_order_count(session, today_start, now, exclude_test_orders)
+    yesterday_refunds = await _summary_refunded_order_count(
+        session, yesterday_start, today_start, exclude_test_orders
+    )
+    today_orders = int(today_metrics["orders"])
+    yesterday_orders = int(yesterday_metrics["orders"])
+    today_sales = float(today_metrics["sales"])
+    yesterday_sales = float(yesterday_metrics["sales"])
+    gross_today_sales = float(today_metrics["gross_sales"])
+    gross_yesterday_sales = float(yesterday_metrics["gross_sales"])
+    net_today_sales = float(today_metrics["net_sales"])
+    net_yesterday_sales = float(yesterday_metrics["net_sales"])
+    return {
+        "today_orders": today_orders,
+        "yesterday_orders": yesterday_orders,
+        "orders_delta_pct": _summary_delta_pct(float(today_orders), float(yesterday_orders)),
+        "today_sales": today_sales,
+        "yesterday_sales": yesterday_sales,
+        "sales_delta_pct": _summary_delta_pct(today_sales, yesterday_sales),
+        "gross_today_sales": gross_today_sales,
+        "gross_yesterday_sales": gross_yesterday_sales,
+        "gross_sales_delta_pct": _summary_delta_pct(gross_today_sales, gross_yesterday_sales),
+        "net_today_sales": net_today_sales,
+        "net_yesterday_sales": net_yesterday_sales,
+        "net_sales_delta_pct": _summary_delta_pct(net_today_sales, net_yesterday_sales),
+        "today_refunds": today_refunds,
+        "yesterday_refunds": yesterday_refunds,
+        "refunds_delta_pct": _summary_delta_pct(float(today_refunds), float(yesterday_refunds)),
+    }
 
-    today_orders = await session.scalar(
-        select(func.count())
-        .select_from(Order)
-        .where(Order.created_at >= today_start, Order.created_at < now, exclude_test_orders)
-    )
-    yesterday_orders = await session.scalar(
-        select(func.count())
-        .select_from(Order)
-        .where(
-            Order.created_at >= yesterday_start,
-            Order.created_at < today_start,
-            exclude_test_orders,
-        )
-    )
-    today_sales = await session.scalar(
-        select(func.coalesce(func.sum(Order.total_amount), 0)).where(
-            Order.created_at >= today_start,
-            Order.created_at < now,
-            Order.status.in_(successful_statuses),
-            exclude_test_orders,
-        )
-    )
-    yesterday_sales = await session.scalar(
-        select(func.coalesce(func.sum(Order.total_amount), 0)).where(
-            Order.created_at >= yesterday_start,
-            Order.created_at < today_start,
-            Order.status.in_(successful_statuses),
-            exclude_test_orders,
-        )
-    )
-    gross_today_sales = await session.scalar(
-        select(func.coalesce(func.sum(Order.total_amount), 0)).where(
-            Order.created_at >= today_start,
-            Order.created_at < now,
-            Order.status.in_(sales_statuses),
-            exclude_test_orders,
-        )
-    )
-    gross_yesterday_sales = await session.scalar(
-        select(func.coalesce(func.sum(Order.total_amount), 0)).where(
-            Order.created_at >= yesterday_start,
-            Order.created_at < today_start,
-            Order.status.in_(sales_statuses),
-            exclude_test_orders,
-        )
-    )
-    refunds_today = await session.scalar(
-        select(func.coalesce(func.sum(OrderRefund.amount), 0))
-        .select_from(OrderRefund)
-        .join(Order, OrderRefund.order_id == Order.id)
-        .where(
-            Order.created_at >= today_start,
-            Order.created_at < now,
-            Order.status.in_(sales_statuses),
-            exclude_test_orders,
-        )
-    )
-    refunds_yesterday = await session.scalar(
-        select(func.coalesce(func.sum(OrderRefund.amount), 0))
-        .select_from(OrderRefund)
-        .join(Order, OrderRefund.order_id == Order.id)
-        .where(
-            Order.created_at >= yesterday_start,
-            Order.created_at < today_start,
-            Order.status.in_(sales_statuses),
-            exclude_test_orders,
-        )
-    )
-    missing_refunds_today = await session.scalar(
-        select(func.coalesce(func.sum(Order.total_amount), 0))
-        .select_from(Order)
-        .outerjoin(OrderRefund, OrderRefund.order_id == Order.id)
-        .where(
-            Order.created_at >= today_start,
-            Order.created_at < now,
-            Order.status == OrderStatus.refunded,
-            OrderRefund.id.is_(None),
-            exclude_test_orders,
-        )
-    )
-    missing_refunds_yesterday = await session.scalar(
-        select(func.coalesce(func.sum(Order.total_amount), 0))
-        .select_from(Order)
-        .outerjoin(OrderRefund, OrderRefund.order_id == Order.id)
-        .where(
-            Order.created_at >= yesterday_start,
-            Order.created_at < today_start,
-            Order.status == OrderStatus.refunded,
-            OrderRefund.id.is_(None),
-            exclude_test_orders,
-        )
-    )
-    net_today_sales = (
-        (gross_today_sales or 0)
-        - (refunds_today or 0)
-        - (missing_refunds_today or 0)
-    )
-    net_yesterday_sales = (
-        (gross_yesterday_sales or 0)
-        - (refunds_yesterday or 0)
-        - (missing_refunds_yesterday or 0)
-    )
-    today_refunds = await session.scalar(
-        select(func.count())
-        .select_from(Order)
-        .where(
-            Order.status == OrderStatus.refunded,
-            Order.updated_at >= today_start,
-            Order.updated_at < now,
-            exclude_test_orders,
-        )
-    )
-    yesterday_refunds = await session.scalar(
-        select(func.count())
-        .select_from(Order)
-        .where(
-            Order.status == OrderStatus.refunded,
-            Order.updated_at >= yesterday_start,
-            Order.updated_at < today_start,
-            exclude_test_orders,
-        )
-    )
 
-    payment_window_end = now
+async def _summary_failed_payment_counts(
+    session: AsyncSession,
+    now: datetime,
+    exclude_test_orders: Any,
+) -> tuple[int, int]:
     payment_window_start = now - timedelta(hours=24)
     payment_prev_start = payment_window_start - timedelta(hours=24)
-    failed_payments = await session.scalar(
+    failed_current = await session.scalar(
         select(func.count())
         .select_from(Order)
         .where(
             Order.status == OrderStatus.pending_payment,
             Order.created_at >= payment_window_start,
-            Order.created_at < payment_window_end,
+            Order.created_at < now,
             exclude_test_orders,
         )
     )
-    failed_payments_prev = await session.scalar(
+    failed_previous = await session.scalar(
         select(func.count())
         .select_from(Order)
         .where(
@@ -533,22 +428,28 @@ async def admin_summary(
             exclude_test_orders,
         )
     )
+    return int(failed_current or 0), int(failed_previous or 0)
 
-    refund_window_end = now
+
+async def _summary_refund_request_counts(
+    session: AsyncSession,
+    now: datetime,
+    exclude_test_orders: Any,
+) -> dict[str, int]:
     refund_window_start = now - timedelta(days=7)
     refund_prev_start = refund_window_start - timedelta(days=7)
-    refund_requests = await session.scalar(
+    requested_current = await session.scalar(
         select(func.count())
         .select_from(ReturnRequest)
         .join(Order, ReturnRequest.order_id == Order.id)
         .where(
             ReturnRequest.status == ReturnRequestStatus.requested,
             ReturnRequest.created_at >= refund_window_start,
-            ReturnRequest.created_at < refund_window_end,
+            ReturnRequest.created_at < now,
             exclude_test_orders,
         )
     )
-    refund_requests_prev = await session.scalar(
+    requested_previous = await session.scalar(
         select(func.count())
         .select_from(ReturnRequest)
         .join(Order, ReturnRequest.order_id == Order.id)
@@ -559,16 +460,12 @@ async def admin_summary(
             exclude_test_orders,
         )
     )
-    refund_window_orders = await session.scalar(
+    orders_current = await session.scalar(
         select(func.count())
         .select_from(Order)
-        .where(
-            Order.created_at >= refund_window_start,
-            Order.created_at < refund_window_end,
-            exclude_test_orders,
-        )
+        .where(Order.created_at >= refund_window_start, Order.created_at < now, exclude_test_orders)
     )
-    refund_window_orders_prev = await session.scalar(
+    orders_previous = await session.scalar(
         select(func.count())
         .select_from(Order)
         .where(
@@ -577,7 +474,15 @@ async def admin_summary(
             exclude_test_orders,
         )
     )
+    return {
+        "refund_requests": int(requested_current or 0),
+        "refund_requests_prev": int(requested_previous or 0),
+        "refund_window_orders": int(orders_current or 0),
+        "refund_window_orders_prev": int(orders_previous or 0),
+    }
 
+
+async def _summary_stockouts_count(session: AsyncSession) -> int:
     stockouts = await session.scalar(
         select(func.count())
         .select_from(Product)
@@ -587,120 +492,219 @@ async def admin_summary(
             Product.is_active.is_(True),
         )
     )
+    return int(stockouts or 0)
 
-    def _delta_pct(today_value: float, yesterday_value: float) -> float | None:
-        if yesterday_value == 0:
-            return None
-        return (today_value - yesterday_value) / yesterday_value * 100.0
 
-    def _rate_pct(numer: float, denom: float) -> float | None:
-        if denom <= 0:
-            return None
-        return numer / denom * 100.0
-
-    thresholds = await _get_dashboard_alert_thresholds(session)
-    failed_payments_threshold_min_count = int(getattr(thresholds, "failed_payments_min_count", 1) or 1)
-    failed_payments_threshold_min_delta_pct = (
-        float(getattr(thresholds, "failed_payments_min_delta_pct"))
-        if getattr(thresholds, "failed_payments_min_delta_pct", None) is not None
-        else None
+async def _summary_anomaly_inputs(
+    session: AsyncSession, now: datetime, exclude_test_orders: Any
+) -> dict[str, int]:
+    failed_payments, failed_payments_prev = await _summary_failed_payment_counts(
+        session, now, exclude_test_orders
     )
-    refund_requests_threshold_min_count = int(getattr(thresholds, "refund_requests_min_count", 1) or 1)
-    refund_requests_threshold_min_rate_pct = (
-        float(getattr(thresholds, "refund_requests_min_rate_pct"))
-        if getattr(thresholds, "refund_requests_min_rate_pct", None) is not None
-        else None
-    )
-    stockouts_threshold_min_count = int(getattr(thresholds, "stockouts_min_count", 1) or 1)
-
-    failed_payments_delta_pct = _delta_pct(float(failed_payments or 0), float(failed_payments_prev or 0))
-    failed_payments_is_alert = bool(int(failed_payments or 0) >= failed_payments_threshold_min_count) and (
-        failed_payments_threshold_min_delta_pct is None
-        or failed_payments_delta_pct is None
-        or failed_payments_delta_pct >= failed_payments_threshold_min_delta_pct
-    )
-
-    refund_rate_pct = _rate_pct(float(refund_requests or 0), float(refund_window_orders or 0))
-    refund_rate_prev_pct = _rate_pct(float(refund_requests_prev or 0), float(refund_window_orders_prev or 0))
-    refund_rate_delta_pct = (
-        _delta_pct(refund_rate_pct, refund_rate_prev_pct)
-        if refund_rate_pct is not None and refund_rate_prev_pct is not None
-        else None
-    )
-    refund_requests_is_alert = bool(int(refund_requests or 0) >= refund_requests_threshold_min_count) and (
-        refund_requests_threshold_min_rate_pct is None
-        or refund_rate_pct is None
-        or refund_rate_pct >= refund_requests_threshold_min_rate_pct
-    )
-
-    stockouts_is_alert = bool(int(stockouts or 0) >= stockouts_threshold_min_count)
-
+    refund_request_counts = await _summary_refund_request_counts(session, now, exclude_test_orders)
     return {
-        "products": products_total or 0,
-        "orders": orders_total or 0,
-        "users": users_total or 0,
-        "low_stock": low_stock or 0,
-        "sales_30d": float(sales_30d or 0),
-        "gross_sales_30d": float(gross_sales_30d or 0),
-        "net_sales_30d": float(net_sales_30d or 0),
-        "orders_30d": orders_30d or 0,
-        "sales_range": float(sales_range or 0),
-        "gross_sales_range": float(gross_sales_range or 0),
-        "net_sales_range": float(net_sales_range or 0),
-        "orders_range": int(orders_range or 0),
+        "failed_payments": failed_payments,
+        "failed_payments_prev": failed_payments_prev,
+        "stockouts": await _summary_stockouts_count(session),
+        **refund_request_counts,
+    }
+
+
+def _summary_failed_payments_is_alert(
+    failed_payments: int,
+    failed_payments_delta_pct: float | None,
+    threshold_min_count: int,
+    threshold_min_delta_pct: float | None,
+) -> bool:
+    if failed_payments < threshold_min_count:
+        return False
+    if threshold_min_delta_pct is None or failed_payments_delta_pct is None:
+        return True
+    return failed_payments_delta_pct >= threshold_min_delta_pct
+
+
+def _summary_refund_requests_is_alert(
+    refund_requests: int,
+    refund_rate_pct: float | None,
+    threshold_min_count: int,
+    threshold_min_rate_pct: float | None,
+) -> bool:
+    if refund_requests < threshold_min_count:
+        return False
+    if threshold_min_rate_pct is None or refund_rate_pct is None:
+        return True
+    return refund_rate_pct >= threshold_min_rate_pct
+
+
+def _summary_failed_payments_payload(
+    failed_payments: int,
+    failed_payments_prev: int,
+    threshold_min_count: int,
+    threshold_min_delta_pct: float | None,
+) -> dict[str, object]:
+    failed_delta_pct = _summary_delta_pct(float(failed_payments), float(failed_payments_prev))
+    return {
+        "window_hours": 24,
+        "current": failed_payments,
+        "previous": failed_payments_prev,
+        "delta_pct": failed_delta_pct,
+        "is_alert": _summary_failed_payments_is_alert(
+            failed_payments,
+            failed_delta_pct,
+            threshold_min_count,
+            threshold_min_delta_pct,
+        ),
+    }
+
+
+def _summary_refund_requests_payload(
+    refund_requests: int,
+    refund_requests_prev: int,
+    refund_window_orders: int,
+    refund_window_orders_prev: int,
+    threshold_min_count: int,
+    threshold_min_rate_pct: float | None,
+) -> dict[str, object]:
+    refund_delta_pct = _summary_delta_pct(float(refund_requests), float(refund_requests_prev))
+    refund_rate_pct = _summary_rate_pct(float(refund_requests), float(refund_window_orders))
+    refund_rate_prev_pct = _summary_rate_pct(float(refund_requests_prev), float(refund_window_orders_prev))
+    refund_rate_delta_pct = None
+    if refund_rate_pct is not None and refund_rate_prev_pct is not None:
+        refund_rate_delta_pct = _summary_delta_pct(refund_rate_pct, refund_rate_prev_pct)
+    return {
+        "window_days": 7,
+        "current": refund_requests,
+        "previous": refund_requests_prev,
+        "delta_pct": refund_delta_pct,
+        "current_denominator": refund_window_orders,
+        "previous_denominator": refund_window_orders_prev,
+        "current_rate_pct": refund_rate_pct,
+        "previous_rate_pct": refund_rate_prev_pct,
+        "rate_delta_pct": refund_rate_delta_pct,
+        "is_alert": _summary_refund_requests_is_alert(
+            refund_requests,
+            refund_rate_pct,
+            threshold_min_count,
+            threshold_min_rate_pct,
+        ),
+    }
+
+
+def _summary_anomalies_payload(
+    anomaly_inputs: dict[str, int], thresholds_payload: dict[str, object]
+) -> dict[str, object]:
+    failed_payments = int(anomaly_inputs["failed_payments"])
+    failed_payments_prev = int(anomaly_inputs["failed_payments_prev"])
+    refund_requests = int(anomaly_inputs["refund_requests"])
+    refund_requests_prev = int(anomaly_inputs["refund_requests_prev"])
+    refund_window_orders = int(anomaly_inputs["refund_window_orders"])
+    refund_window_orders_prev = int(anomaly_inputs["refund_window_orders_prev"])
+    stockouts = int(anomaly_inputs["stockouts"])
+    failed_threshold_min_count = int(thresholds_payload.get("failed_payments_min_count", 1) or 1)
+    failed_threshold_min_delta_pct = thresholds_payload.get("failed_payments_min_delta_pct")
+    refund_threshold_min_count = int(thresholds_payload.get("refund_requests_min_count", 1) or 1)
+    refund_threshold_min_rate_pct = thresholds_payload.get("refund_requests_min_rate_pct")
+    stockouts_threshold_min_count = int(thresholds_payload.get("stockouts_min_count", 1) or 1)
+    return {
+        "failed_payments": _summary_failed_payments_payload(
+            failed_payments,
+            failed_payments_prev,
+            failed_threshold_min_count,
+            float(failed_threshold_min_delta_pct) if failed_threshold_min_delta_pct is not None else None,
+        ),
+        "refund_requests": _summary_refund_requests_payload(
+            refund_requests,
+            refund_requests_prev,
+            refund_window_orders,
+            refund_window_orders_prev,
+            refund_threshold_min_count,
+            float(refund_threshold_min_rate_pct) if refund_threshold_min_rate_pct is not None else None,
+        ),
+        "stockouts": {
+            "count": stockouts,
+            "is_alert": stockouts >= stockouts_threshold_min_count,
+        },
+    }
+
+
+def _summary_overview_payload(
+    totals: dict[str, int],
+    sales_30d_metrics: dict[str, float | int],
+    range_metrics: dict[str, float | int],
+    effective_range_days: int,
+    start: datetime,
+    end: datetime,
+) -> dict[str, object]:
+    return {
+        **totals,
+        "sales_30d": float(sales_30d_metrics["sales"]),
+        "gross_sales_30d": float(sales_30d_metrics["gross_sales"]),
+        "net_sales_30d": float(sales_30d_metrics["net_sales"]),
+        "orders_30d": int(sales_30d_metrics["orders"]),
+        "sales_range": float(range_metrics["sales"]),
+        "gross_sales_range": float(range_metrics["gross_sales"]),
+        "net_sales_range": float(range_metrics["net_sales"]),
+        "orders_range": int(range_metrics["orders"]),
         "range_days": int(effective_range_days),
         "range_from": start.date().isoformat(),
         "range_to": (end - timedelta(microseconds=1)).date().isoformat(),
-        "today_orders": int(today_orders or 0),
-        "yesterday_orders": int(yesterday_orders or 0),
-        "orders_delta_pct": _delta_pct(
-            float(today_orders or 0), float(yesterday_orders or 0)
+    }
+
+
+def _summary_day_payload(day_metrics: dict[str, float | int | None]) -> dict[str, object]:
+    return {
+        "today_orders": int(day_metrics["today_orders"]),
+        "yesterday_orders": int(day_metrics["yesterday_orders"]),
+        "orders_delta_pct": day_metrics["orders_delta_pct"],
+        "today_sales": float(day_metrics["today_sales"]),
+        "yesterday_sales": float(day_metrics["yesterday_sales"]),
+        "sales_delta_pct": day_metrics["sales_delta_pct"],
+        "gross_today_sales": float(day_metrics["gross_today_sales"]),
+        "gross_yesterday_sales": float(day_metrics["gross_yesterday_sales"]),
+        "gross_sales_delta_pct": day_metrics["gross_sales_delta_pct"],
+        "net_today_sales": float(day_metrics["net_today_sales"]),
+        "net_yesterday_sales": float(day_metrics["net_yesterday_sales"]),
+        "net_sales_delta_pct": day_metrics["net_sales_delta_pct"],
+        "today_refunds": int(day_metrics["today_refunds"]),
+        "yesterday_refunds": int(day_metrics["yesterday_refunds"]),
+        "refunds_delta_pct": day_metrics["refunds_delta_pct"],
+    }
+
+
+@router.get("/summary")
+async def admin_summary(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    _: Annotated[User, Depends(require_admin_section("dashboard"))],
+    range_days: int = Query(default=30, ge=1, le=365),
+    range_from: date | None = Query(default=None),
+    range_to: date | None = Query(default=None),
+) -> dict:
+    now = datetime.now(timezone.utc)
+    successful_statuses = (OrderStatus.paid, OrderStatus.shipped, OrderStatus.delivered)
+    sales_statuses = (*successful_statuses, OrderStatus.refunded)
+    exclude_test_orders = Order.id.notin_(select(OrderTag.order_id).where(OrderTag.tag == "test"))
+    start, end, effective_range_days = _summary_resolve_range(now, range_days, range_from, range_to)
+    totals = await _summary_totals(session, exclude_test_orders)
+    sales_30d_metrics = await _summary_sales_metrics(
+        session, now - timedelta(days=30), now, successful_statuses, sales_statuses, exclude_test_orders
+    )
+    range_metrics = await _summary_sales_metrics(
+        session, start, end, successful_statuses, sales_statuses, exclude_test_orders
+    )
+    day_metrics = await _summary_day_metrics(
+        session, now, successful_statuses, sales_statuses, exclude_test_orders
+    )
+    thresholds_payload = _dashboard_alert_thresholds_payload(await _get_dashboard_alert_thresholds(session))
+    anomalies = _summary_anomalies_payload(
+        await _summary_anomaly_inputs(session, now, exclude_test_orders), thresholds_payload
+    )
+    return {
+        **_summary_overview_payload(
+            totals, sales_30d_metrics, range_metrics, effective_range_days, start, end
         ),
-        "today_sales": float(today_sales or 0),
-        "yesterday_sales": float(yesterday_sales or 0),
-        "sales_delta_pct": _delta_pct(
-            float(today_sales or 0), float(yesterday_sales or 0)
-        ),
-        "gross_today_sales": float(gross_today_sales or 0),
-        "gross_yesterday_sales": float(gross_yesterday_sales or 0),
-        "gross_sales_delta_pct": _delta_pct(
-            float(gross_today_sales or 0), float(gross_yesterday_sales or 0)
-        ),
-        "net_today_sales": float(net_today_sales or 0),
-        "net_yesterday_sales": float(net_yesterday_sales or 0),
-        "net_sales_delta_pct": _delta_pct(
-            float(net_today_sales or 0), float(net_yesterday_sales or 0)
-        ),
-        "today_refunds": int(today_refunds or 0),
-        "yesterday_refunds": int(yesterday_refunds or 0),
-        "refunds_delta_pct": _delta_pct(
-            float(today_refunds or 0), float(yesterday_refunds or 0)
-        ),
-        "anomalies": {
-            "failed_payments": {
-                "window_hours": 24,
-                "current": int(failed_payments or 0),
-                "previous": int(failed_payments_prev or 0),
-                "delta_pct": failed_payments_delta_pct,
-                "is_alert": failed_payments_is_alert,
-            },
-            "refund_requests": {
-                "window_days": 7,
-                "current": int(refund_requests or 0),
-                "previous": int(refund_requests_prev or 0),
-                "delta_pct": _delta_pct(
-                    float(refund_requests or 0), float(refund_requests_prev or 0)
-                ),
-                "current_denominator": int(refund_window_orders or 0),
-                "previous_denominator": int(refund_window_orders_prev or 0),
-                "current_rate_pct": refund_rate_pct,
-                "previous_rate_pct": refund_rate_prev_pct,
-                "rate_delta_pct": refund_rate_delta_pct,
-                "is_alert": refund_requests_is_alert,
-            },
-            "stockouts": {"count": int(stockouts or 0), "is_alert": stockouts_is_alert},
-        },
-        "alert_thresholds": _dashboard_alert_thresholds_payload(thresholds),
+        **_summary_day_payload(day_metrics),
+        "anomalies": anomalies,
+        "alert_thresholds": thresholds_payload,
         "system": {"db_ready": True, "backup_last_at": settings.backup_last_at},
     }
 
