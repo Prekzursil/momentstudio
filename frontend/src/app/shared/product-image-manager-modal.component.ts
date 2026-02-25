@@ -356,7 +356,7 @@ export class ProductImageManagerModalComponent implements OnChanges {
     this.draftImages = sorted;
   }
 
-  private normalizeDraftImage(img: ProductImage): DraftImage {
+  private normalizeDraftImage(img: StorefrontProductImage): StorefrontProductImage {
     return {
       id: typeof img?.id === 'string' ? img.id : undefined,
       url: String(img?.url || '').trim(),

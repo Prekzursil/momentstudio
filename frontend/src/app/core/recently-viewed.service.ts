@@ -111,14 +111,34 @@ export class RecentlyViewedService {
   private normalizeItem(raw: unknown): RecentlyViewedProduct | null {
     if (!raw || typeof raw !== 'object') return null;
     const item: any = raw;
-    const slug = typeof item.slug === 'string' ? item.slug.trim() : '';
+    const slug = this.stringOrEmpty(item.slug);
     if (!slug) return null;
-    const id = typeof item.id === 'string' && item.id.trim() ? item.id : slug;
-    const name = typeof item.name === 'string' ? item.name : '';
+    const idCandidate = this.stringOrEmpty(item.id);
+    const id = idCandidate || slug;
+    const name = this.stringOrEmpty(item.name);
     const basePriceRaw = Number(item.base_price);
     const base_price = Number.isFinite(basePriceRaw) ? basePriceRaw : 0;
-    const currencyRaw = typeof item.currency === 'string' ? item.currency.trim() : '';
-    const images = Array.isArray(item.images) ? item.images.filter((img: any) => img && typeof img.url === 'string') : [];
-    return { id, slug, name, base_price, currency: currencyRaw || 'RON', images };
+    return {
+      id,
+      slug,
+      name,
+      base_price,
+      currency: this.normalizedCurrency(item.currency),
+      images: this.normalizedImages(item.images),
+    };
+  }
+
+  private stringOrEmpty(value: unknown): string {
+    return typeof value === 'string' ? value.trim() : '';
+  }
+
+  private normalizedCurrency(value: unknown): string {
+    const currency = this.stringOrEmpty(value);
+    return currency || 'RON';
+  }
+
+  private normalizedImages(value: unknown): any[] {
+    if (!Array.isArray(value)) return [];
+    return value.filter((img: any) => img && typeof img.url === 'string');
   }
 }
