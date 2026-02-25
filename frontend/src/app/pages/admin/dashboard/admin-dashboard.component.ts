@@ -2738,16 +2738,20 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
   private resolveWindowDays(fallback = 30): number {
     const params = this.buildSummaryParams();
     if (params?.range_days) return params.range_days;
-    const from = (params?.range_from || '').trim();
-    const to = (params?.range_to || '').trim();
-    if (!from || !to) return fallback;
+    const days = this.daysBetweenInclusive(params?.range_from, params?.range_to);
+    return days > 0 ? days : fallback;
+  }
+
+  private daysBetweenInclusive(fromRaw: string | undefined, toRaw: string | undefined): number {
+    const from = (fromRaw || '').trim();
+    const to = (toRaw || '').trim();
+    if (!from || !to) return 0;
     const fromDate = new Date(from);
     const toDate = new Date(to);
-    if (!Number.isFinite(fromDate.getTime()) || !Number.isFinite(toDate.getTime())) return fallback;
+    if (!Number.isFinite(fromDate.getTime()) || !Number.isFinite(toDate.getTime())) return 0;
     const diffMs = toDate.getTime() - fromDate.getTime();
-    if (diffMs < 0) return fallback;
-    const days = Math.floor(diffMs / (24 * 60 * 60 * 1000)) + 1;
-    return days > 0 ? days : fallback;
+    if (diffMs < 0) return 0;
+    return Math.floor(diffMs / (24 * 60 * 60 * 1000)) + 1;
   }
 
   loadShippingPerformance(): void {
@@ -3668,4 +3672,3 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
       });
   }
 }
-

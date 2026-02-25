@@ -1,25 +1,24 @@
 import { HttpErrorResponse } from '@angular/common/http';
 
+function readRequestIdValue(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function readRequestIdFromObject(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const obj = payload as Record<string, unknown>;
+  const direct = readRequestIdValue(obj['request_id']) ?? readRequestIdValue(obj['requestId']);
+  if (direct) return direct;
+  return readRequestIdFromObject(obj['error']);
+}
+
 export function extractRequestId(error: unknown): string | null {
   if (!(error instanceof HttpErrorResponse)) return null;
 
-  const header = error.headers?.get('X-Request-ID') || error.headers?.get('x-request-id');
-  if (header && header.trim()) return header.trim();
-
-  const body: unknown = error.error;
-  if (!body || typeof body !== 'object') return null;
-
-  const obj = body as Record<string, unknown>;
-  const direct = obj['request_id'] ?? obj['requestId'];
-  if (typeof direct === 'string' && direct.trim()) return direct.trim();
-
-  const nestedError = obj['error'];
-  if (nestedError && typeof nestedError === 'object') {
-    const nested = nestedError as Record<string, unknown>;
-    const candidate = nested['request_id'] ?? nested['requestId'];
-    if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
-  }
-
-  return null;
+  const header =
+    readRequestIdValue(error.headers?.get('X-Request-ID')) ?? readRequestIdValue(error.headers?.get('x-request-id'));
+  if (header) return header;
+  return readRequestIdFromObject(error.error);
 }
-

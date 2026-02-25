@@ -60,36 +60,78 @@ export class CmsEditorPrefsService {
     return `admin.content.editorMode.v1:${userId || 'anonymous'}`;
   }
 
+  private isMode(value: unknown): value is CmsEditorMode {
+    return value === 'simple' || value === 'advanced';
+  }
+
+  private isPreviewDevice(value: unknown): value is CmsPreviewDevice {
+    return value === 'desktop' || value === 'tablet' || value === 'mobile';
+  }
+
+  private isPreviewLayout(value: unknown): value is CmsPreviewLayout {
+    return value === 'stacked' || value === 'split';
+  }
+
+  private isPreviewLang(value: unknown): value is CmsPreviewLang {
+    return value === 'en' || value === 'ro';
+  }
+
+  private isPreviewTheme(value: unknown): value is CmsPreviewTheme {
+    return value === 'light' || value === 'dark';
+  }
+
+  private isTranslationLayout(value: unknown): value is CmsTranslationLayout {
+    return value === 'single' || value === 'sideBySide';
+  }
+
+  private applyParsedPrefs(data: Record<string, unknown>): void {
+    type PrefBinding = {
+      key: string;
+      isValid: (value: unknown) => boolean;
+      apply: (value: unknown) => void;
+    };
+    const bindings: PrefBinding[] = [
+      { key: 'mode', isValid: (value) => this.isMode(value), apply: (value) => this.mode.set(value as CmsEditorMode) },
+      {
+        key: 'previewDevice',
+        isValid: (value) => this.isPreviewDevice(value),
+        apply: (value) => this.previewDevice.set(value as CmsPreviewDevice),
+      },
+      {
+        key: 'previewLayout',
+        isValid: (value) => this.isPreviewLayout(value),
+        apply: (value) => this.previewLayout.set(value as CmsPreviewLayout),
+      },
+      {
+        key: 'previewLang',
+        isValid: (value) => this.isPreviewLang(value),
+        apply: (value) => this.previewLang.set(value as CmsPreviewLang),
+      },
+      {
+        key: 'previewTheme',
+        isValid: (value) => this.isPreviewTheme(value),
+        apply: (value) => this.previewTheme.set(value as CmsPreviewTheme),
+      },
+      {
+        key: 'translationLayout',
+        isValid: (value) => this.isTranslationLayout(value),
+        apply: (value) => this.translationLayout.set(value as CmsTranslationLayout),
+      },
+    ];
+    for (const binding of bindings) {
+      const value = data[binding.key];
+      if (!binding.isValid(value)) continue;
+      binding.apply(value);
+    }
+  }
+
   private load(): void {
     if (typeof localStorage === 'undefined') return;
     try {
       const raw = localStorage.getItem(this.storageKey());
       if (!raw) return;
-      const parsed = JSON.parse(raw);
-      const mode = (parsed)?.mode;
-      if (mode === 'simple' || mode === 'advanced') {
-        this.mode.set(mode);
-      }
-      const previewDevice = (parsed)?.previewDevice;
-      if (previewDevice === 'desktop' || previewDevice === 'tablet' || previewDevice === 'mobile') {
-        this.previewDevice.set(previewDevice);
-      }
-      const previewLayout = (parsed)?.previewLayout;
-      if (previewLayout === 'stacked' || previewLayout === 'split') {
-        this.previewLayout.set(previewLayout);
-      }
-      const previewLang = (parsed)?.previewLang;
-      if (previewLang === 'en' || previewLang === 'ro') {
-        this.previewLang.set(previewLang);
-      }
-      const previewTheme = (parsed)?.previewTheme;
-      if (previewTheme === 'light' || previewTheme === 'dark') {
-        this.previewTheme.set(previewTheme);
-      }
-      const translationLayout = (parsed)?.translationLayout;
-      if (translationLayout === 'single' || translationLayout === 'sideBySide') {
-        this.translationLayout.set(translationLayout);
-      }
+      const data = (JSON.parse(raw) ?? {}) as Record<string, unknown>;
+      this.applyParsedPrefs(data);
     } catch {
       // ignore
     }
@@ -114,4 +156,3 @@ export class CmsEditorPrefsService {
     }
   }
 }
-
