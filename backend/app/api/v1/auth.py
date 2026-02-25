@@ -3,7 +3,7 @@ import re
 from datetime import datetime, timedelta, timezone, date
 from functools import partial
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 from urllib.parse import urlencode
 from uuid import UUID
 
@@ -350,7 +350,7 @@ def _build_cooldown_info(
     cooldown: timedelta,
     enforce: bool,
     now: datetime,
-) -> CooldownInfo:
+) -> "CooldownInfo":
     last_dt = _ensure_utc_datetime(last)
     if not last_dt or not enforce:
         return CooldownInfo(last_changed_at=last_dt, next_allowed_at=None, remaining_seconds=0)
