@@ -15,6 +15,7 @@
 ## Impacted domains
 
 The delta includes coordinated changes across:
+
 - frontend runtime/SSR and SEO behavior,
 - backend API/services/migrations,
 - audit automation and issue lifecycle workflows,
@@ -26,6 +27,7 @@ The delta includes coordinated changes across:
 A one-off “single module upload” is **not safe** for this baseline gap.
 
 Reason:
+
 - current `main` is a cross-cutting system update, not an isolated patch,
 - DB/schema + SSR + workflow behavior changed together,
 - partial file-copy deployment risks runtime/config drift and schema mismatch.

@@ -8,7 +8,7 @@ This document is provided for transparency and to help you understand your right
 
 **Data controller:** IONITA M.D. ADRIANA PFA
 **Registered office:** Soldat Marin Nicolae 44, Bucharest
-**Email:** momentstudio.ro@gmail.com
+**Email:** <momentstudio.ro@gmail.com>
 **Phone:** +40723204204
 
 ---
@@ -18,6 +18,7 @@ This document is provided for transparency and to help you understand your right
 Depending on how you interact with the Website, we may collect:
 
 ### 2.1 Account data (if you create an account)
+
 - name (first/last name),
 - email address,
 - phone number,
@@ -25,28 +26,35 @@ Depending on how you interact with the Website, we may collect:
 - account settings and preferences.
 
 ### 2.2 Order and delivery data
+
 - billing and delivery address,
 - order contents, quantities, and amounts,
 - delivery method and tracking details (where available),
 - communications about your order.
 
 ### 2.3 Invoicing data (if requested)
+
 - company name, VAT ID, and other invoice details you provide.
 
 ### 2.4 Payment data
+
 - We do **not** store full card details.
 - When you pay by card via **NETOPIA Payments**, your payment data is processed by NETOPIA and the banking/payment networks involved. We typically receive payment confirmation and limited transaction details needed for accounting and order management.
 
 ### 2.5 Customer support communications
+
 - emails/messages you send to us,
 - attachments you provide (e.g., photos for damaged/defective products).
 
 ### 2.6 Technical data and logs
+
 - IP address, device/browser information,
 - log data about how the Website is used (security, performance, troubleshooting).
 
 ### 2.7 Cookies and similar technologies
+
 We use cookies and similar technologies to:
+
 - keep you logged in / keep the cart,
 - remember preferences,
 - improve security and performance.
@@ -72,15 +80,16 @@ We process personal data for:
 ## 4) NETOPIA Payments (important payment privacy information)
 
 If you choose to pay online by card via **NETOPIA Payments**:
+
 - you may be redirected to a NETOPIA secure payment page,
 - NETOPIA processes payer data and payment-related data as described in NETOPIA’s own privacy notices,
 - NETOPIA may implement anti-fraud/security mechanisms on its payment page.
 
 We recommend reading NETOPIA’s GDPR information for payers here:
-https://netopia-payments.com/nota-de-informare-gdpr-platitori/
+<https://netopia-payments.com/nota-de-informare-gdpr-platitori/>
 
 If you need to contact NETOPIA regarding your data in the context of payment processing, their GDPR contact is:
-suport@netopia.ro
+<suport@netopia.ro>
 
 ---
 
@@ -101,6 +110,7 @@ We do not sell your personal data.
 ## 6) International transfers
 
 Some service providers may process data outside the EEA. Where applicable, we use safeguards such as:
+
 - adequacy decisions, or
 - Standard Contractual Clauses,
 - additional security measures.
@@ -110,6 +120,7 @@ Some service providers may process data outside the EEA. Where applicable, we us
 ## 7) How long we keep data (retention)
 
 We keep personal data only as long as necessary for the purposes above, including:
+
 - **orders/invoices:** Until you delete your account or request deletion (or as required by accounting laws),
 - **account data:** Until you delete your account or request deletion (subject to legal retention),
 - **support messages:** Until you delete your account or request deletion,
@@ -120,6 +131,7 @@ We keep personal data only as long as necessary for the purposes above, includin
 ## 8) Your rights (GDPR)
 
 Subject to legal conditions, you may have the right to:
+
 - access your data,
 - correct inaccurate data,
 - delete data (“right to be forgotten”),
@@ -128,17 +140,19 @@ Subject to legal conditions, you may have the right to:
 - data portability,
 - withdraw consent (where consent is the basis).
 
-To exercise your rights, contact us at: momentstudio.ro@gmail.com.
+To exercise your rights, contact us at: <momentstudio.ro@gmail.com>.
 
 You also have the right to lodge a complaint with the Romanian data protection authority (ANSPDCP):
-- Website: https://www.dataprotection.ro
-- Email: anspdcp@dataprotection.ro
+
+- Website: <https://www.dataprotection.ro>
+- Email: <anspdcp@dataprotection.ro>
 
 ---
 
 ## 9) Security
 
 We apply reasonable technical and organizational measures to protect personal data, including:
+
 - SSL/HTTPS where available,
 - access controls,
 - minimization of stored payment data.
@@ -150,10 +164,12 @@ No online system is 100% secure; please contact us if you suspect unauthorized a
 ## 10) Cookies
 
 We use cookies/technologies for:
+
 - essential website functionality (cart, session),
 - security (anti-abuse).
 
 You can manage cookies via:
+
 - browser settings.
 
 ---

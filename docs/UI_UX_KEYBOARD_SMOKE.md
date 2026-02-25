@@ -11,6 +11,7 @@ E2E_BASE_URL=https://momentstudio.ro npm -C frontend run e2e -- frontend/e2e/acc
 ```
 
 Coverage:
+
 - Shopper login form tab order (`Email or username` → `Password` → `Login`).
 - Legal consent modal focus loop (`Accept` ↔ `Close`) and consent completion.
 - Admin orders page route heading focus + keyboard reachability to search filter (requires `E2E_OWNER_PASSWORD`).

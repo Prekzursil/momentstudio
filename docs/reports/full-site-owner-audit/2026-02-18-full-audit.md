@@ -1,6 +1,7 @@
 # Full-Site Owner-Profile Audit Report (2026-02-18, Stabilization Refresh)
 
 ## Scope and Method
+
 - Target: full site surfaces (`storefront`, `account`, `admin`) with owner-profile coverage.
 - Runtime context: local compose stack for deterministic verification and local weekly-style evidence generation.
 - Identity profile: owner bootstrap (`owner@local.test`) and authenticated owner evidence crawling for account/admin surfaces.
@@ -21,6 +22,7 @@
 | Evidence collector static checks | `python3 -m py_compile ...` + `node --check ...` | PASS | No syntax/parse errors |
 
 ## Local Deterministic Evidence (Weekly Mode, Owner-Auth Enabled)
+
 - Command:
   - `python3 scripts/audit/collect_audit_evidence.py --mode weekly --routes-file frontend/src/app/app.routes.ts --output-dir artifacts/audit-evidence/full-local --base-url http://127.0.0.1:4201 --api-base-url http://127.0.0.1:8001/api/v1 --owner-identifier owner --owner-password OwnerDev!123 --max-routes 120`
 - Result:
@@ -37,6 +39,7 @@
   - No “content/forms appear only after interaction” blockers in this run.
 
 ## Key Stabilization Outcomes
+
 1. `make dev-owner` bootstrap path is stable and no longer depends on unsafe shell `source` parsing of `.env`.
 2. `compose-smoke` owner credentials propagate correctly into Playwright E2E.
 3. Checkout smoke seeding now supports authenticated cart seeding, eliminating prior owner-flow false negatives.
@@ -47,6 +50,7 @@
 5. `/shop` and `/shop/:category` duplicate SEO debt no longer appears in actionable findings in the corrected owner-auth evidence run.
 
 ## Residual Low-Severity Noise Follow-Up
+
 - Initial full owner-auth weekly run reported `3` clustered `s4` findings on:
   - `/account/privacy`
   - `/admin/content/pages`
@@ -59,6 +63,7 @@
 - Final full-route confirmation is delegated to refreshed CI weekly evidence/agent runs after branch push.
 
 ## PR #199 Baseline vs Main (Promotion Safety)
+
 - Baseline production reference: PR #199 merge commit `5e3b438520a023ae2f3d1ce3b27fa772e10aa627`.
 - Delta to current main remains large and cross-cutting; direct “single module upload” is unsafe.
 - Safe promotion path:
@@ -69,6 +74,7 @@
   - `docs/reports/main-vs-pr199/2026-02-18-promotion-assessment.md`
 
 ## Acceptance Check (This Refresh)
+
 1. Local owner-profile orchestration green: **PASS**
 2. Hidden-until-interaction blockers across audited routes: **PASS**
 3. `#328`-style noise profile reduced to clustered concise output pattern: **PASS**

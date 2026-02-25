@@ -12,6 +12,7 @@ This project uses a **frontend redirect** OAuth flow:
 Google Cloud Console → **APIs & Services** → **Credentials** → **Create credentials** → **OAuth client ID**
 
 Choose:
+
 - **Application type**: Web application
 
 ### Authorized JavaScript origins
@@ -19,10 +20,12 @@ Choose:
 Add the origins you will serve the frontend from.
 
 Development (pick what you use):
+
 - `http://localhost:4200` (local `start.sh` default)
 - `http://localhost:4201` (Docker stack frontend)
 
 Production:
+
 - `https://<your-domain>` (example: `https://momentstudio.ro`)
 
 If you serve both apex + `www`, add both (or keep `www` redirected to apex and only add the canonical origin).
@@ -32,10 +35,12 @@ If you serve both apex + `www`, add both (or keep `www` redirected to apex and o
 Add the **frontend callback route**. It must match `GOOGLE_REDIRECT_URI` exactly.
 
 Development:
+
 - `http://localhost:4200/auth/google/callback`
 - `http://localhost:4201/auth/google/callback`
 
 Production:
+
 - `https://<your-domain>/auth/google/callback`
 
 ## 2) Backend environment variables
@@ -48,6 +53,7 @@ Set these in `backend/.env` (see `backend/.env.example`):
 - Optional: `GOOGLE_ALLOWED_DOMAINS=["example.com"]` to restrict sign-in emails to specific domains.
 
 Notes:
+
 - `GOOGLE_REDIRECT_URI` should point to the frontend callback route for the environment you’re running.
 - If you run local dev on a bumped port (e.g. `4202`), update `GOOGLE_REDIRECT_URI` accordingly.
 
@@ -64,4 +70,3 @@ The login/register pages expose a “Continue with Google” button, which uses 
   - You configured the correct `GOOGLE_REDIRECT_URI` in `backend/.env`.
 - **Wrong callback port in local dev**: if the frontend runs on `4201` but `GOOGLE_REDIRECT_URI` is still `http://localhost:4200/...`, Google will redirect to the wrong origin.
 - **Consent screen / verification**: for external users, you may need to configure the OAuth consent screen and publish it (or add test users).
-
