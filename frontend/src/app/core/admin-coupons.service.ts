@@ -3,15 +3,17 @@ import { Observable } from 'rxjs';
 import { ApiService } from './api.service';
 import type { CouponRead, CouponVisibility, PromotionDiscountType, PromotionRead } from './coupons.service';
 
+type NumericInput = string | number | null;
+
 export interface PromotionCreatePayload {
   key?: string | null;
   name: string;
   description?: string | null;
   discount_type: PromotionDiscountType;
-  percentage_off?: string | number | null;
-  amount_off?: string | number | null;
-  max_discount_amount?: string | number | null;
-  min_subtotal?: string | number | null;
+  percentage_off?: NumericInput;
+  amount_off?: NumericInput;
+  max_discount_amount?: NumericInput;
+  min_subtotal?: NumericInput;
   included_product_ids?: string[];
   excluded_product_ids?: string[];
   included_category_ids?: string[];
@@ -307,4 +309,3 @@ export class AdminCouponsService {
     return this.api.post<CouponBulkJobRead>(`/coupons/admin/coupons/bulk-jobs/${jobId}/retry`, {});
   }
 }
-

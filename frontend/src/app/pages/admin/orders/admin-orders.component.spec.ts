@@ -1,14 +1,14 @@
 import { AdminOrdersComponent } from './admin-orders.component';
 
-describe('AdminOrdersComponent preset coercion and loading', () => {
-  function createComponentHarness(userId = 'admin-user'): any {
-    const component = Object.create(AdminOrdersComponent.prototype) as any;
-    component.auth = {
-      user: () => ({ id: userId })
-    };
-    return component;
-  }
+function createComponentHarness(userId = 'admin-user'): any {
+  const component = Object.create(AdminOrdersComponent.prototype);
+  component.auth = {
+    user: () => ({ id: userId })
+  };
+  return component;
+}
 
+describe('AdminOrdersComponent preset coercion and loading', () => {
   it('coercePreset applies safe defaults when filters are null', () => {
     const component = createComponentHarness();
 

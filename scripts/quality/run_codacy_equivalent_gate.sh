@@ -20,6 +20,16 @@ require_cmd() {
   return 0
 }
 
+resolve_cmd_or() {
+  local cmd="$1"
+  local fallback="$2"
+  if command -v "$cmd" >/dev/null 2>&1; then
+    printf '%s' "$cmd"
+  else
+    printf '%s' "$fallback"
+  fi
+}
+
 run_check() {
   local name="$1"
   local command_str="$2"
@@ -43,14 +53,19 @@ run_check() {
 }
 
 require_cmd jq
-require_cmd lizard
-require_cmd markdownlint-cli2
-require_cmd npx
-require_cmd stylelint
-require_cmd bandit
-require_cmd checkov
-require_cmd semgrep
 require_cmd python3
+require_cmd npx
+
+LIZARD_CMD="$(resolve_cmd_or lizard '.tmp/quality-venv/bin/lizard')"
+if [[ "$LIZARD_CMD" == ".tmp/quality-venv/bin/lizard" && ! -x "$LIZARD_CMD" ]]; then
+  echo "Required command not found: lizard (and fallback .tmp/quality-venv/bin/lizard missing)" >&2
+  exit 1
+fi
+MARKDOWNLINT_CMD="$(resolve_cmd_or markdownlint-cli2 'npx --yes markdownlint-cli2')"
+STYLELINT_CMD="$(resolve_cmd_or stylelint 'npx --yes stylelint')"
+BANDIT_CMD="$(resolve_cmd_or bandit '.venv/bin/bandit')"
+CHECKOV_CMD="$(resolve_cmd_or checkov '.venv/bin/checkov')"
+SEMGREP_CMD="$(resolve_cmd_or semgrep '.venv/bin/semgrep')"
 
 MARKDOWNLINT_CONFIG="$OUT_DIR/.markdownlint-cli2.jsonc"
 cat > "$MARKDOWNLINT_CONFIG" <<'MARKDOWNLINT_JSON'
@@ -89,14 +104,14 @@ rules:
     pattern-regex: 'run:\\s*[^\\n]*\\$\\{\\{[^\\n]*\\}\\}'
 SEMGREP_YAML
 
-run_check "lizard-ccn-nloc" "lizard -w -C 8 -L 50 backend/app frontend/src scripts infra"
-run_check "markdownlint" "markdownlint-cli2 --config '$MARKDOWNLINT_CONFIG' '**/*.md' '#**/node_modules/**'"
+run_check "lizard-ccn-nloc" "$LIZARD_CMD -w -C 8 -L 50 backend/app frontend/src scripts infra"
+run_check "markdownlint" "$MARKDOWNLINT_CMD --config '$MARKDOWNLINT_CONFIG' '**/*.md' '#**/node_modules/**'"
 run_check "eslint" "cd frontend && npx eslint . -f json -o '../$OUT_DIR/eslint.json'"
 run_check "prettier" "cd frontend && mapfile -t files < <(find scripts -type f \\( -name '*.js' -o -name '*.mjs' -o -name '*.cjs' -o -name '*.ts' -o -name '*.json' \\)); if [[ \${#files[@]} -eq 0 ]]; then echo 'No frontend/scripts files found for Prettier check.'; else npx prettier --check \"\${files[@]}\"; fi"
-run_check "stylelint" "stylelint --allow-empty-input --formatter json --config '$STYLELINT_CONFIG' 'frontend/src/styles.css' > '$OUT_DIR/stylelint.json'"
-run_check "bandit-b110" "bandit -r backend -t B110 -f json -o '$OUT_DIR/bandit-B110.json'"
-run_check "checkov-ckv-gha-7" "checkov -d .github/workflows --check CKV_GHA_7 --quiet --output json > '$OUT_DIR/checkov-CKV_GHA_7.json'"
-run_check "semgrep-targeted" "semgrep --config '$SEMGREP_RULES' --error --json --output '$OUT_DIR/semgrep-targeted.json' backend frontend scripts .github"
+run_check "stylelint" "$STYLELINT_CMD --allow-empty-input --formatter json --config '$STYLELINT_CONFIG' 'frontend/src/styles.css' > '$OUT_DIR/stylelint.json'"
+run_check "bandit-b110" "$BANDIT_CMD -r backend -t B110 -f json -o '$OUT_DIR/bandit-B110.json'"
+run_check "checkov-ckv-gha-7" "$CHECKOV_CMD -d .github/workflows --check CKV_GHA_7 --quiet --output json > '$OUT_DIR/checkov-CKV_GHA_7.json'"
+run_check "semgrep-targeted" "$SEMGREP_CMD --config '$SEMGREP_RULES' --error --json --output '$OUT_DIR/semgrep-targeted.json' backend frontend scripts .github"
 
 CHECKS_JSON="$OUT_DIR/check-status.json"
 awk -F '\t' '

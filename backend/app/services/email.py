@@ -1640,21 +1640,43 @@ def _admin_summary_order_lines(*, is_ro: bool, orders_success: int, orders_total
     ]
 
 
+def _summary_row_name(row: dict) -> str:
+    return (str(row.get("name") or "")).strip() or str(row.get("slug") or "").strip() or "—"
+
+
+def _summary_row_label(name: str, slug: str) -> str:
+    if slug and slug not in name:
+        return f"{name} ({slug})"
+    return name
+
+
+def _summary_qty_sales_suffix(*, qty: int, sales: object, is_ro: bool, currency: str) -> str:
+    if is_ro:
+        return f"{qty} buc · {_money_str(sales, currency)}"
+    return f"{qty} pcs · {_money_str(sales, currency)}"
+
+
 def _admin_summary_top_products_lines(*, products: list[dict] | None, is_ro: bool, currency: str) -> list[str]:
     rows = products or []
     if not rows:
         return ["Top produse: —" if is_ro else "Top products: —", ""]
     lines = ["Top produse:" if is_ro else "Top products:"]
     for row in rows:
-        name = (str(row.get("name") or "")).strip() or str(row.get("slug") or "").strip() or "—"
+        name = _summary_row_name(row)
         slug = (str(row.get("slug") or "")).strip()
         qty = int(row.get("quantity", 0) or 0)
         sales = row.get("gross_sales", 0)
-        label = f"{name} ({slug})" if slug and slug not in name else name
-        suffix = f"{qty} buc · {_money_str(sales, currency)}" if is_ro else f"{qty} pcs · {_money_str(sales, currency)}"
+        label = _summary_row_label(name, slug)
+        suffix = _summary_qty_sales_suffix(qty=qty, sales=sales, is_ro=is_ro, currency=currency)
         lines.append(f"- {label}: {suffix}")
     lines.append("")
     return lines
+
+
+def _low_stock_status_label(*, is_ro: bool, critical: bool) -> str:
+    if critical:
+        return "CRITIC" if is_ro else "CRITICAL"
+    return "scăzut" if is_ro else "low"
 
 
 def _admin_summary_low_stock_lines(*, low_stock: list[dict] | None, is_ro: bool) -> list[str]:
@@ -1663,11 +1685,11 @@ def _admin_summary_low_stock_lines(*, low_stock: list[dict] | None, is_ro: bool)
         return ["Stoc redus: —" if is_ro else "Low stock: —", ""]
     lines = ["Stoc redus:" if is_ro else "Low stock:"]
     for row in rows:
-        name = (str(row.get("name") or "")).strip() or str(row.get("slug") or "").strip() or "—"
+        name = _summary_row_name(row)
         stock = int(row.get("stock_quantity", 0) or 0)
         threshold = int(row.get("threshold", 0) or 0)
         critical = bool(row.get("is_critical", False))
-        status = ("CRITIC" if is_ro else "CRITICAL") if critical else ("scăzut" if is_ro else "low")
+        status = _low_stock_status_label(is_ro=is_ro, critical=critical)
         lines.append(f"- {name}: {stock}/{threshold} ({status})")
     lines.append("")
     return lines

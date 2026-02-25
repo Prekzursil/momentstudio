@@ -25,6 +25,7 @@ from app.models.coupons import (
     CouponRedemption,
     CouponVisibility,
     Promotion,
+    PromotionDiscountType,
     PromotionScope,
     PromotionScopeEntityType,
     PromotionScopeMode,
@@ -266,6 +267,82 @@ def _to_decimal(value: object) -> Decimal:
         return Decimal("0.00")
 
 
+def _validate_promotion_discount_values(
+    *,
+    discount_type: str | PromotionDiscountType,
+    percentage_off: object,
+    amount_off: object,
+) -> None:
+    if discount_type == "percent" and not percentage_off:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="percentage_off is required for percent promotions")
+    if discount_type == "amount" and not amount_off:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="amount_off is required for amount promotions")
+    if discount_type == "free_shipping" and (percentage_off or amount_off):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="free_shipping promotions cannot set percentage_off/amount_off")
+    if percentage_off and amount_off:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Choose percentage_off or amount_off, not both")
+
+
+async def _clean_and_validate_promotion_key(
+    session: AsyncSession,
+    *,
+    raw_key: object,
+    promotion_id: UUID | None = None,
+) -> str | None:
+    key_clean = (raw_key or "").strip() or None
+    if not key_clean:
+        return None
+    key_clean = key_clean[:80]
+    query = select(Promotion).where(Promotion.key == key_clean)
+    if promotion_id is not None:
+        query = query.where(Promotion.id != promotion_id)
+    exists = (await session.execute(query)).scalars().first()
+    if exists:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Promotion key already exists")
+    return key_clean
+
+
+def _apply_promotion_scalar_updates(promo: Promotion, data: dict[str, object]) -> None:
+    for attr in [
+        "name",
+        "description",
+        "discount_type",
+        "percentage_off",
+        "amount_off",
+        "max_discount_amount",
+        "min_subtotal",
+        "allow_on_sale_items",
+        "first_order_only",
+        "is_active",
+        "starts_at",
+        "ends_at",
+        "is_automatic",
+    ]:
+        if attr in data:
+            setattr(promo, attr, data[attr])
+
+
+def _resolve_scope_updates(
+    *,
+    promo: Promotion,
+    data: dict[str, object],
+) -> tuple[set[UUID], set[UUID], set[UUID], set[UUID]] | None:
+    scope_fields = {
+        "included_product_ids",
+        "excluded_product_ids",
+        "included_category_ids",
+        "excluded_category_ids",
+    }
+    if not (scope_fields & set(data.keys())):
+        return None
+    current_in_products, current_ex_products, current_in_categories, current_ex_categories = _scopes_from_promotion(promo)
+    include_products = set(data.get("included_product_ids")) if "included_product_ids" in data else current_in_products
+    exclude_products = set(data.get("excluded_product_ids")) if "excluded_product_ids" in data else current_ex_products
+    include_categories = set(data.get("included_category_ids")) if "included_category_ids" in data else current_in_categories
+    exclude_categories = set(data.get("excluded_category_ids")) if "excluded_category_ids" in data else current_ex_categories
+    return include_products, exclude_products, include_categories, exclude_categories
+
+
 def _shipping_method_rates(shipping_method: ShippingMethod | None) -> tuple[Decimal | None, Decimal | None]:
     if not shipping_method:
         return None, None
@@ -369,24 +446,12 @@ async def admin_create_promotion(
     session: SessionDep,
     _: AdminCouponsDep,
 ) -> PromotionRead:
-    if payload.discount_type == "percent" and not payload.percentage_off:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="percentage_off is required for percent promotions")
-    if payload.discount_type == "amount" and not payload.amount_off:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="amount_off is required for amount promotions")
-    if payload.discount_type == "free_shipping":
-        if payload.percentage_off or payload.amount_off:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="free_shipping promotions cannot set percentage_off/amount_off")
-    if payload.percentage_off and payload.amount_off:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Choose percentage_off or amount_off, not both")
-
-    key_clean = (payload.key or "").strip() or None
-    if key_clean:
-        key_clean = key_clean[:80]
-        exists = (
-            (await session.execute(select(Promotion).where(Promotion.key == key_clean))).scalars().first()
-        )
-        if exists:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Promotion key already exists")
+    _validate_promotion_discount_values(
+        discount_type=payload.discount_type,
+        percentage_off=payload.percentage_off,
+        amount_off=payload.amount_off,
+    )
+    key_clean = await _clean_and_validate_promotion_key(session, raw_key=payload.key)
 
     promo = Promotion(
         **payload.model_dump(
@@ -437,61 +502,19 @@ async def admin_update_promotion(
     discount_type = data.get("discount_type", promo.discount_type)
     percentage_off = data.get("percentage_off", promo.percentage_off)
     amount_off = data.get("amount_off", promo.amount_off)
-    if discount_type == "percent" and not percentage_off:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="percentage_off is required for percent promotions")
-    if discount_type == "amount" and not amount_off:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="amount_off is required for amount promotions")
-    if discount_type == "free_shipping":
-        if percentage_off or amount_off:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="free_shipping promotions cannot set percentage_off/amount_off")
-    if percentage_off and amount_off:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Choose percentage_off or amount_off, not both")
+    _validate_promotion_discount_values(
+        discount_type=discount_type,
+        percentage_off=percentage_off,
+        amount_off=amount_off,
+    )
 
     if "key" in data:
-        key_clean = (data.get("key") or "").strip() or None
-        if key_clean:
-            key_clean = key_clean[:80]
-            if key_clean != promo.key:
-                exists = (
-                    (await session.execute(select(Promotion).where(Promotion.key == key_clean, Promotion.id != promo.id)))
-                    .scalars()
-                    .first()
-                )
-                if exists:
-                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Promotion key already exists")
-        promo.key = key_clean
+        promo.key = await _clean_and_validate_promotion_key(session, raw_key=data.get("key"), promotion_id=promo.id)
 
-    for attr in [
-        "name",
-        "description",
-        "discount_type",
-        "percentage_off",
-        "amount_off",
-        "max_discount_amount",
-        "min_subtotal",
-        "allow_on_sale_items",
-        "first_order_only",
-        "is_active",
-        "starts_at",
-        "ends_at",
-        "is_automatic",
-    ]:
-        if attr in data:
-            setattr(promo, attr, data[attr])
-
-    scope_fields = {
-        "included_product_ids",
-        "excluded_product_ids",
-        "included_category_ids",
-        "excluded_category_ids",
-    }
-    if scope_fields & set(data.keys()):
-        current_in_products, current_ex_products, current_in_categories, current_ex_categories = _scopes_from_promotion(promo)
-        include_products = set(data.get("included_product_ids")) if "included_product_ids" in data else current_in_products
-        exclude_products = set(data.get("excluded_product_ids")) if "excluded_product_ids" in data else current_ex_products
-        include_categories = set(data.get("included_category_ids")) if "included_category_ids" in data else current_in_categories
-        exclude_categories = set(data.get("excluded_category_ids")) if "excluded_category_ids" in data else current_ex_categories
-
+    _apply_promotion_scalar_updates(promo, data)
+    scope_values = _resolve_scope_updates(promo=promo, data=data)
+    if scope_values:
+        include_products, exclude_products, include_categories, exclude_categories = scope_values
         await _replace_promotion_scopes(
             session,
             promotion_id=promo.id,
@@ -659,6 +682,27 @@ async def admin_generate_coupon_code(
     return CouponCodeGenerateResponse(code=code)
 
 
+def _normalize_issue_coupon_ends_at(
+    *,
+    ends_at: datetime | None,
+    validity_days: int | None,
+    starts_at: datetime,
+) -> datetime | None:
+    value = ends_at
+    if value and getattr(value, "tzinfo", None) is None:
+        value = value.replace(tzinfo=timezone.utc)
+    if value is None and validity_days is not None:
+        value = starts_at + timedelta(days=int(validity_days))
+    return value
+
+
+def _resolve_issue_coupon_should_email(*, send_email: bool, user: User) -> bool:
+    should_email = bool(send_email and user.email)
+    if should_email and not bool(getattr(user, "notify_marketing", False)):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_DETAIL_MARKETING_OPT_IN_REQUIRED)
+    return should_email
+
+
 @router.post("/admin/coupons/issue", status_code=status.HTTP_201_CREATED)
 async def admin_issue_coupon_to_user(
     payload: CouponIssueToUserRequest,
@@ -683,11 +727,11 @@ async def admin_issue_coupon_to_user(
     code = await coupons_service.generate_unique_coupon_code(session, prefix=prefix, length=12)
 
     starts_at = datetime.now(timezone.utc)
-    ends_at = payload.ends_at
-    if ends_at and getattr(ends_at, "tzinfo", None) is None:
-        ends_at = ends_at.replace(tzinfo=timezone.utc)
-    if ends_at is None and payload.validity_days is not None:
-        ends_at = starts_at + timedelta(days=int(payload.validity_days))
+    ends_at = _normalize_issue_coupon_ends_at(
+        ends_at=payload.ends_at,
+        validity_days=payload.validity_days,
+        starts_at=starts_at,
+    )
     if ends_at and ends_at < starts_at:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Coupon ends_at must be in the future")
 
@@ -716,9 +760,7 @@ async def admin_issue_coupon_to_user(
         },
     )
 
-    should_email = bool(payload.send_email and user.email)
-    if should_email and not bool(getattr(user, "notify_marketing", False)):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_DETAIL_MARKETING_OPT_IN_REQUIRED)
+    should_email = _resolve_issue_coupon_should_email(send_email=bool(payload.send_email), user=user)
     await session.commit()
 
     if should_email:
@@ -1106,7 +1148,7 @@ async def _coupon_assignment_status_by_user_id(
         )
         .all()
     )
-    return {user_id: revoked_at for user_id, revoked_at in existing}
+    return dict(existing)
 
 
 def _normalize_bulk_emails(raw: list[str]) -> tuple[list[str], list[str]]:
@@ -1649,8 +1691,8 @@ async def _send_bulk_job_notifications(
 
 
 async def _run_bulk_segment_job(engine: AsyncEngine, *, job_id: UUID) -> None:
-    SessionLocal = async_sessionmaker(engine, expire_on_commit=False, autoflush=False, class_=AsyncSession)
-    async with SessionLocal() as session:
+    session_local = async_sessionmaker(engine, expire_on_commit=False, autoflush=False, class_=AsyncSession)
+    async with session_local() as session:
         job = await _load_bulk_job_for_run(session, job_id=job_id)
         if not job:
             return
@@ -1781,6 +1823,63 @@ async def admin_assign_coupon(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+def _apply_bulk_assignments(
+    *,
+    session: AsyncSession,
+    coupon: Coupon,
+    emails: list[str],
+    users_by_email: dict[str, User],
+    assignments_by_user_id: dict[UUID, CouponAssignment],
+) -> tuple[int, int, int, set[UUID]]:
+    created = 0
+    restored = 0
+    already_active = 0
+    notify_user_ids: set[UUID] = set()
+    for email in emails:
+        user = users_by_email.get(email)
+        if not user:
+            continue
+        assignment = assignments_by_user_id.get(user.id)
+        if assignment and assignment.revoked_at is None:
+            already_active += 1
+            continue
+        if assignment and assignment.revoked_at is not None:
+            assignment.revoked_at = None
+            assignment.revoked_reason = None
+            session.add(assignment)
+            restored += 1
+            notify_user_ids.add(user.id)
+            continue
+        session.add(CouponAssignment(coupon_id=coupon.id, user_id=user.id))
+        created += 1
+        notify_user_ids.add(user.id)
+    return created, restored, already_active, notify_user_ids
+
+
+def _enqueue_bulk_assign_notifications(
+    *,
+    background_tasks: BackgroundTasks,
+    coupon: Coupon,
+    users_by_email: dict[str, User],
+    notify_user_ids: set[UUID],
+) -> None:
+    if not notify_user_ids:
+        return
+    ends_at = getattr(coupon, "ends_at", None)
+    for user in users_by_email.values():
+        if user.id not in notify_user_ids or not user.email or not bool(getattr(user, "notify_marketing", False)):
+            continue
+        background_tasks.add_task(
+            email_service.send_coupon_assigned,
+            user.email,
+            coupon_code=coupon.code,
+            promotion_name=coupon.promotion.name if coupon.promotion else _FALLBACK_PROMOTION_NAME,
+            promotion_description=coupon.promotion.description if coupon.promotion else None,
+            ends_at=ends_at,
+            lang=user.preferred_language,
+        )
+
+
 @router.post("/admin/coupons/{coupon_id}/assign/bulk")
 async def admin_bulk_assign_coupon(
     coupon_id: UUID,
@@ -1806,63 +1905,27 @@ async def admin_bulk_assign_coupon(
     if not coupon:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DETAIL_COUPON_NOT_FOUND)
 
-    users = (await session.execute(select(User).where(User.email.in_(emails)))).scalars().all()
-    users_by_email = {u.email: u for u in users if u.email}
+    users_by_email = await _users_by_email(session, emails=emails)
     not_found = [e for e in emails if e not in users_by_email]
     user_ids = [u.id for u in users_by_email.values()]
-
-    assignments_by_user_id: dict[UUID, CouponAssignment] = {}
-    if user_ids:
-        existing = (
-            (
-                await session.execute(
-                    select(CouponAssignment).where(CouponAssignment.coupon_id == coupon.id, CouponAssignment.user_id.in_(user_ids))
-                )
-            )
-            .scalars()
-            .all()
-        )
-        assignments_by_user_id = {a.user_id: a for a in existing}
-
-    created = 0
-    restored = 0
-    already_active = 0
-    notify_user_ids: set[UUID] = set()
-    for email in emails:
-        user = users_by_email.get(email)
-        if not user:
-            continue
-        assignment = assignments_by_user_id.get(user.id)
-        if assignment and assignment.revoked_at is None:
-            already_active += 1
-            continue
-        if assignment and assignment.revoked_at is not None:
-            assignment.revoked_at = None
-            assignment.revoked_reason = None
-            session.add(assignment)
-            restored += 1
-            notify_user_ids.add(user.id)
-        else:
-            session.add(CouponAssignment(coupon_id=coupon.id, user_id=user.id))
-            created += 1
-            notify_user_ids.add(user.id)
+    assignments_by_user_id = await _coupon_assignments_by_user_id(session, coupon_id=coupon.id, user_ids=user_ids)
+    created, restored, already_active, notify_user_ids = _apply_bulk_assignments(
+        session=session,
+        coupon=coupon,
+        emails=emails,
+        users_by_email=users_by_email,
+        assignments_by_user_id=assignments_by_user_id,
+    )
 
     await session.commit()
 
-    if payload.send_email and notify_user_ids:
-        ends_at = getattr(coupon, "ends_at", None)
-        for user in users_by_email.values():
-            if user.id not in notify_user_ids or not user.email or not bool(getattr(user, "notify_marketing", False)):
-                continue
-            background_tasks.add_task(
-                email_service.send_coupon_assigned,
-                user.email,
-                coupon_code=coupon.code,
-                promotion_name=coupon.promotion.name if coupon.promotion else _FALLBACK_PROMOTION_NAME,
-                promotion_description=coupon.promotion.description if coupon.promotion else None,
-                ends_at=ends_at,
-                lang=user.preferred_language,
-            )
+    if payload.send_email:
+        _enqueue_bulk_assign_notifications(
+            background_tasks=background_tasks,
+            coupon=coupon,
+            users_by_email=users_by_email,
+            notify_user_ids=notify_user_ids,
+        )
 
     return CouponBulkResult(
         requested=requested,
@@ -1873,6 +1936,61 @@ async def admin_bulk_assign_coupon(
         restored=restored,
         already_active=already_active,
     )
+
+
+def _apply_bulk_revocations(
+    *,
+    session: AsyncSession,
+    emails: list[str],
+    users_by_email: dict[str, User],
+    assignments_by_user_id: dict[UUID, CouponAssignment],
+    now: datetime,
+    reason: str | None,
+) -> tuple[int, int, int, set[UUID]]:
+    revoked = 0
+    already_revoked = 0
+    not_assigned = 0
+    revoked_user_ids: set[UUID] = set()
+    for email in emails:
+        user = users_by_email.get(email)
+        if not user:
+            continue
+        assignment = assignments_by_user_id.get(user.id)
+        if not assignment:
+            not_assigned += 1
+            continue
+        if assignment.revoked_at is not None:
+            already_revoked += 1
+            continue
+        assignment.revoked_at = now
+        assignment.revoked_reason = reason
+        session.add(assignment)
+        revoked += 1
+        revoked_user_ids.add(user.id)
+    return revoked, already_revoked, not_assigned, revoked_user_ids
+
+
+def _enqueue_bulk_revoke_notifications(
+    *,
+    background_tasks: BackgroundTasks,
+    coupon: Coupon,
+    users_by_email: dict[str, User],
+    revoked_user_ids: set[UUID],
+    reason: str | None,
+) -> None:
+    if not revoked_user_ids:
+        return
+    for user in users_by_email.values():
+        if user.id not in revoked_user_ids or not user.email or not bool(getattr(user, "notify_marketing", False)):
+            continue
+        background_tasks.add_task(
+            email_service.send_coupon_revoked,
+            user.email,
+            coupon_code=coupon.code,
+            promotion_name=coupon.promotion.name if coupon.promotion else _FALLBACK_PROMOTION_NAME,
+            reason=reason,
+            lang=user.preferred_language,
+        )
 
 
 @router.post("/admin/coupons/{coupon_id}/revoke", status_code=status.HTTP_204_NO_CONTENT)
@@ -1952,61 +2070,32 @@ async def admin_bulk_revoke_coupon(
     if not coupon:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DETAIL_COUPON_NOT_FOUND)
 
-    users = (await session.execute(select(User).where(User.email.in_(emails)))).scalars().all()
-    users_by_email = {u.email: u for u in users if u.email}
+    users_by_email = await _users_by_email(session, emails=emails)
     not_found = [e for e in emails if e not in users_by_email]
     user_ids = [u.id for u in users_by_email.values()]
 
-    assignments_by_user_id: dict[UUID, CouponAssignment] = {}
-    if user_ids:
-        existing = (
-            (
-                await session.execute(
-                    select(CouponAssignment).where(CouponAssignment.coupon_id == coupon.id, CouponAssignment.user_id.in_(user_ids))
-                )
-            )
-            .scalars()
-            .all()
-        )
-        assignments_by_user_id = {a.user_id: a for a in existing}
-
-    revoked = 0
-    already_revoked = 0
-    not_assigned = 0
-    revoked_user_ids: set[UUID] = set()
+    assignments_by_user_id = await _coupon_assignments_by_user_id(session, coupon_id=coupon.id, user_ids=user_ids)
     now = datetime.now(timezone.utc)
     reason = (payload.reason or "").strip()[:255] or None
-    for email in emails:
-        user = users_by_email.get(email)
-        if not user:
-            continue
-        assignment = assignments_by_user_id.get(user.id)
-        if not assignment:
-            not_assigned += 1
-            continue
-        if assignment.revoked_at is not None:
-            already_revoked += 1
-            continue
-        assignment.revoked_at = now
-        assignment.revoked_reason = reason
-        session.add(assignment)
-        revoked += 1
-        revoked_user_ids.add(user.id)
+    revoked, already_revoked, not_assigned, revoked_user_ids = _apply_bulk_revocations(
+        session=session,
+        emails=emails,
+        users_by_email=users_by_email,
+        assignments_by_user_id=assignments_by_user_id,
+        now=now,
+        reason=reason,
+    )
 
     await session.commit()
 
-    if payload.send_email and revoked_user_ids:
-        for user in users_by_email.values():
-            if user.id not in revoked_user_ids or not user.email or not bool(getattr(user, "notify_marketing", False)):
-                continue
-            background_tasks.add_task(
-                email_service.send_coupon_revoked,
-                user.email,
-                coupon_code=coupon.code,
-                promotion_name=coupon.promotion.name if coupon.promotion else _FALLBACK_PROMOTION_NAME,
-                reason=reason,
-                lang=user.preferred_language,
-            )
+    if payload.send_email:
+        _enqueue_bulk_revoke_notifications(
+            background_tasks=background_tasks,
+            coupon=coupon,
+            users_by_email=users_by_email,
+            revoked_user_ids=revoked_user_ids,
+            reason=reason,
+        )
 
     return CouponBulkResult(
         requested=requested,

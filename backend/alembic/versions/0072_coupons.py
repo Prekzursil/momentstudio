@@ -18,6 +18,8 @@ depends_on: Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    coupons_id_fk = "coupons.id"
+    users_id_fk = "users.id"
     promotion_discount_type = sa.Enum(
         "percent",
         "amount",
@@ -71,8 +73,8 @@ def upgrade() -> None:
     op.create_table(
         "coupon_assignments",
         sa.Column("id", sa.UUID(as_uuid=True), primary_key=True, nullable=False),
-        sa.Column("coupon_id", sa.UUID(as_uuid=True), sa.ForeignKey("coupons.id"), nullable=False),
-        sa.Column("user_id", sa.UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
+        sa.Column("coupon_id", sa.UUID(as_uuid=True), sa.ForeignKey(coupons_id_fk), nullable=False),
+        sa.Column("user_id", sa.UUID(as_uuid=True), sa.ForeignKey(users_id_fk), nullable=False),
         sa.Column("issued_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column("revoked_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("revoked_reason", sa.String(length=255), nullable=True),
@@ -82,8 +84,8 @@ def upgrade() -> None:
     op.create_table(
         "coupon_reservations",
         sa.Column("id", sa.UUID(as_uuid=True), primary_key=True, nullable=False),
-        sa.Column("coupon_id", sa.UUID(as_uuid=True), sa.ForeignKey("coupons.id"), nullable=False),
-        sa.Column("user_id", sa.UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
+        sa.Column("coupon_id", sa.UUID(as_uuid=True), sa.ForeignKey(coupons_id_fk), nullable=False),
+        sa.Column("user_id", sa.UUID(as_uuid=True), sa.ForeignKey(users_id_fk), nullable=False),
         sa.Column("order_id", sa.UUID(as_uuid=True), sa.ForeignKey("orders.id"), nullable=False),
         sa.Column("reserved_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
@@ -96,8 +98,8 @@ def upgrade() -> None:
     op.create_table(
         "coupon_redemptions",
         sa.Column("id", sa.UUID(as_uuid=True), primary_key=True, nullable=False),
-        sa.Column("coupon_id", sa.UUID(as_uuid=True), sa.ForeignKey("coupons.id"), nullable=False),
-        sa.Column("user_id", sa.UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
+        sa.Column("coupon_id", sa.UUID(as_uuid=True), sa.ForeignKey(coupons_id_fk), nullable=False),
+        sa.Column("user_id", sa.UUID(as_uuid=True), sa.ForeignKey(users_id_fk), nullable=False),
         sa.Column("order_id", sa.UUID(as_uuid=True), sa.ForeignKey("orders.id"), nullable=False),
         sa.Column("redeemed_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column("discount_ron", sa.Numeric(10, 2), nullable=False, server_default="0"),

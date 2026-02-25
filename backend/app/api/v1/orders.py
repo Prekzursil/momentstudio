@@ -3,6 +3,7 @@ import io
 import mimetypes
 import secrets
 import zipfile
+from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from functools import partial
@@ -186,6 +187,10 @@ CHARGE_LABELS: dict[str, tuple[str, str]] = {
 }
 
 DEFAULT_BINARY_MIME_TYPE = "application/octet-stream"
+BILLING_ADDRESS_INCOMPLETE_DETAIL = "Billing address is incomplete"
+CHECKOUT_BILLING_LABEL = "Checkout (Billing)"
+LEGAL_CONSENTS_REQUIRED_DETAIL = "Legal consents required"
+EMAIL_ALREADY_REGISTERED_CHECKOUT_DETAIL = "Email already registered; please sign in to checkout."
 
 
 def _charge_label(kind: str, lang: str | None) -> str:
@@ -1139,6 +1144,22 @@ async def _resolve_logged_checkout_discount(
     return promo, applied_discount, applied_coupon, coupon_shipping_discount
 
 
+def _has_complete_billing_address(
+    *,
+    line1: str | None,
+    city: str | None,
+    postal_code: str | None,
+    country: str | None,
+) -> bool:
+    return bool((line1 or "").strip() and (city or "").strip() and (postal_code or "").strip() and (country or "").strip())
+
+
+def _checkout_billing_label(*, save_address: bool) -> str:
+    if save_address:
+        return CHECKOUT_BILLING_LABEL
+    return f"{CHECKOUT_BILLING_LABEL} · One-time"
+
+
 async def _create_checkout_addresses(
     session: AsyncSession,
     *,
@@ -1173,18 +1194,18 @@ async def _create_checkout_addresses(
     )
     if not has_billing:
         return shipping_addr, shipping_addr
-    if not (
-        (payload.billing_line1 or "").strip()
-        and (payload.billing_city or "").strip()
-        and (payload.billing_postal_code or "").strip()
-        and (payload.billing_country or "").strip()
+    if not _has_complete_billing_address(
+        line1=payload.billing_line1,
+        city=payload.billing_city,
+        postal_code=payload.billing_postal_code,
+        country=payload.billing_country,
     ):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Billing address is incomplete")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=BILLING_ADDRESS_INCOMPLETE_DETAIL)
     billing_addr = await address_service.create_address(
         session,
         address_user_id,
         AddressCreate(
-            label="Checkout (Billing)" if payload.save_address else "Checkout (Billing · One-time)",
+            label=_checkout_billing_label(save_address=bool(payload.save_address)),
             phone=phone,
             line1=payload.billing_line1 or payload.line1,
             line2=payload.billing_line2,
@@ -1232,12 +1253,12 @@ async def _create_guest_checkout_addresses(
         and (payload.billing_postal_code or "").strip()
         and (payload.billing_country or "").strip()
     ):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Billing address is incomplete")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=BILLING_ADDRESS_INCOMPLETE_DETAIL)
     billing_addr = await address_service.create_address(
         session,
         user_id,
         AddressCreate(
-            label="Guest Checkout (Billing)" if not payload.create_account else "Checkout (Billing)",
+            label=f"Guest {CHECKOUT_BILLING_LABEL}" if not payload.create_account else CHECKOUT_BILLING_LABEL,
             phone=phone,
             line1=payload.billing_line1 or payload.line1,
             line2=payload.billing_line2,
@@ -1327,44 +1348,49 @@ async def _initialize_checkout_payment(
     return chosen_payment, stripe_session_id, stripe_checkout_url, paypal_order_id, paypal_approval_url
 
 
+@dataclass(frozen=True)
+class _CheckoutOrderBuildInput:
+    user_id: UUID | None
+    customer_email: str
+    customer_name: str
+    cart: Cart
+    shipping_addr: Address
+    billing_addr: Address
+    shipping_method: Any
+    payment_method: str
+    stripe_session_id: str | None
+    stripe_checkout_url: str | None
+    paypal_order_id: str | None
+    paypal_approval_url: str | None
+    delivery: tuple[str, str, str | None, str | None, str | None, float | None, float | None]
+    discount_val: Decimal
+    promo_code: str | None
+    invoice_company: str | None
+    invoice_vat_id: str | None
+    totals: Totals
+
+
 async def _build_checkout_order(
     session: AsyncSession,
     *,
-    user_id: UUID | None,
-    customer_email: str,
-    customer_name: str,
-    cart: Cart,
-    shipping_addr: Address,
-    billing_addr: Address,
-    shipping_method: Any,
-    payment_method: str,
-    stripe_session_id: str | None,
-    stripe_checkout_url: str | None,
-    paypal_order_id: str | None,
-    paypal_approval_url: str | None,
-    delivery: tuple[str, str, str | None, str | None, str | None, float | None, float | None],
-    discount_val: Decimal,
-    promo_code: str | None,
-    invoice_company: str | None,
-    invoice_vat_id: str | None,
-    totals: Totals,
+    payload: _CheckoutOrderBuildInput,
 ) -> Order:
-    courier, delivery_type, locker_id, locker_name, locker_address, locker_lat, locker_lng = delivery
+    courier, delivery_type, locker_id, locker_name, locker_address, locker_lat, locker_lng = payload.delivery
     return await order_service.build_order_from_cart(
         session,
-        user_id,
-        customer_email=customer_email,
-        customer_name=customer_name,
-        cart=cart,
-        shipping_address_id=shipping_addr.id,
-        billing_address_id=billing_addr.id,
-        shipping_method=shipping_method,
-        payment_method=payment_method,
+        payload.user_id,
+        customer_email=payload.customer_email,
+        customer_name=payload.customer_name,
+        cart=payload.cart,
+        shipping_address_id=payload.shipping_addr.id,
+        billing_address_id=payload.billing_addr.id,
+        shipping_method=payload.shipping_method,
+        payment_method=payload.payment_method,
         payment_intent_id=None,
-        stripe_checkout_session_id=stripe_session_id,
-        stripe_checkout_url=stripe_checkout_url,
-        paypal_order_id=paypal_order_id,
-        paypal_approval_url=paypal_approval_url,
+        stripe_checkout_session_id=payload.stripe_session_id,
+        stripe_checkout_url=payload.stripe_checkout_url,
+        paypal_order_id=payload.paypal_order_id,
+        paypal_approval_url=payload.paypal_approval_url,
         courier=courier,
         delivery_type=delivery_type,
         locker_id=locker_id,
@@ -1372,14 +1398,14 @@ async def _build_checkout_order(
         locker_address=locker_address,
         locker_lat=locker_lat,
         locker_lng=locker_lng,
-        discount=discount_val,
-        promo_code=promo_code,
-        invoice_company=invoice_company,
-        invoice_vat_id=invoice_vat_id,
-        tax_amount=totals.tax,
-        fee_amount=totals.fee,
-        shipping_amount=totals.shipping,
-        total_amount=totals.total,
+        discount=payload.discount_val,
+        promo_code=payload.promo_code,
+        invoice_company=payload.invoice_company,
+        invoice_vat_id=payload.invoice_vat_id,
+        tax_amount=payload.totals.tax,
+        fee_amount=payload.totals.fee,
+        shipping_amount=payload.totals.shipping,
+        total_amount=payload.totals.total,
     )
 
 
@@ -1525,7 +1551,7 @@ def _require_guest_customer_name(payload: GuestCheckoutRequest) -> str:
 def _assert_guest_checkout_consents(payload: GuestCheckoutRequest) -> None:
     if payload.accept_terms and payload.accept_privacy:
         return
-    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Legal consents required")
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=LEGAL_CONSENTS_REQUIRED_DETAIL)
 
 
 def _assert_guest_checkout_no_coupon(payload: GuestCheckoutRequest) -> None:
@@ -1539,7 +1565,7 @@ async def _assert_guest_email_available(session: AsyncSession, email: str) -> No
         return
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
-        detail="Email already registered; please sign in to checkout.",
+        detail=EMAIL_ALREADY_REGISTERED_CHECKOUT_DETAIL,
     )
 
 
@@ -1612,7 +1638,7 @@ async def checkout(
     accepted_versions = await legal_consents_service.latest_accepted_versions(session, user_id=current_user.id)
     needs_consent = not legal_consents_service.is_satisfied(required_versions, accepted_versions)
     if needs_consent and (not payload.accept_terms or not payload.accept_privacy):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Legal consents required")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=LEGAL_CONSENTS_REQUIRED_DETAIL)
     base = _frontend_base_from_request(request)
     user_cart = await cart_service.get_cart(session, current_user.id, session_id)
     _assert_cart_has_items(user_cart)
@@ -1680,24 +1706,26 @@ async def checkout(
     )
     order = await _build_checkout_order(
         session,
-        user_id=current_user.id,
-        customer_email=current_user.email,
-        customer_name=getattr(current_user, "name", None) or current_user.email,
-        cart=user_cart,
-        shipping_addr=shipping_addr,
-        billing_addr=billing_addr,
-        shipping_method=shipping_method,
-        payment_method=payment_method,
-        stripe_session_id=stripe_session_id,
-        stripe_checkout_url=stripe_checkout_url,
-        paypal_order_id=paypal_order_id,
-        paypal_approval_url=paypal_approval_url,
-        delivery=delivery,
-        discount_val=discount_val,
-        promo_code=payload.promo_code,
-        invoice_company=payload.invoice_company,
-        invoice_vat_id=payload.invoice_vat_id,
-        totals=totals,
+        payload=_CheckoutOrderBuildInput(
+            user_id=current_user.id,
+            customer_email=current_user.email,
+            customer_name=getattr(current_user, "name", None) or current_user.email,
+            cart=user_cart,
+            shipping_addr=shipping_addr,
+            billing_addr=billing_addr,
+            shipping_method=shipping_method,
+            payment_method=payment_method,
+            stripe_session_id=stripe_session_id,
+            stripe_checkout_url=stripe_checkout_url,
+            paypal_order_id=paypal_order_id,
+            paypal_approval_url=paypal_approval_url,
+            delivery=delivery,
+            discount_val=discount_val,
+            promo_code=payload.promo_code,
+            invoice_company=payload.invoice_company,
+            invoice_vat_id=payload.invoice_vat_id,
+            totals=totals,
+        ),
     )
     netopia_ntp_id, netopia_payment_url = await _maybe_start_new_order_netopia_payment(
         session,
@@ -2399,40 +2427,66 @@ async def admin_rename_order_tag(
     return OrderTagRenameResponse(**result)
 
 
+def _order_attr_as_str(order: Order, attr: str) -> str:
+    return str(getattr(order, attr, "") or "")
+
+
+def _order_attr_iso(order: Order, attr: str) -> str:
+    value = getattr(order, attr, None)
+    if value:
+        return value.isoformat()
+    return ""
+
+
+def _order_status_value(order: Order) -> str:
+    return getattr(order.status, "value", str(order.status))
+
+
+def _order_user_id(order: Order) -> str:
+    if order.user_id:
+        return str(order.user_id)
+    return ""
+
+
+def _order_shipping_method_name(order: Order) -> str:
+    shipping_method = getattr(order, "shipping_method", None)
+    return getattr(shipping_method, "name", "") or ""
+
+
 def _order_export_allowed_columns(*, include_pii: bool) -> dict[str, Callable[[Order], Any]]:
     allowed: dict[str, Callable[[Order], Any]] = {
         "id": lambda o: str(o.id),
         "reference_code": lambda o: o.reference_code or "",
-        "status": lambda o: getattr(o.status, "value", str(o.status)),
+        "status": _order_status_value,
         "total_amount": lambda o: str(o.total_amount),
         "tax_amount": lambda o: str(o.tax_amount),
         "fee_amount": lambda o: str(getattr(o, "fee_amount", 0) or 0),
         "shipping_amount": lambda o: str(o.shipping_amount),
         "currency": lambda o: o.currency or "",
-        "user_id": lambda o: str(o.user_id) if o.user_id else "",
-        "customer_email": lambda o: getattr(o, "customer_email", "") or "",
-        "customer_name": lambda o: getattr(o, "customer_name", "") or "",
-        "payment_method": lambda o: getattr(o, "payment_method", "") or "",
-        "promo_code": lambda o: getattr(o, "promo_code", "") or "",
-        "courier": lambda o: getattr(o, "courier", "") or "",
-        "delivery_type": lambda o: getattr(o, "delivery_type", "") or "",
-        "tracking_number": lambda o: getattr(o, "tracking_number", "") or "",
-        "tracking_url": lambda o: getattr(o, "tracking_url", "") or "",
-        "invoice_company": lambda o: getattr(o, "invoice_company", "") or "",
-        "invoice_vat_id": lambda o: getattr(o, "invoice_vat_id", "") or "",
-        "shipping_method": lambda o: getattr(getattr(o, "shipping_method", None), "name", "") or "",
-        "locker_name": lambda o: getattr(o, "locker_name", "") or "",
-        "locker_address": lambda o: getattr(o, "locker_address", "") or "",
-        "created_at": lambda o: o.created_at.isoformat() if getattr(o, "created_at", None) else "",
-        "updated_at": lambda o: o.updated_at.isoformat() if getattr(o, "updated_at", None) else "",
+        "user_id": _order_user_id,
+        "customer_email": lambda o: _order_attr_as_str(o, "customer_email"),
+        "customer_name": lambda o: _order_attr_as_str(o, "customer_name"),
+        "payment_method": lambda o: _order_attr_as_str(o, "payment_method"),
+        "promo_code": lambda o: _order_attr_as_str(o, "promo_code"),
+        "courier": lambda o: _order_attr_as_str(o, "courier"),
+        "delivery_type": lambda o: _order_attr_as_str(o, "delivery_type"),
+        "tracking_number": lambda o: _order_attr_as_str(o, "tracking_number"),
+        "tracking_url": lambda o: _order_attr_as_str(o, "tracking_url"),
+        "invoice_company": lambda o: _order_attr_as_str(o, "invoice_company"),
+        "invoice_vat_id": lambda o: _order_attr_as_str(o, "invoice_vat_id"),
+        "shipping_method": _order_shipping_method_name,
+        "locker_name": lambda o: _order_attr_as_str(o, "locker_name"),
+        "locker_address": lambda o: _order_attr_as_str(o, "locker_address"),
+        "created_at": lambda o: _order_attr_iso(o, "created_at"),
+        "updated_at": lambda o: _order_attr_iso(o, "updated_at"),
     }
     if include_pii:
         return allowed
-    allowed["customer_email"] = lambda o: pii_service.mask_email(getattr(o, "customer_email", "") or "") or ""
-    allowed["customer_name"] = lambda o: pii_service.mask_text(getattr(o, "customer_name", "") or "", keep=1) or ""
-    allowed["invoice_company"] = lambda o: pii_service.mask_text(getattr(o, "invoice_company", "") or "", keep=1) or ""
-    allowed["invoice_vat_id"] = lambda o: pii_service.mask_text(getattr(o, "invoice_vat_id", "") or "", keep=2) or ""
-    allowed["locker_address"] = lambda o: "***" if (getattr(o, "locker_address", "") or "").strip() else ""
+    allowed["customer_email"] = lambda o: pii_service.mask_email(_order_attr_as_str(o, "customer_email")) or ""
+    allowed["customer_name"] = lambda o: pii_service.mask_text(_order_attr_as_str(o, "customer_name"), keep=1) or ""
+    allowed["invoice_company"] = lambda o: pii_service.mask_text(_order_attr_as_str(o, "invoice_company"), keep=1) or ""
+    allowed["invoice_vat_id"] = lambda o: pii_service.mask_text(_order_attr_as_str(o, "invoice_vat_id"), keep=2) or ""
+    allowed["locker_address"] = lambda o: "***" if _order_attr_as_str(o, "locker_address").strip() else ""
     return allowed
 
 
@@ -2691,7 +2745,7 @@ async def request_guest_email_verification(
     if await auth_service.is_email_taken(session, email):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered; please sign in to checkout.",
+            detail=EMAIL_ALREADY_REGISTERED_CHECKOUT_DETAIL,
         )
 
     cart = await cart_service.get_cart(session, None, session_id)
@@ -2862,12 +2916,12 @@ async def guest_checkout(
     if await auth_service.is_email_taken(session, email):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered; please sign in to checkout.",
+            detail=EMAIL_ALREADY_REGISTERED_CHECKOUT_DETAIL,
         )
 
     required_versions = await legal_consents_service.required_doc_versions(session)
     if not payload.accept_terms or not payload.accept_privacy:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Legal consents required")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=LEGAL_CONSENTS_REQUIRED_DETAIL)
 
     user_id = None
     customer_name = (payload.name or "").strip()
@@ -2977,12 +3031,12 @@ async def guest_checkout(
             and (payload.billing_postal_code or "").strip()
             and (payload.billing_country or "").strip()
         ):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Billing address is incomplete")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=BILLING_ADDRESS_INCOMPLETE_DETAIL)
         billing_addr = await address_service.create_address(
             session,
             user_id,
             AddressCreate(
-                label="Guest Checkout (Billing)" if not payload.create_account else "Checkout (Billing)",
+                label=f"Guest {CHECKOUT_BILLING_LABEL}" if not payload.create_account else CHECKOUT_BILLING_LABEL,
                 phone=phone,
                 line1=payload.billing_line1 or payload.line1,
                 line2=payload.billing_line2,
