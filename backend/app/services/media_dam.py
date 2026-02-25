@@ -937,6 +937,48 @@ def _preset_to_read(
     )
 
 
+async def _latest_retry_policy_event_for_actions(
+    session: AsyncSession,
+    *,
+    job_type: MediaJobType,
+    actions: tuple[str, ...],
+) -> MediaJobRetryPolicyEvent | None:
+    action_clause: ColumnElement[bool]
+    if len(actions) == 1:
+        action_clause = cast(ColumnElement[bool], MediaJobRetryPolicyEvent.action == actions[0])
+    else:
+        action_clause = cast(ColumnElement[bool], MediaJobRetryPolicyEvent.action.in_(actions))
+    return await session.scalar(
+        select(MediaJobRetryPolicyEvent)
+        .where(MediaJobRetryPolicyEvent.job_type == job_type, action_clause)
+        .order_by(MediaJobRetryPolicyEvent.created_at.desc(), MediaJobRetryPolicyEvent.id.desc())
+    )
+
+
+def _preset_from_event_or_default(
+    *,
+    preset_key: str,
+    event: MediaJobRetryPolicyEvent | None,
+    snapshot_json: str | None,
+    job_type: MediaJobType,
+    default_policy: RetryPolicyResolved,
+) -> MediaRetryPolicyPresetRead:
+    if event is None:
+        return _preset_to_read(
+            preset_key=preset_key,
+            policy=default_policy,
+            fallback_used=True,
+        )
+    policy = _deserialize_policy_snapshot_json(snapshot_json, job_type=job_type)
+    return _preset_to_read(
+        preset_key=preset_key,
+        policy=policy,
+        source_event_id=event.id,
+        fallback_used=False,
+        updated_at=event.created_at,
+    )
+
+
 async def get_retry_policy_presets(
     session: AsyncSession,
     *,
@@ -944,62 +986,31 @@ async def get_retry_policy_presets(
 ) -> MediaRetryPolicyPresetsResponse:
     parsed_job_type = _parse_job_type(job_type)
     default_policy = _default_retry_policy(parsed_job_type)
-
-    # known_good uses the latest explicit marker.
-    known_good_event = await session.scalar(
-        select(MediaJobRetryPolicyEvent)
-        .where(
-            MediaJobRetryPolicyEvent.job_type == parsed_job_type,
-            MediaJobRetryPolicyEvent.action == "mark_known_good",
-        )
-        .order_by(MediaJobRetryPolicyEvent.created_at.desc(), MediaJobRetryPolicyEvent.id.desc())
+    known_good_event = await _latest_retry_policy_event_for_actions(
+        session,
+        job_type=parsed_job_type,
+        actions=("mark_known_good",),
     )
-    if known_good_event is not None:
-        known_good_policy = _deserialize_policy_snapshot_json(
-            known_good_event.after_policy_json,
-            job_type=parsed_job_type,
-        )
-        known_good_preset = _preset_to_read(
-            preset_key="known_good",
-            policy=known_good_policy,
-            source_event_id=known_good_event.id,
-            fallback_used=False,
-            updated_at=known_good_event.created_at,
-        )
-    else:
-        known_good_preset = _preset_to_read(
-            preset_key="known_good",
-            policy=default_policy,
-            fallback_used=True,
-        )
-
-    # last_change reverts to the "before" snapshot of the latest mutating event.
-    last_change_event = await session.scalar(
-        select(MediaJobRetryPolicyEvent)
-        .where(
-            MediaJobRetryPolicyEvent.job_type == parsed_job_type,
-            MediaJobRetryPolicyEvent.action.in_(("update", "reset", "reset_all", "rollback")),
-        )
-        .order_by(MediaJobRetryPolicyEvent.created_at.desc(), MediaJobRetryPolicyEvent.id.desc())
+    known_good_preset = _preset_from_event_or_default(
+        preset_key="known_good",
+        event=known_good_event,
+        snapshot_json=known_good_event.after_policy_json if known_good_event is not None else None,
+        job_type=parsed_job_type,
+        default_policy=default_policy,
     )
-    if last_change_event is not None:
-        last_change_policy = _deserialize_policy_snapshot_json(
-            last_change_event.before_policy_json,
-            job_type=parsed_job_type,
-        )
-        last_change_preset = _preset_to_read(
-            preset_key="last_change",
-            policy=last_change_policy,
-            source_event_id=last_change_event.id,
-            fallback_used=False,
-            updated_at=last_change_event.created_at,
-        )
-    else:
-        last_change_preset = _preset_to_read(
-            preset_key="last_change",
-            policy=default_policy,
-            fallback_used=True,
-        )
+
+    last_change_event = await _latest_retry_policy_event_for_actions(
+        session,
+        job_type=parsed_job_type,
+        actions=("update", "reset", "reset_all", "rollback"),
+    )
+    last_change_preset = _preset_from_event_or_default(
+        preset_key="last_change",
+        event=last_change_event,
+        snapshot_json=last_change_event.before_policy_json if last_change_event is not None else None,
+        job_type=parsed_job_type,
+        default_policy=default_policy,
+    )
 
     return MediaRetryPolicyPresetsResponse(
         job_type=parsed_job_type.value,
@@ -1564,32 +1575,54 @@ async def _replace_asset_i18n(session: AsyncSession, asset: MediaAsset, entries:
         current.description = (row.description or "").strip() or None
 
 
-async def _replace_asset_tags(session: AsyncSession, asset: MediaAsset, tags: list[str]) -> None:
-    normalized = []
-    seen = set()
+def _normalized_asset_tags(tags: list[str] | None, *, limit: int = 30) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
     for raw in tags or []:
         value = _normalize_tag(raw)
         if not value or value in seen:
             continue
         seen.add(value)
         normalized.append(value)
-        if len(normalized) >= 30:
+        if len(normalized) >= limit:
             break
+    return normalized
 
-    existing = {rel.tag.value: rel for rel in (asset.tags or []) if getattr(rel, "tag", None)}
-    keep = set(normalized)
-    for value, relation in existing.items():
-        if value not in keep:
+
+def _existing_asset_tag_links(asset: MediaAsset) -> dict[str, MediaAssetTag]:
+    return {rel.tag.value: rel for rel in (asset.tags or []) if getattr(rel, "tag", None)}
+
+
+async def _delete_asset_tag_links_not_in(
+    session: AsyncSession,
+    *,
+    existing_links: dict[str, MediaAssetTag],
+    keep_values: set[str],
+) -> None:
+    for value, relation in existing_links.items():
+        if value not in keep_values:
             await session.delete(relation)
+
+
+async def _get_or_create_asset_tag(session: AsyncSession, value: str) -> MediaTag:
+    tag = await session.scalar(select(MediaTag).where(MediaTag.value == value))
+    if tag is not None:
+        return tag
+    tag = MediaTag(value=value)
+    session.add(tag)
+    await session.flush()
+    return tag
+
+
+async def _replace_asset_tags(session: AsyncSession, asset: MediaAsset, tags: list[str]) -> None:
+    normalized = _normalized_asset_tags(tags)
+    existing = _existing_asset_tag_links(asset)
+    await _delete_asset_tag_links_not_in(session, existing_links=existing, keep_values=set(normalized))
 
     for value in normalized:
         if value in existing:
             continue
-        tag = await session.scalar(select(MediaTag).where(MediaTag.value == value))
-        if tag is None:
-            tag = MediaTag(value=value)
-            session.add(tag)
-            await session.flush()
+        tag = await _get_or_create_asset_tag(session, value)
         session.add(MediaAssetTag(asset_id=asset.id, tag_id=tag.id))
 
 
