@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 import hashlib
 import re
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, status
@@ -67,13 +68,37 @@ from app.services import cart as cart_service
 from app.api.v1 import cart as cart_api
 
 
-router = APIRouter(prefix="/coupons", tags=["coupons"])
+_ADMIN_SECTION_COUPONS = "coupons"
+_DETAIL_COUPON_NOT_FOUND = "Coupon not found"
+_DETAIL_PROMOTION_NOT_FOUND = "Promotion not found"
+_DETAIL_USER_NOT_FOUND = "User not found"
+_DETAIL_JOB_NOT_FOUND = "Job not found"
+_DETAIL_MARKETING_OPT_IN_REQUIRED = "User has not opted in to marketing emails."
+_DETAIL_DB_ENGINE_UNAVAILABLE = "Database engine unavailable"
+_DEFAULT_COUPON_PREFIX = "COUPON"
+_FALLBACK_PROMOTION_NAME = "Coupon"
+_DETAIL_TOO_MANY_EMAILS = "Too many emails (max 500)"
+
+router = APIRouter(prefix="/coupons", tags=[_ADMIN_SECTION_COUPONS])
 _BULK_SEGMENT_BATCH_SIZE = 500
 _COUPON_ANALYTICS_EXCLUDED_ORDER_STATUSES = [
     OrderStatus.pending_payment,
     OrderStatus.cancelled,
     OrderStatus.refunded,
 ]
+_admin_coupons_dependency = require_admin_section(_ADMIN_SECTION_COUPONS)
+
+SessionDep = Annotated[AsyncSession, Depends(get_session)]
+CurrentUserDep = Annotated[User, Depends(get_current_user)]
+AdminCouponsDep = Annotated[User, Depends(_admin_coupons_dependency)]
+SessionHeaderDep = Annotated[str | None, Depends(cart_api.session_header)]
+ShippingMethodIdQuery = Annotated[UUID | None, Query(default=None)]
+PromotionIdFilterQuery = Annotated[UUID | None, Query(default=None)]
+SearchQuery = Annotated[str | None, Query(default=None)]
+CouponIdFilterQuery = Annotated[UUID | None, Query(default=None)]
+AnalyticsDaysQuery = Annotated[int, Query(default=30, ge=1, le=365)]
+AnalyticsTopLimitQuery = Annotated[int, Query(default=10, ge=1, le=50)]
+BulkJobsLimitQuery = Annotated[int, Query(default=10, ge=1, le=50)]
 
 
 async def _get_shipping_method(session: AsyncSession, shipping_method_id: UUID | None) -> ShippingMethod | None:
@@ -260,12 +285,12 @@ def _partition_coupon_offers(
     return eligible, ineligible
 
 
-@router.get("/eligibility", response_model=CouponEligibilityResponse)
+@router.get("/eligibility")
 async def coupon_eligibility(
-    session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-    shipping_method_id: UUID | None = Query(default=None),
-    session_id: str | None = Depends(cart_api.session_header),
+    session: SessionDep,
+    current_user: CurrentUserDep,
+    shipping_method_id: ShippingMethodIdQuery,
+    session_id: SessionHeaderDep,
 ) -> CouponEligibilityResponse:
     user_cart = await cart_service.get_cart(session, current_user.id, session_id)
     checkout = await checkout_settings_service.get_checkout_settings(session)
@@ -283,18 +308,18 @@ async def coupon_eligibility(
     return CouponEligibilityResponse(eligible=eligible, ineligible=ineligible)
 
 
-@router.post("/validate", response_model=CouponOffer)
+@router.post("/validate")
 async def validate_coupon(
     payload: CouponValidateRequest,
-    session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-    shipping_method_id: UUID | None = Query(default=None),
-    session_id: str | None = Depends(cart_api.session_header),
+    session: SessionDep,
+    current_user: CurrentUserDep,
+    shipping_method_id: ShippingMethodIdQuery,
+    session_id: SessionHeaderDep,
 ) -> CouponOffer:
     code = (payload.code or "").strip().upper()
     coupon = await coupons_service.get_coupon_by_code(session, code=code)
     if not coupon:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DETAIL_COUPON_NOT_FOUND)
     user_cart = await cart_service.get_cart(session, current_user.id, session_id)
     checkout = await checkout_settings_service.get_checkout_settings(session)
     shipping_method = await _get_shipping_method(session, shipping_method_id)
@@ -312,10 +337,10 @@ async def validate_coupon(
     return _to_offer(result)
 
 
-@router.get("/me", response_model=list[CouponRead])
+@router.get("/me")
 async def my_coupons(
-    session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    session: SessionDep,
+    current_user: CurrentUserDep,
 ) -> list[CouponRead]:
     coupons = await coupons_service.get_user_visible_coupons(session, user_id=current_user.id)
     return [
@@ -326,10 +351,10 @@ async def my_coupons(
     ]
 
 
-@router.get("/admin/promotions", response_model=list[PromotionRead])
+@router.get("/admin/promotions")
 async def admin_list_promotions(
-    session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("coupons")),
+    session: SessionDep,
+    _: AdminCouponsDep,
 ) -> list[PromotionRead]:
     result = await session.execute(
         select(Promotion).options(selectinload(Promotion.scopes)).order_by(Promotion.created_at.desc())
@@ -338,11 +363,11 @@ async def admin_list_promotions(
     return [_to_promotion_read(p) for p in promotions]
 
 
-@router.post("/admin/promotions", response_model=PromotionRead, status_code=status.HTTP_201_CREATED)
+@router.post("/admin/promotions", status_code=status.HTTP_201_CREATED)
 async def admin_create_promotion(
     payload: PromotionCreate,
-    session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("coupons")),
+    session: SessionDep,
+    _: AdminCouponsDep,
 ) -> PromotionRead:
     if payload.discount_type == "percent" and not payload.percentage_off:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="percentage_off is required for percent promotions")
@@ -392,12 +417,12 @@ async def admin_create_promotion(
     return _to_promotion_read(promo)
 
 
-@router.patch("/admin/promotions/{promotion_id}", response_model=PromotionRead)
+@router.patch("/admin/promotions/{promotion_id}")
 async def admin_update_promotion(
     promotion_id: UUID,
     payload: PromotionUpdate,
-    session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("coupons")),
+    session: SessionDep,
+    _: AdminCouponsDep,
 ) -> PromotionRead:
     promo = (
         (await session.execute(select(Promotion).options(selectinload(Promotion.scopes)).where(Promotion.id == promotion_id)))
@@ -405,7 +430,7 @@ async def admin_update_promotion(
         .first()
     )
     if not promo:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Promotion not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DETAIL_PROMOTION_NOT_FOUND)
 
     data = payload.model_dump(exclude_unset=True)
 
@@ -482,12 +507,12 @@ async def admin_update_promotion(
     return _to_promotion_read(promo)
 
 
-@router.get("/admin/coupons", response_model=list[CouponRead])
+@router.get("/admin/coupons")
 async def admin_list_coupons(
-    session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("coupons")),
-    promotion_id: UUID | None = Query(default=None),
-    q: str | None = Query(default=None),
+    session: SessionDep,
+    _: AdminCouponsDep,
+    promotion_id: PromotionIdFilterQuery,
+    q: SearchQuery,
 ) -> list[CouponRead]:
     query = select(Coupon).options(selectinload(Coupon.promotion).selectinload(Promotion.scopes))
     if promotion_id:
@@ -504,12 +529,12 @@ async def admin_list_coupons(
     ]
 
 
-@router.patch("/admin/coupons/{coupon_id}", response_model=CouponRead)
+@router.patch("/admin/coupons/{coupon_id}")
 async def admin_update_coupon(
     coupon_id: UUID,
     payload: CouponUpdate,
-    session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("coupons")),
+    session: SessionDep,
+    _: AdminCouponsDep,
 ) -> CouponRead:
     coupon = (
         (
@@ -523,7 +548,7 @@ async def admin_update_coupon(
         .first()
     )
     if not coupon:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DETAIL_COUPON_NOT_FOUND)
 
     data = payload.model_dump(exclude_unset=True)
     for attr in [
@@ -544,15 +569,15 @@ async def admin_update_coupon(
     return coupon_read
 
 
-@router.get("/admin/coupons/{coupon_id}/assignments", response_model=list[CouponAssignmentRead])
+@router.get("/admin/coupons/{coupon_id}/assignments")
 async def admin_list_coupon_assignments(
     coupon_id: UUID,
-    session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("coupons")),
+    session: SessionDep,
+    _: AdminCouponsDep,
 ) -> list[CouponAssignmentRead]:
     coupon = await session.get(Coupon, coupon_id)
     if not coupon:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DETAIL_COUPON_NOT_FOUND)
 
     result = await session.execute(
         select(CouponAssignment)
@@ -575,15 +600,15 @@ async def admin_list_coupon_assignments(
     return out
 
 
-@router.post("/admin/coupons", response_model=CouponRead, status_code=status.HTTP_201_CREATED)
+@router.post("/admin/coupons", status_code=status.HTTP_201_CREATED)
 async def admin_create_coupon(
     payload: CouponCreate,
-    session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("coupons")),
+    session: SessionDep,
+    _: AdminCouponsDep,
 ) -> CouponRead:
     promotion = await session.get(Promotion, payload.promotion_id)
     if not promotion:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Promotion not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DETAIL_PROMOTION_NOT_FOUND)
 
     code = (payload.code or "").strip().upper()
     if not code:
@@ -615,14 +640,14 @@ async def admin_create_coupon(
     return coupon_read
 
 
-@router.post("/admin/coupons/generate-code", response_model=CouponCodeGenerateResponse)
+@router.post("/admin/coupons/generate-code")
 async def admin_generate_coupon_code(
     payload: CouponCodeGenerateRequest,
-    session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("coupons")),
+    session: SessionDep,
+    _: AdminCouponsDep,
 ) -> CouponCodeGenerateResponse:
-    prefix_source = payload.prefix or "COUPON"
-    prefix = _sanitize_coupon_prefix(prefix_source) or "COUPON"
+    prefix_source = payload.prefix or _DEFAULT_COUPON_PREFIX
+    prefix = _sanitize_coupon_prefix(prefix_source) or _DEFAULT_COUPON_PREFIX
     pattern = (payload.pattern or "").strip() or None
     code = await coupons_service.generate_unique_coupon_code(
         session,
@@ -634,16 +659,16 @@ async def admin_generate_coupon_code(
     return CouponCodeGenerateResponse(code=code)
 
 
-@router.post("/admin/coupons/issue", response_model=CouponRead, status_code=status.HTTP_201_CREATED)
+@router.post("/admin/coupons/issue", status_code=status.HTTP_201_CREATED)
 async def admin_issue_coupon_to_user(
     payload: CouponIssueToUserRequest,
     background_tasks: BackgroundTasks,
-    session: AsyncSession = Depends(get_session),
-    actor: User = Depends(require_admin_section("coupons")),
+    session: SessionDep,
+    actor: AdminCouponsDep,
 ) -> CouponRead:
     user = await session.get(User, payload.user_id)
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DETAIL_USER_NOT_FOUND)
 
     promotion = (
         (await session.execute(select(Promotion).options(selectinload(Promotion.scopes)).where(Promotion.id == payload.promotion_id)))
@@ -651,10 +676,10 @@ async def admin_issue_coupon_to_user(
         .first()
     )
     if not promotion:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Promotion not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DETAIL_PROMOTION_NOT_FOUND)
 
-    prefix_source = payload.prefix or promotion.key or promotion.name or "COUPON"
-    prefix = _sanitize_coupon_prefix(prefix_source) or "COUPON"
+    prefix_source = payload.prefix or promotion.key or promotion.name or _DEFAULT_COUPON_PREFIX
+    prefix = _sanitize_coupon_prefix(prefix_source) or _DEFAULT_COUPON_PREFIX
     code = await coupons_service.generate_unique_coupon_code(session, prefix=prefix, length=12)
 
     starts_at = datetime.now(timezone.utc)
@@ -693,7 +718,7 @@ async def admin_issue_coupon_to_user(
 
     should_email = bool(payload.send_email and user.email)
     if should_email and not bool(getattr(user, "notify_marketing", False)):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User has not opted in to marketing emails.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_DETAIL_MARKETING_OPT_IN_REQUIRED)
     await session.commit()
 
     if should_email:
@@ -930,22 +955,22 @@ async def _coupon_analytics_top_products(
     ]
 
 
-@router.get("/admin/analytics", response_model=CouponAnalyticsResponse)
+@router.get("/admin/analytics")
 async def admin_coupon_analytics(
     promotion_id: UUID,
-    session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("coupons")),
-    coupon_id: UUID | None = Query(default=None),
-    days: int = Query(default=30, ge=1, le=365),
-    top_limit: int = Query(default=10, ge=1, le=50),
+    session: SessionDep,
+    _: AdminCouponsDep,
+    coupon_id: CouponIdFilterQuery,
+    days: AnalyticsDaysQuery,
+    top_limit: AnalyticsTopLimitQuery,
 ) -> CouponAnalyticsResponse:
     promotion = await session.get(Promotion, promotion_id)
     if not promotion:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Promotion not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DETAIL_PROMOTION_NOT_FOUND)
     if coupon_id:
         coupon = await session.get(Coupon, coupon_id)
         if not coupon or coupon.promotion_id != promotion_id:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DETAIL_COUPON_NOT_FOUND)
 
     end = datetime.now(timezone.utc)
     start = end - timedelta(days=int(days))
@@ -975,13 +1000,13 @@ async def _find_user(session: AsyncSession, *, user_id: UUID | None, email: str 
     if user_id:
         user = await session.get(User, user_id)
         if not user:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DETAIL_USER_NOT_FOUND)
         return user
     if email:
         email_clean = email.strip().lower()
         user = (await session.execute(select(User).where(User.email == email_clean))).scalars().first()
         if not user:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DETAIL_USER_NOT_FOUND)
         return user
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Provide user_id or email")
 
@@ -998,7 +1023,7 @@ def _coupon_email_context(coupon: Coupon | None) -> _CouponEmailContext:
     promotion = getattr(coupon, "promotion", None) if coupon else None
     return _CouponEmailContext(
         coupon_code=(getattr(coupon, "code", "") if coupon else ""),
-        promotion_name=(getattr(promotion, "name", None) or "Coupon"),
+        promotion_name=(getattr(promotion, "name", None) or _FALLBACK_PROMOTION_NAME),
         promotion_description=(getattr(promotion, "description", None) if promotion else None),
         ends_at=(getattr(coupon, "ends_at", None) if coupon else None),
     )
@@ -1021,7 +1046,7 @@ async def _get_coupon_with_promotion_or_404(session: AsyncSession, *, coupon_id:
         .first()
     )
     if not coupon:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DETAIL_COUPON_NOT_FOUND)
     return coupon
 
 
@@ -1056,7 +1081,10 @@ async def _coupon_assignments_by_user_id(
         .scalars()
         .all()
     )
-    return {a.user_id: a for a in existing}
+    assignments_by_user_id: dict[UUID, CouponAssignment] = {}
+    for assignment in existing:
+        assignments_by_user_id[assignment.user_id] = assignment
+    return assignments_by_user_id
 
 
 async def _coupon_assignment_status_by_user_id(
@@ -1701,8 +1729,8 @@ async def admin_assign_coupon(
     coupon_id: UUID,
     payload: CouponAssignRequest,
     background_tasks: BackgroundTasks,
-    session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("coupons")),
+    session: SessionDep,
+    _: AdminCouponsDep,
 ) -> Response:
     coupon = (
         (
@@ -1712,7 +1740,7 @@ async def admin_assign_coupon(
         .first()
     )
     if not coupon:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DETAIL_COUPON_NOT_FOUND)
 
     user = await _find_user(session, user_id=payload.user_id, email=payload.email)
 
@@ -1736,7 +1764,7 @@ async def admin_assign_coupon(
 
     should_email = bool(payload.send_email and user.email)
     if should_email and not bool(getattr(user, "notify_marketing", False)):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User has not opted in to marketing emails.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_DETAIL_MARKETING_OPT_IN_REQUIRED)
     await session.commit()
 
     if should_email:
@@ -1745,7 +1773,7 @@ async def admin_assign_coupon(
             email_service.send_coupon_assigned,
             user.email,
             coupon_code=coupon.code,
-            promotion_name=coupon.promotion.name if coupon.promotion else "Coupon",
+            promotion_name=coupon.promotion.name if coupon.promotion else _FALLBACK_PROMOTION_NAME,
             promotion_description=coupon.promotion.description if coupon.promotion else None,
             ends_at=ends_at,
             lang=user.preferred_language,
@@ -1753,20 +1781,20 @@ async def admin_assign_coupon(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.post("/admin/coupons/{coupon_id}/assign/bulk", response_model=CouponBulkResult)
+@router.post("/admin/coupons/{coupon_id}/assign/bulk")
 async def admin_bulk_assign_coupon(
     coupon_id: UUID,
     payload: CouponBulkAssignRequest,
     background_tasks: BackgroundTasks,
-    session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("coupons")),
+    session: SessionDep,
+    _: AdminCouponsDep,
 ) -> CouponBulkResult:
     requested = len(payload.emails or [])
     emails, invalid = _normalize_bulk_emails(payload.emails or [])
     if not emails:
         return CouponBulkResult(requested=requested, unique=0, invalid_emails=invalid)
     if len(emails) > 500:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Too many emails (max 500)")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_DETAIL_TOO_MANY_EMAILS)
 
     coupon = (
         (
@@ -1776,7 +1804,7 @@ async def admin_bulk_assign_coupon(
         .first()
     )
     if not coupon:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DETAIL_COUPON_NOT_FOUND)
 
     users = (await session.execute(select(User).where(User.email.in_(emails)))).scalars().all()
     users_by_email = {u.email: u for u in users if u.email}
@@ -1830,7 +1858,7 @@ async def admin_bulk_assign_coupon(
                 email_service.send_coupon_assigned,
                 user.email,
                 coupon_code=coupon.code,
-                promotion_name=coupon.promotion.name if coupon.promotion else "Coupon",
+                promotion_name=coupon.promotion.name if coupon.promotion else _FALLBACK_PROMOTION_NAME,
                 promotion_description=coupon.promotion.description if coupon.promotion else None,
                 ends_at=ends_at,
                 lang=user.preferred_language,
@@ -1852,8 +1880,8 @@ async def admin_revoke_coupon(
     coupon_id: UUID,
     payload: CouponRevokeRequest,
     background_tasks: BackgroundTasks,
-    session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("coupons")),
+    session: SessionDep,
+    _: AdminCouponsDep,
 ) -> Response:
     coupon = (
         (
@@ -1863,7 +1891,7 @@ async def admin_revoke_coupon(
         .first()
     )
     if not coupon:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DETAIL_COUPON_NOT_FOUND)
 
     user = await _find_user(session, user_id=payload.user_id, email=payload.email)
     assignment = (
@@ -1884,7 +1912,7 @@ async def admin_revoke_coupon(
 
     should_email = bool(payload.send_email and user.email)
     if should_email and not bool(getattr(user, "notify_marketing", False)):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User has not opted in to marketing emails.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_DETAIL_MARKETING_OPT_IN_REQUIRED)
     await session.commit()
 
     if should_email:
@@ -1892,27 +1920,27 @@ async def admin_revoke_coupon(
             email_service.send_coupon_revoked,
             user.email,
             coupon_code=coupon.code,
-            promotion_name=coupon.promotion.name if coupon.promotion else "Coupon",
+            promotion_name=coupon.promotion.name if coupon.promotion else _FALLBACK_PROMOTION_NAME,
             reason=assignment.revoked_reason,
             lang=user.preferred_language,
         )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.post("/admin/coupons/{coupon_id}/revoke/bulk", response_model=CouponBulkResult)
+@router.post("/admin/coupons/{coupon_id}/revoke/bulk")
 async def admin_bulk_revoke_coupon(
     coupon_id: UUID,
     payload: CouponBulkRevokeRequest,
     background_tasks: BackgroundTasks,
-    session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("coupons")),
+    session: SessionDep,
+    _: AdminCouponsDep,
 ) -> CouponBulkResult:
     requested = len(payload.emails or [])
     emails, invalid = _normalize_bulk_emails(payload.emails or [])
     if not emails:
         return CouponBulkResult(requested=requested, unique=0, invalid_emails=invalid)
     if len(emails) > 500:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Too many emails (max 500)")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_DETAIL_TOO_MANY_EMAILS)
 
     coupon = (
         (
@@ -1922,7 +1950,7 @@ async def admin_bulk_revoke_coupon(
         .first()
     )
     if not coupon:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DETAIL_COUPON_NOT_FOUND)
 
     users = (await session.execute(select(User).where(User.email.in_(emails)))).scalars().all()
     users_by_email = {u.email: u for u in users if u.email}
@@ -1975,7 +2003,7 @@ async def admin_bulk_revoke_coupon(
                 email_service.send_coupon_revoked,
                 user.email,
                 coupon_code=coupon.code,
-                promotion_name=coupon.promotion.name if coupon.promotion else "Coupon",
+                promotion_name=coupon.promotion.name if coupon.promotion else _FALLBACK_PROMOTION_NAME,
                 reason=reason,
                 lang=user.preferred_language,
             )
@@ -1991,16 +2019,16 @@ async def admin_bulk_revoke_coupon(
     )
 
 
-@router.post("/admin/coupons/{coupon_id}/assign/segment/preview", response_model=CouponBulkSegmentPreview)
+@router.post("/admin/coupons/{coupon_id}/assign/segment/preview")
 async def admin_preview_segment_assign(
     coupon_id: UUID,
     payload: CouponBulkSegmentAssignRequest,
-    session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("coupons")),
+    session: SessionDep,
+    _: AdminCouponsDep,
 ) -> CouponBulkSegmentPreview:
     coupon = await session.get(Coupon, coupon_id)
     if not coupon:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DETAIL_COUPON_NOT_FOUND)
     try:
         bucket = _parse_bucket_config(
             bucket_total=payload.bucket_total,
@@ -2013,16 +2041,16 @@ async def admin_preview_segment_assign(
     return await _preview_segment_assign(session, coupon_id=coupon_id, filters=filters, bucket=bucket)
 
 
-@router.post("/admin/coupons/{coupon_id}/revoke/segment/preview", response_model=CouponBulkSegmentPreview)
+@router.post("/admin/coupons/{coupon_id}/revoke/segment/preview")
 async def admin_preview_segment_revoke(
     coupon_id: UUID,
     payload: CouponBulkSegmentRevokeRequest,
-    session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("coupons")),
+    session: SessionDep,
+    _: AdminCouponsDep,
 ) -> CouponBulkSegmentPreview:
     coupon = await session.get(Coupon, coupon_id)
     if not coupon:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DETAIL_COUPON_NOT_FOUND)
     try:
         bucket = _parse_bucket_config(
             bucket_total=payload.bucket_total,
@@ -2035,17 +2063,17 @@ async def admin_preview_segment_revoke(
     return await _preview_segment_revoke(session, coupon_id=coupon_id, filters=filters, bucket=bucket)
 
 
-@router.post("/admin/coupons/{coupon_id}/assign/segment", response_model=CouponBulkJobRead, status_code=status.HTTP_201_CREATED)
+@router.post("/admin/coupons/{coupon_id}/assign/segment", status_code=status.HTTP_201_CREATED)
 async def admin_start_segment_assign_job(
     coupon_id: UUID,
     payload: CouponBulkSegmentAssignRequest,
     background_tasks: BackgroundTasks,
-    session: AsyncSession = Depends(get_session),
-    admin_user: User = Depends(require_admin_section("coupons")),
+    session: SessionDep,
+    admin_user: AdminCouponsDep,
 ) -> CouponBulkJobRead:
     coupon = await session.get(Coupon, coupon_id)
     if not coupon:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DETAIL_COUPON_NOT_FOUND)
 
     try:
         bucket = _parse_bucket_config(
@@ -2077,22 +2105,22 @@ async def admin_start_segment_assign_job(
 
     engine = session.bind
     if engine is None:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database engine unavailable")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=_DETAIL_DB_ENGINE_UNAVAILABLE)
     background_tasks.add_task(_run_bulk_segment_job, engine, job_id=job.id)
     return CouponBulkJobRead.model_validate(job, from_attributes=True)
 
 
-@router.post("/admin/coupons/{coupon_id}/revoke/segment", response_model=CouponBulkJobRead, status_code=status.HTTP_201_CREATED)
+@router.post("/admin/coupons/{coupon_id}/revoke/segment", status_code=status.HTTP_201_CREATED)
 async def admin_start_segment_revoke_job(
     coupon_id: UUID,
     payload: CouponBulkSegmentRevokeRequest,
     background_tasks: BackgroundTasks,
-    session: AsyncSession = Depends(get_session),
-    admin_user: User = Depends(require_admin_section("coupons")),
+    session: SessionDep,
+    admin_user: AdminCouponsDep,
 ) -> CouponBulkJobRead:
     coupon = await session.get(Coupon, coupon_id)
     if not coupon:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DETAIL_COUPON_NOT_FOUND)
 
     try:
         bucket = _parse_bucket_config(
@@ -2125,28 +2153,28 @@ async def admin_start_segment_revoke_job(
 
     engine = session.bind
     if engine is None:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database engine unavailable")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=_DETAIL_DB_ENGINE_UNAVAILABLE)
     background_tasks.add_task(_run_bulk_segment_job, engine, job_id=job.id)
     return CouponBulkJobRead.model_validate(job, from_attributes=True)
 
 
-@router.get("/admin/coupons/bulk-jobs/{job_id}", response_model=CouponBulkJobRead)
+@router.get("/admin/coupons/bulk-jobs/{job_id}")
 async def admin_get_bulk_job(
     job_id: UUID,
-    session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("coupons")),
+    session: SessionDep,
+    _: AdminCouponsDep,
 ) -> CouponBulkJobRead:
     job = await session.get(CouponBulkJob, job_id)
     if not job:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DETAIL_JOB_NOT_FOUND)
     return CouponBulkJobRead.model_validate(job, from_attributes=True)
 
 
-@router.get("/admin/coupons/bulk-jobs", response_model=list[CouponBulkJobRead])
+@router.get("/admin/coupons/bulk-jobs")
 async def admin_list_bulk_jobs_global(
-    session: AsyncSession = Depends(get_session),
-    limit: int = Query(default=10, ge=1, le=50),
-    _: User = Depends(require_admin_section("coupons")),
+    session: SessionDep,
+    limit: BulkJobsLimitQuery,
+    _: AdminCouponsDep,
 ) -> list[CouponBulkJobRead]:
     jobs = (
         (
@@ -2162,12 +2190,12 @@ async def admin_list_bulk_jobs_global(
     return [CouponBulkJobRead.model_validate(job, from_attributes=True) for job in jobs]
 
 
-@router.get("/admin/coupons/{coupon_id}/bulk-jobs", response_model=list[CouponBulkJobRead])
+@router.get("/admin/coupons/{coupon_id}/bulk-jobs")
 async def admin_list_bulk_jobs(
     coupon_id: UUID,
-    session: AsyncSession = Depends(get_session),
-    limit: int = Query(default=10, ge=1, le=50),
-    _: User = Depends(require_admin_section("coupons")),
+    session: SessionDep,
+    limit: BulkJobsLimitQuery,
+    _: AdminCouponsDep,
 ) -> list[CouponBulkJobRead]:
     jobs = (
         (
@@ -2184,15 +2212,15 @@ async def admin_list_bulk_jobs(
     return [CouponBulkJobRead.model_validate(job, from_attributes=True) for job in jobs]
 
 
-@router.post("/admin/coupons/bulk-jobs/{job_id}/cancel", response_model=CouponBulkJobRead)
+@router.post("/admin/coupons/bulk-jobs/{job_id}/cancel")
 async def admin_cancel_bulk_job(
     job_id: UUID,
-    session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("coupons")),
+    session: SessionDep,
+    _: AdminCouponsDep,
 ) -> CouponBulkJobRead:
     job = await session.get(CouponBulkJob, job_id)
     if not job:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DETAIL_JOB_NOT_FOUND)
     if job.status in (CouponBulkJobStatus.succeeded, CouponBulkJobStatus.failed, CouponBulkJobStatus.cancelled):
         return CouponBulkJobRead.model_validate(job, from_attributes=True)
     job.status = CouponBulkJobStatus.cancelled
@@ -2204,18 +2232,17 @@ async def admin_cancel_bulk_job(
 
 @router.post(
     "/admin/coupons/bulk-jobs/{job_id}/retry",
-    response_model=CouponBulkJobRead,
     status_code=status.HTTP_201_CREATED,
 )
 async def admin_retry_bulk_job(
     job_id: UUID,
     background_tasks: BackgroundTasks,
-    session: AsyncSession = Depends(get_session),
-    admin_user: User = Depends(require_admin_section("coupons")),
+    session: SessionDep,
+    admin_user: AdminCouponsDep,
 ) -> CouponBulkJobRead:
     job = await session.get(CouponBulkJob, job_id)
     if not job:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DETAIL_JOB_NOT_FOUND)
     if job.status in (CouponBulkJobStatus.pending, CouponBulkJobStatus.running):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Job is still in progress")
 
@@ -2254,6 +2281,6 @@ async def admin_retry_bulk_job(
 
     engine = session.bind
     if engine is None:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database engine unavailable")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=_DETAIL_DB_ENGINE_UNAVAILABLE)
     background_tasks.add_task(_run_bulk_segment_job, engine, job_id=new_job.id)
     return CouponBulkJobRead.model_validate(new_job, from_attributes=True)
