@@ -216,7 +216,7 @@ def _normalized_external_id(source: dict[str, Any], *, name: str | None, lat: fl
     )
     if external_id:
         return external_id
-    return hashlib.sha1(f"{name or ''}|{lat:.6f}|{lng:.6f}".encode("utf-8")).hexdigest()[:40]
+    return hashlib.sha256(f"{name or ''}|{lat:.6f}|{lng:.6f}".encode("utf-8")).hexdigest()[:40]
 
 
 def _row_payload_json(row: dict[str, Any]) -> str | None:
