@@ -2430,7 +2430,7 @@ async def _load_categories_for_csv_export(session: AsyncSession) -> list[Categor
         .options(selectinload(Category.translations))
         .order_by(Category.sort_order.asc(), Category.slug.asc())
     )
-    return result.scalars().unique().all()
+    return list(result.scalars().unique().all())
 
 
 def _category_parent_slug(category: Category, id_to_slug: dict[uuid.UUID, str]) -> str:

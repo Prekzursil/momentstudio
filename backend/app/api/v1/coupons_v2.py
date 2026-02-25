@@ -236,6 +236,25 @@ def _to_decimal(value: object) -> Decimal:
         return Decimal("0.00")
 
 
+def _shipping_method_rates(shipping_method: ShippingMethod | None) -> tuple[Decimal | None, Decimal | None]:
+    if not shipping_method:
+        return None, None
+    rate_flat = Decimal(getattr(shipping_method, "rate_flat", None) or 0)
+    rate_per = Decimal(getattr(shipping_method, "rate_per_kg", None) or 0)
+    return rate_flat, rate_per
+
+
+def _partition_coupon_offers(
+    results: list[coupons_service.CouponEligibility],
+) -> tuple[list[CouponOffer], list[CouponOffer]]:
+    eligible: list[CouponOffer] = []
+    ineligible: list[CouponOffer] = []
+    for result in results:
+        target = eligible if result.eligible else ineligible
+        target.append(_to_offer(result))
+    return eligible, ineligible
+
+
 @router.get("/eligibility", response_model=CouponEligibilityResponse)
 async def coupon_eligibility(
     session: AsyncSession = Depends(get_session),
@@ -246,8 +265,7 @@ async def coupon_eligibility(
     user_cart = await cart_service.get_cart(session, current_user.id, session_id)
     checkout = await checkout_settings_service.get_checkout_settings(session)
     shipping_method = await _get_shipping_method(session, shipping_method_id)
-    rate_flat = Decimal(getattr(shipping_method, "rate_flat", None) or 0) if shipping_method else None
-    rate_per = Decimal(getattr(shipping_method, "rate_per_kg", None) or 0) if shipping_method else None
+    rate_flat, rate_per = _shipping_method_rates(shipping_method)
     results = await coupons_service.evaluate_coupons_for_user_cart(
         session,
         user=current_user,
@@ -256,8 +274,7 @@ async def coupon_eligibility(
         shipping_method_rate_flat=rate_flat,
         shipping_method_rate_per_kg=rate_per,
     )
-    eligible = [_to_offer(r) for r in results if r.eligible]
-    ineligible = [_to_offer(r) for r in results if not r.eligible]
+    eligible, ineligible = _partition_coupon_offers(results)
     return CouponEligibilityResponse(eligible=eligible, ineligible=ineligible)
 
 
@@ -912,19 +929,10 @@ def _normalize_bulk_emails(raw: list[str]) -> tuple[list[str], list[str]]:
     seen: set[str] = set()
     emails: list[str] = []
     for value in raw or []:
-        if not isinstance(value, str):
+        clean = _normalize_bulk_email_value(value)
+        if clean is None:
             continue
-        clean = value.strip().lower()
-        if not clean:
-            continue
-        if len(clean) > 255:
-            invalid.append(value)
-            continue
-        if "@" not in clean:
-            invalid.append(value)
-            continue
-        _, domain = clean.split("@", 1)
-        if "." not in domain:
+        if not _is_valid_bulk_email(clean):
             invalid.append(value)
             continue
         if clean in seen:
@@ -932,6 +940,22 @@ def _normalize_bulk_emails(raw: list[str]) -> tuple[list[str], list[str]]:
         seen.add(clean)
         emails.append(clean)
     return emails, invalid
+
+
+def _normalize_bulk_email_value(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    clean = value.strip().lower()
+    return clean or None
+
+
+def _is_valid_bulk_email(clean: str) -> bool:
+    if len(clean) > 255:
+        return False
+    if "@" not in clean:
+        return False
+    _, domain = clean.split("@", 1)
+    return "." in domain
 
 
 def _segment_user_filters(payload: object) -> list[object]:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 import math
 import re
 import unicodedata
@@ -105,6 +106,7 @@ def _snippet(text: str, max_len: int = 140) -> str:
 def _normalize_tags(raw: object) -> list[str]:
     if raw is None:
         return []
+    values: Iterable[str]
     if isinstance(raw, list):
         values = map(str, raw)
     elif isinstance(raw, str):

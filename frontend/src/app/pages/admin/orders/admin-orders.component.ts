@@ -2763,7 +2763,7 @@ export class AdminOrdersComponent implements OnInit {
       if (!Array.isArray(parsed)) return [];
       return parsed
         .filter((candidate: any) => typeof candidate?.id === 'string' && typeof candidate?.name === 'string')
-        .map((candidate: any) => this.coercePreset(candidate)) as AdminOrdersFilterPreset[];
+        .map((candidate: any) => this.coercePreset(candidate));
     } catch {
       return [];
     }

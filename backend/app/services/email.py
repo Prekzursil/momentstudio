@@ -191,6 +191,58 @@ def _lang_or_default(lang: str | None) -> str:
     return lang if lang in {"en", "ro"} else "en"
 
 
+def _localized_text(*, lang: str, ro: str, en: str) -> str:
+    return ro if lang == "ro" else en
+
+
+def _append_optional_labeled_line(
+    lines: list[str],
+    *,
+    value: str | None,
+    label_ro: str,
+    label_en: str,
+    lang: str,
+) -> None:
+    cleaned = (value or "").strip()
+    if not cleaned:
+        return
+    lines.append(f"{_localized_text(lang=lang, ro=label_ro, en=label_en)}: {cleaned}")
+
+
+def _refund_requested_lines(
+    *,
+    lang: str,
+    reference: str,
+    total_amount: object,
+    currency: str,
+    customer_email: str | None,
+    requested_by_email: str | None,
+    note: str | None,
+) -> list[str]:
+    lines = [
+        _localized_text(
+            lang=lang,
+            ro=f"A fost solicitată o rambursare pentru comanda: {reference}",
+            en=f"A refund was requested for order: {reference}",
+        )
+    ]
+    detail_rows = [
+        (customer_email, "Client", "Customer"),
+        (requested_by_email, "Cerut de", "Requested by"),
+        (note, "Notă", "Note"),
+    ]
+    for value, label_ro, label_en in detail_rows:
+        _append_optional_labeled_line(
+            lines,
+            value=value,
+            label_ro=label_ro,
+            label_en=label_en,
+            lang=lang,
+        )
+    lines.append("Total: " + _money_str(total_amount, currency))
+    return lines
+
+
 def _lang_order(preferred_language: str | None) -> tuple[str, str]:
     preferred = _lang_or_default(preferred_language)
     return ("ro", "en") if preferred == "ro" else ("en", "ro")
@@ -975,29 +1027,35 @@ async def send_refund_requested_notification(
 ) -> bool:
     ref = getattr(order, "reference_code", None) or str(getattr(order, "id", ""))
     currency = getattr(order, "currency", "RON") or "RON"
-
-    def _lines(lng: str) -> list[str]:
-        lines = [
-            f"A fost solicitată o rambursare pentru comanda: {ref}"
-            if lng == "ro"
-            else f"A refund was requested for order: {ref}"
-        ]
-        if customer_email:
-            lines.append(f"Client: {customer_email}" if lng == "ro" else f"Customer: {customer_email}")
-        if requested_by_email:
-            lines.append(f"Cerut de: {requested_by_email}" if lng == "ro" else f"Requested by: {requested_by_email}")
-        if note:
-            lines.append(f"Notă: {note}" if lng == "ro" else f"Note: {note}")
-        lines.append(("Total: " if lng == "ro" else "Total: ") + _money_str(getattr(order, "total_amount", 0), currency))
-        return lines
+    total_amount = getattr(order, "total_amount", 0)
 
     subject = _bilingual_subject(
         f"Solicitare rambursare pentru comanda {ref}",
         f"Refund requested for order {ref}",
         preferred_language=lang,
     )
-    text_ro = "\n".join(_lines("ro"))
-    text_en = "\n".join(_lines("en"))
+    text_ro = "\n".join(
+        _refund_requested_lines(
+            lang="ro",
+            reference=ref,
+            total_amount=total_amount,
+            currency=currency,
+            customer_email=customer_email,
+            requested_by_email=requested_by_email,
+            note=note,
+        )
+    )
+    text_en = "\n".join(
+        _refund_requested_lines(
+            lang="en",
+            reference=ref,
+            total_amount=total_amount,
+            currency=currency,
+            customer_email=customer_email,
+            requested_by_email=requested_by_email,
+            note=note,
+        )
+    )
     text_body, html_body = _bilingual_sections(
         text_ro=text_ro,
         text_en=text_en,
@@ -1645,14 +1703,23 @@ def _prune(now: float) -> None:
             _rate_per_recipient.pop(key, None)
 
 
+def _is_rate_limited(timestamps: list[float], *, now: float, window: float, limit: int | None) -> bool:
+    if not limit:
+        return False
+    return len([ts for ts in timestamps if now - ts < window]) >= limit
+
+
 def _allow_send(now: float, recipient: str) -> bool:
     window = 60.0
-    global_limit = settings.email_rate_limit_per_minute
-    recipient_limit = settings.email_rate_limit_per_recipient_per_minute
-    if global_limit and len([ts for ts in _rate_global if now - ts < window]) >= global_limit:
+    if _is_rate_limited(_rate_global, now=now, window=window, limit=settings.email_rate_limit_per_minute):
         return False
-    rec_list = _rate_per_recipient.get(recipient, [])
-    if recipient_limit and len([ts for ts in rec_list if now - ts < window]) >= recipient_limit:
+    recipient_timestamps = _rate_per_recipient.get(recipient, [])
+    if _is_rate_limited(
+        recipient_timestamps,
+        now=now,
+        window=window,
+        limit=settings.email_rate_limit_per_recipient_per_minute,
+    ):
         return False
     return True
 

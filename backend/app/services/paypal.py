@@ -79,6 +79,24 @@ def _cache_bucket() -> dict[str, object]:
     return _token_cache.setdefault(_paypal_env(), {"access_token": None, "expires_at": None})
 
 
+def _cached_access_token(now: datetime) -> str | None:
+    bucket = _cache_bucket()
+    cached_token = bucket.get("access_token")
+    cached_expires_at = bucket.get("expires_at")
+    if isinstance(cached_token, str) and isinstance(cached_expires_at, datetime):
+        # Refresh a bit early to avoid edge-of-expiry failures.
+        if cached_expires_at - now > timedelta(seconds=30):
+            return cached_token
+    return None
+
+
+def _cache_access_token(*, access_token: str, expires_in: Any, now: datetime) -> None:
+    expiry_seconds = int(expires_in) if isinstance(expires_in, (int, float)) else 300
+    bucket = _cache_bucket()
+    bucket["access_token"] = access_token
+    bucket["expires_at"] = now + timedelta(seconds=expiry_seconds)
+
+
 def is_paypal_configured() -> bool:
     return bool(_effective_client_id() and _effective_client_secret())
 
@@ -87,22 +105,7 @@ def _base_url() -> str:
     return "https://api-m.paypal.com" if _paypal_env() == "live" else "https://api-m.sandbox.paypal.com"
 
 
-async def _get_access_token() -> str:
-    if not is_paypal_configured():
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="PayPal not configured")
-
-    now = datetime.now(timezone.utc)
-    bucket = _cache_bucket()
-    cached_token = bucket.get("access_token")
-    cached_expires_at = bucket.get("expires_at")
-    if isinstance(cached_token, str) and isinstance(cached_expires_at, datetime):
-        # Refresh a bit early to avoid edge-of-expiry failures.
-        if cached_expires_at - now > timedelta(seconds=30):
-            return cached_token
-
-    client_id = _effective_client_id()
-    client_secret = _effective_client_secret()
-
+async def _fetch_access_token(*, client_id: str, client_secret: str) -> dict[str, Any]:
     try:
         async with httpx.AsyncClient(base_url=_base_url(), timeout=10) as client:
             resp = await client.post(
@@ -112,18 +115,28 @@ async def _get_access_token() -> str:
                 headers={"Accept": "application/json", "Accept-Language": "en_US"},
             )
             resp.raise_for_status()
-            data = resp.json()
+            return resp.json()
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="PayPal token request failed") from exc
+
+
+async def _get_access_token() -> str:
+    if not is_paypal_configured():
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="PayPal not configured")
+
+    now = datetime.now(timezone.utc)
+    cached_token = _cached_access_token(now)
+    if cached_token:
+        return cached_token
+
+    data = await _fetch_access_token(client_id=_effective_client_id(), client_secret=_effective_client_secret())
 
     access_token = data.get("access_token")
     expires_in = data.get("expires_in")
     if not isinstance(access_token, str) or not access_token:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="PayPal token missing")
 
-    expiry = now + timedelta(seconds=int(expires_in) if isinstance(expires_in, (int, float)) else 300)
-    bucket["access_token"] = access_token
-    bucket["expires_at"] = expiry
+    _cache_access_token(access_token=access_token, expires_in=expires_in, now=now)
     return access_token
 
 
@@ -355,6 +368,31 @@ def _capture_path(paypal_order_id: str) -> str:
     return f"/v2/checkout/orders/{order_id}/capture"
 
 
+def _first_dict_item(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, list):
+        return None
+    if not value:
+        return None
+    item = value[0]
+    if not isinstance(item, dict):
+        return None
+    return item
+
+
+def _extract_capture_id(data: dict[str, Any]) -> str:
+    purchase_unit = _first_dict_item(data.get("purchase_units"))
+    if purchase_unit is None:
+        return ""
+    payments = purchase_unit.get("payments")
+    if not isinstance(payments, dict):
+        return ""
+    capture = _first_dict_item(payments.get("captures"))
+    if capture is None:
+        return ""
+    capture_id = capture.get("id")
+    return capture_id if isinstance(capture_id, str) else ""
+
+
 def _refund_path(paypal_capture_id: str) -> str:
     capture_id = quote(_sanitize_paypal_id(paypal_capture_id), safe="")
     return f"/v2/payments/captures/{capture_id}/refund"
@@ -375,16 +413,7 @@ async def capture_order(*, paypal_order_id: str) -> str:
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="PayPal capture failed") from exc
 
-    # Best-effort extraction of the capture id.
-    purchase_units = data.get("purchase_units")
-    if isinstance(purchase_units, list) and purchase_units:
-        payments = purchase_units[0].get("payments") if isinstance(purchase_units[0], dict) else None
-        captures = payments.get("captures") if isinstance(payments, dict) else None
-        if isinstance(captures, list) and captures:
-            cap = captures[0]
-            if isinstance(cap, dict) and isinstance(cap.get("id"), str):
-                return cap["id"]
-    return ""
+    return _extract_capture_id(data)
 
 
 async def refund_capture(
@@ -432,29 +461,32 @@ def _get_header(headers: dict[str, str], name: str) -> str | None:
     return None
 
 
+def _required_header(headers: dict[str, str], name: str) -> str:
+    value = _get_header(headers, name)
+    if value is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing PayPal signature headers")
+    return value
+
+
+def _webhook_verification_payload(*, headers: dict[str, str], event: dict[str, Any], webhook_id: str) -> dict[str, Any]:
+    return {
+        "auth_algo": _required_header(headers, "paypal-auth-algo"),
+        "cert_url": _required_header(headers, "paypal-cert-url"),
+        "transmission_id": _required_header(headers, "paypal-transmission-id"),
+        "transmission_sig": _required_header(headers, "paypal-transmission-sig"),
+        "transmission_time": _required_header(headers, "paypal-transmission-time"),
+        "webhook_id": webhook_id,
+        "webhook_event": event,
+    }
+
+
 async def verify_webhook_signature(*, headers: dict[str, str], event: dict[str, Any]) -> bool:
     webhook_id = _effective_webhook_id()
     if not webhook_id:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="PayPal webhook id not configured")
 
-    auth_algo = _get_header(headers, "paypal-auth-algo")
-    cert_url = _get_header(headers, "paypal-cert-url")
-    transmission_id = _get_header(headers, "paypal-transmission-id")
-    transmission_sig = _get_header(headers, "paypal-transmission-sig")
-    transmission_time = _get_header(headers, "paypal-transmission-time")
-    if not (auth_algo and cert_url and transmission_id and transmission_sig and transmission_time):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing PayPal signature headers")
-
+    payload = _webhook_verification_payload(headers=headers, event=event, webhook_id=webhook_id)
     token = await _get_access_token()
-    payload = {
-        "auth_algo": auth_algo,
-        "cert_url": cert_url,
-        "transmission_id": transmission_id,
-        "transmission_sig": transmission_sig,
-        "transmission_time": transmission_time,
-        "webhook_id": webhook_id,
-        "webhook_event": event,
-    }
     try:
         async with httpx.AsyncClient(base_url=_base_url(), timeout=15) as client:
             resp = await client.post(
