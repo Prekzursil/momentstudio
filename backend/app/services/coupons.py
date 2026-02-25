@@ -105,6 +105,32 @@ def _should_skip_sale_item(promotion: Promotion, product) -> bool:
     return not promotion.allow_on_sale_items and product is not None and is_sale_active(product)
 
 
+def _cart_item_scope_identifiers(item) -> tuple[object | None, UUID, UUID | None] | None:
+    product = getattr(item, "product", None)
+    product_id = getattr(item, "product_id", None) or getattr(product, "id", None)
+    if not product_id:
+        return None
+    category_id = getattr(product, "category_id", None) if product is not None else None
+    return product, product_id, category_id
+
+
+def _item_is_within_scope(
+    *,
+    product_id: UUID,
+    category_id: UUID | None,
+    include_products: set[UUID],
+    exclude_products: set[UUID],
+    include_categories: set[UUID],
+    exclude_categories: set[UUID],
+    has_includes: bool,
+) -> bool:
+    if not _matches_include_scope(product_id, category_id, include_products, include_categories, has_includes):
+        return False
+    if _matches_exclude_scope(product_id, category_id, exclude_products, exclude_categories):
+        return False
+    return True
+
+
 def _eligible_line_totals_for_item(
     item,
     *,
@@ -118,15 +144,19 @@ def _eligible_line_totals_for_item(
     quantity = int(getattr(item, "quantity", 0) or 0)
     if quantity <= 0:
         return None
-    product = getattr(item, "product", None)
-    product_id = getattr(item, "product_id", None) or getattr(product, "id", None)
-    if not product_id:
+    resolved = _cart_item_scope_identifiers(item)
+    if resolved is None:
         return None
-
-    category_id = getattr(product, "category_id", None) if product is not None else None
-    if not _matches_include_scope(product_id, category_id, include_products, include_categories, has_includes):
-        return None
-    if _matches_exclude_scope(product_id, category_id, exclude_products, exclude_categories):
+    product, product_id, category_id = resolved
+    if not _item_is_within_scope(
+        product_id=product_id,
+        category_id=category_id,
+        include_products=include_products,
+        exclude_products=exclude_products,
+        include_categories=include_categories,
+        exclude_categories=exclude_categories,
+        has_includes=has_includes,
+    ):
         return None
 
     line_total = _line_total_for_item(item, quantity)
@@ -191,13 +221,23 @@ class CouponComputation:
 
 def _estimate_discount_for_promotion(promotion: Promotion, eligible_subtotal: Decimal) -> Decimal:
     if promotion.discount_type == PromotionDiscountType.percent:
-        pct = Decimal(promotion.percentage_off or 0)
-        if pct > 0 and eligible_subtotal > 0:
-            return eligible_subtotal * pct / Decimal("100")
-    elif promotion.discount_type == PromotionDiscountType.amount:
-        amt = Decimal(promotion.amount_off or 0)
-        if amt > 0 and eligible_subtotal > 0:
-            return min(amt, eligible_subtotal)
+        return _percent_discount_estimate(promotion=promotion, eligible_subtotal=eligible_subtotal)
+    if promotion.discount_type == PromotionDiscountType.amount:
+        return _amount_discount_estimate(promotion=promotion, eligible_subtotal=eligible_subtotal)
+    return Decimal("0.00")
+
+
+def _percent_discount_estimate(*, promotion: Promotion, eligible_subtotal: Decimal) -> Decimal:
+    pct = Decimal(promotion.percentage_off or 0)
+    if pct > 0 and eligible_subtotal > 0:
+        return eligible_subtotal * pct / Decimal("100")
+    return Decimal("0.00")
+
+
+def _amount_discount_estimate(*, promotion: Promotion, eligible_subtotal: Decimal) -> Decimal:
+    amount = Decimal(promotion.amount_off or 0)
+    if amount > 0 and eligible_subtotal > 0:
+        return min(amount, eligible_subtotal)
     return Decimal("0.00")
 
 
@@ -943,23 +983,32 @@ async def release_coupon_for_order(session: AsyncSession, *, order: Order, reaso
     if not coupon:
         return
 
-    reservation = (
-        (await session.execute(select(CouponReservation).where(CouponReservation.order_id == order.id))).scalars().first()
-    )
-    if reservation:
-        await session.delete(reservation)
-        session.add(OrderEvent(order_id=order.id, event="coupon_reservation_released", note=reason))
-        await session.commit()
+    await _release_coupon_reservation(session, order_id=order.id, reason=reason)
+    await _void_coupon_redemption(session, order_id=order.id, reason=reason)
 
-    redemption = (
-        (await session.execute(select(CouponRedemption).where(CouponRedemption.order_id == order.id))).scalars().first()
+
+async def _release_coupon_reservation(session: AsyncSession, *, order_id: UUID, reason: str) -> None:
+    reservation = (
+        (await session.execute(select(CouponReservation).where(CouponReservation.order_id == order_id))).scalars().first()
     )
-    if redemption and redemption.voided_at is None:
-        redemption.voided_at = _now()
-        redemption.void_reason = (reason or "")[:255] if reason else None
-        session.add(redemption)
-        session.add(OrderEvent(order_id=order.id, event="coupon_voided", note=reason))
-        await session.commit()
+    if reservation is None:
+        return
+    await session.delete(reservation)
+    session.add(OrderEvent(order_id=order_id, event="coupon_reservation_released", note=reason))
+    await session.commit()
+
+
+async def _void_coupon_redemption(session: AsyncSession, *, order_id: UUID, reason: str) -> None:
+    redemption = (
+        (await session.execute(select(CouponRedemption).where(CouponRedemption.order_id == order_id))).scalars().first()
+    )
+    if redemption is None or redemption.voided_at is not None:
+        return
+    redemption.voided_at = _now()
+    redemption.void_reason = (reason or "")[:255] if reason else None
+    session.add(redemption)
+    session.add(OrderEvent(order_id=order_id, event="coupon_voided", note=reason))
+    await session.commit()
 
 
 _COUPON_CODE_ALPHABET = string.ascii_uppercase + string.digits

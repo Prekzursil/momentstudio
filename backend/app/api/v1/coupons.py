@@ -200,40 +200,51 @@ async def _replace_promotion_scopes(
 
     await session.execute(delete(PromotionScope).where(PromotionScope.promotion_id == promotion_id))
 
-    for product_id in sorted(include_product_ids):
+    _add_promotion_scopes(
+        session,
+        promotion_id=promotion_id,
+        entity_type=PromotionScopeEntityType.product,
+        mode=PromotionScopeMode.include,
+        entity_ids=include_product_ids,
+    )
+    _add_promotion_scopes(
+        session,
+        promotion_id=promotion_id,
+        entity_type=PromotionScopeEntityType.product,
+        mode=PromotionScopeMode.exclude,
+        entity_ids=exclude_product_ids,
+    )
+    _add_promotion_scopes(
+        session,
+        promotion_id=promotion_id,
+        entity_type=PromotionScopeEntityType.category,
+        mode=PromotionScopeMode.include,
+        entity_ids=include_category_ids,
+    )
+    _add_promotion_scopes(
+        session,
+        promotion_id=promotion_id,
+        entity_type=PromotionScopeEntityType.category,
+        mode=PromotionScopeMode.exclude,
+        entity_ids=exclude_category_ids,
+    )
+
+
+def _add_promotion_scopes(
+    session: AsyncSession,
+    *,
+    promotion_id: UUID,
+    entity_type: PromotionScopeEntityType,
+    mode: PromotionScopeMode,
+    entity_ids: set[UUID],
+) -> None:
+    for entity_id in sorted(entity_ids):
         session.add(
             PromotionScope(
                 promotion_id=promotion_id,
-                entity_type=PromotionScopeEntityType.product,
-                entity_id=product_id,
-                mode=PromotionScopeMode.include,
-            )
-        )
-    for product_id in sorted(exclude_product_ids):
-        session.add(
-            PromotionScope(
-                promotion_id=promotion_id,
-                entity_type=PromotionScopeEntityType.product,
-                entity_id=product_id,
-                mode=PromotionScopeMode.exclude,
-            )
-        )
-    for category_id in sorted(include_category_ids):
-        session.add(
-            PromotionScope(
-                promotion_id=promotion_id,
-                entity_type=PromotionScopeEntityType.category,
-                entity_id=category_id,
-                mode=PromotionScopeMode.include,
-            )
-        )
-    for category_id in sorted(exclude_category_ids):
-        session.add(
-            PromotionScope(
-                promotion_id=promotion_id,
-                entity_type=PromotionScopeEntityType.category,
-                entity_id=category_id,
-                mode=PromotionScopeMode.exclude,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                mode=mode,
             )
         )
 
@@ -273,14 +284,32 @@ def _validate_promotion_discount_values(
     percentage_off: object,
     amount_off: object,
 ) -> None:
-    if discount_type == "percent" and not percentage_off:
+    if _is_percent_discount_missing(discount_type=discount_type, percentage_off=percentage_off):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="percentage_off is required for percent promotions")
-    if discount_type == "amount" and not amount_off:
+    if _is_amount_discount_missing(discount_type=discount_type, amount_off=amount_off):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="amount_off is required for amount promotions")
-    if discount_type == "free_shipping" and (percentage_off or amount_off):
+    if _has_invalid_free_shipping_values(discount_type=discount_type, percentage_off=percentage_off, amount_off=amount_off):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="free_shipping promotions cannot set percentage_off/amount_off")
-    if percentage_off and amount_off:
+    if _has_conflicting_discount_values(percentage_off=percentage_off, amount_off=amount_off):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Choose percentage_off or amount_off, not both")
+
+
+def _is_percent_discount_missing(*, discount_type: str | PromotionDiscountType, percentage_off: object) -> bool:
+    return discount_type == "percent" and not percentage_off
+
+
+def _is_amount_discount_missing(*, discount_type: str | PromotionDiscountType, amount_off: object) -> bool:
+    return discount_type == "amount" and not amount_off
+
+
+def _has_invalid_free_shipping_values(
+    *, discount_type: str | PromotionDiscountType, percentage_off: object, amount_off: object
+) -> bool:
+    return discount_type == "free_shipping" and bool(percentage_off or amount_off)
+
+
+def _has_conflicting_discount_values(*, percentage_off: object, amount_off: object) -> bool:
+    return bool(percentage_off and amount_off)
 
 
 async def _clean_and_validate_promotion_key(
@@ -933,26 +962,47 @@ def _coupon_analytics_aggregates(
         subtotal = _to_decimal(subtotal_val)
         order_subtotal = order_subtotals.get(order_id, Decimal("0.00"))
         order_discount = order_discount_by_id.get(order_id, Decimal("0.00"))
-        allocated = Decimal("0.00")
-        if order_discount > 0 and subtotal > 0 and order_subtotal > 0:
-            allocated = order_discount * subtotal / order_subtotal
-        bucket = aggregates.get(product_id)
-        if bucket is None:
-            bucket = _AnalyticsTopProductAgg(
-                product_id=product_id,
-                slug=(slug or None),
-                name=(name or str(product_id)),
-                orders=set(),
-                quantity=0,
-                gross=Decimal("0.00"),
-                allocated=Decimal("0.00"),
-            )
-            aggregates[product_id] = bucket
+        allocated = _allocated_discount(order_discount=order_discount, subtotal=subtotal, order_subtotal=order_subtotal)
+        bucket = _get_or_create_product_aggregate(
+            aggregates=aggregates,
+            product_id=product_id,
+            slug=slug,
+            name=name,
+        )
         bucket.orders.add(order_id)
         bucket.quantity += int(qty or 0)
         bucket.gross += subtotal
         bucket.allocated += allocated
     return aggregates
+
+
+def _allocated_discount(*, order_discount: Decimal, subtotal: Decimal, order_subtotal: Decimal) -> Decimal:
+    if order_discount > 0 and subtotal > 0 and order_subtotal > 0:
+        return order_discount * subtotal / order_subtotal
+    return Decimal("0.00")
+
+
+def _get_or_create_product_aggregate(
+    *,
+    aggregates: dict[UUID, _AnalyticsTopProductAgg],
+    product_id: UUID,
+    slug: str | None,
+    name: str | None,
+) -> _AnalyticsTopProductAgg:
+    bucket = aggregates.get(product_id)
+    if bucket is not None:
+        return bucket
+    bucket = _AnalyticsTopProductAgg(
+        product_id=product_id,
+        slug=(slug or None),
+        name=(name or str(product_id)),
+        orders=set(),
+        quantity=0,
+        gross=Decimal("0.00"),
+        allocated=Decimal("0.00"),
+    )
+    aggregates[product_id] = bucket
+    return bucket
 
 
 async def _coupon_analytics_top_products(
@@ -1205,17 +1255,33 @@ class _BucketConfig:
 
 def _parse_bucket_config(*, bucket_total: object, bucket_index: object, bucket_seed: object) -> _BucketConfig | None:
     seed = (str(bucket_seed) if bucket_seed is not None else "").strip()
-    if bucket_total is None and bucket_index is None and not seed:
+    if _bucket_config_not_provided(bucket_total=bucket_total, bucket_index=bucket_index, seed=seed):
         return None
-    if bucket_total is None or bucket_index is None or not seed:
+    if _bucket_config_incomplete(bucket_total=bucket_total, bucket_index=bucket_index, seed=seed):
         raise ValueError("Bucket config requires bucket_total, bucket_index, and bucket_seed")
     total = int(bucket_total)
     index = int(bucket_index)
-    if total < 2 or total > 100:
+    if not _bucket_total_in_range(total):
         raise ValueError("bucket_total must be between 2 and 100")
-    if index < 0 or index >= total:
+    if not _bucket_index_in_range(index=index, total=total):
         raise ValueError("bucket_index must be within bucket_total range")
     return _BucketConfig(total=total, index=index, seed=seed[:80])
+
+
+def _bucket_config_not_provided(*, bucket_total: object, bucket_index: object, seed: str) -> bool:
+    return bucket_total is None and bucket_index is None and not seed
+
+
+def _bucket_config_incomplete(*, bucket_total: object, bucket_index: object, seed: str) -> bool:
+    return bucket_total is None or bucket_index is None or not seed
+
+
+def _bucket_total_in_range(total: int) -> bool:
+    return 2 <= total <= 100
+
+
+def _bucket_index_in_range(*, index: int, total: int) -> bool:
+    return 0 <= index < total
 
 
 def _bucket_index_for_user(*, user_id: UUID, seed: str, total: int) -> int:
@@ -1313,15 +1379,14 @@ async def _preview_segment_assign_bucketed(
             coupon_id=coupon_id,
             user_ids=user_ids,
         )
-        for user_id, email in bucketed:
-            total += 1
-            _add_sample_email(sample, email)
-            revoked_at = status_by_user_id.get(user_id)
-            if revoked_at is None and user_id in status_by_user_id:
-                already_active += 1
-                continue
-            if revoked_at is not None:
-                restored += 1
+        batch_total, batch_active, batch_restored = _preview_bucket_assignment_counts(
+            bucketed=bucketed,
+            status_by_user_id=status_by_user_id,
+            sample=sample,
+        )
+        total += batch_total
+        already_active += batch_active
+        restored += batch_restored
     created = max(total - already_active - restored, 0)
     return CouponBulkSegmentPreview(
         total_candidates=total,
@@ -1330,6 +1395,27 @@ async def _preview_segment_assign_bucketed(
         restored=restored,
         already_active=already_active,
     )
+
+
+def _preview_bucket_assignment_counts(
+    *,
+    bucketed: list[tuple[UUID, str | None]],
+    status_by_user_id: dict[UUID, datetime | None],
+    sample: list[str],
+) -> tuple[int, int, int]:
+    total = 0
+    already_active = 0
+    restored = 0
+    for user_id, email in bucketed:
+        total += 1
+        _add_sample_email(sample, email)
+        revoked_at = status_by_user_id.get(user_id)
+        if revoked_at is None and user_id in status_by_user_id:
+            already_active += 1
+            continue
+        if revoked_at is not None:
+            restored += 1
+    return total, already_active, restored
 
 
 async def _preview_segment_assign_all(
