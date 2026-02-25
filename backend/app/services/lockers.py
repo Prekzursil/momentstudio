@@ -209,20 +209,46 @@ def _parse_fan_expires_at(value: object, *, now: datetime) -> datetime:
     return now + timedelta(hours=1)
 
 
-async def _sameday_get_token() -> str:
-    global _sameday_auth
-    now = datetime.now(timezone.utc)
-    if _sameday_auth and _sameday_auth.expires_at - _AUTH_SAFETY_WINDOW > now:
-        return _sameday_auth.token
+def _cached_sameday_token(now: datetime) -> str | None:
+    auth = _sameday_auth
+    if not auth:
+        return None
+    if auth.expires_at - _AUTH_SAFETY_WINDOW <= now:
+        return None
+    return auth.token
 
-    if not settings.sameday_api_username or not settings.sameday_api_password:
+
+def _require_sameday_credentials() -> tuple[str, str]:
+    username = settings.sameday_api_username
+    password = settings.sameday_api_password
+    if not username or not password:
         raise LockersNotConfiguredError("Sameday locker API is not configured")
+    return username, password
+
+
+def _cache_sameday_auth(data: dict) -> str:
+    global _sameday_auth
+    token = str((data or {}).get("token") or "").strip()
+    if not token:
+        raise RuntimeError("Sameday authentication returned an empty token")
+    expires_at = _parse_sameday_expire_at((data or {}).get("expire_at"))
+    _sameday_auth = _AuthToken(token=token, expires_at=expires_at)
+    return token
+
+
+async def _sameday_get_token() -> str:
+    now = datetime.now(timezone.utc)
+    cached_token = _cached_sameday_token(now)
+    if cached_token is not None:
+        return cached_token
+
+    username, password = _require_sameday_credentials()
 
     headers = {
         "User-Agent": _UA,
         "Accept": "application/json",
-        "X-Auth-Username": settings.sameday_api_username,
-        "X-Auth-Password": settings.sameday_api_password,
+        "X-Auth-Username": username,
+        "X-Auth-Password": password,
     }
     timeout = httpx.Timeout(15.0, connect=5.0)
     async with httpx.AsyncClient(base_url=_sameday_base_url(), timeout=timeout, headers=headers) as client:
@@ -230,12 +256,7 @@ async def _sameday_get_token() -> str:
         resp.raise_for_status()
         data = resp.json()
 
-    token = str((data or {}).get("token") or "").strip()
-    if not token:
-        raise RuntimeError("Sameday authentication returned an empty token")
-    expires_at = _parse_sameday_expire_at((data or {}).get("expire_at"))
-    _sameday_auth = _AuthToken(token=token, expires_at=expires_at)
-    return token
+    return _cache_sameday_auth(data)
 
 
 async def _load_sameday_lockers() -> list[_LockerPoint]:
@@ -316,6 +337,35 @@ def _format_fan_address(addr: dict) -> str | None:
     return None
 
 
+def _parse_fan_locker_core_fields(row: dict) -> tuple[str, float, float, str] | None:
+    try:
+        locker_id = str(row.get("id") or "").strip()
+        lat_val = float(row.get("latitude"))
+        lng_val = float(row.get("longitude"))
+        name = str(row.get("name") or "").strip()[:255]
+    except Exception:
+        return None
+    if not locker_id or not name:
+        return None
+    return locker_id, lat_val, lng_val, name
+
+
+def _build_fan_locker_point(row: dict) -> _LockerPoint | None:
+    core_fields = _parse_fan_locker_core_fields(row)
+    if core_fields is None:
+        return None
+    locker_id, lat_val, lng_val, name = core_fields
+    address = _format_fan_address(row.get("address") or {})
+    return _LockerPoint(
+        id=f"fan:{locker_id}",
+        provider=LockerProvider.fan_courier,
+        name=name,
+        address=address,
+        lat=lat_val,
+        lng=lng_val,
+    )
+
+
 async def _load_fan_lockers() -> list[_LockerPoint]:
     token = await _fan_get_token()
     headers = {"User-Agent": _UA, "Accept": "application/json", "Authorization": f"Bearer {token}"}
@@ -327,26 +377,10 @@ async def _load_fan_lockers() -> list[_LockerPoint]:
 
     items: list[_LockerPoint] = []
     for row in data.get("data") or []:
-        try:
-            locker_id = str(row.get("id") or "").strip()
-            lat_val = float(row.get("latitude"))
-            lng_val = float(row.get("longitude"))
-            name = str(row.get("name") or "").strip()[:255]
-            if not locker_id or not name:
-                continue
-        except Exception:
+        point = _build_fan_locker_point(row)
+        if point is None:
             continue
-        address = _format_fan_address(row.get("address") or {})
-        items.append(
-            _LockerPoint(
-                id=f"fan:{locker_id}",
-                provider=LockerProvider.fan_courier,
-                name=name,
-                address=address,
-                lat=lat_val,
-                lng=lng_val,
-            )
-        )
+        items.append(point)
     return items
 
 

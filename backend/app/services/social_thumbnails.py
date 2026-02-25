@@ -154,21 +154,34 @@ def _normalize_source_url(raw_url: str) -> str:
     return urlunparse((scheme, netloc, normalized_path, "", normalized_query, ""))
 
 
+def _uses_supported_http_scheme(url: str) -> bool:
+    return urlparse(url).scheme in {"http", "https"}
+
+
+def _is_rejected_image_url_candidate(candidate: str) -> bool:
+    lowered = candidate.lower()
+    return lowered.startswith("data:") or lowered.startswith("javascript:")
+
+
+def _resolve_image_url_candidate(candidate: str, *, base_url: str) -> str:
+    if candidate.startswith("//"):
+        parsed = urlparse(base_url)
+        return f"{parsed.scheme}:{candidate}"
+    if candidate.startswith("/"):
+        return urljoin(base_url, candidate)
+    return candidate
+
+
 def _normalize_image_url(raw: str, *, base_url: str) -> str | None:
     candidate = (raw or "").strip().strip('"')
     if not candidate:
         return None
-    lowered = candidate.lower()
-    if lowered.startswith("data:") or lowered.startswith("javascript:"):
+    if _is_rejected_image_url_candidate(candidate):
         return None
-    if candidate.startswith("//"):
-        parsed = urlparse(base_url)
-        normalized = f"{parsed.scheme}:{candidate}"
-        return normalized if urlparse(normalized).scheme in {"http", "https"} else None
-    if candidate.startswith("/"):
-        normalized = urljoin(base_url, candidate)
-        return normalized if urlparse(normalized).scheme in {"http", "https"} else None
-    return candidate if urlparse(candidate).scheme in {"http", "https"} else None
+    normalized = _resolve_image_url_candidate(candidate, base_url=base_url)
+    if not _uses_supported_http_scheme(normalized):
+        return None
+    return normalized
 
 
 def _extract_first_image(html: str, *, base_url: str) -> str | None:
@@ -402,16 +415,30 @@ def looks_like_social_url(url: str) -> bool:
     return _is_allowed_host(parsed.hostname or "")
 
 
+def _is_instagram_profile_host(host: str | None) -> bool:
+    normalized = (host or "").strip().lower()
+    return normalized in {"instagram.com", "www.instagram.com"}
+
+
+def _first_path_segment(path: str) -> str | None:
+    for segment in path.split("/"):
+        if segment:
+            return segment.strip()
+    return None
+
+
+def _is_reserved_instagram_segment(segment: str) -> bool:
+    return segment.lower() in {"p", "reel", "stories", "explore", "accounts", "direct"}
+
+
 def try_extract_instagram_handle(url: str) -> str | None:
     parsed = urlparse((url or "").strip())
-    host = (parsed.hostname or "").strip().lower()
-    if host not in {"instagram.com", "www.instagram.com"}:
+    if not _is_instagram_profile_host(parsed.hostname):
         return None
-    segments = [segment for segment in parsed.path.split("/") if segment]
-    if not segments:
+    head = _first_path_segment(parsed.path)
+    if not head:
         return None
-    head = segments[0].strip()
-    if head.lower() in {"p", "reel", "stories", "explore", "accounts", "direct"}:
+    if _is_reserved_instagram_segment(head):
         return None
     if not re.fullmatch(r"[A-Za-z0-9._-]{2,30}", head):
         return None

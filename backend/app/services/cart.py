@@ -147,6 +147,28 @@ def _get_first_image(product: Product | None) -> str | None:
 SUPPORTED_COURIERS: set[str] = {"sameday", "fan_courier"}
 
 
+def _iter_cart_products(cart: Cart):
+    for item in getattr(cart, "items", []) or []:
+        product = getattr(item, "product", None)
+        if product:
+            yield product
+
+
+def _disallowed_courier_codes(product: Product) -> list[str]:
+    disallowed = getattr(product, "shipping_disallowed_couriers", None) or []
+    if isinstance(disallowed, str):
+        disallowed = [disallowed]
+    return [str(raw or "").strip().lower() for raw in disallowed]
+
+
+def _apply_product_delivery_constraints(product: Product, locker_allowed: bool, allowed_couriers: set[str]) -> bool:
+    if getattr(product, "shipping_allow_locker", True) is False:
+        locker_allowed = False
+    for code in _disallowed_courier_codes(product):
+        allowed_couriers.discard(code)
+    return locker_allowed
+
+
 def delivery_constraints(cart: Cart) -> tuple[bool, list[str]]:
     """Compute delivery constraints implied by products in the cart.
 
@@ -158,20 +180,8 @@ def delivery_constraints(cart: Cart) -> tuple[bool, list[str]]:
     locker_allowed = True
     allowed_couriers = set(SUPPORTED_COURIERS)
 
-    for item in getattr(cart, "items", []) or []:
-        product = getattr(item, "product", None)
-        if not product:
-            continue
-        if getattr(product, "shipping_allow_locker", True) is False:
-            locker_allowed = False
-
-        disallowed = getattr(product, "shipping_disallowed_couriers", None) or []
-        if isinstance(disallowed, str):
-            disallowed = [disallowed]
-        for raw in disallowed:
-            code = str(raw or "").strip().lower()
-            if code in allowed_couriers:
-                allowed_couriers.remove(code)
+    for product in _iter_cart_products(cart):
+        locker_allowed = _apply_product_delivery_constraints(product, locker_allowed, allowed_couriers)
 
     return locker_allowed, sorted(allowed_couriers)
 
@@ -659,18 +669,22 @@ async def create_promo(session: AsyncSession, payload: PromoCodeCreate) -> Promo
     return promo
 
 
-async def validate_promo(session: AsyncSession, code: str, currency: str | None = None) -> PromoCodeRead:
-    cleaned = code.strip().upper()
-    result = await session.execute(select(PromoCode).where(PromoCode.code == cleaned, PromoCode.active.is_(True)))
-    promo = result.scalar_one_or_none()
-    if not promo:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Promo code not found")
+def _validate_promo_constraints(promo: PromoCode, currency: str | None) -> None:
     if promo.expires_at and promo.expires_at < datetime.now(timezone.utc):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Promo code expired")
     if promo.max_uses and promo.times_used >= promo.max_uses:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Promo code usage limit reached")
     if promo.currency and currency and promo.currency.upper() != currency.upper():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Promo code currency mismatch")
+
+
+async def validate_promo(session: AsyncSession, code: str, currency: str | None = None) -> PromoCodeRead:
+    cleaned = code.strip().upper()
+    result = await session.execute(select(PromoCode).where(PromoCode.code == cleaned, PromoCode.active.is_(True)))
+    promo = result.scalar_one_or_none()
+    if not promo:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Promo code not found")
+    _validate_promo_constraints(promo, currency)
     return PromoCodeRead.model_validate(promo)
 
 
