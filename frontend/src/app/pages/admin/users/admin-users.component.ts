@@ -1846,41 +1846,8 @@ export class AdminUsersComponent implements OnInit {
         include_pii: this.piiReveal() ? true : undefined
       })
       .subscribe({
-        next: (res) => {
-          const items = res.items || [];
-          this.users.set(items);
-          this.meta.set(res.meta || null);
-          this.loading.set(false);
-
-          const selected = this.selectedUser();
-          if (selected) {
-            const refreshed = items.find((u) => u.id === selected.id);
-            if (refreshed) this.selectedUser.set(refreshed);
-          }
-
-          if (this.autoSelectAfterLoad && items.length > 0) {
-            const needle = (this.pendingPrefillSearch || '').trim().toLowerCase();
-            const match =
-              items.find((u) => (u.id || '').toLowerCase() === needle) ||
-              items.find((u) => (u.username || '').toLowerCase() === needle) ||
-              items.find((u) => (u.email || '').toLowerCase() === needle) ||
-              items[0];
-            this.autoSelectAfterLoad = false;
-            this.pendingPrefillSearch = null;
-            this.select(match);
-          }
-        },
-        error: (err) => {
-          if (err?.status === 403 && this.piiReveal()) {
-            this.piiReveal.set(false);
-            this.toast.error(this.t('adminUi.pii.notAuthorized'));
-            this.load();
-            return;
-          }
-          this.error.set(this.t('adminUi.users.errors.load'));
-          this.errorRequestId.set(extractRequestId(err));
-          this.loading.set(false);
-        }
+        next: (res) => this.handleLoadUsersSuccess(res),
+        error: (err) => this.handleLoadUsersError(err)
       });
   }
 
@@ -1902,6 +1869,47 @@ export class AdminUsersComponent implements OnInit {
         this.aliasesLoading.set(false);
       }
     });
+  }
+
+  private handleLoadUsersSuccess(res: { items?: AdminUserListItem[]; meta?: unknown }): void {
+    const items = res.items || [];
+    this.users.set(items);
+    this.meta.set(res.meta || null);
+    this.loading.set(false);
+    this.syncSelectedUser(items);
+    this.autoSelectUserAfterLoad(items);
+  }
+
+  private syncSelectedUser(items: AdminUserListItem[]): void {
+    const selected = this.selectedUser();
+    if (!selected) return;
+    const refreshed = items.find((user) => user.id === selected.id);
+    if (refreshed) this.selectedUser.set(refreshed);
+  }
+
+  private autoSelectUserAfterLoad(items: AdminUserListItem[]): void {
+    if (!this.autoSelectAfterLoad || !items.length) return;
+    const needle = (this.pendingPrefillSearch || '').trim().toLowerCase();
+    const match =
+      items.find((user) => (user.id || '').toLowerCase() === needle) ||
+      items.find((user) => (user.username || '').toLowerCase() === needle) ||
+      items.find((user) => (user.email || '').toLowerCase() === needle) ||
+      items[0];
+    this.autoSelectAfterLoad = false;
+    this.pendingPrefillSearch = null;
+    this.select(match);
+  }
+
+  private handleLoadUsersError(err: any): void {
+    if (err?.status === 403 && this.piiReveal()) {
+      this.piiReveal.set(false);
+      this.toast.error(this.t('adminUi.pii.notAuthorized'));
+      this.load();
+      return;
+    }
+    this.error.set(this.t('adminUi.users.errors.load'));
+    this.errorRequestId.set(extractRequestId(err));
+    this.loading.set(false);
   }
 
   private loadProfile(userId: string): void {

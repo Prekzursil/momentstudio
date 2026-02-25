@@ -56,44 +56,8 @@ export class GoogleCallbackComponent implements OnInit {
   private handleLogin(code: string, state: string): void {
     this.message.set(this.translate.instant('auth.googleSigningIn'));
     this.auth.completeGoogleLogin(code, state).subscribe({
-      next: (res) => {
-        localStorage.removeItem(GOOGLE_FLOW_KEY);
-        if (res.requires_completion || res.completion_token) {
-          if (typeof sessionStorage !== 'undefined' && res.completion_token) {
-            sessionStorage.setItem('google_completion_token', res.completion_token);
-            sessionStorage.setItem('google_completion_user', JSON.stringify(res.user));
-          }
-          this.toast.info(
-            this.translate.instant('auth.completeProfileRequiredTitle'),
-            this.translate.instant('auth.completeProfileRequiredCopy')
-          );
-          void this.router.navigate(['/register'], { queryParams: { complete: 1 } });
-          return;
-        }
-        if (res.requires_two_factor && res.two_factor_token) {
-          if (typeof sessionStorage !== 'undefined') {
-            sessionStorage.setItem('two_factor_token', res.two_factor_token);
-            sessionStorage.setItem('two_factor_user', JSON.stringify(res.user ?? null));
-            sessionStorage.setItem('two_factor_remember', JSON.stringify(true));
-          }
-          this.toast.info(this.translate.instant('auth.twoFactorRequired'));
-          void this.router.navigateByUrl('/login/2fa');
-          return;
-        }
-        this.toast.success(this.translate.instant('auth.googleLoginSuccess'), res.user.email);
-        void this.router.navigateByUrl('/account');
-      },
-      error: (err) => {
-        localStorage.removeItem(GOOGLE_FLOW_KEY);
-        if (typeof sessionStorage !== 'undefined') {
-          sessionStorage.removeItem('google_completion_token');
-          sessionStorage.removeItem('google_completion_user');
-        }
-        const message = err?.error?.detail || this.translate.instant('auth.googleError');
-        this.error.set(message);
-        this.toast.error(message);
-        void this.router.navigateByUrl('/login');
-      }
+      next: (res) => this.handleLoginSuccess(res),
+      error: (err) => this.handleLoginError(err)
     });
   }
 
@@ -104,5 +68,50 @@ export class GoogleCallbackComponent implements OnInit {
     this.toast.info(this.translate.instant('auth.googleLinkContinueInAccount'));
     void this.router.navigateByUrl('/account/security');
   }
-}
 
+  private handleLoginSuccess(res: {
+    requires_completion?: boolean;
+    completion_token?: string | null;
+    requires_two_factor?: boolean;
+    two_factor_token?: string | null;
+    user?: { email?: string | null } | null;
+  }): void {
+    localStorage.removeItem(GOOGLE_FLOW_KEY);
+    if (res.requires_completion || res.completion_token) {
+      if (typeof sessionStorage !== 'undefined' && res.completion_token) {
+        sessionStorage.setItem('google_completion_token', res.completion_token);
+        sessionStorage.setItem('google_completion_user', JSON.stringify(res.user));
+      }
+      this.toast.info(
+        this.translate.instant('auth.completeProfileRequiredTitle'),
+        this.translate.instant('auth.completeProfileRequiredCopy')
+      );
+      void this.router.navigate(['/register'], { queryParams: { complete: 1 } });
+      return;
+    }
+    if (res.requires_two_factor && res.two_factor_token) {
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem('two_factor_token', res.two_factor_token);
+        sessionStorage.setItem('two_factor_user', JSON.stringify(res.user ?? null));
+        sessionStorage.setItem('two_factor_remember', JSON.stringify(true));
+      }
+      this.toast.info(this.translate.instant('auth.twoFactorRequired'));
+      void this.router.navigateByUrl('/login/2fa');
+      return;
+    }
+    this.toast.success(this.translate.instant('auth.googleLoginSuccess'), res.user?.email ?? undefined);
+    void this.router.navigateByUrl('/account');
+  }
+
+  private handleLoginError(err: any): void {
+    localStorage.removeItem(GOOGLE_FLOW_KEY);
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.removeItem('google_completion_token');
+      sessionStorage.removeItem('google_completion_user');
+    }
+    const message = err?.error?.detail || this.translate.instant('auth.googleError');
+    this.error.set(message);
+    this.toast.error(message);
+    void this.router.navigateByUrl('/login');
+  }
+}

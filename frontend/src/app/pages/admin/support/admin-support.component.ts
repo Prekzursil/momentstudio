@@ -731,6 +731,12 @@ export class AdminSupportComponent implements OnInit {
     return parts.join(' ');
   }
 
+  private slaStatusClass(delta: number): string {
+    if (delta < 0) return 'bg-rose-100 text-rose-900 dark:bg-rose-950/30 dark:text-rose-100';
+    if (delta <= 6 * 60 * 60 * 1000) return 'bg-amber-100 text-amber-900 dark:bg-amber-950/30 dark:text-amber-100';
+    return 'bg-slate-100 text-slate-900 dark:bg-slate-800/70 dark:text-slate-100';
+  }
+
   slaInfo(row: AdminContactSubmissionListItem): { label: string; class: string } | null {
     const createdAt = new Date(row.created_at).getTime();
     if (!Number.isFinite(createdAt)) return null;
@@ -748,16 +754,7 @@ export class AdminSupportComponent implements OnInit {
     const suffix = delta < 0
       ? this.translate.instant('adminUi.support.sla.overdue', { duration })
       : this.translate.instant('adminUi.support.sla.due', { duration });
-
-    const dueSoon = delta >= 0 && delta <= 6 * 60 * 60 * 1000;
-    const klass =
-      delta < 0
-        ? 'bg-rose-100 text-rose-900 dark:bg-rose-950/30 dark:text-rose-100'
-        : dueSoon
-          ? 'bg-amber-100 text-amber-900 dark:bg-amber-950/30 dark:text-amber-100'
-          : 'bg-slate-100 text-slate-900 dark:bg-slate-800/70 dark:text-slate-100';
-
-    return { label: `${prefix}: ${suffix}`, class: klass };
+    return { label: `${prefix}: ${suffix}`, class: this.slaStatusClass(delta) };
   }
 
   formatAgent(agent: SupportAgentRef): string {
@@ -1059,4 +1056,3 @@ export class AdminSupportComponent implements OnInit {
     this.load();
   }
 }
-

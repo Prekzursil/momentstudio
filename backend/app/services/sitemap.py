@@ -55,41 +55,55 @@ def _build_urls_for_language(
     return sorted(urls)
 
 
+async def _published_category_slugs(session: AsyncSession) -> list[str]:
+    result = await session.execute(select(Category.slug).where(Category.is_visible.is_(True)))
+    return list(result.scalars().all())
+
+
+async def _published_product_slugs(session: AsyncSession) -> list[str]:
+    result = await session.execute(
+        select(Product.slug).where(
+            Product.status == ProductStatus.published,
+            Product.is_deleted.is_(False),
+            Product.is_active.is_(True),
+        )
+    )
+    return list(result.scalars().all())
+
+
+async def _published_blog_keys(session: AsyncSession, now: datetime) -> list[str]:
+    result = await session.execute(
+        select(ContentBlock.key).where(
+            ContentBlock.key.like("blog.%"),
+            ContentBlock.status == ContentStatus.published,
+            or_(ContentBlock.published_at.is_(None), ContentBlock.published_at <= now),
+            or_(ContentBlock.published_until.is_(None), ContentBlock.published_until > now),
+        )
+    )
+    return list(result.scalars().all())
+
+
+async def _published_page_rows(session: AsyncSession, now: datetime) -> list[tuple[str, object]]:
+    result = await session.execute(
+        select(ContentBlock.key, ContentBlock.meta).where(
+            ContentBlock.key.like("page.%"),
+            ContentBlock.status == ContentStatus.published,
+            or_(ContentBlock.published_at.is_(None), ContentBlock.published_at <= now),
+            or_(ContentBlock.published_until.is_(None), ContentBlock.published_until > now),
+        )
+    )
+    return [(str(key), meta) for key, meta in result.all()]
+
+
 async def build_sitemap_urls(session: AsyncSession, *, langs: list[str] | None = None) -> dict[str, list[str]]:
     base = settings.frontend_origin.rstrip("/")
     now = datetime.now(timezone.utc)
     languages = langs or ["en", "ro"]
 
-    categories = (await session.execute(select(Category.slug).where(Category.is_visible.is_(True)))).scalars().all()
-    products = (
-        await session.execute(
-            select(Product.slug).where(
-                Product.status == ProductStatus.published,
-                Product.is_deleted.is_(False),
-                Product.is_active.is_(True),
-            )
-        )
-    ).scalars().all()
-    blog_keys = (
-        await session.execute(
-            select(ContentBlock.key).where(
-                ContentBlock.key.like("blog.%"),
-                ContentBlock.status == ContentStatus.published,
-                or_(ContentBlock.published_at.is_(None), ContentBlock.published_at <= now),
-                or_(ContentBlock.published_until.is_(None), ContentBlock.published_until > now),
-            )
-        )
-    ).scalars().all()
-    page_rows = (
-        await session.execute(
-            select(ContentBlock.key, ContentBlock.meta).where(
-                ContentBlock.key.like("page.%"),
-                ContentBlock.status == ContentStatus.published,
-                or_(ContentBlock.published_at.is_(None), ContentBlock.published_at <= now),
-                or_(ContentBlock.published_until.is_(None), ContentBlock.published_until > now),
-            )
-        )
-    ).all()
+    categories = await _published_category_slugs(session)
+    products = await _published_product_slugs(session)
+    blog_keys = await _published_blog_keys(session, now)
+    page_rows = await _published_page_rows(session, now)
 
     return {
         lang: _build_urls_for_language(

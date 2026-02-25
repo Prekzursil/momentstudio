@@ -3,7 +3,8 @@ import { HttpErrorResponse } from '@angular/common/http';
 function readRequestIdValue(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
-  return trimmed ? trimmed : null;
+  if (!trimmed) return null;
+  return trimmed;
 }
 
 function readRequestIdFromObject(payload: unknown): string | null {
