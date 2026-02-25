@@ -754,6 +754,33 @@ export class CartComponent implements OnInit {
     this.persistSavedForLater();
   }
 
+  private asStringOr(value: any, fallback: string): string {
+    return String(value || fallback);
+  }
+
+  private asNumberOr(value: any, fallback: number): number {
+    return Number(value || fallback);
+  }
+
+  private asOptionalString(value: any): string {
+    return value ? String(value) : '';
+  }
+
+  private parseSavedForLaterEntry(entry: any): SavedForLaterItem {
+    const variantId = entry?.variant_id;
+    return {
+      product_id: this.asStringOr(entry?.product_id, ''),
+      variant_id: variantId == null ? null : String(variantId),
+      quantity: Math.max(1, this.asNumberOr(entry?.quantity, 1)),
+      name: this.asStringOr(entry?.name, ''),
+      slug: this.asStringOr(entry?.slug, ''),
+      price: this.asNumberOr(entry?.price, 0),
+      currency: this.asStringOr(entry?.currency, 'RON'),
+      image: this.asOptionalString(entry?.image),
+      saved_at: this.asStringOr(entry?.saved_at, '')
+    };
+  }
+
   private loadSavedForLater(): SavedForLaterItem[] {
     if (typeof localStorage === 'undefined') return [];
     try {
@@ -762,17 +789,7 @@ export class CartComponent implements OnInit {
       const parsed = JSON.parse(raw);
       if (!Array.isArray(parsed)) return [];
       return parsed
-        .map((entry) => ({
-          product_id: String(entry?.product_id || ''),
-          variant_id: entry?.variant_id == null ? null : String(entry.variant_id),
-          quantity: Math.max(1, Number(entry?.quantity || 1)),
-          name: String(entry?.name || ''),
-          slug: String(entry?.slug || ''),
-          price: Number(entry?.price || 0),
-          currency: String(entry?.currency || 'RON'),
-          image: entry?.image ? String(entry.image) : '',
-          saved_at: String(entry?.saved_at || '')
-        }))
+        .map((entry) => this.parseSavedForLaterEntry(entry))
         .filter((entry) => entry.product_id && entry.slug && entry.name && Number.isFinite(entry.price));
     } catch {
       return [];

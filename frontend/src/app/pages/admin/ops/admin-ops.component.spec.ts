@@ -9,6 +9,168 @@ import { OpsService } from '../../../core/ops.service';
 import { ToastService } from '../../../core/toast.service';
 import { AdminOpsComponent } from './admin-ops.component';
 
+const OPS_SPY_METHODS = [
+  'getWebhookFailureStats',
+  'getWebhookBacklogStats',
+  'getEmailFailureStats',
+  'getDiagnostics',
+  'listBanners',
+  'listShippingMethods',
+  'listEmailFailures',
+  'listWebhooks',
+  'downloadNewsletterConfirmedSubscribersExport',
+  'simulateShipping',
+  'createBanner',
+  'updateBanner',
+  'deleteBanner',
+  'getWebhookDetail',
+  'retryWebhook',
+  'getSamedaySyncStatus',
+  'listSamedaySyncRuns',
+  'runSamedaySyncNow'
+] as const;
+
+type ServiceSpies = {
+  adminService: jasmine.SpyObj<AdminService>;
+  health: jasmine.SpyObj<HealthService>;
+  ops: jasmine.SpyObj<OpsService>;
+  toast: jasmine.SpyObj<ToastService>;
+};
+
+function createServiceSpies(): ServiceSpies {
+  return {
+    adminService: jasmine.createSpyObj<AdminService>('AdminService', ['getMediaTelemetry']),
+    health: jasmine.createSpyObj<HealthService>('HealthService', ['ready']),
+    ops: jasmine.createSpyObj<OpsService>('OpsService', [...OPS_SPY_METHODS]),
+    toast: jasmine.createSpyObj<ToastService>('ToastService', ['success', 'error'])
+  };
+}
+
+function createMediaTelemetryResponse() {
+  return {
+    queue_depth: 2,
+    online_workers: 1,
+    workers: [],
+    stale_processing_count: 0,
+    dead_letter_count: 1,
+    sla_breached_count: 1,
+    retry_scheduled_count: 2,
+    oldest_queued_age_seconds: 45,
+    avg_processing_seconds: null,
+    status_counts: { queued: 2 },
+    type_counts: { ingest: 2 }
+  };
+}
+
+function createDiagnosticsResponse() {
+  return {
+    environment: 'test',
+    checked_at: '2026-02-17T00:00:00Z',
+    app_version: 'test',
+    payments_provider: 'mock',
+    smtp: { status: 'ok', message: null },
+    redis: { status: 'ok', message: null },
+    storage: { status: 'ok', message: null },
+    stripe: { status: 'ok', message: null },
+    paypal: { status: 'ok', message: null },
+    netopia: { status: 'ok', message: null }
+  };
+}
+
+function createSamedaySyncStatusResponse() {
+  return {
+    provider: 'sameday',
+    total_lockers: 100,
+    stale: false,
+    stale_age_seconds: 10,
+    challenge_failure_streak: 3,
+    schema_drift_detected: true,
+    canary_alert_codes: ['schema_drift', 'challenge_failure_streak'],
+    canary_alert_messages: ['schema changed', 'challenge streak'],
+    latest_run: {
+      id: '1',
+      provider: 'sameday',
+      status: 'success',
+      started_at: '2026-02-18T00:00:00Z',
+      fetched_count: 100,
+      upserted_count: 10,
+      deactivated_count: 2,
+      failure_kind: null,
+      schema_drift_detected: true
+    }
+  };
+}
+
+function createSamedaySyncRunsResponse() {
+  return {
+    items: [
+      {
+        id: '1',
+        provider: 'sameday',
+        status: 'success',
+        started_at: '2026-02-18T00:00:00Z',
+        fetched_count: 100,
+        upserted_count: 10,
+        deactivated_count: 2,
+        failure_kind: null,
+        schema_drift_detected: true
+      }
+    ],
+    meta: { page: 1, limit: 8, total: 1 }
+  };
+}
+
+function configureAdminService(adminService: jasmine.SpyObj<AdminService>): void {
+  adminService.getMediaTelemetry.and.returnValue(of(createMediaTelemetryResponse()));
+}
+
+function configureHealthService(health: jasmine.SpyObj<HealthService>): void {
+  health.ready.and.returnValue(of({ status: 'ok' } as any));
+}
+
+function configureOpsListMethods(ops: jasmine.SpyObj<OpsService>): void {
+  [ops.listBanners, ops.listShippingMethods, ops.listEmailFailures, ops.listWebhooks].forEach((method) =>
+    method.and.returnValue(of([]))
+  );
+}
+
+function configureOpsObjectMethods(ops: jasmine.SpyObj<OpsService>): void {
+  [
+    ops.simulateShipping,
+    ops.createBanner,
+    ops.updateBanner,
+    ops.deleteBanner,
+    ops.getWebhookDetail,
+    ops.retryWebhook,
+    ops.runSamedaySyncNow
+  ].forEach((method) => method.and.returnValue(of({} as any)));
+}
+
+function configureOpsService(ops: jasmine.SpyObj<OpsService>): void {
+  ops.getWebhookFailureStats.and.returnValue(of({ failed: 0 } as any));
+  ops.getWebhookBacklogStats.and.returnValue(of({ pending: 0 } as any));
+  ops.getEmailFailureStats.and.returnValue(of({ failed: 0 } as any));
+  ops.getDiagnostics.and.returnValue(of(createDiagnosticsResponse() as any));
+  configureOpsListMethods(ops);
+  ops.downloadNewsletterConfirmedSubscribersExport.and.returnValue(of(new Blob()));
+  configureOpsObjectMethods(ops);
+  ops.getSamedaySyncStatus.and.returnValue(of(createSamedaySyncStatusResponse() as any));
+  ops.listSamedaySyncRuns.and.returnValue(of(createSamedaySyncRunsResponse() as any));
+}
+
+function configureTestModule(spies: ServiceSpies): Promise<void> {
+  return TestBed.configureTestingModule({
+    imports: [TranslateModule.forRoot(), AdminOpsComponent],
+    providers: [
+      { provide: AdminService, useValue: spies.adminService },
+      { provide: HealthService, useValue: spies.health },
+      { provide: OpsService, useValue: spies.ops },
+      { provide: ToastService, useValue: spies.toast },
+      { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: new Map<string, string>() } } }
+    ]
+  }).compileComponents();
+}
+
 describe('AdminOpsComponent', () => {
   let adminService: jasmine.SpyObj<AdminService>;
   let health: jasmine.SpyObj<HealthService>;
@@ -16,127 +178,11 @@ describe('AdminOpsComponent', () => {
   let toast: jasmine.SpyObj<ToastService>;
 
   beforeEach(async () => {
-    adminService = jasmine.createSpyObj<AdminService>('AdminService', ['getMediaTelemetry']);
-    health = jasmine.createSpyObj<HealthService>('HealthService', ['ready']);
-    ops = jasmine.createSpyObj<OpsService>('OpsService', [
-      'getWebhookFailureStats',
-      'getWebhookBacklogStats',
-      'getEmailFailureStats',
-      'getDiagnostics',
-      'listBanners',
-      'listShippingMethods',
-      'listEmailFailures',
-      'listWebhooks',
-      'downloadNewsletterConfirmedSubscribersExport',
-      'simulateShipping',
-      'createBanner',
-      'updateBanner',
-      'deleteBanner',
-      'getWebhookDetail',
-      'retryWebhook',
-      'getSamedaySyncStatus',
-      'listSamedaySyncRuns',
-      'runSamedaySyncNow'
-    ]);
-    toast = jasmine.createSpyObj<ToastService>('ToastService', ['success', 'error']);
-
-    adminService.getMediaTelemetry.and.returnValue(
-      of({
-        queue_depth: 2,
-        online_workers: 1,
-        workers: [],
-        stale_processing_count: 0,
-        dead_letter_count: 1,
-        sla_breached_count: 1,
-        retry_scheduled_count: 2,
-        oldest_queued_age_seconds: 45,
-        avg_processing_seconds: null,
-        status_counts: { queued: 2 },
-        type_counts: { ingest: 2 }
-      })
-    );
-    health.ready.and.returnValue(of({ status: 'ok' } as any));
-    ops.getWebhookFailureStats.and.returnValue(of({ failed: 0 } as any));
-    ops.getWebhookBacklogStats.and.returnValue(of({ pending: 0 } as any));
-    ops.getEmailFailureStats.and.returnValue(of({ failed: 0 } as any));
-    ops.getDiagnostics.and.returnValue(
-      of({
-        environment: 'test',
-        checked_at: '2026-02-17T00:00:00Z',
-        app_version: 'test',
-        payments_provider: 'mock',
-        smtp: { status: 'ok', message: null },
-        redis: { status: 'ok', message: null },
-        storage: { status: 'ok', message: null },
-        stripe: { status: 'ok', message: null },
-        paypal: { status: 'ok', message: null },
-        netopia: { status: 'ok', message: null }
-      } as any)
-    );
-    ops.listBanners.and.returnValue(of([]));
-    ops.listShippingMethods.and.returnValue(of([]));
-    ops.listEmailFailures.and.returnValue(of([]));
-    ops.listWebhooks.and.returnValue(of([]));
-    ops.downloadNewsletterConfirmedSubscribersExport.and.returnValue(of(new Blob()));
-    ops.simulateShipping.and.returnValue(of({} as any));
-    ops.createBanner.and.returnValue(of({} as any));
-    ops.updateBanner.and.returnValue(of({} as any));
-    ops.deleteBanner.and.returnValue(of({} as any));
-    ops.getWebhookDetail.and.returnValue(of({} as any));
-    ops.retryWebhook.and.returnValue(of({} as any));
-    ops.getSamedaySyncStatus.and.returnValue(
-      of({
-        provider: 'sameday',
-        total_lockers: 100,
-        stale: false,
-        stale_age_seconds: 10,
-        challenge_failure_streak: 3,
-        schema_drift_detected: true,
-        canary_alert_codes: ['schema_drift', 'challenge_failure_streak'],
-        canary_alert_messages: ['schema changed', 'challenge streak'],
-        latest_run: {
-          id: '1',
-          provider: 'sameday',
-          status: 'success',
-          started_at: '2026-02-18T00:00:00Z',
-          fetched_count: 100,
-          upserted_count: 10,
-          deactivated_count: 2,
-          failure_kind: null,
-          schema_drift_detected: true
-        }
-      } as any)
-    );
-    ops.listSamedaySyncRuns.and.returnValue(
-      of({
-        items: [
-          {
-            id: '1',
-            provider: 'sameday',
-            status: 'success',
-            started_at: '2026-02-18T00:00:00Z',
-            fetched_count: 100,
-            upserted_count: 10,
-            deactivated_count: 2,
-            failure_kind: null,
-            schema_drift_detected: true
-          }
-        ],
-        meta: { page: 1, limit: 8, total: 1 }
-      } as any)
-    );
-    ops.runSamedaySyncNow.and.returnValue(of({} as any));
-
-    await TestBed.configureTestingModule({
-      imports: [TranslateModule.forRoot(), AdminOpsComponent],
-      providers: [
-        { provide: AdminService, useValue: adminService },
-        { provide: HealthService, useValue: health },
-        { provide: OpsService, useValue: ops },
-        { provide: ToastService, useValue: toast },
-        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: new Map<string, string>() } } }
-      ]
-    }).compileComponents();
+    ({ adminService, health, ops, toast } = createServiceSpies());
+    configureAdminService(adminService);
+    configureHealthService(health);
+    configureOpsService(ops);
+    await configureTestModule({ adminService, health, ops, toast });
   });
 
   it('loads DAM telemetry and renders the DAM telemetry card', () => {
