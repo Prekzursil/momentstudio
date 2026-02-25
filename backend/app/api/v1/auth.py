@@ -310,6 +310,65 @@ async def _resolve_active_refresh_session_jti(
     return replacement.jti
 
 
+def _ensure_utc_datetime(value: datetime | None) -> datetime | None:
+    if value and value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value
+
+
+def _active_refresh_session_expiry(row: RefreshSession, *, now: datetime) -> datetime | None:
+    expires_at = _ensure_utc_datetime(row.expires_at)
+    if not expires_at or expires_at < now:
+        return None
+    return expires_at
+
+
+def _build_refresh_session_response(
+    row: RefreshSession,
+    *,
+    now: datetime,
+    current_jti: str | None,
+) -> RefreshSessionResponse | None:
+    expires_at = _active_refresh_session_expiry(row, now=now)
+    if expires_at is None:
+        return None
+    return RefreshSessionResponse(
+        id=row.id,
+        created_at=_ensure_utc_datetime(row.created_at),
+        expires_at=expires_at,
+        persistent=bool(getattr(row, "persistent", True)),
+        is_current=bool(current_jti and row.jti == current_jti),
+        user_agent=getattr(row, "user_agent", None),
+        ip_address=getattr(row, "ip_address", None),
+        country_code=getattr(row, "country_code", None),
+    )
+
+
+def _build_cooldown_info(
+    *,
+    last: datetime | None,
+    cooldown: timedelta,
+    enforce: bool,
+    now: datetime,
+) -> CooldownInfo:
+    last_dt = _ensure_utc_datetime(last)
+    if not last_dt or not enforce:
+        return CooldownInfo(last_changed_at=last_dt, next_allowed_at=None, remaining_seconds=0)
+    next_dt = last_dt + cooldown
+    remaining = int(max(0, (next_dt - now).total_seconds()))
+    return CooldownInfo(
+        last_changed_at=last_dt,
+        next_allowed_at=next_dt if remaining > 0 else None,
+        remaining_seconds=remaining,
+    )
+
+
+async def _latest_user_history_at(session: AsyncSession, model: Any, user_id: UUID) -> datetime | None:
+    return await session.scalar(
+        select(model.created_at).where(model.user_id == user_id).order_by(model.created_at.desc()).limit(1)
+    )
+
+
 class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str = Field(min_length=6, max_length=128)
@@ -1389,53 +1448,35 @@ async def read_cooldowns(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> UserCooldownsResponse:
     now = datetime.now(timezone.utc)
-
-    def normalize_dt(value: datetime | None) -> datetime | None:
-        if not value:
-            return None
-        return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
-
-    def cooldown_info(*, last: datetime | None, cooldown: timedelta, enforce: bool) -> CooldownInfo:
-        last_dt = normalize_dt(last)
-        if not last_dt or not enforce:
-            return CooldownInfo(last_changed_at=last_dt, next_allowed_at=None, remaining_seconds=0)
-        next_dt = last_dt + cooldown
-        remaining = int(max(0, (next_dt - now).total_seconds()))
-        return CooldownInfo(
-            last_changed_at=last_dt,
-            next_allowed_at=next_dt if remaining > 0 else None,
-            remaining_seconds=remaining,
-        )
-
-    username_last = await session.scalar(
-        select(UserUsernameHistory.created_at)
-        .where(UserUsernameHistory.user_id == current_user.id)
-        .order_by(UserUsernameHistory.created_at.desc())
-        .limit(1)
-    )
-    display_last = await session.scalar(
-        select(UserDisplayNameHistory.created_at)
-        .where(UserDisplayNameHistory.user_id == current_user.id)
-        .order_by(UserDisplayNameHistory.created_at.desc())
-        .limit(1)
-    )
+    username_last = await _latest_user_history_at(session, UserUsernameHistory, current_user.id)
+    display_last = await _latest_user_history_at(session, UserDisplayNameHistory, current_user.id)
 
     email_count = int(
         await session.scalar(select(func.count()).select_from(UserEmailHistory).where(UserEmailHistory.user_id == current_user.id))
         or 0
     )
-    email_last = await session.scalar(
-        select(UserEmailHistory.created_at)
-        .where(UserEmailHistory.user_id == current_user.id)
-        .order_by(UserEmailHistory.created_at.desc())
-        .limit(1)
-    )
+    email_last = await _latest_user_history_at(session, UserEmailHistory, current_user.id)
 
     profile_complete = auth_service.is_profile_complete(current_user)
     return UserCooldownsResponse(
-        username=cooldown_info(last=username_last, cooldown=auth_service.USERNAME_CHANGE_COOLDOWN, enforce=profile_complete),
-        display_name=cooldown_info(last=display_last, cooldown=auth_service.DISPLAY_NAME_CHANGE_COOLDOWN, enforce=profile_complete),
-        email=cooldown_info(last=email_last, cooldown=auth_service.EMAIL_CHANGE_COOLDOWN, enforce=email_count > 1),
+        username=_build_cooldown_info(
+            last=username_last,
+            cooldown=auth_service.USERNAME_CHANGE_COOLDOWN,
+            enforce=profile_complete,
+            now=now,
+        ),
+        display_name=_build_cooldown_info(
+            last=display_last,
+            cooldown=auth_service.DISPLAY_NAME_CHANGE_COOLDOWN,
+            enforce=profile_complete,
+            now=now,
+        ),
+        email=_build_cooldown_info(
+            last=email_last,
+            cooldown=auth_service.EMAIL_CHANGE_COOLDOWN,
+            enforce=email_count > 1,
+            now=now,
+        ),
     )
 
 
@@ -1863,26 +1904,9 @@ async def list_my_sessions(
     now = datetime.now(timezone.utc)
     sessions: list[RefreshSessionResponse] = []
     for row in rows:
-        expires_at = row.expires_at
-        if expires_at and expires_at.tzinfo is None:
-            expires_at = expires_at.replace(tzinfo=timezone.utc)
-        if not expires_at or expires_at < now:
-            continue
-        created_at = row.created_at
-        if created_at and created_at.tzinfo is None:
-            created_at = created_at.replace(tzinfo=timezone.utc)
-        sessions.append(
-            RefreshSessionResponse(
-                id=row.id,
-                created_at=created_at,
-                expires_at=expires_at,
-                persistent=bool(getattr(row, "persistent", True)),
-                is_current=bool(current_jti and row.jti == current_jti),
-                user_agent=getattr(row, "user_agent", None),
-                ip_address=getattr(row, "ip_address", None),
-                country_code=getattr(row, "country_code", None),
-            )
-        )
+        payload = _build_refresh_session_response(row, now=now, current_jti=current_jti)
+        if payload is not None:
+            sessions.append(payload)
 
     sessions.sort(key=lambda entry: (entry.is_current, entry.created_at), reverse=True)
     return sessions
@@ -1918,10 +1942,7 @@ async def revoke_other_sessions(
     for row in rows:
         if row.jti == current_jti:
             continue
-        expires_at = row.expires_at
-        if expires_at and expires_at.tzinfo is None:
-            expires_at = expires_at.replace(tzinfo=timezone.utc)
-        if not expires_at or expires_at < now:
+        if _active_refresh_session_expiry(row, now=now) is None:
             continue
         row.revoked = True
         row.revoked_reason = "revoke_others"
