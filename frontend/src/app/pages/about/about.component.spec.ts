@@ -79,7 +79,7 @@ describe('AboutComponent content + lifecycle', () => {
   });
 });
 
-const setupAboutSpec = (): void => {
+function setupAboutSpec(): void {
   aboutMeta = jasmine.createSpyObj<Meta>('Meta', ['updateTag']);
   aboutTitle = jasmine.createSpyObj<Title>('Title', ['setTitle']);
   aboutApi = jasmine.createSpyObj<ApiService>('ApiService', ['get']);
@@ -91,7 +91,7 @@ const setupAboutSpec = (): void => {
   aboutTranslate = TestBed.inject(TranslateService);
   seedAboutTranslations(aboutTranslate);
   aboutTranslate.use('en');
-};
+}
 
 function configureAboutTestingModule(
   meta: jasmine.SpyObj<Meta>,

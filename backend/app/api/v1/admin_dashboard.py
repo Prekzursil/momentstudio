@@ -175,6 +175,10 @@ def _dashboard_alert_thresholds_payload(record: AdminDashboardAlertThresholds) -
     }
 
 
+def _decimal_or_none(value: float | int | str | Decimal | None) -> Decimal | None:
+    return Decimal(str(value)) if value is not None else None
+
+
 @router.get("/alert-thresholds")
 async def admin_get_alert_thresholds(
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -196,17 +200,9 @@ async def admin_update_alert_thresholds(
     before = {k: v for k, v in before_full.items() if k != "updated_at"}
 
     record.failed_payments_min_count = int(payload.failed_payments_min_count)
-    record.failed_payments_min_delta_pct = (
-        Decimal(str(payload.failed_payments_min_delta_pct))
-        if payload.failed_payments_min_delta_pct is not None
-        else None
-    )
+    record.failed_payments_min_delta_pct = _decimal_or_none(payload.failed_payments_min_delta_pct)
     record.refund_requests_min_count = int(payload.refund_requests_min_count)
-    record.refund_requests_min_rate_pct = (
-        Decimal(str(payload.refund_requests_min_rate_pct))
-        if payload.refund_requests_min_rate_pct is not None
-        else None
-    )
+    record.refund_requests_min_rate_pct = _decimal_or_none(payload.refund_requests_min_rate_pct)
     record.stockouts_min_count = int(payload.stockouts_min_count)
     session.add(record)
 
@@ -1207,22 +1203,22 @@ async def admin_refunds_breakdown(
         normalized = unicodedata.normalize("NFKD", raw)
         return normalized.encode("ascii", "ignore").decode("ascii").lower()
 
+    reason_rules: tuple[tuple[str, tuple[str, ...]], ...] = (
+        ("damaged", ("damaged", "broken", "defect", "defective", "crack", "spart", "stricat", "zgariat", "deterior")),
+        ("wrong_item", ("wrong", "different", "gresit", "incorect", "alt produs", "other item", "not the one")),
+        ("not_as_described", ("not as described", "different than expected", "nu corespunde", "nu este ca", "description", "poza", "picture")),
+        ("size_fit", ("size", "fit", "too big", "too small", "marime", "potriv")),
+        ("delivery_issue", ("delivery", "shipping", "ship", "courier", "curier", "livrare", "intarzi", "intarzier")),
+        ("changed_mind", ("changed my mind", "dont want", "do not want", "no longer", "nu mai", "razgand", "renunt")),
+    )
+
     def _reason_category(reason: str) -> str:
         t = _normalize_text(reason)
         if not t:
             return "other"
-        if any(key in t for key in ("damaged", "broken", "defect", "defective", "crack", "spart", "stricat", "zgariat", "deterior")):
-            return "damaged"
-        if any(key in t for key in ("wrong", "different", "gresit", "incorect", "alt produs", "other item", "not the one")):
-            return "wrong_item"
-        if any(key in t for key in ("not as described", "different than expected", "nu corespunde", "nu este ca", "description", "poza", "picture")):
-            return "not_as_described"
-        if any(key in t for key in ("size", "fit", "too big", "too small", "marime", "potriv")):
-            return "size_fit"
-        if any(key in t for key in ("delivery", "shipping", "ship", "courier", "curier", "livrare", "intarzi", "intarzier")):
-            return "delivery_issue"
-        if any(key in t for key in ("changed my mind", "dont want", "do not want", "no longer", "nu mai", "razgand", "renunt")):
-            return "changed_mind"
+        for category, keywords in reason_rules:
+            if any(keyword in t for keyword in keywords):
+                return category
         return "other"
 
     async def _reason_counts(window_start: datetime, window_end: datetime) -> dict[str, int]:
@@ -3454,6 +3450,28 @@ async def revoke_sessions(
     return None
 
 
+def _as_utc(value: datetime | None) -> datetime | None:
+    if value and value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value
+
+
+def _refresh_session_to_response(row: RefreshSession, now: datetime) -> RefreshSessionResponse | None:
+    expires_at = _as_utc(row.expires_at)
+    if not expires_at or expires_at < now:
+        return None
+    return RefreshSessionResponse(
+        id=row.id,
+        created_at=_as_utc(row.created_at),
+        expires_at=expires_at,
+        persistent=bool(getattr(row, "persistent", True)),
+        is_current=False,
+        user_agent=getattr(row, "user_agent", None),
+        ip_address=getattr(row, "ip_address", None),
+        country_code=getattr(row, "country_code", None),
+    )
+
+
 @router.get("/sessions/{user_id}")
 async def admin_list_user_sessions(
     user_id: UUID,
@@ -3475,26 +3493,9 @@ async def admin_list_user_sessions(
     now = datetime.now(timezone.utc)
     sessions: list[RefreshSessionResponse] = []
     for row in rows:
-        expires_at = row.expires_at
-        if expires_at and expires_at.tzinfo is None:
-            expires_at = expires_at.replace(tzinfo=timezone.utc)
-        if not expires_at or expires_at < now:
-            continue
-        created_at = row.created_at
-        if created_at and created_at.tzinfo is None:
-            created_at = created_at.replace(tzinfo=timezone.utc)
-        sessions.append(
-            RefreshSessionResponse(
-                id=row.id,
-                created_at=created_at,
-                expires_at=expires_at,
-                persistent=bool(getattr(row, "persistent", True)),
-                is_current=False,
-                user_agent=getattr(row, "user_agent", None),
-                ip_address=getattr(row, "ip_address", None),
-                country_code=getattr(row, "country_code", None),
-            )
-        )
+        payload = _refresh_session_to_response(row, now)
+        if payload is not None:
+            sessions.append(payload)
 
     return sessions
 
@@ -3822,6 +3823,26 @@ async def admin_gdpr_deletion_requests(
     )
 
 
+def _assert_gdpr_deletion_target_allowed(
+    user: User,
+    current_user: User,
+    *,
+    owner_error: str,
+    staff_error: str,
+) -> None:
+    if user.role == UserRole.owner:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=owner_error)
+
+    staff_roles = {
+        UserRole.admin,
+        UserRole.support,
+        UserRole.fulfillment,
+        UserRole.content,
+    }
+    if user.role in staff_roles and current_user.role != UserRole.owner:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=staff_error)
+
+
 @router.post("/gdpr/deletions/{user_id}/execute", status_code=status.HTTP_204_NO_CONTENT)
 async def admin_gdpr_execute_deletion(
     user_id: UUID,
@@ -3836,15 +3857,12 @@ async def admin_gdpr_execute_deletion(
     user = await session.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    if user.role == UserRole.owner:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Owner account cannot be deleted")
-    if user.role in (
-        UserRole.admin,
-        UserRole.support,
-        UserRole.fulfillment,
-        UserRole.content,
-    ) and current_user.role != UserRole.owner:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the owner can delete staff accounts")
+    _assert_gdpr_deletion_target_allowed(
+        user,
+        current_user,
+        owner_error="Owner account cannot be deleted",
+        staff_error="Only the owner can delete staff accounts",
+    )
 
     email_before = user.email
     await self_service.execute_account_deletion(session, user)
@@ -3873,15 +3891,12 @@ async def admin_gdpr_cancel_deletion(
     user = await session.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    if user.role == UserRole.owner:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Owner account cannot be modified")
-    if user.role in (
-        UserRole.admin,
-        UserRole.support,
-        UserRole.fulfillment,
-        UserRole.content,
-    ) and current_user.role != UserRole.owner:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the owner can modify staff accounts")
+    _assert_gdpr_deletion_target_allowed(
+        user,
+        current_user,
+        owner_error="Owner account cannot be modified",
+        staff_error="Only the owner can modify staff accounts",
+    )
 
     if user.deletion_requested_at is not None or user.deletion_scheduled_for is not None:
         user.deletion_requested_at = None
@@ -4611,6 +4626,31 @@ async def inventory_restock_list(
     )
 
 
+async def _resolve_inventory_product_for_reservations(
+    session: AsyncSession,
+    *,
+    product_id: UUID,
+    variant_id: UUID | None,
+) -> Product:
+    product = await session.get(Product, product_id)
+    if not product or getattr(product, "is_deleted", False):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+
+    if variant_id is not None:
+        variant = await session.get(ProductVariant, variant_id)
+        if not variant or variant.product_id != product.id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid variant")
+
+    return product
+
+
+def _masked_reservation_email(row: dict[str, Any], *, include_pii: bool) -> str | None:
+    email_value = str(row.get("customer_email") or "").strip() or None
+    if email_value and not include_pii:
+        email_value = pii_service.mask_email(email_value) or email_value
+    return email_value
+
+
 @router.get("/inventory/reservations/carts")
 async def inventory_reserved_carts(
     request: Request,
@@ -4625,14 +4665,9 @@ async def inventory_reserved_carts(
     if include_pii:
         pii_service.require_pii_reveal(current_user, request=request)
 
-    product = await session.get(Product, product_id)
-    if not product or getattr(product, "is_deleted", False):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-
-    if variant_id is not None:
-        variant = await session.get(ProductVariant, variant_id)
-        if not variant or variant.product_id != product.id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid variant")
+    product = await _resolve_inventory_product_for_reservations(
+        session, product_id=product_id, variant_id=variant_id
+    )
 
     cutoff, rows = await inventory_service.list_cart_reservations(
         session,
@@ -4643,15 +4678,11 @@ async def inventory_reserved_carts(
     )
     items: list[dict] = []
     for row in rows:
-        email_raw = str(row.get("customer_email") or "").strip() or None
-        email_value = email_raw
-        if email_value and not include_pii:
-            email_value = pii_service.mask_email(email_value) or email_value
         items.append(
             {
                 "cart_id": row.get("cart_id"),
                 "updated_at": row.get("updated_at"),
-                "customer_email": email_value,
+                "customer_email": _masked_reservation_email(row, include_pii=include_pii),
                 "quantity": int(row.get("quantity") or 0),
             }
         )
@@ -4673,14 +4704,9 @@ async def inventory_reserved_orders(
     if include_pii:
         pii_service.require_pii_reveal(current_user, request=request)
 
-    product = await session.get(Product, product_id)
-    if not product or getattr(product, "is_deleted", False):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-
-    if variant_id is not None:
-        variant = await session.get(ProductVariant, variant_id)
-        if not variant or variant.product_id != product.id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid variant")
+    product = await _resolve_inventory_product_for_reservations(
+        session, product_id=product_id, variant_id=variant_id
+    )
 
     rows = await inventory_service.list_order_reservations(
         session,
@@ -4691,17 +4717,13 @@ async def inventory_reserved_orders(
     )
     items: list[dict] = []
     for row in rows:
-        email_raw = str(row.get("customer_email") or "").strip() or None
-        email_value = email_raw
-        if email_value and not include_pii:
-            email_value = pii_service.mask_email(email_value) or email_value
         items.append(
             {
                 "order_id": row.get("order_id"),
                 "reference_code": row.get("reference_code"),
                 "status": row.get("status"),
                 "created_at": row.get("created_at"),
-                "customer_email": email_value,
+                "customer_email": _masked_reservation_email(row, include_pii=include_pii),
                 "quantity": int(row.get("quantity") or 0),
             }
         )

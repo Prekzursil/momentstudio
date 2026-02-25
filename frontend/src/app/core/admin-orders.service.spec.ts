@@ -25,7 +25,7 @@ describe('AdminOrdersService', () => {
   defineDownloadOrderExportSpec();
 });
 
-const defineSearchOrdersSpec = (): void => {
+function defineSearchOrdersSpec(): void {
   it('searches orders', () => {
     adminOrdersService.search({ q: 'ref', status: 'paid', page: 2, limit: 10 }).subscribe((res) => {
       expect(res.meta.page).toBe(2);
@@ -40,9 +40,9 @@ const defineSearchOrdersSpec = (): void => {
     expect(req.request.params.get('limit')).toBe('10');
     req.flush({ items: [], meta: { total_items: 0, total_pages: 1, page: 2, limit: 10 } });
   });
-};
+}
 
-const defineGetOrderSpec = (): void => {
+function defineGetOrderSpec(): void {
   it('fetches an order', () => {
     adminOrdersService.get('o1').subscribe((res) => {
       expect(res.id).toBe('o1');
@@ -61,9 +61,9 @@ const defineGetOrderSpec = (): void => {
       items: []
     });
   });
-};
+}
 
-const defineUpdateOrderSpec = (): void => {
+function defineUpdateOrderSpec(): void {
   it('updates an order', () => {
     adminOrdersService.update('o1', { status: 'paid', tracking_number: 'T123' }).subscribe((res) => {
       expect(res.status).toBe('paid');
@@ -83,9 +83,9 @@ const defineUpdateOrderSpec = (): void => {
       items: []
     });
   });
-};
+}
 
-const defineDownloadOrderExportSpec = (): void => {
+function defineDownloadOrderExportSpec(): void {
   it('downloads order export', () => {
     adminOrdersService.downloadExport().subscribe((blob) => {
       expect(blob.size).toBe(3);
@@ -97,4 +97,4 @@ const defineDownloadOrderExportSpec = (): void => {
     expect(req.request.responseType).toBe('blob');
     req.flush(new Blob(['csv'], { type: 'text/csv' }));
   });
-};
+}
