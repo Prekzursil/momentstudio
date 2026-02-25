@@ -1005,7 +1005,8 @@ async def _void_coupon_redemption(session: AsyncSession, *, order_id: UUID, reas
     if redemption is None or redemption.voided_at is not None:
         return
     redemption.voided_at = _now()
-    redemption.void_reason = (reason or "")[:255] if reason else None
+    reason_trimmed = reason.strip()
+    redemption.void_reason = reason_trimmed[:255] or None
     session.add(redemption)
     session.add(OrderEvent(order_id=order_id, event="coupon_voided", note=reason))
     await session.commit()
