@@ -17,6 +17,44 @@ def _localized_url(base: str, path: str, lang: str) -> str:
     return f"{base}{normalized_path}?lang={lang}"
 
 
+def _public_page_path(key: str, meta: object) -> str | None:
+    if isinstance(meta, dict) and (meta.get("requires_auth") or meta.get("hidden")):
+        return None
+    slug = key.split(".", 1)[1] if key.startswith("page.") else key
+    if not slug:
+        return None
+    if slug == "about":
+        return "/about"
+    if slug == "contact":
+        return "/contact"
+    return f"/pages/{slug}"
+
+
+def _build_urls_for_language(
+    *,
+    base: str,
+    lang: str,
+    categories: list[str],
+    products: list[str],
+    blog_keys: list[str],
+    page_rows: list[tuple[str, object]],
+) -> list[str]:
+    urls: set[str] = {_localized_url(base, "/", lang), _localized_url(base, "/shop", lang), _localized_url(base, "/blog", lang)}
+    urls.update(_localized_url(base, f"/shop/{slug}", lang) for slug in categories)
+    urls.update(_localized_url(base, f"/products/{slug}", lang) for slug in products)
+
+    for key in blog_keys:
+        slug = key.split(".", 1)[1] if key.startswith("blog.") else key
+        urls.add(_localized_url(base, f"/blog/{slug}", lang))
+
+    for key, meta in page_rows:
+        path = _public_page_path(key, meta)
+        if path:
+            urls.add(_localized_url(base, path, lang))
+
+    return sorted(urls)
+
+
 async def build_sitemap_urls(session: AsyncSession, *, langs: list[str] | None = None) -> dict[str, list[str]]:
     base = settings.frontend_origin.rstrip("/")
     now = datetime.now(timezone.utc)
@@ -53,38 +91,14 @@ async def build_sitemap_urls(session: AsyncSession, *, langs: list[str] | None =
         )
     ).all()
 
-    by_lang: dict[str, list[str]] = {}
-    for lang in languages:
-        urls: set[str] = set()
-        urls.add(_localized_url(base, "/", lang))
-        urls.add(_localized_url(base, "/shop", lang))
-        urls.add(_localized_url(base, "/blog", lang))
-
-        for slug in categories:
-            urls.add(_localized_url(base, f"/shop/{slug}", lang))
-        for slug in products:
-            urls.add(_localized_url(base, f"/products/{slug}", lang))
-
-        for key in blog_keys:
-            slug = key.split(".", 1)[1] if key.startswith("blog.") else key
-            urls.add(_localized_url(base, f"/blog/{slug}", lang))
-
-        for key, meta in page_rows:
-            if isinstance(meta, dict) and meta.get("requires_auth"):
-                continue
-            if isinstance(meta, dict) and meta.get("hidden"):
-                continue
-            slug = key.split(".", 1)[1] if key.startswith("page.") else key
-            if not slug:
-                continue
-            if slug == "about":
-                path = "/about"
-            elif slug == "contact":
-                path = "/contact"
-            else:
-                path = f"/pages/{slug}"
-            urls.add(_localized_url(base, path, lang))
-
-        by_lang[lang] = sorted(urls)
-
-    return by_lang
+    return {
+        lang: _build_urls_for_language(
+            base=base,
+            lang=lang,
+            categories=categories,
+            products=products,
+            blog_keys=blog_keys,
+            page_rows=page_rows,
+        )
+        for lang in languages
+    }

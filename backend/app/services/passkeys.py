@@ -189,38 +189,33 @@ async def generate_authentication_options_for_user(session: AsyncSession, user: 
     return _as_camel_authentication_options(payload), challenge
 
 
-async def verify_passkey_authentication(
-    session: AsyncSession,
-    *,
-    credential: dict,
-    expected_challenge: bytes,
-    user_id: str | None = None,
-) -> tuple[User, UserPasskey]:
+def _credential_id_from_payload(credential: dict) -> str:
     cred_id_b64 = (credential.get("rawId") or credential.get("id") or "").strip()
     if not cred_id_b64:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid credential")
-
-    # `rawId` is preferred; allow `id` for compatibility with different serializers.
     try:
         credential_id_bytes = base64url_to_bytes(cred_id_b64)
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid credential") from exc
     if not credential_id_bytes:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid credential")
-    credential_id = bytes_to_base64url(credential_id_bytes)
+    return bytes_to_base64url(credential_id_bytes)
 
+
+async def _load_passkey_for_authentication(
+    session: AsyncSession, *, credential_id: str, user_id: str | None
+) -> UserPasskey:
     passkey = (await session.execute(select(UserPasskey).where(UserPasskey.credential_id == credential_id))).scalar_one_or_none()
     if not passkey:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown passkey")
     if user_id and str(passkey.user_id) != str(user_id):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown passkey")
+    return passkey
 
-    user = await session.get(User, passkey.user_id)
-    if not user:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown passkey")
 
+def _verify_passkey_assertion(*, credential: dict, expected_challenge: bytes, passkey: UserPasskey) -> object:
     try:
-        verified = verify_authentication_response(
+        return verify_authentication_response(
             credential=credential,
             expected_challenge=expected_challenge,
             expected_rp_id=rp_id(),
@@ -231,6 +226,23 @@ async def verify_passkey_authentication(
         )
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey assertion") from exc
+
+
+async def verify_passkey_authentication(
+    session: AsyncSession,
+    *,
+    credential: dict,
+    expected_challenge: bytes,
+    user_id: str | None = None,
+) -> tuple[User, UserPasskey]:
+    credential_id = _credential_id_from_payload(credential)
+    passkey = await _load_passkey_for_authentication(session, credential_id=credential_id, user_id=user_id)
+
+    user = await session.get(User, passkey.user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown passkey")
+
+    verified = _verify_passkey_assertion(credential=credential, expected_challenge=expected_challenge, passkey=passkey)
 
     passkey.sign_count = int(getattr(verified, "new_sign_count", passkey.sign_count or 0))
     passkey.last_used_at = datetime.now(timezone.utc)

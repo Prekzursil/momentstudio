@@ -37,6 +37,93 @@ newsletter_subscribe_rate_limit = per_identifier_limiter(
 )
 
 
+def _normalize_subscriber_input(payload: NewsletterSubscribeRequest) -> tuple[str, str | None]:
+    email = str(payload.email or "").strip().lower()
+    source = (payload.source or "").strip()[:64] or None
+    return email, source
+
+
+def _queue_confirmation_email(background_tasks: BackgroundTasks, email: str) -> None:
+    token = newsletter_tokens.create_newsletter_token(email=email, purpose=newsletter_tokens.NEWSLETTER_PURPOSE_CONFIRM)
+    confirm_url = newsletter_tokens.build_frontend_confirm_url(token=token)
+    background_tasks.add_task(email_service.send_newsletter_confirmation, email, confirm_url=confirm_url)
+
+
+def _should_send_confirmation(existing: NewsletterSubscriber, now: datetime) -> bool:
+    if existing.confirmed_at is not None or not settings.smtp_enabled:
+        return False
+    if existing.confirmation_sent_at and now - existing.confirmation_sent_at < _CONFIRM_RESEND_COOLDOWN:
+        return False
+    return True
+
+
+async def _handle_active_subscription(
+    *,
+    existing: NewsletterSubscriber,
+    email: str,
+    source: str | None,
+    now: datetime,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession,
+) -> NewsletterSubscribeResponse:
+    should_send = _should_send_confirmation(existing, now)
+    if should_send:
+        existing.confirmation_sent_at = now
+    if source:
+        existing.source = source
+    if should_send or source:
+        session.add(existing)
+        await session.commit()
+    if should_send:
+        _queue_confirmation_email(background_tasks, email)
+    return NewsletterSubscribeResponse(subscribed=True, already_subscribed=True)
+
+
+async def _handle_reactivated_subscription(
+    *,
+    existing: NewsletterSubscriber,
+    email: str,
+    source: str | None,
+    now: datetime,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession,
+) -> NewsletterSubscribeResponse:
+    existing.unsubscribed_at = None
+    existing.subscribed_at = now
+    existing.confirmed_at = None
+    if source:
+        existing.source = source
+    should_send = settings.smtp_enabled
+    existing.confirmation_sent_at = now if should_send else None
+    session.add(existing)
+    await session.commit()
+    if should_send:
+        _queue_confirmation_email(background_tasks, email)
+    return NewsletterSubscribeResponse(subscribed=True, already_subscribed=False)
+
+
+async def _create_subscriber(
+    *,
+    email: str,
+    source: str | None,
+    now: datetime,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession,
+) -> NewsletterSubscribeResponse:
+    subscriber = NewsletterSubscriber(
+        email=email,
+        source=source,
+        subscribed_at=now,
+        confirmed_at=None,
+        confirmation_sent_at=now if settings.smtp_enabled else None,
+    )
+    session.add(subscriber)
+    await session.commit()
+    if settings.smtp_enabled:
+        _queue_confirmation_email(background_tasks, email)
+    return NewsletterSubscribeResponse(subscribed=True, already_subscribed=False)
+
+
 @router.post("/subscribe", response_model=NewsletterSubscribeResponse)
 async def subscribe_newsletter(
     payload: NewsletterSubscribeRequest,
@@ -47,75 +134,34 @@ async def subscribe_newsletter(
 ) -> NewsletterSubscribeResponse:
     await captcha_service.verify(payload.captcha_token, remote_ip=request.client.host if request.client else None)
 
-    email = str(payload.email or "").strip().lower()
-    source = (payload.source or "").strip()[:64] or None
-
+    email, source = _normalize_subscriber_input(payload)
     existing = await session.scalar(sa.select(NewsletterSubscriber).where(NewsletterSubscriber.email == email))
     now = datetime.now(timezone.utc)
-    if existing:
-        # Subscribed (either confirmed or pending confirmation).
-        if existing.unsubscribed_at is None:
-            should_send = False
-            if existing.confirmed_at is None and settings.smtp_enabled:
-                should_send = True
-                if existing.confirmation_sent_at and now - existing.confirmation_sent_at < _CONFIRM_RESEND_COOLDOWN:
-                    should_send = False
-                if should_send:
-                    existing.confirmation_sent_at = now
-
-            if source:
-                existing.source = source
-            if should_send or source:
-                session.add(existing)
-                await session.commit()
-
-            if should_send:
-                token = newsletter_tokens.create_newsletter_token(
-                    email=email, purpose=newsletter_tokens.NEWSLETTER_PURPOSE_CONFIRM
-                )
-                confirm_url = newsletter_tokens.build_frontend_confirm_url(token=token)
-                background_tasks.add_task(email_service.send_newsletter_confirmation, email, confirm_url=confirm_url)
-
-            return NewsletterSubscribeResponse(subscribed=True, already_subscribed=True)
-
-        # Previously unsubscribed; start a new pending subscription.
-        existing.unsubscribed_at = None
-        existing.subscribed_at = now
-        existing.confirmed_at = None
-        if source:
-            existing.source = source
-        should_send = settings.smtp_enabled
-        existing.confirmation_sent_at = now if should_send else None
-        session.add(existing)
-        await session.commit()
-
-        if should_send:
-            token = newsletter_tokens.create_newsletter_token(
-                email=email, purpose=newsletter_tokens.NEWSLETTER_PURPOSE_CONFIRM
-            )
-            confirm_url = newsletter_tokens.build_frontend_confirm_url(token=token)
-            background_tasks.add_task(email_service.send_newsletter_confirmation, email, confirm_url=confirm_url)
-
-        return NewsletterSubscribeResponse(subscribed=True, already_subscribed=False)
-
-    subscriber = NewsletterSubscriber(
+    if not existing:
+        return await _create_subscriber(
+            email=email,
+            source=source,
+            now=now,
+            background_tasks=background_tasks,
+            session=session,
+        )
+    if existing.unsubscribed_at is None:
+        return await _handle_active_subscription(
+            existing=existing,
+            email=email,
+            source=source,
+            now=now,
+            background_tasks=background_tasks,
+            session=session,
+        )
+    return await _handle_reactivated_subscription(
+        existing=existing,
         email=email,
         source=source,
-        subscribed_at=now,
-        confirmed_at=None,
-        confirmation_sent_at=now if settings.smtp_enabled else None,
+        now=now,
+        background_tasks=background_tasks,
+        session=session,
     )
-    session.add(subscriber)
-    await session.commit()
-
-    if settings.smtp_enabled:
-        token = newsletter_tokens.create_newsletter_token(
-            email=email, purpose=newsletter_tokens.NEWSLETTER_PURPOSE_CONFIRM
-        )
-        confirm_url = newsletter_tokens.build_frontend_confirm_url(token=token)
-        background_tasks.add_task(email_service.send_newsletter_confirmation, email, confirm_url=confirm_url)
-
-    return NewsletterSubscribeResponse(subscribed=True, already_subscribed=False)
 
 
 @router.post("/confirm", response_model=NewsletterConfirmResponse)
