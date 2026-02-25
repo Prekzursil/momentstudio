@@ -337,13 +337,25 @@ def _format_fan_address(addr: dict) -> str | None:
     return None
 
 
-def _parse_fan_locker_core_fields(row: dict) -> tuple[str, float, float, str] | None:
+def _coerce_float(value: object) -> float | None:
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if not isinstance(value, str):
+        return None
     try:
-        locker_id = str(row.get("id") or "").strip()
-        lat_val = float(row.get("latitude"))
-        lng_val = float(row.get("longitude"))
-        name = str(row.get("name") or "").strip()[:255]
-    except Exception:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_fan_locker_core_fields(row: dict) -> tuple[str, float, float, str] | None:
+    locker_id = str(row.get("id") or "").strip()
+    lat_val = _coerce_float(row.get("latitude"))
+    lng_val = _coerce_float(row.get("longitude"))
+    name = str(row.get("name") or "").strip()[:255]
+    if lat_val is None or lng_val is None:
         return None
     if not locker_id or not name:
         return None

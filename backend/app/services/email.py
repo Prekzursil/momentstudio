@@ -39,6 +39,7 @@ _rate_per_recipient: dict[str, list[float]] = {}
 EmailAttachment = dict[str, object]
 
 RECEIPT_SHARE_DAYS = 365
+TOTAL_LABEL = "Total: "
 
 
 def _build_message(
@@ -239,7 +240,7 @@ def _refund_requested_lines(
             label_en=label_en,
             lang=lang,
         )
-    lines.append("Total: " + _money_str(total_amount, currency))
+    lines.append(TOTAL_LABEL + _money_str(total_amount, currency))
     return lines
 
 
@@ -442,7 +443,7 @@ async def send_order_confirmation(
         if tax_amount is not None:
             lines.append(("TVA: " if lng == "ro" else "VAT: ") + _money_str(tax_amount, currency))
 
-        lines.append(("Total: " if lng == "ro" else "Total: ") + _money_str(getattr(order, "total_amount", 0), currency))
+        lines.append(TOTAL_LABEL + _money_str(getattr(order, "total_amount", 0), currency))
 
         account_url = f"{settings.frontend_origin.rstrip('/')}/account"
         lines.append("")
@@ -633,7 +634,7 @@ async def send_order_refunded_update(to_email: str, order, *, lang: str | None =
         lines = [
             f"Comanda {ref} a fost rambursată." if lng == "ro" else f"Your order {ref} was refunded."
         ]
-        lines.append(("Total: " if lng == "ro" else "Total: ") + _money_str(getattr(order, "total_amount", 0), currency))
+        lines.append(TOTAL_LABEL + _money_str(getattr(order, "total_amount", 0), currency))
         payment = _payment_method_label(getattr(order, "payment_method", None), lang=lng)
         if payment:
             lines.append(("Plată: " if lng == "ro" else "Payment: ") + payment)
@@ -729,7 +730,7 @@ async def send_new_order_notification(
         if payment:
             lines.append(("Plată: " if lng == "ro" else "Payment: ") + payment)
         lines.extend(_delivery_lines(order, lang=lng))
-        lines.append(("Total: " if lng == "ro" else "Total: ") + _money_str(getattr(order, "total_amount", 0), currency))
+        lines.append(TOTAL_LABEL + _money_str(getattr(order, "total_amount", 0), currency))
         admin_url = f"{settings.frontend_origin.rstrip('/')}/admin/orders"
         lines.append("")
         lines.append(f"Vezi în admin: {admin_url}" if lng == "ro" else f"View in admin: {admin_url}")
