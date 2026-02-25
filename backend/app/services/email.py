@@ -1,6 +1,7 @@
 import logging
 import smtplib
 import html as _html
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from email.message import EmailMessage
@@ -40,6 +41,8 @@ EmailAttachment = dict[str, object]
 
 RECEIPT_SHARE_DAYS = 365
 TOTAL_LABEL = "Total: "
+PAYMENT_PREFIX_RO = "Plată: "
+PAYMENT_PREFIX_EN = "Payment: "
 
 
 def _first_non_empty_str(*values: object, default: str = "") -> str:
@@ -510,8 +513,9 @@ def _order_confirmation_lines(
 ) -> list[str]:
     lines = [f"Îți mulțumim pentru comanda {ref}." if lang == "ro" else f"Thank you for your order {ref}."]
     payment = _payment_method_label(getattr(order, "payment_method", None), lang=lang)
-    if payment:
-        lines.append(("Plată: " if lang == "ro" else "Payment: ") + payment)
+    payment_line = _payment_method_line(lang=lang, payment=payment)
+    if payment_line:
+        lines.append(payment_line)
     lines.extend(_delivery_lines(order, lang=lang))
     _append_order_item_lines(lines, items=items, currency=currency, lang=lang)
     _append_order_charge_lines(lines, order=order, currency=currency, lang=lang)
@@ -616,8 +620,9 @@ async def send_order_processing_update(to_email: str, order, *, lang: str | None
             else "We’re preparing your package and will follow up with shipping details."
         )
         payment = _payment_method_label(getattr(order, "payment_method", None), lang=lng)
-        if payment:
-            lines.append(("Plată: " if lng == "ro" else "Payment: ") + payment)
+        payment_line = _payment_method_line(lang=lng, payment=payment)
+        if payment_line:
+            lines.append(payment_line)
         lines.extend(_delivery_lines(order, lang=lng))
         lines.append("")
         lines.append(
@@ -646,6 +651,15 @@ def _localized_prefixed_line(*, lang: str, ro_prefix: str, en_prefix: str, value
     if not value:
         return None
     return (ro_prefix if lang == "ro" else en_prefix) + value
+
+
+def _payment_method_line(*, lang: str, payment: str | None) -> str | None:
+    return _localized_prefixed_line(
+        lang=lang,
+        ro_prefix=PAYMENT_PREFIX_RO,
+        en_prefix=PAYMENT_PREFIX_EN,
+        value=payment,
+    )
 
 
 def _refund_card_note(*, lang: str, payment_method: str) -> str | None:
@@ -677,7 +691,12 @@ def _order_cancelled_lines(
     )
     raw_payment_method = (getattr(order, "payment_method", None) or "").strip().lower()
     payment = _payment_method_label(raw_payment_method, lang=lang)
-    payment_line = _localized_prefixed_line(lang=lang, ro_prefix="Plată: ", en_prefix="Payment: ", value=payment)
+    payment_line = _localized_prefixed_line(
+        lang=lang,
+        ro_prefix=PAYMENT_PREFIX_RO,
+        en_prefix=PAYMENT_PREFIX_EN,
+        value=payment,
+    )
     if payment_line:
         lines.append(payment_line)
     refund_line = _refund_card_note(lang=lang, payment_method=raw_payment_method)
@@ -754,7 +773,12 @@ def _cancel_request_lines(
     if reason_line:
         lines.append(reason_line)
     payment = _payment_method_label(getattr(order, "payment_method", None), lang=lang)
-    payment_line = _localized_prefixed_line(lang=lang, ro_prefix="Plată: ", en_prefix="Payment: ", value=payment)
+    payment_line = _localized_prefixed_line(
+        lang=lang,
+        ro_prefix=PAYMENT_PREFIX_RO,
+        en_prefix=PAYMENT_PREFIX_EN,
+        value=payment,
+    )
     if payment_line:
         lines.append(payment_line)
     status_line = _localized_prefixed_line(lang=lang, ro_prefix="Status: ", en_prefix="Status: ", value=status_value)
@@ -828,8 +852,9 @@ async def send_order_refunded_update(to_email: str, order, *, lang: str | None =
         ]
         lines.append(TOTAL_LABEL + _money_str(getattr(order, "total_amount", 0), currency))
         payment = _payment_method_label(getattr(order, "payment_method", None), lang=lng)
-        if payment:
-            lines.append(("Plată: " if lng == "ro" else "Payment: ") + payment)
+        payment_line = _payment_method_line(lang=lng, payment=payment)
+        if payment_line:
+            lines.append(payment_line)
         lines.append("")
         lines.append(
             f"Detalii în cont: {account_url}" if lng == "ro" else f"View in your account: {account_url}"
@@ -919,8 +944,9 @@ async def send_new_order_notification(
         if customer_email:
             lines.append(f"Client: {customer_email}" if lng == "ro" else f"Customer: {customer_email}")
         payment = _payment_method_label(getattr(order, "payment_method", None), lang=lng)
-        if payment:
-            lines.append(("Plată: " if lng == "ro" else "Payment: ") + payment)
+        payment_line = _payment_method_line(lang=lng, payment=payment)
+        if payment_line:
+            lines.append(payment_line)
         lines.extend(_delivery_lines(order, lang=lng))
         lines.append(TOTAL_LABEL + _money_str(getattr(order, "total_amount", 0), currency))
         admin_url = f"{settings.frontend_origin.rstrip('/')}/admin/orders"
@@ -1942,109 +1968,92 @@ def _admin_summary_low_stock_lines(*, low_stock: list[dict] | None, is_ro: bool)
     return lines
 
 
-def _admin_report_lines_for_lang(
-    *,
-    lang: str,
-    kind_label_ro: str,
-    kind_label_en: str,
-    start_label: str,
-    end_label: str,
-    gross: object,
-    net: object,
-    refunds: object,
-    missing: object,
-    currency: str,
-    orders_success: int,
-    orders_total: int,
-    orders_refunded: int,
-    top_products: list[dict] | None,
-    low_stock: list[dict] | None,
-) -> list[str]:
+@dataclass(frozen=True, slots=True)
+class _AdminReportRenderContext:
+    kind_label_ro: str
+    kind_label_en: str
+    start_label: str
+    end_label: str
+    gross: object
+    net: object
+    refunds: object
+    missing: object
+    currency: str
+    orders_success: int
+    orders_total: int
+    orders_refunded: int
+    top_products: list[dict] | None
+    low_stock: list[dict] | None
+
+
+def _admin_report_lines_for_lang(*, lang: str, context: _AdminReportRenderContext) -> list[str]:
     is_ro = lang == "ro"
     lines = _admin_summary_header_lines(
         is_ro=is_ro,
-        kind_label_ro=kind_label_ro,
-        kind_label_en=kind_label_en,
-        start_label=start_label,
-        end_label=end_label,
-        gross=gross,
-        net=net,
-        refunds=refunds,
-        currency=currency,
+        kind_label_ro=context.kind_label_ro,
+        kind_label_en=context.kind_label_en,
+        start_label=context.start_label,
+        end_label=context.end_label,
+        gross=context.gross,
+        net=context.net,
+        refunds=context.refunds,
+        currency=context.currency,
     )
-    if Decimal(str(missing or 0)) > 0:
+    if Decimal(str(context.missing or 0)) > 0:
         lines.append(
             ("Rambursări lipsă (fallback): " if is_ro else "Missing refunds (fallback): ")
-            + _money_str(missing, currency)
+            + _money_str(context.missing, context.currency)
         )
     lines.extend(
         _admin_summary_order_lines(
             is_ro=is_ro,
-            orders_success=orders_success,
-            orders_total=orders_total,
-            orders_refunded=orders_refunded,
+            orders_success=context.orders_success,
+            orders_total=context.orders_total,
+            orders_refunded=context.orders_refunded,
         )
     )
-    lines.extend(_admin_summary_top_products_lines(products=top_products, is_ro=is_ro, currency=currency))
-    lines.extend(_admin_summary_low_stock_lines(low_stock=low_stock, is_ro=is_ro))
+    lines.extend(
+        _admin_summary_top_products_lines(products=context.top_products, is_ro=is_ro, currency=context.currency)
+    )
+    lines.extend(_admin_summary_low_stock_lines(low_stock=context.low_stock, is_ro=is_ro))
     admin_url = f"{settings.frontend_origin.rstrip('/')}/admin/dashboard"
     lines.append(("Admin: " if is_ro else "Admin: ") + admin_url)
     return lines
 
 
-def _admin_report_text(
-    *,
-    kind_label_ro: str,
-    kind_label_en: str,
-    start_label: str,
-    end_label: str,
-    gross: object,
-    net: object,
-    refunds: object,
-    missing: object,
-    currency: str,
-    orders_success: int,
-    orders_total: int,
-    orders_refunded: int,
-    top_products: list[dict] | None,
-    low_stock: list[dict] | None,
-) -> tuple[str, str]:
-    common = {
-        "kind_label_ro": kind_label_ro,
-        "kind_label_en": kind_label_en,
-        "start_label": start_label,
-        "end_label": end_label,
-        "gross": gross,
-        "net": net,
-        "refunds": refunds,
-        "missing": missing,
-        "currency": currency,
-        "orders_success": orders_success,
-        "orders_total": orders_total,
-        "orders_refunded": orders_refunded,
-        "top_products": top_products,
-        "low_stock": low_stock,
-    }
-    text_ro = "\n".join(_admin_report_lines_for_lang(lang="ro", **common))
-    text_en = "\n".join(_admin_report_lines_for_lang(lang="en", **common))
+def _admin_report_text(*, context: _AdminReportRenderContext) -> tuple[str, str]:
+    text_ro = "\n".join(_admin_report_lines_for_lang(lang="ro", context=context))
+    text_en = "\n".join(_admin_report_lines_for_lang(lang="en", context=context))
     return text_ro, text_en
 
 
-def _admin_report_context(*, kind: str, period_start: datetime, period_end: datetime, summary: dict) -> dict[str, object]:
+def _admin_report_context(
+    *,
+    kind: str,
+    period_start: datetime,
+    period_end: datetime,
+    currency: str,
+    summary: dict,
+    top_products: list[dict] | None,
+    low_stock: list[dict] | None,
+) -> _AdminReportRenderContext:
     kind_clean = (kind or "").strip().lower()
-    return {
-        "kind_label_en": "Weekly" if kind_clean == "weekly" else "Monthly",
-        "kind_label_ro": "Săptămânal" if kind_clean == "weekly" else "Lunar",
-        "start_label": period_start.astimezone(timezone.utc).date().isoformat(),
-        "end_label": period_end.astimezone(timezone.utc).date().isoformat(),
-        "gross": summary.get("gross_sales", 0),
-        "net": summary.get("net_sales", 0),
-        "refunds": summary.get("refunds", 0),
-        "missing": summary.get("missing_refunds", 0),
-        "orders_total": int(summary.get("orders_total", 0) or 0),
-        "orders_success": int(summary.get("orders_success", 0) or 0),
-        "orders_refunded": int(summary.get("orders_refunded", 0) or 0),
-    }
+    return _AdminReportRenderContext(
+        kind_label_en="Weekly" if kind_clean == "weekly" else "Monthly",
+        kind_label_ro="Săptămânal" if kind_clean == "weekly" else "Lunar",
+        start_label=period_start.astimezone(timezone.utc).date().isoformat(),
+        end_label=period_end.astimezone(timezone.utc).date().isoformat(),
+        gross=summary.get("gross_sales", 0),
+        net=summary.get("net_sales", 0),
+        refunds=summary.get("refunds", 0),
+        missing=summary.get("missing_refunds", 0),
+        currency=currency,
+        orders_total=int(summary.get("orders_total", 0) or 0),
+        orders_success=int(summary.get("orders_success", 0) or 0),
+        orders_refunded=int(summary.get("orders_refunded", 0) or 0),
+        top_products=top_products,
+        low_stock=low_stock,
+    )
 
 
 async def send_admin_report_summary(
@@ -2059,33 +2068,26 @@ async def send_admin_report_summary(
     low_stock: list[dict] | None = None,
     lang: str | None = None,
 ) -> bool:
-    context = _admin_report_context(kind=kind, period_start=period_start, period_end=period_end, summary=summary)
-    kind_label_en = str(context["kind_label_en"])
-    kind_label_ro = str(context["kind_label_ro"])
-    start_label = str(context["start_label"])
-    end_label = str(context["end_label"])
+    context = _admin_report_context(
+        kind=kind,
+        period_start=period_start,
+        period_end=period_end,
+        currency=currency,
+        summary=summary,
+        top_products=top_products,
+        low_stock=low_stock,
+    )
+    kind_label_en = context.kind_label_en
+    kind_label_ro = context.kind_label_ro
+    start_label = context.start_label
+    end_label = context.end_label
 
     subject = _bilingual_subject(
         f"Raport {kind_label_ro.lower()} — {start_label} → {end_label}",
         f"{kind_label_en} report — {start_label} → {end_label}",
         preferred_language=lang,
     )
-    text_ro, text_en = _admin_report_text(
-        kind_label_ro=kind_label_ro,
-        kind_label_en=kind_label_en,
-        start_label=start_label,
-        end_label=end_label,
-        gross=context["gross"],
-        net=context["net"],
-        refunds=context["refunds"],
-        missing=context["missing"],
-        currency=currency,
-        orders_success=int(context["orders_success"]),
-        orders_total=int(context["orders_total"]),
-        orders_refunded=int(context["orders_refunded"]),
-        top_products=top_products,
-        low_stock=low_stock,
-    )
+    text_ro, text_en = _admin_report_text(context=context)
     text_body, html_body = _bilingual_sections(
         text_ro=text_ro,
         text_en=text_en,

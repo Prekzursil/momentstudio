@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from math import asin, cos, radians, sin, sqrt
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 from urllib.parse import quote_plus
 
 import httpx
@@ -155,8 +155,8 @@ def _extract_location_lat_lng(location: Any) -> tuple[float | None, float | None
 def _to_lat_lng(candidate: dict[str, Any]) -> tuple[float, float] | None:
     for lat_key, lng_key in _PRIMARY_LAT_LNG_KEYS:
         lat, lng = _extract_lat_lng(candidate, lat_key, lng_key)
-        if _is_valid_coordinate_pair(lat, lng):
-            return float(lat), float(lng)
+        if lat is not None and lng is not None and _is_valid_coordinate_pair(lat, lng):
+            return lat, lng
 
     geometry = candidate.get("geometry")
     if isinstance(geometry, dict):
@@ -164,12 +164,12 @@ def _to_lat_lng(candidate: dict[str, Any]) -> tuple[float, float] | None:
         if isinstance(coords, (list, tuple)) and len(coords) >= 2:
             lng = _to_float(coords[0])
             lat = _to_float(coords[1])
-            if _is_valid_coordinate_pair(lat, lng):
-                return float(lat), float(lng)
+            if lat is not None and lng is not None and _is_valid_coordinate_pair(lat, lng):
+                return lat, lng
 
     lat, lng = _extract_location_lat_lng(candidate.get("location"))
-    if _is_valid_coordinate_pair(lat, lng):
-        return float(lat), float(lng)
+    if lat is not None and lng is not None and _is_valid_coordinate_pair(lat, lng):
+        return lat, lng
 
     return None
 
@@ -540,7 +540,7 @@ def _apply_snapshot_item(row: ShippingLockerMirror, item: _NormalizedLocker, *, 
 
 def _deactivate_missing_snapshot_rows(
     session: AsyncSession,
-    existing_rows: list[ShippingLockerMirror],
+    existing_rows: Sequence[ShippingLockerMirror],
     *,
     seen_ids: set[str],
     now: datetime,
