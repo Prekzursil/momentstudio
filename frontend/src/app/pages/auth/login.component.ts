@@ -333,49 +333,64 @@ export class LoginComponent {
           this.loading = false;
         })
       )
-		      .subscribe({
-		        next: (res) => {
-		          const anyRes = (res && typeof res === 'object')
-		            ? (res as {
-		                requires_two_factor?: boolean;
-		                two_factor_token?: string;
-		                user?: {
-		                  email?: string | null;
-		                } | null;
-		              })
-		            : null;
-
-		          if (anyRes?.requires_two_factor && anyRes.two_factor_token) {
-		            this.twoFactorToken = anyRes.two_factor_token;
-		            this.twoFactorUserEmail = anyRes.user?.email || null;
-		            this.twoFactorCode = '';
-		            if (typeof sessionStorage !== 'undefined') {
-		              sessionStorage.setItem('two_factor_token', anyRes.two_factor_token);
-		              sessionStorage.setItem('two_factor_user', JSON.stringify(anyRes.user ?? null));
-		              sessionStorage.setItem('two_factor_remember', JSON.stringify(this.keepSignedIn));
-		            }
-		            this.toast.info(this.translate.instant('auth.twoFactorRequired'));
-		            return;
-		          }
-		          this.error = '';
-		          this.toast.success(this.translate.instant('auth.successLogin'), anyRes?.user?.email ?? undefined);
-		          this.navigateAfterLogin();
-		        },
-	        error: (err) => {
-	          this.resetCaptcha();
-	          if (err?.status === 401) {
-	            const msg = this.translate.instant('auth.invalidCredentials');
-	            this.error = msg;
-	            this.toast.error(msg);
-	            return;
-	          }
-	          const detail = err?.error?.detail;
-	          const message = typeof detail === 'string' && detail.trim()
-	            ? detail
-	            : this.translate.instant('auth.errorLogin');
-	          this.error = message;
-	          this.toast.error(message);
-	        }
-	      });
+      .subscribe({
+        next: (res) => this.handleLoginSuccess(res),
+        error: (err) => this.handleLoginFailure(err)
+      });
 	  }
+
+  private coerceLoginResponse(
+    res: unknown
+  ): {
+    requires_two_factor?: boolean;
+    two_factor_token?: string;
+    user?: { email?: string | null } | null;
+  } | null {
+    if (!res || typeof res !== 'object') return null;
+    return res as {
+      requires_two_factor?: boolean;
+      two_factor_token?: string;
+      user?: { email?: string | null } | null;
+    };
+  }
+
+  private applyTwoFactorLoginState(response: { two_factor_token: string; user?: { email?: string | null } | null }): void {
+    this.twoFactorToken = response.two_factor_token;
+    this.twoFactorUserEmail = response.user?.email || null;
+    this.twoFactorCode = '';
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem('two_factor_token', response.two_factor_token);
+      sessionStorage.setItem('two_factor_user', JSON.stringify(response.user ?? null));
+      sessionStorage.setItem('two_factor_remember', JSON.stringify(this.keepSignedIn));
+    }
+    this.toast.info(this.translate.instant('auth.twoFactorRequired'));
+  }
+
+  private handleLoginSuccess(res: unknown): void {
+    const response = this.coerceLoginResponse(res);
+    if (response?.requires_two_factor && response.two_factor_token) {
+      this.applyTwoFactorLoginState({
+        two_factor_token: response.two_factor_token,
+        user: response.user
+      });
+      return;
+    }
+    this.error = '';
+    this.toast.success(this.translate.instant('auth.successLogin'), response?.user?.email ?? undefined);
+    this.navigateAfterLogin();
+  }
+
+  private handleLoginFailure(err: any): void {
+    this.resetCaptcha();
+    if (err?.status === 401) {
+      const msg = this.translate.instant('auth.invalidCredentials');
+      this.error = msg;
+      this.toast.error(msg);
+      return;
+    }
+    const detail = err?.error?.detail;
+    const message = typeof detail === 'string' && detail.trim() ? detail : this.translate.instant('auth.errorLogin');
+    this.error = message;
+    this.toast.error(message);
+  }
 }

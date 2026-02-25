@@ -22,18 +22,28 @@ export function base64urlToUint8Array(value: string): Uint8Array {
   return bytes;
 }
 
-export function bufferToBase64url(data: ArrayBuffer | ArrayBufferView): string {
-  const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
-  if (!bytes.length) return '';
+function asBytes(data: ArrayBuffer | ArrayBufferView): Uint8Array {
+  if (data instanceof ArrayBuffer) return new Uint8Array(data);
+  return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+}
 
+function bytesToBinary(bytes: Uint8Array): string {
   let binary = '';
   const chunkSize = 0x8000;
   for (let i = 0; i < bytes.length; i += chunkSize) {
-    const chunk = bytes.subarray(i, i + chunkSize);
-    binary += String.fromCharCode(...chunk);
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
   }
-  const base64 = btoa(binary);
+  return binary;
+}
+
+function base64ToUrlSafe(base64: string): string {
   return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+export function bufferToBase64url(data: ArrayBuffer | ArrayBufferView): string {
+  const bytes = asBytes(data);
+  if (!bytes.length) return '';
+  return base64ToUrlSafe(btoa(bytesToBinary(bytes)));
 }
 
 export function toPublicKeyCredentialCreationOptions(raw: any): PublicKeyCredentialCreationOptions {
@@ -97,4 +107,3 @@ export function serializePublicKeyCredential(credential: PublicKeyCredential): a
   }
   return json;
 }
-

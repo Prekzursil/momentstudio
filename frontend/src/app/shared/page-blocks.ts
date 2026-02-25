@@ -680,66 +680,73 @@ export function parsePageBlocks(
   return blocks;
 }
 
+function htmlToPlainText(html: string): string {
+  return (html || '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function appendTextLikeParts(parts: string[], bodyHtml: string, ctaLabel?: string | null): void {
+  const text = htmlToPlainText(bodyHtml || '');
+  if (text) parts.push(text);
+  if (ctaLabel) parts.push(ctaLabel);
+}
+
+function appendFaqParts(parts: string[], block: Extract<PageBlock, { type: 'faq' }>): void {
+  for (const item of block.items) {
+    parts.push(item.question);
+    appendTextLikeParts(parts, item.answer_html || '');
+  }
+}
+
+function appendTestimonialsParts(parts: string[], block: Extract<PageBlock, { type: 'testimonials' }>): void {
+  for (const item of block.items) {
+    appendTextLikeParts(parts, item.quote_html || '');
+    if (item.author) parts.push(item.author);
+    if (item.role) parts.push(item.role);
+  }
+}
+
+function appendGalleryParts(parts: string[], block: Extract<PageBlock, { type: 'gallery' }>): void {
+  for (const image of block.images) {
+    if (image.caption) parts.push(image.caption);
+  }
+}
+
+function appendSlidesParts(
+  parts: string[],
+  slides: Array<{ headline?: string | null; subheadline?: string | null; cta_label?: string | null }>
+): void {
+  for (const slide of slides) {
+    if (slide.headline) parts.push(slide.headline);
+    if (slide.subheadline) parts.push(slide.subheadline);
+    if (slide.cta_label) parts.push(slide.cta_label);
+  }
+}
+
+function appendColumnsParts(parts: string[], block: Extract<PageBlock, { type: 'columns' }>): void {
+  for (const column of block.columns) {
+    if (column.title) parts.push(column.title);
+    appendTextLikeParts(parts, column.body_html || '');
+  }
+}
+
 export function pageBlocksToPlainText(blocks: PageBlock[]): string {
   const parts: string[] = [];
-  const htmlToText = (html: string): string =>
-    (html || '')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
   for (const block of blocks) {
     if (!block.enabled) continue;
     if (block.title) parts.push(block.title);
-    if (block.type === 'text') {
-      const text = htmlToText(block.body_html || '');
-      if (text) parts.push(text);
-    }
-    if (block.type === 'cta') {
-      const text = htmlToText(block.body_html || '');
-      if (text) parts.push(text);
-      if (block.cta_label) parts.push(block.cta_label);
-    }
-    if (block.type === 'faq') {
-      for (const item of block.items) {
-        parts.push(item.question);
-        const answer = htmlToText(item.answer_html || '');
-        if (answer) parts.push(answer);
-      }
-    }
-    if (block.type === 'testimonials') {
-      for (const item of block.items) {
-        const quote = htmlToText(item.quote_html || '');
-        if (quote) parts.push(quote);
-        if (item.author) parts.push(item.author);
-        if (item.role) parts.push(item.role);
-      }
-    }
+
+    if (block.type === 'text') appendTextLikeParts(parts, block.body_html || '');
+    if (block.type === 'cta') appendTextLikeParts(parts, block.body_html || '', block.cta_label);
+    if (block.type === 'faq') appendFaqParts(parts, block);
+    if (block.type === 'testimonials') appendTestimonialsParts(parts, block);
     if (block.type === 'image' && block.caption) parts.push(block.caption);
-    if (block.type === 'gallery') {
-      for (const img of block.images) {
-        if (img.caption) parts.push(img.caption);
-      }
-    }
-    if (block.type === 'banner') {
-      const slide = block.slide;
-      if (slide.headline) parts.push(slide.headline);
-      if (slide.subheadline) parts.push(slide.subheadline);
-      if (slide.cta_label) parts.push(slide.cta_label);
-    }
-    if (block.type === 'carousel') {
-      for (const slide of block.slides) {
-        if (slide.headline) parts.push(slide.headline);
-        if (slide.subheadline) parts.push(slide.subheadline);
-        if (slide.cta_label) parts.push(slide.cta_label);
-      }
-    }
-    if (block.type === 'columns') {
-      for (const col of block.columns) {
-        if (col.title) parts.push(col.title);
-        const text = htmlToText(col.body_html || '');
-        if (text) parts.push(text);
-      }
-    }
+    if (block.type === 'gallery') appendGalleryParts(parts, block);
+    if (block.type === 'banner') appendSlidesParts(parts, [block.slide]);
+    if (block.type === 'carousel') appendSlidesParts(parts, block.slides);
+    if (block.type === 'columns') appendColumnsParts(parts, block);
   }
   return parts.join(' ').replace(/\s+/g, ' ').trim();
 }

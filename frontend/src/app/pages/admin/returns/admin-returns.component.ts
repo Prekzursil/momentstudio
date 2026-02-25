@@ -692,15 +692,7 @@ export class AdminReturnsComponent implements OnInit, OnDestroy {
       received: this.api.search({ ...params, status_filter: 'received' }),
       refunded: this.api.search({ ...params, status_filter: 'refunded' })
     }).subscribe({
-      next: (resp) => {
-        this.board.set({
-          requested: { items: resp.requested.items || [], total: resp.requested.meta?.total_items || 0 },
-          approved: { items: resp.approved.items || [], total: resp.approved.meta?.total_items || 0 },
-          received: { items: resp.received.items || [], total: resp.received.meta?.total_items || 0 },
-          refunded: { items: resp.refunded.items || [], total: resp.refunded.meta?.total_items || 0 }
-        });
-        this.boardLoading.set(false);
-      },
+      next: (resp) => this.handleBoardLoaded(resp),
       error: (err) => {
         this.boardError.set(this.translate.instant('adminUi.returns.errors.load'));
         this.boardErrorRequestId.set(extractRequestId(err));
@@ -708,5 +700,26 @@ export class AdminReturnsComponent implements OnInit, OnDestroy {
       }
     });
   }
-}
 
+  private boardColumn(result: { items?: ReturnRequestRead[]; meta?: { total_items?: number } | null }): {
+    items: ReturnRequestRead[];
+    total: number;
+  } {
+    return { items: result.items || [], total: result.meta?.total_items || 0 };
+  }
+
+  private handleBoardLoaded(resp: {
+    requested: { items?: ReturnRequestRead[]; meta?: { total_items?: number } | null };
+    approved: { items?: ReturnRequestRead[]; meta?: { total_items?: number } | null };
+    received: { items?: ReturnRequestRead[]; meta?: { total_items?: number } | null };
+    refunded: { items?: ReturnRequestRead[]; meta?: { total_items?: number } | null };
+  }): void {
+    this.board.set({
+      requested: this.boardColumn(resp.requested),
+      approved: this.boardColumn(resp.approved),
+      received: this.boardColumn(resp.received),
+      refunded: this.boardColumn(resp.refunded)
+    });
+    this.boardLoading.set(false);
+  }
+}

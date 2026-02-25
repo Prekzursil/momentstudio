@@ -52,22 +52,10 @@ export class RecentlyViewedService {
     const normalized: RecentlyViewedProduct[] = [];
     const seen = new Set<string>();
     for (const raw of items) {
-      if (!raw || typeof raw !== 'object') continue;
-      const item: any = raw;
-      const slug = typeof item.slug === 'string' ? item.slug.trim() : '';
-      if (!slug) continue;
-      if (seen.has(slug)) continue;
-      seen.add(slug);
-
-      const id = typeof item.id === 'string' && item.id.trim() ? item.id : slug;
-      const name = typeof item.name === 'string' ? item.name : '';
-      const basePriceRaw = Number(item.base_price);
-      const base_price = Number.isFinite(basePriceRaw) ? basePriceRaw : 0;
-      const currencyRaw = typeof item.currency === 'string' ? item.currency.trim() : '';
-      const currency = currencyRaw || 'RON';
-      const images = Array.isArray(item.images) ? item.images.filter((img: any) => img && typeof img.url === 'string') : [];
-
-      normalized.push({ id, slug, name, base_price, currency, images });
+      const item = this.normalizeItem(raw);
+      if (!item || seen.has(item.slug)) continue;
+      seen.add(item.slug);
+      normalized.push(item);
     }
     return normalized;
   }
@@ -118,5 +106,19 @@ export class RecentlyViewedService {
     const expires = new Date();
     expires.setDate(expires.getDate() + days);
     document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`;
+  }
+
+  private normalizeItem(raw: unknown): RecentlyViewedProduct | null {
+    if (!raw || typeof raw !== 'object') return null;
+    const item: any = raw;
+    const slug = typeof item.slug === 'string' ? item.slug.trim() : '';
+    if (!slug) return null;
+    const id = typeof item.id === 'string' && item.id.trim() ? item.id : slug;
+    const name = typeof item.name === 'string' ? item.name : '';
+    const basePriceRaw = Number(item.base_price);
+    const base_price = Number.isFinite(basePriceRaw) ? basePriceRaw : 0;
+    const currencyRaw = typeof item.currency === 'string' ? item.currency.trim() : '';
+    const images = Array.isArray(item.images) ? item.images.filter((img: any) => img && typeof img.url === 'string') : [];
+    return { id, slug, name, base_price, currency: currencyRaw || 'RON', images };
   }
 }

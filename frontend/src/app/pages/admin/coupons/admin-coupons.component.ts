@@ -1521,45 +1521,44 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
     this.promotionsLoading.set(true);
     this.promotionsError.set(null);
     this.adminCoupons.listPromotions().subscribe({
-      next: (promos) => {
-        const list = Array.isArray(promos) ? promos : [];
-        this.promotions.set(list);
-        this.promotionsLoading.set(false);
-
-        if (this.autoStartNewPromotion) {
-          this.autoStartNewPromotion = false;
-          this.startNewPromotion();
-          return;
-        }
-
-        if (this.preselectPromotionId) {
-          const desiredId = this.preselectPromotionId;
-          this.preselectPromotionId = null;
-          const found = list.find((p) => p.id === desiredId) || null;
-          if (found) {
-            this.selectPromotion(found);
-            return;
-          }
-        }
-
-        if (currentId) {
-          const found = list.find((p) => p.id === currentId) || null;
-          if (found) {
-            this.selectPromotion(found);
-            return;
-          }
-        }
-        if (list.length) {
-          this.selectPromotion(list[0]);
-        } else {
-          this.startNewPromotion();
-        }
-      },
+      next: (promos) => this.handlePromotionsLoaded(promos, currentId),
       error: (err) => {
         this.promotionsLoading.set(false);
         this.promotionsError.set(err?.error?.detail || this.t('adminUi.couponsV2.errors.loadPromotions'));
       }
     });
+  }
+
+  private handlePromotionsLoaded(promos: unknown, currentId: string | null): void {
+    const list = Array.isArray(promos) ? promos : [];
+    this.promotions.set(list);
+    this.promotionsLoading.set(false);
+    if (this.autoStartNewPromotion) {
+      this.autoStartNewPromotion = false;
+      this.startNewPromotion();
+      return;
+    }
+    if (this.selectPreselectedPromotion(list)) return;
+    if (currentId && this.selectPromotionById(list, currentId)) return;
+    if (list.length) {
+      this.selectPromotion(list[0]);
+      return;
+    }
+    this.startNewPromotion();
+  }
+
+  private selectPreselectedPromotion(list: PromotionRead[]): boolean {
+    if (!this.preselectPromotionId) return false;
+    const desiredId = this.preselectPromotionId;
+    this.preselectPromotionId = null;
+    return this.selectPromotionById(list, desiredId);
+  }
+
+  private selectPromotionById(list: PromotionRead[], promotionId: string): boolean {
+    const found = list.find((promotion) => promotion.id === promotionId) || null;
+    if (!found) return false;
+    this.selectPromotion(found);
+    return true;
   }
 
   selectPromotion(promo: PromotionRead): void {
@@ -2884,4 +2883,3 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
     return true;
   }
 }
-
