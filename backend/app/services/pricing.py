@@ -79,9 +79,6 @@ def compute_vat(
 def _taxable_subtotal(subtotal: Decimal, discount: Decimal, *, rounding: MoneyRounding) -> tuple[Decimal, Decimal]:
     subtotal_q = quantize_money(subtotal, rounding=rounding)
     discount_q = quantize_money(discount, rounding=rounding) if discount > 0 else Decimal("0.00")
-    taxable = subtotal_q - discount_q
-    if taxable < 0:
-        taxable = Decimal("0.00")
     return subtotal_q, discount_q if discount_q >= 0 else Decimal("0.00")
 
 

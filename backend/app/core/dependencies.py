@@ -1,5 +1,6 @@
 from collections.abc import Awaitable, Callable
 from ipaddress import ip_address, ip_network, IPv4Address, IPv4Network, IPv6Address, IPv6Network
+from typing import NoReturn
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, Request, status
@@ -122,7 +123,7 @@ def _admin_ip_bypass_active(request: Request, user: User) -> bool:
     return _admin_ip_bypass_cookie_active(request, user)
 
 
-def _raise_admin_ip_error(detail: str, code: str) -> None:
+def _raise_admin_ip_error(detail: str, code: str) -> NoReturn:
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail=detail,

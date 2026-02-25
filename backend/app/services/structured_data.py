@@ -55,7 +55,7 @@ async def _published_products(session: AsyncSession) -> list[Product]:
         )
         .order_by(Product.slug)
     )
-    return result.scalars().all()
+    return list(result.scalars().all())
 
 
 def _product_slug_or_issue(product: Product, issues: list[dict[str, str]]) -> str | None:
@@ -131,7 +131,7 @@ async def _published_pages(session: AsyncSession, now: datetime) -> list[Content
             or_(ContentBlock.published_until.is_(None), ContentBlock.published_until > now),
         )
     )
-    return result.scalars().all()
+    return list(result.scalars().all())
 
 
 def _page_url_path(slug: str) -> str:
