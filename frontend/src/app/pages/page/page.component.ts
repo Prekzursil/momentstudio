@@ -252,7 +252,7 @@ export class CmsPageComponent implements OnInit, OnDestroy {
     this.legalIndexLoading.set(false);
     this.legalIndexSub?.unsubscribe();
     this.legalIndexSub = undefined;
-    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
+    const lang: 'en' | 'ro' = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     const req = this.previewToken
       ? this.api.get<ContentBlock>(`/content/pages/${encodeURIComponent(slug)}/preview`, { token: this.previewToken, lang })
       : this.api.get<ContentBlock>(`/content/pages/${encodeURIComponent(slug)}`, { lang });
@@ -262,7 +262,7 @@ export class CmsPageComponent implements OnInit, OnDestroy {
     });
   }
 
-  private handlePageLoadSuccess(block: ContentBlock, slug: string, lang: string): void {
+  private handlePageLoadSuccess(block: ContentBlock, slug: string, lang: 'en' | 'ro'): void {
     const canonicalSlug = this.slugFromKey(block.key);
     this.block.set(block);
     const bodyMarkdown = canonicalSlug === 'terms' ? this.stripLegalIndexTable(block.body_markdown) : block.body_markdown;
@@ -284,7 +284,7 @@ export class CmsPageComponent implements OnInit, OnDestroy {
     this.setMetaTags(block.title || slug, metaBody, canonicalSlug || slug);
   }
 
-  private setRestrictedPageState(slug: string, lang: string): void {
+  private setRestrictedPageState(slug: string, lang: 'en' | 'ro'): void {
     this.block.set(null);
     this.bodyHtml.set('');
     this.pageBlocks.set([]);
@@ -298,7 +298,7 @@ export class CmsPageComponent implements OnInit, OnDestroy {
     ]);
   }
 
-  private setPageErrorState(slug: string, lang: string): void {
+  private setPageErrorState(slug: string, lang: 'en' | 'ro'): void {
     this.block.set(null);
     this.bodyHtml.set('');
     this.pageBlocks.set([]);
@@ -313,7 +313,7 @@ export class CmsPageComponent implements OnInit, OnDestroy {
     this.setMetaTags(slug, this.translate.instant('about.metaDescription'), slug);
   }
 
-  private handlePageLoadError(err: any, slug: string, lang: string): void {
+  private handlePageLoadError(err: any, slug: string, lang: 'en' | 'ro'): void {
     if (err?.status === 401) {
       this.setRestrictedPageState(slug, lang);
       return;
@@ -360,7 +360,7 @@ export class CmsPageComponent implements OnInit, OnDestroy {
     return out.join('\n').trim();
   }
 
-  private loadLegalIndexDocs(slug: string, lang: string): void {
+  private loadLegalIndexDocs(slug: string, lang: 'en' | 'ro'): void {
     if (slug !== 'terms') return;
     const docs = [
       { slug: 'terms-and-conditions', fallbackKey: 'nav.terms' },
