@@ -42,6 +42,35 @@ RECEIPT_SHARE_DAYS = 365
 TOTAL_LABEL = "Total: "
 
 
+def _apply_message_headers(msg: EmailMessage, headers: dict[str, str] | None) -> None:
+    if not headers:
+        return
+    protected = {"subject", "from", "to"}
+    for key, value in headers.items():
+        k = str(key or "").strip()
+        v = str(value or "").strip()
+        if not k or not v:
+            continue
+        if k.lower() in protected:
+            continue
+        msg[k] = v
+
+
+def _add_message_attachments(msg: EmailMessage, attachments: Sequence[EmailAttachment] | None) -> None:
+    if not attachments:
+        return
+    for att in attachments:
+        filename = str(att.get("filename") or "attachment")
+        mime = str(att.get("mime") or "application/octet-stream")
+        content = att.get("content")
+        if not isinstance(content, (bytes, bytearray)):
+            continue
+        maintype, _, subtype = mime.partition("/")
+        if not subtype:
+            maintype, subtype = "application", "octet-stream"
+        msg.add_attachment(bytes(content), maintype=maintype, subtype=subtype, filename=filename)
+
+
 def _build_message(
     to_email: str,
     subject: str,
@@ -55,29 +84,11 @@ def _build_message(
     msg["Subject"] = subject
     msg["From"] = settings.smtp_from_email or "no-reply@momentstudio.local"
     msg["To"] = to_email
-    if headers:
-        for key, value in headers.items():
-            k = str(key or "").strip()
-            v = str(value or "").strip()
-            if not k or not v:
-                continue
-            if k.lower() in {"subject", "from", "to"}:
-                continue
-            msg[k] = v
+    _apply_message_headers(msg, headers)
     msg.set_content(text_body)
     if html_body:
         msg.add_alternative(html_body, subtype="html")
-    if attachments:
-        for att in attachments:
-            filename = str(att.get("filename") or "attachment")
-            mime = str(att.get("mime") or "application/octet-stream")
-            content = att.get("content")
-            if not isinstance(content, (bytes, bytearray)):
-                continue
-            maintype, _, subtype = mime.partition("/")
-            if not subtype:
-                maintype, subtype = "application", "octet-stream"
-            msg.add_attachment(bytes(content), maintype=maintype, subtype=subtype, filename=filename)
+    _add_message_attachments(msg, attachments)
     return msg
 
 
@@ -375,6 +386,61 @@ def _delivery_lines(order, *, lang: str) -> list[str]:
     return lines
 
 
+def _order_item_line(item, *, currency: str) -> str:
+    product = getattr(item, "product", None)
+    name = (getattr(product, "name", None) or str(getattr(item, "product_id", ""))).strip()
+    slug = (getattr(product, "slug", None) or "").strip()
+    product_url = f"{settings.frontend_origin.rstrip('/')}/products/{slug}" if slug else None
+    qty = int(getattr(item, "quantity", 0) or 0)
+    unit_price = getattr(item, "unit_price", None)
+    tail = f" — {product_url}" if product_url else ""
+    if unit_price is None:
+        return f"- {name} ×{qty}{tail}"
+    return f"- {name} ×{qty} — {_money_str(unit_price, currency)}{tail}"
+
+
+def _append_order_item_lines(lines: list[str], *, items: Sequence | None, currency: str, lang: str) -> None:
+    if not items:
+        return
+    lines.append("Produse:" if lang == "ro" else "Items:")
+    for item in items:
+        lines.append(_order_item_line(item, currency=currency))
+
+
+def _is_non_zero_amount(amount: object) -> bool:
+    try:
+        dec = amount if isinstance(amount, Decimal) else Decimal(str(amount))
+    except Exception:
+        dec = Decimal("0.00")
+    return dec != 0
+
+
+def _append_order_charge_lines(lines: list[str], *, order, currency: str, lang: str) -> None:
+    shipping_amount = getattr(order, "shipping_amount", None)
+    fee_amount = getattr(order, "fee_amount", None)
+    tax_amount = getattr(order, "tax_amount", None)
+    if shipping_amount is not None:
+        lines.append(("Livrare: " if lang == "ro" else "Shipping: ") + _money_str(shipping_amount, currency))
+    if fee_amount is not None and _is_non_zero_amount(fee_amount):
+        lines.append(("Cost suplimentar: " if lang == "ro" else "Additional cost: ") + _money_str(fee_amount, currency))
+    if tax_amount is not None:
+        lines.append(("TVA: " if lang == "ro" else "VAT: ") + _money_str(tax_amount, currency))
+
+
+def _append_order_account_links(
+    lines: list[str],
+    *,
+    lang: str,
+    receipt_url: str,
+    receipt_pdf_url: str,
+) -> None:
+    account_url = f"{settings.frontend_origin.rstrip('/')}/account"
+    lines.append("")
+    lines.append(f"Chitanță (HTML): {receipt_url}" if lang == "ro" else f"Receipt (HTML): {receipt_url}")
+    lines.append(f"Chitanță (PDF): {receipt_pdf_url}" if lang == "ro" else f"Receipt (PDF): {receipt_pdf_url}")
+    lines.append(f"Detalii în cont: {account_url}" if lang == "ro" else f"View in your account: {account_url}")
+
+
 async def send_order_confirmation(
     to_email: str,
     order,
@@ -407,54 +473,14 @@ async def send_order_confirmation(
         if payment:
             lines.append(("Plată: " if lng == "ro" else "Payment: ") + payment)
         lines.extend(_delivery_lines(order, lang=lng))
-
-        if items:
-            lines.append("Produse:" if lng == "ro" else "Items:")
-            for item in items:
-                product = getattr(item, "product", None)
-                name = (getattr(product, "name", None) or str(getattr(item, "product_id", ""))).strip()
-                slug = (getattr(product, "slug", None) or "").strip()
-                product_url = f"{settings.frontend_origin.rstrip('/')}/products/{slug}" if slug else None
-                qty = int(getattr(item, "quantity", 0) or 0)
-                unit_price = getattr(item, "unit_price", None)
-                if unit_price is not None:
-                    price_str = _money_str(unit_price, currency)
-                    tail = f" — {product_url}" if product_url else ""
-                    lines.append(f"- {name} ×{qty} — {price_str}{tail}")
-                else:
-                    tail = f" — {product_url}" if product_url else ""
-                    lines.append(f"- {name} ×{qty}{tail}")
-
-        shipping_amount = getattr(order, "shipping_amount", None)
-        fee_amount = getattr(order, "fee_amount", None)
-        tax_amount = getattr(order, "tax_amount", None)
-        if shipping_amount is not None:
-            lines.append(("Livrare: " if lng == "ro" else "Shipping: ") + _money_str(shipping_amount, currency))
-        if fee_amount is not None:
-            try:
-                fee_dec = fee_amount if isinstance(fee_amount, Decimal) else Decimal(str(fee_amount))
-            except Exception:
-                fee_dec = Decimal("0.00")
-            if fee_dec != 0:
-                lines.append(
-                    ("Cost suplimentar: " if lng == "ro" else "Additional cost: ")
-                    + _money_str(fee_amount, currency)
-                )
-        if tax_amount is not None:
-            lines.append(("TVA: " if lng == "ro" else "VAT: ") + _money_str(tax_amount, currency))
-
+        _append_order_item_lines(lines, items=items, currency=currency, lang=lng)
+        _append_order_charge_lines(lines, order=order, currency=currency, lang=lng)
         lines.append(TOTAL_LABEL + _money_str(getattr(order, "total_amount", 0), currency))
-
-        account_url = f"{settings.frontend_origin.rstrip('/')}/account"
-        lines.append("")
-        lines.append(
-            f"Chitanță (HTML): {receipt_url}" if lng == "ro" else f"Receipt (HTML): {receipt_url}"
-        )
-        lines.append(
-            f"Chitanță (PDF): {receipt_pdf_url}" if lng == "ro" else f"Receipt (PDF): {receipt_pdf_url}"
-        )
-        lines.append(
-            f"Detalii în cont: {account_url}" if lng == "ro" else f"View in your account: {account_url}"
+        _append_order_account_links(
+            lines,
+            lang=lng,
+            receipt_url=receipt_url,
+            receipt_pdf_url=receipt_pdf_url,
         )
         return lines
 
@@ -1573,6 +1599,80 @@ async def preview_email(template_name: str, context: dict) -> dict[str, str]:
     return {"text": text_body, "html": html_body}
 
 
+def _admin_summary_header_lines(
+    *,
+    is_ro: bool,
+    kind_label_ro: str,
+    kind_label_en: str,
+    start_label: str,
+    end_label: str,
+    gross: object,
+    net: object,
+    refunds: object,
+    currency: str,
+) -> list[str]:
+    return [
+        (
+            f"Raport {kind_label_ro.lower()} — {start_label} → {end_label} (UTC)"
+            if is_ro
+            else f"{kind_label_en} report — {start_label} → {end_label} (UTC)"
+        ),
+        "",
+        ("Vânzări brute: " if is_ro else "Gross sales: ") + _money_str(gross, currency),
+        ("Vânzări nete: " if is_ro else "Net sales: ") + _money_str(net, currency),
+        ("Rambursări: " if is_ro else "Refunds: ") + _money_str(refunds, currency),
+    ]
+
+
+def _admin_summary_order_lines(*, is_ro: bool, orders_success: int, orders_total: int, orders_refunded: int) -> list[str]:
+    return [
+        (
+            f"Comenzi: {orders_success} plătite/expediate/livrate · {orders_total} total"
+            if is_ro
+            else f"Orders: {orders_success} paid/shipped/delivered · {orders_total} total"
+        ),
+        (
+            f"Comenzi rambursate: {orders_refunded}"
+            if is_ro
+            else f"Refunded orders: {orders_refunded}"
+        ),
+        "",
+    ]
+
+
+def _admin_summary_top_products_lines(*, products: list[dict] | None, is_ro: bool, currency: str) -> list[str]:
+    rows = products or []
+    if not rows:
+        return ["Top produse: —" if is_ro else "Top products: —", ""]
+    lines = ["Top produse:" if is_ro else "Top products:"]
+    for row in rows:
+        name = (str(row.get("name") or "")).strip() or str(row.get("slug") or "").strip() or "—"
+        slug = (str(row.get("slug") or "")).strip()
+        qty = int(row.get("quantity", 0) or 0)
+        sales = row.get("gross_sales", 0)
+        label = f"{name} ({slug})" if slug and slug not in name else name
+        suffix = f"{qty} buc · {_money_str(sales, currency)}" if is_ro else f"{qty} pcs · {_money_str(sales, currency)}"
+        lines.append(f"- {label}: {suffix}")
+    lines.append("")
+    return lines
+
+
+def _admin_summary_low_stock_lines(*, low_stock: list[dict] | None, is_ro: bool) -> list[str]:
+    rows = low_stock or []
+    if not rows:
+        return ["Stoc redus: —" if is_ro else "Low stock: —", ""]
+    lines = ["Stoc redus:" if is_ro else "Low stock:"]
+    for row in rows:
+        name = (str(row.get("name") or "")).strip() or str(row.get("slug") or "").strip() or "—"
+        stock = int(row.get("stock_quantity", 0) or 0)
+        threshold = int(row.get("threshold", 0) or 0)
+        critical = bool(row.get("is_critical", False))
+        status = ("CRITIC" if is_ro else "CRITICAL") if critical else ("scăzut" if is_ro else "low")
+        lines.append(f"- {name}: {stock}/{threshold} ({status})")
+    lines.append("")
+    return lines
+
+
 async def send_admin_report_summary(
     to_email: str,
     *,
@@ -1601,72 +1701,32 @@ async def send_admin_report_summary(
 
     def _lines(lng: str) -> list[str]:
         is_ro = lng == "ro"
-        lines = [
-            (
-                f"Raport {kind_label_ro.lower()} — {start_label} → {end_label} (UTC)"
-                if is_ro
-                else f"{kind_label_en} report — {start_label} → {end_label} (UTC)"
-            ),
-            "",
-            ("Vânzări brute: " if is_ro else "Gross sales: ") + _money_str(gross, currency),
-            ("Vânzări nete: " if is_ro else "Net sales: ") + _money_str(net, currency),
-            ("Rambursări: " if is_ro else "Refunds: ") + _money_str(refunds, currency),
-        ]
+        lines = _admin_summary_header_lines(
+            is_ro=is_ro,
+            kind_label_ro=kind_label_ro,
+            kind_label_en=kind_label_en,
+            start_label=start_label,
+            end_label=end_label,
+            gross=gross,
+            net=net,
+            refunds=refunds,
+            currency=currency,
+        )
         if Decimal(str(missing or 0)) > 0:
             lines.append(
                 ("Rambursări lipsă (fallback): " if is_ro else "Missing refunds (fallback): ")
                 + _money_str(missing, currency)
             )
         lines.extend(
-            [
-                (
-                    f"Comenzi: {orders_success} plătite/expediate/livrate · {orders_total} total"
-                    if is_ro
-                    else f"Orders: {orders_success} paid/shipped/delivered · {orders_total} total"
-                ),
-                (
-                    f"Comenzi rambursate: {orders_refunded}"
-                    if is_ro
-                    else f"Refunded orders: {orders_refunded}"
-                ),
-                "",
-            ]
+            _admin_summary_order_lines(
+                is_ro=is_ro,
+                orders_success=orders_success,
+                orders_total=orders_total,
+                orders_refunded=orders_refunded,
+            )
         )
-
-        products = top_products or []
-        if products:
-            lines.append("Top produse:" if is_ro else "Top products:")
-            for row in products:
-                name = (str(row.get("name") or "")).strip() or str(row.get("slug") or "").strip() or "—"
-                slug = (str(row.get("slug") or "")).strip()
-                qty = int(row.get("quantity", 0) or 0)
-                sales = row.get("gross_sales", 0)
-                label = f"{name} ({slug})" if slug and slug not in name else name
-                lines.append(
-                    ("- " + label + f": {qty} buc · " + _money_str(sales, currency))
-                    if is_ro
-                    else ("- " + label + f": {qty} pcs · " + _money_str(sales, currency))
-                )
-            lines.append("")
-        else:
-            lines.append("Top produse: —" if is_ro else "Top products: —")
-            lines.append("")
-
-        lows = low_stock or []
-        if lows:
-            lines.append("Stoc redus:" if is_ro else "Low stock:")
-            for row in lows:
-                name = (str(row.get("name") or "")).strip() or str(row.get("slug") or "").strip() or "—"
-                stock = int(row.get("stock_quantity", 0) or 0)
-                threshold = int(row.get("threshold", 0) or 0)
-                critical = bool(row.get("is_critical", False))
-                status = ("CRITIC" if is_ro else "CRITICAL") if critical else ("scăzut" if is_ro else "low")
-                lines.append(f"- {name}: {stock}/{threshold} ({status})")
-            lines.append("")
-        else:
-            lines.append("Stoc redus: —" if is_ro else "Low stock: —")
-            lines.append("")
-
+        lines.extend(_admin_summary_top_products_lines(products=top_products, is_ro=is_ro, currency=currency))
+        lines.extend(_admin_summary_low_stock_lines(low_stock=low_stock, is_ro=is_ro))
         admin_url = f"{settings.frontend_origin.rstrip('/')}/admin/dashboard"
         lines.append(("Admin: " if is_ro else "Admin: ") + admin_url)
         return lines

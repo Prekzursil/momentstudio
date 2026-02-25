@@ -9,7 +9,7 @@ import mimetypes
 import random
 import re
 import shutil
-from collections.abc import Awaitable, Iterable
+from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -1097,6 +1097,53 @@ async def rollback_retry_policy(
     return _retry_policy_to_read(parsed_job_type, _policy_row_to_resolved(row, job_type=parsed_job_type), row)
 
 
+def _existing_job_tag_links(job: MediaJob) -> dict[str, MediaJobTagLink]:
+    return {
+        rel.tag.value: rel for rel in (job.tags or []) if getattr(rel, "tag", None) and getattr(rel.tag, "value", None)
+    }
+
+
+def _normalized_non_empty_job_tags(raw_tags: list[str] | None) -> set[str]:
+    normalized = {_normalize_job_tag(raw) for raw in (raw_tags or [])}
+    return {value for value in normalized if value}
+
+
+async def _delete_job_tag_links(
+    session: AsyncSession,
+    *,
+    existing_links: dict[str, MediaJobTagLink],
+    remove_tags: list[str] | None,
+) -> None:
+    for value in _normalized_non_empty_job_tags(remove_tags):
+        relation = existing_links.get(value)
+        if relation is not None:
+            await session.delete(relation)
+
+
+async def _get_or_create_job_tag(session: AsyncSession, value: str) -> MediaJobTag:
+    tag = await session.scalar(select(MediaJobTag).where(MediaJobTag.value == value))
+    if tag is not None:
+        return tag
+    tag = MediaJobTag(value=value)
+    session.add(tag)
+    await session.flush()
+    return tag
+
+
+async def _add_job_tag_links(
+    session: AsyncSession,
+    *,
+    job_id: UUID,
+    existing_links: dict[str, MediaJobTagLink],
+    add_tags: list[str] | None,
+) -> None:
+    for value in _normalized_non_empty_job_tags(add_tags):
+        if value in existing_links:
+            continue
+        tag = await _get_or_create_job_tag(session, value)
+        session.add(MediaJobTagLink(job_id=job_id, tag_id=tag.id))
+
+
 async def _apply_job_tag_changes(
     session: AsyncSession,
     *,
@@ -1104,28 +1151,9 @@ async def _apply_job_tag_changes(
     add_tags: list[str] | None = None,
     remove_tags: list[str] | None = None,
 ) -> None:
-    existing_by_value = {
-        rel.tag.value: rel for rel in (job.tags or []) if getattr(rel, "tag", None) and getattr(rel.tag, "value", None)
-    }
-
-    remove_values = {_normalize_job_tag(raw) for raw in (remove_tags or [])}
-    remove_values = {value for value in remove_values if value}
-    for value in remove_values:
-        relation = existing_by_value.get(value)
-        if relation is not None:
-            await session.delete(relation)
-
-    add_values = {_normalize_job_tag(raw) for raw in (add_tags or [])}
-    add_values = {value for value in add_values if value}
-    for value in add_values:
-        if value in existing_by_value:
-            continue
-        tag = await session.scalar(select(MediaJobTag).where(MediaJobTag.value == value))
-        if tag is None:
-            tag = MediaJobTag(value=value)
-            session.add(tag)
-            await session.flush()
-        session.add(MediaJobTagLink(job_id=job.id, tag_id=tag.id))
+    existing_links = _existing_job_tag_links(job)
+    await _delete_job_tag_links(session, existing_links=existing_links, remove_tags=remove_tags)
+    await _add_job_tag_links(session, job_id=job.id, existing_links=existing_links, add_tags=add_tags)
     await session.flush()
 
 
@@ -1244,115 +1272,101 @@ async def list_jobs(session: AsyncSession, filters: MediaJobListFilters) -> tupl
     return list(rows), {"total_items": total_items, "total_pages": total_pages, "page": filters.page, "limit": filters.limit}
 
 
-async def get_telemetry(session: AsyncSession) -> MediaTelemetryResponse:
-    redis = get_redis()
-    queue_depth = 0
+async def _redis_queue_depth(redis: Any) -> int:
+    try:
+        return int(await _await_if_needed(redis.llen(QUEUE_KEY)) or 0)
+    except Exception:
+        return 0
+
+
+def _heartbeat_scan_limit() -> int:
+    return max(1, int(getattr(settings, "media_dam_telemetry_heartbeat_scan_limit", 500) or 500))
+
+
+def _parse_heartbeat_timestamp(value: Any) -> datetime | None:
+    try:
+        parsed = datetime.fromisoformat(str(value))
+    except Exception:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def _heartbeat_payload_to_worker(payload: dict[str, Any], *, key: object, now: datetime) -> MediaTelemetryWorkerRead | None:
+    last_seen = _parse_heartbeat_timestamp(payload.get("last_seen_at"))
+    if last_seen is None:
+        return None
+    lag = max(0, int((now - last_seen).total_seconds()))
+    return MediaTelemetryWorkerRead(
+        worker_id=str(payload.get("worker_id") or str(key).split(":")[-1]),
+        hostname=str(payload.get("hostname") or "") or None,
+        pid=int(payload["pid"]) if str(payload.get("pid") or "").isdigit() else None,
+        app_version=str(payload.get("app_version") or "") or None,
+        last_seen_at=last_seen,
+        lag_seconds=lag,
+    )
+
+
+async def _consume_heartbeat(redis: Any, *, key: object, now: datetime) -> MediaTelemetryWorkerRead | None:
+    raw = await _await_if_needed(redis.get(str(key)))
+    if not raw:
+        return None
+    payload = json_loads(raw)
+    return _heartbeat_payload_to_worker(payload, key=key, now=now)
+
+
+async def _collect_telemetry_workers(
+    redis: Any,
+    *,
+    prefix: str,
+    now: datetime,
+) -> list[MediaTelemetryWorkerRead]:
     workers: list[MediaTelemetryWorkerRead] = []
-    now = _now()
-    prefix = str(getattr(settings, "media_dam_worker_heartbeat_prefix", HEARTBEAT_PREFIX) or HEARTBEAT_PREFIX)
+    scan_limit = _heartbeat_scan_limit()
+    scanned = 0
+    key_iter = redis.scan_iter(match=f"{prefix}:*")
+    if hasattr(key_iter, "__aiter__"):
+        async for key in key_iter:
+            if scanned >= scan_limit:
+                break
+            scanned += 1
+            worker = await _consume_heartbeat(redis, key=key, now=now)
+            if worker is not None:
+                workers.append(worker)
+        return workers
+    for key in cast(Iterable[object], key_iter):
+        if scanned >= scan_limit:
+            break
+        scanned += 1
+        worker = await _consume_heartbeat(redis, key=key, now=now)
+        if worker is not None:
+            workers.append(worker)
+    return workers
 
-    if redis is not None:
-        try:
-            queue_depth = int(await _await_if_needed(redis.llen(QUEUE_KEY)) or 0)
-        except Exception:
-            queue_depth = 0
 
-        try:
-            scan_limit = max(1, int(getattr(settings, "media_dam_telemetry_heartbeat_scan_limit", 500) or 500))
+async def _count_jobs(session: AsyncSession, *conditions: ColumnElement[bool]) -> int:
+    stmt = select(func.count()).select_from(MediaJob)
+    if conditions:
+        stmt = stmt.where(*conditions)
+    return int((await session.scalar(stmt)) or 0)
 
-            async def _consume_heartbeat(key: object) -> bool:
-                raw = await _await_if_needed(redis.get(str(key)))
-                if not raw:
-                    return False
-                payload = json_loads(raw)
-                last_seen_raw = payload.get("last_seen_at")
-                try:
-                    last_seen = datetime.fromisoformat(str(last_seen_raw))
-                    if last_seen.tzinfo is None:
-                        last_seen = last_seen.replace(tzinfo=timezone.utc)
-                except Exception:
-                    return False
-                lag = max(0, int((now - last_seen).total_seconds()))
-                workers.append(
-                    MediaTelemetryWorkerRead(
-                        worker_id=str(payload.get("worker_id") or str(key).split(":")[-1]),
-                        hostname=str(payload.get("hostname") or "") or None,
-                        pid=int(payload["pid"]) if str(payload.get("pid") or "").isdigit() else None,
-                        app_version=str(payload.get("app_version") or "") or None,
-                        last_seen_at=last_seen,
-                        lag_seconds=lag,
-                    )
-                )
-                return True
 
-            scanned = 0
-            key_iter = redis.scan_iter(match=f"{prefix}:*")
-            if hasattr(key_iter, "__aiter__"):
-                async for key in key_iter:
-                    if scanned >= scan_limit:
-                        break
-                    scanned += 1
-                    await _consume_heartbeat(key)
-            else:
-                for key in cast(Iterable[object], key_iter):
-                    if scanned >= scan_limit:
-                        break
-                    scanned += 1
-                    await _consume_heartbeat(key)
-        except Exception:
-            workers = []
-
-    stale_seconds = max(60, int(getattr(settings, "media_dam_processing_stale_seconds", 600) or 600))
-    stale_cutoff = now - timedelta(seconds=stale_seconds)
-    stale_processing_count = int(
-        (await session.scalar(select(func.count()).select_from(MediaJob).where(MediaJob.status == MediaJobStatus.processing, MediaJob.started_at < stale_cutoff)))
-        or 0
-    )
-    dead_letter_count = int(
-        (await session.scalar(select(func.count()).select_from(MediaJob).where(MediaJob.status == MediaJobStatus.dead_letter)))
-        or 0
-    )
-    retry_scheduled_count = int(
-        (
-            await session.scalar(
-                select(func.count()).select_from(MediaJob).where(
-                    MediaJob.status == MediaJobStatus.failed,
-                    MediaJob.next_retry_at.is_not(None),
-                )
-            )
-        )
-        or 0
-    )
-    sla_breached_count = int(
-        (
-            await session.scalar(
-                select(func.count()).select_from(MediaJob).where(
-                    MediaJob.sla_due_at.is_not(None),
-                    MediaJob.sla_due_at < now,
-                    MediaJob.triage_state != "resolved",
-                )
-            )
-        )
-        or 0
-    )
-
+async def _oldest_queued_age_seconds(session: AsyncSession, *, now: datetime) -> int | None:
     oldest_queued_at = await session.scalar(
         select(func.min(MediaJob.created_at)).where(MediaJob.status == MediaJobStatus.queued)
     )
-    oldest_queued_age_seconds: int | None = None
-    if oldest_queued_at:
-        oldest_queued_age_seconds = max(0, int((now - oldest_queued_at).total_seconds()))
+    if not oldest_queued_at:
+        return None
+    return max(0, int((now - oldest_queued_at).total_seconds()))
 
-    status_counts_rows = (
-        await session.execute(select(MediaJob.status, func.count()).group_by(MediaJob.status))
-    ).all()
-    status_counts = {row[0].value if hasattr(row[0], "value") else str(row[0]): int(row[1] or 0) for row in status_counts_rows}
 
-    type_counts_rows = (
-        await session.execute(select(MediaJob.job_type, func.count()).group_by(MediaJob.job_type))
-    ).all()
-    type_counts = {row[0].value if hasattr(row[0], "value") else str(row[0]): int(row[1] or 0) for row in type_counts_rows}
+async def _grouped_job_counts(session: AsyncSession, column: ColumnElement[Any]) -> dict[str, int]:
+    rows = (await session.execute(select(column, func.count()).group_by(column))).all()
+    return {row[0].value if hasattr(row[0], "value") else str(row[0]): int(row[1] or 0) for row in rows}
 
+
+async def _avg_processing_seconds_last_day(session: AsyncSession, *, now: datetime) -> int | None:
     completed_rows = (
         await session.execute(
             select(MediaJob.started_at, MediaJob.completed_at)
@@ -1371,7 +1385,48 @@ async def get_telemetry(session: AsyncSession) -> MediaTelemetryResponse:
         if not started_at or not completed_at:
             continue
         processing_seconds.append(max(0, int((completed_at - started_at).total_seconds())))
-    avg_processing_seconds = int(sum(processing_seconds) / len(processing_seconds)) if processing_seconds else None
+    if not processing_seconds:
+        return None
+    return int(sum(processing_seconds) / len(processing_seconds))
+
+
+async def get_telemetry(session: AsyncSession) -> MediaTelemetryResponse:
+    redis = get_redis()
+    queue_depth = 0
+    workers: list[MediaTelemetryWorkerRead] = []
+    now = _now()
+    prefix = str(getattr(settings, "media_dam_worker_heartbeat_prefix", HEARTBEAT_PREFIX) or HEARTBEAT_PREFIX)
+
+    if redis is not None:
+        queue_depth = await _redis_queue_depth(redis)
+        try:
+            workers = await _collect_telemetry_workers(redis, prefix=prefix, now=now)
+        except Exception:
+            workers = []
+
+    stale_seconds = max(60, int(getattr(settings, "media_dam_processing_stale_seconds", 600) or 600))
+    stale_cutoff = now - timedelta(seconds=stale_seconds)
+    stale_processing_count = await _count_jobs(
+        session,
+        MediaJob.status == MediaJobStatus.processing,
+        MediaJob.started_at < stale_cutoff,
+    )
+    dead_letter_count = await _count_jobs(session, MediaJob.status == MediaJobStatus.dead_letter)
+    retry_scheduled_count = await _count_jobs(
+        session,
+        MediaJob.status == MediaJobStatus.failed,
+        MediaJob.next_retry_at.is_not(None),
+    )
+    sla_breached_count = await _count_jobs(
+        session,
+        MediaJob.sla_due_at.is_not(None),
+        MediaJob.sla_due_at < now,
+        MediaJob.triage_state != "resolved",
+    )
+    oldest_queued_age_seconds = await _oldest_queued_age_seconds(session, now=now)
+    status_counts = await _grouped_job_counts(session, cast(ColumnElement[Any], MediaJob.status))
+    type_counts = await _grouped_job_counts(session, cast(ColumnElement[Any], MediaJob.job_type))
+    avg_processing_seconds = await _avg_processing_seconds_last_day(session, now=now)
 
     workers.sort(key=lambda row: row.last_seen_at, reverse=True)
     return MediaTelemetryResponse(
@@ -1823,8 +1878,12 @@ def _detect_image_dimensions(path: Path) -> tuple[int | None, int | None]:
         return None, None
 
 
-async def process_job_inline(session: AsyncSession, job: MediaJob) -> MediaJob:
-    payload = _job_payload(job)
+async def _prepare_job_retry_policy(
+    session: AsyncSession,
+    *,
+    job: MediaJob,
+    payload: dict[str, Any],
+) -> RetryPolicyResolved:
     retry_policy = _retry_policy_from_payload(payload, job_type=job.job_type)
     if retry_policy is None:
         retry_policy = await get_retry_policy_for_job_type(session, job.job_type)
@@ -1833,7 +1892,10 @@ async def process_job_inline(session: AsyncSession, job: MediaJob) -> MediaJob:
         job.payload_json = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
     if not int(job.max_attempts or 0):
         job.max_attempts = int(retry_policy.max_attempts)
+    return retry_policy
 
+
+async def _mark_job_processing_started(session: AsyncSession, *, job: MediaJob) -> None:
     job.status = MediaJobStatus.processing
     job.triage_state = "retrying" if job.attempt > 0 else _coerce_triage_state(job.triage_state, fallback="open")
     job.started_at = _now()
@@ -1842,86 +1904,109 @@ async def process_job_inline(session: AsyncSession, job: MediaJob) -> MediaJob:
     session.add(job)
     await session.flush()
     await _record_job_event(session, job=job, action="processing_started", meta={"attempt": int(job.attempt or 0)})
-    try:
-        if job.job_type == MediaJobType.ingest:
-            await _process_ingest_job(session, job)
-        elif job.job_type == MediaJobType.variant:
-            await _process_variant_job(session, job)
-        elif job.job_type == MediaJobType.edit:
-            await _process_edit_job(session, job)
-        elif job.job_type == MediaJobType.ai_tag:
-            await _process_ai_tag_job(session, job)
-        elif job.job_type == MediaJobType.duplicate_scan:
-            await _process_duplicate_scan_job(session, job)
-        elif job.job_type == MediaJobType.usage_reconcile:
-            await _process_usage_reconcile_job(session, job)
-        job.status = MediaJobStatus.completed
-        job.progress_pct = 100
-        job.completed_at = _now()
+
+
+def _resolve_job_processor(job_type: MediaJobType) -> Callable[[AsyncSession, MediaJob], Awaitable[None]] | None:
+    processors: dict[MediaJobType, Callable[[AsyncSession, MediaJob], Awaitable[None]]] = {
+        MediaJobType.ingest: _process_ingest_job,
+        MediaJobType.variant: _process_variant_job,
+        MediaJobType.edit: _process_edit_job,
+        MediaJobType.ai_tag: _process_ai_tag_job,
+        MediaJobType.duplicate_scan: _process_duplicate_scan_job,
+        MediaJobType.usage_reconcile: _process_usage_reconcile_job,
+    }
+    return processors.get(job_type)
+
+
+async def _mark_job_completed(session: AsyncSession, *, job: MediaJob) -> None:
+    job.status = MediaJobStatus.completed
+    job.progress_pct = 100
+    job.completed_at = _now()
+    job.next_retry_at = None
+    job.dead_lettered_at = None
+    job.last_error_at = None
+    job.triage_state = "resolved"
+    job.error_code = None
+    job.error_message = None
+    await _record_job_event(
+        session,
+        job=job,
+        action="completed",
+        meta={"attempt": int(job.attempt or 0), "job_type": job.job_type.value},
+    )
+
+
+async def _mark_job_failed_or_retrying(
+    session: AsyncSession,
+    *,
+    job: MediaJob,
+    exc: Exception,
+    retry_policy: RetryPolicyResolved,
+) -> None:
+    now = _now()
+    effective_max_attempts = max(1, int(job.max_attempts or retry_policy.max_attempts or DEFAULT_MAX_ATTEMPTS))
+    delay = (
+        None
+        if not retry_policy.enabled
+        else _retry_delay_seconds(
+            attempt=int(job.attempt or 0),
+            max_attempts=effective_max_attempts,
+            schedule=list(retry_policy.schedule),
+            jitter_ratio=float(retry_policy.jitter_ratio),
+        )
+    )
+    job.last_error_at = now
+    job.error_code = "processing_failed"
+    job.error_message = str(exc)
+    job.completed_at = now
+    if delay is None:
+        job.status = MediaJobStatus.dead_letter
+        job.dead_lettered_at = now
         job.next_retry_at = None
-        job.dead_lettered_at = None
-        job.last_error_at = None
-        job.triage_state = "resolved"
-        job.error_code = None
-        job.error_message = None
+        job.triage_state = "open"
         await _record_job_event(
             session,
             job=job,
-            action="completed",
-            meta={"attempt": int(job.attempt or 0), "job_type": job.job_type.value},
+            action="dead_lettered",
+            note=str(exc),
+            meta={
+                "attempt": int(job.attempt or 0),
+                "max_attempts": effective_max_attempts,
+                "schedule": retry_policy.schedule,
+                "jitter_ratio": retry_policy.jitter_ratio,
+                "policy_enabled": retry_policy.enabled,
+            },
         )
+        return
+    job.status = MediaJobStatus.failed
+    job.next_retry_at = now + timedelta(seconds=delay)
+    job.triage_state = "retrying"
+    await _record_job_event(
+        session,
+        job=job,
+        action="retry_scheduled",
+        note=str(exc),
+        meta={
+            "attempt": int(job.attempt or 0),
+            "max_attempts": effective_max_attempts,
+            "retry_in_seconds": int(delay),
+            "schedule": retry_policy.schedule,
+            "jitter_ratio": retry_policy.jitter_ratio,
+        },
+    )
+
+
+async def process_job_inline(session: AsyncSession, job: MediaJob) -> MediaJob:
+    payload = _job_payload(job)
+    retry_policy = await _prepare_job_retry_policy(session, job=job, payload=payload)
+    await _mark_job_processing_started(session, job=job)
+    try:
+        processor = _resolve_job_processor(job.job_type)
+        if processor is not None:
+            await processor(session, job)
+        await _mark_job_completed(session, job=job)
     except Exception as exc:
-        now = _now()
-        effective_max_attempts = max(1, int(job.max_attempts or retry_policy.max_attempts or DEFAULT_MAX_ATTEMPTS))
-        delay = (
-            None
-            if not retry_policy.enabled
-            else _retry_delay_seconds(
-                attempt=int(job.attempt or 0),
-                max_attempts=effective_max_attempts,
-                schedule=list(retry_policy.schedule),
-                jitter_ratio=float(retry_policy.jitter_ratio),
-            )
-        )
-        job.last_error_at = now
-        job.error_code = "processing_failed"
-        job.error_message = str(exc)
-        job.completed_at = now
-        if delay is None:
-            job.status = MediaJobStatus.dead_letter
-            job.dead_lettered_at = now
-            job.next_retry_at = None
-            job.triage_state = "open"
-            await _record_job_event(
-                session,
-                job=job,
-                action="dead_lettered",
-                note=str(exc),
-                meta={
-                    "attempt": int(job.attempt or 0),
-                    "max_attempts": effective_max_attempts,
-                    "schedule": retry_policy.schedule,
-                    "jitter_ratio": retry_policy.jitter_ratio,
-                    "policy_enabled": retry_policy.enabled,
-                },
-            )
-        else:
-            job.status = MediaJobStatus.failed
-            job.next_retry_at = now + timedelta(seconds=delay)
-            job.triage_state = "retrying"
-            await _record_job_event(
-                session,
-                job=job,
-                action="retry_scheduled",
-                note=str(exc),
-                meta={
-                    "attempt": int(job.attempt or 0),
-                    "max_attempts": effective_max_attempts,
-                    "retry_in_seconds": int(delay),
-                    "schedule": retry_policy.schedule,
-                    "jitter_ratio": retry_policy.jitter_ratio,
-                },
-            )
+        await _mark_job_failed_or_retrying(session, job=job, exc=exc, retry_policy=retry_policy)
     session.add(job)
     await session.commit()
     await session.refresh(job)

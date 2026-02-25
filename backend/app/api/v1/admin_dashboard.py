@@ -1536,31 +1536,23 @@ async def admin_shipping_performance(
     }
 
 
-@router.get("/stockout-impact")
-async def admin_stockout_impact(
-    session: Annotated[AsyncSession, Depends(get_session)],
-    _: Annotated[User, Depends(require_admin_section("inventory"))],
-    window_days: int = Query(default=30, ge=1, le=365),
-    limit: int = Query(default=8, ge=1, le=30),
-) -> dict:
-    now = datetime.now(timezone.utc)
-    since = now - timedelta(days=int(window_days))
-    successful_statuses = (OrderStatus.paid, OrderStatus.shipped, OrderStatus.delivered)
+def _stockout_rows(restock_rows: list[Any]) -> list[Any]:
+    return [
+        row
+        for row in restock_rows
+        if int(getattr(row, "available_quantity", 0) or 0) <= 0
+    ]
 
-    test_order_ids = select(OrderTag.order_id).where(OrderTag.tag == "test")
-    exclude_test_orders = Order.id.notin_(test_order_ids)
 
-    restock_rows = await inventory_service.list_restock_list(
-        session,
-        include_variants=False,
-        default_threshold=DEFAULT_LOW_STOCK_DASHBOARD_THRESHOLD,
-    )
-    stockouts = [row for row in restock_rows if int(getattr(row, "available_quantity", 0) or 0) <= 0]
-    if not stockouts:
-        return {"window_days": int(window_days), "window_start": since, "window_end": now, "items": []}
-
-    product_ids = [row.product_id for row in stockouts]
-
+async def _stockout_demand_map(
+    session: AsyncSession,
+    *,
+    since: datetime,
+    now: datetime,
+    successful_statuses: tuple[OrderStatus, ...],
+    product_ids: list[UUID],
+    exclude_test_orders: Any,
+) -> dict[UUID, tuple[int, float]]:
     demand_rows = await session.execute(
         select(
             OrderItem.product_id,
@@ -1578,11 +1570,12 @@ async def admin_stockout_impact(
         )
         .group_by(OrderItem.product_id)
     )
-    demand_map = {
-        row[0]: (int(row[1] or 0), float(row[2] or 0))
-        for row in demand_rows.all()
-    }
+    return {row[0]: (int(row[1] or 0), float(row[2] or 0)) for row in demand_rows.all()}
 
+
+async def _stockout_product_map(
+    session: AsyncSession, *, product_ids: list[UUID]
+) -> dict[UUID, dict[str, object]]:
     product_rows = await session.execute(
         select(
             Product.id,
@@ -1592,7 +1585,7 @@ async def admin_stockout_impact(
             Product.allow_backorder,
         ).where(Product.id.in_(product_ids))
     )
-    product_map = {
+    return {
         row[0]: {
             "base_price": float(row[1] or 0),
             "sale_price": float(row[2] or 0) if row[2] is not None else None,
@@ -1602,37 +1595,48 @@ async def admin_stockout_impact(
         for row in product_rows.all()
     }
 
-    items: list[dict] = []
-    for row in stockouts:
-        meta = product_map.get(row.product_id, {})
-        allow_backorder = bool(meta.get("allow_backorder", False))
-        base_price = float(meta.get("base_price", 0) or 0)
-        sale_price = meta.get("sale_price")
-        current_price = float(sale_price if sale_price is not None else base_price)
 
-        demand_units, demand_revenue = demand_map.get(row.product_id, (0, 0.0))
-        avg_price = float(demand_revenue / demand_units) if demand_units > 0 else current_price
-        reserved_carts = int(getattr(row, "reserved_in_carts", 0) or 0)
-        reserved_orders = int(getattr(row, "reserved_in_orders", 0) or 0)
-        estimated_missed = 0.0 if allow_backorder else float(reserved_carts) * avg_price
+def _stockout_item(
+    row: Any,
+    *,
+    demand_map: dict[UUID, tuple[int, float]],
+    product_map: dict[UUID, dict[str, object]],
+) -> dict[str, object]:
+    meta = product_map.get(row.product_id, {})
+    allow_backorder = bool(meta.get("allow_backorder", False))
+    base_price = float(meta.get("base_price", 0) or 0)
+    sale_price = meta.get("sale_price")
+    current_price = float(sale_price if sale_price is not None else base_price)
 
-        items.append(
-            {
-                "product_id": str(row.product_id),
-                "product_slug": row.product_slug,
-                "product_name": row.product_name,
-                "available_quantity": int(getattr(row, "available_quantity", 0) or 0),
-                "reserved_in_carts": reserved_carts,
-                "reserved_in_orders": reserved_orders,
-                "stock_quantity": int(getattr(row, "stock_quantity", 0) or 0),
-                "demand_units": int(demand_units),
-                "demand_revenue": float(demand_revenue),
-                "estimated_missed_revenue": float(estimated_missed),
-                "currency": str(meta.get("currency") or "RON"),
-                "allow_backorder": allow_backorder,
-            }
-        )
+    demand_units, demand_revenue = demand_map.get(row.product_id, (0, 0.0))
+    avg_price = float(demand_revenue / demand_units) if demand_units > 0 else current_price
+    reserved_carts = int(getattr(row, "reserved_in_carts", 0) or 0)
+    reserved_orders = int(getattr(row, "reserved_in_orders", 0) or 0)
+    estimated_missed = 0.0 if allow_backorder else float(reserved_carts) * avg_price
 
+    return {
+        "product_id": str(row.product_id),
+        "product_slug": row.product_slug,
+        "product_name": row.product_name,
+        "available_quantity": int(getattr(row, "available_quantity", 0) or 0),
+        "reserved_in_carts": reserved_carts,
+        "reserved_in_orders": reserved_orders,
+        "stock_quantity": int(getattr(row, "stock_quantity", 0) or 0),
+        "demand_units": int(demand_units),
+        "demand_revenue": float(demand_revenue),
+        "estimated_missed_revenue": float(estimated_missed),
+        "currency": str(meta.get("currency") or "RON"),
+        "allow_backorder": allow_backorder,
+    }
+
+
+def _stockout_items(
+    stockout_rows: list[Any],
+    *,
+    demand_map: dict[UUID, tuple[int, float]],
+    product_map: dict[UUID, dict[str, object]],
+) -> list[dict[str, object]]:
+    items = [_stockout_item(row, demand_map=demand_map, product_map=product_map) for row in stockout_rows]
     items.sort(
         key=lambda item: (
             float(item.get("estimated_missed_revenue", 0)),
@@ -1641,6 +1645,41 @@ async def admin_stockout_impact(
         ),
         reverse=True,
     )
+    return items
+
+
+@router.get("/stockout-impact")
+async def admin_stockout_impact(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    _: Annotated[User, Depends(require_admin_section("inventory"))],
+    window_days: int = Query(default=30, ge=1, le=365),
+    limit: int = Query(default=8, ge=1, le=30),
+) -> dict:
+    now = datetime.now(timezone.utc)
+    since = now - timedelta(days=int(window_days))
+    successful_statuses = (OrderStatus.paid, OrderStatus.shipped, OrderStatus.delivered)
+    exclude_test_orders = _exclude_test_orders_clause()
+
+    restock_rows = await inventory_service.list_restock_list(
+        session,
+        include_variants=False,
+        default_threshold=DEFAULT_LOW_STOCK_DASHBOARD_THRESHOLD,
+    )
+    stockouts = _stockout_rows(restock_rows)
+    if not stockouts:
+        return {"window_days": int(window_days), "window_start": since, "window_end": now, "items": []}
+
+    product_ids = [row.product_id for row in stockouts]
+    demand_map = await _stockout_demand_map(
+        session,
+        since=since,
+        now=now,
+        successful_statuses=successful_statuses,
+        product_ids=product_ids,
+        exclude_test_orders=exclude_test_orders,
+    )
+    product_map = await _stockout_product_map(session, product_ids=product_ids)
+    items = _stockout_items(stockouts, demand_map=demand_map, product_map=product_map)
 
     return {
         "window_days": int(window_days),
@@ -4274,6 +4313,10 @@ async def update_user_internal(
         )
     await session.commit()
 
+    return _admin_user_profile(user)
+
+
+def _admin_user_profile(user: User) -> AdminUserProfileUser:
     return AdminUserProfileUser(
         id=user.id,
         email=user.email,
@@ -4289,6 +4332,58 @@ async def update_user_internal(
         locked_reason=getattr(user, "locked_reason", None),
         password_reset_required=bool(getattr(user, "password_reset_required", False)),
     )
+
+
+def _user_security_snapshot(user: User) -> tuple[datetime | None, str | None, bool]:
+    return (
+        _as_utc(getattr(user, "locked_until", None)),
+        getattr(user, "locked_reason", None),
+        bool(getattr(user, "password_reset_required", False)),
+    )
+
+
+def _apply_user_security_update(user: User, data: dict[str, Any], *, now: datetime) -> None:
+    if "locked_until" in data:
+        locked_until = _as_utc(data.get("locked_until"))
+        if locked_until and locked_until <= now:
+            locked_until = None
+        user.locked_until = locked_until
+
+    if "locked_reason" in data:
+        raw_reason = data.get("locked_reason")
+        user.locked_reason = (raw_reason or "").strip()[:255] or None
+
+    if getattr(user, "locked_until", None) is None:
+        user.locked_reason = None
+
+    password_reset_required = data.get("password_reset_required")
+    if "password_reset_required" in data and password_reset_required is not None:
+        user.password_reset_required = bool(password_reset_required)
+
+
+def _user_security_changes(
+    before: tuple[datetime | None, str | None, bool],
+    after: tuple[datetime | None, str | None, bool],
+) -> dict[str, object]:
+    before_locked_until, before_locked_reason, before_password_reset_required = before
+    after_locked_until, after_locked_reason, after_password_reset_required = after
+    changes: dict[str, object] = {}
+    if before_locked_until != after_locked_until:
+        changes["locked_until"] = {
+            "before": before_locked_until.isoformat() if before_locked_until else None,
+            "after": after_locked_until.isoformat() if after_locked_until else None,
+        }
+    if before_locked_reason != after_locked_reason:
+        changes["locked_reason"] = {
+            "before_length": len(before_locked_reason or ""),
+            "after_length": len(after_locked_reason or ""),
+        }
+    if before_password_reset_required != after_password_reset_required:
+        changes["password_reset_required"] = {
+            "before": before_password_reset_required,
+            "after": after_password_reset_required,
+        }
+    return changes
 
 
 @router.patch("/users/{user_id}/security")
@@ -4308,48 +4403,11 @@ async def update_user_security(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot modify your own security settings")
 
     now = datetime.now(timezone.utc)
-    before_locked_until = getattr(user, "locked_until", None)
-    if before_locked_until and before_locked_until.tzinfo is None:
-        before_locked_until = before_locked_until.replace(tzinfo=timezone.utc)
-    before_locked_reason = getattr(user, "locked_reason", None)
-    before_password_reset_required = bool(getattr(user, "password_reset_required", False))
-
+    before_snapshot = _user_security_snapshot(user)
     data = payload.model_dump(exclude_unset=True)
-    if "locked_until" in data:
-        locked_until = data.get("locked_until")
-        if locked_until and locked_until.tzinfo is None:
-            locked_until = locked_until.replace(tzinfo=timezone.utc)
-        if locked_until and locked_until <= now:
-            locked_until = None
-        user.locked_until = locked_until
-
-    if "locked_reason" in data:
-        raw_reason = data.get("locked_reason")
-        cleaned = (raw_reason or "").strip()[:255] or None
-        user.locked_reason = cleaned
-
-    if getattr(user, "locked_until", None) is None:
-        user.locked_reason = None
-
-    if "password_reset_required" in data and data.get("password_reset_required") is not None:
-        user.password_reset_required = bool(data["password_reset_required"])
-
-    after_locked_until = getattr(user, "locked_until", None)
-    if after_locked_until and after_locked_until.tzinfo is None:
-        after_locked_until = after_locked_until.replace(tzinfo=timezone.utc)
-    after_locked_reason = getattr(user, "locked_reason", None)
-    after_password_reset_required = bool(getattr(user, "password_reset_required", False))
-
-    changes: dict[str, object] = {}
-    if before_locked_until != after_locked_until:
-        changes["locked_until"] = {
-            "before": before_locked_until.isoformat() if before_locked_until else None,
-            "after": after_locked_until.isoformat() if after_locked_until else None,
-        }
-    if before_locked_reason != after_locked_reason:
-        changes["locked_reason"] = {"before_length": len(before_locked_reason or ""), "after_length": len(after_locked_reason or "")}
-    if before_password_reset_required != after_password_reset_required:
-        changes["password_reset_required"] = {"before": before_password_reset_required, "after": after_password_reset_required}
+    _apply_user_security_update(user, data, now=now)
+    after_snapshot = _user_security_snapshot(user)
+    changes = _user_security_changes(before_snapshot, after_snapshot)
 
     session.add(user)
     await session.flush()
@@ -4367,21 +4425,7 @@ async def update_user_security(
         )
     await session.commit()
 
-    return AdminUserProfileUser(
-        id=user.id,
-        email=user.email,
-        username=user.username,
-        name=user.name,
-        name_tag=user.name_tag,
-        role=user.role,
-        email_verified=bool(user.email_verified),
-        created_at=user.created_at,
-        vip=bool(getattr(user, "vip", False)),
-        admin_note=getattr(user, "admin_note", None),
-        locked_until=getattr(user, "locked_until", None),
-        locked_reason=getattr(user, "locked_reason", None),
-        password_reset_required=bool(getattr(user, "password_reset_required", False)),
-    )
+    return _admin_user_profile(user)
 
 
 @router.get("/users/{user_id}/email/verification")
