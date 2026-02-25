@@ -22,6 +22,82 @@ def session_header(x_session_id: str | None = Header(default=None)) -> str | Non
     return x_session_id
 
 
+def _effective_session_id(current_user, session_id: str | None) -> str | None:
+    if current_user or session_id:
+        return session_id
+    return f"guest-{uuid.uuid4()}"
+
+
+async def _resolve_cart_shipping_method(session: AsyncSession, shipping_method_id: UUID | None):
+    if not shipping_method_id:
+        return None
+    shipping_method = await order_service.get_shipping_method(session, shipping_method_id)
+    if not shipping_method:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping method not found")
+    return shipping_method
+
+
+async def _resolve_cart_promo_context(
+    *,
+    session: AsyncSession,
+    current_user,
+    cart,
+    checkout_settings,
+    shipping_method,
+    promo_code: str | None,
+    country: str | None,
+) -> tuple[object | None, object | None]:
+    if not promo_code:
+        return None, None
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sign in to use coupons.")
+    rate_flat = Decimal(getattr(shipping_method, "rate_flat", None) or 0) if shipping_method else None
+    rate_per = Decimal(getattr(shipping_method, "rate_per_kg", None) or 0) if shipping_method else None
+    totals_override = await _try_apply_coupon_discount(
+        session=session,
+        current_user=current_user,
+        cart=cart,
+        checkout_settings=checkout_settings,
+        rate_flat=rate_flat,
+        rate_per=rate_per,
+        promo_code=promo_code,
+        country=country,
+    )
+    if totals_override is not None:
+        return None, totals_override
+    promo = await cart_service.validate_promo(session, promo_code, currency=None)
+    return promo, None
+
+
+async def _try_apply_coupon_discount(
+    *,
+    session: AsyncSession,
+    current_user,
+    cart,
+    checkout_settings,
+    rate_flat,
+    rate_per,
+    promo_code: str,
+    country: str | None,
+) -> object | None:
+    try:
+        applied = await coupons_service.apply_discount_code_to_cart(
+            session,
+            user=current_user,
+            cart=cart,
+            checkout=checkout_settings,
+            shipping_method_rate_flat=rate_flat,
+            shipping_method_rate_per_kg=rate_per,
+            code=promo_code,
+            country_code=country,
+        )
+        return applied.totals
+    except HTTPException as exc:
+        if exc.status_code != status.HTTP_404_NOT_FOUND:
+            raise
+    return None
+
+
 @router.get("", response_model=CartRead)
 async def get_cart(
     session: AsyncSession = Depends(get_session),
@@ -31,42 +107,20 @@ async def get_cart(
     promo_code: str | None = Query(default=None),
     country: str | None = Query(default=None),
 ):
-    if not current_user and not session_id:
-        session_id = f"guest-{uuid.uuid4()}"
+    session_id = _effective_session_id(current_user, session_id)
     cart = await cart_service.get_cart(session, getattr(current_user, "id", None) if current_user else None, session_id)
     await session.refresh(cart)
-    shipping_method = None
-    if shipping_method_id:
-        shipping_method = await order_service.get_shipping_method(session, shipping_method_id)
-        if not shipping_method:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping method not found")
+    shipping_method = await _resolve_cart_shipping_method(session, shipping_method_id)
     checkout_settings = await checkout_settings_service.get_checkout_settings(session)
-
-    promo = None
-    totals_override = None
-    if promo_code:
-        if not current_user:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sign in to use coupons.")
-        rate_flat = Decimal(getattr(shipping_method, "rate_flat", None) or 0) if shipping_method else None
-        rate_per = Decimal(getattr(shipping_method, "rate_per_kg", None) or 0) if shipping_method else None
-        try:
-            applied = await coupons_service.apply_discount_code_to_cart(
-                session,
-                user=current_user,
-                cart=cart,
-                checkout=checkout_settings,
-                shipping_method_rate_flat=rate_flat,
-                shipping_method_rate_per_kg=rate_per,
-                code=promo_code,
-                country_code=country,
-            )
-            totals_override = applied.totals
-        except HTTPException as exc:
-            if exc.status_code == status.HTTP_404_NOT_FOUND:
-                promo = await cart_service.validate_promo(session, promo_code, currency=None)
-            else:
-                raise
-
+    promo, totals_override = await _resolve_cart_promo_context(
+        session=session,
+        current_user=current_user,
+        cart=cart,
+        checkout_settings=checkout_settings,
+        shipping_method=shipping_method,
+        promo_code=promo_code,
+        country=country,
+    )
     return await cart_service.serialize_cart(
         session,
         cart,
