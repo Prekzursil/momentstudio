@@ -178,17 +178,20 @@ def _money_to_cents(value: Decimal) -> int:
     return int((quantized * 100).to_integral_value(rounding=ROUND_HALF_UP))
 
 
+CHARGE_LABELS: dict[str, tuple[str, str]] = {
+    "shipping": ("Shipping", "Livrare"),
+    "fee": ("Fee", "Taxă"),
+    "vat": ("VAT", "TVA"),
+    "discount": ("Discount", "Reducere"),
+}
+
+
 def _charge_label(kind: str, lang: str | None) -> str:
     ro = (lang or "").strip().lower() == "ro"
-    if kind == "shipping":
-        return "Livrare" if ro else "Shipping"
-    if kind == "fee":
-        return "Taxă" if ro else "Fee"
-    if kind == "vat":
-        return "TVA" if ro else "VAT"
-    if kind == "discount":
-        return "Reducere" if ro else "Discount"
-    return kind
+    labels = CHARGE_LABELS.get(kind)
+    if labels is None:
+        return kind
+    return labels[1] if ro else labels[0]
 
 
 def _cart_item_name(item, lang: str | None) -> str:
@@ -293,25 +296,43 @@ def _split_customer_name(value: str) -> tuple[str, str]:
     return parts[0], " ".join(parts[1:]).strip() or parts[0]
 
 
+def _strip_text(value: object | None) -> str:
+    return str(value or "").strip()
+
+
+def _default_customer_name(value: str | None) -> str:
+    cleaned = _strip_text(value)
+    return cleaned if cleaned else "Customer"
+
+
+def _resolve_country_payload(country_value: str | None) -> tuple[int, str]:
+    country = _strip_text(country_value).upper() or "RO"
+    if country == "RO":
+        return 642, "Romania"
+    return 0, country
+
+
+def _join_address_details(addr: Address) -> str:
+    parts = (
+        _strip_text(getattr(addr, "line1", None)),
+        _strip_text(getattr(addr, "line2", None)),
+    )
+    return ", ".join(part for part in parts if part)
+
+
 def _netopia_address_payload(*, email: str, phone: str | None, first_name: str, last_name: str, addr: Address) -> dict[str, Any]:
-    country = (getattr(addr, "country", None) or "").strip().upper() or "RO"
-    country_num = 642 if country == "RO" else 0
-    country_name = "Romania" if country == "RO" else country
-    details = (getattr(addr, "line1", None) or "").strip()
-    line2 = (getattr(addr, "line2", None) or "").strip()
-    if line2:
-        details = f"{details}, {line2}" if details else line2
+    country_num, country_name = _resolve_country_payload(getattr(addr, "country", None))
     return {
-        "email": (email or "").strip(),
-        "phone": (phone or "").strip() or "",
-        "firstName": (first_name or "").strip() or "Customer",
-        "lastName": (last_name or "").strip() or "Customer",
-        "city": (getattr(addr, "city", None) or "").strip(),
+        "email": _strip_text(email),
+        "phone": _strip_text(phone),
+        "firstName": _default_customer_name(first_name),
+        "lastName": _default_customer_name(last_name),
+        "city": _strip_text(getattr(addr, "city", None)),
         "country": int(country_num),
         "countryName": country_name,
-        "state": (getattr(addr, "region", None) or "").strip() or "",
-        "postalCode": (getattr(addr, "postal_code", None) or "").strip(),
-        "details": details,
+        "state": _strip_text(getattr(addr, "region", None)),
+        "postalCode": _strip_text(getattr(addr, "postal_code", None)),
+        "details": _join_address_details(addr),
     }
 
 
@@ -370,21 +391,45 @@ def _delivery_from_payload(
     locker_lat: float | None,
     locker_lng: float | None,
 ) -> tuple[str, str, str | None, str | None, str | None, float | None, float | None]:
-    courier_clean = (courier or "sameday").strip()
-    delivery_clean = (delivery_type or "home").strip()
-    if delivery_clean == "locker":
-        if not (locker_id or "").strip() or not (locker_name or "").strip() or locker_lat is None or locker_lng is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Locker selection is required")
-        return (
-            courier_clean,
-            delivery_clean,
-            locker_id.strip(),
-            locker_name.strip(),
-            (locker_address or "").strip() or None,
-            float(locker_lat),
-            float(locker_lng),
-        )
-    return courier_clean, delivery_clean, None, None, None, None, None
+    courier_clean = _strip_text(courier) or "sameday"
+    delivery_clean = _strip_text(delivery_type) or "home"
+    if delivery_clean != "locker":
+        return courier_clean, delivery_clean, None, None, None, None, None
+    return _locker_delivery_payload(
+        courier_clean=courier_clean,
+        delivery_clean=delivery_clean,
+        locker_id=locker_id,
+        locker_name=locker_name,
+        locker_address=locker_address,
+        locker_lat=locker_lat,
+        locker_lng=locker_lng,
+    )
+
+
+def _locker_delivery_payload(
+    *,
+    courier_clean: str,
+    delivery_clean: str,
+    locker_id: str | None,
+    locker_name: str | None,
+    locker_address: str | None,
+    locker_lat: float | None,
+    locker_lng: float | None,
+) -> tuple[str, str, str | None, str | None, str | None, float | None, float | None]:
+    locker_id_clean = _strip_text(locker_id)
+    locker_name_clean = _strip_text(locker_name)
+    if not locker_id_clean or not locker_name_clean or locker_lat is None or locker_lng is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Locker selection is required")
+    locker_address_clean = _strip_text(locker_address) or None
+    return (
+        courier_clean,
+        delivery_clean,
+        locker_id_clean,
+        locker_name_clean,
+        locker_address_clean,
+        float(locker_lat),
+        float(locker_lng),
+    )
 
 
 def _sanitize_filename(value: str | None) -> str:
@@ -402,6 +447,37 @@ def _frontend_base_from_request(request: Request | None) -> str:
         if origin in allowed:
             return origin
     return settings.frontend_origin.rstrip("/")
+
+
+def _resolve_order_contact_email(order: Order) -> str | None:
+    user_email = _strip_text(getattr(getattr(order, "user", None), "email", None))
+    if user_email:
+        return user_email
+    customer_email = _strip_text(getattr(order, "customer_email", None))
+    return customer_email or None
+
+
+def _admin_actor_label(admin: object) -> str:
+    for key in ("email", "username"):
+        candidate = _strip_text(getattr(admin, key, None))
+        if candidate:
+            return candidate
+    return "admin"
+
+
+def _order_email_event_note(admin: object, note: str | None) -> str:
+    actor = _admin_actor_label(admin)
+    note_clean = _strip_text(note)
+    return f"{actor}: {note_clean}" if note_clean else actor
+
+
+def _shipping_label_event_name(action: str | None) -> str:
+    return "shipping_label_printed" if _strip_text(action).lower() == "print" else "shipping_label_downloaded"
+
+
+def _shipping_label_event_note(admin: object, filename: str) -> str:
+    actor = _admin_actor_label(admin)
+    return f"{actor}: {filename}" if actor else filename
 
 
 async def _load_user_cart_for_create_order(session: AsyncSession, user_id: UUID) -> Cart:
@@ -2717,10 +2793,8 @@ async def admin_download_shipping_label(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping label not found")
 
     filename = _sanitize_filename(getattr(order, "shipping_label_filename", None) or path.name)
-    action_clean = (action or "").strip().lower()
-    event = "shipping_label_printed" if action_clean == "print" else "shipping_label_downloaded"
-    actor = (getattr(admin, "email", None) or getattr(admin, "username", None) or "admin").strip()
-    note = f"{actor}: {filename}" if actor else filename
+    event = _shipping_label_event_name(action)
+    note = _shipping_label_event_note(admin, filename)
     session.add(OrderEvent(order_id=order.id, event=event, note=note))
     await session.commit()
     media_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
@@ -2958,12 +3032,10 @@ async def admin_send_delivery_email(
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
-    to_email = (order.user.email if order.user and order.user.email else None) or getattr(order, "customer_email", None)
+    to_email = _resolve_order_contact_email(order)
     if not to_email:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order customer email missing")
-    note = (payload.note or "").strip() or None
-    actor = (getattr(admin, "email", None) or getattr(admin, "username", None) or "admin").strip()
-    event_note = f"{actor}: {note}" if note else actor
+    event_note = _order_email_event_note(admin, payload.note)
     session.add(OrderEvent(order_id=order.id, event="email_resend_delivery", note=event_note))
     await session.commit()
     await session.refresh(order, attribute_names=["events"])
@@ -2987,12 +3059,10 @@ async def admin_send_confirmation_email(
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
-    to_email = (order.user.email if order.user and order.user.email else None) or getattr(order, "customer_email", None)
+    to_email = _resolve_order_contact_email(order)
     if not to_email:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order customer email missing")
-    note = (payload.note or "").strip() or None
-    actor = (getattr(admin, "email", None) or getattr(admin, "username", None) or "admin").strip()
-    event_note = f"{actor}: {note}" if note else actor
+    event_note = _order_email_event_note(admin, payload.note)
     session.add(OrderEvent(order_id=order.id, event="email_resend_confirmation", note=event_note))
     await session.commit()
     await session.refresh(order, attribute_names=["events"])

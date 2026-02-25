@@ -10,116 +10,57 @@ import { SeoHeadLinksService } from '../../core/seo-head-links.service';
 import { StorefrontAdminModeService } from '../../core/storefront-admin-mode.service';
 import { AboutComponent } from './about.component';
 
-describe('AboutComponent', () => {
-  let meta: jasmine.SpyObj<Meta>;
-  let title: jasmine.SpyObj<Title>;
-  let api: jasmine.SpyObj<ApiService>;
-  let seoHeadLinks: jasmine.SpyObj<SeoHeadLinksService>;
-  let translate: TranslateService;
+let aboutMeta: jasmine.SpyObj<Meta>;
+let aboutTitle: jasmine.SpyObj<Title>;
+let aboutApi: jasmine.SpyObj<ApiService>;
+let aboutSeoHeadLinks: jasmine.SpyObj<SeoHeadLinksService>;
+let aboutTranslate: TranslateService;
 
-  beforeEach(() => {
-    meta = jasmine.createSpyObj<Meta>('Meta', ['updateTag']);
-    title = jasmine.createSpyObj<Title>('Title', ['setTitle']);
-    api = jasmine.createSpyObj<ApiService>('ApiService', ['get']);
-    seoHeadLinks = jasmine.createSpyObj<SeoHeadLinksService>('SeoHeadLinksService', ['setLocalizedCanonical']);
-    seoHeadLinks.setLocalizedCanonical.and.returnValue('http://localhost:4200/about');
-    api.get.and.callFake((path: string, params?: Record<string, unknown>) => {
-      if (path !== '/content/pages/about') throw new Error(`Unexpected path: ${path}`);
-      if (params?.['lang'] === 'ro') {
-        return of({ title: 'Despre noi', body_markdown: 'Salut', meta: null, images: [] } as any);
-      }
-      return of({ title: 'About', body_markdown: 'Hello', meta: null, images: [] } as any);
-    });
-    const markdown = { render: (s: string) => s } as unknown as MarkdownService;
-
-    TestBed.configureTestingModule({
-      imports: [RouterTestingModule, AboutComponent, TranslateModule.forRoot()],
-      providers: [
-        { provide: Title, useValue: title },
-        { provide: Meta, useValue: meta },
-        { provide: ApiService, useValue: api },
-        { provide: SeoHeadLinksService, useValue: seoHeadLinks },
-        { provide: StorefrontAdminModeService, useValue: { enabled: () => false } },
-        { provide: MarkdownService, useValue: markdown }
-      ]
-    });
-
-    translate = TestBed.inject(TranslateService);
-    translate.setTranslation(
-      'en',
-      {
-        about: { metaTitle: 'About | momentstudio', metaDescription: 'About desc' }
-      },
-      true
-    );
-    translate.setTranslation(
-      'ro',
-      {
-        about: { metaTitle: 'Despre noi | momentstudio', metaDescription: 'Descriere' }
-      },
-      true
-    );
-    translate.use('en');
-  });
+describe('AboutComponent SEO', () => {
+  beforeEach(setupAboutSpec);
 
   it('sets meta tags on init', () => {
     const fixture = TestBed.createComponent(AboutComponent);
     fixture.detectChanges();
 
-    expect(title.setTitle).toHaveBeenCalledWith('About | momentstudio');
-    expect(meta.updateTag).toHaveBeenCalledWith({ name: 'description', content: 'Hello' });
-    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:description', content: 'Hello' });
-    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:title', content: 'About | momentstudio' });
-    expect(seoHeadLinks.setLocalizedCanonical).toHaveBeenCalledWith('/about', 'en', {});
-    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:url', content: 'http://localhost:4200/about' });
+    expect(aboutTitle.setTitle).toHaveBeenCalledWith('About | momentstudio');
+    expect(aboutMeta.updateTag).toHaveBeenCalledWith({ name: 'description', content: 'Hello' });
+    expect(aboutMeta.updateTag).toHaveBeenCalledWith({ property: 'og:description', content: 'Hello' });
+    expect(aboutMeta.updateTag).toHaveBeenCalledWith({ property: 'og:title', content: 'About | momentstudio' });
+    expect(aboutSeoHeadLinks.setLocalizedCanonical).toHaveBeenCalledWith('/about', 'en', {});
+    expect(aboutMeta.updateTag).toHaveBeenCalledWith({ property: 'og:url', content: 'http://localhost:4200/about' });
   });
 
   it('updates meta tags when language changes', () => {
     const fixture = TestBed.createComponent(AboutComponent);
     fixture.detectChanges();
 
-    title.setTitle.calls.reset();
-    meta.updateTag.calls.reset();
-    seoHeadLinks.setLocalizedCanonical.calls.reset();
-    seoHeadLinks.setLocalizedCanonical.and.returnValue('http://localhost:4200/about?lang=ro');
+    aboutTitle.setTitle.calls.reset();
+    aboutMeta.updateTag.calls.reset();
+    aboutSeoHeadLinks.setLocalizedCanonical.calls.reset();
+    aboutSeoHeadLinks.setLocalizedCanonical.and.returnValue('http://localhost:4200/about?lang=ro');
 
-    translate.use('ro');
+    aboutTranslate.use('ro');
 
-    expect(title.setTitle).toHaveBeenCalledWith('Despre noi | momentstudio');
-    expect(meta.updateTag).toHaveBeenCalledWith({ name: 'description', content: 'Salut' });
-    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:description', content: 'Salut' });
-    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:title', content: 'Despre noi | momentstudio' });
-    expect(seoHeadLinks.setLocalizedCanonical).toHaveBeenCalledWith('/about', 'ro', {});
-    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:url', content: 'http://localhost:4200/about?lang=ro' });
+    expect(aboutTitle.setTitle).toHaveBeenCalledWith('Despre noi | momentstudio');
+    expect(aboutMeta.updateTag).toHaveBeenCalledWith({ name: 'description', content: 'Salut' });
+    expect(aboutMeta.updateTag).toHaveBeenCalledWith({ property: 'og:description', content: 'Salut' });
+    expect(aboutMeta.updateTag).toHaveBeenCalledWith({ property: 'og:title', content: 'Despre noi | momentstudio' });
+    expect(aboutSeoHeadLinks.setLocalizedCanonical).toHaveBeenCalledWith('/about', 'ro', {});
+    expect(aboutMeta.updateTag).toHaveBeenCalledWith({ property: 'og:url', content: 'http://localhost:4200/about?lang=ro' });
   });
+});
+
+describe('AboutComponent content + lifecycle', () => {
+  beforeEach(setupAboutSpec);
 
   it('uses page blocks for meta description when present', () => {
-    api.get.and.callFake((path: string, params?: Record<string, unknown>) => {
-      if (path !== '/content/pages/about') throw new Error(`Unexpected path: ${path}`);
-      if (params?.['lang'] === 'ro') {
-        return of({
-          title: 'Despre noi',
-          body_markdown: 'Salut',
-          meta: {
-            blocks: [{ key: 'intro', type: 'text', enabled: true, title: { ro: 'Introducere' }, body_markdown: { ro: 'Bun venit' } }]
-          },
-          images: []
-        } as any);
-      }
-      return of({
-        title: 'About',
-        body_markdown: 'Hello',
-        meta: {
-          blocks: [{ key: 'intro', type: 'text', enabled: true, title: { en: 'Intro' }, body_markdown: { en: 'Welcome' } }]
-        },
-        images: []
-      } as any);
-    });
+    aboutApi.get.and.callFake(aboutPageBlocksCallFake);
 
     const fixture = TestBed.createComponent(AboutComponent);
     fixture.detectChanges();
 
-    expect(meta.updateTag).toHaveBeenCalledWith({ name: 'description', content: 'Intro Welcome' });
+    expect(aboutMeta.updateTag).toHaveBeenCalledWith({ name: 'description', content: 'Intro Welcome' });
   });
 
   it('stops updating after destroy', () => {
@@ -128,12 +69,93 @@ describe('AboutComponent', () => {
     fixture.detectChanges();
     cmp.ngOnDestroy();
 
-    title.setTitle.calls.reset();
-    meta.updateTag.calls.reset();
+    aboutTitle.setTitle.calls.reset();
+    aboutMeta.updateTag.calls.reset();
 
-    translate.use('ro');
+    aboutTranslate.use('ro');
 
-    expect(title.setTitle).not.toHaveBeenCalled();
-    expect(meta.updateTag).not.toHaveBeenCalled();
+    expect(aboutTitle.setTitle).not.toHaveBeenCalled();
+    expect(aboutMeta.updateTag).not.toHaveBeenCalled();
   });
 });
+
+const setupAboutSpec = (): void => {
+  aboutMeta = jasmine.createSpyObj<Meta>('Meta', ['updateTag']);
+  aboutTitle = jasmine.createSpyObj<Title>('Title', ['setTitle']);
+  aboutApi = jasmine.createSpyObj<ApiService>('ApiService', ['get']);
+  aboutSeoHeadLinks = jasmine.createSpyObj<SeoHeadLinksService>('SeoHeadLinksService', ['setLocalizedCanonical']);
+  aboutSeoHeadLinks.setLocalizedCanonical.and.returnValue('http://localhost:4200/about');
+  aboutApi.get.and.callFake(aboutPageCallFake);
+  const markdown = { render: (s: string) => s } as unknown as MarkdownService;
+  configureAboutTestingModule(aboutMeta, aboutTitle, aboutApi, aboutSeoHeadLinks, markdown);
+  aboutTranslate = TestBed.inject(TranslateService);
+  seedAboutTranslations(aboutTranslate);
+  aboutTranslate.use('en');
+};
+
+function configureAboutTestingModule(
+  meta: jasmine.SpyObj<Meta>,
+  title: jasmine.SpyObj<Title>,
+  api: jasmine.SpyObj<ApiService>,
+  seoHeadLinks: jasmine.SpyObj<SeoHeadLinksService>,
+  markdown: MarkdownService
+): void {
+  TestBed.configureTestingModule({
+    imports: [RouterTestingModule, AboutComponent, TranslateModule.forRoot()],
+    providers: [
+      { provide: Title, useValue: title },
+      { provide: Meta, useValue: meta },
+      { provide: ApiService, useValue: api },
+      { provide: SeoHeadLinksService, useValue: seoHeadLinks },
+      { provide: StorefrontAdminModeService, useValue: { enabled: () => false } },
+      { provide: MarkdownService, useValue: markdown }
+    ]
+  });
+}
+
+function seedAboutTranslations(translate: TranslateService): void {
+  translate.setTranslation(
+    'en',
+    {
+      about: { metaTitle: 'About | momentstudio', metaDescription: 'About desc' }
+    },
+    true
+  );
+  translate.setTranslation(
+    'ro',
+    {
+      about: { metaTitle: 'Despre noi | momentstudio', metaDescription: 'Descriere' }
+    },
+    true
+  );
+}
+
+function aboutPageCallFake(path: string, params?: Record<string, unknown>) {
+  if (path !== '/content/pages/about') throw new Error(`Unexpected path: ${path}`);
+  if (params?.['lang'] === 'ro') {
+    return of({ title: 'Despre noi', body_markdown: 'Salut', meta: null, images: [] } as any);
+  }
+  return of({ title: 'About', body_markdown: 'Hello', meta: null, images: [] } as any);
+}
+
+function aboutPageBlocksCallFake(path: string, params?: Record<string, unknown>) {
+  if (path !== '/content/pages/about') throw new Error(`Unexpected path: ${path}`);
+  if (params?.['lang'] === 'ro') {
+    return of({
+      title: 'Despre noi',
+      body_markdown: 'Salut',
+      meta: {
+        blocks: [{ key: 'intro', type: 'text', enabled: true, title: { ro: 'Introducere' }, body_markdown: { ro: 'Bun venit' } }]
+      },
+      images: []
+    } as any);
+  }
+  return of({
+    title: 'About',
+    body_markdown: 'Hello',
+    meta: {
+      blocks: [{ key: 'intro', type: 'text', enabled: true, title: { en: 'Intro' }, body_markdown: { en: 'Welcome' } }]
+    },
+    images: []
+  } as any);
+}

@@ -32,34 +32,11 @@ describe('ShopComponent i18n meta', () => {
     });
   });
 
-  it('updates meta tags based on current language', () => {
+  it('updates english meta tags and category variants', () => {
     const fixture = TestBed.createComponent(ShopComponent);
     const cmp = fixture.componentInstance as any;
     const translate = TestBed.inject(TranslateService);
-    translate.setTranslation(
-      'en',
-      {
-        shop: {
-          metaTitle: 'EN title',
-          metaDescription: 'EN desc',
-          metaTitleCategory: 'EN title {{category}}',
-          metaDescriptionCategory: 'EN desc {{category}}'
-        }
-      },
-      true
-    );
-    translate.setTranslation(
-      'ro',
-      {
-        shop: {
-          metaTitle: 'RO title',
-          metaDescription: 'RO desc',
-          metaTitleCategory: 'RO title {{category}}',
-          metaDescriptionCategory: 'RO desc {{category}}'
-        }
-      },
-      true
-    );
+    seedShopTranslations(translate);
     translate.use('en');
 
     cmp.setMetaTags();
@@ -78,11 +55,18 @@ describe('ShopComponent i18n meta', () => {
     cmp.setMetaTags();
     expect(title.setTitle).toHaveBeenCalledWith('EN title Featured');
     expect(meta.updateTag).toHaveBeenCalledWith({ name: 'description', content: 'EN desc Featured' });
+  });
+
+  it('updates romanian meta tags when language changes', () => {
+    const fixture = TestBed.createComponent(ShopComponent);
+    const cmp = fixture.componentInstance as any;
+    const translate = TestBed.inject(TranslateService);
+    seedShopTranslations(translate);
 
     meta.updateTag.calls.reset();
     title.setTitle.calls.reset();
-    cmp.activeCategorySlug = null;
     translate.use('ro');
+    cmp.activeCategorySlug = null;
     cmp.setMetaTags();
     expect(title.setTitle).toHaveBeenCalledWith('RO title');
     expect(meta.updateTag).toHaveBeenCalledWith({ name: 'description', content: 'RO desc' });
@@ -138,3 +122,30 @@ describe('ShopComponent i18n meta', () => {
     expect(cmp.products[0].id).toBe('new');
   });
 });
+
+function seedShopTranslations(translate: TranslateService): void {
+  translate.setTranslation(
+    'en',
+    {
+      shop: {
+        metaTitle: 'EN title',
+        metaDescription: 'EN desc',
+        metaTitleCategory: 'EN title {{category}}',
+        metaDescriptionCategory: 'EN desc {{category}}'
+      }
+    },
+    true
+  );
+  translate.setTranslation(
+    'ro',
+    {
+      shop: {
+        metaTitle: 'RO title',
+        metaDescription: 'RO desc',
+        metaTitleCategory: 'RO title {{category}}',
+        metaDescriptionCategory: 'RO desc {{category}}'
+      }
+    },
+    true
+  );
+}

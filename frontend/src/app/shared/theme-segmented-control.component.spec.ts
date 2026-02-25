@@ -4,24 +4,33 @@ import { TranslateModule } from '@ngx-translate/core';
 import { ThemeSegmentedControlComponent } from './theme-segmented-control.component';
 
 describe('ThemeSegmentedControlComponent', () => {
+  registerThemeControlSetup();
+  defineOptionRenderSpec();
+  defineArrowNavigationSpec();
+  defineHomeEndSpec();
+});
+
+const registerThemeControlSetup = (): void => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [TranslateModule.forRoot(), ThemeSegmentedControlComponent]
     });
   });
+};
 
-  function getButtons(fixture: any): HTMLButtonElement[] {
-    return Array.from(fixture.nativeElement.querySelectorAll('button[role="radio"]')) as HTMLButtonElement[];
-  }
+const getButtons = (fixture: any): HTMLButtonElement[] => {
+  return Array.from(fixture.nativeElement.querySelectorAll('button[role="radio"]')) as HTMLButtonElement[];
+};
 
+const defineOptionRenderSpec = (): void => {
   it('renders 3 theme options and emits selection', () => {
     const fixture = TestBed.createComponent(ThemeSegmentedControlComponent);
-    const cmp = fixture.componentInstance;
-    cmp.preference = 'system';
+    const component = fixture.componentInstance;
+    component.preference = 'system';
     fixture.detectChanges();
 
     const emitted: string[] = [];
-    cmp.preferenceChange.subscribe((v) => emitted.push(v));
+    component.preferenceChange.subscribe((value) => emitted.push(value));
 
     const buttons = getButtons(fixture);
     expect(buttons.length).toBe(3);
@@ -29,17 +38,19 @@ describe('ThemeSegmentedControlComponent', () => {
     buttons[1].click(); // light
     expect(emitted).toEqual(['light']);
   });
+};
 
+const defineArrowNavigationSpec = (): void => {
   it('supports arrow navigation and moves focus', () => {
     const fixture = TestBed.createComponent(ThemeSegmentedControlComponent);
-    const cmp = fixture.componentInstance;
-    cmp.preference = 'system';
+    const component = fixture.componentInstance;
+    component.preference = 'system';
     fixture.detectChanges();
 
     const emitted: string[] = [];
-    cmp.preferenceChange.subscribe((v) => {
-      emitted.push(v);
-      cmp.preference = v;
+    component.preferenceChange.subscribe((value) => {
+      emitted.push(value);
+      component.preference = value;
       fixture.detectChanges();
     });
 
@@ -62,17 +73,19 @@ describe('ThemeSegmentedControlComponent', () => {
     expect(emitted).toEqual(['light', 'dark', 'system']);
     expect(document.activeElement).toBe(buttons[0]);
   });
+};
 
+const defineHomeEndSpec = (): void => {
   it('supports Home/End keys', () => {
     const fixture = TestBed.createComponent(ThemeSegmentedControlComponent);
-    const cmp = fixture.componentInstance;
-    cmp.preference = 'dark';
+    const component = fixture.componentInstance;
+    component.preference = 'dark';
     fixture.detectChanges();
 
     const emitted: string[] = [];
-    cmp.preferenceChange.subscribe((v) => {
-      emitted.push(v);
-      cmp.preference = v;
+    component.preferenceChange.subscribe((value) => {
+      emitted.push(value);
+      component.preference = value;
       fixture.detectChanges();
     });
 
@@ -89,4 +102,4 @@ describe('ThemeSegmentedControlComponent', () => {
     expect(emitted).toEqual(['system', 'dark']);
     expect(document.activeElement).toBe(buttons[2]);
   });
-});
+};
