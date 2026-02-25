@@ -1227,6 +1227,217 @@ def _payments_provider_rows(
     ]
 
 
+def _refund_delta_pct(current: float, previous: float) -> float | None:
+    if previous == 0:
+        return None
+    return (current - previous) / previous * 100.0
+
+
+async def _refund_provider_rows(
+    session: AsyncSession,
+    provider_col: Any,
+    exclude_test_orders: Any,
+    window_start: datetime,
+    window_end: datetime,
+) -> list[tuple[str, int, float]]:
+    rows = await session.execute(
+        select(
+            provider_col,
+            func.count().label("count"),
+            func.coalesce(func.sum(OrderRefund.amount), 0).label("amount"),
+        )
+        .select_from(OrderRefund)
+        .join(Order, OrderRefund.order_id == Order.id)
+        .where(
+            OrderRefund.created_at >= window_start,
+            OrderRefund.created_at < window_end,
+            exclude_test_orders,
+        )
+        .group_by(provider_col)
+    )
+    items: list[tuple[str, int, float]] = []
+    for provider, count, amount in rows.all():
+        items.append((str(provider or "unknown"), int(count or 0), float(amount or 0)))
+    return items
+
+
+def _refund_provider_payload(
+    current_provider: list[tuple[str, int, float]],
+    previous_provider: list[tuple[str, int, float]],
+) -> list[dict]:
+    prev_provider_map = {row[0]: row for row in previous_provider}
+    providers: list[dict] = []
+    for provider, count, amount in current_provider:
+        _, prev_count, prev_amount = prev_provider_map.get(provider, (provider, 0, 0.0))
+        providers.append(
+            {
+                "provider": provider,
+                "current": {"count": int(count), "amount": float(amount)},
+                "previous": {"count": int(prev_count), "amount": float(prev_amount)},
+                "delta_pct": {
+                    "count": _refund_delta_pct(float(count), float(prev_count)),
+                    "amount": _refund_delta_pct(float(amount), float(prev_amount)),
+                },
+            }
+        )
+    providers.sort(
+        key=lambda row: (
+            row.get("current", {}).get("amount", 0),
+            row.get("current", {}).get("count", 0),
+        ),
+        reverse=True,
+    )
+    return providers
+
+
+async def _refund_missing_refunds(
+    session: AsyncSession,
+    exclude_test_orders: Any,
+    window_start: datetime,
+    window_end: datetime,
+) -> tuple[int, float]:
+    row = await session.execute(
+        select(
+            func.count().label("count"),
+            func.coalesce(func.sum(Order.total_amount), 0).label("amount"),
+        )
+        .select_from(Order)
+        .outerjoin(OrderRefund, OrderRefund.order_id == Order.id)
+        .where(
+            Order.status == OrderStatus.refunded,
+            Order.updated_at >= window_start,
+            Order.updated_at < window_end,
+            OrderRefund.id.is_(None),
+            exclude_test_orders,
+        )
+    )
+    count, amount = row.one()
+    return int(count or 0), float(amount or 0)
+
+
+def _normalize_refund_reason_text(value: str) -> str:
+    raw = (value or "").strip()
+    if not raw:
+        return ""
+    normalized = unicodedata.normalize("NFKD", raw)
+    return normalized.encode("ascii", "ignore").decode("ascii").lower()
+
+
+_REFUND_REASON_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("damaged", ("damaged", "broken", "defect", "defective", "crack", "spart", "stricat", "zgariat", "deterior")),
+    ("wrong_item", ("wrong", "different", "gresit", "incorect", "alt produs", "other item", "not the one")),
+    (
+        "not_as_described",
+        (
+            "not as described",
+            "different than expected",
+            "nu corespunde",
+            "nu este ca",
+            "description",
+            "poza",
+            "picture",
+        ),
+    ),
+    ("size_fit", ("size", "fit", "too big", "too small", "marime", "potriv")),
+    ("delivery_issue", ("delivery", "shipping", "ship", "courier", "curier", "livrare", "intarzi", "intarzier")),
+    ("changed_mind", ("changed my mind", "dont want", "do not want", "no longer", "nu mai", "razgand", "renunt")),
+)
+_REFUND_REASON_CATEGORIES = [
+    "damaged",
+    "wrong_item",
+    "not_as_described",
+    "size_fit",
+    "delivery_issue",
+    "changed_mind",
+    "other",
+]
+
+
+def _refund_reason_category(reason: str) -> str:
+    text = _normalize_refund_reason_text(reason)
+    if not text:
+        return "other"
+    for category, keywords in _REFUND_REASON_RULES:
+        if any(keyword in text for keyword in keywords):
+            return category
+    return "other"
+
+
+async def _refund_reason_counts(
+    session: AsyncSession,
+    exclude_test_orders: Any,
+    window_start: datetime,
+    window_end: datetime,
+) -> dict[str, int]:
+    rows = await session.execute(
+        select(ReturnRequest.reason)
+        .select_from(ReturnRequest)
+        .join(Order, ReturnRequest.order_id == Order.id)
+        .where(
+            ReturnRequest.status == ReturnRequestStatus.refunded,
+            ReturnRequest.updated_at >= window_start,
+            ReturnRequest.updated_at < window_end,
+            exclude_test_orders,
+        )
+    )
+    counts: dict[str, int] = {}
+    for reason in rows.scalars().all():
+        category = _refund_reason_category(str(reason or ""))
+        counts[category] = counts.get(category, 0) + 1
+    return counts
+
+
+def _refund_reasons_payload(
+    current_reasons: dict[str, int],
+    previous_reasons: dict[str, int],
+) -> list[dict]:
+    reasons: list[dict] = []
+    for category in _REFUND_REASON_CATEGORIES:
+        cur = int(current_reasons.get(category, 0))
+        prev = int(previous_reasons.get(category, 0))
+        reasons.append(
+            {
+                "category": category,
+                "current": cur,
+                "previous": prev,
+                "delta_pct": _refund_delta_pct(float(cur), float(prev)),
+            }
+        )
+    reasons.sort(key=lambda row: row.get("current", 0), reverse=True)
+    return reasons
+
+
+def _refund_breakdown_payload(
+    *,
+    window_days: int,
+    window_start: datetime,
+    window_end: datetime,
+    current_provider: list[tuple[str, int, float]],
+    previous_provider: list[tuple[str, int, float]],
+    missing_current_count: int,
+    missing_current_amount: float,
+    missing_prev_count: int,
+    missing_prev_amount: float,
+    current_reasons: dict[str, int],
+    previous_reasons: dict[str, int],
+) -> dict:
+    return {
+        "window_days": int(window_days),
+        "window_start": window_start,
+        "window_end": window_end,
+        "providers": _refund_provider_payload(current_provider, previous_provider),
+        "missing_refunds": {
+            "current": {"count": missing_current_count, "amount": float(missing_current_amount)},
+            "previous": {"count": missing_prev_count, "amount": float(missing_prev_amount)},
+            "delta_pct": {
+                "count": _refund_delta_pct(float(missing_current_count), float(missing_prev_count)),
+                "amount": _refund_delta_pct(float(missing_current_amount), float(missing_prev_amount)),
+            },
+        },
+        "reasons": _refund_reasons_payload(current_reasons, previous_reasons),
+    }
+
+
 @router.get("/refunds-breakdown")
 async def admin_refunds_breakdown(
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -1240,153 +1451,33 @@ async def admin_refunds_breakdown(
 
     test_order_ids = select(OrderTag.order_id).where(OrderTag.tag == "test")
     exclude_test_orders = Order.id.notin_(test_order_ids)
-
     provider_col = func.lower(func.coalesce(OrderRefund.provider, literal("unknown")))
-
-    async def _provider_rows(window_start: datetime, window_end: datetime) -> list[tuple[str, int, float]]:
-        rows = await session.execute(
-            select(
-                provider_col,
-                func.count().label("count"),
-                func.coalesce(func.sum(OrderRefund.amount), 0).label("amount"),
-            )
-            .select_from(OrderRefund)
-            .join(Order, OrderRefund.order_id == Order.id)
-            .where(
-                OrderRefund.created_at >= window_start,
-                OrderRefund.created_at < window_end,
-                exclude_test_orders,
-            )
-            .group_by(provider_col)
-        )
-        items: list[tuple[str, int, float]] = []
-        for provider, count, amount in rows.all():
-            items.append((str(provider or "unknown"), int(count or 0), float(amount or 0)))
-        return items
-
-    current_provider = await _provider_rows(start, now)
-    previous_provider = await _provider_rows(prev_start, start)
-    prev_provider_map = {row[0]: row for row in previous_provider}
-
-    def _delta_pct(current: float, previous: float) -> float | None:
-        if previous == 0:
-            return None
-        return (current - previous) / previous * 100.0
-
-    providers: list[dict] = []
-    for provider, count, amount in current_provider:
-        _, prev_count, prev_amount = prev_provider_map.get(provider, (provider, 0, 0.0))
-        providers.append(
-            {
-                "provider": provider,
-                "current": {"count": int(count), "amount": float(amount)},
-                "previous": {"count": int(prev_count), "amount": float(prev_amount)},
-                "delta_pct": {
-                    "count": _delta_pct(float(count), float(prev_count)),
-                    "amount": _delta_pct(float(amount), float(prev_amount)),
-                },
-            }
-        )
-    providers.sort(key=lambda row: (row.get("current", {}).get("amount", 0), row.get("current", {}).get("count", 0)), reverse=True)
-
-    async def _missing_refunds(window_start: datetime, window_end: datetime) -> tuple[int, float]:
-        row = await session.execute(
-            select(
-                func.count().label("count"),
-                func.coalesce(func.sum(Order.total_amount), 0).label("amount"),
-            )
-            .select_from(Order)
-            .outerjoin(OrderRefund, OrderRefund.order_id == Order.id)
-            .where(
-                Order.status == OrderStatus.refunded,
-                Order.updated_at >= window_start,
-                Order.updated_at < window_end,
-                OrderRefund.id.is_(None),
-                exclude_test_orders,
-            )
-        )
-        count, amount = row.one()
-        return int(count or 0), float(amount or 0)
-
-    missing_current_count, missing_current_amount = await _missing_refunds(start, now)
-    missing_prev_count, missing_prev_amount = await _missing_refunds(prev_start, start)
-
-    def _normalize_text(value: str) -> str:
-        raw = (value or "").strip()
-        if not raw:
-            return ""
-        normalized = unicodedata.normalize("NFKD", raw)
-        return normalized.encode("ascii", "ignore").decode("ascii").lower()
-
-    reason_rules: tuple[tuple[str, tuple[str, ...]], ...] = (
-        ("damaged", ("damaged", "broken", "defect", "defective", "crack", "spart", "stricat", "zgariat", "deterior")),
-        ("wrong_item", ("wrong", "different", "gresit", "incorect", "alt produs", "other item", "not the one")),
-        ("not_as_described", ("not as described", "different than expected", "nu corespunde", "nu este ca", "description", "poza", "picture")),
-        ("size_fit", ("size", "fit", "too big", "too small", "marime", "potriv")),
-        ("delivery_issue", ("delivery", "shipping", "ship", "courier", "curier", "livrare", "intarzi", "intarzier")),
-        ("changed_mind", ("changed my mind", "dont want", "do not want", "no longer", "nu mai", "razgand", "renunt")),
+    current_provider = await _refund_provider_rows(session, provider_col, exclude_test_orders, start, now)
+    previous_provider = await _refund_provider_rows(
+        session, provider_col, exclude_test_orders, prev_start, start
     )
+    missing_current_count, missing_current_amount = await _refund_missing_refunds(
+        session, exclude_test_orders, start, now
+    )
+    missing_prev_count, missing_prev_amount = await _refund_missing_refunds(
+        session, exclude_test_orders, prev_start, start
+    )
+    current_reasons = await _refund_reason_counts(session, exclude_test_orders, start, now)
+    previous_reasons = await _refund_reason_counts(session, exclude_test_orders, prev_start, start)
 
-    def _reason_category(reason: str) -> str:
-        t = _normalize_text(reason)
-        if not t:
-            return "other"
-        for category, keywords in reason_rules:
-            if any(keyword in t for keyword in keywords):
-                return category
-        return "other"
-
-    async def _reason_counts(window_start: datetime, window_end: datetime) -> dict[str, int]:
-        rows = await session.execute(
-            select(ReturnRequest.reason)
-            .select_from(ReturnRequest)
-            .join(Order, ReturnRequest.order_id == Order.id)
-            .where(
-                ReturnRequest.status == ReturnRequestStatus.refunded,
-                ReturnRequest.updated_at >= window_start,
-                ReturnRequest.updated_at < window_end,
-                exclude_test_orders,
-            )
-        )
-        counts: dict[str, int] = {}
-        for reason in rows.scalars().all():
-            category = _reason_category(str(reason or ""))
-            counts[category] = counts.get(category, 0) + 1
-        return counts
-
-    current_reasons = await _reason_counts(start, now)
-    previous_reasons = await _reason_counts(prev_start, start)
-
-    categories = ["damaged", "wrong_item", "not_as_described", "size_fit", "delivery_issue", "changed_mind", "other"]
-    reasons: list[dict] = []
-    for category in categories:
-        cur = int(current_reasons.get(category, 0))
-        prev = int(previous_reasons.get(category, 0))
-        reasons.append(
-            {
-                "category": category,
-                "current": cur,
-                "previous": prev,
-                "delta_pct": _delta_pct(float(cur), float(prev)),
-            }
-        )
-    reasons.sort(key=lambda row: row.get("current", 0), reverse=True)
-
-    return {
-        "window_days": int(window_days),
-        "window_start": start,
-        "window_end": now,
-        "providers": providers,
-        "missing_refunds": {
-            "current": {"count": missing_current_count, "amount": float(missing_current_amount)},
-            "previous": {"count": missing_prev_count, "amount": float(missing_prev_amount)},
-            "delta_pct": {
-                "count": _delta_pct(float(missing_current_count), float(missing_prev_count)),
-                "amount": _delta_pct(float(missing_current_amount), float(missing_prev_amount)),
-            },
-        },
-        "reasons": reasons,
-    }
+    return _refund_breakdown_payload(
+        window_days=window_days,
+        window_start=start,
+        window_end=now,
+        current_provider=current_provider,
+        previous_provider=previous_provider,
+        missing_current_count=missing_current_count,
+        missing_current_amount=missing_current_amount,
+        missing_prev_count=missing_prev_count,
+        missing_prev_amount=missing_prev_amount,
+        current_reasons=current_reasons,
+        previous_reasons=previous_reasons,
+    )
 
 
 def _shipping_delta_pct(current: float | None, previous: float | None) -> float | None:
@@ -2654,6 +2745,39 @@ async def admin_users(
     ]
 
 
+def _search_users_stmt(q: str | None, role: UserRole | None) -> Any:
+    stmt = select(User).where(User.deleted_at.is_(None))
+    if q:
+        like = f"%{q.strip().lower()}%"
+        stmt = stmt.where(
+            func.lower(User.email).ilike(like)
+            | func.lower(User.username).ilike(like)
+            | func.lower(User.name).ilike(like)
+        )
+    if role is not None:
+        stmt = stmt.where(User.role == role)
+    return stmt
+
+
+def _admin_user_list_item_payload(user: User, include_pii: bool) -> AdminUserListItem:
+    return AdminUserListItem(
+        id=user.id,
+        email=user.email if include_pii else (pii_service.mask_email(user.email) or user.email),
+        username=user.username,
+        name=user.name if include_pii else pii_service.mask_text(user.name, keep=1),
+        name_tag=user.name_tag,
+        role=user.role,
+        email_verified=bool(user.email_verified),
+        created_at=user.created_at,
+    )
+
+
+def _pagination_total_pages(total_items: int, limit: int) -> int:
+    if total_items <= 0:
+        return 1
+    return max(1, (total_items + limit - 1) // limit)
+
+
 @router.get("/users/search")
 async def search_users(
     request: Request,
@@ -2668,24 +2792,13 @@ async def search_users(
     if include_pii:
         pii_service.require_pii_reveal(current_user, request=request)
     offset = (page - 1) * limit
-    stmt = select(User).where(User.deleted_at.is_(None))
-
-    if q:
-        like = f"%{q.strip().lower()}%"
-        stmt = stmt.where(
-            func.lower(User.email).ilike(like)
-            | func.lower(User.username).ilike(like)
-            | func.lower(User.name).ilike(like)
-        )
-
-    if role is not None:
-        stmt = stmt.where(User.role == role)
+    stmt = _search_users_stmt(q, role)
 
     total = await session.scalar(
         stmt.with_only_columns(func.count(func.distinct(User.id))).order_by(None)
     )
     total_items = int(total or 0)
-    total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
+    total_pages = _pagination_total_pages(total_items, limit)
 
     rows = (
         (
@@ -2696,19 +2809,7 @@ async def search_users(
         .scalars()
         .all()
     )
-    items = [
-        AdminUserListItem(
-            id=u.id,
-            email=u.email if include_pii else (pii_service.mask_email(u.email) or u.email),
-            username=u.username,
-            name=u.name if include_pii else pii_service.mask_text(u.name, keep=1),
-            name_tag=u.name_tag,
-            role=u.role,
-            email_verified=bool(u.email_verified),
-            created_at=u.created_at,
-        )
-        for u in rows
-    ]
+    items = [_admin_user_list_item_payload(user, include_pii) for user in rows]
 
     return AdminUserListResponse(
         items=items,
