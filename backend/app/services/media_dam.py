@@ -410,17 +410,8 @@ def verify_preview_signature(asset_id: UUID, *, exp: int, sig: str, variant_prof
     expected = _sign_preview(asset_id, exp=exp_ts, variant_profile=variant_profile)
     return hmac.compare_digest(expected, str(sig or ""))
 
-async def create_asset_from_upload(
-    session: AsyncSession,
-    *,
-    file,
-    created_by_user_id: UUID | None,
-    visibility: MediaVisibility = MediaVisibility.private,
-) -> MediaAssetUploadResponse:
-    asset_id = uuid4()
-    filename = _safe_storage_name(getattr(file, "filename", None))
-    asset_type = _guess_asset_type(getattr(file, "content_type", None), filename)
-    storage_key = f"originals/{_asset_base_folder(asset_id)}/{filename}"
+
+def _persist_uploaded_file(*, file: Any, filename: str, storage_key: str) -> str:
     temp_url, _ = storage.save_upload(
         file,
         root=settings.media_root,
@@ -435,7 +426,21 @@ async def create_asset_from_upload(
     temp_path = storage.media_url_to_path(temp_url)
     if temp_path != target_path:
         _move_file(temp_path, target_path)
-    media_url = _public_url_from_storage_key(storage_key)
+    return _public_url_from_storage_key(storage_key)
+
+
+async def create_asset_from_upload(
+    session: AsyncSession,
+    *,
+    file,
+    created_by_user_id: UUID | None,
+    visibility: MediaVisibility = MediaVisibility.private,
+) -> MediaAssetUploadResponse:
+    asset_id = uuid4()
+    filename = _safe_storage_name(getattr(file, "filename", None))
+    asset_type = _guess_asset_type(getattr(file, "content_type", None), filename)
+    storage_key = f"originals/{_asset_base_folder(asset_id)}/{filename}"
+    media_url = _persist_uploaded_file(file=file, filename=filename, storage_key=storage_key)
     asset = MediaAsset(
         id=asset_id,
         asset_type=asset_type,
@@ -1214,12 +1219,8 @@ def _asset_tag_clause(raw_tag: str) -> ColumnElement[bool] | None:
     )
 
 
-def _build_asset_filter_clauses(filters: MediaListFilters) -> list[ColumnElement[bool]]:
+def _asset_enum_filter_clauses(filters: MediaListFilters) -> list[ColumnElement[bool]]:
     clauses: list[ColumnElement[bool]] = []
-    if not filters.include_trashed:
-        clauses.append(MediaAsset.status != MediaAssetStatus.trashed)
-    if filters.q:
-        clauses.append(_asset_search_clause(filters.q))
     for raw_value, enum_type, column in (
         (filters.asset_type, MediaAssetType, cast(ColumnElement[Any], MediaAsset.asset_type)),
         (filters.status, MediaAssetStatus, cast(ColumnElement[Any], MediaAsset.status)),
@@ -1227,6 +1228,16 @@ def _build_asset_filter_clauses(filters: MediaListFilters) -> list[ColumnElement
     ):
         if raw_value:
             clauses.append(cast(ColumnElement[bool], column == enum_type(raw_value)))
+    return clauses
+
+
+def _build_asset_filter_clauses(filters: MediaListFilters) -> list[ColumnElement[bool]]:
+    clauses: list[ColumnElement[bool]] = []
+    if not filters.include_trashed:
+        clauses.append(MediaAsset.status != MediaAssetStatus.trashed)
+    if filters.q:
+        clauses.append(_asset_search_clause(filters.q))
+    clauses.extend(_asset_enum_filter_clauses(filters))
     if filters.created_from:
         clauses.append(MediaAsset.created_at >= filters.created_from)
     if filters.created_to:
@@ -1237,8 +1248,18 @@ def _build_asset_filter_clauses(filters: MediaListFilters) -> list[ColumnElement
     return clauses
 
 
-def _build_job_filter_clauses(filters: MediaJobListFilters, *, now: datetime) -> list[ColumnElement[bool]]:
-    clauses: list[ColumnElement[bool]] = []
+def _job_tag_clause(raw_tag: str) -> ColumnElement[bool] | None:
+    normalized_tag = _normalize_job_tag(raw_tag)
+    if not normalized_tag:
+        return None
+    return MediaJob.id.in_(
+        select(MediaJobTagLink.job_id)
+        .join(MediaJobTag, MediaJobTag.id == MediaJobTagLink.tag_id)
+        .where(MediaJobTag.value == normalized_tag)
+    )
+
+
+def _job_base_filter_clauses(filters: MediaJobListFilters) -> list[ColumnElement[bool]]:
     simple_filters: tuple[ColumnElement[bool] | None, ...] = (
         MediaJob.status == MediaJobStatus(filters.status) if filters.status else None,
         MediaJob.job_type == MediaJobType(filters.job_type) if filters.job_type else None,
@@ -1248,20 +1269,18 @@ def _build_job_filter_clauses(filters: MediaJobListFilters, *, now: datetime) ->
         MediaJob.assigned_to_user_id == filters.assigned_to_user_id if filters.assigned_to_user_id else None,
         MediaJob.status == MediaJobStatus.dead_letter if filters.dead_letter_only else None,
     )
-    clauses.extend([clause for clause in simple_filters if clause is not None])
+    return [clause for clause in simple_filters if clause is not None]
+
+
+def _build_job_filter_clauses(filters: MediaJobListFilters, *, now: datetime) -> list[ColumnElement[bool]]:
+    clauses = _job_base_filter_clauses(filters)
     if filters.triage_state:
         clauses.append(MediaJob.triage_state == _coerce_triage_state(filters.triage_state, fallback="open"))
     if filters.sla_breached:
         clauses.extend((MediaJob.sla_due_at.is_not(None), MediaJob.sla_due_at < now, MediaJob.triage_state != "resolved"))
-    normalized_tag = _normalize_job_tag(filters.tag) if filters.tag else ""
-    if normalized_tag:
-        clauses.append(
-            MediaJob.id.in_(
-                select(MediaJobTagLink.job_id)
-                .join(MediaJobTag, MediaJobTag.id == MediaJobTagLink.tag_id)
-                .where(MediaJobTag.value == normalized_tag)
-            )
-        )
+    tag_clause = _job_tag_clause(filters.tag) if filters.tag else None
+    if tag_clause is not None:
+        clauses.append(tag_clause)
     return clauses
 
 
@@ -2058,6 +2077,19 @@ def _retry_policy_event_meta(
     return meta
 
 
+def _set_dead_letter_state(job: MediaJob, *, now: datetime) -> None:
+    job.status = MediaJobStatus.dead_letter
+    job.dead_lettered_at = now
+    job.next_retry_at = None
+    job.triage_state = "open"
+
+
+def _set_retry_scheduled_state(job: MediaJob, *, now: datetime, delay: int) -> None:
+    job.status = MediaJobStatus.failed
+    job.next_retry_at = now + timedelta(seconds=delay)
+    job.triage_state = "retrying"
+
+
 async def _mark_job_failed_or_retrying(
     session: AsyncSession,
     *,
@@ -2083,10 +2115,7 @@ async def _mark_job_failed_or_retrying(
     job.completed_at = now
     note = str(exc)
     if delay is None:
-        job.status = MediaJobStatus.dead_letter
-        job.dead_lettered_at = now
-        job.next_retry_at = None
-        job.triage_state = "open"
+        _set_dead_letter_state(job, now=now)
         await _record_job_event(
             session,
             job=job,
@@ -2099,9 +2128,7 @@ async def _mark_job_failed_or_retrying(
             ),
         )
         return
-    job.status = MediaJobStatus.failed
-    job.next_retry_at = now + timedelta(seconds=delay)
-    job.triage_state = "retrying"
+    _set_retry_scheduled_state(job, now=now, delay=delay)
     await _record_job_event(
         session,
         job=job,
@@ -2260,14 +2287,15 @@ async def _process_edit_job(session: AsyncSession, job: MediaJob) -> None:
     session.add(row)
 
 
-async def _process_ai_tag_job(session: AsyncSession, job: MediaJob) -> None:
-    def _auto_tags_from_filename(filename: str) -> set[str]:
-        tags: set[str] = set()
-        for token in re.split(r"[^a-z0-9]+", filename.lower()):
-            if len(token) >= 3:
-                tags.add(token[:32])
-        return tags
+def _auto_tags_from_filename(filename: str) -> set[str]:
+    tags: set[str] = set()
+    for token in re.split(r"[^a-z0-9]+", filename.lower()):
+        if len(token) >= 3:
+            tags.add(token[:32])
+    return tags
 
+
+async def _process_ai_tag_job(session: AsyncSession, job: MediaJob) -> None:
     if not job.asset_id:
         return
     asset = await session.scalar(
