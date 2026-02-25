@@ -89,7 +89,7 @@ from app.models.user import (
 )
 from app.models.admin_dashboard_settings import AdminDashboardAlertThresholds
 from app.models.promo import PromoCode, StripeCouponMapping
-from app.models.coupons_v2 import Promotion
+from app.models.coupons import Promotion
 from app.models.user_export import UserDataExportJob, UserDataExportStatus
 from app.models.analytics_event import AnalyticsEvent
 from app.models.webhook import PayPalWebhookEvent, StripeWebhookEvent

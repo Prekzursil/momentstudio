@@ -11,7 +11,7 @@ from app.core.config import settings
 from app.models.order import Order, OrderEvent, OrderItem, OrderStatus
 from app.services import auth as auth_service
 from app.services import checkout_settings as checkout_settings_service
-from app.services import coupons_v2 as coupons_service
+from app.services import coupons as coupons_service
 from app.services import email as email_service
 from app.services import notifications as notification_service
 from app.services import paypal as paypal_service

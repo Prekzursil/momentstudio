@@ -50,7 +50,7 @@ from app.schemas.order import (
     ShippingMethodRead,
 )
 from app.services import cart as cart_service
-from app.services import coupons_v2 as coupons_service
+from app.services import coupons as coupons_service
 from app.services import order as order_service
 from app.services import email as email_service
 from app.services import checkout_settings as checkout_settings_service

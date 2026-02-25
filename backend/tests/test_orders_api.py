@@ -16,7 +16,7 @@ from app.db.session import get_session
 from app.models.address import Address
 from app.models.catalog import Category, Product, ProductStatus
 from app.models.cart import Cart, CartItem
-from app.models.coupons_v2 import Coupon, CouponRedemption, CouponReservation, CouponVisibility, Promotion, PromotionDiscountType
+from app.models.coupons import Coupon, CouponRedemption, CouponReservation, CouponVisibility, Promotion, PromotionDiscountType
 from app.models.email_event import EmailDeliveryEvent
 from app.models.order import Order, OrderEvent, OrderStatus, OrderItem
 from app.models.passkeys import UserPasskey

@@ -15,7 +15,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.models.cart import Cart
-from app.models.coupons_v2 import (
+from app.models.coupons import (
     Coupon,
     CouponAssignment,
     CouponRedemption,

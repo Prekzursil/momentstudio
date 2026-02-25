@@ -167,7 +167,7 @@ export interface CouponAnalyticsResponse {
 }
 
 @Injectable({ providedIn: 'root' })
-export class AdminCouponsV2Service {
+export class AdminCouponsService {
   constructor(private readonly api: ApiService) {}
 
   listPromotions(): Observable<PromotionRead[]> {

@@ -12,7 +12,7 @@ from app.schemas.promo import PromoCodeRead, PromoCodeCreate
 from app.services import cart as cart_service
 from app.services import checkout_settings as checkout_settings_service
 from app.services import order as order_service
-from app.services import coupons_v2 as coupons_service
+from app.services import coupons as coupons_service
 from app.schemas.cart_sync import CartSyncRequest
 
 router = APIRouter(prefix="/cart", tags=["cart"])

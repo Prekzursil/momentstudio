@@ -12,7 +12,7 @@ from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
 from app.models.catalog import Category, Product, ProductImage, ProductStatus
-from app.models.coupons_v2 import (
+from app.models.coupons import (
     Coupon,
     CouponAssignment,
     CouponBulkJobStatus,
@@ -32,7 +32,7 @@ from app.schemas.user import UserCreate
 from app.services import cart as cart_service
 from app.services import checkout_settings as checkout_settings_service
 from app.services.auth import create_user, issue_tokens_for_user
-from app.services.coupons_v2 import (
+from app.services.coupons import (
     evaluate_coupon_for_cart,
     get_coupon_by_code,
     issue_first_order_reward_if_eligible,

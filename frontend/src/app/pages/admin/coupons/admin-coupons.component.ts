@@ -5,13 +5,13 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { forkJoin } from 'rxjs';
 
 import {
-  AdminCouponsV2Service,
+  AdminCouponsService,
   type CouponAnalyticsResponse,
   type CouponAssignmentRead,
   type CouponBulkJobRead,
   type CouponBulkResult,
   type CouponBulkSegmentPreview
-} from '../../../core/admin-coupons-v2.service';
+} from '../../../core/admin-coupons.service';
 import { AdminProductsService, type AdminProductListItem } from '../../../core/admin-products.service';
 import { type AdminCategory, AdminService } from '../../../core/admin.service';
 import { ToastService } from '../../../core/toast.service';
@@ -1489,7 +1489,7 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
   private preselectPromotionId: string | null = null;
 
   constructor(
-    private readonly adminCoupons: AdminCouponsV2Service,
+    private readonly adminCoupons: AdminCouponsService,
     private readonly adminProducts: AdminProductsService,
     private readonly admin: AdminService,
     private readonly toast: ToastService,

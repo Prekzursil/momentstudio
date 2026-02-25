@@ -5,7 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AdminUserAliasesResponse, AdminUserSession, AdminService } from '../../../core/admin.service';
-import { AdminCouponsV2Service } from '../../../core/admin-coupons-v2.service';
+import { AdminCouponsService } from '../../../core/admin-coupons.service';
 import {
   AdminEmailVerificationHistoryResponse,
   AdminUserListItem,
@@ -1137,7 +1137,7 @@ export class AdminUsersComponent implements OnInit {
 
   constructor(
     private readonly usersApi: AdminUsersService,
-    private readonly couponsApi: AdminCouponsV2Service,
+    private readonly couponsApi: AdminCouponsService,
     private readonly admin: AdminService,
     private readonly auth: AuthService,
     private readonly recent: AdminRecentService,

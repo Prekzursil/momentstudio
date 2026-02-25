@@ -15,7 +15,7 @@ from sqlalchemy.orm import selectinload
 from app.core.dependencies import get_current_user, require_admin_section
 from app.db.session import get_session
 from app.models.catalog import Category, Product
-from app.models.coupons_v2 import (
+from app.models.coupons import (
     Coupon,
     CouponAssignment,
     CouponBulkJob,
@@ -30,7 +30,7 @@ from app.models.coupons_v2 import (
 )
 from app.models.order import Order, OrderItem, OrderStatus, ShippingMethod
 from app.models.user import User
-from app.schemas.coupons_v2 import (
+from app.schemas.coupons import (
     CouponAssignRequest,
     CouponAssignmentRead,
     CouponAnalyticsDaily,
@@ -59,7 +59,7 @@ from app.schemas.coupons_v2 import (
     PromotionUpdate,
 )
 from app.services import checkout_settings as checkout_settings_service
-from app.services import coupons_v2 as coupons_service
+from app.services import coupons as coupons_service
 from app.services import email as email_service
 from app.services import audit_chain as audit_chain_service
 from app.services import pricing

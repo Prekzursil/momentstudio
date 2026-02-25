@@ -37,7 +37,7 @@ import {
   AdminSummary
 } from '../../../core/admin.service';
 import { AdminOrdersService } from '../../../core/admin-orders.service';
-import { AdminCouponsV2Service, CouponBulkJobRead } from '../../../core/admin-coupons-v2.service';
+import { AdminCouponsService, CouponBulkJobRead } from '../../../core/admin-coupons.service';
 import { ToastService } from '../../../core/toast.service';
 import { AdminGdprExportJobItem, AdminUsersService } from '../../../core/admin-users.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
@@ -2176,7 +2176,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     private readonly admin: AdminService,
     private readonly ordersApi: AdminOrdersService,
     private readonly usersApi: AdminUsersService,
-    private readonly couponsApi: AdminCouponsV2Service,
+    private readonly couponsApi: AdminCouponsService,
     private readonly auth: AuthService,
     public favorites: AdminFavoritesService,
     public recent: AdminRecentService,

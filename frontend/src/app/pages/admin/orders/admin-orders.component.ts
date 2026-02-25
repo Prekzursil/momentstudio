@@ -2772,8 +2772,8 @@ export class AdminOrdersComponent implements OnInit {
   private coercePreset(candidate: any): AdminOrdersFilterPreset {
     const filters = candidate?.filters;
     return {
-      id: String(candidate.id),
-      name: String(candidate.name),
+      id: String(candidate?.id ?? ''),
+      name: String(candidate?.name ?? ''),
       createdAt: String(candidate.createdAt ?? ''),
       filters: {
         q: String(filters?.q ?? ''),
