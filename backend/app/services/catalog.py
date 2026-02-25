@@ -8,6 +8,7 @@ import secrets
 import string
 import unicodedata
 import uuid
+from typing import cast
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, delete, func, select, update, or_, case, false
@@ -765,7 +766,7 @@ def _sanitize_category_update_data(category: Category, data: dict[str, object]) 
     sanitized = dict(data)
     if "slug" not in sanitized:
         return sanitized
-    requested_slug = (sanitized.get("slug") or "").strip()
+    requested_slug = str(sanitized.get("slug") or "").strip()
     if requested_slug and requested_slug != category.slug:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Category slug cannot be changed")
     sanitized.pop("slug", None)
@@ -784,7 +785,8 @@ async def _validate_category_update_relations(
     session: AsyncSession, category_id: uuid.UUID, data: dict[str, object]
 ) -> None:
     if "parent_id" in data:
-        await _validate_category_parent_assignment(session, category_id=category_id, parent_id=data.get("parent_id"))
+        parent_id = cast(uuid.UUID | None, data.get("parent_id"))
+        await _validate_category_parent_assignment(session, category_id=category_id, parent_id=parent_id)
     if "tax_group_id" in data:
         await _validate_category_tax_group(session, data.get("tax_group_id"))
 
