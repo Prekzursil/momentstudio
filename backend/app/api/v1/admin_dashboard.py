@@ -1389,21 +1389,135 @@ async def admin_refunds_breakdown(
     }
 
 
-@router.get("/shipping-performance")
-async def admin_shipping_performance(
-    session: Annotated[AsyncSession, Depends(get_session)],
-    _: Annotated[User, Depends(require_admin_section("orders"))],
-    window_days: int = Query(default=30, ge=1, le=365),
-) -> dict:
+def _shipping_delta_pct(current: float | None, previous: float | None) -> float | None:
+    if current is None or previous is None or previous == 0:
+        return None
+    return (current - previous) / previous * 100.0
+
+
+def _shipping_avg(values: list[float]) -> float | None:
+    if not values:
+        return None
+    return sum(values) / len(values)
+
+
+def _shipping_duration_map(
+    rows: list[tuple[Any, Any, Any]],
+    *,
+    courier_idx: int,
+    start_idx: int,
+    end_idx: int,
+) -> dict[str, list[float]]:
+    durations: dict[str, list[float]] = {}
+    for row in rows:
+        courier = row[courier_idx]
+        start_at = row[start_idx]
+        end_at = row[end_idx]
+        if not start_at or not end_at:
+            continue
+        hours = (end_at - start_at).total_seconds() / 3600.0
+        if hours < 0 or hours > 24 * 365:
+            continue
+        key = str(courier or "unknown")
+        durations.setdefault(key, []).append(float(hours))
+    return durations
+
+
+async def _shipping_collect_ship_durations(
+    session: AsyncSession,
+    *,
+    window_start: datetime,
+    window_end: datetime,
+    exclude_test_orders: Any,
+    courier_col: Any,
+    shipped_subq: Any,
+) -> dict[str, list[float]]:
+    rows = await session.execute(
+        select(Order.created_at, courier_col, shipped_subq.c.shipped_at)
+        .select_from(Order)
+        .join(shipped_subq, shipped_subq.c.order_id == Order.id)
+        .where(
+            shipped_subq.c.shipped_at >= window_start,
+            shipped_subq.c.shipped_at < window_end,
+            exclude_test_orders,
+        )
+    )
+    return _shipping_duration_map(
+        rows.all(), courier_idx=1, start_idx=0, end_idx=2
+    )
+
+
+async def _shipping_collect_delivery_durations(
+    session: AsyncSession,
+    *,
+    window_start: datetime,
+    window_end: datetime,
+    exclude_test_orders: Any,
+    courier_col: Any,
+    shipped_subq: Any,
+    delivered_subq: Any,
+) -> dict[str, list[float]]:
+    rows = await session.execute(
+        select(courier_col, shipped_subq.c.shipped_at, delivered_subq.c.delivered_at)
+        .select_from(Order)
+        .join(delivered_subq, delivered_subq.c.order_id == Order.id)
+        .join(shipped_subq, shipped_subq.c.order_id == Order.id)
+        .where(
+            delivered_subq.c.delivered_at >= window_start,
+            delivered_subq.c.delivered_at < window_end,
+            exclude_test_orders,
+        )
+    )
+    return _shipping_duration_map(
+        rows.all(), courier_idx=0, start_idx=1, end_idx=2
+    )
+
+
+def _shipping_rows(
+    current_durations: dict[str, list[float]],
+    previous_durations: dict[str, list[float]],
+) -> list[dict]:
+    rows: list[dict] = []
+    for courier in sorted(set(current_durations) | set(previous_durations)):
+        current_values = current_durations.get(courier, [])
+        previous_values = previous_durations.get(courier, [])
+        cur_avg = _shipping_avg(current_values)
+        prev_avg = _shipping_avg(previous_values)
+        rows.append(
+            {
+                "courier": courier,
+                "current": {"count": len(current_values), "avg_hours": cur_avg},
+                "previous": {"count": len(previous_values), "avg_hours": prev_avg},
+                "delta_pct": {
+                    "avg_hours": _shipping_delta_pct(cur_avg, prev_avg),
+                    "count": _shipping_delta_pct(
+                        float(len(current_values)),
+                        float(len(previous_values)),
+                    ),
+                },
+            }
+        )
+    rows.sort(
+        key=lambda row: (row.get("current", {}).get("count", 0), row.get("courier", "")),
+        reverse=True,
+    )
+    return rows
+
+
+def _shipping_window_bounds(window_days: int) -> tuple[datetime, datetime, datetime]:
     now = datetime.now(timezone.utc)
     window = timedelta(days=int(window_days))
     start = now - window
-    prev_start = start - window
+    return now, start, start - window
 
+
+def _shipping_exclude_test_orders_clause() -> Any:
     test_order_ids = select(OrderTag.order_id).where(OrderTag.tag == "test")
-    exclude_test_orders = Order.id.notin_(test_order_ids)
+    return Order.id.notin_(test_order_ids)
 
-    shipped_subq = (
+
+def _shipping_shipped_subquery() -> Any:
+    return (
         select(
             OrderEvent.order_id.label("order_id"),
             func.min(OrderEvent.created_at).label("shipped_at"),
@@ -1416,7 +1530,10 @@ async def admin_shipping_performance(
         .group_by(OrderEvent.order_id)
         .subquery()
     )
-    delivered_subq = (
+
+
+def _shipping_delivered_subquery() -> Any:
+    return (
         select(
             OrderEvent.order_id.label("order_id"),
             func.min(OrderEvent.created_at).label("delivered_at"),
@@ -1430,110 +1547,105 @@ async def admin_shipping_performance(
         .subquery()
     )
 
-    courier_col = func.lower(func.coalesce(Order.courier, literal("unknown"))).label("courier")
 
-    def _delta_pct(current: float | None, previous: float | None) -> float | None:
-        if current is None or previous is None or previous == 0:
-            return None
-        return (current - previous) / previous * 100.0
+def _shipping_courier_col() -> Any:
+    return func.lower(func.coalesce(Order.courier, literal("unknown"))).label("courier")
 
-    async def _collect_ship_durations(window_start: datetime, window_end: datetime) -> dict[str, list[float]]:
-        rows = await session.execute(
-            select(Order.created_at, courier_col, shipped_subq.c.shipped_at)
-            .select_from(Order)
-            .join(shipped_subq, shipped_subq.c.order_id == Order.id)
-            .where(
-                shipped_subq.c.shipped_at >= window_start,
-                shipped_subq.c.shipped_at < window_end,
-                exclude_test_orders,
-            )
-        )
-        durations: dict[str, list[float]] = {}
-        for created_at, courier, shipped_at in rows.all():
-            if not created_at or not shipped_at:
-                continue
-            hours = (shipped_at - created_at).total_seconds() / 3600.0
-            if hours < 0 or hours > 24 * 365:
-                continue
-            key = str(courier or "unknown")
-            durations.setdefault(key, []).append(float(hours))
-        return durations
 
-    async def _collect_delivery_durations(window_start: datetime, window_end: datetime) -> dict[str, list[float]]:
-        rows = await session.execute(
-            select(courier_col, shipped_subq.c.shipped_at, delivered_subq.c.delivered_at)
-            .select_from(Order)
-            .join(delivered_subq, delivered_subq.c.order_id == Order.id)
-            .join(shipped_subq, shipped_subq.c.order_id == Order.id)
-            .where(
-                delivered_subq.c.delivered_at >= window_start,
-                delivered_subq.c.delivered_at < window_end,
-                exclude_test_orders,
-            )
-        )
-        durations: dict[str, list[float]] = {}
-        for courier, shipped_at, delivered_at in rows.all():
-            if not shipped_at or not delivered_at:
-                continue
-            hours = (delivered_at - shipped_at).total_seconds() / 3600.0
-            if hours < 0 or hours > 24 * 365:
-                continue
-            key = str(courier or "unknown")
-            durations.setdefault(key, []).append(float(hours))
-        return durations
-
-    def _avg(values: list[float]) -> float | None:
-        if not values:
-            return None
-        return sum(values) / len(values)
-
-    current_ship = await _collect_ship_durations(start, now)
-    previous_ship = await _collect_ship_durations(prev_start, start)
-
-    ship_rows: list[dict] = []
-    for courier in sorted(set(current_ship) | set(previous_ship)):
-        cur_avg = _avg(current_ship.get(courier, []))
-        prev_avg = _avg(previous_ship.get(courier, []))
-        ship_rows.append(
-            {
-                "courier": courier,
-                "current": {"count": len(current_ship.get(courier, [])), "avg_hours": cur_avg},
-                "previous": {"count": len(previous_ship.get(courier, [])), "avg_hours": prev_avg},
-                "delta_pct": {
-                    "avg_hours": _delta_pct(cur_avg, prev_avg),
-                    "count": _delta_pct(float(len(current_ship.get(courier, []))), float(len(previous_ship.get(courier, [])))),
-                },
-            }
-        )
-    ship_rows.sort(key=lambda row: (row.get("current", {}).get("count", 0), row.get("courier", "")), reverse=True)
-
-    current_delivery = await _collect_delivery_durations(start, now)
-    previous_delivery = await _collect_delivery_durations(prev_start, start)
-
-    delivery_rows: list[dict] = []
-    for courier in sorted(set(current_delivery) | set(previous_delivery)):
-        cur_avg = _avg(current_delivery.get(courier, []))
-        prev_avg = _avg(previous_delivery.get(courier, []))
-        delivery_rows.append(
-            {
-                "courier": courier,
-                "current": {"count": len(current_delivery.get(courier, [])), "avg_hours": cur_avg},
-                "previous": {"count": len(previous_delivery.get(courier, [])), "avg_hours": prev_avg},
-                "delta_pct": {
-                    "avg_hours": _delta_pct(cur_avg, prev_avg),
-                    "count": _delta_pct(float(len(current_delivery.get(courier, []))), float(len(previous_delivery.get(courier, [])))),
-                },
-            }
-        )
-    delivery_rows.sort(key=lambda row: (row.get("current", {}).get("count", 0), row.get("courier", "")), reverse=True)
-
+def _shipping_response_payload(
+    window_days: int,
+    start: datetime,
+    now: datetime,
+    current_ship: dict[str, list[float]],
+    previous_ship: dict[str, list[float]],
+    current_delivery: dict[str, list[float]],
+    previous_delivery: dict[str, list[float]],
+) -> dict:
     return {
         "window_days": int(window_days),
         "window_start": start,
         "window_end": now,
-        "time_to_ship": ship_rows,
-        "delivery_time": delivery_rows,
+        "time_to_ship": _shipping_rows(current_ship, previous_ship),
+        "delivery_time": _shipping_rows(current_delivery, previous_delivery),
     }
+
+
+def _shipping_query_context() -> tuple[Any, Any, Any, Any]:
+    return (
+        _shipping_exclude_test_orders_clause(),
+        _shipping_shipped_subquery(),
+        _shipping_delivered_subquery(),
+        _shipping_courier_col(),
+    )
+
+
+async def _shipping_period_durations(
+    session: AsyncSession,
+    *,
+    start: datetime,
+    now: datetime,
+    prev_start: datetime,
+    exclude_test_orders: Any,
+    courier_col: Any,
+    shipped_subq: Any,
+    delivered_subq: Any,
+) -> tuple[dict[str, list[float]], dict[str, list[float]], dict[str, list[float]], dict[str, list[float]]]:
+    current_ship = await _shipping_collect_ship_durations(
+        session,
+        window_start=start,
+        window_end=now,
+        exclude_test_orders=exclude_test_orders,
+        courier_col=courier_col,
+        shipped_subq=shipped_subq,
+    )
+    previous_ship = await _shipping_collect_ship_durations(
+        session,
+        window_start=prev_start,
+        window_end=start,
+        exclude_test_orders=exclude_test_orders,
+        courier_col=courier_col,
+        shipped_subq=shipped_subq,
+    )
+    current_delivery = await _shipping_collect_delivery_durations(
+        session,
+        window_start=start,
+        window_end=now,
+        exclude_test_orders=exclude_test_orders,
+        courier_col=courier_col,
+        shipped_subq=shipped_subq,
+        delivered_subq=delivered_subq,
+    )
+    previous_delivery = await _shipping_collect_delivery_durations(
+        session,
+        window_start=prev_start,
+        window_end=start,
+        exclude_test_orders=exclude_test_orders,
+        courier_col=courier_col,
+        shipped_subq=shipped_subq,
+        delivered_subq=delivered_subq,
+    )
+    return current_ship, previous_ship, current_delivery, previous_delivery
+
+
+@router.get("/shipping-performance")
+async def admin_shipping_performance(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    _: Annotated[User, Depends(require_admin_section("orders"))],
+    window_days: int = Query(default=30, ge=1, le=365),
+) -> dict:
+    now, start, prev_start = _shipping_window_bounds(window_days)
+    exclude_test_orders, shipped_subq, delivered_subq, courier_col = _shipping_query_context()
+    current_ship, previous_ship, current_delivery, previous_delivery = await _shipping_period_durations(
+        session,
+        start=start,
+        now=now,
+        prev_start=prev_start,
+        exclude_test_orders=exclude_test_orders,
+        courier_col=courier_col,
+        shipped_subq=shipped_subq,
+        delivered_subq=delivered_subq,
+    )
+    return _shipping_response_payload(window_days, start, now, current_ship, previous_ship, current_delivery, previous_delivery)
 
 
 def _stockout_rows(restock_rows: list[Any]) -> list[Any]:
@@ -1596,6 +1708,35 @@ async def _stockout_product_map(
     }
 
 
+def _stockout_current_price(meta: dict[str, object]) -> float:
+    sale_price = meta.get("sale_price")
+    if sale_price is not None:
+        return float(sale_price)
+    return float(meta.get("base_price", 0) or 0)
+
+
+def _stockout_int_attr(row: Any, field_name: str) -> int:
+    return int(getattr(row, field_name, 0) or 0)
+
+
+def _stockout_avg_price(demand_units: int, demand_revenue: float, current_price: float) -> float:
+    if demand_units <= 0:
+        return current_price
+    return float(demand_revenue / demand_units)
+
+
+def _stockout_estimated_missed_revenue(
+    allow_backorder: bool, reserved_carts: int, avg_price: float
+) -> float:
+    if allow_backorder:
+        return 0.0
+    return float(reserved_carts) * avg_price
+
+
+def _stockout_currency(meta: dict[str, object]) -> str:
+    return str(meta.get("currency") or "RON")
+
+
 def _stockout_item(
     row: Any,
     *,
@@ -1604,28 +1745,29 @@ def _stockout_item(
 ) -> dict[str, object]:
     meta = product_map.get(row.product_id, {})
     allow_backorder = bool(meta.get("allow_backorder", False))
-    base_price = float(meta.get("base_price", 0) or 0)
-    sale_price = meta.get("sale_price")
-    current_price = float(sale_price if sale_price is not None else base_price)
-
-    demand_units, demand_revenue = demand_map.get(row.product_id, (0, 0.0))
-    avg_price = float(demand_revenue / demand_units) if demand_units > 0 else current_price
-    reserved_carts = int(getattr(row, "reserved_in_carts", 0) or 0)
-    reserved_orders = int(getattr(row, "reserved_in_orders", 0) or 0)
-    estimated_missed = 0.0 if allow_backorder else float(reserved_carts) * avg_price
+    current_price = _stockout_current_price(meta)
+    demand_units_raw, demand_revenue_raw = demand_map.get(row.product_id, (0, 0.0))
+    demand_units = int(demand_units_raw)
+    demand_revenue = float(demand_revenue_raw)
+    reserved_carts = _stockout_int_attr(row, "reserved_in_carts")
+    reserved_orders = _stockout_int_attr(row, "reserved_in_orders")
+    available_quantity = _stockout_int_attr(row, "available_quantity")
+    stock_quantity = _stockout_int_attr(row, "stock_quantity")
+    avg_price = _stockout_avg_price(demand_units, demand_revenue, current_price)
+    estimated_missed = _stockout_estimated_missed_revenue(allow_backorder, reserved_carts, avg_price)
 
     return {
         "product_id": str(row.product_id),
         "product_slug": row.product_slug,
         "product_name": row.product_name,
-        "available_quantity": int(getattr(row, "available_quantity", 0) or 0),
+        "available_quantity": available_quantity,
         "reserved_in_carts": reserved_carts,
         "reserved_in_orders": reserved_orders,
-        "stock_quantity": int(getattr(row, "stock_quantity", 0) or 0),
-        "demand_units": int(demand_units),
-        "demand_revenue": float(demand_revenue),
+        "stock_quantity": stock_quantity,
+        "demand_units": demand_units,
+        "demand_revenue": demand_revenue,
         "estimated_missed_revenue": float(estimated_missed),
-        "currency": str(meta.get("currency") or "RON"),
+        "currency": _stockout_currency(meta),
         "allow_backorder": allow_backorder,
     }
 
