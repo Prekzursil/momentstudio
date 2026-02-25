@@ -69,6 +69,11 @@ from app.api.v1 import cart as cart_api
 
 router = APIRouter(prefix="/coupons", tags=["coupons"])
 _BULK_SEGMENT_BATCH_SIZE = 500
+_COUPON_ANALYTICS_EXCLUDED_ORDER_STATUSES = [
+    OrderStatus.pending_payment,
+    OrderStatus.cancelled,
+    OrderStatus.refunded,
+]
 
 
 async def _get_shipping_method(session: AsyncSession, shipping_method_id: UUID | None) -> ShippingMethod | None:
@@ -710,47 +715,43 @@ async def admin_issue_coupon_to_user(
     return coupon_read
 
 
-@router.get("/admin/analytics", response_model=CouponAnalyticsResponse)
-async def admin_coupon_analytics(
+@dataclass
+class _AnalyticsTopProductAgg:
+    product_id: UUID
+    slug: str | None
+    name: str
+    orders: set[UUID]
+    quantity: int
+    gross: Decimal
+    allocated: Decimal
+
+
+def _coupon_redemption_filters(
+    *,
     promotion_id: UUID,
-    session: AsyncSession = Depends(get_session),
-    _: User = Depends(require_admin_section("coupons")),
-    coupon_id: UUID | None = Query(default=None),
-    days: int = Query(default=30, ge=1, le=365),
-    top_limit: int = Query(default=10, ge=1, le=50),
-) -> CouponAnalyticsResponse:
-    @dataclass
-    class _TopProductAgg:
-        product_id: UUID
-        slug: str | None
-        name: str
-        orders: set[UUID]
-        quantity: int
-        gross: Decimal
-        allocated: Decimal
-
-    promotion = await session.get(Promotion, promotion_id)
-    if not promotion:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Promotion not found")
-
-    if coupon_id:
-        coupon = await session.get(Coupon, coupon_id)
-        if not coupon or coupon.promotion_id != promotion_id:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
-
-    end = datetime.now(timezone.utc)
-    start = end - timedelta(days=int(days))
-
-    redemption_filters = [
+    coupon_id: UUID | None,
+    start: datetime,
+    end: datetime,
+) -> list[object]:
+    filters: list[object] = [
         CouponRedemption.voided_at.is_(None),
         CouponRedemption.redeemed_at >= start,
         CouponRedemption.redeemed_at <= end,
         Coupon.promotion_id == promotion_id,
-        Order.status.notin_([OrderStatus.pending_payment, OrderStatus.cancelled, OrderStatus.refunded]),
+        Order.status.notin_(_COUPON_ANALYTICS_EXCLUDED_ORDER_STATUSES),
     ]
     if coupon_id:
-        redemption_filters.append(Coupon.id == coupon_id)
+        filters.append(Coupon.id == coupon_id)
+    return filters
 
+
+async def _coupon_analytics_summary(
+    session: AsyncSession,
+    *,
+    redemption_filters: list[object],
+    start: datetime,
+    end: datetime,
+) -> CouponAnalyticsSummary:
     summary_row = (
         await session.execute(
             select(
@@ -765,10 +766,6 @@ async def admin_coupon_analytics(
             .where(*redemption_filters)
         )
     ).one()
-
-    redemptions_count = int(summary_row[0] or 0)
-    total_discount = pricing.quantize_money(_to_decimal(summary_row[1]))
-    total_shipping_discount = pricing.quantize_money(_to_decimal(summary_row[2]))
     avg_with_val = summary_row[3]
     avg_with = pricing.quantize_money(_to_decimal(avg_with_val)) if avg_with_val is not None else None
 
@@ -777,14 +774,28 @@ async def admin_coupon_analytics(
             select(func.avg(Order.total_amount)).where(
                 Order.created_at >= start,
                 Order.created_at <= end,
-                Order.status.notin_([OrderStatus.pending_payment, OrderStatus.cancelled, OrderStatus.refunded]),
+                Order.status.notin_(_COUPON_ANALYTICS_EXCLUDED_ORDER_STATUSES),
                 or_(Order.promo_code.is_(None), func.length(func.trim(Order.promo_code)) == 0),
             )
         )
     ).scalar_one()
     avg_without = pricing.quantize_money(_to_decimal(baseline_avg_val)) if baseline_avg_val is not None else None
     aov_lift = pricing.quantize_money(avg_with - avg_without) if avg_with is not None and avg_without is not None else None
+    return CouponAnalyticsSummary(
+        redemptions=int(summary_row[0] or 0),
+        total_discount_ron=pricing.quantize_money(_to_decimal(summary_row[1])),
+        total_shipping_discount_ron=pricing.quantize_money(_to_decimal(summary_row[2])),
+        avg_order_total_with_coupon=avg_with,
+        avg_order_total_without_coupon=avg_without,
+        aov_lift=aov_lift,
+    )
 
+
+async def _coupon_analytics_daily(
+    session: AsyncSession,
+    *,
+    redemption_filters: list[object],
+) -> list[CouponAnalyticsDaily]:
     daily_rows = (
         await session.execute(
             select(
@@ -801,18 +812,22 @@ async def admin_coupon_analytics(
             .order_by("day")
         )
     ).all()
-
-    daily: list[CouponAnalyticsDaily] = []
-    for day_val, count_val, disc_val, ship_val in daily_rows:
-        daily.append(
-            CouponAnalyticsDaily(
-                date=str(day_val),
-                redemptions=int(count_val or 0),
-                discount_ron=pricing.quantize_money(_to_decimal(disc_val)),
-                shipping_discount_ron=pricing.quantize_money(_to_decimal(ship_val)),
-            )
+    return [
+        CouponAnalyticsDaily(
+            date=str(day_val),
+            redemptions=int(count_val or 0),
+            discount_ron=pricing.quantize_money(_to_decimal(disc_val)),
+            shipping_discount_ron=pricing.quantize_money(_to_decimal(ship_val)),
         )
+        for day_val, count_val, disc_val, ship_val in daily_rows
+    ]
 
+
+async def _coupon_analytics_order_discounts(
+    session: AsyncSession,
+    *,
+    redemption_filters: list[object],
+) -> dict[UUID, Decimal]:
     redemption_orders = (
         await session.execute(
             select(CouponRedemption.order_id, CouponRedemption.discount_ron)
@@ -822,91 +837,138 @@ async def admin_coupon_analytics(
             .where(*redemption_filters)
         )
     ).all()
-    order_discount_by_id: dict[UUID, Decimal] = {
+    return {
         order_id: _to_decimal(discount_val) for order_id, discount_val in redemption_orders if order_id
     }
+
+
+def _coupon_order_subtotals(
+    item_rows: list[tuple[UUID | None, UUID | None, str | None, str | None, int | None, Decimal | None]],
+) -> dict[UUID, Decimal]:
+    order_subtotals: dict[UUID, Decimal] = {}
+    for order_id, _, _, _, _, subtotal_val in item_rows:
+        if not order_id:
+            continue
+        order_subtotals[order_id] = order_subtotals.get(order_id, Decimal("0.00")) + _to_decimal(subtotal_val)
+    return order_subtotals
+
+
+def _coupon_analytics_aggregates(
+    *,
+    item_rows: list[tuple[UUID | None, UUID | None, str | None, str | None, int | None, Decimal | None]],
+    order_discount_by_id: dict[UUID, Decimal],
+) -> dict[UUID, _AnalyticsTopProductAgg]:
+    aggregates: dict[UUID, _AnalyticsTopProductAgg] = {}
+    order_subtotals = _coupon_order_subtotals(item_rows)
+    for order_id, product_id, slug, name, qty, subtotal_val in item_rows:
+        if not order_id or not product_id:
+            continue
+        subtotal = _to_decimal(subtotal_val)
+        order_subtotal = order_subtotals.get(order_id, Decimal("0.00"))
+        order_discount = order_discount_by_id.get(order_id, Decimal("0.00"))
+        allocated = Decimal("0.00")
+        if order_discount > 0 and subtotal > 0 and order_subtotal > 0:
+            allocated = order_discount * subtotal / order_subtotal
+        bucket = aggregates.get(product_id)
+        if bucket is None:
+            bucket = _AnalyticsTopProductAgg(
+                product_id=product_id,
+                slug=(slug or None),
+                name=(name or str(product_id)),
+                orders=set(),
+                quantity=0,
+                gross=Decimal("0.00"),
+                allocated=Decimal("0.00"),
+            )
+            aggregates[product_id] = bucket
+        bucket.orders.add(order_id)
+        bucket.quantity += int(qty or 0)
+        bucket.gross += subtotal
+        bucket.allocated += allocated
+    return aggregates
+
+
+async def _coupon_analytics_top_products(
+    session: AsyncSession,
+    *,
+    order_discount_by_id: dict[UUID, Decimal],
+    top_limit: int,
+) -> list[CouponAnalyticsTopProduct]:
     order_ids = list(order_discount_by_id.keys())
-
-    aggregates: dict[UUID, _TopProductAgg] = {}
-    if order_ids:
-        item_rows = (
-            await session.execute(
-                select(
-                    OrderItem.order_id,
-                    OrderItem.product_id,
-                    Product.slug,
-                    Product.name,
-                    OrderItem.quantity,
-                    OrderItem.subtotal,
-                )
-                .select_from(OrderItem)
-                .join(Product, OrderItem.product_id == Product.id)
-                .where(OrderItem.order_id.in_(order_ids))
+    if not order_ids:
+        return []
+    item_rows = (
+        await session.execute(
+            select(
+                OrderItem.order_id,
+                OrderItem.product_id,
+                Product.slug,
+                Product.name,
+                OrderItem.quantity,
+                OrderItem.subtotal,
             )
-        ).all()
+            .select_from(OrderItem)
+            .join(Product, OrderItem.product_id == Product.id)
+            .where(OrderItem.order_id.in_(order_ids))
+        )
+    ).all()
+    aggregates = _coupon_analytics_aggregates(item_rows=item_rows, order_discount_by_id=order_discount_by_id)
+    if not aggregates:
+        return []
+    items_sorted = sorted(aggregates.values(), key=lambda item: item.allocated, reverse=True)
+    return [
+        CouponAnalyticsTopProduct(
+            product_id=bucket.product_id,
+            product_slug=bucket.slug,
+            product_name=bucket.name,
+            orders_count=len(bucket.orders),
+            quantity=bucket.quantity,
+            gross_sales_ron=pricing.quantize_money(bucket.gross),
+            allocated_discount_ron=pricing.quantize_money(bucket.allocated),
+        )
+        for bucket in items_sorted[: int(top_limit)]
+    ]
 
-        order_subtotals: dict[UUID, Decimal] = {}
-        for order_id, _, _, _, _, subtotal_val in item_rows:
-            if not order_id:
-                continue
-            order_subtotals[order_id] = order_subtotals.get(order_id, Decimal("0.00")) + _to_decimal(subtotal_val)
 
-        for order_id, product_id, slug, name, qty, subtotal_val in item_rows:
-            if not order_id or not product_id:
-                continue
-            subtotal = _to_decimal(subtotal_val)
-            order_subtotal = order_subtotals.get(order_id, Decimal("0.00"))
-            order_discount = order_discount_by_id.get(order_id, Decimal("0.00"))
-            allocated = Decimal("0.00")
-            if order_discount > 0 and subtotal > 0 and order_subtotal > 0:
-                allocated = order_discount * subtotal / order_subtotal
+@router.get("/admin/analytics", response_model=CouponAnalyticsResponse)
+async def admin_coupon_analytics(
+    promotion_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin_section("coupons")),
+    coupon_id: UUID | None = Query(default=None),
+    days: int = Query(default=30, ge=1, le=365),
+    top_limit: int = Query(default=10, ge=1, le=50),
+) -> CouponAnalyticsResponse:
+    promotion = await session.get(Promotion, promotion_id)
+    if not promotion:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Promotion not found")
+    if coupon_id:
+        coupon = await session.get(Coupon, coupon_id)
+        if not coupon or coupon.promotion_id != promotion_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
 
-            bucket = aggregates.get(product_id)
-            if bucket is None:
-                bucket = _TopProductAgg(
-                    product_id=product_id,
-                    slug=(slug or None),
-                    name=(name or str(product_id)),
-                    orders=set(),
-                    quantity=0,
-                    gross=Decimal("0.00"),
-                    allocated=Decimal("0.00"),
-                )
-                aggregates[product_id] = bucket
-
-            bucket.orders.add(order_id)
-            bucket.quantity += int(qty or 0)
-            bucket.gross += subtotal
-            bucket.allocated += allocated
-
-    top_products: list[CouponAnalyticsTopProduct] = []
-    if aggregates:
-        items_sorted = sorted(aggregates.values(), key=lambda item: item.allocated, reverse=True)
-        for bucket in items_sorted[: int(top_limit)]:
-            top_products.append(
-                CouponAnalyticsTopProduct(
-                    product_id=bucket.product_id,
-                    product_slug=bucket.slug,
-                    product_name=bucket.name,
-                    orders_count=len(bucket.orders),
-                    quantity=bucket.quantity,
-                    gross_sales_ron=pricing.quantize_money(bucket.gross),
-                    allocated_discount_ron=pricing.quantize_money(bucket.allocated),
-                )
-            )
-
-    return CouponAnalyticsResponse(
-        summary=CouponAnalyticsSummary(
-            redemptions=redemptions_count,
-            total_discount_ron=total_discount,
-            total_shipping_discount_ron=total_shipping_discount,
-            avg_order_total_with_coupon=avg_with,
-            avg_order_total_without_coupon=avg_without,
-            aov_lift=aov_lift,
-        ),
-        daily=daily,
-        top_products=top_products,
+    end = datetime.now(timezone.utc)
+    start = end - timedelta(days=int(days))
+    redemption_filters = _coupon_redemption_filters(
+        promotion_id=promotion_id,
+        coupon_id=coupon_id,
+        start=start,
+        end=end,
     )
+    summary = await _coupon_analytics_summary(
+        session,
+        redemption_filters=redemption_filters,
+        start=start,
+        end=end,
+    )
+    daily = await _coupon_analytics_daily(session, redemption_filters=redemption_filters)
+    order_discount_by_id = await _coupon_analytics_order_discounts(session, redemption_filters=redemption_filters)
+    top_products = await _coupon_analytics_top_products(
+        session,
+        order_discount_by_id=order_discount_by_id,
+        top_limit=int(top_limit),
+    )
+    return CouponAnalyticsResponse(summary=summary, daily=daily, top_products=top_products)
 
 
 async def _find_user(session: AsyncSession, *, user_id: UUID | None, email: str | None) -> User:
@@ -922,6 +984,101 @@ async def _find_user(session: AsyncSession, *, user_id: UUID | None, email: str 
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
         return user
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Provide user_id or email")
+
+
+@dataclass(frozen=True)
+class _CouponEmailContext:
+    coupon_code: str
+    promotion_name: str
+    promotion_description: str | None
+    ends_at: datetime | None
+
+
+def _coupon_email_context(coupon: Coupon | None) -> _CouponEmailContext:
+    promotion = getattr(coupon, "promotion", None) if coupon else None
+    return _CouponEmailContext(
+        coupon_code=(getattr(coupon, "code", "") if coupon else ""),
+        promotion_name=(getattr(promotion, "name", None) or "Coupon"),
+        promotion_description=(getattr(promotion, "description", None) if promotion else None),
+        ends_at=(getattr(coupon, "ends_at", None) if coupon else None),
+    )
+
+
+def _trimmed_revoke_reason(value: str | None, *, max_len: int = 255) -> str | None:
+    return (value or "").strip()[:max_len] or None
+
+
+def _notification_revoke_reason(value: str | None) -> str | None:
+    return (value or "").strip() or None
+
+
+async def _get_coupon_with_promotion_or_404(session: AsyncSession, *, coupon_id: UUID) -> Coupon:
+    coupon = (
+        (
+            await session.execute(select(Coupon).options(selectinload(Coupon.promotion)).where(Coupon.id == coupon_id))
+        )
+        .scalars()
+        .first()
+    )
+    if not coupon:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+    return coupon
+
+
+async def _users_by_email(
+    session: AsyncSession,
+    *,
+    emails: list[str],
+) -> dict[str, User]:
+    if not emails:
+        return {}
+    users = (await session.execute(select(User).where(User.email.in_(emails)))).scalars().all()
+    return {u.email: u for u in users if u.email}
+
+
+async def _coupon_assignments_by_user_id(
+    session: AsyncSession,
+    *,
+    coupon_id: UUID,
+    user_ids: list[UUID],
+) -> dict[UUID, CouponAssignment]:
+    if not user_ids:
+        return {}
+    existing = (
+        (
+            await session.execute(
+                select(CouponAssignment).where(
+                    CouponAssignment.coupon_id == coupon_id,
+                    CouponAssignment.user_id.in_(user_ids),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return {a.user_id: a for a in existing}
+
+
+async def _coupon_assignment_status_by_user_id(
+    session: AsyncSession,
+    *,
+    coupon_id: UUID,
+    user_ids: list[UUID],
+) -> dict[UUID, datetime | None]:
+    if not user_ids:
+        return {}
+    existing = (
+        (
+            await session.execute(
+                select(CouponAssignment.user_id, CouponAssignment.revoked_at).where(
+                    CouponAssignment.coupon_id == coupon_id,
+                    CouponAssignment.user_id.in_(user_ids),
+                )
+            )
+        )
+        .all()
+    )
+    return {user_id: revoked_at for user_id, revoked_at in existing}
 
 
 def _normalize_bulk_emails(raw: list[str]) -> tuple[list[str], list[str]]:
@@ -1003,70 +1160,114 @@ async def _segment_sample_emails(session: AsyncSession, *, filters: list[object]
     return [str(e) for e in rows if e]
 
 
-async def _preview_segment_assign(
+def _add_sample_email(sample: list[str], email: str | None, *, limit: int = 10) -> None:
+    if email and len(sample) < limit:
+        sample.append(str(email))
+
+
+async def _segment_user_batch(
+    session: AsyncSession,
+    *,
+    filters: list[object],
+    last_id: UUID | None,
+) -> list[tuple[UUID, str | None]]:
+    q = select(User.id, User.email).where(*filters).order_by(User.id).limit(_BULK_SEGMENT_BATCH_SIZE)
+    if last_id is not None:
+        q = q.where(User.id > last_id)
+    return (await session.execute(q)).all()
+
+
+async def _segment_user_batch_with_language(
+    session: AsyncSession,
+    *,
+    filters: list[object],
+    last_id: UUID | None,
+) -> list[tuple[UUID, str | None, str | None]]:
+    q = select(User.id, User.email, User.preferred_language).where(*filters).order_by(User.id).limit(_BULK_SEGMENT_BATCH_SIZE)
+    if last_id is not None:
+        q = q.where(User.id > last_id)
+    return (await session.execute(q)).all()
+
+
+def _bucket_preview_rows(
+    rows: list[tuple[UUID, str | None]],
+    *,
+    bucket: _BucketConfig | None,
+) -> list[tuple[UUID, str | None]]:
+    if bucket is None:
+        return rows
+    return [
+        (user_id, email)
+        for user_id, email in rows
+        if _bucket_index_for_user(user_id=user_id, seed=bucket.seed, total=bucket.total) == bucket.index
+    ]
+
+
+def _bucket_job_rows(
+    rows: list[tuple[UUID, str | None, str | None]],
+    *,
+    bucket: _BucketConfig | None,
+) -> list[tuple[UUID, str | None, str | None]]:
+    if bucket is None:
+        return rows
+    return [
+        (user_id, email, preferred_language)
+        for user_id, email, preferred_language in rows
+        if _bucket_index_for_user(user_id=user_id, seed=bucket.seed, total=bucket.total) == bucket.index
+    ]
+
+
+async def _preview_segment_assign_bucketed(
     session: AsyncSession,
     *,
     coupon_id: UUID,
     filters: list[object],
-    bucket: _BucketConfig | None = None,
+    bucket: _BucketConfig,
 ) -> CouponBulkSegmentPreview:
-    if bucket is not None:
-        total = 0
-        already_active = 0
-        restored = 0
-        sample: list[str] = []
-
-        last_id: UUID | None = None
-        while True:
-            q = select(User.id, User.email).where(*filters).order_by(User.id).limit(_BULK_SEGMENT_BATCH_SIZE)
-            if last_id is not None:
-                q = q.where(User.id > last_id)
-            rows = (await session.execute(q)).all()
-            if not rows:
-                break
-            last_id = rows[-1][0]
-
-            bucketed = [
-                (user_id, email)
-                for user_id, email in rows
-                if _bucket_index_for_user(user_id=user_id, seed=bucket.seed, total=bucket.total) == bucket.index
-            ]
-            if not bucketed:
-                continue
-
-            user_ids = [user_id for user_id, _ in bucketed]
-            existing = (
-                (
-                    await session.execute(
-                        select(CouponAssignment.user_id, CouponAssignment.revoked_at).where(
-                            CouponAssignment.coupon_id == coupon_id,
-                            CouponAssignment.user_id.in_(user_ids),
-                        )
-                    )
-                )
-                .all()
-            )
-            status_by_user_id = {user_id: revoked_at for user_id, revoked_at in existing}
-
-            for user_id, email in bucketed:
-                total += 1
-                if email and len(sample) < 10:
-                    sample.append(str(email))
-                revoked_at = status_by_user_id.get(user_id)
-                if revoked_at is None and user_id in status_by_user_id:
-                    already_active += 1
-                elif revoked_at is not None:
-                    restored += 1
-
-        created = max(total - already_active - restored, 0)
-        return CouponBulkSegmentPreview(
-            total_candidates=total,
-            sample_emails=sample,
-            created=created,
-            restored=restored,
-            already_active=already_active,
+    total = 0
+    already_active = 0
+    restored = 0
+    sample: list[str] = []
+    last_id: UUID | None = None
+    while True:
+        rows = await _segment_user_batch(session, filters=filters, last_id=last_id)
+        if not rows:
+            break
+        last_id = rows[-1][0]
+        bucketed = _bucket_preview_rows(rows, bucket=bucket)
+        if not bucketed:
+            continue
+        user_ids = [user_id for user_id, _ in bucketed]
+        status_by_user_id = await _coupon_assignment_status_by_user_id(
+            session,
+            coupon_id=coupon_id,
+            user_ids=user_ids,
         )
+        for user_id, email in bucketed:
+            total += 1
+            _add_sample_email(sample, email)
+            revoked_at = status_by_user_id.get(user_id)
+            if revoked_at is None and user_id in status_by_user_id:
+                already_active += 1
+                continue
+            if revoked_at is not None:
+                restored += 1
+    created = max(total - already_active - restored, 0)
+    return CouponBulkSegmentPreview(
+        total_candidates=total,
+        sample_emails=sample,
+        created=created,
+        restored=restored,
+        already_active=already_active,
+    )
 
+
+async def _preview_segment_assign_all(
+    session: AsyncSession,
+    *,
+    coupon_id: UUID,
+    filters: list[object],
+) -> CouponBulkSegmentPreview:
     total = int((await session.execute(select(func.count()).select_from(User).where(*filters))).scalar_one())
     already_active = int(
         (
@@ -1099,73 +1300,71 @@ async def _preview_segment_assign(
     )
 
 
-async def _preview_segment_revoke(
+async def _preview_segment_assign(
     session: AsyncSession,
     *,
     coupon_id: UUID,
     filters: list[object],
     bucket: _BucketConfig | None = None,
 ) -> CouponBulkSegmentPreview:
-    if bucket is not None:
-        total = 0
-        revoked = 0
-        already_revoked = 0
-        not_assigned = 0
-        sample: list[str] = []
+    if bucket is None:
+        return await _preview_segment_assign_all(session, coupon_id=coupon_id, filters=filters)
+    return await _preview_segment_assign_bucketed(session, coupon_id=coupon_id, filters=filters, bucket=bucket)
 
-        last_id: UUID | None = None
-        while True:
-            q = select(User.id, User.email).where(*filters).order_by(User.id).limit(_BULK_SEGMENT_BATCH_SIZE)
-            if last_id is not None:
-                q = q.where(User.id > last_id)
-            rows = (await session.execute(q)).all()
-            if not rows:
-                break
-            last_id = rows[-1][0]
 
-            bucketed = [
-                (user_id, email)
-                for user_id, email in rows
-                if _bucket_index_for_user(user_id=user_id, seed=bucket.seed, total=bucket.total) == bucket.index
-            ]
-            if not bucketed:
-                continue
-
-            user_ids = [user_id for user_id, _ in bucketed]
-            existing = (
-                (
-                    await session.execute(
-                        select(CouponAssignment.user_id, CouponAssignment.revoked_at).where(
-                            CouponAssignment.coupon_id == coupon_id,
-                            CouponAssignment.user_id.in_(user_ids),
-                        )
-                    )
-                )
-                .all()
-            )
-            status_by_user_id = {user_id: revoked_at for user_id, revoked_at in existing}
-
-            for user_id, email in bucketed:
-                total += 1
-                if email and len(sample) < 10:
-                    sample.append(str(email))
-                if user_id not in status_by_user_id:
-                    not_assigned += 1
-                    continue
-                revoked_at = status_by_user_id.get(user_id)
-                if revoked_at is None:
-                    revoked += 1
-                else:
-                    already_revoked += 1
-
-        return CouponBulkSegmentPreview(
-            total_candidates=total,
-            sample_emails=sample,
-            revoked=revoked,
-            already_revoked=already_revoked,
-            not_assigned=not_assigned,
+async def _preview_segment_revoke_bucketed(
+    session: AsyncSession,
+    *,
+    coupon_id: UUID,
+    filters: list[object],
+    bucket: _BucketConfig,
+) -> CouponBulkSegmentPreview:
+    total = 0
+    revoked = 0
+    already_revoked = 0
+    not_assigned = 0
+    sample: list[str] = []
+    last_id: UUID | None = None
+    while True:
+        rows = await _segment_user_batch(session, filters=filters, last_id=last_id)
+        if not rows:
+            break
+        last_id = rows[-1][0]
+        bucketed = _bucket_preview_rows(rows, bucket=bucket)
+        if not bucketed:
+            continue
+        user_ids = [user_id for user_id, _ in bucketed]
+        status_by_user_id = await _coupon_assignment_status_by_user_id(
+            session,
+            coupon_id=coupon_id,
+            user_ids=user_ids,
         )
+        for user_id, email in bucketed:
+            total += 1
+            _add_sample_email(sample, email)
+            if user_id not in status_by_user_id:
+                not_assigned += 1
+                continue
+            revoked_at = status_by_user_id.get(user_id)
+            if revoked_at is None:
+                revoked += 1
+                continue
+            already_revoked += 1
+    return CouponBulkSegmentPreview(
+        total_candidates=total,
+        sample_emails=sample,
+        revoked=revoked,
+        already_revoked=already_revoked,
+        not_assigned=not_assigned,
+    )
 
+
+async def _preview_segment_revoke_all(
+    session: AsyncSession,
+    *,
+    coupon_id: UUID,
+    filters: list[object],
+) -> CouponBulkSegmentPreview:
     total = int((await session.execute(select(func.count()).select_from(User).where(*filters))).scalar_one())
     revoked = int(
         (
@@ -1198,30 +1397,240 @@ async def _preview_segment_revoke(
     )
 
 
+async def _preview_segment_revoke(
+    session: AsyncSession,
+    *,
+    coupon_id: UUID,
+    filters: list[object],
+    bucket: _BucketConfig | None = None,
+) -> CouponBulkSegmentPreview:
+    if bucket is None:
+        return await _preview_segment_revoke_all(session, coupon_id=coupon_id, filters=filters)
+    return await _preview_segment_revoke_bucketed(session, coupon_id=coupon_id, filters=filters, bucket=bucket)
+
+
+async def _load_bulk_job_for_run(session: AsyncSession, *, job_id: UUID) -> CouponBulkJob | None:
+    return (
+        (
+            await session.execute(
+                select(CouponBulkJob)
+                .options(selectinload(CouponBulkJob.coupon).selectinload(Coupon.promotion))
+                .where(CouponBulkJob.id == job_id)
+            )
+        )
+        .scalars()
+        .first()
+    )
+
+
+async def _mark_bulk_job_running(session: AsyncSession, *, job: CouponBulkJob) -> None:
+    job.status = CouponBulkJobStatus.running
+    job.started_at = datetime.now(timezone.utc)
+    job.error_message = None
+    await session.commit()
+
+
+async def _initialize_bulk_job_counters(
+    session: AsyncSession,
+    *,
+    job: CouponBulkJob,
+    filters: list[object],
+    bucket: _BucketConfig | None,
+) -> None:
+    if bucket is None:
+        job.total_candidates = int((await session.execute(select(func.count()).select_from(User).where(*filters))).scalar_one())
+    else:
+        job.total_candidates = int(getattr(job, "total_candidates", 0) or 0)
+    job.processed = 0
+    job.created = 0
+    job.restored = 0
+    job.already_active = 0
+    job.revoked = 0
+    job.already_revoked = 0
+    job.not_assigned = 0
+    await session.commit()
+
+
+async def _finish_bulk_job_if_cancelled(session: AsyncSession, *, job: CouponBulkJob) -> bool:
+    await session.refresh(job, attribute_names=["status"])
+    if job.status != CouponBulkJobStatus.cancelled:
+        return False
+    job.finished_at = datetime.now(timezone.utc)
+    await session.commit()
+    return True
+
+
+def _append_job_notification(
+    notify: list[tuple[str, str | None]],
+    *,
+    send_email: bool,
+    email: str | None,
+    preferred_language: str | None,
+) -> None:
+    if send_email and email:
+        notify.append((email, preferred_language))
+
+
+def _apply_bulk_job_assign_row(
+    *,
+    session: AsyncSession,
+    job: CouponBulkJob,
+    assignment: CouponAssignment | None,
+    user_id: UUID,
+    email: str | None,
+    preferred_language: str | None,
+    notify: list[tuple[str, str | None]],
+) -> None:
+    if assignment and assignment.revoked_at is None:
+        job.already_active += 1
+        return
+    if assignment and assignment.revoked_at is not None:
+        assignment.revoked_at = None
+        assignment.revoked_reason = None
+        session.add(assignment)
+        job.restored += 1
+        _append_job_notification(
+            notify,
+            send_email=job.send_email,
+            email=email,
+            preferred_language=preferred_language,
+        )
+        return
+    session.add(CouponAssignment(coupon_id=job.coupon_id, user_id=user_id))
+    job.created += 1
+    _append_job_notification(
+        notify,
+        send_email=job.send_email,
+        email=email,
+        preferred_language=preferred_language,
+    )
+
+
+def _apply_bulk_job_revoke_row(
+    *,
+    session: AsyncSession,
+    job: CouponBulkJob,
+    assignment: CouponAssignment | None,
+    email: str | None,
+    preferred_language: str | None,
+    notify: list[tuple[str, str | None]],
+    now: datetime,
+    revoke_reason: str | None,
+) -> None:
+    if not assignment:
+        job.not_assigned += 1
+        return
+    if assignment.revoked_at is not None:
+        job.already_revoked += 1
+        return
+    assignment.revoked_at = now
+    assignment.revoked_reason = revoke_reason
+    session.add(assignment)
+    job.revoked += 1
+    _append_job_notification(
+        notify,
+        send_email=job.send_email,
+        email=email,
+        preferred_language=preferred_language,
+    )
+
+
+def _apply_bulk_job_rows(
+    *,
+    session: AsyncSession,
+    job: CouponBulkJob,
+    rows: list[tuple[UUID, str | None, str | None]],
+    assignments_by_user_id: dict[UUID, CouponAssignment],
+    now: datetime,
+    revoke_reason: str | None,
+) -> list[tuple[str, str | None]]:
+    notify: list[tuple[str, str | None]] = []
+    if job.action == CouponBulkJobAction.assign:
+        for user_id, email, preferred_language in rows:
+            _apply_bulk_job_assign_row(
+                session=session,
+                job=job,
+                assignment=assignments_by_user_id.get(user_id),
+                user_id=user_id,
+                email=email,
+                preferred_language=preferred_language,
+                notify=notify,
+            )
+            job.processed += 1
+        return notify
+    for user_id, email, preferred_language in rows:
+        _apply_bulk_job_revoke_row(
+            session=session,
+            job=job,
+            assignment=assignments_by_user_id.get(user_id),
+            email=email,
+            preferred_language=preferred_language,
+            notify=notify,
+            now=now,
+            revoke_reason=revoke_reason,
+        )
+        job.processed += 1
+    return notify
+
+
+async def _send_bulk_assign_notifications(
+    *,
+    notify: list[tuple[str, str | None]],
+    context: _CouponEmailContext,
+) -> None:
+    for to_email, lang in notify:
+        await email_service.send_coupon_assigned(
+            to_email,
+            coupon_code=context.coupon_code,
+            promotion_name=context.promotion_name,
+            promotion_description=context.promotion_description,
+            ends_at=context.ends_at,
+            lang=lang,
+        )
+
+
+async def _send_bulk_revoke_notifications(
+    *,
+    notify: list[tuple[str, str | None]],
+    context: _CouponEmailContext,
+    revoke_reason: str | None,
+) -> None:
+    for to_email, lang in notify:
+        await email_service.send_coupon_revoked(
+            to_email,
+            coupon_code=context.coupon_code,
+            promotion_name=context.promotion_name,
+            reason=revoke_reason,
+            lang=lang,
+        )
+
+
+async def _send_bulk_job_notifications(
+    *,
+    job: CouponBulkJob,
+    notify: list[tuple[str, str | None]],
+    context: _CouponEmailContext,
+    revoke_reason: str | None,
+) -> None:
+    if not notify:
+        return
+    if job.action == CouponBulkJobAction.assign:
+        await _send_bulk_assign_notifications(notify=notify, context=context)
+        return
+    await _send_bulk_revoke_notifications(notify=notify, context=context, revoke_reason=revoke_reason)
+
+
 async def _run_bulk_segment_job(engine: AsyncEngine, *, job_id: UUID) -> None:
     SessionLocal = async_sessionmaker(engine, expire_on_commit=False, autoflush=False, class_=AsyncSession)
     async with SessionLocal() as session:
-        job = (
-            (
-                await session.execute(
-                    select(CouponBulkJob)
-                    .options(selectinload(CouponBulkJob.coupon).selectinload(Coupon.promotion))
-                    .where(CouponBulkJob.id == job_id)
-                )
-            )
-            .scalars()
-            .first()
-        )
+        job = await _load_bulk_job_for_run(session, job_id=job_id)
         if not job:
             return
         if job.status not in (CouponBulkJobStatus.pending, CouponBulkJobStatus.running):
             return
 
         try:
-            job.status = CouponBulkJobStatus.running
-            job.started_at = datetime.now(timezone.utc)
-            job.error_message = None
-            await session.commit()
+            await _mark_bulk_job_running(session, job=job)
 
             bucket = _parse_bucket_config(
                 bucket_total=getattr(job, "bucket_total", None),
@@ -1229,151 +1638,57 @@ async def _run_bulk_segment_job(engine: AsyncEngine, *, job_id: UUID) -> None:
                 bucket_seed=getattr(job, "bucket_seed", None),
             )
             filters = _segment_user_filters(job)
-            if bucket is None:
-                total = int((await session.execute(select(func.count()).select_from(User).where(*filters))).scalar_one())
-                job.total_candidates = total
-            else:
-                total = int(getattr(job, "total_candidates", 0) or 0)
-            job.processed = 0
-            job.created = 0
-            job.restored = 0
-            job.already_active = 0
-            job.revoked = 0
-            job.already_revoked = 0
-            job.not_assigned = 0
-            await session.commit()
+            await _initialize_bulk_job_counters(session, job=job, filters=filters, bucket=bucket)
 
-            coupon = job.coupon
-            promotion = getattr(coupon, "promotion", None) if coupon else None
-            coupon_code = getattr(coupon, "code", "") if coupon else ""
-            promo_name = getattr(promotion, "name", None) or "Coupon"
-            promo_desc = getattr(promotion, "description", None) if promotion else None
-            ends_at = getattr(coupon, "ends_at", None)
-
+            context = _coupon_email_context(job.coupon)
+            revoke_reason = _trimmed_revoke_reason(job.revoke_reason)
+            revoke_notify_reason = _notification_revoke_reason(job.revoke_reason)
             last_id: UUID | None = None
             now = datetime.now(timezone.utc)
-
             while True:
-                await session.refresh(job, attribute_names=["status"])
-                if job.status == CouponBulkJobStatus.cancelled:
-                    job.finished_at = datetime.now(timezone.utc)
-                    await session.commit()
+                if await _finish_bulk_job_if_cancelled(session, job=job):
                     return
 
-                q = select(User.id, User.email, User.preferred_language).where(*filters).order_by(User.id).limit(_BULK_SEGMENT_BATCH_SIZE)
-                if last_id is not None:
-                    q = q.where(User.id > last_id)
-                rows = (await session.execute(q)).all()
+                rows = await _segment_user_batch_with_language(session, filters=filters, last_id=last_id)
                 if not rows:
                     break
-
-                if bucket is None:
-                    bucketed_rows = rows
-                else:
-                    bucketed_rows = [
-                        (user_id, email, preferred_language)
-                        for user_id, email, preferred_language in rows
-                        if _bucket_index_for_user(user_id=user_id, seed=bucket.seed, total=bucket.total) == bucket.index
-                    ]
-
+                last_id = rows[-1][0]
+                bucketed_rows = _bucket_job_rows(rows, bucket=bucket)
                 if not bucketed_rows:
-                    last_id = rows[-1][0]
                     continue
 
                 user_ids = [row[0] for row in bucketed_rows]
-                existing = (
-                    (
-                        await session.execute(
-                            select(CouponAssignment).where(
-                                CouponAssignment.coupon_id == job.coupon_id,
-                                CouponAssignment.user_id.in_(user_ids),
-                            )
-                        )
-                    )
-                    .scalars()
-                    .all()
+                assignments_by_user_id = await _coupon_assignments_by_user_id(
+                    session,
+                    coupon_id=job.coupon_id,
+                    user_ids=user_ids,
                 )
-                assignments_by_user_id = {a.user_id: a for a in existing}
-
-                notify: list[tuple[str, str | None]] = []
-
-                for user_id, email, preferred_language in bucketed_rows:
-                    assignment = assignments_by_user_id.get(user_id)
-                    if job.action == CouponBulkJobAction.assign:
-                        if assignment and assignment.revoked_at is None:
-                            job.already_active += 1
-                        elif assignment and assignment.revoked_at is not None:
-                            assignment.revoked_at = None
-                            assignment.revoked_reason = None
-                            session.add(assignment)
-                            job.restored += 1
-                            if job.send_email and email:
-                                notify.append((email, preferred_language))
-                        else:
-                            session.add(CouponAssignment(coupon_id=job.coupon_id, user_id=user_id))
-                            job.created += 1
-                            if job.send_email and email:
-                                notify.append((email, preferred_language))
-                    else:
-                        if not assignment:
-                            job.not_assigned += 1
-                        elif assignment.revoked_at is not None:
-                            job.already_revoked += 1
-                        else:
-                            assignment.revoked_at = now
-                            assignment.revoked_reason = (job.revoke_reason or "").strip()[:255] or None
-                            session.add(assignment)
-                            job.revoked += 1
-                            if job.send_email and email:
-                                notify.append((email, preferred_language))
-
-                    job.processed += 1
-
+                notify = _apply_bulk_job_rows(
+                    session=session,
+                    job=job,
+                    rows=bucketed_rows,
+                    assignments_by_user_id=assignments_by_user_id,
+                    now=now,
+                    revoke_reason=revoke_reason,
+                )
                 await session.commit()
-
-                await session.refresh(job, attribute_names=["status"])
-                if job.status == CouponBulkJobStatus.cancelled:
-                    job.finished_at = datetime.now(timezone.utc)
-                    await session.commit()
+                if await _finish_bulk_job_if_cancelled(session, job=job):
                     return
+                await _send_bulk_job_notifications(
+                    job=job,
+                    notify=notify,
+                    context=context,
+                    revoke_reason=revoke_notify_reason,
+                )
 
-                if notify:
-                    if job.action == CouponBulkJobAction.assign:
-                        for to_email, lang in notify:
-                            await email_service.send_coupon_assigned(
-                                to_email,
-                                coupon_code=coupon_code,
-                                promotion_name=promo_name,
-                                promotion_description=promo_desc,
-                                ends_at=ends_at,
-                                lang=lang,
-                            )
-                    else:
-                        for to_email, lang in notify:
-                            await email_service.send_coupon_revoked(
-                                to_email,
-                                coupon_code=coupon_code,
-                                promotion_name=promo_name,
-                                reason=(job.revoke_reason or "").strip() or None,
-                                lang=lang,
-                            )
-
-                last_id = rows[-1][0]
-
-            await session.refresh(job, attribute_names=["status"])
-            if job.status == CouponBulkJobStatus.cancelled:
-                job.finished_at = datetime.now(timezone.utc)
-                await session.commit()
+            if await _finish_bulk_job_if_cancelled(session, job=job):
                 return
 
             job.status = CouponBulkJobStatus.succeeded
             job.finished_at = datetime.now(timezone.utc)
             await session.commit()
         except Exception as exc:
-            await session.refresh(job, attribute_names=["status"])
-            if job.status == CouponBulkJobStatus.cancelled:
-                job.finished_at = datetime.now(timezone.utc)
-                await session.commit()
+            if await _finish_bulk_job_if_cancelled(session, job=job):
                 return
             job.status = CouponBulkJobStatus.failed
             job.error_message = str(exc)[:1000]

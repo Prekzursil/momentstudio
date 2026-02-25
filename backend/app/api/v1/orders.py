@@ -873,163 +873,281 @@ async def create_order(
     return order
 
 
-@router.post("/checkout", response_model=GuestCheckoutResponse, status_code=status.HTTP_201_CREATED)
-async def checkout(
-    payload: CheckoutRequest,
-    request: Request,
-    response: Response,
-    background_tasks: BackgroundTasks,
-    _: None = Depends(checkout_rate_limit),
-    session: AsyncSession = Depends(get_session),
-    current_user=Depends(require_verified_email),
-    session_id: str | None = Depends(cart_api.session_header),
+def _guest_checkout_response_from_order(order: Order) -> GuestCheckoutResponse:
+    return GuestCheckoutResponse(
+        order_id=order.id,
+        reference_code=order.reference_code,
+        paypal_order_id=order.paypal_order_id,
+        paypal_approval_url=getattr(order, "paypal_approval_url", None),
+        netopia_ntp_id=getattr(order, "netopia_ntp_id", None),
+        netopia_payment_url=getattr(order, "netopia_payment_url", None),
+        stripe_session_id=order.stripe_checkout_session_id,
+        stripe_checkout_url=getattr(order, "stripe_checkout_url", None),
+        payment_method=order.payment_method,
+    )
+
+
+def _guest_checkout_response_with_payment(
+    *,
+    order: Order,
+    payment_method: str,
+    stripe_session_id: str | None,
+    stripe_checkout_url: str | None,
+    paypal_order_id: str | None,
+    paypal_approval_url: str | None,
+    netopia_ntp_id: str | None,
+    netopia_payment_url: str | None,
 ) -> GuestCheckoutResponse:
-    required_versions = await legal_consents_service.required_doc_versions(session)
-    accepted_versions = await legal_consents_service.latest_accepted_versions(session, user_id=current_user.id)
-    needs_consent = not legal_consents_service.is_satisfied(required_versions, accepted_versions)
-    if needs_consent and (not payload.accept_terms or not payload.accept_privacy):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Legal consents required")
+    return GuestCheckoutResponse(
+        order_id=order.id,
+        reference_code=order.reference_code,
+        paypal_order_id=paypal_order_id,
+        paypal_approval_url=paypal_approval_url,
+        netopia_ntp_id=netopia_ntp_id,
+        netopia_payment_url=netopia_payment_url,
+        stripe_session_id=stripe_session_id,
+        stripe_checkout_url=stripe_checkout_url,
+        payment_method=payment_method,
+    )
 
-    base = _frontend_base_from_request(request)
 
-    user_cart = await cart_service.get_cart(session, current_user.id, session_id)
-    if not user_cart.items:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty")
+def _netopia_order_description(order: Order) -> str:
+    return f"Order {order.reference_code}" if order.reference_code else f"Order {order.id}"
 
+
+def _can_restart_existing_netopia_payment(order: Order) -> bool:
+    existing_method = (order.payment_method or "").strip().lower()
+    existing_netopia_url = (getattr(order, "netopia_payment_url", None) or "").strip()
+    return (
+        existing_method == "netopia"
+        and not existing_netopia_url
+        and settings.netopia_enabled
+        and netopia_service.is_netopia_configured()
+    )
+
+
+def _assert_netopia_enabled_and_configured() -> None:
+    if not settings.netopia_enabled:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Netopia is disabled")
+    netopia_configured, netopia_reason = netopia_service.netopia_configuration_status()
+    if netopia_configured:
+        return
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=netopia_reason or "Netopia is not configured",
+    )
+
+
+async def _start_netopia_payment_for_order(
+    order: Order,
+    *,
+    email: str,
+    phone: str | None,
+    lang: str | None,
+    base: str,
+    shipping_fallback: Address | None = None,
+    billing_fallback: Address | None = None,
+) -> tuple[str, str] | None:
+    shipping_addr_obj = order.shipping_address or shipping_fallback
+    billing_addr_obj = order.billing_address or billing_fallback or shipping_addr_obj
+    if not shipping_addr_obj or not billing_addr_obj:
+        return None
+    first_name, last_name = _split_customer_name(getattr(order, "customer_name", None) or "")
+    billing_payload = _netopia_address_payload(
+        email=getattr(order, "customer_email", None) or email,
+        phone=getattr(shipping_addr_obj, "phone", None) or phone,
+        first_name=first_name,
+        last_name=last_name,
+        addr=billing_addr_obj,
+    )
+    shipping_payload = _netopia_address_payload(
+        email=getattr(order, "customer_email", None) or email,
+        phone=getattr(shipping_addr_obj, "phone", None) or phone,
+        first_name=first_name,
+        last_name=last_name,
+        addr=shipping_addr_obj,
+    )
+    netopia_ntp_id, netopia_payment_url = await netopia_service.start_payment(
+        order_id=str(order.id),
+        amount_ron=pricing.quantize_money(order.total_amount),
+        description=_netopia_order_description(order),
+        billing=billing_payload,
+        shipping=shipping_payload,
+        products=_build_netopia_products(order, lang=lang),
+        language=(lang or "ro"),
+        cancel_url=f"{base}/checkout/netopia/cancel?order_id={order.id}",
+        notify_url=f"{base}/api/v1/payments/netopia/webhook",
+        redirect_url=f"{base}/checkout/netopia/return?order_id={order.id}",
+    )
+    return netopia_ntp_id, netopia_payment_url
+
+
+async def _refresh_existing_order_netopia_payment(
+    session: AsyncSession,
+    order: Order,
+    *,
+    email: str,
+    phone: str | None,
+    lang: str | None,
+    base: str,
+) -> None:
+    if not _can_restart_existing_netopia_payment(order):
+        return
+    started = await _start_netopia_payment_for_order(order, email=email, phone=phone, lang=lang, base=base)
+    if not started:
+        return
+    order.netopia_ntp_id, order.netopia_payment_url = started
+    session.add(order)
+    await session.commit()
+    await session.refresh(order)
+
+
+async def _clear_cart_last_order_pointer(
+    session: AsyncSession,
+    *,
+    cart_id: UUID,
+    cart_row: Cart | None = None,
+) -> None:
+    cart = cart_row if cart_row is not None else await session.get(Cart, cart_id)
+    if not cart:
+        return
+    cart.last_order_id = None
+    session.add(cart)
+
+
+async def _resolve_existing_checkout_response(
+    session: AsyncSession,
+    *,
+    cart_id: UUID,
+    base: str,
+    email: str,
+    phone: str | None,
+    lang: str | None,
+    cart_row: Cart | None = None,
+) -> GuestCheckoutResponse | None:
     last_order_id = await session.scalar(
-        select(Cart.last_order_id).where(Cart.id == user_cart.id).with_for_update()
+        select(Cart.last_order_id).where(Cart.id == cart_id).with_for_update()
     )
-    if last_order_id:
-        existing_order = await order_service.get_order_by_id(session, last_order_id)
-        if existing_order:
-            existing_method = (existing_order.payment_method or "").strip().lower()
-            existing_netopia_url = (getattr(existing_order, "netopia_payment_url", None) or "").strip()
-            if (
-                existing_method == "netopia"
-                and not existing_netopia_url
-                and settings.netopia_enabled
-                and netopia_service.is_netopia_configured()
-            ):
-                first_name, last_name = _split_customer_name(getattr(existing_order, "customer_name", None) or "")
-                shipping_addr_obj = existing_order.shipping_address
-                billing_addr_obj = existing_order.billing_address or shipping_addr_obj
-                if shipping_addr_obj and billing_addr_obj:
-                    billing_payload = _netopia_address_payload(
-                        email=getattr(existing_order, "customer_email", None) or current_user.email,
-                        phone=getattr(shipping_addr_obj, "phone", None) or getattr(current_user, "phone", None),
-                        first_name=first_name,
-                        last_name=last_name,
-                        addr=billing_addr_obj,
-                    )
-                    shipping_payload = _netopia_address_payload(
-                        email=getattr(existing_order, "customer_email", None) or current_user.email,
-                        phone=getattr(shipping_addr_obj, "phone", None) or getattr(current_user, "phone", None),
-                        first_name=first_name,
-                        last_name=last_name,
-                        addr=shipping_addr_obj,
-                    )
-                    cancel_url = f"{base}/checkout/netopia/cancel?order_id={existing_order.id}"
-                    redirect_url = f"{base}/checkout/netopia/return?order_id={existing_order.id}"
-                    notify_url = f"{base}/api/v1/payments/netopia/webhook"
-                    netopia_ntp_id, netopia_payment_url = await netopia_service.start_payment(
-                        order_id=str(existing_order.id),
-                        amount_ron=pricing.quantize_money(existing_order.total_amount),
-                        description=f"Order {existing_order.reference_code}"
-                        if existing_order.reference_code
-                        else f"Order {existing_order.id}",
-                        billing=billing_payload,
-                        shipping=shipping_payload,
-                        products=_build_netopia_products(existing_order, lang=current_user.preferred_language),
-                        language=(current_user.preferred_language or "ro"),
-                        cancel_url=cancel_url,
-                        notify_url=notify_url,
-                        redirect_url=redirect_url,
-                    )
-                    existing_order.netopia_ntp_id = netopia_ntp_id
-                    existing_order.netopia_payment_url = netopia_payment_url
-                    session.add(existing_order)
-                    await session.commit()
-                    await session.refresh(existing_order)
-            response.status_code = status.HTTP_200_OK
-            return GuestCheckoutResponse(
-                order_id=existing_order.id,
-                reference_code=existing_order.reference_code,
-                paypal_order_id=existing_order.paypal_order_id,
-                paypal_approval_url=getattr(existing_order, "paypal_approval_url", None),
-                netopia_ntp_id=getattr(existing_order, "netopia_ntp_id", None),
-                netopia_payment_url=getattr(existing_order, "netopia_payment_url", None),
-                stripe_session_id=existing_order.stripe_checkout_session_id,
-                stripe_checkout_url=getattr(existing_order, "stripe_checkout_url", None),
-                payment_method=existing_order.payment_method,
-            )
-        # Stale pointer; clear it to allow checkout to proceed.
-        cart_row = await session.get(Cart, user_cart.id)
-        if cart_row:
-            cart_row.last_order_id = None
-            session.add(cart_row)
+    if not last_order_id:
+        return None
+    existing_order = await order_service.get_order_by_id(session, last_order_id)
+    if not existing_order:
+        await _clear_cart_last_order_pointer(session, cart_id=cart_id, cart_row=cart_row)
+        return None
+    await _refresh_existing_order_netopia_payment(session, existing_order, email=email, phone=phone, lang=lang, base=base)
+    return _guest_checkout_response_from_order(existing_order)
 
-    shipping_method = None
-    if payload.shipping_method_id:
-        shipping_method = await order_service.get_shipping_method(session, payload.shipping_method_id)
-        if not shipping_method:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping method not found")
 
-    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
+def _assert_cart_has_items(cart: Cart) -> None:
+    if cart.items:
+        return
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty")
 
-    courier, delivery_type, locker_id, locker_name, locker_address, locker_lat, locker_lng = _delivery_from_payload(
-        courier=payload.courier,
-        delivery_type=payload.delivery_type,
-        locker_id=payload.locker_id,
-        locker_name=payload.locker_name,
-        locker_address=payload.locker_address,
-        locker_lat=payload.locker_lat,
-        locker_lng=payload.locker_lng,
-    )
-    locker_allowed, allowed_couriers = cart_service.delivery_constraints(user_cart)
+
+def _assert_delivery_available_for_cart(cart: Cart, *, courier: str, delivery_type: str) -> None:
+    locker_allowed, allowed_couriers = cart_service.delivery_constraints(cart)
     if not allowed_couriers:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No couriers available for cart items")
     if courier not in allowed_couriers:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Selected courier is not available for cart items")
     if delivery_type == "locker" and not locker_allowed:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Locker delivery is not available for cart items")
-    phone_required = bool(
-        checkout_settings.phone_required_locker if delivery_type == "locker" else checkout_settings.phone_required_home
-    )
-    phone = (payload.phone or "").strip() or None
+
+
+def _resolve_checkout_phone(*, payload_phone: str | None, fallback_phone: str | None, phone_required: bool) -> str | None:
+    phone = (payload_phone or "").strip() or None
     if not phone:
-        phone = (getattr(current_user, "phone", None) or "").strip() or None
+        phone = (fallback_phone or "").strip() or None
     if phone_required and not phone:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Phone is required")
+    return phone
 
+
+def _resolve_delivery_and_phone(
+    cart: Cart,
+    *,
+    checkout_settings: Any,
+    courier: str,
+    delivery_type: str,
+    locker_id: str | None,
+    locker_name: str | None,
+    locker_address: str | None,
+    locker_lat: float | None,
+    locker_lng: float | None,
+    payload_phone: str | None,
+    fallback_phone: str | None,
+) -> tuple[tuple[str, str, str | None, str | None, str | None, float | None, float | None], str | None]:
+    delivery = _delivery_from_payload(
+        courier=courier,
+        delivery_type=delivery_type,
+        locker_id=locker_id,
+        locker_name=locker_name,
+        locker_address=locker_address,
+        locker_lat=locker_lat,
+        locker_lng=locker_lng,
+    )
+    courier_clean, delivery_type_clean, _locker_id, _locker_name, _locker_address, _locker_lat, _locker_lng = delivery
+    _assert_delivery_available_for_cart(cart, courier=courier_clean, delivery_type=delivery_type_clean)
+    phone_required = bool(
+        checkout_settings.phone_required_locker
+        if delivery_type_clean == "locker"
+        else checkout_settings.phone_required_home
+    )
+    phone = _resolve_checkout_phone(
+        payload_phone=payload_phone,
+        fallback_phone=fallback_phone,
+        phone_required=phone_required,
+    )
+    return delivery, phone
+
+
+async def _resolve_logged_checkout_discount(
+    session: AsyncSession,
+    *,
+    payload: CheckoutRequest,
+    current_user: User,
+    cart: Cart,
+    checkout_settings: Any,
+    shipping_method: Any,
+) -> tuple[Any, Any, Any, Decimal]:
     promo = None
     applied_discount = None
     applied_coupon = None
     coupon_shipping_discount = Decimal("0.00")
-    if payload.promo_code:
-        rate_flat = Decimal(getattr(shipping_method, "rate_flat", None) or 0) if shipping_method else None
-        rate_per = Decimal(getattr(shipping_method, "rate_per_kg", None) or 0) if shipping_method else None
-        try:
-            applied_discount = await coupons_service.apply_discount_code_to_cart(
-                session,
-                user=current_user,
-                cart=user_cart,
-                checkout=checkout_settings,
-                shipping_method_rate_flat=rate_flat,
-                shipping_method_rate_per_kg=rate_per,
-                code=payload.promo_code,
-                country_code=payload.country,
-            )
-            applied_coupon = applied_discount.coupon if applied_discount else None
-            coupon_shipping_discount = applied_discount.shipping_discount_ron if applied_discount else Decimal("0.00")
-        except HTTPException as exc:
-            if exc.status_code == status.HTTP_404_NOT_FOUND:
-                promo = await cart_service.validate_promo(session, payload.promo_code, currency=None)
-            else:
-                raise
+    if not payload.promo_code:
+        return promo, applied_discount, applied_coupon, coupon_shipping_discount
+    rate_flat = Decimal(getattr(shipping_method, "rate_flat", None) or 0) if shipping_method else None
+    rate_per = Decimal(getattr(shipping_method, "rate_per_kg", None) or 0) if shipping_method else None
+    try:
+        applied_discount = await coupons_service.apply_discount_code_to_cart(
+            session,
+            user=current_user,
+            cart=cart,
+            checkout=checkout_settings,
+            shipping_method_rate_flat=rate_flat,
+            shipping_method_rate_per_kg=rate_per,
+            code=payload.promo_code,
+            country_code=payload.country,
+        )
+        applied_coupon = applied_discount.coupon if applied_discount else None
+        coupon_shipping_discount = applied_discount.shipping_discount_ron if applied_discount else Decimal("0.00")
+    except HTTPException as exc:
+        if exc.status_code == status.HTTP_404_NOT_FOUND:
+            promo = await cart_service.validate_promo(session, payload.promo_code, currency=None)
+        else:
+            raise
+    return promo, applied_discount, applied_coupon, coupon_shipping_discount
 
+
+async def _create_checkout_addresses(
+    session: AsyncSession,
+    *,
+    payload: CheckoutRequest,
+    current_user: User,
+    phone: str | None,
+) -> tuple[Address, Address]:
     has_billing = bool((payload.billing_line1 or "").strip())
     billing_same_as_shipping = not has_billing
-
     address_user_id = current_user.id if payload.save_address else None
     default_shipping = bool(
         payload.save_address and (payload.default_shipping if payload.default_shipping is not None else True)
@@ -1037,7 +1155,6 @@ async def checkout(
     default_billing = bool(
         payload.save_address and (payload.default_billing if payload.default_billing is not None else True)
     )
-
     shipping_addr = await address_service.create_address(
         session,
         address_user_id,
@@ -1054,74 +1171,150 @@ async def checkout(
             is_default_billing=bool(default_billing and billing_same_as_shipping),
         ),
     )
+    if not has_billing:
+        return shipping_addr, shipping_addr
+    if not (
+        (payload.billing_line1 or "").strip()
+        and (payload.billing_city or "").strip()
+        and (payload.billing_postal_code or "").strip()
+        and (payload.billing_country or "").strip()
+    ):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Billing address is incomplete")
+    billing_addr = await address_service.create_address(
+        session,
+        address_user_id,
+        AddressCreate(
+            label="Checkout (Billing)" if payload.save_address else "Checkout (Billing · One-time)",
+            phone=phone,
+            line1=payload.billing_line1 or payload.line1,
+            line2=payload.billing_line2,
+            city=payload.billing_city,
+            region=payload.billing_region,
+            postal_code=payload.billing_postal_code,
+            country=payload.billing_country,
+            is_default_shipping=False,
+            is_default_billing=default_billing,
+        ),
+    )
+    return shipping_addr, billing_addr
 
-    billing_addr = shipping_addr
-    if has_billing:
-        if not (
-            (payload.billing_line1 or "").strip()
-            and (payload.billing_city or "").strip()
-            and (payload.billing_postal_code or "").strip()
-            and (payload.billing_country or "").strip()
-        ):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Billing address is incomplete")
-        billing_addr = await address_service.create_address(
-            session,
-            address_user_id,
-            AddressCreate(
-                label="Checkout (Billing)" if payload.save_address else "Checkout (Billing · One-time)",
-                phone=phone,
-                line1=payload.billing_line1 or payload.line1,
-                line2=payload.billing_line2,
-                city=payload.billing_city,
-                region=payload.billing_region,
-                postal_code=payload.billing_postal_code,
-                country=payload.billing_country,
-                is_default_shipping=False,
-                is_default_billing=default_billing,
-            ),
-        )
 
+async def _create_guest_checkout_addresses(
+    session: AsyncSession,
+    *,
+    payload: GuestCheckoutRequest,
+    user_id: UUID | None,
+    phone: str | None,
+) -> tuple[Address, Address]:
+    has_billing = bool((payload.billing_line1 or "").strip())
+    billing_same_as_shipping = not has_billing
+    shipping_addr = await address_service.create_address(
+        session,
+        user_id,
+        AddressCreate(
+            label="Guest Checkout" if not payload.create_account else "Checkout",
+            phone=phone,
+            line1=payload.line1,
+            line2=payload.line2,
+            city=payload.city,
+            region=payload.region,
+            postal_code=payload.postal_code,
+            country=payload.country,
+            is_default_shipping=bool(payload.save_address and payload.create_account),
+            is_default_billing=bool(payload.save_address and payload.create_account and billing_same_as_shipping),
+        ),
+    )
+    if not has_billing:
+        return shipping_addr, shipping_addr
+    if not (
+        (payload.billing_line1 or "").strip()
+        and (payload.billing_city or "").strip()
+        and (payload.billing_postal_code or "").strip()
+        and (payload.billing_country or "").strip()
+    ):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Billing address is incomplete")
+    billing_addr = await address_service.create_address(
+        session,
+        user_id,
+        AddressCreate(
+            label="Guest Checkout (Billing)" if not payload.create_account else "Checkout (Billing)",
+            phone=phone,
+            line1=payload.billing_line1 or payload.line1,
+            line2=payload.billing_line2,
+            city=payload.billing_city,
+            region=payload.billing_region,
+            postal_code=payload.billing_postal_code,
+            country=payload.billing_country,
+            is_default_shipping=False,
+            is_default_billing=bool(payload.save_address and payload.create_account),
+        ),
+    )
+    return shipping_addr, billing_addr
+
+
+async def _resolve_checkout_totals(
+    session: AsyncSession,
+    *,
+    cart: Cart,
+    shipping_method: Any,
+    promo: Any,
+    checkout_settings: Any,
+    country_code: str | None,
+    applied_coupon: Any,
+    applied_discount: Any,
+) -> tuple[Totals, Decimal]:
     if applied_coupon and applied_discount:
-        totals, discount_val = applied_discount.totals, applied_discount.discount_ron
-    else:
-        totals, discount_val = await cart_service.calculate_totals_async(
-            session,
-            user_cart,
-            shipping_method=shipping_method,
-            promo=promo,
-            checkout_settings=checkout_settings,
-            country_code=shipping_addr.country,
-        )
-    payment_method = payload.payment_method or "stripe"
+        return applied_discount.totals, applied_discount.discount_ron
+    return await cart_service.calculate_totals_async(
+        session,
+        cart,
+        shipping_method=shipping_method,
+        promo=promo,
+        checkout_settings=checkout_settings,
+        country_code=country_code,
+    )
+
+
+async def _initialize_checkout_payment(
+    *,
+    session: AsyncSession,
+    cart: Cart,
+    totals: Totals,
+    discount_val: Decimal,
+    payment_method: str | None,
+    base: str,
+    lang: str | None,
+    customer_email: str,
+    user_id: UUID | None,
+    promo_code: str | None,
+) -> tuple[str, str | None, str | None, str | None, str | None]:
+    chosen_payment = payment_method or "stripe"
     stripe_session_id = None
     stripe_checkout_url = None
-    payment_intent_id = None
     paypal_order_id = None
     paypal_approval_url = None
-    netopia_ntp_id = None
-    netopia_payment_url = None
-    if payment_method == "stripe":
-        stripe_line_items = _build_stripe_line_items(user_cart, totals, lang=current_user.preferred_language)
+    if chosen_payment == "stripe":
+        stripe_line_items = _build_stripe_line_items(cart, totals, lang=lang)
         discount_cents = _money_to_cents(discount_val) if discount_val and discount_val > 0 else None
         stripe_session = await payments.create_checkout_session(
             session=session,
             amount_cents=_money_to_cents(totals.total),
-            customer_email=current_user.email,
+            customer_email=customer_email,
             success_url=f"{base}/checkout/stripe/return?session_id={{CHECKOUT_SESSION_ID}}",
             cancel_url=f"{base}/checkout/stripe/cancel?session_id={{CHECKOUT_SESSION_ID}}",
-            lang=current_user.preferred_language,
-            metadata={"cart_id": str(user_cart.id), "user_id": str(current_user.id)},
+            lang=lang,
+            metadata={"cart_id": str(cart.id), "user_id": str(user_id) if user_id else ""},
             line_items=stripe_line_items,
             discount_cents=discount_cents,
-            promo_code=payload.promo_code,
+            promo_code=promo_code,
         )
         stripe_session_id = str(stripe_session.get("session_id"))
         stripe_checkout_url = str(stripe_session.get("checkout_url"))
-    elif payment_method == "paypal":
-        paypal_items = _build_paypal_items(user_cart, lang=current_user.preferred_language)
+    elif chosen_payment == "paypal":
+        paypal_items = _build_paypal_items(cart, lang=lang)
         paypal_order_id, paypal_approval_url = await paypal_service.create_order(
             total_ron=totals.total,
-            reference=str(user_cart.id),
+            reference=str(cart.id),
             return_url=f"{base}/checkout/paypal/return",
             cancel_url=f"{base}/checkout/paypal/cancel",
             item_total_ron=totals.subtotal,
@@ -1131,17 +1324,43 @@ async def checkout(
             discount_ron=discount_val,
             items=paypal_items,
         )
-    order = await order_service.build_order_from_cart(
+    return chosen_payment, stripe_session_id, stripe_checkout_url, paypal_order_id, paypal_approval_url
+
+
+async def _build_checkout_order(
+    session: AsyncSession,
+    *,
+    user_id: UUID | None,
+    customer_email: str,
+    customer_name: str,
+    cart: Cart,
+    shipping_addr: Address,
+    billing_addr: Address,
+    shipping_method: Any,
+    payment_method: str,
+    stripe_session_id: str | None,
+    stripe_checkout_url: str | None,
+    paypal_order_id: str | None,
+    paypal_approval_url: str | None,
+    delivery: tuple[str, str, str | None, str | None, str | None, float | None, float | None],
+    discount_val: Decimal,
+    promo_code: str | None,
+    invoice_company: str | None,
+    invoice_vat_id: str | None,
+    totals: Totals,
+) -> Order:
+    courier, delivery_type, locker_id, locker_name, locker_address, locker_lat, locker_lng = delivery
+    return await order_service.build_order_from_cart(
         session,
-        current_user.id,
-        customer_email=current_user.email,
-        customer_name=getattr(current_user, "name", None) or current_user.email,
-        cart=user_cart,
+        user_id,
+        customer_email=customer_email,
+        customer_name=customer_name,
+        cart=cart,
         shipping_address_id=shipping_addr.id,
         billing_address_id=billing_addr.id,
         shipping_method=shipping_method,
         payment_method=payment_method,
-        payment_intent_id=payment_intent_id,
+        payment_intent_id=None,
         stripe_checkout_session_id=stripe_session_id,
         stripe_checkout_url=stripe_checkout_url,
         paypal_order_id=paypal_order_id,
@@ -1154,119 +1373,428 @@ async def checkout(
         locker_lat=locker_lat,
         locker_lng=locker_lng,
         discount=discount_val,
-        promo_code=payload.promo_code,
-        invoice_company=payload.invoice_company,
-        invoice_vat_id=payload.invoice_vat_id,
+        promo_code=promo_code,
+        invoice_company=invoice_company,
+        invoice_vat_id=invoice_vat_id,
         tax_amount=totals.tax,
         fee_amount=totals.fee,
         shipping_amount=totals.shipping,
         total_amount=totals.total,
     )
-    if payment_method == "netopia":
-        if not settings.netopia_enabled:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Netopia is disabled")
-        netopia_configured, netopia_reason = netopia_service.netopia_configuration_status()
-        if not netopia_configured:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=netopia_reason or "Netopia is not configured",
-            )
-        first_name, last_name = _split_customer_name(getattr(order, "customer_name", None) or "")
-        shipping_addr_obj = order.shipping_address or shipping_addr
-        billing_addr_obj = order.billing_address or billing_addr or shipping_addr_obj
-        billing_payload = _netopia_address_payload(
-            email=getattr(order, "customer_email", None) or current_user.email,
-            phone=getattr(shipping_addr_obj, "phone", None) or getattr(current_user, "phone", None),
-            first_name=first_name,
-            last_name=last_name,
-            addr=billing_addr_obj,
-        )
-        shipping_payload = _netopia_address_payload(
-            email=getattr(order, "customer_email", None) or current_user.email,
-            phone=getattr(shipping_addr_obj, "phone", None) or getattr(current_user, "phone", None),
-            first_name=first_name,
-            last_name=last_name,
-            addr=shipping_addr_obj,
-        )
-        cancel_url = f"{base}/checkout/netopia/cancel?order_id={order.id}"
-        redirect_url = f"{base}/checkout/netopia/return?order_id={order.id}"
-        notify_url = f"{base}/api/v1/payments/netopia/webhook"
-        netopia_ntp_id, netopia_payment_url = await netopia_service.start_payment(
-            order_id=str(order.id),
-            amount_ron=pricing.quantize_money(order.total_amount),
-            description=f"Order {order.reference_code}" if order.reference_code else f"Order {order.id}",
-            billing=billing_payload,
-            shipping=shipping_payload,
-            products=_build_netopia_products(order, lang=current_user.preferred_language),
-            language=(current_user.preferred_language or "ro"),
-            cancel_url=cancel_url,
-            notify_url=notify_url,
-            redirect_url=redirect_url,
-        )
-        order.netopia_ntp_id = netopia_ntp_id
-        order.netopia_payment_url = netopia_payment_url
-        session.add(order)
+
+
+async def _maybe_start_new_order_netopia_payment(
+    session: AsyncSession,
+    order: Order,
+    *,
+    payment_method: str,
+    base: str,
+    email: str,
+    phone: str | None,
+    lang: str | None,
+    shipping_fallback: Address | None,
+    billing_fallback: Address | None,
+    commit: bool,
+) -> tuple[str | None, str | None]:
+    if payment_method != "netopia":
+        return None, None
+    _assert_netopia_enabled_and_configured()
+    started = await _start_netopia_payment_for_order(
+        order,
+        email=email,
+        phone=phone,
+        lang=lang,
+        base=base,
+        shipping_fallback=shipping_fallback,
+        billing_fallback=billing_fallback,
+    )
+    if not started:
+        return None, None
+    order.netopia_ntp_id, order.netopia_payment_url = started
+    session.add(order)
+    if commit:
         await session.commit()
         await session.refresh(order)
-    if needs_consent:
-        legal_consents_service.add_consent_records(
-            session,
-            context=LegalConsentContext.checkout,
-            required_versions=required_versions,
-            accepted_at=datetime.now(timezone.utc),
-            user_id=current_user.id,
-            order_id=order.id,
-        )
-        await session.commit()
-    if applied_coupon:
-        await coupons_service.reserve_coupon_for_order(
-            session,
-            user=current_user,
-            order=order,
-            coupon=applied_coupon,
-            discount_ron=discount_val,
-            shipping_discount_ron=coupon_shipping_discount,
-        )
-        if (payment_method or "").strip().lower() == "cod":
-            await coupons_service.redeem_coupon_for_order(session, order=order, note="COD checkout")
-    await notification_service.create_notification(
+    return started
+
+
+async def _add_checkout_consents(
+    session: AsyncSession,
+    *,
+    required_versions: Any,
+    user_id: UUID | None,
+    order_id: UUID,
+    should_add: bool,
+    commit: bool,
+) -> None:
+    if not should_add:
+        return
+    legal_consents_service.add_consent_records(
         session,
-        user_id=current_user.id,
-        type="order",
-        title="Order placed" if (current_user.preferred_language or "en") != "ro" else "Comandă plasată",
-        body=f"Reference {order.reference_code}" if order.reference_code else None,
-        url=_account_orders_url(order),
+        context=LegalConsentContext.checkout,
+        required_versions=required_versions,
+        accepted_at=datetime.now(timezone.utc),
+        user_id=user_id,
+        order_id=order_id,
+    )
+    if commit:
+        await session.commit()
+
+
+async def _reserve_checkout_coupon(
+    session: AsyncSession,
+    *,
+    current_user: User,
+    order: Order,
+    applied_coupon: Any,
+    discount_val: Decimal,
+    coupon_shipping_discount: Decimal,
+    payment_method: str,
+) -> None:
+    if not applied_coupon:
+        return
+    await coupons_service.reserve_coupon_for_order(
+        session,
+        user=current_user,
+        order=order,
+        coupon=applied_coupon,
+        discount_ron=discount_val,
+        shipping_discount_ron=coupon_shipping_discount,
     )
     if (payment_method or "").strip().lower() == "cod":
-        background_tasks.add_task(
-            email_service.send_order_confirmation,
-            current_user.email,
-            order,
-            order.items,
-            current_user.preferred_language,
-            receipt_share_days=checkout_settings.receipt_share_days,
-        )
-        owner = await auth_service.get_owner_user(session)
-        admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
-        if admin_to:
-            background_tasks.add_task(
-                email_service.send_new_order_notification,
-                admin_to,
-                order,
-                current_user.email,
-                owner.preferred_language if owner else None,
-            )
-    return GuestCheckoutResponse(
+        await coupons_service.redeem_coupon_for_order(session, order=order, note="COD checkout")
+
+
+async def _create_checkout_notification(
+    session: AsyncSession,
+    *,
+    user_id: UUID,
+    preferred_language: str | None,
+    order: Order,
+) -> None:
+    await notification_service.create_notification(
+        session,
+        user_id=user_id,
+        type="order",
+        title=_order_placed_title(preferred_language),
+        body=_order_reference_body(order),
+        url=_account_orders_url(order),
+    )
+
+
+async def _queue_cod_checkout_emails(
+    session: AsyncSession,
+    background_tasks: BackgroundTasks,
+    *,
+    payment_method: str,
+    customer_email: str,
+    preferred_language: str | None,
+    order: Order,
+    receipt_share_days: int,
+) -> None:
+    if (payment_method or "").strip().lower() != "cod":
+        return
+    background_tasks.add_task(
+        email_service.send_order_confirmation,
+        customer_email,
+        order,
+        order.items,
+        preferred_language,
+        receipt_share_days=receipt_share_days,
+    )
+    owner = await auth_service.get_owner_user(session)
+    admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+    if not admin_to:
+        return
+    background_tasks.add_task(
+        email_service.send_new_order_notification,
+        admin_to,
+        order,
+        customer_email,
+        owner.preferred_language if owner else None,
+    )
+
+
+def _require_guest_customer_name(payload: GuestCheckoutRequest) -> str:
+    customer_name = (payload.name or "").strip()
+    if customer_name:
+        return customer_name
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Name is required")
+
+
+def _assert_guest_checkout_consents(payload: GuestCheckoutRequest) -> None:
+    if payload.accept_terms and payload.accept_privacy:
+        return
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Legal consents required")
+
+
+def _assert_guest_checkout_no_coupon(payload: GuestCheckoutRequest) -> None:
+    if not (payload.promo_code or "").strip():
+        return
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sign in to use coupons.")
+
+
+async def _assert_guest_email_available(session: AsyncSession, email: str) -> None:
+    if not await auth_service.is_email_taken(session, email):
+        return
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Email already registered; please sign in to checkout.",
+    )
+
+
+def _validate_guest_account_creation(payload: GuestCheckoutRequest) -> None:
+    if not payload.password:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Password is required")
+    if not payload.username:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username is required")
+    if not payload.first_name:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="First name is required")
+    if not payload.last_name:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Last name is required")
+    if not payload.date_of_birth:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Date of birth is required")
+    if not payload.phone:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Phone is required")
+
+
+async def _maybe_create_guest_checkout_user(
+    session: AsyncSession,
+    background_tasks: BackgroundTasks,
+    *,
+    payload: GuestCheckoutRequest,
+    email: str,
+    customer_name: str,
+) -> UUID | None:
+    if not payload.create_account:
+        return None
+    _validate_guest_account_creation(payload)
+    user = await auth_service.create_user(
+        session,
+        UserCreate(
+            email=email,
+            username=payload.username,
+            password=payload.password,
+            name=customer_name,
+            first_name=payload.first_name,
+            middle_name=payload.middle_name,
+            last_name=payload.last_name,
+            date_of_birth=payload.date_of_birth,
+            phone=payload.phone,
+            preferred_language=payload.preferred_language or "en",
+        ),
+    )
+    user.email_verified = True
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
+    background_tasks.add_task(
+        email_service.send_welcome_email,
+        user.email,
+        first_name=user.first_name,
+        lang=user.preferred_language,
+    )
+    return user.id
+
+
+@router.post("/checkout", response_model=GuestCheckoutResponse, status_code=status.HTTP_201_CREATED)
+async def checkout(
+    payload: CheckoutRequest,
+    request: Request,
+    response: Response,
+    background_tasks: BackgroundTasks,
+    _: None = Depends(checkout_rate_limit),
+    session: AsyncSession = Depends(get_session),
+    current_user=Depends(require_verified_email),
+    session_id: str | None = Depends(cart_api.session_header),
+) -> GuestCheckoutResponse:
+    required_versions = await legal_consents_service.required_doc_versions(session)
+    accepted_versions = await legal_consents_service.latest_accepted_versions(session, user_id=current_user.id)
+    needs_consent = not legal_consents_service.is_satisfied(required_versions, accepted_versions)
+    if needs_consent and (not payload.accept_terms or not payload.accept_privacy):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Legal consents required")
+    base = _frontend_base_from_request(request)
+    user_cart = await cart_service.get_cart(session, current_user.id, session_id)
+    _assert_cart_has_items(user_cart)
+    existing_response = await _resolve_existing_checkout_response(
+        session,
+        cart_id=user_cart.id,
+        base=base,
+        email=current_user.email,
+        phone=getattr(current_user, "phone", None),
+        lang=current_user.preferred_language,
+    )
+    if existing_response:
+        response.status_code = status.HTTP_200_OK
+        return existing_response
+    shipping_method = await _resolve_shipping_method_for_create_order(session, payload.shipping_method_id)
+    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
+    delivery, phone = _resolve_delivery_and_phone(
+        user_cart,
+        checkout_settings=checkout_settings,
+        courier=payload.courier,
+        delivery_type=payload.delivery_type,
+        locker_id=payload.locker_id,
+        locker_name=payload.locker_name,
+        locker_address=payload.locker_address,
+        locker_lat=payload.locker_lat,
+        locker_lng=payload.locker_lng,
+        payload_phone=payload.phone,
+        fallback_phone=getattr(current_user, "phone", None),
+    )
+    promo, applied_discount, applied_coupon, coupon_shipping_discount = await _resolve_logged_checkout_discount(
+        session,
+        payload=payload,
+        current_user=current_user,
+        cart=user_cart,
+        checkout_settings=checkout_settings,
+        shipping_method=shipping_method,
+    )
+    shipping_addr, billing_addr = await _create_checkout_addresses(
+        session,
+        payload=payload,
+        current_user=current_user,
+        phone=phone,
+    )
+    totals, discount_val = await _resolve_checkout_totals(
+        session,
+        cart=user_cart,
+        shipping_method=shipping_method,
+        promo=promo,
+        checkout_settings=checkout_settings,
+        country_code=shipping_addr.country,
+        applied_coupon=applied_coupon,
+        applied_discount=applied_discount,
+    )
+    payment_method, stripe_session_id, stripe_checkout_url, paypal_order_id, paypal_approval_url = await _initialize_checkout_payment(
+        session=session,
+        cart=user_cart,
+        totals=totals,
+        discount_val=discount_val,
+        payment_method=payload.payment_method,
+        base=base,
+        lang=current_user.preferred_language,
+        customer_email=current_user.email,
+        user_id=current_user.id,
+        promo_code=payload.promo_code,
+    )
+    order = await _build_checkout_order(
+        session,
+        user_id=current_user.id,
+        customer_email=current_user.email,
+        customer_name=getattr(current_user, "name", None) or current_user.email,
+        cart=user_cart,
+        shipping_addr=shipping_addr,
+        billing_addr=billing_addr,
+        shipping_method=shipping_method,
+        payment_method=payment_method,
+        stripe_session_id=stripe_session_id,
+        stripe_checkout_url=stripe_checkout_url,
+        paypal_order_id=paypal_order_id,
+        paypal_approval_url=paypal_approval_url,
+        delivery=delivery,
+        discount_val=discount_val,
+        promo_code=payload.promo_code,
+        invoice_company=payload.invoice_company,
+        invoice_vat_id=payload.invoice_vat_id,
+        totals=totals,
+    )
+    netopia_ntp_id, netopia_payment_url = await _maybe_start_new_order_netopia_payment(
+        session,
+        order,
+        payment_method=payment_method,
+        base=base,
+        email=current_user.email,
+        phone=phone,
+        lang=current_user.preferred_language,
+        shipping_fallback=shipping_addr,
+        billing_fallback=billing_addr,
+        commit=True,
+    )
+    await _add_checkout_consents(
+        session,
+        required_versions=required_versions,
+        user_id=current_user.id,
         order_id=order.id,
-        reference_code=order.reference_code,
+        should_add=needs_consent,
+        commit=True,
+    )
+    await _reserve_checkout_coupon(
+        session,
+        current_user=current_user,
+        order=order,
+        applied_coupon=applied_coupon,
+        discount_val=discount_val,
+        coupon_shipping_discount=coupon_shipping_discount,
+        payment_method=payment_method,
+    )
+    await _create_checkout_notification(
+        session,
+        user_id=current_user.id,
+        preferred_language=current_user.preferred_language,
+        order=order,
+    )
+    await _queue_cod_checkout_emails(
+        session,
+        background_tasks,
+        payment_method=payment_method,
+        customer_email=current_user.email,
+        preferred_language=current_user.preferred_language,
+        order=order,
+        receipt_share_days=checkout_settings.receipt_share_days,
+    )
+    return _guest_checkout_response_with_payment(
+        order=order,
+        payment_method=payment_method,
+        stripe_session_id=stripe_session_id,
+        stripe_checkout_url=stripe_checkout_url,
         paypal_order_id=paypal_order_id,
         paypal_approval_url=paypal_approval_url,
         netopia_ntp_id=netopia_ntp_id,
         netopia_payment_url=netopia_payment_url,
-        stripe_session_id=stripe_session_id,
-        stripe_checkout_url=stripe_checkout_url,
-        payment_method=payment_method,
     )
+
+
+def _paypal_capture_response(order: Order) -> PayPalCaptureResponse:
+    return PayPalCaptureResponse(
+        order_id=order.id,
+        reference_code=order.reference_code,
+        status=order.status,
+        paypal_capture_id=order.paypal_capture_id,
+    )
+
+
+def _required_paypal_order_id(paypal_order_id: str | None) -> str:
+    value = (paypal_order_id or "").strip()
+    if value:
+        return value
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="PayPal order id is required")
+
+
+def _assert_paypal_capture_order(order: Order) -> None:
+    if (order.payment_method or "").strip().lower() == "paypal":
+        return
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order is not a PayPal order")
+
+
+def _assert_paypal_capture_status(order: Order) -> None:
+    if order.status in {OrderStatus.pending_payment, OrderStatus.pending_acceptance, OrderStatus.paid}:
+        return
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order cannot be captured")
+
+
+async def _resolve_paypal_capture_id(
+    payload: PayPalCaptureRequest,
+    *,
+    paypal_order_id: str,
+    mock_mode: bool,
+) -> str:
+    if not mock_mode:
+        return await paypal_service.capture_order(paypal_order_id=paypal_order_id)
+    outcome = str(payload.mock or "success").strip().lower()
+    if outcome == "decline":
+        raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail="Payment declined")
+    return f"paypal_mock_capture_{secrets.token_hex(8)}"
 
 
 @router.post("/paypal/capture", response_model=PayPalCaptureResponse)
@@ -1276,113 +1804,31 @@ async def capture_paypal_order(
     session: AsyncSession = Depends(get_session),
     current_user=Depends(get_current_user_optional),
 ) -> PayPalCaptureResponse:
-    paypal_order_id = (payload.paypal_order_id or "").strip()
-    if not paypal_order_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="PayPal order id is required")
-
-    mock_mode = is_mock_payments()
-
-    order = (
-        (
-            await session.execute(
-                select(Order)
-                .options(
-                    selectinload(Order.user),
-                    selectinload(Order.items).selectinload(OrderItem.product),
-                    selectinload(Order.events),
-                    selectinload(Order.shipping_address),
-                    selectinload(Order.billing_address),
-                )
-                .where(Order.paypal_order_id == paypal_order_id)
-            )
-        )
-        .scalars()
-        .first()
-    )
-    if not order:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
-    if payload.order_id and order.id != payload.order_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order mismatch")
-    if (order.payment_method or "").strip().lower() != "paypal":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order is not a PayPal order")
-
-    # For signed-in checkouts, keep the capture bound to the same user.
-    if order.user_id:
-        if current_user and order.user_id == current_user.id:
-            pass
-        elif payload.order_id and order.id == payload.order_id:
-            # Allow guest checkout return flows (including "create account" during guest checkout).
-            pass
-        else:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
-
+    paypal_order_id = _required_paypal_order_id(payload.paypal_order_id)
+    order = await _get_order_by_paypal_order_id_for_confirmation(session, paypal_order_id)
+    _assert_confirmation_order_match(order, payload.order_id)
+    _assert_paypal_capture_order(order)
+    _assert_confirmation_access(order, current_user, payload.order_id)
     if order.paypal_capture_id:
-        return PayPalCaptureResponse(
-            order_id=order.id,
-            reference_code=order.reference_code,
-            status=order.status,
-            paypal_capture_id=order.paypal_capture_id,
-        )
-
-    if order.status not in {OrderStatus.pending_payment, OrderStatus.pending_acceptance, OrderStatus.paid}:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order cannot be captured")
-
-    if mock_mode:
-        outcome = str(payload.mock or "success").strip().lower()
-        if outcome == "decline":
-            raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail="Payment declined")
-        capture_id = f"paypal_mock_capture_{secrets.token_hex(8)}"
-    else:
-        capture_id = await paypal_service.capture_order(paypal_order_id=paypal_order_id)
-    if order.status == OrderStatus.pending_payment:
-        order.status = OrderStatus.pending_acceptance
-        session.add(OrderEvent(order_id=order.id, event="status_change", note="pending_payment -> pending_acceptance"))
+        return _paypal_capture_response(order)
+    _assert_paypal_capture_status(order)
+    capture_id = await _resolve_paypal_capture_id(payload, paypal_order_id=paypal_order_id, mock_mode=is_mock_payments())
+    capture_note = f"PayPal {capture_id}".strip()
     order.paypal_capture_id = capture_id or order.paypal_capture_id
-    session.add(order)
-    session.add(OrderEvent(order_id=order.id, event="payment_captured", note=f"PayPal {capture_id}".strip()))
-    await promo_usage.record_promo_usage(session, order=order, note=f"PayPal {capture_id}".strip())
-    await session.commit()
-    await session.refresh(order)
-    await coupons_service.redeem_coupon_for_order(session, order=order, note=f"PayPal {capture_id}".strip())
-
-    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
-    customer_to = (order.user.email if order.user and order.user.email else None) or getattr(order, "customer_email", None)
-    customer_lang = order.user.preferred_language if order.user else None
-    if customer_to:
-        background_tasks.add_task(
-            email_service.send_order_confirmation,
-            customer_to,
-            order,
-            order.items,
-            customer_lang,
-            receipt_share_days=checkout_settings.receipt_share_days,
-        )
-    owner = await auth_service.get_owner_user(session)
-    admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
-    if admin_to:
-        background_tasks.add_task(
-            email_service.send_new_order_notification,
-            admin_to,
-            order,
-            customer_to,
-            owner.preferred_language if owner else None,
-        )
-    if order.user and order.user.id:
-        await notification_service.create_notification(
-            session,
-            user_id=order.user.id,
-            type="order",
-            title="Payment received" if (order.user.preferred_language or "en") != "ro" else "Plată confirmată",
-            body=f"Reference {order.reference_code}" if order.reference_code else None,
-            url=_account_orders_url(order),
-        )
-
-    return PayPalCaptureResponse(
-        order_id=order.id,
-        reference_code=order.reference_code,
-        status=order.status,
-        paypal_capture_id=order.paypal_capture_id,
+    await _finalize_order_after_payment_capture(
+        session,
+        order,
+        note=capture_note,
+        add_capture_event=True,
     )
+    await coupons_service.redeem_coupon_for_order(session, order=order, note=capture_note)
+    await _queue_payment_capture_notifications(
+        session,
+        background_tasks,
+        order,
+        include_receipt_share_days=True,
+    )
+    return _paypal_capture_response(order)
 
 
 def _payment_confirmation_query(stmt):
@@ -1393,6 +1839,16 @@ def _payment_confirmation_query(stmt):
         selectinload(Order.shipping_address),
         selectinload(Order.billing_address),
     )
+
+
+async def _get_order_by_paypal_order_id_for_confirmation(session: AsyncSession, paypal_order_id: str) -> Order:
+    result = await session.execute(
+        _payment_confirmation_query(select(Order).where(Order.paypal_order_id == paypal_order_id))
+    )
+    order = result.scalars().first()
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    return order
 
 
 async def _get_order_by_stripe_session_id(session: AsyncSession, session_id: str) -> Order:
@@ -1747,6 +2203,112 @@ async def admin_list_orders(
     return await order_service.list_orders(session, status=status, user_id=user_id)
 
 
+def _parse_admin_status_filter(raw_status: str | None) -> tuple[bool, OrderStatus | None, list[OrderStatus] | None]:
+    status_clean = (raw_status or "").strip().lower()
+    if not status_clean:
+        return False, None, None
+    if status_clean == "pending":
+        return True, None, None
+    if status_clean == "sales":
+        return False, None, [OrderStatus.paid, OrderStatus.shipped, OrderStatus.delivered, OrderStatus.refunded]
+    try:
+        return False, OrderStatus(status_clean), None
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid order status") from exc
+
+
+def _parse_admin_sla_filter(raw_sla: str | None) -> str | None:
+    sla_clean = (raw_sla or "").strip().lower()
+    if not sla_clean:
+        return None
+    if sla_clean in {"accept_overdue", "acceptance_overdue", "overdue_acceptance", "overdue_accept"}:
+        return "accept_overdue"
+    if sla_clean in {"ship_overdue", "shipping_overdue", "overdue_shipping", "overdue_ship"}:
+        return "ship_overdue"
+    if sla_clean in {"any_overdue", "overdue", "any"}:
+        return "any_overdue"
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid SLA filter")
+
+
+def _parse_admin_fraud_filter(raw_fraud: str | None) -> str | None:
+    fraud_clean = (raw_fraud or "").strip().lower()
+    if not fraud_clean:
+        return None
+    if fraud_clean in {"queue", "review", "needs_review", "needs-review"}:
+        return "queue"
+    if fraud_clean in {"flagged", "risk"}:
+        return "flagged"
+    if fraud_clean in {"approved"}:
+        return "approved"
+    if fraud_clean in {"denied"}:
+        return "denied"
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid fraud filter")
+
+
+def _ensure_utc_datetime(dt: datetime | None) -> datetime | None:
+    if not dt:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _admin_order_sla_due(
+    *,
+    sla_kind: str | None,
+    sla_started_at: datetime | None,
+    now: datetime,
+    accept_hours: int,
+    ship_hours: int,
+) -> tuple[datetime | None, bool]:
+    if not sla_started_at:
+        return None, False
+    if sla_kind == "accept":
+        due_at = sla_started_at + timedelta(hours=accept_hours)
+        return due_at, due_at <= now
+    if sla_kind == "ship":
+        due_at = sla_started_at + timedelta(hours=ship_hours)
+        return due_at, due_at <= now
+    return None, False
+
+
+def _admin_order_list_item_from_row(
+    row: tuple[Order, str | None, str | None, str | None, datetime | None, Any, Any],
+    *,
+    include_pii: bool,
+    now: datetime,
+    accept_hours: int,
+    ship_hours: int,
+) -> AdminOrderListItem:
+    order, email, username, sla_kind, sla_started_at, fraud_flagged, fraud_severity = row
+    started_at_utc = _ensure_utc_datetime(sla_started_at)
+    sla_due_at, sla_overdue = _admin_order_sla_due(
+        sla_kind=sla_kind,
+        sla_started_at=started_at_utc,
+        now=now,
+        accept_hours=accept_hours,
+        ship_hours=ship_hours,
+    )
+    return AdminOrderListItem(
+        id=order.id,
+        reference_code=order.reference_code,
+        status=order.status,
+        total_amount=order.total_amount,
+        currency=order.currency,
+        payment_method=getattr(order, "payment_method", None),
+        created_at=order.created_at,
+        customer_email=email if include_pii else pii_service.mask_email(email),
+        customer_username=username,
+        tags=[t.tag for t in (getattr(order, "tags", None) or [])],
+        sla_kind=sla_kind,
+        sla_started_at=started_at_utc,
+        sla_due_at=sla_due_at,
+        sla_overdue=sla_overdue,
+        fraud_flagged=bool(fraud_flagged),
+        fraud_severity=fraud_severity,
+    )
+
+
 @router.get("/admin/search", response_model=AdminOrderListResponse)
 async def admin_search_orders(
     request: Request,
@@ -1767,49 +2329,9 @@ async def admin_search_orders(
 ) -> AdminOrderListResponse:
     if include_pii:
         pii_service.require_pii_reveal(admin, request=request)
-    status_clean = (status or "").strip().lower() if status else None
-    pending_any = False
-    parsed_status = None
-    parsed_statuses: list[OrderStatus] | None = None
-    if status_clean:
-        if status_clean == "pending":
-            pending_any = True
-        elif status_clean == "sales":
-            parsed_statuses = [
-                OrderStatus.paid,
-                OrderStatus.shipped,
-                OrderStatus.delivered,
-                OrderStatus.refunded,
-            ]
-        else:
-            try:
-                parsed_status = OrderStatus(status_clean)
-            except ValueError:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid order status")
-    sla_clean = (sla or "").strip().lower() if sla else None
-    parsed_sla: str | None = None
-    if sla_clean:
-        if sla_clean in {"accept_overdue", "acceptance_overdue", "overdue_acceptance", "overdue_accept"}:
-            parsed_sla = "accept_overdue"
-        elif sla_clean in {"ship_overdue", "shipping_overdue", "overdue_shipping", "overdue_ship"}:
-            parsed_sla = "ship_overdue"
-        elif sla_clean in {"any_overdue", "overdue", "any"}:
-            parsed_sla = "any_overdue"
-        else:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid SLA filter")
-    fraud_clean = (fraud or "").strip().lower() if fraud else None
-    parsed_fraud: str | None = None
-    if fraud_clean:
-        if fraud_clean in {"queue", "review", "needs_review", "needs-review"}:
-            parsed_fraud = "queue"
-        elif fraud_clean in {"flagged", "risk"}:
-            parsed_fraud = "flagged"
-        elif fraud_clean in {"approved"}:
-            parsed_fraud = "approved"
-        elif fraud_clean in {"denied"}:
-            parsed_fraud = "denied"
-        else:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid fraud filter")
+    pending_any, parsed_status, parsed_statuses = _parse_admin_status_filter(status)
+    parsed_sla = _parse_admin_sla_filter(sla)
+    parsed_fraud = _parse_admin_fraud_filter(fraud)
     rows, total_items = await order_service.admin_search_orders(
         session,
         q=q,
@@ -1829,46 +2351,16 @@ async def admin_search_orders(
     now = datetime.now(timezone.utc)
     accept_hours = max(1, int(getattr(settings, "order_sla_accept_hours", 24) or 24))
     ship_hours = max(1, int(getattr(settings, "order_sla_ship_hours", 48) or 48))
-
-    def _ensure_utc(dt: datetime | None) -> datetime | None:
-        if not dt:
-            return None
-        if dt.tzinfo is None:
-            return dt.replace(tzinfo=timezone.utc)
-        return dt.astimezone(timezone.utc)
-
-    items: list[AdminOrderListItem] = []
-    for (order, email, username, sla_kind, sla_started_at, fraud_flagged, fraud_severity) in rows:
-        sla_started_at = _ensure_utc(sla_started_at)
-        sla_due_at: datetime | None = None
-        sla_overdue = False
-        if sla_kind == "accept" and sla_started_at:
-            sla_due_at = sla_started_at + timedelta(hours=accept_hours)
-            sla_overdue = sla_due_at <= now
-        elif sla_kind == "ship" and sla_started_at:
-            sla_due_at = sla_started_at + timedelta(hours=ship_hours)
-            sla_overdue = sla_due_at <= now
-
-        items.append(
-            AdminOrderListItem(
-                id=order.id,
-                reference_code=order.reference_code,
-                status=order.status,
-                total_amount=order.total_amount,
-                currency=order.currency,
-                payment_method=getattr(order, "payment_method", None),
-                created_at=order.created_at,
-                customer_email=email if include_pii else pii_service.mask_email(email),
-                customer_username=username,
-                tags=[t.tag for t in (getattr(order, "tags", None) or [])],
-                sla_kind=sla_kind,
-                sla_started_at=sla_started_at,
-                sla_due_at=sla_due_at,
-                sla_overdue=sla_overdue,
-                fraud_flagged=bool(fraud_flagged),
-                fraud_severity=fraud_severity,
-            )
+    items = [
+        _admin_order_list_item_from_row(
+            row,
+            include_pii=include_pii,
+            now=now,
+            accept_hours=accept_hours,
+            ship_hours=ship_hours,
         )
+        for row in rows
+    ]
     total_pages = max(1, (int(total_items) + limit - 1) // limit)
     meta = AdminPaginationMeta(total_items=int(total_items), total_pages=total_pages, page=page, limit=limit)
     return AdminOrderListResponse(items=items, meta=meta)
@@ -1907,18 +2399,7 @@ async def admin_rename_order_tag(
     return OrderTagRenameResponse(**result)
 
 
-@router.get("/admin/export")
-async def admin_export_orders(
-    request: Request,
-    columns: list[str] | None = Query(default=None),
-    include_pii: bool = Query(default=False),
-    session: AsyncSession = Depends(get_session),
-    admin: User = Depends(require_admin_section("orders")),
-):
-    step_up_service.require_step_up(request, admin)
-    if include_pii:
-        pii_service.require_pii_reveal(admin, request=request)
-    orders = await order_service.list_orders(session)
+def _order_export_allowed_columns(*, include_pii: bool) -> dict[str, Callable[[Order], Any]]:
     allowed: dict[str, Callable[[Order], Any]] = {
         "id": lambda o: str(o.id),
         "reference_code": lambda o: o.reference_code or "",
@@ -1945,38 +2426,70 @@ async def admin_export_orders(
         "created_at": lambda o: o.created_at.isoformat() if getattr(o, "created_at", None) else "",
         "updated_at": lambda o: o.updated_at.isoformat() if getattr(o, "updated_at", None) else "",
     }
-    if not include_pii:
-        allowed["customer_email"] = lambda o: pii_service.mask_email(getattr(o, "customer_email", "") or "") or ""
-        allowed["customer_name"] = lambda o: pii_service.mask_text(getattr(o, "customer_name", "") or "", keep=1) or ""
-        allowed["invoice_company"] = lambda o: pii_service.mask_text(getattr(o, "invoice_company", "") or "", keep=1) or ""
-        allowed["invoice_vat_id"] = lambda o: pii_service.mask_text(getattr(o, "invoice_vat_id", "") or "", keep=2) or ""
-        allowed["locker_address"] = lambda o: "***" if (getattr(o, "locker_address", "") or "").strip() else ""
+    if include_pii:
+        return allowed
+    allowed["customer_email"] = lambda o: pii_service.mask_email(getattr(o, "customer_email", "") or "") or ""
+    allowed["customer_name"] = lambda o: pii_service.mask_text(getattr(o, "customer_name", "") or "", keep=1) or ""
+    allowed["invoice_company"] = lambda o: pii_service.mask_text(getattr(o, "invoice_company", "") or "", keep=1) or ""
+    allowed["invoice_vat_id"] = lambda o: pii_service.mask_text(getattr(o, "invoice_vat_id", "") or "", keep=2) or ""
+    allowed["locker_address"] = lambda o: "***" if (getattr(o, "locker_address", "") or "").strip() else ""
+    return allowed
+
+
+def _selected_export_columns(
+    columns: list[str] | None,
+    *,
+    allowed: dict[str, Callable[[Order], Any]],
+) -> list[str]:
     default_columns = ["id", "reference_code", "status", "total_amount", "currency", "user_id", "created_at"]
     if not columns:
-        selected_columns = default_columns
-    else:
-        requested: list[str] = []
-        for raw in columns:
-            for part in str(raw).split(","):
-                cleaned = part.strip()
-                if cleaned:
-                    requested.append(cleaned)
-        invalid = [c for c in requested if c not in allowed]
-        if invalid:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid export columns: {', '.join(sorted(set(invalid)))}. Allowed: {', '.join(sorted(allowed.keys()))}",
-            )
-        selected_columns = requested
+        return default_columns
+    requested: list[str] = []
+    for raw in columns:
+        for part in str(raw).split(","):
+            cleaned = part.strip()
+            if cleaned:
+                requested.append(cleaned)
+    invalid = [column for column in requested if column not in allowed]
+    if not invalid:
+        return requested
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=f"Invalid export columns: {', '.join(sorted(set(invalid)))}. Allowed: {', '.join(sorted(allowed.keys()))}",
+    )
 
+
+def _render_orders_csv(
+    orders: list[Order],
+    *,
+    selected_columns: list[str],
+    allowed: dict[str, Callable[[Order], Any]],
+) -> str:
     buffer = io.StringIO()
     writer = csv.writer(buffer)
     writer.writerow(selected_columns)
     for order in orders:
-        writer.writerow([allowed[col](order) for col in selected_columns])
-    buffer.seek(0)
+        writer.writerow([allowed[column](order) for column in selected_columns])
+    return buffer.getvalue()
+
+
+@router.get("/admin/export")
+async def admin_export_orders(
+    request: Request,
+    columns: list[str] | None = Query(default=None),
+    include_pii: bool = Query(default=False),
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(require_admin_section("orders")),
+):
+    step_up_service.require_step_up(request, admin)
+    if include_pii:
+        pii_service.require_pii_reveal(admin, request=request)
+    orders = await order_service.list_orders(session)
+    allowed = _order_export_allowed_columns(include_pii=include_pii)
+    selected_columns = _selected_export_columns(columns, allowed=allowed)
+    csv_text = _render_orders_csv(orders, selected_columns=selected_columns, allowed=allowed)
     headers = {"Content-Disposition": "attachment; filename=orders.csv"}
-    return StreamingResponse(iter([buffer.getvalue()]), media_type="text/csv", headers=headers)
+    return StreamingResponse(iter([csv_text]), media_type="text/csv", headers=headers)
 
 
 @router.get("/admin/exports", response_model=AdminOrderDocumentExportListResponse)

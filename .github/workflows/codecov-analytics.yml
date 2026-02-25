@@ -90,6 +90,19 @@ jobs:
           echo "test_exit_code=$test_exit" >> "$GITHUB_OUTPUT"
           exit 0
 
+      - name: Enforce absolute backend/frontend/project coverage >= 90
+        id: absolute_coverage
+        continue-on-error: true
+        run: |
+          set +e
+          python3 scripts/quality/assert_coverage_thresholds.py \
+            --backend backend/coverage.xml \
+            --frontend frontend/coverage/lcov.info \
+            --threshold 90
+          coverage_exit=$?
+          echo "coverage_exit_code=$coverage_exit" >> "$GITHUB_OUTPUT"
+          exit 0
+
       - name: Build frontend browser bundle
         id: frontend_build
         continue-on-error: true
@@ -181,6 +194,11 @@ jobs:
 
           if [ "${{ steps.frontend_tests.outputs.test_exit_code }}" != "0" ]; then
             echo "::error::Frontend tests failed (exit ${{ steps.frontend_tests.outputs.test_exit_code }})."
+            fail=1
+          fi
+
+          if [ "${{ steps.absolute_coverage.outputs.coverage_exit_code }}" != "0" ]; then
+            echo "::error::Absolute coverage threshold check failed (exit ${{ steps.absolute_coverage.outputs.coverage_exit_code }})."
             fail=1
           fi
 
