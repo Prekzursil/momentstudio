@@ -51,6 +51,34 @@ def _normalize_token(token: str) -> str:
     return cleaned
 
 
+def _normalize_email_value(email: str | None) -> str:
+    return (email or "").strip().lower()
+
+
+def _normalize_optional_text(value: str | None) -> str | None:
+    cleaned = (value or "").strip()
+    return cleaned or None
+
+
+def _normalize_display_name(value: str | None, fallback: str) -> str:
+    return ((value or "").strip() or fallback)[:255]
+
+
+def _require_valid_token(token: str) -> str:
+    normalized = _normalize_token(token)
+    if not normalized:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token")
+    return normalized
+
+
+def _is_expired_timestamp(value: datetime | None) -> bool:
+    if not value:
+        return True
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value < datetime.now(timezone.utc)
+
+
 async def get_user_by_email(session: AsyncSession, email: str) -> User | None:
     email = (email or "").strip().lower()
     result = await session.execute(select(User).where(func.lower(User.email) == email))
@@ -230,6 +258,26 @@ async def _try_reuse_name_tag(
     return None
 
 
+async def _enforce_username_change_cooldown(session: AsyncSession, user: User) -> None:
+    if not _profile_is_complete(user):
+        return
+    last = await session.scalar(
+        select(UserUsernameHistory.created_at)
+        .where(UserUsernameHistory.user_id == user.id)
+        .order_by(UserUsernameHistory.created_at.desc())
+        .limit(1)
+    )
+    if not isinstance(last, datetime):
+        return
+    if last.tzinfo is None:
+        last = last.replace(tzinfo=timezone.utc)
+    if datetime.now(timezone.utc) - last < USERNAME_CHANGE_COOLDOWN:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="You can change your username once every 7 days.",
+        )
+
+
 async def create_user(session: AsyncSession, user_in: UserCreate) -> User:
     normalized_email = (user_in.email or "").strip().lower()
     if not normalized_email:
@@ -361,21 +409,7 @@ async def update_username(session: AsyncSession, user: User, new_username: str) 
     new_username = _validate_username(new_username)
     if new_username == user.username:
         return user
-    if _profile_is_complete(user):
-        last = await session.scalar(
-            select(UserUsernameHistory.created_at)
-            .where(UserUsernameHistory.user_id == user.id)
-            .order_by(UserUsernameHistory.created_at.desc())
-            .limit(1)
-        )
-        if last and isinstance(last, datetime):
-            if last.tzinfo is None:
-                last = last.replace(tzinfo=timezone.utc)
-            if datetime.now(timezone.utc) - last < USERNAME_CHANGE_COOLDOWN:
-                raise HTTPException(
-                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail="You can change your username once every 7 days.",
-                )
+    await _enforce_username_change_cooldown(session, user)
     existing = await get_user_by_username(session, new_username)
     if existing and existing.id != user.id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already taken")
@@ -453,12 +487,11 @@ async def create_google_user(
     email_verified: bool,
     preferred_language: str = "en",
 ) -> User:
-    email = (email or "").strip().lower()
+    email = _normalize_email_value(email)
     if await is_email_taken(session, email):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
     username = await _generate_unique_username(session, email)
-    display_name = (name or "").strip() or username
-    display_name = display_name[:255]
+    display_name = _normalize_display_name(name, username)
     name_tag = await _allocate_name_tag(session, display_name)
 
     password_placeholder = security.hash_password(secrets.token_urlsafe(16))
@@ -468,8 +501,8 @@ async def create_google_user(
         hashed_password=password_placeholder,
         name=display_name,
         name_tag=name_tag,
-        first_name=(first_name or "").strip() or None,
-        last_name=(last_name or "").strip() or None,
+        first_name=_normalize_optional_text(first_name),
+        last_name=_normalize_optional_text(last_name),
         google_sub=sub,
         google_email=email,
         google_picture_url=picture,
@@ -632,9 +665,7 @@ async def request_secondary_email_verification(
 
 
 async def confirm_secondary_email_verification(session: AsyncSession, token: str) -> UserSecondaryEmail:
-    token = _normalize_token(token)
-    if not token:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token")
+    token = _require_valid_token(token)
     record = (
         (
             await session.execute(
@@ -647,10 +678,7 @@ async def confirm_secondary_email_verification(session: AsyncSession, token: str
         .scalars()
         .first()
     )
-    expires_at = record.expires_at if record else None
-    if expires_at and expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
-    if not record or not expires_at or expires_at < datetime.now(timezone.utc):
+    if not record or _is_expired_timestamp(record.expires_at):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token")
 
     secondary = await session.get(UserSecondaryEmail, record.secondary_email_id)
@@ -777,17 +805,12 @@ async def create_reset_token(
 
 
 async def confirm_reset_token(session: AsyncSession, token: str, new_password: str) -> User:
-    token = _normalize_token(token)
-    if not token:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token")
+    token = _require_valid_token(token)
     result = await session.execute(
         select(PasswordResetToken).where(PasswordResetToken.token == token, PasswordResetToken.used.is_(False))
     )
     reset = result.scalar_one_or_none()
-    expires_at = reset.expires_at if reset else None
-    if expires_at and expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
-    if not reset or not expires_at or expires_at < datetime.now(timezone.utc):
+    if not reset or _is_expired_timestamp(reset.expires_at):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token")
     user = await session.get(User, reset.user_id)
     if not user:
@@ -1041,17 +1064,12 @@ async def create_email_verification(session: AsyncSession, user: User, expires_m
 
 
 async def confirm_email_verification(session: AsyncSession, token: str) -> User:
-    token = _normalize_token(token)
-    if not token:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token")
+    token = _require_valid_token(token)
     result = await session.execute(
         select(EmailVerificationToken).where(EmailVerificationToken.token == token, EmailVerificationToken.used.is_(False))
     )
     record = result.scalar_one_or_none()
-    expires_at = record.expires_at if record else None
-    if expires_at and expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
-    if not record or not expires_at or expires_at < datetime.now(timezone.utc):
+    if not record or _is_expired_timestamp(record.expires_at):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token")
     user = await session.get(User, record.user_id)
     if not user:

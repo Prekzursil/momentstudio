@@ -102,16 +102,23 @@ function normalizeAuthMode(raw) {
   return "none";
 }
 
-function resolveMaxRoutes(value, logger = console) {
-  const token = value === undefined ? undefined : String(value);
-  const parsed = Number.parseInt(token ?? "", 10);
-  const maxRoutes = Number.isFinite(parsed) && parsed > 0 ? parsed : 30;
+function parseMaxRoutes(value) {
+  if (value === undefined) {
+    return { token: undefined, parsed: Number.NaN };
+  }
+  const token = String(value);
+  return { token, parsed: Number.parseInt(token, 10) };
+}
 
-  if (token !== undefined && maxRoutes === 30 && parsed !== 30) {
+function resolveMaxRoutes(value, logger = console) {
+  const { token, parsed } = parseMaxRoutes(value);
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return parsed;
+  }
+  if (token !== undefined && parsed !== 30) {
     logger?.warn?.(`Invalid --max-routes value "${token}"; defaulting to 30.`);
   }
-
-  return maxRoutes;
+  return 30;
 }
 
 function routeSlug(routePath) {
@@ -181,11 +188,6 @@ function buildResourceFailureKey({ source, statusCode, url, resourceType, method
   ].join("|");
 }
 
-function placeholderKeys(pathTemplate) {
-  const matches = String(pathTemplate || "").matchAll(/:([A-Za-z][A-Za-z0-9_]*)/g);
-  return Array.from(matches, (match) => String(match[1] || "")).filter(Boolean);
-}
-
 function materializeRoute(routeTemplate, routeSamples) {
   const template = String(routeTemplate || "/");
   const keys = placeholderKeys(template);
@@ -206,6 +208,16 @@ function materializeRoute(routeTemplate, routeSamples) {
     };
   }
 
+  const resolved = resolveTemplateWithSample(template, keys, sample);
+  const unresolvedPlaceholder = hasUnresolvedPlaceholderKeys(resolved.resolvedRoute, resolved.unresolvedKeys);
+  return {
+    resolvedRoute: resolved.resolvedRoute,
+    unresolvedPlaceholder,
+    unresolvedKeys: resolved.unresolvedKeys
+  };
+}
+
+function resolveTemplateWithSample(template, keys, sample) {
   let resolvedRoute = template;
   const unresolvedKeys = [];
   for (const key of keys) {
@@ -217,11 +229,12 @@ function materializeRoute(routeTemplate, routeSamples) {
     }
     resolvedRoute = resolvedRoute.replaceAll(`:${key}`, encodeURIComponent(value));
   }
-  return {
-    resolvedRoute,
-    unresolvedPlaceholder: unresolvedKeys.length > 0 || placeholderKeys(resolvedRoute).length > 0,
-    unresolvedKeys
-  };
+  return { resolvedRoute, unresolvedKeys };
+}
+
+function hasUnresolvedPlaceholderKeys(resolvedRoute, unresolvedKeys) {
+  if (unresolvedKeys.length > 0) return true;
+  return placeholderKeys(resolvedRoute).length > 0;
 }
 
 async function loadRouteSamples(routeSamplesPath, allowedRoots) {
@@ -262,14 +275,24 @@ function readSeriesSlug(payload) {
   return "";
 }
 
-function readOrderSample(payload) {
+function readFirstObjectFromItems(payload) {
   const items = Array.isArray(payload?.items) ? payload.items : [];
-  const first = items.find((item) => item && typeof item === "object");
+  return items.find((item) => item && typeof item === "object") || null;
+}
+
+function readFirstTruthyField(item, fields) {
+  for (const field of fields) {
+    const value = String(item[field] || "").trim();
+    if (value) return value;
+  }
+  return "";
+}
+
+function readOrderSample(payload) {
+  const first = readFirstObjectFromItems(payload);
   if (!first) return { orderId: "", receiptToken: "" };
-  const orderId = String(first.id || first.order_id || "").trim();
-  const receiptToken = String(
-    first.receipt_share_token || first.receipt_token || first.token || first.share_token || ""
-  ).trim();
+  const orderId = readFirstTruthyField(first, ["id", "order_id"]);
+  const receiptToken = readFirstTruthyField(first, ["receipt_share_token", "receipt_token", "token", "share_token"]);
   return { orderId, receiptToken };
 }
 
@@ -292,6 +315,7 @@ async function hydrateRouteSamplesFromApi(context, { apiBaseUrl, routeSamples, a
   if (!apiRoot) return routeSamples;
 
   const hydrated = routeSamples && typeof routeSamples === "object" ? { ...routeSamples } : {};
+
   const setSample = (routeTemplate, key, value) => {
     const token = String(value || "").trim();
     if (!token) {
@@ -301,32 +325,43 @@ async function hydrateRouteSamplesFromApi(context, { apiBaseUrl, routeSamples, a
     hydrated[routeTemplate] = { [key]: token };
   };
 
-  const categories = await fetchJson(context, `${apiRoot}/catalog/categories`);
-  if (categories.ok) {
-    setSample("/shop/:category", "category", readSlugFromCollection(categories.data));
-  }
+  const hydratePublicSamples = async () => {
+    const categories = await fetchJson(context, `${apiRoot}/catalog/categories`);
+    if (categories.ok) {
+      setSample("/shop/:category", "category", readSlugFromCollection(categories.data));
+    }
 
-  const products = await fetchJson(context, `${apiRoot}/catalog/products?limit=1`);
-  if (products.ok) {
-    setSample("/products/:slug", "slug", readSlugFromCollection(products.data));
-  }
+    const products = await fetchJson(context, `${apiRoot}/catalog/products?limit=1`);
+    if (products.ok) {
+      setSample("/products/:slug", "slug", readSlugFromCollection(products.data));
+    }
 
-  const blogPosts = await fetchJson(context, `${apiRoot}/blog/posts?limit=20`);
-  if (blogPosts.ok) {
+    const blogPosts = await fetchJson(context, `${apiRoot}/blog/posts?limit=20`);
+    if (!blogPosts.ok) {
+      return;
+    }
     setSample("/blog/:slug", "slug", readSlugFromCollection(blogPosts.data));
     setSample("/blog/series/:series", "series", readSeriesSlug(blogPosts.data));
-  }
+  };
 
-  if (accessToken) {
+  const hydrateAdminSamples = async () => {
+    if (!accessToken) return;
     const adminOrders = await fetchJson(context, `${apiRoot}/orders/admin/search?limit=1`, accessToken);
-    if (adminOrders.ok) {
-      const sample = readOrderSample(adminOrders.data);
-      setSample("/admin/orders/:orderId", "orderId", sample.orderId);
-      setSample("/receipt/:token", "token", sample.receiptToken);
-    }
-  }
+    if (!adminOrders.ok) return;
+    const sample = readOrderSample(adminOrders.data);
+    setSample("/admin/orders/:orderId", "orderId", sample.orderId);
+    setSample("/receipt/:token", "token", sample.receiptToken);
+  };
+
+  await hydratePublicSamples();
+  await hydrateAdminSamples();
 
   return hydrated;
+}
+
+function placeholderKeys(pathTemplate) {
+  const matches = String(pathTemplate || "").matchAll(/:([A-Za-z][A-Za-z0-9_]*)/g);
+  return Array.from(matches, (match) => String(match[1] || "")).filter(Boolean);
 }
 
 async function installApiRewrite(context, { baseUrl, apiBaseUrl }) {

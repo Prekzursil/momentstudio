@@ -119,6 +119,9 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
   hidden: ['tags']
 });
 
+const PRESET_SLA_FILTERS = new Set<SlaFilter>(['any_overdue', 'accept_overdue', 'ship_overdue']);
+const PRESET_FRAUD_FILTERS = new Set<FraudFilter>(['queue', 'flagged', 'approved', 'denied']);
+
   @Component({
     selector: 'app-admin-orders',
     standalone: true,
@@ -2429,22 +2432,7 @@ export class AdminOrdersComponent implements OnInit {
     this.tagRenameBusy = true;
     this.tagRenameError = '';
     this.ordersApi.renameOrderTag({ from_tag: fromTag, to_tag: toTag }).subscribe({
-      next: (res) => {
-        const fromKey = normalizeTagKey(res.from_tag || fromTag);
-        const toKey = normalizeTagKey(res.to_tag || toTag);
-        if (fromKey && toKey && this.tagColorOverrides[fromKey] && !this.tagColorOverrides[toKey]) {
-          this.tagColorOverrides[toKey] = this.tagColorOverrides[fromKey];
-        }
-        if (fromKey) delete this.tagColorOverrides[fromKey];
-        persistTagColorOverrides(this.tagColorOverrides);
-
-        if (this.tag === fromKey) this.tag = toKey;
-        this.toast.success(this.translate.instant('adminUi.orders.tags.renamed', { count: res.total }));
-        this.tagRenameFrom = '';
-        this.tagRenameTo = '';
-        this.reloadTagManager();
-        this.load();
-      },
+      next: (res) => this.handleTagRenameSuccess(res, fromTag, toTag),
       error: (err) => {
         this.tagRenameError = err?.error?.detail || this.translate.instant('adminUi.orders.tags.errors.rename');
       },
@@ -2452,6 +2440,31 @@ export class AdminOrdersComponent implements OnInit {
         this.tagRenameBusy = false;
       }
     });
+  }
+
+  private handleTagRenameSuccess(
+    res: { from_tag?: string | null; to_tag?: string | null; total: number },
+    fromTag: string,
+    toTag: string
+  ): void {
+    const fromKey = normalizeTagKey(res.from_tag || fromTag);
+    const toKey = normalizeTagKey(res.to_tag || toTag);
+    this.copyTagColorOverride(fromKey, toKey);
+    if (fromKey) delete this.tagColorOverrides[fromKey];
+    persistTagColorOverrides(this.tagColorOverrides);
+
+    if (this.tag === fromKey) this.tag = toKey;
+    this.toast.success(this.translate.instant('adminUi.orders.tags.renamed', { count: res.total }));
+    this.tagRenameFrom = '';
+    this.tagRenameTo = '';
+    this.reloadTagManager();
+    this.load();
+  }
+
+  private copyTagColorOverride(fromKey: string, toKey: string): void {
+    if (!fromKey || !toKey) return;
+    if (!this.tagColorOverrides[fromKey] || this.tagColorOverrides[toKey]) return;
+    this.tagColorOverrides[toKey] = this.tagColorOverrides[fromKey];
   }
 
   private refreshTagOptions(): void {
@@ -2750,35 +2763,48 @@ export class AdminOrdersComponent implements OnInit {
       if (!Array.isArray(parsed)) return [];
       return parsed
         .filter((candidate: any) => typeof candidate?.id === 'string' && typeof candidate?.name === 'string')
-        .map((candidate: any) => ({
-          id: String(candidate.id),
-          name: String(candidate.name),
-          createdAt: String(candidate.createdAt ?? ''),
-          filters: {
-            q: String(candidate?.filters?.q ?? ''),
-            status: (candidate?.filters?.status ?? 'all') as OrderStatusFilter,
-            sla: ((): SlaFilter => {
-              const raw = String(candidate?.filters?.sla ?? 'all');
-              return raw === 'any_overdue' || raw === 'accept_overdue' || raw === 'ship_overdue' ? raw : 'all';
-            })(),
-            fraud: ((): FraudFilter => {
-              const raw = String(candidate?.filters?.fraud ?? 'all');
-              return raw === 'queue' || raw === 'flagged' || raw === 'approved' || raw === 'denied' ? raw : 'all';
-            })(),
-            tag: String(candidate?.filters?.tag ?? ''),
-            fromDate: String(candidate?.filters?.fromDate ?? ''),
-            toDate: String(candidate?.filters?.toDate ?? ''),
-            includeTestOrders:
-              typeof candidate?.filters?.includeTestOrders === 'boolean' ? candidate.filters.includeTestOrders : true,
-            limit:
-              typeof candidate?.filters?.limit === 'number' && Number.isFinite(candidate.filters.limit)
-                ? candidate.filters.limit
-                : 20
-          }
-        })) as AdminOrdersFilterPreset[];
+        .map((candidate: any) => this.coercePreset(candidate)) as AdminOrdersFilterPreset[];
     } catch {
       return [];
     }
+  }
+
+  private coercePreset(candidate: any): AdminOrdersFilterPreset {
+    const filters = candidate?.filters;
+    return {
+      id: String(candidate.id),
+      name: String(candidate.name),
+      createdAt: String(candidate.createdAt ?? ''),
+      filters: {
+        q: String(filters?.q ?? ''),
+        status: (filters?.status ?? 'all') as OrderStatusFilter,
+        sla: this.coercePresetSlaFilter(filters?.sla),
+        fraud: this.coercePresetFraudFilter(filters?.fraud),
+        tag: String(filters?.tag ?? ''),
+        fromDate: String(filters?.fromDate ?? ''),
+        toDate: String(filters?.toDate ?? ''),
+        includeTestOrders: this.coercePresetIncludeTestOrders(filters?.includeTestOrders),
+        limit: this.coercePresetLimit(filters?.limit)
+      }
+    };
+  }
+
+  private coercePresetIncludeTestOrders(value: unknown): boolean {
+    return typeof value === 'boolean' ? value : true;
+  }
+
+  private coercePresetLimit(value: unknown): number {
+    return typeof value === 'number' && Number.isFinite(value) ? value : 20;
+  }
+
+  private coercePresetSlaFilter(value: unknown): SlaFilter {
+    const raw = typeof value === 'string' ? value : 'all';
+    return PRESET_SLA_FILTERS.has(raw as SlaFilter) ? (raw as SlaFilter) : 'all';
+  }
+
+  private coercePresetFraudFilter(value: unknown): FraudFilter {
+    const raw = typeof value === 'string' ? value : 'all';
+    return PRESET_FRAUD_FILTERS.has(raw as FraudFilter) ? (raw as FraudFilter) : 'all';
   }
 
   private persistPresets(): void {
