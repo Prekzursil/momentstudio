@@ -8,6 +8,56 @@ import { AuthResponse, AuthService } from '../../core/auth.service';
 import { ToastService } from '../../core/toast.service';
 import { RegisterComponent } from './register.component';
 
+const configureRegisterTestingModule = (
+  auth: jasmine.SpyObj<AuthService>,
+  toast: jasmine.SpyObj<ToastService>,
+  router: jasmine.SpyObj<Router>
+): void => {
+  TestBed.configureTestingModule({
+    imports: [RegisterComponent, RouterTestingModule, TranslateModule.forRoot()],
+    providers: [
+      { provide: AuthService, useValue: auth },
+      { provide: ToastService, useValue: toast },
+      { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: { get: () => null } } } },
+      { provide: Router, useValue: router }
+    ]
+  });
+};
+
+const fillValidRegisterForm = (cmp: RegisterComponent): void => {
+  cmp.step = 2;
+  cmp.displayName = 'Ana';
+  cmp.username = 'ana2005l';
+  cmp.email = 'ana@example.com';
+  cmp.password = 'supersecret';
+  cmp.confirmPassword = 'supersecret';
+  cmp.firstName = 'Ana';
+  cmp.middleName = '';
+  cmp.lastName = 'Test';
+  cmp.dateOfBirth = '2000-01-01';
+  cmp.phoneCountry = 'RO';
+  cmp.phoneNational = '723204204';
+  cmp.acceptTerms = true;
+  cmp.acceptPrivacy = true;
+};
+
+const expectRegistrationPayload = (auth: jasmine.SpyObj<AuthService>): void => {
+  expect(auth.register).toHaveBeenCalledWith({
+    name: 'Ana',
+    username: 'ana2005l',
+    email: 'ana@example.com',
+    password: 'supersecret',
+    first_name: 'Ana',
+    middle_name: null,
+    last_name: 'Test',
+    date_of_birth: '2000-01-01',
+    phone: '+40723204204',
+    preferred_language: 'en',
+    accept_terms: true,
+    accept_privacy: true
+  });
+};
+
 describe('RegisterComponent', () => {
   it('submits registration payload with derived E.164 phone', () => {
     const auth = jasmine.createSpyObj<AuthService>('AuthService', ['register', 'startGoogleLogin']);
@@ -22,15 +72,7 @@ describe('RegisterComponent', () => {
       } as AuthResponse)
     );
 
-    TestBed.configureTestingModule({
-      imports: [RegisterComponent, RouterTestingModule, TranslateModule.forRoot()],
-      providers: [
-        { provide: AuthService, useValue: auth },
-        { provide: ToastService, useValue: toast },
-        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: { get: () => null } } } },
-        { provide: Router, useValue: router }
-      ]
-    });
+    configureRegisterTestingModule(auth, toast, router);
 
     const translate = TestBed.inject(TranslateService);
     translate.setTranslation('en', { auth: { successRegister: 'Account created' } }, true);
@@ -38,37 +80,11 @@ describe('RegisterComponent', () => {
 
     const fixture = TestBed.createComponent(RegisterComponent);
     const cmp = fixture.componentInstance;
-    cmp.step = 2;
-    cmp.displayName = 'Ana';
-    cmp.username = 'ana2005l';
-    cmp.email = 'ana@example.com';
-    cmp.password = 'supersecret';
-    cmp.confirmPassword = 'supersecret';
-    cmp.firstName = 'Ana';
-    cmp.middleName = '';
-    cmp.lastName = 'Test';
-    cmp.dateOfBirth = '2000-01-01';
-    cmp.phoneCountry = 'RO';
-    cmp.phoneNational = '723204204';
-    cmp.acceptTerms = true;
-    cmp.acceptPrivacy = true;
+    fillValidRegisterForm(cmp);
 
     cmp.onSubmit({ valid: true, form: { markAllAsTouched: () => {} } } as any);
 
-    expect(auth.register).toHaveBeenCalledWith({
-      name: 'Ana',
-      username: 'ana2005l',
-      email: 'ana@example.com',
-      password: 'supersecret',
-      first_name: 'Ana',
-      middle_name: null,
-      last_name: 'Test',
-      date_of_birth: '2000-01-01',
-      phone: '+40723204204',
-      preferred_language: 'en',
-      accept_terms: true,
-      accept_privacy: true
-    });
+    expectRegistrationPayload(auth);
     expect(router.navigateByUrl).toHaveBeenCalledWith('/account');
     expect(toast.success).toHaveBeenCalled();
   });
