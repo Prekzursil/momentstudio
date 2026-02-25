@@ -76,6 +76,55 @@ def compute_vat(
     return quantize_money(base * vat_rate_percent / Decimal("100"), rounding=rounding)
 
 
+def _taxable_subtotal(subtotal: Decimal, discount: Decimal, *, rounding: MoneyRounding) -> tuple[Decimal, Decimal]:
+    subtotal_q = quantize_money(subtotal, rounding=rounding)
+    discount_q = quantize_money(discount, rounding=rounding) if discount > 0 else Decimal("0.00")
+    taxable = subtotal_q - discount_q
+    if taxable < 0:
+        taxable = Decimal("0.00")
+    return subtotal_q, discount_q if discount_q >= 0 else Decimal("0.00")
+
+
+def _resolved_taxable(taxable: Decimal, *, rounding: MoneyRounding) -> Decimal:
+    if taxable < 0:
+        return Decimal("0.00")
+    return quantize_money(taxable, rounding=rounding)
+
+
+def _resolved_shipping(shipping: Decimal, *, rounding: MoneyRounding) -> Decimal:
+    if shipping <= 0:
+        return Decimal("0.00")
+    return quantize_money(shipping, rounding=rounding)
+
+
+def _resolved_vat(
+    *,
+    taxable: Decimal,
+    shipping: Decimal,
+    fee: Decimal,
+    vat_enabled: bool,
+    vat_override: Decimal | None,
+    vat_rate_percent: Decimal,
+    vat_apply_to_shipping: bool,
+    vat_apply_to_fee: bool,
+    rounding: MoneyRounding,
+) -> Decimal:
+    if not vat_enabled:
+        return Decimal("0.00")
+    if vat_override is not None:
+        return quantize_money(vat_override if vat_override > 0 else Decimal("0.00"), rounding=rounding)
+    return compute_vat(
+        taxable_subtotal=taxable,
+        shipping=shipping,
+        fee=fee,
+        enabled=vat_enabled,
+        vat_rate_percent=vat_rate_percent,
+        apply_to_shipping=vat_apply_to_shipping,
+        apply_to_fee=vat_apply_to_fee,
+        rounding=rounding,
+    )
+
+
 def compute_totals(
     *,
     subtotal: Decimal,
@@ -91,29 +140,21 @@ def compute_totals(
     rounding: MoneyRounding = "half_up",
     vat_override: Decimal | None = None,
 ) -> PricingBreakdown:
-    subtotal_q = quantize_money(subtotal, rounding=rounding)
-    discount_q = quantize_money(discount, rounding=rounding) if discount > 0 else Decimal("0.00")
-    taxable = subtotal_q - discount_q
-    if taxable < 0:
-        taxable = Decimal("0.00")
-    taxable = quantize_money(taxable, rounding=rounding)
-    shipping_q = quantize_money(shipping, rounding=rounding) if shipping > 0 else Decimal("0.00")
+    subtotal_q, discount_q = _taxable_subtotal(subtotal, discount, rounding=rounding)
+    taxable = _resolved_taxable(subtotal_q - discount_q, rounding=rounding)
+    shipping_q = _resolved_shipping(shipping, rounding=rounding)
     fee = compute_fee(taxable_subtotal=taxable, enabled=fee_enabled, fee_type=fee_type, fee_value=fee_value, rounding=rounding)
-    if not vat_enabled:
-        vat = Decimal("0.00")
-    elif vat_override is not None:
-        vat = quantize_money(vat_override if vat_override > 0 else Decimal("0.00"), rounding=rounding)
-    else:
-        vat = compute_vat(
-            taxable_subtotal=taxable,
-            shipping=shipping_q,
-            fee=fee,
-            enabled=vat_enabled,
-            vat_rate_percent=vat_rate_percent,
-            apply_to_shipping=vat_apply_to_shipping,
-            apply_to_fee=vat_apply_to_fee,
-            rounding=rounding,
-        )
+    vat = _resolved_vat(
+        taxable=taxable,
+        shipping=shipping_q,
+        fee=fee,
+        vat_enabled=vat_enabled,
+        vat_override=vat_override,
+        vat_rate_percent=vat_rate_percent,
+        vat_apply_to_shipping=vat_apply_to_shipping,
+        vat_apply_to_fee=vat_apply_to_fee,
+        rounding=rounding,
+    )
     total = taxable + shipping_q + fee + vat
     if total < 0:
         total = Decimal("0.00")
