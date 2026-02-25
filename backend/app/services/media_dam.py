@@ -169,6 +169,11 @@ def _normalize_job_tag(value: str) -> str:
     return _normalize_tag(value)
 
 
+def _optional_stripped(value: str | None) -> str | None:
+    text = str(value or "").strip()
+    return text or None
+
+
 def _coerce_triage_state(
     value: str | None,
     *,
@@ -1047,6 +1052,40 @@ async def mark_retry_policy_known_good(
     return retry_policy_event_to_read(event)
 
 
+async def _resolve_rollback_target_policy(
+    session: AsyncSession,
+    *,
+    parsed_job_type: MediaJobType,
+    payload: MediaRetryPolicyRollbackRequest,
+) -> tuple[RetryPolicyResolved, str | None]:
+    if payload.event_id:
+        event = await session.scalar(
+            select(MediaJobRetryPolicyEvent).where(
+                MediaJobRetryPolicyEvent.id == payload.event_id,
+                MediaJobRetryPolicyEvent.job_type == parsed_job_type,
+            )
+        )
+        if event is None:
+            raise ValueError("Retry policy history event not found")
+        return _deserialize_policy_snapshot_json(event.after_policy_json, job_type=parsed_job_type), None
+
+    presets = await get_retry_policy_presets(session, job_type=parsed_job_type)
+    preset = next((item for item in presets.items if item.preset_key == payload.preset_key), None)
+    if preset is None:
+        raise ValueError("Unknown retry policy preset")
+    policy = _policy_snapshot_from_raw(
+        {
+            "max_attempts": preset.policy.max_attempts,
+            "schedule": list(preset.policy.backoff_schedule_seconds),
+            "jitter_ratio": preset.policy.jitter_ratio,
+            "enabled": preset.policy.enabled,
+            "version_ts": preset.policy.version_ts or "preset",
+        },
+        job_type=parsed_job_type,
+    )
+    return policy, payload.preset_key
+
+
 async def rollback_retry_policy(
     session: AsyncSession,
     *,
@@ -1057,35 +1096,11 @@ async def rollback_retry_policy(
     parsed_job_type = _parse_job_type(job_type)
     row = await session.scalar(select(MediaJobRetryPolicy).where(MediaJobRetryPolicy.job_type == parsed_job_type))
     before_policy = _policy_row_to_resolved(row, job_type=parsed_job_type)
-
-    target_policy: RetryPolicyResolved
-    target_preset_key: str | None = payload.preset_key
-    if payload.event_id:
-        event = await session.scalar(
-            select(MediaJobRetryPolicyEvent).where(
-                MediaJobRetryPolicyEvent.id == payload.event_id,
-                MediaJobRetryPolicyEvent.job_type == parsed_job_type,
-            )
-        )
-        if event is None:
-            raise ValueError("Retry policy history event not found")
-        target_policy = _deserialize_policy_snapshot_json(event.after_policy_json, job_type=parsed_job_type)
-        target_preset_key = None
-    else:
-        presets = await get_retry_policy_presets(session, job_type=parsed_job_type)
-        preset = next((item for item in presets.items if item.preset_key == payload.preset_key), None)
-        if preset is None:
-            raise ValueError("Unknown retry policy preset")
-        target_policy = _policy_snapshot_from_raw(
-            {
-                "max_attempts": preset.policy.max_attempts,
-                "schedule": list(preset.policy.backoff_schedule_seconds),
-                "jitter_ratio": preset.policy.jitter_ratio,
-                "enabled": preset.policy.enabled,
-                "version_ts": preset.policy.version_ts or "preset",
-            },
-            job_type=parsed_job_type,
-        )
+    target_policy, target_preset_key = await _resolve_rollback_target_policy(
+        session,
+        parsed_job_type=parsed_job_type,
+        payload=payload,
+    )
 
     if row is None:
         row = MediaJobRetryPolicy(job_type=parsed_job_type)
@@ -1168,50 +1183,90 @@ async def _apply_job_tag_changes(
     await session.flush()
 
 
-async def list_assets(session: AsyncSession, filters: MediaListFilters) -> tuple[list[MediaAsset], dict[str, int]]:
-    clauses = []
+def _asset_search_clause(query: str) -> ColumnElement[bool]:
+    search = f"%{query.strip().lower()}%"
+    return or_(
+        func.lower(MediaAsset.original_filename).like(search),
+        func.lower(MediaAsset.public_url).like(search),
+        func.lower(MediaAsset.storage_key).like(search),
+        func.lower(MediaAsset.source_ref).like(search),
+        MediaAsset.id.in_(
+            select(MediaAssetI18n.asset_id).where(
+                or_(
+                    func.lower(MediaAssetI18n.title).like(search),
+                    func.lower(MediaAssetI18n.alt_text).like(search),
+                    func.lower(MediaAssetI18n.caption).like(search),
+                    func.lower(MediaAssetI18n.description).like(search),
+                )
+            )
+        ),
+    )
+
+
+def _asset_tag_clause(raw_tag: str) -> ColumnElement[bool] | None:
+    normalized_tag = _normalize_tag(raw_tag)
+    if not normalized_tag:
+        return None
+    return MediaAsset.id.in_(
+        select(MediaAssetTag.asset_id)
+        .join(MediaTag, MediaTag.id == MediaAssetTag.tag_id)
+        .where(MediaTag.value == normalized_tag)
+    )
+
+
+def _build_asset_filter_clauses(filters: MediaListFilters) -> list[ColumnElement[bool]]:
+    clauses: list[ColumnElement[bool]] = []
     if not filters.include_trashed:
         clauses.append(MediaAsset.status != MediaAssetStatus.trashed)
     if filters.q:
-        q = f"%{filters.q.strip().lower()}%"
-        clauses.append(
-            or_(
-                func.lower(MediaAsset.original_filename).like(q),
-                func.lower(MediaAsset.public_url).like(q),
-                func.lower(MediaAsset.storage_key).like(q),
-                func.lower(MediaAsset.source_ref).like(q),
-                MediaAsset.id.in_(
-                    select(MediaAssetI18n.asset_id).where(
-                        or_(
-                            func.lower(MediaAssetI18n.title).like(q),
-                            func.lower(MediaAssetI18n.alt_text).like(q),
-                            func.lower(MediaAssetI18n.caption).like(q),
-                            func.lower(MediaAssetI18n.description).like(q),
-                        )
-                    )
-                ),
-            )
-        )
-    if filters.asset_type:
-        clauses.append(MediaAsset.asset_type == MediaAssetType(filters.asset_type))
-    if filters.status:
-        clauses.append(MediaAsset.status == MediaAssetStatus(filters.status))
-    if filters.visibility:
-        clauses.append(MediaAsset.visibility == MediaVisibility(filters.visibility))
+        clauses.append(_asset_search_clause(filters.q))
+    for raw_value, enum_type, column in (
+        (filters.asset_type, MediaAssetType, cast(ColumnElement[Any], MediaAsset.asset_type)),
+        (filters.status, MediaAssetStatus, cast(ColumnElement[Any], MediaAsset.status)),
+        (filters.visibility, MediaVisibility, cast(ColumnElement[Any], MediaAsset.visibility)),
+    ):
+        if raw_value:
+            clauses.append(cast(ColumnElement[bool], column == enum_type(raw_value)))
     if filters.created_from:
         clauses.append(MediaAsset.created_at >= filters.created_from)
     if filters.created_to:
         clauses.append(MediaAsset.created_at <= filters.created_to)
-    if filters.tag:
-        normalized_tag = _normalize_tag(filters.tag)
-        if normalized_tag:
-            clauses.append(
-                MediaAsset.id.in_(
-                    select(MediaAssetTag.asset_id)
-                    .join(MediaTag, MediaTag.id == MediaAssetTag.tag_id)
-                    .where(MediaTag.value == normalized_tag)
-                )
+    tag_clause = _asset_tag_clause(filters.tag) if filters.tag else None
+    if tag_clause is not None:
+        clauses.append(tag_clause)
+    return clauses
+
+
+def _build_job_filter_clauses(filters: MediaJobListFilters, *, now: datetime) -> list[ColumnElement[bool]]:
+    clauses: list[ColumnElement[bool]] = []
+    simple_filters: tuple[ColumnElement[bool] | None, ...] = (
+        MediaJob.status == MediaJobStatus(filters.status) if filters.status else None,
+        MediaJob.job_type == MediaJobType(filters.job_type) if filters.job_type else None,
+        MediaJob.asset_id == filters.asset_id if filters.asset_id else None,
+        MediaJob.created_at >= filters.created_from if filters.created_from else None,
+        MediaJob.created_at <= filters.created_to if filters.created_to else None,
+        MediaJob.assigned_to_user_id == filters.assigned_to_user_id if filters.assigned_to_user_id else None,
+        MediaJob.status == MediaJobStatus.dead_letter if filters.dead_letter_only else None,
+    )
+    clauses.extend([clause for clause in simple_filters if clause is not None])
+    if filters.triage_state:
+        clauses.append(MediaJob.triage_state == _coerce_triage_state(filters.triage_state, fallback="open"))
+    if filters.sla_breached:
+        clauses.extend((MediaJob.sla_due_at.is_not(None), MediaJob.sla_due_at < now, MediaJob.triage_state != "resolved"))
+    normalized_tag = _normalize_job_tag(filters.tag) if filters.tag else ""
+    if normalized_tag:
+        clauses.append(
+            MediaJob.id.in_(
+                select(MediaJobTagLink.job_id)
+                .join(MediaJobTag, MediaJobTag.id == MediaJobTagLink.tag_id)
+                .where(MediaJobTag.value == normalized_tag)
             )
+        )
+    return clauses
+
+
+async def list_assets(session: AsyncSession, filters: MediaListFilters) -> tuple[list[MediaAsset], dict[str, int]]:
+    clauses = _build_asset_filter_clauses(filters)
 
     stmt = select(MediaAsset).options(
         selectinload(MediaAsset.tags).selectinload(MediaAssetTag.tag),
@@ -1220,8 +1275,9 @@ async def list_assets(session: AsyncSession, filters: MediaListFilters) -> tuple
     )
     count_stmt = select(func.count()).select_from(MediaAsset)
     if clauses:
-        stmt = stmt.where(and_(*clauses))
-        count_stmt = count_stmt.where(and_(*clauses))
+        where_clause = and_(*clauses)
+        stmt = stmt.where(where_clause)
+        count_stmt = count_stmt.where(where_clause)
 
     order_map: dict[str, list[ColumnElement[Any]]] = {
         "newest": [MediaAsset.created_at.desc(), MediaAsset.id.desc()],
@@ -1231,6 +1287,7 @@ async def list_assets(session: AsyncSession, filters: MediaListFilters) -> tuple
     }
     order = order_map.get(filters.sort, order_map["newest"])
     stmt = stmt.order_by(*order).offset((filters.page - 1) * filters.limit).limit(filters.limit)
+
     total_items = int((await session.scalar(count_stmt)) or 0)
     total_pages = max(1, (total_items + filters.limit - 1) // filters.limit) if total_items else 1
     rows = (await session.execute(stmt)).scalars().all()
@@ -1238,43 +1295,14 @@ async def list_assets(session: AsyncSession, filters: MediaListFilters) -> tuple
 
 
 async def list_jobs(session: AsyncSession, filters: MediaJobListFilters) -> tuple[list[MediaJob], dict[str, int]]:
-    clauses: list[ColumnElement[bool]] = []
-    if filters.status:
-        clauses.append(MediaJob.status == MediaJobStatus(filters.status))
-    if filters.job_type:
-        clauses.append(MediaJob.job_type == MediaJobType(filters.job_type))
-    if filters.asset_id:
-        clauses.append(MediaJob.asset_id == filters.asset_id)
-    if filters.created_from:
-        clauses.append(MediaJob.created_at >= filters.created_from)
-    if filters.created_to:
-        clauses.append(MediaJob.created_at <= filters.created_to)
-    if filters.triage_state:
-        clauses.append(MediaJob.triage_state == _coerce_triage_state(filters.triage_state, fallback="open"))
-    if filters.assigned_to_user_id:
-        clauses.append(MediaJob.assigned_to_user_id == filters.assigned_to_user_id)
-    if filters.dead_letter_only:
-        clauses.append(MediaJob.status == MediaJobStatus.dead_letter)
-    if filters.sla_breached:
-        clauses.append(MediaJob.sla_due_at.is_not(None))
-        clauses.append(MediaJob.sla_due_at < _now())
-        clauses.append(MediaJob.triage_state != "resolved")
-    if filters.tag:
-        normalized_tag = _normalize_job_tag(filters.tag)
-        if normalized_tag:
-            clauses.append(
-                MediaJob.id.in_(
-                    select(MediaJobTagLink.job_id)
-                    .join(MediaJobTag, MediaJobTag.id == MediaJobTagLink.tag_id)
-                    .where(MediaJobTag.value == normalized_tag)
-                )
-            )
+    clauses = _build_job_filter_clauses(filters, now=_now())
 
     stmt = select(MediaJob).options(selectinload(MediaJob.tags).selectinload(MediaJobTagLink.tag))
     count_stmt = select(func.count()).select_from(MediaJob)
     if clauses:
-        stmt = stmt.where(and_(*clauses))
-        count_stmt = count_stmt.where(and_(*clauses))
+        where_clause = and_(*clauses)
+        stmt = stmt.where(where_clause)
+        count_stmt = count_stmt.where(where_clause)
 
     stmt = stmt.order_by(MediaJob.created_at.desc(), MediaJob.id.desc()).offset((filters.page - 1) * filters.limit).limit(filters.limit)
     total_items = int((await session.scalar(count_stmt)) or 0)
@@ -1401,6 +1429,37 @@ async def _avg_processing_seconds_last_day(session: AsyncSession, *, now: dateti
     return int(sum(processing_seconds) / len(processing_seconds))
 
 
+async def _telemetry_job_counters(
+    session: AsyncSession,
+    *,
+    now: datetime,
+) -> tuple[int, int, int, int, int | None, dict[str, int], dict[str, int], int | None]:
+    stale_seconds = max(60, int(getattr(settings, "media_dam_processing_stale_seconds", 600) or 600))
+    stale_cutoff = now - timedelta(seconds=stale_seconds)
+    stale_processing = await _count_jobs(
+        session,
+        MediaJob.status == MediaJobStatus.processing,
+        MediaJob.started_at < stale_cutoff,
+    )
+    dead_letter = await _count_jobs(session, MediaJob.status == MediaJobStatus.dead_letter)
+    retry_scheduled = await _count_jobs(
+        session,
+        MediaJob.status == MediaJobStatus.failed,
+        MediaJob.next_retry_at.is_not(None),
+    )
+    sla_breached = await _count_jobs(
+        session,
+        MediaJob.sla_due_at.is_not(None),
+        MediaJob.sla_due_at < now,
+        MediaJob.triage_state != "resolved",
+    )
+    oldest_age = await _oldest_queued_age_seconds(session, now=now)
+    status_counts = await _grouped_job_counts(session, cast(ColumnElement[Any], MediaJob.status))
+    type_counts = await _grouped_job_counts(session, cast(ColumnElement[Any], MediaJob.job_type))
+    avg_processing = await _avg_processing_seconds_last_day(session, now=now)
+    return stale_processing, dead_letter, retry_scheduled, sla_breached, oldest_age, status_counts, type_counts, avg_processing
+
+
 async def get_telemetry(session: AsyncSession) -> MediaTelemetryResponse:
     redis = get_redis()
     queue_depth = 0
@@ -1415,29 +1474,16 @@ async def get_telemetry(session: AsyncSession) -> MediaTelemetryResponse:
         except Exception:
             workers = []
 
-    stale_seconds = max(60, int(getattr(settings, "media_dam_processing_stale_seconds", 600) or 600))
-    stale_cutoff = now - timedelta(seconds=stale_seconds)
-    stale_processing_count = await _count_jobs(
-        session,
-        MediaJob.status == MediaJobStatus.processing,
-        MediaJob.started_at < stale_cutoff,
-    )
-    dead_letter_count = await _count_jobs(session, MediaJob.status == MediaJobStatus.dead_letter)
-    retry_scheduled_count = await _count_jobs(
-        session,
-        MediaJob.status == MediaJobStatus.failed,
-        MediaJob.next_retry_at.is_not(None),
-    )
-    sla_breached_count = await _count_jobs(
-        session,
-        MediaJob.sla_due_at.is_not(None),
-        MediaJob.sla_due_at < now,
-        MediaJob.triage_state != "resolved",
-    )
-    oldest_queued_age_seconds = await _oldest_queued_age_seconds(session, now=now)
-    status_counts = await _grouped_job_counts(session, cast(ColumnElement[Any], MediaJob.status))
-    type_counts = await _grouped_job_counts(session, cast(ColumnElement[Any], MediaJob.job_type))
-    avg_processing_seconds = await _avg_processing_seconds_last_day(session, now=now)
+    (
+        stale_processing_count,
+        dead_letter_count,
+        retry_scheduled_count,
+        sla_breached_count,
+        oldest_queued_age_seconds,
+        status_counts,
+        type_counts,
+        avg_processing_seconds,
+    ) = await _telemetry_job_counters(session, now=now)
 
     workers.sort(key=lambda row: row.last_seen_at, reverse=True)
     return MediaTelemetryResponse(
@@ -1454,13 +1500,11 @@ async def get_telemetry(session: AsyncSession) -> MediaTelemetryResponse:
         type_counts=type_counts,
     )
 
-def asset_to_read(asset: MediaAsset) -> MediaAssetRead:
-    _ensure_asset_storage_placement(asset)
-    tags = sorted({tag_rel.tag.value for tag_rel in (asset.tags or []) if getattr(tag_rel, "tag", None)})
-    i18n: list[MediaAssetI18nRead] = []
-    for i18n_row in sorted(asset.i18n or [], key=lambda x: x.lang):
+def _asset_i18n_to_read(asset: MediaAsset) -> list[MediaAssetI18nRead]:
+    rows: list[MediaAssetI18nRead] = []
+    for i18n_row in sorted(asset.i18n or [], key=lambda row: row.lang):
         lang = cast(Literal["en", "ro"], i18n_row.lang if i18n_row.lang in {"en", "ro"} else "en")
-        i18n.append(
+        rows.append(
             MediaAssetI18nRead(
                 lang=lang,
                 title=i18n_row.title,
@@ -1469,9 +1513,13 @@ def asset_to_read(asset: MediaAsset) -> MediaAssetRead:
                 description=i18n_row.description,
             )
         )
-    variants: list[MediaVariantRead] = []
-    for variant_row in sorted(asset.variants or [], key=lambda x: x.profile):
-        variants.append(
+    return rows
+
+
+def _asset_variants_to_read(asset: MediaAsset) -> list[MediaVariantRead]:
+    rows: list[MediaVariantRead] = []
+    for variant_row in sorted(asset.variants or [], key=lambda row: row.profile):
+        rows.append(
             MediaVariantRead(
                 id=variant_row.id,
                 profile=variant_row.profile,
@@ -1483,6 +1531,15 @@ def asset_to_read(asset: MediaAsset) -> MediaAssetRead:
                 created_at=variant_row.created_at,
             )
         )
+    return rows
+
+
+def asset_to_read(asset: MediaAsset) -> MediaAssetRead:
+
+    _ensure_asset_storage_placement(asset)
+    tags = sorted({tag_rel.tag.value for tag_rel in (asset.tags or []) if getattr(tag_rel, "tag", None)})
+    i18n = _asset_i18n_to_read(asset)
+    variants = _asset_variants_to_read(asset)
     preview_url = asset.public_url if _is_publicly_servable(asset) else build_preview_url(asset.id)
     return MediaAssetRead(
         id=asset.id,
@@ -1533,17 +1590,19 @@ async def get_asset_or_404(session: AsyncSession, asset_id: UUID) -> MediaAsset:
 
 
 async def apply_asset_update(session: AsyncSession, asset: MediaAsset, payload: MediaAssetUpdateRequest) -> None:
+    def _set_optional_text(attr: str, value: str | None) -> None:
+        if value is None:
+            return
+        setattr(asset, attr, (value or "").strip() or None)
+
     before_public = _is_publicly_servable(asset)
     if payload.status:
         asset.status = MediaAssetStatus(payload.status)
     if payload.visibility:
         asset.visibility = MediaVisibility(payload.visibility)
-    if payload.rights_license is not None:
-        asset.rights_license = (payload.rights_license or "").strip() or None
-    if payload.rights_owner is not None:
-        asset.rights_owner = (payload.rights_owner or "").strip() or None
-    if payload.rights_notes is not None:
-        asset.rights_notes = (payload.rights_notes or "").strip() or None
+    _set_optional_text("rights_license", payload.rights_license)
+    _set_optional_text("rights_owner", payload.rights_owner)
+    _set_optional_text("rights_notes", payload.rights_notes)
     session.add(asset)
 
     if payload.tags is not None:
@@ -1558,6 +1617,12 @@ async def apply_asset_update(session: AsyncSession, asset: MediaAsset, payload: 
 
 
 async def _replace_asset_i18n(session: AsyncSession, asset: MediaAsset, entries: list[MediaAssetUpdateI18nItem]) -> None:
+    def _apply_i18n_values(row: MediaAssetI18n, data: MediaAssetUpdateI18nItem) -> None:
+        row.title = _optional_stripped(data.title)
+        row.alt_text = _optional_stripped(data.alt_text)
+        row.caption = _optional_stripped(data.caption)
+        row.description = _optional_stripped(data.description)
+
     by_lang = {row.lang: row for row in (asset.i18n or [])}
     seen_langs: set[str] = set()
     for row in entries:
@@ -1569,10 +1634,7 @@ async def _replace_asset_i18n(session: AsyncSession, asset: MediaAsset, entries:
         if current is None:
             current = MediaAssetI18n(asset_id=asset.id, lang=lang)
             session.add(current)
-        current.title = (row.title or "").strip() or None
-        current.alt_text = (row.alt_text or "").strip() or None
-        current.caption = (row.caption or "").strip() or None
-        current.description = (row.description or "").strip() or None
+        _apply_i18n_values(current, row)
 
 
 def _normalized_asset_tags(tags: list[str] | None, *, limit: int = 30) -> list[str]:
@@ -1832,6 +1894,60 @@ async def rebuild_usage_edges(
     )
 
 
+async def _collect_usage_refs_for_url(
+    session: AsyncSession,
+    *,
+    url: str,
+) -> list[tuple[str, str, str | None, str, str | None]]:
+    refs: list[tuple[str, str, str | None, str, str | None]] = []
+    keys = await content_service.get_asset_usage_keys(session, url=url)
+    refs.extend([("content_block", key, None, "auto_scan", None) for key in keys])
+
+    content_rows = (
+        await session.execute(
+            select(ContentImage.id, ContentBlock.key)
+            .join(ContentBlock, ContentBlock.id == ContentImage.content_block_id)
+            .where(ContentImage.url == url)
+        )
+    ).all()
+    refs.extend([("content_image", block_key, str(image_id), "content_images.url", None) for image_id, block_key in content_rows])
+
+    product_rows = (
+        await session.execute(
+            select(ProductImage.id, Product.slug)
+            .join(Product, Product.id == ProductImage.product_id)
+            .where(ProductImage.url == url, ProductImage.is_deleted.is_(False))
+        )
+    ).all()
+    refs.extend([("product_image", slug, str(image_id), "product_images.url", None) for image_id, slug in product_rows])
+
+    like = f"%{url}%"
+    tr_rows = (
+        await session.execute(
+            select(ContentBlock.key, ContentBlockTranslation.lang)
+            .join(ContentBlock, ContentBlock.id == ContentBlockTranslation.content_block_id)
+            .where(ContentBlockTranslation.body_markdown.ilike(like))
+        )
+    ).all()
+    refs.extend(
+        [("content_translation", block_key, None, "translations.body_markdown", str(lang or "")) for block_key, lang in tr_rows]
+    )
+
+    social_rows = (
+        await session.execute(
+            select(ContentBlock.key).where(
+                ContentBlock.key == "site.social",
+                or_(
+                    ContentBlock.body_markdown.ilike(like),
+                    func.cast(ContentBlock.meta, String).ilike(like),
+                ),
+            )
+        )
+    ).all()
+    refs.extend([("site_social", block_key, None, "site.social", None) for (block_key,) in social_rows])
+    return refs
+
+
 async def _collect_usage_refs(
     session: AsyncSession,
     asset: MediaAsset,
@@ -1839,54 +1955,7 @@ async def _collect_usage_refs(
     refs: list[tuple[str, str, str | None, str, str | None]] = []
     urls = [asset.public_url]
     for url in urls:
-        keys = await content_service.get_asset_usage_keys(session, url=url)
-        refs.extend([("content_block", key, None, "auto_scan", None) for key in keys])
-
-        content_rows = (
-            await session.execute(
-                select(ContentImage.id, ContentBlock.key)
-                .join(ContentBlock, ContentBlock.id == ContentImage.content_block_id)
-                .where(ContentImage.url == url)
-            )
-        ).all()
-        for image_id, block_key in content_rows:
-            refs.append(("content_image", block_key, str(image_id), "content_images.url", None))
-
-        product_rows = (
-            await session.execute(
-                select(ProductImage.id, Product.slug)
-                .join(Product, Product.id == ProductImage.product_id)
-                .where(ProductImage.url == url, ProductImage.is_deleted.is_(False))
-            )
-        ).all()
-        for image_id, slug in product_rows:
-            refs.append(("product_image", slug, str(image_id), "product_images.url", None))
-
-        like = f"%{url}%"
-        tr_rows = (
-            await session.execute(
-                select(ContentBlock.key, ContentBlockTranslation.lang)
-                .join(ContentBlock, ContentBlock.id == ContentBlockTranslation.content_block_id)
-                .where(ContentBlockTranslation.body_markdown.ilike(like))
-            )
-        ).all()
-        for block_key, lang in tr_rows:
-            refs.append(("content_translation", block_key, None, "translations.body_markdown", str(lang or "")))
-
-        social_rows = (
-            await session.execute(
-                select(ContentBlock.key)
-                .where(
-                    ContentBlock.key == "site.social",
-                    or_(
-                        ContentBlock.body_markdown.ilike(like),
-                        func.cast(ContentBlock.meta, String).ilike(like),
-                    ),
-                )
-            )
-        ).all()
-        for (block_key,) in social_rows:
-            refs.append(("site_social", block_key, None, "site.social", None))
+        refs.extend(await _collect_usage_refs_for_url(session, url=url))
 
     return refs
 
@@ -1969,6 +2038,26 @@ async def _mark_job_completed(session: AsyncSession, *, job: MediaJob) -> None:
     )
 
 
+def _retry_policy_event_meta(
+    *,
+    job: MediaJob,
+    retry_policy: RetryPolicyResolved,
+    effective_max_attempts: int,
+    delay: int | None = None,
+) -> dict[str, Any]:
+    meta: dict[str, Any] = {
+        "attempt": int(job.attempt or 0),
+        "max_attempts": effective_max_attempts,
+        "schedule": retry_policy.schedule,
+        "jitter_ratio": retry_policy.jitter_ratio,
+    }
+    if delay is not None:
+        meta["retry_in_seconds"] = int(delay)
+    else:
+        meta["policy_enabled"] = retry_policy.enabled
+    return meta
+
+
 async def _mark_job_failed_or_retrying(
     session: AsyncSession,
     *,
@@ -1992,6 +2081,7 @@ async def _mark_job_failed_or_retrying(
     job.error_code = "processing_failed"
     job.error_message = str(exc)
     job.completed_at = now
+    note = str(exc)
     if delay is None:
         job.status = MediaJobStatus.dead_letter
         job.dead_lettered_at = now
@@ -2001,14 +2091,12 @@ async def _mark_job_failed_or_retrying(
             session,
             job=job,
             action="dead_lettered",
-            note=str(exc),
-            meta={
-                "attempt": int(job.attempt or 0),
-                "max_attempts": effective_max_attempts,
-                "schedule": retry_policy.schedule,
-                "jitter_ratio": retry_policy.jitter_ratio,
-                "policy_enabled": retry_policy.enabled,
-            },
+            note=note,
+            meta=_retry_policy_event_meta(
+                job=job,
+                retry_policy=retry_policy,
+                effective_max_attempts=effective_max_attempts,
+            ),
         )
         return
     job.status = MediaJobStatus.failed
@@ -2018,14 +2106,13 @@ async def _mark_job_failed_or_retrying(
         session,
         job=job,
         action="retry_scheduled",
-        note=str(exc),
-        meta={
-            "attempt": int(job.attempt or 0),
-            "max_attempts": effective_max_attempts,
-            "retry_in_seconds": int(delay),
-            "schedule": retry_policy.schedule,
-            "jitter_ratio": retry_policy.jitter_ratio,
-        },
+        note=note,
+        meta=_retry_policy_event_meta(
+            job=job,
+            retry_policy=retry_policy,
+            effective_max_attempts=effective_max_attempts,
+            delay=delay,
+        ),
     )
 
 
@@ -2174,6 +2261,13 @@ async def _process_edit_job(session: AsyncSession, job: MediaJob) -> None:
 
 
 async def _process_ai_tag_job(session: AsyncSession, job: MediaJob) -> None:
+    def _auto_tags_from_filename(filename: str) -> set[str]:
+        tags: set[str] = set()
+        for token in re.split(r"[^a-z0-9]+", filename.lower()):
+            if len(token) >= 3:
+                tags.add(token[:32])
+        return tags
+
     if not job.asset_id:
         return
     asset = await session.scalar(
@@ -2181,11 +2275,7 @@ async def _process_ai_tag_job(session: AsyncSession, job: MediaJob) -> None:
     )
     if asset is None:
         return
-    auto_tags = set()
-    filename = str(asset.original_filename or "").lower()
-    for token in re.split(r"[^a-z0-9]+", filename):
-        if len(token) >= 3:
-            auto_tags.add(token[:32])
+    auto_tags = _auto_tags_from_filename(str(asset.original_filename or ""))
     if asset.width and asset.height:
         auto_tags.add("landscape" if asset.width >= asset.height else "portrait")
     await _replace_asset_tags(session, asset, sorted({*(tag.tag.value for tag in (asset.tags or []) if tag.tag), *auto_tags}))
@@ -2281,16 +2371,7 @@ async def manual_retry_job(
     job: MediaJob,
     actor_user_id: UUID | None = None,
 ) -> MediaJob:
-    job.status = MediaJobStatus.queued
-    job.progress_pct = 0
-    job.error_code = None
-    job.error_message = None
-    job.next_retry_at = None
-    job.started_at = None
-    job.completed_at = None
-    job.dead_lettered_at = None
-    if job.triage_state in {"open", "ignored", "resolved"}:
-        job.triage_state = "retrying"
+    _reset_job_for_retry(job)
     session.add(job)
     await _record_job_event(
         session,
@@ -2303,6 +2384,28 @@ async def manual_retry_job(
     await _maybe_queue_job(job.id)
     await session.refresh(job)
     return job
+
+
+def _is_retryable_job(job: MediaJob) -> bool:
+    if job.status == MediaJobStatus.processing:
+        return False
+    max_attempts = int(job.max_attempts or DEFAULT_MAX_ATTEMPTS)
+    if int(job.attempt or 0) < max_attempts:
+        return True
+    return job.status == MediaJobStatus.dead_letter
+
+
+def _reset_job_for_retry(job: MediaJob) -> None:
+    job.status = MediaJobStatus.queued
+    job.progress_pct = 0
+    job.error_code = None
+    job.error_message = None
+    job.next_retry_at = None
+    job.started_at = None
+    job.completed_at = None
+    job.dead_lettered_at = None
+    if job.triage_state in {"open", "ignored", "resolved"}:
+        job.triage_state = "retrying"
 
 
 async def bulk_retry_jobs(
@@ -2320,20 +2423,9 @@ async def bulk_retry_jobs(
     ).scalars().all()
     retried: list[MediaJob] = []
     for job in rows:
-        if job.status == MediaJobStatus.processing:
+        if not _is_retryable_job(job):
             continue
-        if int(job.attempt or 0) >= int(job.max_attempts or DEFAULT_MAX_ATTEMPTS) and job.status != MediaJobStatus.dead_letter:
-            continue
-        job.status = MediaJobStatus.queued
-        job.progress_pct = 0
-        job.error_code = None
-        job.error_message = None
-        job.next_retry_at = None
-        job.started_at = None
-        job.completed_at = None
-        job.dead_lettered_at = None
-        if job.triage_state in {"open", "ignored", "resolved"}:
-            job.triage_state = "retrying"
+        _reset_job_for_retry(job)
         session.add(job)
         await _record_job_event(
             session,
@@ -2349,6 +2441,66 @@ async def bulk_retry_jobs(
     for row in retried:
         await session.refresh(row)
     return retried
+
+
+def _apply_triage_state_update(job: MediaJob, *, triage_state: str | None, meta: dict[str, Any]) -> None:
+    if not triage_state:
+        return
+    current_triage = _coerce_triage_state(job.triage_state, fallback="open")
+    job.triage_state = _coerce_triage_state(triage_state, fallback=current_triage)
+    meta["triage_state"] = job.triage_state
+
+
+def _apply_assignee_update(
+    job: MediaJob,
+    *,
+    clear_assignee: bool,
+    assigned_to_user_id: UUID | None,
+    meta: dict[str, Any],
+) -> None:
+    if clear_assignee:
+        job.assigned_to_user_id = None
+        meta["assigned_to_user_id"] = None
+        return
+    if assigned_to_user_id is None:
+        return
+    job.assigned_to_user_id = assigned_to_user_id
+    meta["assigned_to_user_id"] = str(assigned_to_user_id)
+
+
+def _apply_sla_update(
+    job: MediaJob,
+    *,
+    clear_sla_due_at: bool,
+    sla_due_at: datetime | None,
+    meta: dict[str, Any],
+) -> None:
+    if clear_sla_due_at:
+        job.sla_due_at = None
+        meta["sla_due_at"] = None
+        return
+    if sla_due_at is None:
+        return
+    job.sla_due_at = sla_due_at
+    meta["sla_due_at"] = sla_due_at.isoformat()
+
+
+def _apply_incident_update(
+    job: MediaJob,
+    *,
+    clear_incident_url: bool,
+    incident_url: str | None,
+    meta: dict[str, Any],
+) -> None:
+    if clear_incident_url:
+        job.incident_url = None
+        meta["incident_url"] = None
+        return
+    if incident_url is None:
+        return
+    cleaned = (incident_url or "").strip()
+    job.incident_url = cleaned or None
+    meta["incident_url"] = job.incident_url
 
 
 async def update_job_triage(
@@ -2368,29 +2520,25 @@ async def update_job_triage(
     note: str | None = None,
 ) -> MediaJob:
     meta: dict[str, Any] = {}
-    if triage_state:
-        current_triage = _coerce_triage_state(job.triage_state, fallback="open")
-        job.triage_state = _coerce_triage_state(triage_state, fallback=current_triage)
-        meta["triage_state"] = job.triage_state
-    if clear_assignee:
-        job.assigned_to_user_id = None
-        meta["assigned_to_user_id"] = None
-    elif assigned_to_user_id is not None:
-        job.assigned_to_user_id = assigned_to_user_id
-        meta["assigned_to_user_id"] = str(assigned_to_user_id)
-    if clear_sla_due_at:
-        job.sla_due_at = None
-        meta["sla_due_at"] = None
-    elif sla_due_at is not None:
-        job.sla_due_at = sla_due_at
-        meta["sla_due_at"] = sla_due_at.isoformat()
-    if clear_incident_url:
-        job.incident_url = None
-        meta["incident_url"] = None
-    elif incident_url is not None:
-        cleaned = (incident_url or "").strip()
-        job.incident_url = cleaned or None
-        meta["incident_url"] = job.incident_url
+    _apply_triage_state_update(job, triage_state=triage_state, meta=meta)
+    _apply_assignee_update(
+        job,
+        clear_assignee=clear_assignee,
+        assigned_to_user_id=assigned_to_user_id,
+        meta=meta,
+    )
+    _apply_sla_update(
+        job,
+        clear_sla_due_at=clear_sla_due_at,
+        sla_due_at=sla_due_at,
+        meta=meta,
+    )
+    _apply_incident_update(
+        job,
+        clear_incident_url=clear_incident_url,
+        incident_url=incident_url,
+        meta=meta,
+    )
 
     await _apply_job_tag_changes(session, job=job, add_tags=add_tags or [], remove_tags=remove_tags or [])
     session.add(job)
