@@ -1871,10 +1871,10 @@ export class AdminUsersComponent implements OnInit {
     });
   }
 
-  private handleLoadUsersSuccess(res: { items?: AdminUserListItem[]; meta?: unknown }): void {
+  private handleLoadUsersSuccess(res: AdminUserListResponse): void {
     const items = res.items || [];
     this.users.set(items);
-    this.meta.set(res.meta || null);
+    this.meta.set(res.meta);
     this.loading.set(false);
     this.syncSelectedUser(items);
     this.autoSelectUserAfterLoad(items);

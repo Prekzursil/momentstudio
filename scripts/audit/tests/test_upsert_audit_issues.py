@@ -30,10 +30,8 @@ def test_should_upsert_issue_includes_s1_s2_and_optional_s3_seo() -> None:
     assert not module._should_upsert_issue(low, include_s3_seo=True)
 
 
-def test_upsert_issues_updates_existing_and_creates_new(monkeypatch) -> None:
-    module = _load_module()
-    ctx = module.GitHubContext(token="token", owner="octo", repo="demo")
-    findings = [
+def _sample_upsert_findings() -> list[dict[str, object]]:
+    return [
         {
             "fingerprint": "fp-existing",
             "severity": "s2",
@@ -51,7 +49,9 @@ def test_upsert_issues_updates_existing_and_creates_new(monkeypatch) -> None:
         },
     ]
 
-    module._list_open_issues = lambda _ctx, labels=None: [
+
+def _existing_issue_rows() -> list[dict[str, object]]:
+    return [
         {
             "number": 77,
             "title": "Existing",
@@ -59,8 +59,9 @@ def test_upsert_issues_updates_existing_and_creates_new(monkeypatch) -> None:
         }
     ]
 
-    created_calls: list[tuple[str, str, list[str]]] = []
-    patched_numbers: list[int] = []
+
+def _install_upsert_fakes(module, monkeypatch, created_calls: list[tuple[str, str, list[str]]], patched_numbers: list[int]) -> None:
+    module._list_open_issues = lambda _ctx, labels=None: _existing_issue_rows()
 
     def fake_request(_ctx, method: str, path: str, payload=None):
         if method == "PATCH":
@@ -74,6 +75,16 @@ def test_upsert_issues_updates_existing_and_creates_new(monkeypatch) -> None:
 
     monkeypatch.setattr(module, "_request", fake_request)
     monkeypatch.setattr(module, "_safe_create_issue", fake_create_issue)
+
+
+def test_upsert_issues_updates_existing_and_creates_new(monkeypatch) -> None:
+    module = _load_module()
+    ctx = module.GitHubContext(token="token", owner="octo", repo="demo")
+    findings = _sample_upsert_findings()
+
+    created_calls: list[tuple[str, str, list[str]]] = []
+    patched_numbers: list[int] = []
+    _install_upsert_fakes(module, monkeypatch, created_calls, patched_numbers)
 
     created, updated, rows = module._upsert_issues(
         ctx,

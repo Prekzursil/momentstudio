@@ -52,34 +52,28 @@ function requiredColumnIds(columns: AdminTableColumn[]): Set<string> {
   return required;
 }
 
-function normalizeOrderEntry(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : '';
-}
+const normalizeOrderEntry = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
-function isAllowedOrderId(id: string, allowed: Set<string>): boolean {
-  if (!id.length) return false;
-  return allowed.has(id);
-}
+const isAllowedOrderId = (id: string, allowed: Set<string>): boolean => id.length > 0 && allowed.has(id);
 
-function collectAllowedOrderIds(rawOrder: unknown[], allowed: Set<string>): string[] {
+const collectAllowedOrderIds = (rawOrder: unknown[], allowed: Set<string>): string[] => {
   const normalized = rawOrder.map((value) => normalizeOrderEntry(value));
   const allowedIds = normalized.filter((id) => isAllowedOrderId(id, allowed));
   return Array.from(new Set(allowedIds));
-}
+};
 
-function appendMissingOrderIds(order: string[], ids: string[]): string[] {
+const appendMissingOrderIds = (order: string[], ids: string[]): string[] => {
   const seen = new Set(order);
   for (const id of ids) {
     if (!seen.has(id)) order.push(id);
   }
   return order;
-}
+};
 
-function sanitizeOrder(rawOrder: unknown[], ids: string[], allowed: Set<string>): string[] {
-  return appendMissingOrderIds(collectAllowedOrderIds(rawOrder, allowed), ids);
-}
+const sanitizeOrder = (rawOrder: unknown[], ids: string[], allowed: Set<string>): string[] =>
+  appendMissingOrderIds(collectAllowedOrderIds(rawOrder, allowed), ids);
 
-function sanitizeHidden(rawHidden: unknown[], allowed: Set<string>, required: Set<string>): string[] {
+const sanitizeHidden = (rawHidden: unknown[], allowed: Set<string>, required: Set<string>): string[] => {
   const hiddenSet = new Set<string>();
   for (const value of rawHidden) {
     if (typeof value !== 'string') continue;
@@ -88,13 +82,13 @@ function sanitizeHidden(rawHidden: unknown[], allowed: Set<string>, required: Se
     hiddenSet.add(id);
   }
   return Array.from(hiddenSet);
-}
+};
 
-function asLayoutObject(input: unknown): Record<string, unknown> | null {
+const asLayoutObject = (input: unknown): Record<string, unknown> | null => {
   if (!input || typeof input !== 'object') return null;
   const obj = input as Record<string, unknown>;
   return obj['version'] === 1 ? obj : null;
-}
+};
 
 function asArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
