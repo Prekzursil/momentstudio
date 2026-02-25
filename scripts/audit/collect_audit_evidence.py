@@ -112,23 +112,36 @@ def _normalize_whitespace_lower(value: str) -> str:
     return " ".join(str(value or "").split()).lower()
 
 
+def _parse_integral_float(value: Any) -> int | None:
+    if not isinstance(value, float):
+        return None
+    if not value.is_integer():
+        return None
+    return int(value)
+
+
+def _extract_embedded_status_code(text: str) -> int | None:
+    match = re.search(r"(\d{3})", text)
+    if not match:
+        return None
+    return int(match.group(1))
+
+
 def _parse_optional_int(value: Any) -> int | None:
     if isinstance(value, bool):
         return None
     if isinstance(value, int):
         return value
-    if isinstance(value, float) and value.is_integer():
-        return int(value)
+    float_int = _parse_integral_float(value)
+    if float_int is not None:
+        return float_int
     text = str(value or "").strip()
     if not text:
         return None
     if text.isdigit():
         return int(text)
-    match = re.search(r"(\d{3})", text)
-    if not match:
-        return None
     try:
-        return int(match.group(1))
+        return _extract_embedded_status_code(text)
     except Exception:
         return None
 
@@ -167,35 +180,49 @@ def _is_benign_storefront_unexpected_token(row: dict[str, Any]) -> bool:
     return status_code is None or status_code >= 400
 
 
+def _console_noise_signature_payload(row: dict[str, Any]) -> str:
+    return "||".join(
+        [
+            str(row.get("surface") or "storefront"),
+            _normalize_whitespace_lower(str(row.get("text") or "")),
+            str(_parse_optional_int(row.get("status_code")) or "none"),
+            str(row.get("request_url") or ""),
+        ]
+    )
+
+
+def _console_noise_signature(row: dict[str, Any]) -> str:
+    payload = _console_noise_signature_payload(row)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:12]
+
+
+def _new_console_noise_cluster(row: dict[str, Any], signature: str) -> dict[str, Any]:
+    return {
+        "signature": signature,
+        "surface": "storefront",
+        "message": str(row.get("text") or "")[:500],
+        "status_code": _parse_optional_int(row.get("status_code")),
+        "request_url": str(row.get("request_url") or "") or None,
+        "sample_routes": [],
+        "cluster_count": 0,
+    }
+
+
+def _maybe_append_sample_route(cluster: dict[str, Any], row: dict[str, Any]) -> None:
+    route = str(row.get("route") or "").strip()
+    routes = cluster["sample_routes"]
+    if route and route not in routes and len(routes) < 8:
+        routes.append(route)
+
+
 def _build_console_noise_telemetry(console_errors: list[dict[str, Any]]) -> dict[str, Any]:
     clusters: dict[str, dict[str, Any]] = {}
     for row in console_errors:
         if not _is_benign_storefront_unexpected_token(row):
             continue
-        signature_payload = "||".join(
-            [
-                str(row.get("surface") or "storefront"),
-                _normalize_whitespace_lower(str(row.get("text") or "")),
-                str(_parse_optional_int(row.get("status_code")) or "none"),
-                str(row.get("request_url") or ""),
-            ]
-        )
-        signature = hashlib.sha256(signature_payload.encode("utf-8")).hexdigest()[:12]
-        cluster = clusters.setdefault(
-            signature,
-            {
-                "signature": signature,
-                "surface": "storefront",
-                "message": str(row.get("text") or "")[:500],
-                "status_code": _parse_optional_int(row.get("status_code")),
-                "request_url": str(row.get("request_url") or "") or None,
-                "sample_routes": [],
-                "cluster_count": 0,
-            },
-        )
-        route = str(row.get("route") or "").strip()
-        if route and route not in cluster["sample_routes"] and len(cluster["sample_routes"]) < 8:
-            cluster["sample_routes"].append(route)
+        signature = _console_noise_signature(row)
+        cluster = clusters.setdefault(signature, _new_console_noise_cluster(row, signature))
+        _maybe_append_sample_route(cluster, row)
         cluster["cluster_count"] += 1
 
     ordered = sorted(clusters.values(), key=lambda item: (-int(item["cluster_count"]), str(item["signature"])))
@@ -218,15 +245,24 @@ def _infer_surfaces_from_changes(changed_files: list[str]) -> set[str]:
     if not changed_files:
         return {"storefront", "account", "admin"}
 
+    surface_patterns: tuple[tuple[str, str], ...] = (
+        ("/pages/admin/", "admin"),
+        ("/app/api/v1/content.py", "admin"),
+        ("/services/media_", "admin"),
+        ("/pages/account/", "account"),
+        ("/app/api/v1/account", "account"),
+        ("/services/account", "account"),
+        ("/pages/blog/", "storefront"),
+        ("/pages/shop/", "storefront"),
+        ("/layout/", "storefront"),
+        ("/pages/home/", "storefront"),
+    )
     surfaces: set[str] = set()
     for file in changed_files:
         f = file.replace("\\", "/")
-        if "/pages/admin/" in f or "/app/api/v1/content.py" in f or "/services/media_" in f:
-            surfaces.add("admin")
-        if "/pages/account/" in f or "/app/api/v1/account" in f or "/services/account" in f:
-            surfaces.add("account")
-        if "/pages/blog/" in f or "/pages/shop/" in f or "/layout/" in f or "/pages/home/" in f:
-            surfaces.add("storefront")
+        for needle, surface in surface_patterns:
+            if needle in f:
+                surfaces.add(surface)
 
     if not surfaces:
         return {"storefront", "account", "admin"}
@@ -1237,6 +1273,98 @@ def _build_deterministic_findings(
     return _dedupe_and_order_findings(findings)
 
 
+def _evidence_index_header_lines(
+    *,
+    mode: str,
+    base_url: str | None,
+    api_base_url: str | None,
+    auth_profile: str,
+    browser_ok: bool,
+) -> list[str]:
+    return [
+        "# Audit Evidence Pack",
+        "",
+        f"- Generated at: `{_now_iso()}`",
+        f"- Mode: `{mode}`",
+        f"- Base URL: `{base_url or 'n/a'}`",
+        f"- API base URL: `{api_base_url or 'n/a'}`",
+        f"- Auth profile: `{auth_profile}`",
+        f"- Browser collection: `{'ok' if browser_ok else 'skipped_or_failed'}`",
+        "",
+    ]
+
+
+def _evidence_index_route_lines(route_map: dict[str, Any], selected_routes: list[dict[str, Any]]) -> list[str]:
+    by_surface = route_map.get("summary", {}).get("by_surface", {})
+    return [
+        "## Route coverage",
+        "",
+        f"- Total routes discovered: `{route_map.get('summary', {}).get('total_routes', 0)}`",
+        f"- Selected routes for this run: `{len(selected_routes)}`",
+        f"- Storefront routes discovered: `{by_surface.get('storefront', 0)}`",
+        f"- Account routes discovered: `{by_surface.get('account', 0)}`",
+        f"- Admin routes discovered: `{by_surface.get('admin', 0)}`",
+        "",
+    ]
+
+
+def _evidence_index_findings_lines(findings: list[dict[str, Any]], console_noise_telemetry: dict[str, Any]) -> list[str]:
+    severe_count = sum(1 for finding in findings if finding.get("severity") in {"s1", "s2"})
+    return [
+        "## Deterministic findings",
+        "",
+        f"- Total findings: `{len(findings)}`",
+        f"- Severe findings (s1/s2): `{severe_count}`",
+        f"- Suppressed benign parser-noise clusters: `{console_noise_telemetry.get('suppressed_cluster_count', 0)}`",
+        f"- Suppressed benign parser-noise events: `{console_noise_telemetry.get('suppressed_event_count', 0)}`",
+        "",
+    ]
+
+
+def _evidence_index_artifact_lines() -> list[str]:
+    return [
+        "## Artifact files",
+        "",
+        "- `route-map.json`",
+        "- `surface-map.json`",
+        f"- `{SEO_SNAPSHOT_FILE}`",
+        f"- `{CONSOLE_ERRORS_FILE}`",
+        f"- `{LAYOUT_SIGNALS_FILE}`",
+        f"- `{VISIBILITY_SIGNALS_FILE}`",
+        f"- `{DETERMINISTIC_FINDINGS_FILE}`",
+        f"- `{CONSOLE_NOISE_TELEMETRY_FILE}`",
+        "- `screenshots/`",
+    ]
+
+
+def _build_evidence_index_lines(
+    *,
+    mode: str,
+    base_url: str | None,
+    api_base_url: str | None,
+    auth_profile: str,
+    route_map: dict[str, Any],
+    selected_routes: list[dict[str, Any]],
+    findings: list[dict[str, Any]],
+    console_noise_telemetry: dict[str, Any],
+    browser_ok: bool,
+    browser_message: str,
+) -> list[str]:
+    lines = _evidence_index_header_lines(
+        mode=mode,
+        base_url=base_url,
+        api_base_url=api_base_url,
+        auth_profile=auth_profile,
+        browser_ok=browser_ok,
+    )
+    lines.extend(_evidence_index_route_lines(route_map, selected_routes))
+    lines.extend(_evidence_index_findings_lines(findings, console_noise_telemetry))
+    lines.extend(_evidence_index_artifact_lines())
+    if browser_message:
+        lines.extend(["", "## Browser collector output", "", "```text", browser_message, "```"])
+    return lines
+
+
 def _write_evidence_index(
     *,
     output_dir: Path,
@@ -1251,46 +1379,18 @@ def _write_evidence_index(
     browser_ok: bool,
     browser_message: str,
 ) -> None:
-    by_surface = route_map.get("summary", {}).get("by_surface", {})
-    lines = [
-        "# Audit Evidence Pack",
-        "",
-        f"- Generated at: `{_now_iso()}`",
-        f"- Mode: `{mode}`",
-        f"- Base URL: `{base_url or 'n/a'}`",
-        f"- API base URL: `{api_base_url or 'n/a'}`",
-        f"- Auth profile: `{auth_profile}`",
-        f"- Browser collection: `{'ok' if browser_ok else 'skipped_or_failed'}`",
-        "",
-        "## Route coverage",
-        "",
-        f"- Total routes discovered: `{route_map.get('summary', {}).get('total_routes', 0)}`",
-        f"- Selected routes for this run: `{len(selected_routes)}`",
-        f"- Storefront routes discovered: `{by_surface.get('storefront', 0)}`",
-        f"- Account routes discovered: `{by_surface.get('account', 0)}`",
-        f"- Admin routes discovered: `{by_surface.get('admin', 0)}`",
-        "",
-        "## Deterministic findings",
-        "",
-        f"- Total findings: `{len(findings)}`",
-        f"- Severe findings (s1/s2): `{sum(1 for f in findings if f.get('severity') in {'s1', 's2'})}`",
-        f"- Suppressed benign parser-noise clusters: `{console_noise_telemetry.get('suppressed_cluster_count', 0)}`",
-        f"- Suppressed benign parser-noise events: `{console_noise_telemetry.get('suppressed_event_count', 0)}`",
-        "",
-        "## Artifact files",
-        "",
-        "- `route-map.json`",
-        "- `surface-map.json`",
-        f"- `{SEO_SNAPSHOT_FILE}`",
-        f"- `{CONSOLE_ERRORS_FILE}`",
-        f"- `{LAYOUT_SIGNALS_FILE}`",
-        f"- `{VISIBILITY_SIGNALS_FILE}`",
-        f"- `{DETERMINISTIC_FINDINGS_FILE}`",
-        f"- `{CONSOLE_NOISE_TELEMETRY_FILE}`",
-        "- `screenshots/`",
-    ]
-    if browser_message:
-        lines.extend(["", "## Browser collector output", "", "```text", browser_message, "```"])
+    lines = _build_evidence_index_lines(
+        mode=mode,
+        base_url=base_url,
+        api_base_url=api_base_url,
+        auth_profile=auth_profile,
+        route_map=route_map,
+        selected_routes=selected_routes,
+        findings=findings,
+        console_noise_telemetry=console_noise_telemetry,
+        browser_ok=browser_ok,
+        browser_message=browser_message,
+    )
     (output_dir / "evidence-index.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -1346,14 +1446,9 @@ def _auth_profile(owner_identifier: str, owner_password: str) -> str:
     return "owner" if owner_identifier.strip() and owner_password.strip() else "anonymous"
 
 
-def main() -> int:
-    args = _parse_args()
-    repo_root = _repo_root()
-    output_dir = _resolve_repo_path(args.output_dir, allowed_prefixes=("artifacts",))
-    output_dir.mkdir(parents=True, exist_ok=True)
-
+def _build_route_map(repo_root: Path, output_dir: Path, routes_file_arg: str) -> dict[str, Any]:
     route_map_path = output_dir / "route-map.json"
-    routes_file = _resolve_repo_path(args.routes_file, allowed_prefixes=("frontend",))
+    routes_file = _resolve_repo_path(routes_file_arg, allowed_prefixes=("frontend",))
     _run_python(
         [
             str(repo_root / "scripts" / "audit" / "extract_route_map.py"),
@@ -1365,17 +1460,26 @@ def main() -> int:
         cwd=repo_root,
     )
     route_map = _load_json(route_map_path, default={"routes": [], "summary": {}})
+    return route_map if isinstance(route_map, dict) else {}
 
-    changed_files_path = (
-        _resolve_repo_path(args.changed_files_file, allowed_prefixes=("artifacts",)) if args.changed_files_file else None
-    )
-    changed_files = _load_changed_files(changed_files_path)
-    selected_routes = _routes_for_mode(route_map, changed_files=changed_files, max_routes=max(1, int(args.max_routes)))
+
+def _changed_files_path(raw_path: str) -> Path | None:
+    if not raw_path:
+        return None
+    return _resolve_repo_path(raw_path, allowed_prefixes=("artifacts",))
+
+
+def _build_selected_routes(route_map: dict[str, Any], *, changed_files_file: str, max_routes: int) -> list[dict[str, Any]]:
+    changed_files = _load_changed_files(_changed_files_path(changed_files_file))
+    return _routes_for_mode(route_map, changed_files=changed_files, max_routes=max(1, int(max_routes)))
+
+
+def _write_route_selection_artifacts(output_dir: Path, *, mode: str, selected_routes: list[dict[str, Any]]) -> None:
     _write_json(
         output_dir / "surface-map.json",
         {
             "generated_at": _now_iso(),
-            "mode": args.mode,
+            "mode": mode,
             "selected_surfaces": sorted({row.get("surface") for row in selected_routes}),
             "selected_route_count": len(selected_routes),
             "selected_routes": selected_routes,
@@ -1383,6 +1487,13 @@ def main() -> int:
     )
     _write_json(output_dir / "selected-routes.json", {"routes": selected_routes})
 
+
+def _collect_browser_if_configured(
+    *,
+    args: argparse.Namespace,
+    repo_root: Path,
+    output_dir: Path,
+) -> tuple[bool, str, str, str]:
     browser_ok = False
     browser_message = ""
     base_url = _validate_base_url(args.base_url)
@@ -1398,7 +1509,31 @@ def main() -> int:
             owner_identifier=str(args.owner_identifier or ""),
             owner_password=str(args.owner_password or ""),
         )
+    return browser_ok, browser_message, base_url, api_base_url
 
+
+def _print_summary(output_dir: Path, selected_routes: list[dict[str, Any]], findings: list[dict[str, Any]], browser_ok: bool) -> None:
+    severe = sum(1 for row in findings if row.get("severity") in {"s1", "s2"})
+    print(
+        f"Evidence pack ready at {output_dir}. "
+        f"routes={len(selected_routes)} findings={len(findings)} severe={severe} browser_ok={browser_ok}"
+    )
+
+
+def main() -> int:
+    args = _parse_args()
+    repo_root = _repo_root()
+    output_dir = _resolve_repo_path(args.output_dir, allowed_prefixes=("artifacts",))
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    route_map = _build_route_map(repo_root, output_dir, args.routes_file)
+    selected_routes = _build_selected_routes(
+        route_map, changed_files_file=args.changed_files_file, max_routes=max(1, int(args.max_routes))
+    )
+    _write_route_selection_artifacts(output_dir, mode=args.mode, selected_routes=selected_routes)
+    browser_ok, browser_message, base_url, api_base_url = _collect_browser_if_configured(
+        args=args, repo_root=repo_root, output_dir=output_dir
+    )
     _ensure_browser_artifacts(output_dir)
     findings, console_noise_telemetry = _collect_findings(output_dir)
 
@@ -1415,12 +1550,7 @@ def main() -> int:
         browser_ok=browser_ok,
         browser_message=browser_message,
     )
-
-    severe = sum(1 for row in findings if row.get("severity") in {"s1", "s2"})
-    print(
-        f"Evidence pack ready at {output_dir}. "
-        f"routes={len(selected_routes)} findings={len(findings)} severe={severe} browser_ok={browser_ok}"
-    )
+    _print_summary(output_dir, selected_routes, findings, browser_ok)
     return 0
 
 

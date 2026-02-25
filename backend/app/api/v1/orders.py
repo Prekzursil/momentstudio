@@ -404,6 +404,115 @@ def _frontend_base_from_request(request: Request | None) -> str:
     return settings.frontend_origin.rstrip("/")
 
 
+async def _load_user_cart_for_create_order(session: AsyncSession, user_id: UUID) -> Cart:
+    cart_result = await session.execute(
+        select(Cart).options(selectinload(Cart.items)).where(Cart.user_id == user_id).with_for_update()
+    )
+    cart = cart_result.scalar_one_or_none()
+    if not cart or not cart.items:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty")
+    return cart
+
+
+async def _resolve_existing_cart_order(session: AsyncSession, cart: Cart) -> Order | None:
+    if not cart.last_order_id:
+        return None
+    existing_order = await order_service.get_order_by_id(session, cart.last_order_id)
+    if existing_order:
+        return existing_order
+    cart.last_order_id = None
+    session.add(cart)
+    return None
+
+
+async def _resolve_shipping_country_for_create_order(
+    session: AsyncSession, payload: OrderCreate, user_id: UUID
+) -> str | None:
+    shipping_country: str | None = None
+    for address_id in (payload.shipping_address_id, payload.billing_address_id):
+        if not address_id:
+            continue
+        addr = await session.get(Address, address_id)
+        if not addr or addr.user_id != user_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid address")
+        if address_id == payload.shipping_address_id:
+            shipping_country = addr.country
+    return shipping_country
+
+
+async def _resolve_shipping_method_for_create_order(session: AsyncSession, shipping_method_id: UUID | None):
+    if not shipping_method_id:
+        return None
+    shipping_method = await order_service.get_shipping_method(session, shipping_method_id)
+    if not shipping_method:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping method not found")
+    return shipping_method
+
+
+def _order_placed_title(preferred_language: str | None) -> str:
+    if (preferred_language or "en") == "ro":
+        return "Comandă plasată"
+    return "Order placed"
+
+
+def _order_reference_body(order: Order) -> str | None:
+    if not order.reference_code:
+        return None
+    return f"Reference {order.reference_code}"
+
+
+async def _queue_create_order_admin_notification(
+    session: AsyncSession,
+    background_tasks: BackgroundTasks,
+    *,
+    order: Order,
+    customer_email: str,
+) -> None:
+    owner = await auth_service.get_owner_user(session)
+    admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+    if not admin_to:
+        return
+    background_tasks.add_task(
+        email_service.send_new_order_notification,
+        admin_to,
+        order,
+        customer_email,
+        owner.preferred_language if owner else None,
+    )
+
+
+async def _queue_create_order_notifications(
+    session: AsyncSession,
+    background_tasks: BackgroundTasks,
+    *,
+    order: Order,
+    user: User,
+    receipt_share_days: int,
+) -> None:
+    await notification_service.create_notification(
+        session,
+        user_id=user.id,
+        type="order",
+        title=_order_placed_title(user.preferred_language),
+        body=_order_reference_body(order),
+        url=_account_orders_url(order),
+    )
+    background_tasks.add_task(
+        email_service.send_order_confirmation,
+        user.email,
+        order,
+        order.items,
+        user.preferred_language,
+        receipt_share_days=receipt_share_days,
+    )
+    await _queue_create_order_admin_notification(
+        session,
+        background_tasks,
+        order=order,
+        customer_email=user.email,
+    )
+
+
 @router.post("", response_model=OrderRead, status_code=status.HTTP_201_CREATED)
 async def create_order(
     response: Response,
@@ -412,36 +521,13 @@ async def create_order(
     session: AsyncSession = Depends(get_session),
     current_user=Depends(require_verified_email),
 ):
-    cart_result = await session.execute(
-        select(Cart).options(selectinload(Cart.items)).where(Cart.user_id == current_user.id).with_for_update()
-    )
-    cart = cart_result.scalar_one_or_none()
-    if not cart or not cart.items:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty")
-
-    if cart.last_order_id:
-        existing_order = await order_service.get_order_by_id(session, cart.last_order_id)
-        if existing_order:
-            response.status_code = status.HTTP_200_OK
-            return existing_order
-        cart.last_order_id = None
-        session.add(cart)
-
-    shipping_country: str | None = None
-    for address_id in [payload.shipping_address_id, payload.billing_address_id]:
-        if address_id:
-            addr = await session.get(Address, address_id)
-            if not addr or addr.user_id != current_user.id:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid address")
-            if address_id == payload.shipping_address_id:
-                shipping_country = addr.country
-
-    shipping_method = None
-    if payload.shipping_method_id:
-        shipping_method = await order_service.get_shipping_method(session, payload.shipping_method_id)
-        if not shipping_method:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping method not found")
-
+    cart = await _load_user_cart_for_create_order(session, current_user.id)
+    existing_order = await _resolve_existing_cart_order(session, cart)
+    if existing_order:
+        response.status_code = status.HTTP_200_OK
+        return existing_order
+    shipping_country = await _resolve_shipping_country_for_create_order(session, payload, current_user.id)
+    shipping_method = await _resolve_shipping_method_for_create_order(session, payload.shipping_method_id)
     checkout_settings = await checkout_settings_service.get_checkout_settings(session)
     totals, _ = await cart_service.calculate_totals_async(
         session,
@@ -467,32 +553,13 @@ async def create_order(
         shipping_amount=totals.shipping,
         total_amount=totals.total,
     )
-    await notification_service.create_notification(
+    await _queue_create_order_notifications(
         session,
-        user_id=current_user.id,
-        type="order",
-        title="Order placed" if (current_user.preferred_language or "en") != "ro" else "Comandă plasată",
-        body=f"Reference {order.reference_code}" if order.reference_code else None,
-        url=_account_orders_url(order),
-    )
-    background_tasks.add_task(
-        email_service.send_order_confirmation,
-        current_user.email,
-        order,
-        order.items,
-        current_user.preferred_language,
+        background_tasks,
+        order=order,
+        user=current_user,
         receipt_share_days=checkout_settings.receipt_share_days,
     )
-    owner = await auth_service.get_owner_user(session)
-    admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
-    if admin_to:
-        background_tasks.add_task(
-            email_service.send_new_order_notification,
-            admin_to,
-            order,
-            current_user.email,
-            owner.preferred_language if owner else None,
-        )
     return order
 
 
