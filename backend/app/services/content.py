@@ -73,9 +73,11 @@ _SUPPORTED_LANGS = {"en", "ro"}
 
 _NON_TRANSLATABLE_META_KEYS = {"hidden", "last_updated", "requires_auth", "version"}
 
-_INLINE_EVENT_HANDLER_RE = re.compile(r"(?<![\w-])on[a-z0-9_]+\s*=")
-_MARKDOWN_IMAGE_LINK_RE = re.compile(r"!\[[^\]]*\]\s*\(([^)]+)\)")
-_MARKDOWN_TEXT_LINK_RE = re.compile(r"(?<!!)\[[^\]]*\]\s*\(([^)]+)\)")
+_MEDIA_RELATIVE_PREFIX = "media/"
+_MEDIA_PATH_PREFIX = "/media/"
+_PRODUCTS_PATH_PREFIX = "/products/"
+_PAGES_PATH_PREFIX = "/pages/"
+_BLOG_PATH_PREFIX = "/blog/"
 
 
 def _normalized_lang(value: str | None) -> str:
@@ -697,7 +699,7 @@ async def edit_image_asset(
             storage.generate_thumbnails(destination)
 
             rel_path = destination.relative_to(base_root).as_posix()
-            new_url = f"/media/{rel_path}"
+            new_url = f"{_MEDIA_PATH_PREFIX}{rel_path}"
             return new_url, int(new_focal_x), int(new_focal_y)
 
     new_url, new_focal_x, new_focal_y = await anyio.to_thread.run_sync(_process_image)
@@ -1010,7 +1012,36 @@ def _sanitize_markdown(body: str) -> None:
 
 
 def _contains_inline_event_handler(text: str) -> bool:
-    return bool(_INLINE_EVENT_HANDLER_RE.search(text))
+    if not text:
+        return False
+
+    def _is_boundary_char(ch: str) -> bool:
+        return ch.isalnum() or ch == "_" or ch == "-"
+
+    def _is_event_name_char(ch: str) -> bool:
+        return ("a" <= ch <= "z") or ("0" <= ch <= "9") or ch == "_"
+
+    text_len = len(text)
+    start = 0
+    while True:
+        idx = text.find("on", start)
+        if idx < 0:
+            return False
+        if idx > 0 and _is_boundary_char(text[idx - 1]):
+            start = idx + 2
+            continue
+
+        cursor = idx + 2
+        if cursor >= text_len or not _is_event_name_char(text[cursor]):
+            start = idx + 2
+            continue
+        while cursor < text_len and _is_event_name_char(text[cursor]):
+            cursor += 1
+        while cursor < text_len and text[cursor].isspace():
+            cursor += 1
+        if cursor < text_len and text[cursor] == "=":
+            return True
+        start = idx + 2
 
 
 def _find_replace_subn(text: str, find: str, replace: str, *, case_sensitive: bool) -> tuple[str, int]:
@@ -1336,12 +1367,43 @@ def _extract_markdown_target_urls(body: str, *, image_only: bool) -> list[str]:
     if not text:
         return []
 
-    pattern = _MARKDOWN_IMAGE_LINK_RE if image_only else _MARKDOWN_TEXT_LINK_RE
+    def _is_match_start(index: int) -> bool:
+        is_image = index > 0 and text[index - 1] == "!"
+        return is_image if image_only else not is_image
+
+    text_len = len(text)
+    idx = 0
     urls: list[str] = []
-    for match in pattern.finditer(text):
-        url = _normalize_md_url(match.group(1))
-        if url:
-            urls.append(url)
+    while idx < text_len:
+        if text[idx] != "[" or not _is_match_start(idx):
+            idx += 1
+            continue
+
+        close_idx = idx + 1
+        while close_idx < text_len and text[close_idx] != "]":
+            close_idx += 1
+        if close_idx >= text_len:
+            break
+
+        cursor = close_idx + 1
+        while cursor < text_len and text[cursor].isspace():
+            cursor += 1
+        if cursor >= text_len or text[cursor] != "(":
+            idx = close_idx + 1
+            continue
+
+        target_start = cursor + 1
+        target_end = target_start
+        while target_end < text_len and text[target_end] != ")":
+            target_end += 1
+        if target_end >= text_len:
+            break
+
+        if target_end > target_start:
+            url = _normalize_md_url(text[target_start:target_end])
+            if url:
+                urls.append(url)
+        idx = target_end + 1
     return urls
 
 
@@ -1415,13 +1477,13 @@ def _register_shop_targets(path: str, query: str, *, category_slugs: set[str]) -
 
 
 def _normalize_content_path(url: str, path: str) -> str:
-    if url.startswith("media/") and not path.startswith("/"):
+    if url.startswith(_MEDIA_RELATIVE_PREFIX) and not path.startswith("/"):
         return "/" + path
     return path
 
 
 def _register_media_target(path: str, *, media_urls: set[str] | None) -> bool:
-    if not path.startswith("/media/"):
+    if not path.startswith(_MEDIA_PATH_PREFIX):
         return False
     if media_urls is not None:
         media_urls.add("/" + path.lstrip("/"))
@@ -1429,7 +1491,7 @@ def _register_media_target(path: str, *, media_urls: set[str] | None) -> bool:
 
 
 def _register_product_target(path: str, *, product_slugs: set[str]) -> bool:
-    if not path.startswith("/products/"):
+    if not path.startswith(_PRODUCTS_PATH_PREFIX):
         return False
     parts = _path_parts(path)
     if len(parts) >= 2:
@@ -1438,7 +1500,7 @@ def _register_product_target(path: str, *, product_slugs: set[str]) -> bool:
 
 
 def _register_page_target(path: str, *, page_keys: set[str]) -> bool:
-    if not path.startswith("/pages/"):
+    if not path.startswith(_PAGES_PATH_PREFIX):
         return False
     parts = _path_parts(path)
     if len(parts) >= 2:
@@ -1447,7 +1509,7 @@ def _register_page_target(path: str, *, page_keys: set[str]) -> bool:
 
 
 def _register_blog_target(path: str, *, blog_keys: set[str]) -> bool:
-    if not path.startswith("/blog/"):
+    if not path.startswith(_BLOG_PATH_PREFIX):
         return False
     parts = _path_parts(path)
     if len(parts) >= 2:
@@ -1500,12 +1562,12 @@ def _resolve_redirect_chain(key: str, redirects: dict[str, str], *, max_hops: in
 
 def _media_url_exists(url: str) -> bool:
     value = (url or "").strip()
-    if value.startswith("media/"):
+    if value.startswith(_MEDIA_RELATIVE_PREFIX):
         value = "/" + value
-    if not value.startswith("/media/"):
+    if not value.startswith(_MEDIA_PATH_PREFIX):
         return True
     base_root = Path(settings.media_root).resolve()
-    rel = value.removeprefix("/media/")
+    rel = value.removeprefix(_MEDIA_PATH_PREFIX)
     path = (base_root / rel).resolve()
     try:
         path.relative_to(base_root)
@@ -1598,10 +1660,10 @@ async def check_content_links(session: AsyncSession, *, key: str) -> list[Conten
         if split.scheme in ("http", "https"):
             continue
         path = split.path or ""
-        if url.startswith("media/") and not path.startswith("/"):
+        if url.startswith(_MEDIA_RELATIVE_PREFIX) and not path.startswith("/"):
             path = "/" + path
 
-        if path.startswith("/media/"):
+        if path.startswith(_MEDIA_PATH_PREFIX):
             if not _media_url_exists(path):
                 issues.append(
                     ContentLinkCheckIssue(
@@ -1615,7 +1677,7 @@ async def check_content_links(session: AsyncSession, *, key: str) -> list[Conten
                 )
             continue
 
-        if path.startswith("/products/"):
+        if path.startswith(_PRODUCTS_PATH_PREFIX):
             slug = slugify_page_slug(path.split("/", 3)[2] if len(path.split("/")) >= 3 else "")
             if not slug:
                 continue
@@ -1678,8 +1740,8 @@ async def check_content_links(session: AsyncSession, *, key: str) -> list[Conten
                         )
             continue
 
-        if path.startswith("/pages/") or path.startswith("/blog/"):
-            base = "page." if path.startswith("/pages/") else "blog."
+        if path.startswith(_PAGES_PATH_PREFIX) or path.startswith(_BLOG_PATH_PREFIX):
+            base = "page." if path.startswith(_PAGES_PATH_PREFIX) else "blog."
             slug = slugify_page_slug(path.split("/", 3)[2] if len(path.split("/")) >= 3 else "")
             if not slug:
                 continue
@@ -1818,10 +1880,10 @@ async def check_content_links_preview(
         if split.scheme in ("http", "https"):
             continue
         path = split.path or ""
-        if url.startswith("media/") and not path.startswith("/"):
+        if url.startswith(_MEDIA_RELATIVE_PREFIX) and not path.startswith("/"):
             path = "/" + path
 
-        if path.startswith("/media/"):
+        if path.startswith(_MEDIA_PATH_PREFIX):
             if not _media_url_exists(path):
                 issues.append(
                     ContentLinkCheckIssue(
@@ -1835,7 +1897,7 @@ async def check_content_links_preview(
                 )
             continue
 
-        if path.startswith("/products/"):
+        if path.startswith(_PRODUCTS_PATH_PREFIX):
             slug = slugify_page_slug(path.split("/", 3)[2] if len(path.split("/")) >= 3 else "")
             if not slug:
                 continue
@@ -1898,8 +1960,8 @@ async def check_content_links_preview(
                         )
             continue
 
-        if path.startswith("/pages/") or path.startswith("/blog/"):
-            base = "page." if path.startswith("/pages/") else "blog."
+        if path.startswith(_PAGES_PATH_PREFIX) or path.startswith(_BLOG_PATH_PREFIX):
+            base = "page." if path.startswith(_PAGES_PATH_PREFIX) else "blog."
             slug = slugify_page_slug(path.split("/", 3)[2] if len(path.split("/")) >= 3 else "")
             if not slug:
                 continue
