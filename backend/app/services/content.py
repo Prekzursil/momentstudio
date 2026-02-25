@@ -1283,6 +1283,39 @@ def _extract_markdown_refs(body: str) -> list[tuple[str, str, str, str]]:
     return refs
 
 
+def _iter_meta_blocks(meta: dict | None) -> list[tuple[int, dict[str, Any]]]:
+    if not isinstance(meta, dict):
+        return []
+    blocks = meta.get("blocks")
+    if not isinstance(blocks, list):
+        return []
+    return [(idx, block) for idx, block in enumerate(blocks) if isinstance(block, dict)]
+
+
+def _refs_from_text_block(block: dict[str, Any], *, prefix: str) -> list[tuple[str, str, str, str]]:
+    body = block.get("body_markdown")
+    if not isinstance(body, str):
+        return []
+    return [(k, s, f"{prefix}.body_markdown", u) for k, s, _, u in _extract_markdown_refs(body)]
+
+
+def _refs_from_asset_block(
+    block_type: str,
+    block: dict[str, Any],
+    *,
+    prefix: str,
+) -> list[tuple[str, str, str, str]]:
+    extractor = _BLOCK_URL_EXTRACTORS.get(block_type)
+    if not extractor:
+        return []
+    refs: list[tuple[str, str, str, str]] = []
+    for kind, raw in extractor(block):
+        url = _normalize_md_url(raw)
+        if url:
+            refs.append((kind, "block", prefix, url))
+    return refs
+
+
 def _extract_markdown_target_urls(body: str, *, image_only: bool) -> list[str]:
     text = body or ""
     if not text:
@@ -1340,35 +1373,98 @@ _BLOCK_URL_EXTRACTORS: dict[str, Any] = {
 
 
 def _extract_block_refs(meta: dict | None) -> list[tuple[str, str, str, str]]:
-    if not isinstance(meta, dict):
-        return []
-    blocks = meta.get("blocks")
-    if not isinstance(blocks, list):
-        return []
     refs: list[tuple[str, str, str, str]] = []
-
-    for idx, block in enumerate(blocks):
-        if not isinstance(block, dict):
-            continue
+    for idx, block in _iter_meta_blocks(meta):
         block_type = str(block.get("type") or "").strip().lower()
         prefix = f"meta.blocks[{idx}]"
         if block_type == "text":
-            body = block.get("body_markdown")
-            if isinstance(body, str):
-                refs.extend([(k, s, f"{prefix}.body_markdown", u) for k, s, _, u in _extract_markdown_refs(body)])
-            continue
-
-        extractor = _BLOCK_URL_EXTRACTORS.get(block_type)
-        if not extractor:
-            continue
-        urls = extractor(block)
-
-        for kind, raw in urls:
-            url = _normalize_md_url(raw)
-            if not url:
-                continue
-            refs.append((kind, "block", f"{prefix}", url))
+            refs.extend(_refs_from_text_block(block, prefix=prefix))
+        else:
+            refs.extend(_refs_from_asset_block(block_type, block, prefix=prefix))
     return refs
+
+
+def _path_parts(path: str) -> list[str]:
+    return [part for part in path.split("/") if part]
+
+
+def _register_shop_targets(path: str, query: str, *, category_slugs: set[str]) -> None:
+    parts = _path_parts(path)
+    if len(parts) >= 2 and parts[0] == "shop":
+        category_slugs.add(slugify_page_slug(parts[1]))
+    parsed = parse_qs(query or "")
+    for param in ("category", "sub"):
+        values = parsed.get(param)
+        if values:
+            category_slugs.add(slugify_page_slug(str(values[0])))
+
+
+def _normalize_content_path(url: str, path: str) -> str:
+    if url.startswith("media/") and not path.startswith("/"):
+        return "/" + path
+    return path
+
+
+def _register_media_target(path: str, *, media_urls: set[str] | None) -> bool:
+    if not path.startswith("/media/"):
+        return False
+    if media_urls is not None:
+        media_urls.add("/" + path.lstrip("/"))
+    return True
+
+
+def _register_product_target(path: str, *, product_slugs: set[str]) -> bool:
+    if not path.startswith("/products/"):
+        return False
+    parts = _path_parts(path)
+    if len(parts) >= 2:
+        product_slugs.add(parts[1])
+    return True
+
+
+def _register_page_target(path: str, *, page_keys: set[str]) -> bool:
+    if not path.startswith("/pages/"):
+        return False
+    parts = _path_parts(path)
+    if len(parts) >= 2:
+        page_keys.add(f"page.{slugify_page_slug(parts[1])}")
+    return True
+
+
+def _register_blog_target(path: str, *, blog_keys: set[str]) -> bool:
+    if not path.startswith("/blog/"):
+        return False
+    parts = _path_parts(path)
+    if len(parts) >= 2:
+        blog_keys.add(f"blog.{slugify_page_slug(parts[1])}")
+    return True
+
+
+def _register_content_target_url(
+    url: str,
+    *,
+    product_slugs: set[str],
+    category_slugs: set[str],
+    page_keys: set[str],
+    blog_keys: set[str],
+    media_urls: set[str] | None = None,
+) -> None:
+    split = urlsplit(url)
+    if split.scheme in ("http", "https"):
+        return
+
+    path = _normalize_content_path(url, split.path or "")
+    handlers = (
+        lambda: _register_media_target(path, media_urls=media_urls),
+        lambda: _register_product_target(path, product_slugs=product_slugs),
+        lambda: _register_page_target(path, page_keys=page_keys),
+        lambda: _register_blog_target(path, blog_keys=blog_keys),
+    )
+    for handler in handlers:
+        if handler():
+            return
+    if path.startswith("/shop"):
+        _register_shop_targets(path, split.query or "", category_slugs=category_slugs)
 
 
 def _resolve_redirect_chain(key: str, redirects: dict[str, str], *, max_hops: int = 10) -> tuple[str, str | None]:
@@ -1421,43 +1517,14 @@ async def check_content_links(session: AsyncSession, *, key: str) -> list[Conten
     page_keys: set[str] = set()
     blog_keys: set[str] = set()
 
-    def register(kind: str, url: str) -> None:
-        split = urlsplit(url)
-        if split.scheme in ("http", "https"):
-            return
-        path = split.path or ""
-        if url.startswith("media/") and not path.startswith("/"):
-            path = "/" + path
-        if path.startswith("/media/"):
-            return
-        if path.startswith("/products/"):
-            parts = [p for p in path.split("/") if p]
-            if len(parts) >= 2:
-                product_slugs.add(parts[1])
-            return
-        if path.startswith("/pages/"):
-            parts = [p for p in path.split("/") if p]
-            if len(parts) >= 2:
-                page_keys.add(f"page.{slugify_page_slug(parts[1])}")
-            return
-        if path.startswith("/blog/"):
-            parts = [p for p in path.split("/") if p]
-            if len(parts) >= 2:
-                blog_keys.add(f"blog.{slugify_page_slug(parts[1])}")
-            return
-        if path.startswith("/shop"):
-            parts = [p for p in path.split("/") if p]
-            if len(parts) >= 2 and parts[0] == "shop":
-                category_slugs.add(slugify_page_slug(parts[1]))
-            query = parse_qs(split.query or "")
-            if "category" in query and query["category"]:
-                category_slugs.add(slugify_page_slug(str(query["category"][0])))
-            if "sub" in query and query["sub"]:
-                category_slugs.add(slugify_page_slug(str(query["sub"][0])))
-            return
-
-    for kind, source, field, url in refs:
-        register(kind, url)
+    for _kind, _source, _field, url in refs:
+        _register_content_target_url(
+            url,
+            product_slugs=product_slugs,
+            category_slugs=category_slugs,
+            page_keys=page_keys,
+            blog_keys=blog_keys,
+        )
 
     now = datetime.now(timezone.utc)
 
@@ -1669,44 +1736,15 @@ async def check_content_links_preview(
     blog_keys: set[str] = set()
     media_urls: set[str] = set()
 
-    def register(kind: str, url: str) -> None:
-        split = urlsplit(url)
-        if split.scheme in ("http", "https"):
-            return
-        path = split.path or ""
-        if url.startswith("media/") and not path.startswith("/"):
-            path = "/" + path
-        if path.startswith("/media/"):
-            media_urls.add("/" + path.lstrip("/"))
-            return
-        if path.startswith("/products/"):
-            parts = [p for p in path.split("/") if p]
-            if len(parts) >= 2:
-                product_slugs.add(parts[1])
-            return
-        if path.startswith("/pages/"):
-            parts = [p for p in path.split("/") if p]
-            if len(parts) >= 2:
-                page_keys.add(f"page.{slugify_page_slug(parts[1])}")
-            return
-        if path.startswith("/blog/"):
-            parts = [p for p in path.split("/") if p]
-            if len(parts) >= 2:
-                blog_keys.add(f"blog.{slugify_page_slug(parts[1])}")
-            return
-        if path.startswith("/shop"):
-            parts = [p for p in path.split("/") if p]
-            if len(parts) >= 2 and parts[0] == "shop":
-                category_slugs.add(slugify_page_slug(parts[1]))
-            query = parse_qs(split.query or "")
-            if "category" in query and query["category"]:
-                category_slugs.add(slugify_page_slug(str(query["category"][0])))
-            if "sub" in query and query["sub"]:
-                category_slugs.add(slugify_page_slug(str(query["sub"][0])))
-            return
-
-    for kind, _source, _field, url in refs:
-        register(kind, url)
+    for _kind, _source, _field, url in refs:
+        _register_content_target_url(
+            url,
+            product_slugs=product_slugs,
+            category_slugs=category_slugs,
+            page_keys=page_keys,
+            blog_keys=blog_keys,
+            media_urls=media_urls,
+        )
 
     now = datetime.now(timezone.utc)
 
