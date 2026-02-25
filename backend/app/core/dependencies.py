@@ -101,6 +101,17 @@ def _extract_admin_client_ip(request: Request) -> str | None:
     return request.client.host if request.client else None
 
 
+def _admin_ip_bypass_cookie_active(request: Request, user: User) -> bool:
+    cookie_value = (request.cookies.get(_ADMIN_IP_BYPASS_COOKIE) or "").strip()
+    if not cookie_value:
+        return False
+    payload = decode_token(cookie_value)
+    if not payload or payload.get("type") != "admin_ip_bypass":
+        return False
+    subject = str(payload.get("sub") or "").strip()
+    return subject == str(user.id)
+
+
 def _admin_ip_bypass_active(request: Request, user: User) -> bool:
     bypass_secret = (getattr(settings, "admin_ip_bypass_token", None) or "").strip()
     if not bypass_secret:
@@ -108,14 +119,37 @@ def _admin_ip_bypass_active(request: Request, user: User) -> bool:
     header_value = (request.headers.get(_ADMIN_IP_BYPASS_HEADER) or "").strip()
     if header_value and header_value == bypass_secret:
         return True
-    cookie_value = (request.cookies.get(_ADMIN_IP_BYPASS_COOKIE) or "").strip()
-    if not cookie_value:
-        return False
-    payload = decode_token(cookie_value)
-    if not payload or payload.get("type") != "admin_ip_bypass":
-        return False
-    sub = str(payload.get("sub") or "").strip()
-    return sub == str(user.id)
+    return _admin_ip_bypass_cookie_active(request, user)
+
+
+def _raise_admin_ip_error(detail: str, code: str) -> None:
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=detail,
+        headers={"X-Error-Code": code},
+    )
+
+
+def _parse_admin_client_ip_or_deny(request: Request) -> _IPAddress:
+    ip_raw = (_extract_admin_client_ip(request) or "").strip()
+    if not ip_raw:
+        _raise_admin_ip_error(_ADMIN_IP_DENIED_DETAIL, "admin_ip_denied")
+    try:
+        return ip_address(ip_raw)
+    except ValueError:
+        _raise_admin_ip_error(_ADMIN_IP_DENIED_DETAIL, "admin_ip_denied")
+
+
+def _ensure_not_denied(client_ip: _IPAddress, deny_raw: list[str]) -> None:
+    deny = _parse_ip_networks(deny_raw)
+    if any(client_ip in network for network in deny):
+        _raise_admin_ip_error(_ADMIN_IP_DENIED_DETAIL, "admin_ip_denied")
+
+
+def _ensure_allowlisted(client_ip: _IPAddress, allow_raw: list[str]) -> None:
+    allow = _parse_ip_networks(allow_raw)
+    if allow and not any(client_ip in network for network in allow):
+        _raise_admin_ip_error(_ADMIN_IP_ALLOWLIST_DETAIL, "admin_ip_allowlist")
 
 
 def _require_admin_ip_access(request: Request, user: User) -> None:
@@ -125,38 +159,9 @@ def _require_admin_ip_access(request: Request, user: User) -> None:
         return
     if _admin_ip_bypass_active(request, user):
         return
-
-    ip_raw = (_extract_admin_client_ip(request) or "").strip()
-    if not ip_raw:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=_ADMIN_IP_DENIED_DETAIL,
-            headers={"X-Error-Code": "admin_ip_denied"},
-        )
-    try:
-        client_ip = ip_address(ip_raw)
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=_ADMIN_IP_DENIED_DETAIL,
-            headers={"X-Error-Code": "admin_ip_denied"},
-        )
-
-    deny = _parse_ip_networks(deny_raw)
-    if any(client_ip in network for network in deny):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=_ADMIN_IP_DENIED_DETAIL,
-            headers={"X-Error-Code": "admin_ip_denied"},
-        )
-
-    allow = _parse_ip_networks(allow_raw)
-    if allow and not any(client_ip in network for network in allow):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=_ADMIN_IP_ALLOWLIST_DETAIL,
-            headers={"X-Error-Code": "admin_ip_allowlist"},
-        )
+    client_ip = _parse_admin_client_ip_or_deny(request)
+    _ensure_not_denied(client_ip, deny_raw)
+    _ensure_allowlisted(client_ip, allow_raw)
 
 
 def _require_training_mode_writes_allowed(request: Request, user: User) -> None:
@@ -171,46 +176,95 @@ def _require_training_mode_writes_allowed(request: Request, user: User) -> None:
     )
 
 
+def _decode_required_payload(credentials: HTTPAuthorizationCredentials | None, token_type: str) -> dict:
+    if credentials is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    payload = decode_token(credentials.credentials)
+    if not payload or payload.get("type") != token_type:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    return payload
+
+
+def _decode_optional_payload(credentials: HTTPAuthorizationCredentials | None, token_type: str) -> dict | None:
+    if credentials is None:
+        return None
+    payload = decode_token(credentials.credentials)
+    if not payload or payload.get("type") != token_type:
+        return None
+    return payload
+
+
+def _parse_uuid_claim_or_raise(payload: dict, claim: str) -> UUID:
+    try:
+        return UUID(str(payload.get(claim)))
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+
+
+def _parse_uuid_claim_or_none(payload: dict, claim: str) -> UUID | None:
+    try:
+        return UUID(str(payload.get(claim)))
+    except Exception:
+        return None
+
+
+def _apply_required_impersonation_claim(request: Request, payload: dict) -> None:
+    impersonator = payload.get("impersonator")
+    if not impersonator:
+        return
+    try:
+        impersonator_id = UUID(str(impersonator))
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+    if request.method.upper() not in _IMPERSONATION_SAFE_METHODS:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Impersonation is read-only")
+    request.state.impersonator_user_id = impersonator_id
+
+
+def _apply_optional_impersonation_claim(request: Request, payload: dict) -> bool:
+    impersonator = payload.get("impersonator")
+    if not impersonator:
+        return True
+    try:
+        impersonator_id = UUID(str(impersonator))
+    except Exception:
+        return False
+    if request.method.upper() not in _IMPERSONATION_SAFE_METHODS:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Impersonation is read-only")
+    request.state.impersonator_user_id = impersonator_id
+    return True
+
+
+async def _load_user_by_id(session: AsyncSession, user_id: UUID) -> User | None:
+    result = await session.execute(select(User).where(User.id == user_id))
+    return result.scalar_one_or_none()
+
+
+async def _ensure_active_user(session: AsyncSession, user: User, *, optional: bool) -> bool:
+    if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(user):
+        await self_service.execute_account_deletion(session, user)
+        if optional:
+            return False
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
+    if getattr(user, "deleted_at", None) is not None:
+        if optional:
+            return False
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
+    return True
+
+
 async def get_current_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     session: AsyncSession = Depends(get_session),
 ) -> User:
-    if credentials is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-
-    payload = decode_token(credentials.credentials)
-    if not payload or payload.get("type") != "access":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-
-    try:
-        user_id = UUID(str(payload.get("sub")))
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
-    if user_id is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
-
-    impersonator = payload.get("impersonator")
-    if impersonator:
-        try:
-            impersonator_id = UUID(str(impersonator))
-        except Exception:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
-        if request.method.upper() not in _IMPERSONATION_SAFE_METHODS:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Impersonation is read-only")
-        request.state.impersonator_user_id = impersonator_id
-
-    result = await session.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
+    payload = _decode_required_payload(credentials, "access")
+    user_id = _parse_uuid_claim_or_raise(payload, "sub")
+    _apply_required_impersonation_claim(request, payload)
+    user = await _load_user_by_id(session, user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
-
-    if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(user):
-        await self_service.execute_account_deletion(session, user)
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
-    if getattr(user, "deleted_at", None) is not None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
-
+    await _ensure_active_user(session, user, optional=False)
     return user
 
 
@@ -219,35 +273,18 @@ async def get_current_user_optional(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     session: AsyncSession = Depends(get_session),
 ) -> User | None:
-    if credentials is None:
+    payload = _decode_optional_payload(credentials, "access")
+    if not payload:
         return None
-    payload = decode_token(credentials.credentials)
-    if not payload or payload.get("type") != "access":
+    user_id = _parse_uuid_claim_or_none(payload, "sub")
+    if user_id is None:
         return None
-
-    try:
-        user_id = UUID(str(payload.get("sub")))
-    except Exception:
+    if not _apply_optional_impersonation_claim(request, payload):
         return None
-
-    impersonator = payload.get("impersonator")
-    if impersonator:
-        try:
-            impersonator_id = UUID(str(impersonator))
-        except Exception:
-            return None
-        if request.method.upper() not in _IMPERSONATION_SAFE_METHODS:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Impersonation is read-only")
-        request.state.impersonator_user_id = impersonator_id
-
-    result = await session.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
+    user = await _load_user_by_id(session, user_id)
     if not user:
         return None
-    if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(user):
-        await self_service.execute_account_deletion(session, user)
-        return None
-    if getattr(user, "deleted_at", None) is not None:
+    if not await _ensure_active_user(session, user, optional=True):
         return None
     return user
 
@@ -256,28 +293,12 @@ async def get_google_completion_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     session: AsyncSession = Depends(get_session),
 ) -> User:
-    if credentials is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-
-    payload = decode_token(credentials.credentials)
-    if not payload or payload.get("type") != "google_completion":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-
-    try:
-        user_id = UUID(str(payload.get("sub")))
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
-
-    result = await session.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
+    payload = _decode_required_payload(credentials, "google_completion")
+    user_id = _parse_uuid_claim_or_raise(payload, "sub")
+    user = await _load_user_by_id(session, user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
-
-    if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(user):
-        await self_service.execute_account_deletion(session, user)
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
-    if getattr(user, "deleted_at", None) is not None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
+    await _ensure_active_user(session, user, optional=False)
 
     if not getattr(user, "google_sub", None):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Google account required")
