@@ -80,6 +80,13 @@ _PLAYWRIGHT_SCRIPT = Path(__file__).resolve().parents[3] / "frontend" / "scripts
 _ALLOWED_HOSTS = {"sameday.ro", "www.sameday.ro"}
 _SCHEMA_DRIFT_ALERT_CODE = "schema_drift"
 _CHALLENGE_STREAK_ALERT_CODE = "challenge_failure_streak"
+_LAT_BOUNDS = (-90.0, 90.0)
+_LNG_BOUNDS = (-180.0, 180.0)
+_PRIMARY_LAT_LNG_KEYS = (
+    ("lat", "lng"),
+    ("latitude", "longitude"),
+    ("latitude", "lon"),
+)
 
 
 @dataclass(slots=True)
@@ -127,21 +134,29 @@ def _to_float(value: Any) -> float | None:
     return parsed
 
 
+def _is_valid_coordinate_pair(lat: float | None, lng: float | None) -> bool:
+    if lat is None or lng is None:
+        return False
+    return _LAT_BOUNDS[0] <= lat <= _LAT_BOUNDS[1] and _LNG_BOUNDS[0] <= lng <= _LNG_BOUNDS[1]
+
+
+def _extract_lat_lng(mapping: dict[str, Any], lat_key: str, lng_key: str) -> tuple[float | None, float | None]:
+    return _to_float(mapping.get(lat_key)), _to_float(mapping.get(lng_key))
+
+
+def _extract_location_lat_lng(location: Any) -> tuple[float | None, float | None]:
+    if not isinstance(location, dict):
+        return None, None
+    lat = _to_float(location.get("lat") or location.get("latitude"))
+    lng = _to_float(location.get("lng") or location.get("lon") or location.get("longitude"))
+    return lat, lng
+
+
 def _to_lat_lng(candidate: dict[str, Any]) -> tuple[float, float] | None:
-    lat = _to_float(candidate.get("lat"))
-    lng = _to_float(candidate.get("lng"))
-    if lat is not None and lng is not None and -90 <= lat <= 90 and -180 <= lng <= 180:
-        return lat, lng
-
-    lat = _to_float(candidate.get("latitude"))
-    lng = _to_float(candidate.get("longitude"))
-    if lat is not None and lng is not None and -90 <= lat <= 90 and -180 <= lng <= 180:
-        return lat, lng
-
-    lat = _to_float(candidate.get("latitude"))
-    lng = _to_float(candidate.get("lon"))
-    if lat is not None and lng is not None and -90 <= lat <= 90 and -180 <= lng <= 180:
-        return lat, lng
+    for lat_key, lng_key in _PRIMARY_LAT_LNG_KEYS:
+        lat, lng = _extract_lat_lng(candidate, lat_key, lng_key)
+        if _is_valid_coordinate_pair(lat, lng):
+            return float(lat), float(lng)
 
     geometry = candidate.get("geometry")
     if isinstance(geometry, dict):
@@ -149,15 +164,12 @@ def _to_lat_lng(candidate: dict[str, Any]) -> tuple[float, float] | None:
         if isinstance(coords, (list, tuple)) and len(coords) >= 2:
             lng = _to_float(coords[0])
             lat = _to_float(coords[1])
-            if lat is not None and lng is not None and -90 <= lat <= 90 and -180 <= lng <= 180:
-                return lat, lng
+            if _is_valid_coordinate_pair(lat, lng):
+                return float(lat), float(lng)
 
-    location = candidate.get("location")
-    if isinstance(location, dict):
-        lat = _to_float(location.get("lat") or location.get("latitude"))
-        lng = _to_float(location.get("lng") or location.get("lon") or location.get("longitude"))
-        if lat is not None and lng is not None and -90 <= lat <= 90 and -180 <= lng <= 180:
-            return lat, lng
+    lat, lng = _extract_location_lat_lng(candidate.get("location"))
+    if _is_valid_coordinate_pair(lat, lng):
+        return float(lat), float(lng)
 
     return None
 
@@ -184,6 +196,39 @@ def _collect_candidate_rows(payload: Any) -> list[dict[str, Any]]:
     return rows
 
 
+def _first_present_value(mapping: dict[str, Any], keys: tuple[str, ...]) -> Any:
+    for key in keys:
+        value = mapping.get(key)
+        if value not in (None, ""):
+            return value
+    return None
+
+
+def _normalized_text(mapping: dict[str, Any], keys: tuple[str, ...], *, max_len: int) -> str | None:
+    return _clean_text(_first_present_value(mapping, keys), max_len=max_len)
+
+
+def _normalized_external_id(source: dict[str, Any], *, name: str | None, lat: float, lng: float) -> str:
+    external_id = _normalized_text(
+        source,
+        ("lockerId", "locker_id", "external_id", "id", "locationId", "location_id"),
+        max_len=128,
+    )
+    if external_id:
+        return external_id
+    return hashlib.sha1(f"{name or ''}|{lat:.6f}|{lng:.6f}".encode("utf-8")).hexdigest()[:40]
+
+
+def _row_payload_json(row: dict[str, Any]) -> str | None:
+    try:
+        payload_json = json.dumps(row, ensure_ascii=False, separators=(",", ":"))
+    except Exception:
+        return None
+    if len(payload_json) > 12000:
+        return payload_json[:12000]
+    return payload_json
+
+
 def _normalize_row(row: dict[str, Any]) -> _NormalizedLocker | None:
     props = row.get("properties")
     source = props if isinstance(props, dict) else row
@@ -192,57 +237,16 @@ def _normalize_row(row: dict[str, Any]) -> _NormalizedLocker | None:
         return None
     lat, lng = lat_lng
 
-    external_id = _clean_text(
-        source.get("lockerId")
-        or source.get("locker_id")
-        or source.get("external_id")
-        or source.get("id")
-        or source.get("locationId")
-        or source.get("location_id"),
-        max_len=128,
-    )
-    name = _clean_text(
-        source.get("name")
-        or source.get("lockerName")
-        or source.get("title")
-        or source.get("label"),
-        max_len=255,
-    )
-    address = _clean_text(
-        source.get("address")
-        or source.get("fullAddress")
-        or source.get("street")
-        or source.get("addressLine"),
-        max_len=255,
-    )
-    city = _clean_text(
-        source.get("city")
-        or source.get("locality")
-        or source.get("town")
-        or source.get("municipality"),
-        max_len=120,
-    )
-    county = _clean_text(
-        source.get("county")
-        or source.get("region")
-        or source.get("state")
-        or source.get("judet"),
-        max_len=120,
-    )
-    postal_code = _clean_text(source.get("postalCode") or source.get("postcode") or source.get("zip"), max_len=32)
-
-    if not external_id:
-        external_id = hashlib.sha1(f"{name or ''}|{lat:.6f}|{lng:.6f}".encode("utf-8")).hexdigest()[:40]
+    name = _normalized_text(source, ("name", "lockerName", "title", "label"), max_len=255)
+    external_id = _normalized_external_id(source, name=name, lat=lat, lng=lng)
+    address = _normalized_text(source, ("address", "fullAddress", "street", "addressLine"), max_len=255)
+    city = _normalized_text(source, ("city", "locality", "town", "municipality"), max_len=120)
+    county = _normalized_text(source, ("county", "region", "state", "judet"), max_len=120)
+    postal_code = _normalized_text(source, ("postalCode", "postcode", "zip"), max_len=32)
     if not name:
         name = f"Easybox {external_id[:8]}"
 
-    payload_json: str | None
-    try:
-        payload_json = json.dumps(row, ensure_ascii=False, separators=(",", ":"))
-    except Exception:
-        payload_json = None
-    if payload_json and len(payload_json) > 12000:
-        payload_json = payload_json[:12000]
+    payload_json = _row_payload_json(row)
 
     return _NormalizedLocker(
         external_id=external_id,
@@ -288,29 +292,52 @@ async def _fetch_json_url(client: httpx.AsyncClient, url: str) -> Any:
         raise RuntimeError(f"Non-JSON response from {url}") from exc
 
 
+def _payload_candidates(payload: Any) -> list[dict[str, Any]]:
+    candidates = _collect_candidate_rows(payload)
+    if not candidates and isinstance(payload, list):
+        candidates = [item for item in payload if isinstance(item, dict)]
+    return candidates
+
+
+async def _fetch_template_rows(client: httpx.AsyncClient, template: str) -> list[dict[str, Any]]:
+    collected: list[dict[str, Any]] = []
+    success_count = 0
+    for city in _CITY_SEEDS:
+        url = template.format(q=quote_plus(city))
+        try:
+            payload = await _fetch_json_url(client, url)
+        except Exception:
+            continue
+        candidates = _payload_candidates(payload)
+        if not candidates:
+            continue
+        success_count += 1
+        collected.extend(candidates)
+    return collected if success_count > 0 else []
+
+
 async def _fetch_via_known_endpoints(timeout_seconds: int) -> tuple[Any, str]:
     headers = {"User-Agent": _FETCH_UA, "Accept": "application/json,text/plain,*/*", "Referer": _SAMEDAY_ORIGIN}
     timeout = httpx.Timeout(float(timeout_seconds), connect=min(10.0, float(timeout_seconds)))
     async with httpx.AsyncClient(headers=headers, timeout=timeout, follow_redirects=True) as client:
         for template in _JSON_ENDPOINT_TEMPLATES:
-            collected: list[dict[str, Any]] = []
-            successes = 0
-            for city in _CITY_SEEDS:
-                url = template.format(q=quote_plus(city))
-                try:
-                    payload = await _fetch_json_url(client, url)
-                except Exception:
-                    continue
-                candidates = _collect_candidate_rows(payload)
-                if not candidates and isinstance(payload, list):
-                    candidates = [item for item in payload if isinstance(item, dict)]
-                if candidates:
-                    successes += 1
-                    collected.extend(candidates)
-            if successes > 0 and collected:
+            collected = await _fetch_template_rows(client, template)
+            if collected:
                 source = template.format(q="{city}")
                 return collected, source
     raise RuntimeError("No known Sameday public endpoint yielded locker JSON")
+
+
+def _parse_playwright_payload(stdout_data: bytes) -> tuple[Any, str]:
+    try:
+        payload = json.loads(stdout_data.decode("utf-8", errors="ignore"))
+    except Exception as exc:
+        raise RuntimeError("Playwright fetch returned invalid JSON") from exc
+    source_url = str((payload or {}).get("source_url") or "").strip() or "playwright"
+    data = (payload or {}).get("payload")
+    if data is None:
+        raise RuntimeError("Playwright fetch payload is empty")
+    return data, source_url
 
 
 async def _fetch_via_playwright(timeout_seconds: int) -> tuple[Any, str]:
@@ -334,16 +361,7 @@ async def _fetch_via_playwright(timeout_seconds: int) -> tuple[Any, str]:
         raise RuntimeError("Playwright fetch timed out")
     if proc.returncode != 0:
         raise RuntimeError((err.decode("utf-8", errors="ignore") or "Playwright fetch failed").strip())
-
-    try:
-        payload = json.loads(out.decode("utf-8", errors="ignore"))
-    except Exception as exc:
-        raise RuntimeError("Playwright fetch returned invalid JSON") from exc
-    source_url = str((payload or {}).get("source_url") or "").strip() or "playwright"
-    data = (payload or {}).get("payload")
-    if data is None:
-        raise RuntimeError("Playwright fetch payload is empty")
-    return data, source_url
+    return _parse_playwright_payload(out)
 
 
 async def _fetch_raw_payload() -> tuple[Any, str]:
@@ -371,10 +389,7 @@ async def _normalize_payload(payload: Any) -> list[_NormalizedLocker]:
 
 
 def _candidate_rows(payload: Any) -> list[dict[str, Any]]:
-    rows = _collect_candidate_rows(payload)
-    if not rows and isinstance(payload, list):
-        rows = [item for item in payload if isinstance(item, dict)]
-    return rows
+    return _payload_candidates(payload)
 
 
 def _schema_signature_from_rows(rows: list[dict[str, Any]]) -> str | None:
@@ -396,16 +411,16 @@ def _schema_signature_from_rows(rows: list[dict[str, Any]]) -> str | None:
 
 def _classify_failure(error: Exception) -> tuple[str, bool]:
     message = str(error or "").strip().lower()
-    if "cloudflare challenge" in message or "cf-mitigated" in message:
-        return "cloudflare_challenge", True
-    if "captcha" in message:
-        return "captcha_challenge", True
-    if "non-json response" in message:
-        return "non_json", False
-    if "no locker rows found" in message or "empty payload" in message:
-        return "empty_payload", False
-    if "from https://" in message or "from http://" in message:
-        return "upstream_http", False
+    failure_rules = (
+        (("cloudflare challenge", "cf-mitigated"), "cloudflare_challenge", True),
+        (("captcha",), "captcha_challenge", True),
+        (("non-json response",), "non_json", False),
+        (("no locker rows found", "empty payload"), "empty_payload", False),
+        (("from https://", "from http://"), "upstream_http", False),
+    )
+    for markers, code, challenge in failure_rules:
+        if any(marker in message for marker in markers):
+            return code, challenge
     return "unknown", False
 
 
@@ -421,6 +436,23 @@ async def _get_previous_success(session: AsyncSession) -> ShippingLockerSyncRun 
     )
 
 
+def _schema_signature_changed(prev_signature: str | None, current_signature: str | None) -> bool:
+    if not prev_signature:
+        return False
+    if not current_signature:
+        return False
+    return prev_signature != current_signature
+
+
+def _ratio_drop_alert(previous_ratio: float, current_ratio: float) -> bool:
+    ratio_drop_threshold = max(0.0, float(getattr(settings, "sameday_mirror_schema_drift_ratio_drop", 0.20) or 0.20))
+    min_ratio_threshold = max(0.0, float(getattr(settings, "sameday_mirror_schema_drift_min_ratio", 0.80) or 0.80))
+    ratio_drop = previous_ratio - current_ratio
+    if ratio_drop < ratio_drop_threshold:
+        return False
+    return current_ratio < min_ratio_threshold
+
+
 def _detect_schema_drift(
     *,
     previous_success: ShippingLockerSyncRun | None,
@@ -431,12 +463,10 @@ def _detect_schema_drift(
         return False
     prev_signature = str(previous_success.schema_signature or "").strip() or None
     prev_ratio = float(previous_success.normalization_ratio or 0.0)
-    ratio_drop_threshold = max(0.0, float(getattr(settings, "sameday_mirror_schema_drift_ratio_drop", 0.20) or 0.20))
-    min_ratio_threshold = max(0.0, float(getattr(settings, "sameday_mirror_schema_drift_min_ratio", 0.80) or 0.80))
-    signature_changed = bool(prev_signature and schema_signature and prev_signature != schema_signature)
-    ratio_drop = prev_ratio - float(normalization_ratio)
-    ratio_alert = ratio_drop >= ratio_drop_threshold and float(normalization_ratio) < min_ratio_threshold
-    return bool(signature_changed or ratio_alert)
+    current_ratio = float(normalization_ratio)
+    if _schema_signature_changed(prev_signature, schema_signature):
+        return True
+    return _ratio_drop_alert(prev_ratio, current_ratio)
 
 
 async def _get_challenge_failure_streak(session: AsyncSession) -> int:
@@ -460,6 +490,72 @@ async def _get_challenge_failure_streak(session: AsyncSession) -> int:
             break
         streak += 1
     return streak
+
+
+def _create_snapshot_row(item: _NormalizedLocker, *, now: datetime) -> ShippingLockerMirror:
+    return ShippingLockerMirror(
+        provider=ShippingLockerProvider.sameday,
+        external_id=item.external_id,
+        name=item.name,
+        address=item.address,
+        city=item.city,
+        county=item.county,
+        postal_code=item.postal_code,
+        lat=item.lat,
+        lng=item.lng,
+        is_active=True,
+        source_payload_json=item.source_payload_json,
+        first_seen_at=now,
+        last_seen_at=now,
+    )
+
+
+def _row_needs_update(row: ShippingLockerMirror, item: _NormalizedLocker) -> bool:
+    changed_pairs = (
+        (row.name, item.name),
+        (row.address, item.address),
+        (row.city, item.city),
+        (row.county, item.county),
+        (row.postal_code, item.postal_code),
+        (float(row.lat), float(item.lat)),
+        (float(row.lng), float(item.lng)),
+        (row.source_payload_json, item.source_payload_json),
+        (bool(row.is_active), True),
+    )
+    return any(current != expected for current, expected in changed_pairs)
+
+
+def _apply_snapshot_item(row: ShippingLockerMirror, item: _NormalizedLocker, *, now: datetime) -> None:
+    row.name = item.name
+    row.address = item.address
+    row.city = item.city
+    row.county = item.county
+    row.postal_code = item.postal_code
+    row.lat = item.lat
+    row.lng = item.lng
+    row.source_payload_json = item.source_payload_json
+    row.is_active = True
+    row.last_seen_at = now
+
+
+def _deactivate_missing_snapshot_rows(
+    session: AsyncSession,
+    existing_rows: list[ShippingLockerMirror],
+    *,
+    seen_ids: set[str],
+    now: datetime,
+) -> int:
+    deactivated = 0
+    for row in existing_rows:
+        if row.external_id in seen_ids:
+            continue
+        if not row.is_active:
+            continue
+        row.is_active = False
+        row.last_seen_at = now
+        session.add(row)
+        deactivated += 1
+    return deactivated
 
 
 def _build_canary_alerts(
@@ -502,63 +598,97 @@ async def _upsert_snapshot(session: AsyncSession, items: list[_NormalizedLocker]
         seen_ids.add(item.external_id)
         row = existing_by_external_id.get(item.external_id)
         if row is None:
-            session.add(
-                ShippingLockerMirror(
-                    provider=ShippingLockerProvider.sameday,
-                    external_id=item.external_id,
-                    name=item.name,
-                    address=item.address,
-                    city=item.city,
-                    county=item.county,
-                    postal_code=item.postal_code,
-                    lat=item.lat,
-                    lng=item.lng,
-                    is_active=True,
-                    source_payload_json=item.source_payload_json,
-                    first_seen_at=now,
-                    last_seen_at=now,
-                )
-            )
+            session.add(_create_snapshot_row(item, now=now))
             upserted += 1
             continue
 
-        was_active = bool(row.is_active)
-        changed = (
-            row.name != item.name
-            or row.address != item.address
-            or row.city != item.city
-            or row.county != item.county
-            or row.postal_code != item.postal_code
-            or float(row.lat) != float(item.lat)
-            or float(row.lng) != float(item.lng)
-            or row.source_payload_json != item.source_payload_json
-            or not was_active
-        )
-        row.name = item.name
-        row.address = item.address
-        row.city = item.city
-        row.county = item.county
-        row.postal_code = item.postal_code
-        row.lat = item.lat
-        row.lng = item.lng
-        row.source_payload_json = item.source_payload_json
-        row.is_active = True
-        row.last_seen_at = now
+        changed = _row_needs_update(row, item)
+        _apply_snapshot_item(row, item, now=now)
         session.add(row)
         if changed:
             upserted += 1
 
-    deactivated = 0
-    for row in existing_rows:
-        if row.external_id in seen_ids:
-            continue
-        if row.is_active:
-            row.is_active = False
-            row.last_seen_at = now
-            session.add(row)
-            deactivated += 1
-
+    deactivated = _deactivate_missing_snapshot_rows(session, existing_rows, seen_ids=seen_ids, now=now)
     return upserted, deactivated
+
+
+async def _mark_sync_success(
+    session: AsyncSession,
+    run: ShippingLockerSyncRun,
+    *,
+    trigger: str,
+    payload: Any,
+    source_url: str,
+    candidate_count: int,
+    normalized_items: list[_NormalizedLocker],
+    normalization_ratio: float,
+    schema_signature: str | None,
+    schema_drift_detected: bool,
+    upserted_count: int,
+    deactivated_count: int,
+    finished_at: datetime,
+) -> ShippingLockerSyncRun:
+    run.status = ShippingLockerSyncStatus.success
+    run.finished_at = finished_at
+    run.candidate_count = candidate_count
+    run.normalized_count = int(len(normalized_items))
+    run.normalization_ratio = normalization_ratio
+    run.schema_signature = schema_signature
+    run.schema_drift_detected = schema_drift_detected
+    run.failure_kind = None
+    run.challenge_failure = False
+    run.fetched_count = len(normalized_items)
+    run.upserted_count = upserted_count
+    run.deactivated_count = deactivated_count
+    run.error_message = None
+    run.source_url_used = str(source_url or "").strip()[:512] or None
+    run.payload_hash = _payload_hash(payload)
+    session.add(run)
+    await session.commit()
+    await session.refresh(run)
+    logger.info(
+        "sameday_easybox_sync_success",
+        extra={
+            "trigger": trigger,
+            "fetched_count": int(run.fetched_count),
+            "candidate_count": int(run.candidate_count or 0),
+            "normalization_ratio": float(run.normalization_ratio or 0.0),
+            "schema_drift_detected": bool(run.schema_drift_detected),
+            "upserted_count": int(run.upserted_count),
+            "deactivated_count": int(run.deactivated_count),
+        },
+    )
+    return run
+
+
+async def _mark_sync_failure(
+    session: AsyncSession,
+    run: ShippingLockerSyncRun,
+    *,
+    trigger: str,
+    error: Exception,
+    finished_at: datetime,
+) -> ShippingLockerSyncRun:
+    failure_kind, challenge_failure = _classify_failure(error)
+    run.status = ShippingLockerSyncStatus.failed
+    run.finished_at = finished_at
+    run.failure_kind = failure_kind
+    run.challenge_failure = challenge_failure
+    run.schema_drift_detected = False
+    run.error_message = str(error)[:4000]
+    session.add(run)
+    await session.commit()
+    await session.refresh(run)
+    logger.warning(
+        "sameday_easybox_sync_failed",
+        extra={
+            "trigger": trigger,
+            "error": str(error),
+            "failure_kind": failure_kind,
+            "challenge_failure": challenge_failure,
+        },
+    )
+    return run
 
 
 def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
@@ -610,59 +740,23 @@ async def sync_now(session: AsyncSession, *, trigger: str) -> ShippingLockerSync
             normalization_ratio=normalization_ratio,
         )
         upserted_count, deactivated_count = await _upsert_snapshot(session, normalized_items, now=now)
-
-        run.status = ShippingLockerSyncStatus.success
-        run.finished_at = now
-        run.candidate_count = candidate_count
-        run.normalized_count = normalized_count
-        run.normalization_ratio = normalization_ratio
-        run.schema_signature = schema_signature
-        run.schema_drift_detected = schema_drift_detected
-        run.failure_kind = None
-        run.challenge_failure = False
-        run.fetched_count = len(normalized_items)
-        run.upserted_count = upserted_count
-        run.deactivated_count = deactivated_count
-        run.error_message = None
-        run.source_url_used = str(source_url or "").strip()[:512] or None
-        run.payload_hash = _payload_hash(payload)
-        session.add(run)
-        await session.commit()
-        await session.refresh(run)
-        logger.info(
-            "sameday_easybox_sync_success",
-            extra={
-                "trigger": trigger,
-                "fetched_count": int(run.fetched_count),
-                "candidate_count": int(run.candidate_count or 0),
-                "normalization_ratio": float(run.normalization_ratio or 0.0),
-                "schema_drift_detected": bool(run.schema_drift_detected),
-                "upserted_count": int(run.upserted_count),
-                "deactivated_count": int(run.deactivated_count),
-            },
+        return await _mark_sync_success(
+            session,
+            run,
+            trigger=trigger,
+            payload=payload,
+            source_url=source_url,
+            candidate_count=candidate_count,
+            normalized_items=normalized_items,
+            normalization_ratio=normalization_ratio,
+            schema_signature=schema_signature,
+            schema_drift_detected=schema_drift_detected,
+            upserted_count=upserted_count,
+            deactivated_count=deactivated_count,
+            finished_at=now,
         )
-        return run
     except Exception as exc:
-        failure_kind, challenge_failure = _classify_failure(exc)
-        run.status = ShippingLockerSyncStatus.failed
-        run.finished_at = _now()
-        run.failure_kind = failure_kind
-        run.challenge_failure = challenge_failure
-        run.schema_drift_detected = False
-        run.error_message = str(exc)[:4000]
-        session.add(run)
-        await session.commit()
-        await session.refresh(run)
-        logger.warning(
-            "sameday_easybox_sync_failed",
-            extra={
-                "trigger": trigger,
-                "error": str(exc),
-                "failure_kind": failure_kind,
-                "challenge_failure": challenge_failure,
-            },
-        )
-        return run
+        return await _mark_sync_failure(session, run, trigger=trigger, error=exc, finished_at=_now())
 
 
 async def list_sync_runs(session: AsyncSession, *, page: int, limit: int) -> tuple[list[ShippingLockerSyncRun], int]:
@@ -694,8 +788,8 @@ async def list_sync_runs(session: AsyncSession, *, page: int, limit: int) -> tup
     return list(rows), total
 
 
-async def get_snapshot_status(session: AsyncSession) -> LockerMirrorSnapshotRead:
-    total_lockers = int(
+async def _count_active_lockers(session: AsyncSession) -> int:
+    return int(
         (
             await session.scalar(
                 select(func.count())
@@ -708,52 +802,45 @@ async def get_snapshot_status(session: AsyncSession) -> LockerMirrorSnapshotRead
         )
         or 0
     )
-    last_success = await session.scalar(
-        select(ShippingLockerSyncRun)
-        .where(
-            ShippingLockerSyncRun.provider == ShippingLockerProvider.sameday,
-            ShippingLockerSyncRun.status == ShippingLockerSyncStatus.success,
-        )
-        .order_by(desc(ShippingLockerSyncRun.started_at))
-        .limit(1)
-    )
-    latest_failed = await session.scalar(
-        select(ShippingLockerSyncRun)
-        .where(
-            ShippingLockerSyncRun.provider == ShippingLockerProvider.sameday,
-            ShippingLockerSyncRun.status == ShippingLockerSyncStatus.failed,
-        )
-        .order_by(desc(ShippingLockerSyncRun.started_at))
-        .limit(1)
-    )
-    latest_run = await session.scalar(
-        select(ShippingLockerSyncRun)
-        .where(ShippingLockerSyncRun.provider == ShippingLockerProvider.sameday)
-        .order_by(desc(ShippingLockerSyncRun.started_at))
-        .limit(1)
-    )
-    latest_schema_drift = await session.scalar(
-        select(ShippingLockerSyncRun)
-        .where(
-            ShippingLockerSyncRun.provider == ShippingLockerProvider.sameday,
-            ShippingLockerSyncRun.schema_drift_detected.is_(True),
-        )
-        .order_by(desc(ShippingLockerSyncRun.started_at))
-        .limit(1)
-    )
+
+
+async def _latest_run_by_status(
+    session: AsyncSession,
+    *,
+    status: ShippingLockerSyncStatus | None = None,
+    schema_drift_only: bool = False,
+) -> ShippingLockerSyncRun | None:
+    stmt = select(ShippingLockerSyncRun).where(ShippingLockerSyncRun.provider == ShippingLockerProvider.sameday)
+    if status is not None:
+        stmt = stmt.where(ShippingLockerSyncRun.status == status)
+    if schema_drift_only:
+        stmt = stmt.where(ShippingLockerSyncRun.schema_drift_detected.is_(True))
+    stmt = stmt.order_by(desc(ShippingLockerSyncRun.started_at)).limit(1)
+    return await session.scalar(stmt)
+
+
+def _compute_snapshot_staleness(last_success: ShippingLockerSyncRun | None) -> tuple[bool, int | None, datetime | None]:
+    stale_after = max(60, int(getattr(settings, "sameday_mirror_stale_after_seconds", 2592000) or 2592000))
+    finished_at = _as_utc(last_success.finished_at) if last_success else None
+    if finished_at is None:
+        return True, None, None
+    age_seconds = max(0, int((_now() - finished_at).total_seconds()))
+    return age_seconds > stale_after, age_seconds, finished_at
+
+
+async def get_snapshot_status(session: AsyncSession) -> LockerMirrorSnapshotRead:
+    total_lockers = await _count_active_lockers(session)
+    last_success = await _latest_run_by_status(session, status=ShippingLockerSyncStatus.success)
+    latest_failed = await _latest_run_by_status(session, status=ShippingLockerSyncStatus.failed)
+    latest_run = await _latest_run_by_status(session)
+    latest_schema_drift = await _latest_run_by_status(session, schema_drift_only=True)
     challenge_failure_streak = await _get_challenge_failure_streak(session)
     schema_drift_detected = bool(latest_run and latest_run.schema_drift_detected)
     canary_alert_codes, canary_alert_messages = _build_canary_alerts(
         schema_drift_detected=schema_drift_detected,
         challenge_failure_streak=challenge_failure_streak,
     )
-    stale_after = max(60, int(getattr(settings, "sameday_mirror_stale_after_seconds", 2592000) or 2592000))
-    age_seconds: int | None = None
-    stale = True
-    finished_at = _as_utc(last_success.finished_at) if last_success else None
-    if finished_at is not None:
-        age_seconds = max(0, int((_now() - finished_at).total_seconds()))
-        stale = age_seconds > stale_after
+    stale, age_seconds, finished_at = _compute_snapshot_staleness(last_success)
     return LockerMirrorSnapshotRead(
         provider=LockerProvider.sameday,
         total_lockers=total_lockers,
@@ -797,6 +884,57 @@ async def should_run_scheduled_sync(session: AsyncSession) -> bool:
     return (_now() - finished_at).total_seconds() >= interval
 
 
+def _update_city_bucket(
+    grouped: dict[str, dict[str, Any]],
+    *,
+    city: Any,
+    county: Any,
+    lat: Any,
+    lng: Any,
+    normalized_query: str,
+) -> None:
+    city_name = _clean_text(city, max_len=120)
+    if not city_name:
+        return
+    if normalized_query and normalized_query not in city_name.lower():
+        return
+
+    key = city_name.lower()
+    bucket = grouped.get(key)
+    if bucket is None:
+        bucket = {
+            "city": city_name,
+            "counties": Counter(),
+            "lat_sum": 0.0,
+            "lng_sum": 0.0,
+            "count": 0,
+        }
+        grouped[key] = bucket
+
+    county_name = _clean_text(county, max_len=120)
+    if county_name:
+        bucket["counties"][county_name] += 1
+    bucket["lat_sum"] += float(lat)
+    bucket["lng_sum"] += float(lng)
+    bucket["count"] += 1
+
+
+def _bucket_to_city_read(item: dict[str, Any]) -> LockerCityRead:
+    county = item["counties"].most_common(1)[0][0] if item["counties"] else None
+    city = str(item["city"])
+    display_name = f"{city}, {county}" if county else city
+    count = max(1, int(item["count"]))
+    return LockerCityRead(
+        provider=LockerProvider.sameday,
+        city=city,
+        county=county,
+        display_name=display_name,
+        lat=float(item["lat_sum"] / count),
+        lng=float(item["lng_sum"] / count),
+        locker_count=int(item["count"]),
+    )
+
+
 async def list_city_suggestions(session: AsyncSession, *, q: str, limit: int) -> list[LockerCityRead]:
     stmt = (
         select(
@@ -818,51 +956,36 @@ async def list_city_suggestions(session: AsyncSession, *, q: str, limit: int) ->
 
     grouped: dict[str, dict[str, Any]] = {}
     for city, county, lat, lng in rows:
-        city_name = _clean_text(city, max_len=120)
-        if not city_name:
-            continue
-        if normalized_query and normalized_query not in city_name.lower():
-            continue
-        key = city_name.lower()
-        bucket = grouped.get(key)
-        if bucket is None:
-            bucket = {
-                "city": city_name,
-                "counties": Counter(),
-                "lat_sum": 0.0,
-                "lng_sum": 0.0,
-                "count": 0,
-            }
-            grouped[key] = bucket
-        county_name = _clean_text(county, max_len=120)
-        if county_name:
-            bucket["counties"][county_name] += 1
-        bucket["lat_sum"] += float(lat)
-        bucket["lng_sum"] += float(lng)
-        bucket["count"] += 1
+        _update_city_bucket(
+            grouped,
+            city=city,
+            county=county,
+            lat=lat,
+            lng=lng,
+            normalized_query=normalized_query,
+        )
 
     ordered = sorted(
         grouped.values(),
         key=lambda item: (-int(item["count"]), str(item["city"]).lower()),
     )[: max(1, min(50, int(limit or 8)))]
+    return [_bucket_to_city_read(item) for item in ordered]
 
-    out: list[LockerCityRead] = []
-    for item in ordered:
-        county = item["counties"].most_common(1)[0][0] if item["counties"] else None
-        city = str(item["city"])
-        display_name = f"{city}, {county}" if county else city
-        out.append(
-            LockerCityRead(
-                provider=LockerProvider.sameday,
-                city=city,
-                county=county,
-                display_name=display_name,
-                lat=float(item["lat_sum"] / max(1, int(item["count"]))),
-                lng=float(item["lng_sum"] / max(1, int(item["count"]))),
-                locker_count=int(item["count"]),
+
+async def _has_any_active_lockers(session: AsyncSession) -> bool:
+    return bool(
+        (
+            await session.scalar(
+                select(func.count())
+                .select_from(ShippingLockerMirror)
+                .where(
+                    ShippingLockerMirror.provider == ShippingLockerProvider.sameday,
+                    ShippingLockerMirror.is_active.is_(True),
+                )
             )
         )
-    return out
+        or 0
+    )
 
 
 async def list_nearby_lockers(
@@ -905,20 +1028,7 @@ async def list_nearby_lockers(
         return filtered[:safe_limit]
 
     # No nearby points in bounding box. Return empty for normal behavior only when we have data at all.
-    has_any = bool(
-        (
-            await session.scalar(
-                select(func.count())
-                .select_from(ShippingLockerMirror)
-                .where(
-                    ShippingLockerMirror.provider == ShippingLockerProvider.sameday,
-                    ShippingLockerMirror.is_active.is_(True),
-                )
-            )
-        )
-        or 0
-    )
-    if has_any:
+    if await _has_any_active_lockers(session):
         return []
     raise RuntimeError("Sameday locker mirror is not initialized")
 

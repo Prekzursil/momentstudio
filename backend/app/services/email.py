@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from email.message import EmailMessage
 from pathlib import Path
-from typing import Sequence
+from typing import Any, Sequence
 from urllib.parse import urlencode
 
 import anyio
@@ -40,6 +40,14 @@ EmailAttachment = dict[str, object]
 
 RECEIPT_SHARE_DAYS = 365
 TOTAL_LABEL = "Total: "
+
+
+def _first_non_empty_str(*values: object, default: str = "") -> str:
+    for value in values:
+        text = str(value or "").strip()
+        if text:
+            return text
+    return default
 
 
 def _apply_message_headers(msg: EmailMessage, headers: dict[str, str] | None) -> None:
@@ -398,21 +406,40 @@ def _payment_method_label(payment_method: str | None, *, lang: str) -> str | Non
     return payment_method
 
 
-def _delivery_lines(order, *, lang: str) -> list[str]:
+def _delivery_summary_line(order, *, lang: str) -> str | None:
     courier = _courier_label(getattr(order, "courier", None), lang=lang)
     delivery = _delivery_type_label(getattr(order, "delivery_type", None), lang=lang)
+    parts = [x for x in (courier, delivery) if x]
+    if not parts:
+        return None
+    label = "Delivery" if lang == "en" else "Livrare"
+    return f"{label}: {' · '.join(parts)}"
+
+
+def _locker_line(order, *, lang: str) -> str | None:
+    delivery_type = _first_non_empty_str(getattr(order, "delivery_type", None)).lower()
+    if delivery_type != "locker":
+        return None
+    locker_name = _first_non_empty_str(getattr(order, "locker_name", None))
+    locker_address = _first_non_empty_str(getattr(order, "locker_address", None))
+    if not locker_name and not locker_address:
+        return None
+    label = "Locker" if lang == "en" else "Locker"
+    if locker_name and locker_address:
+        detail = f"{locker_name} — {locker_address}"
+    else:
+        detail = locker_name or locker_address
+    return f"{label}: {detail}"
+
+
+def _delivery_lines(order, *, lang: str) -> list[str]:
     lines: list[str] = []
-    if courier or delivery:
-        label = "Delivery" if lang == "en" else "Livrare"
-        detail = " · ".join([x for x in [courier, delivery] if x])
-        lines.append(f"{label}: {detail}")
-    if (getattr(order, "delivery_type", None) or "").strip().lower() == "locker":
-        locker_name = (getattr(order, "locker_name", None) or "").strip()
-        locker_address = (getattr(order, "locker_address", None) or "").strip()
-        if locker_name or locker_address:
-            label = "Locker" if lang == "en" else "Locker"
-            detail = " — ".join([x for x in [locker_name, locker_address] if x])
-            lines.append(f"{label}: {detail}")
+    delivery_line = _delivery_summary_line(order, lang=lang)
+    if delivery_line:
+        lines.append(delivery_line)
+    locker_line = _locker_line(order, lang=lang)
+    if locker_line:
+        lines.append(locker_line)
     return lines
 
 
@@ -471,6 +498,67 @@ def _append_order_account_links(
     lines.append(f"Detalii în cont: {account_url}" if lang == "ro" else f"View in your account: {account_url}")
 
 
+def _order_confirmation_lines(
+    *,
+    lang: str,
+    order,
+    ref: str,
+    items: Sequence | None,
+    currency: str,
+    receipt_url: str,
+    receipt_pdf_url: str,
+) -> list[str]:
+    lines = [f"Îți mulțumim pentru comanda {ref}." if lang == "ro" else f"Thank you for your order {ref}."]
+    payment = _payment_method_label(getattr(order, "payment_method", None), lang=lang)
+    if payment:
+        lines.append(("Plată: " if lang == "ro" else "Payment: ") + payment)
+    lines.extend(_delivery_lines(order, lang=lang))
+    _append_order_item_lines(lines, items=items, currency=currency, lang=lang)
+    _append_order_charge_lines(lines, order=order, currency=currency, lang=lang)
+    lines.append(TOTAL_LABEL + _money_str(getattr(order, "total_amount", 0), currency))
+    _append_order_account_links(lines, lang=lang, receipt_url=receipt_url, receipt_pdf_url=receipt_pdf_url)
+    return lines
+
+
+def _order_confirmation_receipt_context(order, *, ref: str, receipt_share_days: int | None) -> tuple[str, str, str, str]:
+    currency = _first_non_empty_str(getattr(order, "currency", None), default="RON")
+    ttl_days = int(receipt_share_days) if receipt_share_days and int(receipt_share_days) > 0 else RECEIPT_SHARE_DAYS
+    receipt_expires_at = datetime.now(timezone.utc) + timedelta(days=ttl_days)
+    token_version = int(getattr(order, "receipt_token_version", 0) or 0)
+    receipt_token = create_receipt_token(
+        order_id=str(getattr(order, "id", "")),
+        expires_at=receipt_expires_at,
+        token_version=token_version,
+    )
+    base = settings.frontend_origin.rstrip("/")
+    receipt_url = f"{base}/receipt/{receipt_token}"
+    receipt_pdf_url = f"{base}/api/v1/orders/receipt/{receipt_token}/pdf"
+    receipt_filename = f"receipt-{ref}.pdf"
+    return currency, receipt_url, receipt_pdf_url, receipt_filename
+
+
+def _order_confirmation_text(
+    *,
+    order,
+    ref: str,
+    items: Sequence | None,
+    currency: str,
+    receipt_url: str,
+    receipt_pdf_url: str,
+) -> tuple[str, str]:
+    common = {
+        "order": order,
+        "ref": ref,
+        "items": items,
+        "currency": currency,
+        "receipt_url": receipt_url,
+        "receipt_pdf_url": receipt_pdf_url,
+    }
+    text_ro = "\n".join(_order_confirmation_lines(lang="ro", **common))
+    text_en = "\n".join(_order_confirmation_lines(lang="en", **common))
+    return text_ro, text_en
+
+
 async def send_order_confirmation(
     to_email: str,
     order,
@@ -480,45 +568,23 @@ async def send_order_confirmation(
     receipt_share_days: int | None = None,
 ) -> bool:
     ref = getattr(order, "reference_code", None) or str(getattr(order, "id", ""))
-    currency = getattr(order, "currency", "RON") or "RON"
-    ttl_days = int(receipt_share_days) if receipt_share_days and int(receipt_share_days) > 0 else RECEIPT_SHARE_DAYS
-    receipt_expires_at = datetime.now(timezone.utc) + timedelta(days=ttl_days)
-    token_version = int(getattr(order, "receipt_token_version", 0) or 0)
-    receipt_token = create_receipt_token(
-        order_id=str(getattr(order, "id", "")),
-        expires_at=receipt_expires_at,
-        token_version=token_version,
+    currency, receipt_url, receipt_pdf_url, receipt_filename = _order_confirmation_receipt_context(
+        order,
+        ref=ref,
+        receipt_share_days=receipt_share_days,
     )
-    receipt_url = f"{settings.frontend_origin.rstrip('/')}/receipt/{receipt_token}"
-    receipt_pdf_url = f"{settings.frontend_origin.rstrip('/')}/api/v1/orders/receipt/{receipt_token}/pdf"
-    receipt_filename = f"receipt-{ref}.pdf"
-
-    def _lines(lng: str) -> list[str]:
-        lines = [
-            f"Îți mulțumim pentru comanda {ref}."
-            if lng == "ro"
-            else f"Thank you for your order {ref}."
-        ]
-        payment = _payment_method_label(getattr(order, "payment_method", None), lang=lng)
-        if payment:
-            lines.append(("Plată: " if lng == "ro" else "Payment: ") + payment)
-        lines.extend(_delivery_lines(order, lang=lng))
-        _append_order_item_lines(lines, items=items, currency=currency, lang=lng)
-        _append_order_charge_lines(lines, order=order, currency=currency, lang=lng)
-        lines.append(TOTAL_LABEL + _money_str(getattr(order, "total_amount", 0), currency))
-        _append_order_account_links(
-            lines,
-            lang=lng,
-            receipt_url=receipt_url,
-            receipt_pdf_url=receipt_pdf_url,
-        )
-        return lines
 
     subject_ro = f"Confirmare comandă {ref}"
     subject_en = f"Order confirmation {ref}"
     subject = _bilingual_subject(subject_ro, subject_en, preferred_language=lang)
-    text_ro = "\n".join(_lines("ro"))
-    text_en = "\n".join(_lines("en"))
+    text_ro, text_en = _order_confirmation_text(
+        order=order,
+        ref=ref,
+        items=items,
+        currency=currency,
+        receipt_url=receipt_url,
+        receipt_pdf_url=receipt_pdf_url,
+    )
     text_body, html_body = _bilingual_sections(
         text_ro=text_ro,
         text_en=text_en,
@@ -576,46 +642,81 @@ async def send_order_processing_update(to_email: str, order, *, lang: str | None
     return await send_email(to_email, subject, text_body, html_body)
 
 
+def _localized_prefixed_line(*, lang: str, ro_prefix: str, en_prefix: str, value: str | None) -> str | None:
+    if not value:
+        return None
+    return (ro_prefix if lang == "ro" else en_prefix) + value
+
+
+def _refund_card_note(*, lang: str, payment_method: str) -> str | None:
+    if payment_method not in {"stripe", "paypal"}:
+        return None
+    return (
+        "Dacă ai plătit cu cardul, suma va fi rambursată în contul tău cât mai curând."
+        if lang == "ro"
+        else "If you paid by card, the amount will be refunded back to your account as soon as possible."
+    )
+
+
+def _order_cancelled_lines(
+    *,
+    lang: str,
+    order,
+    ref: str,
+    cancel_reason: str | None,
+    contact_url: str,
+) -> list[str]:
+    lines = [f"Comanda {ref} a fost anulată." if lang == "ro" else f"Your order {ref} was cancelled."]
+    reason_line = _localized_prefixed_line(lang=lang, ro_prefix="Motiv: ", en_prefix="Reason: ", value=cancel_reason)
+    if reason_line:
+        lines.append(reason_line)
+    lines.append(
+        "Dacă ai întrebări sau crezi că este o eroare, te rugăm să ne contactezi."
+        if lang == "ro"
+        else "If you have questions or believe this is a mistake, please contact us."
+    )
+    raw_payment_method = (getattr(order, "payment_method", None) or "").strip().lower()
+    payment = _payment_method_label(raw_payment_method, lang=lang)
+    payment_line = _localized_prefixed_line(lang=lang, ro_prefix="Plată: ", en_prefix="Payment: ", value=payment)
+    if payment_line:
+        lines.append(payment_line)
+    refund_line = _refund_card_note(lang=lang, payment_method=raw_payment_method)
+    if refund_line:
+        lines.append(refund_line)
+    lines.extend(_delivery_lines(order, lang=lang))
+    lines.append("")
+    lines.append(f"Contact: {contact_url}")
+    return lines
+
+
 async def send_order_cancelled_update(to_email: str, order, *, lang: str | None = None) -> bool:
     ref = getattr(order, "reference_code", None) or str(getattr(order, "id", ""))
     contact_url = f"{settings.frontend_origin.rstrip('/')}/contact"
     cancel_reason = (getattr(order, "cancel_reason", None) or "").strip() or None
-
-    def _lines(lng: str) -> list[str]:
-        lines = [
-            f"Comanda {ref} a fost anulată." if lng == "ro" else f"Your order {ref} was cancelled."
-        ]
-        if cancel_reason:
-            lines.append(("Motiv: " if lng == "ro" else "Reason: ") + cancel_reason)
-        lines.append(
-            "Dacă ai întrebări sau crezi că este o eroare, te rugăm să ne contactezi."
-            if lng == "ro"
-            else "If you have questions or believe this is a mistake, please contact us."
-        )
-        raw_payment_method = (getattr(order, "payment_method", None) or "").strip().lower()
-        payment = _payment_method_label(raw_payment_method, lang=lng)
-        if payment:
-            lines.append(("Plată: " if lng == "ro" else "Payment: ") + payment)
-        if raw_payment_method in {"stripe", "paypal"}:
-            lines.append(
-                "Dacă ai plătit cu cardul, suma va fi rambursată în contul tău cât mai curând."
-                if lng == "ro"
-                else "If you paid by card, the amount will be refunded back to your account as soon as possible."
-            )
-        lines.extend(_delivery_lines(order, lang=lng))
-        lines.append("")
-        lines.append(
-            f"Contact: {contact_url}" if lng == "ro" else f"Contact: {contact_url}"
-        )
-        return lines
 
     subject = _bilingual_subject(
         f"Comanda {ref} a fost anulată",
         f"Order {ref} was cancelled",
         preferred_language=lang,
     )
-    text_ro = "\n".join(_lines("ro"))
-    text_en = "\n".join(_lines("en"))
+    text_ro = "\n".join(
+        _order_cancelled_lines(
+            lang="ro",
+            order=order,
+            ref=ref,
+            cancel_reason=cancel_reason,
+            contact_url=contact_url,
+        )
+    )
+    text_en = "\n".join(
+        _order_cancelled_lines(
+            lang="en",
+            order=order,
+            ref=ref,
+            cancel_reason=cancel_reason,
+            contact_url=contact_url,
+        )
+    )
     text_body, html_body = _bilingual_sections(
         text_ro=text_ro,
         text_en=text_en,
@@ -624,6 +725,44 @@ async def send_order_cancelled_update(to_email: str, order, *, lang: str | None 
         preferred_language=lang,
     )
     return await send_email(to_email, subject, text_body, html_body)
+
+
+def _cancel_request_lines(
+    *,
+    lang: str,
+    order,
+    ref: str,
+    requested_by: str | None,
+    reason: str | None,
+    status_value: str | None,
+    admin_url: str,
+) -> list[str]:
+    lines = [
+        f"Cerere de anulare pentru comanda {ref}."
+        if lang == "ro"
+        else f"Cancellation request for order {ref}."
+    ]
+    requested_by_line = _localized_prefixed_line(
+        lang=lang,
+        ro_prefix="Solicitat de: ",
+        en_prefix="Requested by: ",
+        value=requested_by,
+    )
+    if requested_by_line:
+        lines.append(requested_by_line)
+    reason_line = _localized_prefixed_line(lang=lang, ro_prefix="Motiv: ", en_prefix="Reason: ", value=reason)
+    if reason_line:
+        lines.append(reason_line)
+    payment = _payment_method_label(getattr(order, "payment_method", None), lang=lang)
+    payment_line = _localized_prefixed_line(lang=lang, ro_prefix="Plată: ", en_prefix="Payment: ", value=payment)
+    if payment_line:
+        lines.append(payment_line)
+    status_line = _localized_prefixed_line(lang=lang, ro_prefix="Status: ", en_prefix="Status: ", value=status_value)
+    if status_line:
+        lines.append(status_line)
+    lines.append("")
+    lines.append(f"Admin: {admin_url}")
+    return lines
 
 
 async def send_order_cancel_request_notification(
@@ -641,36 +780,33 @@ async def send_order_cancel_request_notification(
     reason_clean = (reason or "").strip() or None
     requested_by = (requested_by_email or "").strip() or None
 
-    def _lines(lng: str) -> list[str]:
-        lines = [
-            (
-                f"Cerere de anulare pentru comanda {ref}."
-                if lng == "ro"
-                else f"Cancellation request for order {ref}."
-            )
-        ]
-        if requested_by:
-            lines.append(("Solicitat de: " if lng == "ro" else "Requested by: ") + requested_by)
-        if reason_clean:
-            lines.append(("Motiv: " if lng == "ro" else "Reason: ") + reason_clean)
-        payment = _payment_method_label(getattr(order, "payment_method", None), lang=lng)
-        if payment:
-            lines.append(("Plată: " if lng == "ro" else "Payment: ") + payment)
-        if status_value:
-            lines.append(("Status: " if lng == "ro" else "Status: ") + status_value)
-        lines.append("")
-        lines.append(
-            f"Admin: {admin_url}" if lng == "ro" else f"Admin: {admin_url}"
-        )
-        return lines
-
     subject = _bilingual_subject(
         f"Cerere de anulare: {ref}",
         f"Cancellation request: {ref}",
         preferred_language=lang,
     )
-    text_ro = "\n".join(_lines("ro"))
-    text_en = "\n".join(_lines("en"))
+    text_ro = "\n".join(
+        _cancel_request_lines(
+            lang="ro",
+            order=order,
+            ref=ref,
+            requested_by=requested_by,
+            reason=reason_clean,
+            status_value=status_value,
+            admin_url=admin_url,
+        )
+    )
+    text_en = "\n".join(
+        _cancel_request_lines(
+            lang="en",
+            order=order,
+            ref=ref,
+            requested_by=requested_by,
+            reason=reason_clean,
+            status_value=status_value,
+            admin_url=admin_url,
+        )
+    )
     text_body, html_body = _bilingual_sections(
         text_ro=text_ro,
         text_en=text_en,
@@ -968,6 +1104,59 @@ async def send_email_changed(
     return await send_email(to_email, subject, text_body, html_body)
 
 
+def _admin_login_alert_context(
+    *,
+    admin_username: str,
+    admin_display_name: str | None,
+    admin_role: str | None,
+    ip_address: str | None,
+    country_code: str | None,
+    user_agent: str | None,
+    occurred_at: datetime | None,
+) -> dict[str, str]:
+    admin_name = _first_non_empty_str(admin_display_name, admin_username)
+    role_value = _first_non_empty_str(admin_role, default="admin")
+    when = (occurred_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat(timespec="seconds")
+    ip = _first_non_empty_str(ip_address, default="unknown")
+    cc = _first_non_empty_str(country_code)
+    ua = _first_non_empty_str(user_agent, default="unknown")
+    location = f"{ip} ({cc})" if cc else ip
+    dashboard_url = f"{settings.frontend_origin.rstrip('/')}/admin"
+    return {
+        "admin_name": admin_name,
+        "admin_username": admin_username,
+        "role_value": role_value,
+        "when": when,
+        "location": location,
+        "user_agent": ua,
+        "dashboard_url": dashboard_url,
+    }
+
+
+def _admin_login_alert_bodies(context: dict[str, str]) -> tuple[str, str]:
+    text_ro = (
+        "A fost detectată o autentificare nouă pentru un cont de administrator.\n\n"
+        f"Admin: {context['admin_name']} ({context['admin_username']})\n"
+        f"Rol: {context['role_value']}\n"
+        f"Când: {context['when']}\n"
+        f"IP: {context['location']}\n"
+        f"User-Agent: {context['user_agent']}\n\n"
+        "Dacă nu recunoști această autentificare, recomandăm să schimbi parola și să revoci sesiunile active.\n\n"
+        f"Admin: {context['dashboard_url']}"
+    )
+    text_en = (
+        "A new login was detected for an admin account.\n\n"
+        f"Admin: {context['admin_name']} ({context['admin_username']})\n"
+        f"Role: {context['role_value']}\n"
+        f"When: {context['when']}\n"
+        f"IP: {context['location']}\n"
+        f"User-Agent: {context['user_agent']}\n\n"
+        "If you don’t recognize this login, we recommend changing the password and revoking active sessions.\n\n"
+        f"Admin: {context['dashboard_url']}"
+    )
+    return text_ro, text_en
+
+
 async def send_admin_login_alert(
     to_email: str,
     *,
@@ -981,35 +1170,16 @@ async def send_admin_login_alert(
     lang: str | None = None,
 ) -> bool:
     subject = _bilingual_subject("Alertă: autentificare admin nouă", "Alert: new admin login", preferred_language=lang)
-    admin_name = (admin_display_name or "").strip() or (admin_username or "").strip()
-    role_value = (admin_role or "").strip() or "admin"
-    when = (occurred_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat(timespec="seconds")
-    ip = (ip_address or "").strip() or "unknown"
-    cc = (country_code or "").strip() or None
-    ua = (user_agent or "").strip() or "unknown"
-    dashboard_url = f"{settings.frontend_origin.rstrip('/')}/admin"
-
-    location = f"{ip} ({cc})" if cc else ip
-    text_ro = (
-        "A fost detectată o autentificare nouă pentru un cont de administrator.\n\n"
-        f"Admin: {admin_name} ({admin_username})\n"
-        f"Rol: {role_value}\n"
-        f"Când: {when}\n"
-        f"IP: {location}\n"
-        f"User-Agent: {ua}\n\n"
-        "Dacă nu recunoști această autentificare, recomandăm să schimbi parola și să revoci sesiunile active.\n\n"
-        f"Admin: {dashboard_url}"
+    context = _admin_login_alert_context(
+        admin_username=admin_username,
+        admin_display_name=admin_display_name,
+        admin_role=admin_role,
+        ip_address=ip_address,
+        country_code=country_code,
+        user_agent=user_agent,
+        occurred_at=occurred_at,
     )
-    text_en = (
-        "A new login was detected for an admin account.\n\n"
-        f"Admin: {admin_name} ({admin_username})\n"
-        f"Role: {role_value}\n"
-        f"When: {when}\n"
-        f"IP: {location}\n"
-        f"User-Agent: {ua}\n\n"
-        "If you don’t recognize this login, we recommend changing the password and revoking active sessions.\n\n"
-        f"Admin: {dashboard_url}"
-    )
+    text_ro, text_en = _admin_login_alert_bodies(context)
     text_body, html_body = _bilingual_sections(
         text_ro=text_ro,
         text_en=text_en,
@@ -1439,6 +1609,34 @@ async def send_contact_submission_notification(
     return await send_email(to_email, subject, text_body, html_body)
 
 
+def _contact_submission_reply_fallback_bodies(
+    *,
+    safe_name: str,
+    reply_message: str,
+    topic: str | None,
+    order_reference: str | None,
+    reference: str | None,
+    contact_url: str | None,
+) -> tuple[str, str]:
+    ro_lines = ["Răspuns la mesajul tău", f"Salut {safe_name},", ""]
+    en_lines = ["Reply to your message", f"Hi {safe_name},", ""]
+    if topic:
+        ro_lines.append(f"Tip: {topic}")
+        en_lines.append(f"Topic: {topic}")
+    if order_reference:
+        ro_lines.append(f"Comandă: {order_reference}")
+        en_lines.append(f"Order: {order_reference}")
+    if reference:
+        ro_lines.append(f"Referință: {reference}")
+        en_lines.append(f"Reference: {reference}")
+    ro_lines.extend(["", reply_message])
+    en_lines.extend(["", reply_message])
+    if contact_url:
+        ro_lines.extend(["", f"Ajutor: {contact_url}"])
+        en_lines.extend(["", f"Help: {contact_url}"])
+    return "\n".join(ro_lines), "\n".join(en_lines)
+
+
 async def send_contact_submission_reply(
     to_email: str,
     *,
@@ -1453,24 +1651,14 @@ async def send_contact_submission_reply(
     subject = _bilingual_subject("Răspuns la solicitarea ta", "Reply to your request", preferred_language=lang)
     safe_name = (customer_name or "").strip() or "Customer"
     if env is None:
-        ro_lines = ["Răspuns la mesajul tău", f"Salut {safe_name},", ""]
-        en_lines = ["Reply to your message", f"Hi {safe_name},", ""]
-        if topic:
-            ro_lines.append(f"Tip: {topic}")
-            en_lines.append(f"Topic: {topic}")
-        if order_reference:
-            ro_lines.append(f"Comandă: {order_reference}")
-            en_lines.append(f"Order: {order_reference}")
-        if reference:
-            ro_lines.append(f"Referință: {reference}")
-            en_lines.append(f"Reference: {reference}")
-        ro_lines.extend(["", reply_message])
-        en_lines.extend(["", reply_message])
-        if contact_url:
-            ro_lines.extend(["", f"Ajutor: {contact_url}"])
-            en_lines.extend(["", f"Help: {contact_url}"])
-        text_ro = "\n".join(ro_lines)
-        text_en = "\n".join(en_lines)
+        text_ro, text_en = _contact_submission_reply_fallback_bodies(
+            safe_name=safe_name,
+            reply_message=reply_message,
+            topic=topic,
+            order_reference=order_reference,
+            reference=reference,
+            contact_url=contact_url,
+        )
         text_body, html_body = _bilingual_sections(
             text_ro=text_ro,
             text_en=text_en,
@@ -1495,35 +1683,53 @@ async def send_contact_submission_reply(
     return await send_email(to_email, subject, text_body, html_body)
 
 
+def _return_request_item_rows(return_request) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    for item in getattr(return_request, "items", []) or []:
+        order_item = getattr(item, "order_item", None)
+        product = getattr(order_item, "product", None) if order_item else None
+        items.append({"name": getattr(product, "name", None) or str(getattr(item, "order_item_id", "")), "quantity": item.quantity})
+    return items
+
+
+def _return_request_created_fallback_bodies(
+    *,
+    order_ref: str,
+    customer_name: str,
+    items: list[dict[str, Any]],
+    reason: str,
+) -> tuple[str, str]:
+    ro_lines = ["Cerere de retur creată", f"Comandă: {order_ref}"]
+    en_lines = ["Return request created", f"Order: {order_ref}"]
+    if customer_name:
+        ro_lines.append(f"Client: {customer_name}")
+        en_lines.append(f"Customer: {customer_name}")
+    ro_lines.append("")
+    en_lines.append("")
+    for row in items:
+        ro_lines.append(f"- {row['name']} ×{row['quantity']}")
+        en_lines.append(f"- {row['name']} ×{row['quantity']}")
+    ro_lines.extend(["", reason])
+    en_lines.extend(["", reason])
+    return "\n".join(ro_lines), "\n".join(en_lines)
+
+
 async def send_return_request_created(to_email: str, return_request, *, lang: str | None = None) -> bool:
     subject = _bilingual_subject("Cerere de retur creată", "Return request created", preferred_language=lang)
     order_ref = getattr(getattr(return_request, "order", None), "reference_code", None) or str(
         getattr(return_request, "order_id", "")
     )
     customer_name = getattr(getattr(return_request, "order", None), "customer_name", None) or ""
-    items = []
-    for it in getattr(return_request, "items", []) or []:
-        order_item = getattr(it, "order_item", None)
-        product = getattr(order_item, "product", None) if order_item else None
-        items.append({"name": getattr(product, "name", None) or str(getattr(it, "order_item_id", "")), "quantity": it.quantity})
+    items = _return_request_item_rows(return_request)
+    reason = getattr(return_request, "reason", "") or ""
 
     if env is None:
-        ro_lines = ["Cerere de retur creată", f"Comandă: {order_ref}"]
-        en_lines = ["Return request created", f"Order: {order_ref}"]
-        if customer_name:
-            ro_lines.append(f"Client: {customer_name}")
-            en_lines.append(f"Customer: {customer_name}")
-        ro_lines.append("")
-        en_lines.append("")
-        for row in items:
-            ro_lines.append(f"- {row['name']} ×{row['quantity']}")
-            en_lines.append(f"- {row['name']} ×{row['quantity']}")
-        ro_lines.append("")
-        en_lines.append("")
-        ro_lines.append(getattr(return_request, "reason", "") or "")
-        en_lines.append(getattr(return_request, "reason", "") or "")
-        text_ro = "\n".join(ro_lines)
-        text_en = "\n".join(en_lines)
+        text_ro, text_en = _return_request_created_fallback_bodies(
+            order_ref=order_ref,
+            customer_name=customer_name,
+            items=items,
+            reason=reason,
+        )
         text_body, html_body = _bilingual_sections(
             text_ro=text_ro,
             text_en=text_en,
@@ -1549,6 +1755,33 @@ async def send_return_request_created(to_email: str, return_request, *, lang: st
     return await send_email(to_email, subject, text_body, html_body)
 
 
+def _return_request_status_fallback_bodies(
+    *,
+    order_ref: str,
+    customer_name: str,
+    previous_status: Any,
+    next_status: Any,
+    admin_note: str | None,
+) -> tuple[str, str]:
+    ro_lines = [
+        "Actualizare cerere de retur",
+        f"Comandă: {order_ref}",
+        f"Stare: {previous_status} → {next_status}",
+    ]
+    en_lines = [
+        "Return request update",
+        f"Order: {order_ref}",
+        f"Status: {previous_status} → {next_status}",
+    ]
+    if customer_name:
+        ro_lines.append(f"Client: {customer_name}")
+        en_lines.append(f"Customer: {customer_name}")
+    if admin_note:
+        ro_lines.extend(["", admin_note])
+        en_lines.extend(["", admin_note])
+    return "\n".join(ro_lines), "\n".join(en_lines)
+
+
 async def send_return_request_status_update(
     to_email: str,
     return_request,
@@ -1561,29 +1794,18 @@ async def send_return_request_status_update(
         getattr(return_request, "order_id", "")
     )
     customer_name = getattr(getattr(return_request, "order", None), "customer_name", None) or ""
+    prev_label = getattr(previous_status, "value", previous_status)
+    next_label = getattr(getattr(return_request, "status", None), "value", getattr(return_request, "status", ""))
+    note = getattr(return_request, "admin_note", None)
 
     if env is None:
-        prev_label = getattr(previous_status, "value", previous_status)
-        next_label = getattr(getattr(return_request, "status", None), "value", getattr(return_request, "status", ""))
-        ro_lines = [
-            "Actualizare cerere de retur",
-            f"Comandă: {order_ref}",
-            f"Stare: {prev_label} → {next_label}",
-        ]
-        en_lines = [
-            "Return request update",
-            f"Order: {order_ref}",
-            f"Status: {prev_label} → {next_label}",
-        ]
-        if customer_name:
-            ro_lines.append(f"Client: {customer_name}")
-            en_lines.append(f"Customer: {customer_name}")
-        note = getattr(return_request, "admin_note", None)
-        if note:
-            ro_lines.extend(["", note])
-            en_lines.extend(["", note])
-        text_ro = "\n".join(ro_lines)
-        text_en = "\n".join(en_lines)
+        text_ro, text_en = _return_request_status_fallback_bodies(
+            order_ref=order_ref,
+            customer_name=customer_name,
+            previous_status=prev_label,
+            next_status=next_label,
+            admin_note=note,
+        )
         text_body, html_body = _bilingual_sections(
             text_ro=text_ro,
             text_en=text_en,
@@ -1598,9 +1820,9 @@ async def send_return_request_status_update(
         {
             "order_reference": order_ref,
             "customer_name": customer_name,
-            "previous_status": getattr(previous_status, "value", previous_status),
-            "status": getattr(getattr(return_request, "status", None), "value", None) or str(getattr(return_request, "status", "")),
-            "admin_note": getattr(return_request, "admin_note", None),
+            "previous_status": prev_label,
+            "status": next_label,
+            "admin_note": note,
             "account_url": f"{settings.frontend_origin.rstrip('/')}/account",
         },
         preferred_language=lang,
@@ -1720,6 +1942,111 @@ def _admin_summary_low_stock_lines(*, low_stock: list[dict] | None, is_ro: bool)
     return lines
 
 
+def _admin_report_lines_for_lang(
+    *,
+    lang: str,
+    kind_label_ro: str,
+    kind_label_en: str,
+    start_label: str,
+    end_label: str,
+    gross: object,
+    net: object,
+    refunds: object,
+    missing: object,
+    currency: str,
+    orders_success: int,
+    orders_total: int,
+    orders_refunded: int,
+    top_products: list[dict] | None,
+    low_stock: list[dict] | None,
+) -> list[str]:
+    is_ro = lang == "ro"
+    lines = _admin_summary_header_lines(
+        is_ro=is_ro,
+        kind_label_ro=kind_label_ro,
+        kind_label_en=kind_label_en,
+        start_label=start_label,
+        end_label=end_label,
+        gross=gross,
+        net=net,
+        refunds=refunds,
+        currency=currency,
+    )
+    if Decimal(str(missing or 0)) > 0:
+        lines.append(
+            ("Rambursări lipsă (fallback): " if is_ro else "Missing refunds (fallback): ")
+            + _money_str(missing, currency)
+        )
+    lines.extend(
+        _admin_summary_order_lines(
+            is_ro=is_ro,
+            orders_success=orders_success,
+            orders_total=orders_total,
+            orders_refunded=orders_refunded,
+        )
+    )
+    lines.extend(_admin_summary_top_products_lines(products=top_products, is_ro=is_ro, currency=currency))
+    lines.extend(_admin_summary_low_stock_lines(low_stock=low_stock, is_ro=is_ro))
+    admin_url = f"{settings.frontend_origin.rstrip('/')}/admin/dashboard"
+    lines.append(("Admin: " if is_ro else "Admin: ") + admin_url)
+    return lines
+
+
+def _admin_report_text(
+    *,
+    kind_label_ro: str,
+    kind_label_en: str,
+    start_label: str,
+    end_label: str,
+    gross: object,
+    net: object,
+    refunds: object,
+    missing: object,
+    currency: str,
+    orders_success: int,
+    orders_total: int,
+    orders_refunded: int,
+    top_products: list[dict] | None,
+    low_stock: list[dict] | None,
+) -> tuple[str, str]:
+    common = {
+        "kind_label_ro": kind_label_ro,
+        "kind_label_en": kind_label_en,
+        "start_label": start_label,
+        "end_label": end_label,
+        "gross": gross,
+        "net": net,
+        "refunds": refunds,
+        "missing": missing,
+        "currency": currency,
+        "orders_success": orders_success,
+        "orders_total": orders_total,
+        "orders_refunded": orders_refunded,
+        "top_products": top_products,
+        "low_stock": low_stock,
+    }
+    text_ro = "\n".join(_admin_report_lines_for_lang(lang="ro", **common))
+    text_en = "\n".join(_admin_report_lines_for_lang(lang="en", **common))
+    return text_ro, text_en
+
+
+def _admin_report_context(*, kind: str, period_start: datetime, period_end: datetime, summary: dict) -> dict[str, object]:
+    kind_clean = (kind or "").strip().lower()
+    return {
+        "kind_label_en": "Weekly" if kind_clean == "weekly" else "Monthly",
+        "kind_label_ro": "Săptămânal" if kind_clean == "weekly" else "Lunar",
+        "start_label": period_start.astimezone(timezone.utc).date().isoformat(),
+        "end_label": period_end.astimezone(timezone.utc).date().isoformat(),
+        "gross": summary.get("gross_sales", 0),
+        "net": summary.get("net_sales", 0),
+        "refunds": summary.get("refunds", 0),
+        "missing": summary.get("missing_refunds", 0),
+        "orders_total": int(summary.get("orders_total", 0) or 0),
+        "orders_success": int(summary.get("orders_success", 0) or 0),
+        "orders_refunded": int(summary.get("orders_refunded", 0) or 0),
+    }
+
+
 async def send_admin_report_summary(
     to_email: str,
     *,
@@ -1732,59 +2059,33 @@ async def send_admin_report_summary(
     low_stock: list[dict] | None = None,
     lang: str | None = None,
 ) -> bool:
-    kind_clean = (kind or "").strip().lower()
-    kind_label_en = "Weekly" if kind_clean == "weekly" else "Monthly"
-    kind_label_ro = "Săptămânal" if kind_clean == "weekly" else "Lunar"
-    start_label = period_start.astimezone(timezone.utc).date().isoformat()
-    end_label = period_end.astimezone(timezone.utc).date().isoformat()
-
-    gross = summary.get("gross_sales", 0)
-    net = summary.get("net_sales", 0)
-    refunds = summary.get("refunds", 0)
-    missing = summary.get("missing_refunds", 0)
-    orders_total = int(summary.get("orders_total", 0) or 0)
-    orders_success = int(summary.get("orders_success", 0) or 0)
-    orders_refunded = int(summary.get("orders_refunded", 0) or 0)
-
-    def _lines(lng: str) -> list[str]:
-        is_ro = lng == "ro"
-        lines = _admin_summary_header_lines(
-            is_ro=is_ro,
-            kind_label_ro=kind_label_ro,
-            kind_label_en=kind_label_en,
-            start_label=start_label,
-            end_label=end_label,
-            gross=gross,
-            net=net,
-            refunds=refunds,
-            currency=currency,
-        )
-        if Decimal(str(missing or 0)) > 0:
-            lines.append(
-                ("Rambursări lipsă (fallback): " if is_ro else "Missing refunds (fallback): ")
-                + _money_str(missing, currency)
-            )
-        lines.extend(
-            _admin_summary_order_lines(
-                is_ro=is_ro,
-                orders_success=orders_success,
-                orders_total=orders_total,
-                orders_refunded=orders_refunded,
-            )
-        )
-        lines.extend(_admin_summary_top_products_lines(products=top_products, is_ro=is_ro, currency=currency))
-        lines.extend(_admin_summary_low_stock_lines(low_stock=low_stock, is_ro=is_ro))
-        admin_url = f"{settings.frontend_origin.rstrip('/')}/admin/dashboard"
-        lines.append(("Admin: " if is_ro else "Admin: ") + admin_url)
-        return lines
+    context = _admin_report_context(kind=kind, period_start=period_start, period_end=period_end, summary=summary)
+    kind_label_en = str(context["kind_label_en"])
+    kind_label_ro = str(context["kind_label_ro"])
+    start_label = str(context["start_label"])
+    end_label = str(context["end_label"])
 
     subject = _bilingual_subject(
         f"Raport {kind_label_ro.lower()} — {start_label} → {end_label}",
         f"{kind_label_en} report — {start_label} → {end_label}",
         preferred_language=lang,
     )
-    text_ro = "\n".join(_lines("ro"))
-    text_en = "\n".join(_lines("en"))
+    text_ro, text_en = _admin_report_text(
+        kind_label_ro=kind_label_ro,
+        kind_label_en=kind_label_en,
+        start_label=start_label,
+        end_label=end_label,
+        gross=context["gross"],
+        net=context["net"],
+        refunds=context["refunds"],
+        missing=context["missing"],
+        currency=currency,
+        orders_success=int(context["orders_success"]),
+        orders_total=int(context["orders_total"]),
+        orders_refunded=int(context["orders_refunded"]),
+        top_products=top_products,
+        low_stock=low_stock,
+    )
     text_body, html_body = _bilingual_sections(
         text_ro=text_ro,
         text_en=text_en,
