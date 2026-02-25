@@ -1160,6 +1160,125 @@ def _checkout_billing_label(*, save_address: bool) -> str:
     return f"{CHECKOUT_BILLING_LABEL} · One-time"
 
 
+def _billing_line_present(line1: str | None) -> bool:
+    return bool((line1 or "").strip())
+
+
+def _default_shipping_flag(*, save_address: bool, explicit_default: bool | None) -> bool:
+    if not save_address:
+        return False
+    if explicit_default is None:
+        return True
+    return bool(explicit_default)
+
+
+def _default_billing_flag(*, save_address: bool, explicit_default: bool | None) -> bool:
+    if not save_address:
+        return False
+    if explicit_default is None:
+        return True
+    return bool(explicit_default)
+
+
+def _guest_shipping_label(*, create_account: bool) -> str:
+    if create_account:
+        return "Checkout"
+    return "Guest Checkout"
+
+
+def _guest_billing_label(*, create_account: bool) -> str:
+    if create_account:
+        return CHECKOUT_BILLING_LABEL
+    return f"Guest {CHECKOUT_BILLING_LABEL}"
+
+
+def _guest_default_shipping(*, save_address: bool, create_account: bool) -> bool:
+    return bool(save_address and create_account)
+
+
+def _guest_default_billing(*, save_address: bool, create_account: bool, billing_same_as_shipping: bool) -> bool:
+    return bool(save_address and create_account and billing_same_as_shipping)
+
+
+def _checkout_shipping_address_create(
+    *,
+    payload: CheckoutRequest,
+    phone: str | None,
+    default_shipping: bool,
+    default_billing: bool,
+    billing_same_as_shipping: bool,
+) -> AddressCreate:
+    return AddressCreate(
+        label="Checkout" if payload.save_address else "Checkout (One-time)",
+        phone=phone,
+        line1=payload.line1,
+        line2=payload.line2,
+        city=payload.city,
+        region=payload.region,
+        postal_code=payload.postal_code,
+        country=payload.country,
+        is_default_shipping=default_shipping,
+        is_default_billing=bool(default_billing and billing_same_as_shipping),
+    )
+
+
+def _checkout_billing_address_create(*, payload: CheckoutRequest, phone: str | None, default_billing: bool) -> AddressCreate:
+    return AddressCreate(
+        label=_checkout_billing_label(save_address=bool(payload.save_address)),
+        phone=phone,
+        line1=payload.billing_line1 or payload.line1,
+        line2=payload.billing_line2,
+        city=payload.billing_city,
+        region=payload.billing_region,
+        postal_code=payload.billing_postal_code,
+        country=payload.billing_country,
+        is_default_shipping=False,
+        is_default_billing=default_billing,
+    )
+
+
+def _guest_shipping_address_create(
+    *,
+    payload: GuestCheckoutRequest,
+    phone: str | None,
+    billing_same_as_shipping: bool,
+) -> AddressCreate:
+    return AddressCreate(
+        label=_guest_shipping_label(create_account=bool(payload.create_account)),
+        phone=phone,
+        line1=payload.line1,
+        line2=payload.line2,
+        city=payload.city,
+        region=payload.region,
+        postal_code=payload.postal_code,
+        country=payload.country,
+        is_default_shipping=_guest_default_shipping(
+            save_address=bool(payload.save_address),
+            create_account=bool(payload.create_account),
+        ),
+        is_default_billing=_guest_default_billing(
+            save_address=bool(payload.save_address),
+            create_account=bool(payload.create_account),
+            billing_same_as_shipping=billing_same_as_shipping,
+        ),
+    )
+
+
+def _guest_billing_address_create(*, payload: GuestCheckoutRequest, phone: str | None) -> AddressCreate:
+    return AddressCreate(
+        label=_guest_billing_label(create_account=bool(payload.create_account)),
+        phone=phone,
+        line1=payload.billing_line1 or payload.line1,
+        line2=payload.billing_line2,
+        city=payload.billing_city,
+        region=payload.billing_region,
+        postal_code=payload.billing_postal_code,
+        country=payload.billing_country,
+        is_default_shipping=False,
+        is_default_billing=bool(payload.save_address and payload.create_account),
+    )
+
+
 async def _create_checkout_addresses(
     session: AsyncSession,
     *,
@@ -1167,29 +1286,26 @@ async def _create_checkout_addresses(
     current_user: User,
     phone: str | None,
 ) -> tuple[Address, Address]:
-    has_billing = bool((payload.billing_line1 or "").strip())
+    has_billing = _billing_line_present(payload.billing_line1)
     billing_same_as_shipping = not has_billing
     address_user_id = current_user.id if payload.save_address else None
-    default_shipping = bool(
-        payload.save_address and (payload.default_shipping if payload.default_shipping is not None else True)
+    default_shipping = _default_shipping_flag(
+        save_address=bool(payload.save_address),
+        explicit_default=payload.default_shipping,
     )
-    default_billing = bool(
-        payload.save_address and (payload.default_billing if payload.default_billing is not None else True)
+    default_billing = _default_billing_flag(
+        save_address=bool(payload.save_address),
+        explicit_default=payload.default_billing,
     )
     shipping_addr = await address_service.create_address(
         session,
         address_user_id,
-        AddressCreate(
-            label="Checkout" if payload.save_address else "Checkout (One-time)",
+        _checkout_shipping_address_create(
+            payload=payload,
             phone=phone,
-            line1=payload.line1,
-            line2=payload.line2,
-            city=payload.city,
-            region=payload.region,
-            postal_code=payload.postal_code,
-            country=payload.country,
-            is_default_shipping=default_shipping,
-            is_default_billing=bool(default_billing and billing_same_as_shipping),
+            default_shipping=default_shipping,
+            default_billing=default_billing,
+            billing_same_as_shipping=billing_same_as_shipping,
         ),
     )
     if not has_billing:
@@ -1204,18 +1320,7 @@ async def _create_checkout_addresses(
     billing_addr = await address_service.create_address(
         session,
         address_user_id,
-        AddressCreate(
-            label=_checkout_billing_label(save_address=bool(payload.save_address)),
-            phone=phone,
-            line1=payload.billing_line1 or payload.line1,
-            line2=payload.billing_line2,
-            city=payload.billing_city,
-            region=payload.billing_region,
-            postal_code=payload.billing_postal_code,
-            country=payload.billing_country,
-            is_default_shipping=False,
-            is_default_billing=default_billing,
-        ),
+        _checkout_billing_address_create(payload=payload, phone=phone, default_billing=default_billing),
     )
     return shipping_addr, billing_addr
 
@@ -1227,48 +1332,30 @@ async def _create_guest_checkout_addresses(
     user_id: UUID | None,
     phone: str | None,
 ) -> tuple[Address, Address]:
-    has_billing = bool((payload.billing_line1 or "").strip())
+    has_billing = _billing_line_present(payload.billing_line1)
     billing_same_as_shipping = not has_billing
     shipping_addr = await address_service.create_address(
         session,
         user_id,
-        AddressCreate(
-            label="Guest Checkout" if not payload.create_account else "Checkout",
+        _guest_shipping_address_create(
+            payload=payload,
             phone=phone,
-            line1=payload.line1,
-            line2=payload.line2,
-            city=payload.city,
-            region=payload.region,
-            postal_code=payload.postal_code,
-            country=payload.country,
-            is_default_shipping=bool(payload.save_address and payload.create_account),
-            is_default_billing=bool(payload.save_address and payload.create_account and billing_same_as_shipping),
+            billing_same_as_shipping=billing_same_as_shipping,
         ),
     )
     if not has_billing:
         return shipping_addr, shipping_addr
-    if not (
-        (payload.billing_line1 or "").strip()
-        and (payload.billing_city or "").strip()
-        and (payload.billing_postal_code or "").strip()
-        and (payload.billing_country or "").strip()
+    if not _has_complete_billing_address(
+        line1=payload.billing_line1,
+        city=payload.billing_city,
+        postal_code=payload.billing_postal_code,
+        country=payload.billing_country,
     ):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=BILLING_ADDRESS_INCOMPLETE_DETAIL)
     billing_addr = await address_service.create_address(
         session,
         user_id,
-        AddressCreate(
-            label=f"Guest {CHECKOUT_BILLING_LABEL}" if not payload.create_account else CHECKOUT_BILLING_LABEL,
-            phone=phone,
-            line1=payload.billing_line1 or payload.line1,
-            line2=payload.billing_line2,
-            city=payload.billing_city,
-            region=payload.billing_region,
-            postal_code=payload.billing_postal_code,
-            country=payload.billing_country,
-            is_default_shipping=False,
-            is_default_billing=bool(payload.save_address and payload.create_account),
-        ),
+        _guest_billing_address_create(payload=payload, phone=phone),
     )
     return shipping_addr, billing_addr
 
