@@ -84,7 +84,7 @@ describe('ContactComponent content + lifecycle', () => {
   });
 });
 
-const setupContactSpec = (): void => {
+function setupContactSpec(): void {
   contactMeta = jasmine.createSpyObj<Meta>('Meta', ['updateTag']);
   contactTitle = jasmine.createSpyObj<Title>('Title', ['setTitle']);
   contactApi = jasmine.createSpyObj<ApiService>('ApiService', ['get']);

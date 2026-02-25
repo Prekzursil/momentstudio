@@ -73,19 +73,31 @@ _SUPPORTED_LANGS = {"en", "ro"}
 
 _NON_TRANSLATABLE_META_KEYS = {"hidden", "last_updated", "requires_auth", "version"}
 
+_INLINE_EVENT_HANDLER_RE = re.compile(r"(?<![\w-])on[a-z0-9_]+\s*=")
+_MARKDOWN_IMAGE_LINK_RE = re.compile(r"!\[[^\]]*\]\s*\(([^)]+)\)")
+_MARKDOWN_TEXT_LINK_RE = re.compile(r"(?<!!)\[[^\]]*\]\s*\(([^)]+)\)")
+
+
+def _normalized_lang(value: str | None) -> str:
+    return (value or "").strip().lower()
+
+
+def _has_localized_content(lang: str | None, title: str | None, body: str | None) -> bool:
+    return _normalized_lang(lang) in _SUPPORTED_LANGS and bool((title or "").strip()) and bool((body or "").strip())
+
 
 def _present_langs_for_bilingual(block: ContentBlock) -> set[str]:
     present: set[str] = set()
 
-    base_lang = (block.lang or "").strip().lower()
-    if base_lang in _SUPPORTED_LANGS and (block.title or "").strip() and (block.body_markdown or "").strip():
+    base_lang = _normalized_lang(block.lang)
+    if _has_localized_content(base_lang, block.title, block.body_markdown):
         present.add(base_lang)
 
     for tr in getattr(block, "translations", None) or []:
-        lang = (getattr(tr, "lang", None) or "").strip().lower()
+        lang = _normalized_lang(getattr(tr, "lang", None))
         title = (getattr(tr, "title", None) or "").strip()
         body = (getattr(tr, "body_markdown", None) or "").strip()
-        if lang in _SUPPORTED_LANGS and title and body:
+        if _has_localized_content(lang, title, body):
             present.add(lang)
 
     return present
@@ -983,20 +995,7 @@ def _sanitize_markdown(body: str) -> None:
 
 
 def _contains_inline_event_handler(text: str) -> bool:
-    idx = text.find("on")
-    while idx >= 0:
-        prev = text[idx - 1] if idx > 0 else " "
-        if not (prev.isalnum() or prev in {"_", "-"}):
-            cursor = idx + 2
-            while cursor < len(text) and (text[cursor].isalnum() or text[cursor] == "_"):
-                cursor += 1
-            if cursor > idx + 2:
-                while cursor < len(text) and text[cursor].isspace():
-                    cursor += 1
-                if cursor < len(text) and text[cursor] == "=":
-                    return True
-        idx = text.find("on", idx + 2)
-    return False
+    return bool(_INLINE_EVENT_HANDLER_RE.search(text))
 
 
 def _find_replace_subn(text: str, find: str, replace: str, *, case_sensitive: bool) -> tuple[str, int]:
@@ -1267,21 +1266,12 @@ async def apply_find_replace(
 
 
 def _normalize_md_url(raw: str) -> str:
-    value = (raw or "").strip()
+    value = (raw or "").strip().strip("<>").strip()
     if not value:
         return ""
-    if value.startswith("<") and value.endswith(">") and len(value) > 2:
-        value = value[1:-1].strip()
-    if not value:
+    if value.startswith(("mailto:", "tel:", "#")):
         return ""
-    if any(value.startswith(prefix) for prefix in ("mailto:", "tel:")):
-        return ""
-    if value.startswith("#"):
-        return ""
-    # Links may include an optional title: url "title"
-    if any(ch.isspace() for ch in value):
-        value = value.split(maxsplit=1)[0]
-    return value.strip()
+    return value.split(maxsplit=1)[0].strip()
 
 
 def _extract_markdown_refs(body: str) -> list[tuple[str, str, str, str]]:
@@ -1298,34 +1288,55 @@ def _extract_markdown_target_urls(body: str, *, image_only: bool) -> list[str]:
     if not text:
         return []
 
-    marker = "![" if image_only else "["
+    pattern = _MARKDOWN_IMAGE_LINK_RE if image_only else _MARKDOWN_TEXT_LINK_RE
     urls: list[str] = []
-    cursor = 0
-    while cursor < len(text):
-        idx = text.find(marker, cursor)
-        if idx < 0:
-            break
-        if not image_only and idx > 0 and text[idx - 1] == "!":
-            cursor = idx + 1
-            continue
-        close_bracket = text.find("]", idx + len(marker))
-        if close_bracket < 0:
-            break
-        open_paren = close_bracket + 1
-        while open_paren < len(text) and text[open_paren].isspace():
-            open_paren += 1
-        if open_paren >= len(text) or text[open_paren] != "(":
-            cursor = close_bracket + 1
-            continue
-        close_paren = text.find(")", open_paren + 1)
-        if close_paren < 0:
-            break
-        raw = text[open_paren + 1 : close_paren]
-        url = _normalize_md_url(raw)
+    for match in pattern.finditer(text):
+        url = _normalize_md_url(match.group(1))
         if url:
             urls.append(url)
-        cursor = close_paren + 1
     return urls
+
+
+def _block_urls_image(block: dict[str, object]) -> list[tuple[str, str]]:
+    return [("image", str(block.get("url") or "")), ("link", str(block.get("link_url") or ""))]
+
+
+def _block_urls_gallery(block: dict[str, object]) -> list[tuple[str, str]]:
+    urls: list[tuple[str, str]] = []
+    images = block.get("images")
+    if not isinstance(images, list):
+        return urls
+    for img in images:
+        if isinstance(img, dict):
+            urls.append(("image", str(img.get("url") or "")))
+    return urls
+
+
+def _block_urls_banner(block: dict[str, object]) -> list[tuple[str, str]]:
+    slide = block.get("slide")
+    if not isinstance(slide, dict):
+        return []
+    return [("image", str(slide.get("image_url") or "")), ("link", str(slide.get("cta_url") or ""))]
+
+
+def _block_urls_carousel(block: dict[str, object]) -> list[tuple[str, str]]:
+    urls: list[tuple[str, str]] = []
+    slides = block.get("slides")
+    if not isinstance(slides, list):
+        return urls
+    for slide in slides:
+        if isinstance(slide, dict):
+            urls.append(("image", str(slide.get("image_url") or "")))
+            urls.append(("link", str(slide.get("cta_url") or "")))
+    return urls
+
+
+_BLOCK_URL_EXTRACTORS: dict[str, Any] = {
+    "image": _block_urls_image,
+    "gallery": _block_urls_gallery,
+    "banner": _block_urls_banner,
+    "carousel": _block_urls_carousel,
+}
 
 
 def _extract_block_refs(meta: dict | None) -> list[tuple[str, str, str, str]]:
@@ -1347,30 +1358,10 @@ def _extract_block_refs(meta: dict | None) -> list[tuple[str, str, str, str]]:
                 refs.extend([(k, s, f"{prefix}.body_markdown", u) for k, s, _, u in _extract_markdown_refs(body)])
             continue
 
-        urls: list[tuple[str, str]] = []
-        if block_type == "image":
-            urls.append(("image", str(block.get("url") or "")))
-            urls.append(("link", str(block.get("link_url") or "")))
-        elif block_type == "gallery":
-            images = block.get("images")
-            if isinstance(images, list):
-                for img in images:
-                    if not isinstance(img, dict):
-                        continue
-                    urls.append(("image", str(img.get("url") or "")))
-        elif block_type == "banner":
-            slide = block.get("slide")
-            if isinstance(slide, dict):
-                urls.append(("image", str(slide.get("image_url") or "")))
-                urls.append(("link", str(slide.get("cta_url") or "")))
-        elif block_type == "carousel":
-            slides = block.get("slides")
-            if isinstance(slides, list):
-                for slide in slides:
-                    if not isinstance(slide, dict):
-                        continue
-                    urls.append(("image", str(slide.get("image_url") or "")))
-                    urls.append(("link", str(slide.get("cta_url") or "")))
+        extractor = _BLOCK_URL_EXTRACTORS.get(block_type)
+        if not extractor:
+            continue
+        urls = extractor(block)
 
         for kind, raw in urls:
             url = _normalize_md_url(raw)

@@ -10,7 +10,7 @@ describe('AddressFormComponent', () => {
   defineUseAsBillingSpec();
 });
 
-const registerAddressFormSetup = (): void => {
+function registerAddressFormSetup(): void {
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [AddressFormComponent, TranslateModule.forRoot()]
@@ -46,7 +46,7 @@ const registerAddressFormSetup = (): void => {
   });
 };
 
-const defineInvalidSubmitSpec = (): void => {
+function defineInvalidSubmitSpec(): void {
   it('does not emit save when form is invalid', () => {
     const fixture = TestBed.createComponent(AddressFormComponent);
     const component = fixture.componentInstance;
@@ -56,7 +56,7 @@ const defineInvalidSubmitSpec = (): void => {
   });
 };
 
-const defineValidSubmitSpec = (): void => {
+function defineValidSubmitSpec(): void {
   it('emits save when form is valid', () => {
     const fixture = TestBed.createComponent(AddressFormComponent);
     const component = fixture.componentInstance;
@@ -67,7 +67,7 @@ const defineValidSubmitSpec = (): void => {
   });
 };
 
-const defineUseAsBillingSpec = (): void => {
+function defineUseAsBillingSpec(): void {
   it('supports "Use as billing too" convenience action', () => {
     const fixture = TestBed.createComponent(AddressFormComponent);
     const component = fixture.componentInstance;

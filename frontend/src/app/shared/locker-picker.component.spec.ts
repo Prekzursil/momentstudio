@@ -61,7 +61,7 @@ describe('LockerPickerComponent', () => {
   defineMirrorUnavailableSpec();
 });
 
-const defineCitySuggestionSpec = (): void => {
+function defineCitySuggestionSpec(): void {
   it('loads city suggestions from backend for sameday and stores stale snapshot metadata', async () => {
     lockerPickerComponent.provider = 'sameday';
     await (lockerPickerComponent as any).fetchLocations('Bucu');
@@ -79,7 +79,7 @@ const defineCitySuggestionSpec = (): void => {
   });
 };
 
-const defineMirrorUnavailableSpec = (): void => {
+function defineMirrorUnavailableSpec(): void {
   it('shows mirror unavailable message when backend returns 503 locker mirror error', async () => {
     lockerPickerShipping.listLockers.and.returnValue(
       throwError(() => ({ error: { detail: 'Sameday locker mirror is not initialized' } }))

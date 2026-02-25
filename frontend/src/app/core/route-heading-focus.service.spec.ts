@@ -32,7 +32,7 @@ describe('RouteHeadingFocusService', () => {
   defineModalHeadingIgnoreSpec();
 });
 
-const defineRouteHeadingFocusSpec = (): void => {
+function defineRouteHeadingFocusSpec(): void {
   it('focuses route heading after navigation end', fakeAsync(() => {
     const shellHeading = createRouteHeadingElement('h1');
     document.body.appendChild(shellHeading);
@@ -54,7 +54,7 @@ const defineRouteHeadingFocusSpec = (): void => {
   }));
 };
 
-const defineModalHeadingIgnoreSpec = (): void => {
+function defineModalHeadingIgnoreSpec(): void {
   it('ignores modal headings when focusing route heading', fakeAsync(() => {
     const main = document.createElement('main');
     const heading = createRouteHeadingElement('h1');

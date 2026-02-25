@@ -25,7 +25,7 @@ describe('NotificationsService', () => {
   defineDismissSpec();
 });
 
-const defineRefreshUnreadCountSpec = (): void => {
+function defineRefreshUnreadCountSpec(): void {
   it('refreshes unread count', () => {
     notificationsService.refreshUnreadCount();
 
@@ -37,7 +37,7 @@ const defineRefreshUnreadCountSpec = (): void => {
   });
 };
 
-const defineLoadNotificationsSpec = (): void => {
+function defineLoadNotificationsSpec(): void {
   it('loads notifications and derives unread count', () => {
     notificationsService.load(25);
 
@@ -56,7 +56,7 @@ const defineLoadNotificationsSpec = (): void => {
   });
 };
 
-const defineMarkReadSpec = (): void => {
+function defineMarkReadSpec(): void {
   it('marks a notification as read', () => {
     notificationsService.load(20);
     const loadReq = notificationsHttpMock.expectOne((r) => r.url === '/api/v1/notifications');
@@ -82,7 +82,7 @@ const defineMarkReadSpec = (): void => {
   });
 };
 
-const defineDismissSpec = (): void => {
+function defineDismissSpec(): void {
   it('dismisses a notification', () => {
     notificationsService.load(20);
     const loadReq = notificationsHttpMock.expectOne((r) => r.url === '/api/v1/notifications');

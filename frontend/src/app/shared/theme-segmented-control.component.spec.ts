@@ -10,7 +10,7 @@ describe('ThemeSegmentedControlComponent', () => {
   defineHomeEndSpec();
 });
 
-const registerThemeControlSetup = (): void => {
+function registerThemeControlSetup(): void {
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [TranslateModule.forRoot(), ThemeSegmentedControlComponent]
@@ -22,7 +22,7 @@ const getButtons = (fixture: any): HTMLButtonElement[] => {
   return Array.from(fixture.nativeElement.querySelectorAll('button[role="radio"]')) as HTMLButtonElement[];
 };
 
-const defineOptionRenderSpec = (): void => {
+function defineOptionRenderSpec(): void {
   it('renders 3 theme options and emits selection', () => {
     const fixture = TestBed.createComponent(ThemeSegmentedControlComponent);
     const component = fixture.componentInstance;
@@ -40,7 +40,7 @@ const defineOptionRenderSpec = (): void => {
   });
 };
 
-const defineArrowNavigationSpec = (): void => {
+function defineArrowNavigationSpec(): void {
   it('supports arrow navigation and moves focus', () => {
     const fixture = TestBed.createComponent(ThemeSegmentedControlComponent);
     const component = fixture.componentInstance;
@@ -75,7 +75,7 @@ const defineArrowNavigationSpec = (): void => {
   });
 };
 
-const defineHomeEndSpec = (): void => {
+function defineHomeEndSpec(): void {
   it('supports Home/End keys', () => {
     const fixture = TestBed.createComponent(ThemeSegmentedControlComponent);
     const component = fixture.componentInstance;

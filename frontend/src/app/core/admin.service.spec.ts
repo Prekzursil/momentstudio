@@ -31,7 +31,7 @@ describe('AdminService', () => {
   defineSocialThumbnailSpec();
 });
 
-const defineSummarySpec = (): void => {
+function defineSummarySpec(): void {
   it('should fetch summary', () => {
     const mock = { products: 1, orders: 2, users: 3, low_stock: 0, sales_30d: 0, orders_30d: 0 };
     adminService.summary().subscribe((res) => {
@@ -43,7 +43,7 @@ const defineSummarySpec = (): void => {
   });
 };
 
-const defineUpdateOrderStatusSpec = (): void => {
+function defineUpdateOrderStatusSpec(): void {
   it('should update order status', () => {
     const mock = { id: 'o1', status: 'paid' } as any;
     adminService.updateOrderStatus('o1', 'paid').subscribe((res) => {
@@ -56,7 +56,7 @@ const defineUpdateOrderStatusSpec = (): void => {
   });
 };
 
-const defineCreateAndUpdateCouponSpec = (): void => {
+function defineCreateAndUpdateCouponSpec(): void {
   it('should create and update coupon', () => {
     const create = { id: 'c1', code: 'SAVE10', active: true } as any;
     const update = { id: 'c1', code: 'SAVE11', active: false } as any;
@@ -86,7 +86,7 @@ const defineCreateAndUpdateCouponSpec = (): void => {
   });
 };
 
-const defineReorderCategoriesSpec = (): void => {
+function defineReorderCategoriesSpec(): void {
   it('should reorder categories', () => {
     const payload = [{ slug: 'art', sort_order: 2 }];
     adminService.reorderCategories(payload).subscribe((res) => {
@@ -99,7 +99,7 @@ const defineReorderCategoriesSpec = (): void => {
   });
 };
 
-const defineMaintenanceToggleSpec = (): void => {
+function defineMaintenanceToggleSpec(): void {
   it('should toggle maintenance', () => {
     adminService.setMaintenance(true).subscribe((res) => {
       expect(res.enabled).toBeTrue();
@@ -111,7 +111,7 @@ const defineMaintenanceToggleSpec = (): void => {
   });
 };
 
-const defineLowStockSpec = (): void => {
+function defineLowStockSpec(): void {
   it('should fetch low stock items', () => {
     adminService.lowStock().subscribe((items) => {
       expect(items.length).toBe(1);
@@ -122,7 +122,7 @@ const defineLowStockSpec = (): void => {
   });
 };
 
-const defineUpdateUserRoleSpec = (): void => {
+function defineUpdateUserRoleSpec(): void {
   it('should update user role and revoke sessions', () => {
     adminService.updateUserRole('u1', 'admin', 'pw').subscribe((res) => {
       expect(res.role).toBe('admin');
@@ -141,7 +141,7 @@ const defineUpdateUserRoleSpec = (): void => {
   });
 };
 
-const defineMaintenanceStateSpec = (): void => {
+function defineMaintenanceStateSpec(): void {
   it('should fetch maintenance state', () => {
     adminService.getMaintenance().subscribe((res) => {
       expect(res.enabled).toBeFalse();
@@ -152,7 +152,7 @@ const defineMaintenanceStateSpec = (): void => {
   });
 };
 
-const defineListCouponsSpec = (): void => {
+function defineListCouponsSpec(): void {
   it('should list coupons', () => {
     adminService.coupons().subscribe((res) => {
       expect(res[0].code).toBe('SAVE10');
@@ -163,7 +163,7 @@ const defineListCouponsSpec = (): void => {
   });
 };
 
-const defineSocialThumbnailSpec = (): void => {
+function defineSocialThumbnailSpec(): void {
   it('should fetch social thumbnail', () => {
     adminService.fetchSocialThumbnail('https://www.instagram.com/example/').subscribe((res) => {
       expect(res.thumbnail_url).toBe('https://cdn.example/thumb.png');
