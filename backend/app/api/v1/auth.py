@@ -221,22 +221,26 @@ def _extract_bearer_token(request: Request) -> str | None:
     return token or None
 
 
+def _extract_token_jti(token: str, *, token_type: str) -> str | None:
+    payload = security.decode_token(token)
+    if not payload or payload.get("type") != token_type:
+        return None
+    jti = str(payload.get("jti") or "").strip()
+    return jti or None
+
+
 def _extract_refresh_session_jti(request: Request) -> str | None:
     refresh_token = (request.cookies.get("refresh_token") or "").strip()
     if refresh_token:
-        payload = security.decode_token(refresh_token)
-        if payload and payload.get("type") == "refresh":
-            jti = str(payload.get("jti") or "").strip()
-            if jti:
-                return jti
+        refresh_jti = _extract_token_jti(refresh_token, token_type="refresh")
+        if refresh_jti:
+            return refresh_jti
 
     access_token = _extract_bearer_token(request)
     if access_token:
-        payload = security.decode_token(access_token)
-        if payload and payload.get("type") == "access":
-            jti = str(payload.get("jti") or "").strip()
-            if jti:
-                return jti
+        access_jti = _extract_token_jti(access_token, token_type="access")
+        if access_jti:
+            return access_jti
 
     return None
 
@@ -266,17 +270,29 @@ async def _resolve_active_refresh_session_jti(
     user_id: UUID,
     candidate_jti: str | None,
 ) -> str | None:
+    def _normalized_expiry(value: datetime | None) -> datetime | None:
+        if value and value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value
+
+    def _session_is_active(
+        candidate: RefreshSession | None,
+        *,
+        allow_revoked: bool = False,
+        now: datetime,
+    ) -> bool:
+        if not candidate or candidate.user_id != user_id:
+            return False
+        if candidate.revoked and not allow_revoked:
+            return False
+        expires_at = _normalized_expiry(candidate.expires_at)
+        return bool(expires_at and expires_at >= now)
+
     if not candidate_jti:
         return None
     stored = (await session.execute(select(RefreshSession).where(RefreshSession.jti == candidate_jti))).scalar_one_or_none()
-    if not stored or stored.user_id != user_id:
-        return None
-
     now = datetime.now(timezone.utc)
-    expires_at = stored.expires_at
-    if expires_at and expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
-    if not expires_at or expires_at < now:
+    if not _session_is_active(stored, allow_revoked=True, now=now):
         return None
 
     if not stored.revoked:
@@ -289,12 +305,7 @@ async def _resolve_active_refresh_session_jti(
     replacement = (
         await session.execute(select(RefreshSession).where(RefreshSession.jti == replacement_jti))
     ).scalar_one_or_none()
-    if not replacement or replacement.user_id != user_id or replacement.revoked:
-        return None
-    replacement_expires_at = replacement.expires_at
-    if replacement_expires_at and replacement_expires_at.tzinfo is None:
-        replacement_expires_at = replacement_expires_at.replace(tzinfo=timezone.utc)
-    if not replacement_expires_at or replacement_expires_at < now:
+    if not _session_is_active(replacement, now=now):
         return None
     return replacement.jti
 
