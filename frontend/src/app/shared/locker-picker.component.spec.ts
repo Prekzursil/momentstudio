@@ -73,7 +73,9 @@ const defineCitySuggestionSpec = (): void => {
     expect(lockerPickerComponent.mirrorSnapshot?.stale).toBeTrue();
     expect(lockerPickerComponent.mirrorSnapshot?.canary_alert_messages?.length).toBeGreaterThan(0);
     expect(lockerPickerComponent.staleDays()).toBeGreaterThanOrEqual(30);
-    expect((lockerPickerFixture.nativeElement.textContent || '').replace(/\s+/g, ' ')).toContain('checkout.lockers.snapshotCanaryTitle');
+    expect((lockerPickerFixture.nativeElement.textContent || '').replaceAll(/\s+/g, ' ')).toContain(
+      'checkout.lockers.snapshotCanaryTitle'
+    );
   });
 };
 

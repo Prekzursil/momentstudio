@@ -83,7 +83,7 @@ const defineModalHeadingIgnoreSpec = (): void => {
 
 const createRouteHeadingElement = (tagName: 'h1' | 'h2'): HTMLElement => {
   const element = document.createElement(tagName);
-  element.setAttribute('data-route-heading', 'true');
+  element.dataset['routeHeading'] = 'true';
   element.tabIndex = -1;
   return element;
 };
