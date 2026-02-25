@@ -105,24 +105,21 @@ def _snippet(text: str, max_len: int = 140) -> str:
 def _normalize_tags(raw: object) -> list[str]:
     if raw is None:
         return []
-    values: list[str]
     if isinstance(raw, list):
-        values = [str(v).strip() for v in raw]
+        values = map(str, raw)
     elif isinstance(raw, str):
-        values = [v.strip() for v in raw.split(",")]
+        values = raw.split(",")
     else:
         return []
 
     seen: set[str] = set()
     out: list[str] = []
-    for value in values:
-        if not value:
-            continue
+    for raw_value in values:
+        value = raw_value.strip()
         key = value.lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        out.append(value)
+        if value and key not in seen:
+            seen.add(key)
+            out.append(value)
     return out
 
 
@@ -782,10 +779,27 @@ async def soft_delete_comment(
 
 def to_comment_read(comment: BlogComment) -> dict:
     author = comment.author
+    body = comment.body
+    if comment.is_deleted or comment.is_hidden:
+        body = ""
+
+    if author:
+        author_id = author.id
+        author_name = author.name
+        author_name_tag = getattr(author, "name_tag", None)
+        author_username = getattr(author, "username", None)
+        author_avatar_url = author.avatar_url or author.google_picture_url
+    else:
+        author_id = comment.user_id
+        author_name = None
+        author_name_tag = None
+        author_username = None
+        author_avatar_url = None
+
     return {
         "id": comment.id,
         "parent_id": comment.parent_id,
-        "body": "" if comment.is_deleted or comment.is_hidden else comment.body,
+        "body": body,
         "is_deleted": comment.is_deleted,
         "is_hidden": comment.is_hidden,
         "created_at": comment.created_at,
@@ -793,11 +807,11 @@ def to_comment_read(comment: BlogComment) -> dict:
         "deleted_at": comment.deleted_at,
         "hidden_at": comment.hidden_at,
         "author": {
-            "id": author.id if author else comment.user_id,
-            "name": author.name if author else None,
-            "name_tag": getattr(author, "name_tag", None) if author else None,
-            "username": getattr(author, "username", None) if author else None,
-            "avatar_url": (author.avatar_url or author.google_picture_url) if author else None,
+            "id": author_id,
+            "name": author_name,
+            "name_tag": author_name_tag,
+            "username": author_username,
+            "avatar_url": author_avatar_url,
         }
     }
 

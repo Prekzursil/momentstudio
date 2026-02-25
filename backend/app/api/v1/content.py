@@ -163,6 +163,117 @@ def _redirect_chain_error(from_key: str, redirects: dict[str, str], *, max_hops:
     return "too_deep"
 
 
+def _parse_optional_datetime_range(
+    created_from: str | None,
+    created_to: str | None,
+) -> tuple[datetime | None, datetime | None]:
+    parsed_from = None
+    parsed_to = None
+    try:
+        if created_from:
+            parsed_from = datetime.fromisoformat(created_from)
+        if created_to:
+            parsed_to = datetime.fromisoformat(created_to)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date filters") from exc
+    if parsed_from and parsed_to and parsed_from > parsed_to:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date range")
+    return parsed_from, parsed_to
+
+
+def _validate_public_page_access(block: ContentBlock, user: User | None) -> None:
+    block_key = getattr(block, "key", "")
+    if not block_key.startswith("page."):
+        return
+    if _is_hidden(block):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+    if _requires_auth(block) and not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+
+
+async def _serialize_content_block(block: ContentBlock) -> ContentBlockRead:
+    if getattr(block, "key", "") != "site.social":
+        return block
+    hydrated_meta = await social_thumbnails.hydrate_site_social_meta(block.meta if isinstance(block.meta, dict) else None)
+    out = ContentBlockRead.model_validate(block)
+    out.meta = hydrated_meta
+    return out
+
+
+async def _list_media_assets_or_400(
+    session: AsyncSession,
+    *,
+    q: str,
+    tag: str,
+    asset_type: str,
+    status_filter: str,
+    visibility: str,
+    include_trashed: bool,
+    created_from: datetime | None,
+    created_to: datetime | None,
+    page: int,
+    limit: int,
+    sort: str,
+) -> tuple[list, dict]:
+    try:
+        return await media_dam.list_assets(
+            session,
+            media_dam.MediaListFilters(
+                q=q,
+                tag=tag,
+                asset_type=asset_type,
+                status=status_filter,
+                visibility=visibility,
+                include_trashed=include_trashed,
+                created_from=created_from,
+                created_to=created_to,
+                page=page,
+                limit=limit,
+                sort=sort,
+            ),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+async def _list_media_jobs_or_400(
+    session: AsyncSession,
+    *,
+    page: int,
+    limit: int,
+    status_filter: str,
+    job_type: str,
+    asset_id: UUID | None,
+    triage_state: str,
+    assigned_to_user_id: UUID | None,
+    tag: str,
+    sla_breached: bool,
+    dead_letter_only: bool,
+    created_from: datetime | None,
+    created_to: datetime | None,
+) -> tuple[list, dict]:
+    try:
+        return await media_dam.list_jobs(
+            session,
+            media_dam.MediaJobListFilters(
+                page=page,
+                limit=limit,
+                status=status_filter,
+                job_type=job_type,
+                asset_id=asset_id,
+                triage_state=triage_state,
+                assigned_to_user_id=assigned_to_user_id,
+                tag=tag,
+                sla_breached=sla_breached,
+                dead_letter_only=dead_letter_only,
+                created_from=created_from,
+                created_to=created_to,
+            ),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
 @router.get("/pages/{slug}", response_model=ContentBlockRead)
 async def get_static_page(
     slug: str,
@@ -241,16 +352,8 @@ async def get_content(
     block = await content_service.get_published_by_key_following_redirects(session, key, lang=lang)
     if not block:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
-    if getattr(block, "key", "").startswith("page.") and _is_hidden(block):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
-    if getattr(block, "key", "").startswith("page.") and _requires_auth(block) and not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-    if getattr(block, "key", "") == "site.social":
-        hydrated_meta = await social_thumbnails.hydrate_site_social_meta(block.meta if isinstance(block.meta, dict) else None)
-        out = ContentBlockRead.model_validate(block)
-        out.meta = hydrated_meta
-        return out
-    return block
+    _validate_public_page_access(block, user)
+    return await _serialize_content_block(block)
 
 
 @router.get("/home/preview", response_model=HomePreviewResponse)
@@ -1083,37 +1186,21 @@ async def admin_list_media_assets(
     session: AsyncSession = Depends(get_session),
     _: User = Depends(require_admin_section("content")),
 ) -> MediaAssetListResponse:
-    parsed_from = None
-    parsed_to = None
-    try:
-        if created_from:
-            parsed_from = datetime.fromisoformat(created_from)
-        if created_to:
-            parsed_to = datetime.fromisoformat(created_to)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date filters")
-    if parsed_from and parsed_to and parsed_from > parsed_to:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date range")
-
-    try:
-        rows, meta = await media_dam.list_assets(
-            session,
-            media_dam.MediaListFilters(
-                q=q,
-                tag=tag,
-                asset_type=asset_type,
-                status=status_filter,
-                visibility=visibility,
-                include_trashed=include_trashed,
-                created_from=parsed_from,
-                created_to=parsed_to,
-                page=page,
-                limit=limit,
-                sort=sort,
-            ),
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    parsed_from, parsed_to = _parse_optional_datetime_range(created_from, created_to)
+    rows, meta = await _list_media_assets_or_400(
+        session,
+        q=q,
+        tag=tag,
+        asset_type=asset_type,
+        status_filter=status_filter,
+        visibility=visibility,
+        include_trashed=include_trashed,
+        created_from=parsed_from,
+        created_to=parsed_to,
+        page=page,
+        limit=limit,
+        sort=sort,
+    )
     return MediaAssetListResponse(items=[media_dam.asset_to_read(row) for row in rows], meta=meta)
 
 
@@ -1414,38 +1501,22 @@ async def admin_list_media_jobs(
     session: AsyncSession = Depends(get_session),
     _: User = Depends(require_admin_section("content")),
 ) -> MediaJobListResponse:
-    parsed_from = None
-    parsed_to = None
-    try:
-        if created_from:
-            parsed_from = datetime.fromisoformat(created_from)
-        if created_to:
-            parsed_to = datetime.fromisoformat(created_to)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date filters")
-    if parsed_from and parsed_to and parsed_from > parsed_to:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date range")
-
-    try:
-        rows, meta = await media_dam.list_jobs(
-            session,
-            media_dam.MediaJobListFilters(
-                page=page,
-                limit=limit,
-                status=status_filter,
-                job_type=job_type,
-                asset_id=asset_id,
-                triage_state=triage_state,
-                assigned_to_user_id=assigned_to_user_id,
-                tag=tag,
-                sla_breached=sla_breached,
-                dead_letter_only=dead_letter_only,
-                created_from=parsed_from,
-                created_to=parsed_to,
-            ),
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    parsed_from, parsed_to = _parse_optional_datetime_range(created_from, created_to)
+    rows, meta = await _list_media_jobs_or_400(
+        session,
+        page=page,
+        limit=limit,
+        status_filter=status_filter,
+        job_type=job_type,
+        asset_id=asset_id,
+        triage_state=triage_state,
+        assigned_to_user_id=assigned_to_user_id,
+        tag=tag,
+        sla_breached=sla_breached,
+        dead_letter_only=dead_letter_only,
+        created_from=parsed_from,
+        created_to=parsed_to,
+    )
     return MediaJobListResponse(items=[media_dam.job_to_read(row) for row in rows], meta=meta)
 
 

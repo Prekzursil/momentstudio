@@ -263,21 +263,41 @@ def generate_thumbnails(path: str | Path) -> None:
     _generate_thumbnails(Path(path))
 
 
+def _is_invalid_media_relative_path(rel: str) -> bool:
+    if not rel:
+        return True
+    if rel.startswith(("/", "\\")):
+        return True
+    if "\\" in rel:
+        return True
+    if "\x00" in rel:
+        return True
+
+    pure = PurePosixPath(rel)
+    if pure.is_absolute():
+        return True
+    return any(part in {".", ".."} for part in pure.parts)
+
+
+def _is_path_within_root(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True
+
+
 def _media_url_to_path(url: str) -> Path:
     if not url.startswith(_MEDIA_URL_PREFIX):
         raise ValueError(_INVALID_MEDIA_URL)
 
     base_root = Path(settings.media_root).resolve()
     rel = url.removeprefix(_MEDIA_URL_PREFIX)
-    if not rel or rel.startswith(("/", "\\")) or "\\" in rel or "\x00" in rel:
+    if _is_invalid_media_relative_path(rel):
         raise ValueError(_INVALID_MEDIA_URL)
-    pure = PurePosixPath(rel)
-    if pure.is_absolute() or any(part in {".", ".."} for part in pure.parts):
-        raise ValueError(_INVALID_MEDIA_URL)
+
     path = (base_root / rel).resolve()
-    try:
-        path.relative_to(base_root)
-    except ValueError:
+    if not _is_path_within_root(path, base_root):
         raise ValueError(_INVALID_MEDIA_URL)
     return path
 
@@ -344,17 +364,30 @@ def _detect_svg_mime(content: bytes) -> str | None:
     return None
 
 
-def _validate_raster_dimensions(*, width: int, height: int) -> None:
-    max_width = int(getattr(settings, "upload_image_max_width", 0) or 0)
-    max_height = int(getattr(settings, "upload_image_max_height", 0) or 0)
-    max_pixels = int(getattr(settings, "upload_image_max_pixels", 0) or 0)
+def _upload_image_limit(setting_name: str) -> int:
+    return int(getattr(settings, setting_name, 0) or 0)
 
-    if max_width and width > max_width:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image too large")
-    if max_height and height > max_height:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image too large")
-    if max_pixels and (width * height) > max_pixels:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image too large")
+
+def _is_over_limit(value: int, limit: int) -> bool:
+    return bool(limit) and value > limit
+
+
+def _raise_image_too_large() -> None:
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image too large")
+
+
+def _validate_raster_dimensions(*, width: int, height: int) -> None:
+    max_width = _upload_image_limit("upload_image_max_width")
+    max_height = _upload_image_limit("upload_image_max_height")
+    max_pixels = _upload_image_limit("upload_image_max_pixels")
+    pixel_count = width * height
+
+    if _is_over_limit(width, max_width):
+        _raise_image_too_large()
+    if _is_over_limit(height, max_height):
+        _raise_image_too_large()
+    if _is_over_limit(pixel_count, max_pixels):
+        _raise_image_too_large()
 
 
 def _suffix_for_mime(mime: str | None) -> str | None:
