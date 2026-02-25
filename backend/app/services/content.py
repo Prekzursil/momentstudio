@@ -1011,15 +1011,28 @@ def _sanitize_markdown(body: str) -> None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Disallowed event handlers")
 
 
+def _is_event_handler_boundary_char(ch: str) -> bool:
+    return ch.isalnum() or ch == "_" or ch == "-"
+
+
+def _is_event_handler_name_char(ch: str) -> bool:
+    return ("a" <= ch <= "z") or ("0" <= ch <= "9") or ch == "_"
+
+
+def _has_event_handler_assignment(text: str, idx: int, *, text_len: int) -> bool:
+    cursor = idx + 2
+    if cursor >= text_len or not _is_event_handler_name_char(text[cursor]):
+        return False
+    while cursor < text_len and _is_event_handler_name_char(text[cursor]):
+        cursor += 1
+    while cursor < text_len and text[cursor].isspace():
+        cursor += 1
+    return cursor < text_len and text[cursor] == "="
+
+
 def _contains_inline_event_handler(text: str) -> bool:
     if not text:
         return False
-
-    def _is_boundary_char(ch: str) -> bool:
-        return ch.isalnum() or ch == "_" or ch == "-"
-
-    def _is_event_name_char(ch: str) -> bool:
-        return ("a" <= ch <= "z") or ("0" <= ch <= "9") or ch == "_"
 
     text_len = len(text)
     start = 0
@@ -1027,21 +1040,11 @@ def _contains_inline_event_handler(text: str) -> bool:
         idx = text.find("on", start)
         if idx < 0:
             return False
-        if idx > 0 and _is_boundary_char(text[idx - 1]):
-            start = idx + 2
-            continue
-
-        cursor = idx + 2
-        if cursor >= text_len or not _is_event_name_char(text[cursor]):
-            start = idx + 2
-            continue
-        while cursor < text_len and _is_event_name_char(text[cursor]):
-            cursor += 1
-        while cursor < text_len and text[cursor].isspace():
-            cursor += 1
-        if cursor < text_len and text[cursor] == "=":
-            return True
         start = idx + 2
+        if idx > 0 and _is_event_handler_boundary_char(text[idx - 1]):
+            continue
+        if _has_event_handler_assignment(text, idx, text_len=text_len):
+            return True
 
 
 def _find_replace_subn(text: str, find: str, replace: str, *, case_sensitive: bool) -> tuple[str, int]:
@@ -1075,18 +1078,15 @@ def _find_replace_in_json(value: Any, find: str, replace: str, *, case_sensitive
     return value, 0
 
 
-async def preview_find_replace(
-    session: AsyncSession,
+def _build_preview_find_replace_query(
     *,
     find: str,
-    replace: str,
-    key_prefix: str | None = None,
-    case_sensitive: bool = True,
-    limit: int = 200,
-) -> tuple[list[dict[str, object]], int, int, bool]:
+    key_prefix: str | None,
+    case_sensitive: bool,
+    limit: int,
+) -> Any:
     needle = f"%{find}%"
     like = (lambda col: col.like(needle)) if case_sensitive else (lambda col: col.ilike(needle))
-
     query = (
         select(ContentBlock)
         .distinct()
@@ -1107,7 +1107,76 @@ async def preview_find_replace(
     )
     if key_prefix:
         query = query.where(ContentBlock.key.like(f"{key_prefix}%"))
+    return query
 
+
+def _preview_base_match_count(block: ContentBlock, find: str, replace: str, *, case_sensitive: bool) -> int:
+    base_matches = 0
+    _, n = _find_replace_subn(block.title or "", find, replace, case_sensitive=case_sensitive)
+    base_matches += n
+    _, n = _find_replace_subn(block.body_markdown or "", find, replace, case_sensitive=case_sensitive)
+    base_matches += n
+    meta = getattr(block, "meta", None)
+    if meta is not None:
+        _, n = _find_replace_in_json(meta, find, replace, case_sensitive=case_sensitive)
+        base_matches += n
+    return base_matches
+
+
+def _preview_translation_matches(
+    block: ContentBlock, find: str, replace: str, *, case_sensitive: bool
+) -> tuple[list[dict[str, object]], int]:
+    translations_out: list[dict[str, object]] = []
+    total = 0
+    for tr in getattr(block, "translations", None) or []:
+        tr_matches = 0
+        _, n = _find_replace_subn(tr.title or "", find, replace, case_sensitive=case_sensitive)
+        tr_matches += n
+        _, n = _find_replace_subn(tr.body_markdown or "", find, replace, case_sensitive=case_sensitive)
+        tr_matches += n
+        if tr_matches:
+            translations_out.append({"lang": tr.lang, "matches": tr_matches})
+            total += tr_matches
+    return translations_out, total
+
+
+def _build_preview_find_replace_item(
+    block: ContentBlock,
+    *,
+    find: str,
+    replace: str,
+    case_sensitive: bool,
+) -> tuple[dict[str, object] | None, int]:
+    base_matches = _preview_base_match_count(block, find, replace, case_sensitive=case_sensitive)
+    translations_out, tr_total = _preview_translation_matches(block, find, replace, case_sensitive=case_sensitive)
+    matches = base_matches + tr_total
+    if matches <= 0:
+        return None, 0
+    item = {
+        "key": block.key,
+        "title": block.title,
+        "matches": matches,
+        "base_matches": base_matches,
+        "translations": sorted(translations_out, key=lambda it: str(it.get("lang") or "")),
+    }
+    return item, matches
+
+
+async def preview_find_replace(
+    session: AsyncSession,
+    *,
+    find: str,
+    replace: str,
+    key_prefix: str | None = None,
+    case_sensitive: bool = True,
+    limit: int = 200,
+) -> tuple[list[dict[str, object]], int, int, bool]:
+    query = _build_preview_find_replace_query(
+        find=find,
+        key_prefix=key_prefix,
+        case_sensitive=case_sensitive,
+        limit=limit,
+    )
     rows = (await session.execute(query)).scalars().all()
     truncated = len(rows) > limit
     blocks = rows[:limit]
@@ -1117,44 +1186,17 @@ async def preview_find_replace(
     total_matches = 0
 
     for block in blocks:
-        base_matches = 0
-        _, n = _find_replace_subn(block.title or "", find, replace, case_sensitive=case_sensitive)
-        base_matches += n
-        _, n = _find_replace_subn(block.body_markdown or "", find, replace, case_sensitive=case_sensitive)
-        base_matches += n
-
-        meta = getattr(block, "meta", None)
-        if meta is not None:
-            _, n = _find_replace_in_json(meta, find, replace, case_sensitive=case_sensitive)
-            base_matches += n
-
-        translations_out: list[dict[str, object]] = []
-        tr_total = 0
-        for tr in getattr(block, "translations", None) or []:
-            tr_matches = 0
-            _, n = _find_replace_subn(tr.title or "", find, replace, case_sensitive=case_sensitive)
-            tr_matches += n
-            _, n = _find_replace_subn(tr.body_markdown or "", find, replace, case_sensitive=case_sensitive)
-            tr_matches += n
-            if tr_matches:
-                translations_out.append({"lang": tr.lang, "matches": tr_matches})
-                tr_total += tr_matches
-
-        matches = base_matches + tr_total
-        if matches <= 0:
+        item, matches = _build_preview_find_replace_item(
+            block,
+            find=find,
+            replace=replace,
+            case_sensitive=case_sensitive,
+        )
+        if item is None:
             continue
-
         total_items += 1
         total_matches += matches
-        items.append(
-            {
-                "key": block.key,
-                "title": block.title,
-                "matches": matches,
-                "base_matches": base_matches,
-                "translations": sorted(translations_out, key=lambda it: str(it.get("lang") or "")),
-            }
-        )
+        items.append(item)
 
     return items, total_items, total_matches, truncated
 
@@ -1362,48 +1404,68 @@ def _refs_from_asset_block(
     return refs
 
 
+def _is_markdown_target_match_start(text: str, *, index: int, image_only: bool) -> bool:
+    is_image = index > 0 and text[index - 1] == "!"
+    return is_image if image_only else not is_image
+
+
+def _scan_to_char(text: str, *, start: int, stop_char: str, text_len: int) -> int:
+    cursor = start
+    while cursor < text_len and text[cursor] != stop_char:
+        cursor += 1
+    return cursor
+
+
+def _skip_inline_whitespace(text: str, *, start: int, text_len: int) -> int:
+    cursor = start
+    while cursor < text_len and text[cursor].isspace():
+        cursor += 1
+    return cursor
+
+
+def _next_markdown_target_start(text: str, *, start: int, image_only: bool, text_len: int) -> int:
+    idx = start
+    while idx < text_len:
+        if text[idx] == "[" and _is_markdown_target_match_start(text, index=idx, image_only=image_only):
+            return idx
+        idx += 1
+    return -1
+
+
+def _parse_markdown_target_span(text: str, *, start: int, text_len: int) -> tuple[int, int, int] | None:
+    close_idx = _scan_to_char(text, start=start + 1, stop_char="]", text_len=text_len)
+    if close_idx >= text_len:
+        return None
+    cursor = _skip_inline_whitespace(text, start=close_idx + 1, text_len=text_len)
+    if cursor >= text_len or text[cursor] != "(":
+        return -1, -1, close_idx + 1
+    target_start = cursor + 1
+    target_end = _scan_to_char(text, start=target_start, stop_char=")", text_len=text_len)
+    if target_end >= text_len:
+        return None
+    return target_start, target_end, target_end + 1
+
+
 def _extract_markdown_target_urls(body: str, *, image_only: bool) -> list[str]:
     text = body or ""
     if not text:
         return []
 
-    def _is_match_start(index: int) -> bool:
-        is_image = index > 0 and text[index - 1] == "!"
-        return is_image if image_only else not is_image
-
     text_len = len(text)
     idx = 0
     urls: list[str] = []
-    while idx < text_len:
-        if text[idx] != "[" or not _is_match_start(idx):
-            idx += 1
-            continue
-
-        close_idx = idx + 1
-        while close_idx < text_len and text[close_idx] != "]":
-            close_idx += 1
-        if close_idx >= text_len:
+    while True:
+        match_idx = _next_markdown_target_start(text, start=idx, image_only=image_only, text_len=text_len)
+        if match_idx < 0:
             break
-
-        cursor = close_idx + 1
-        while cursor < text_len and text[cursor].isspace():
-            cursor += 1
-        if cursor >= text_len or text[cursor] != "(":
-            idx = close_idx + 1
-            continue
-
-        target_start = cursor + 1
-        target_end = target_start
-        while target_end < text_len and text[target_end] != ")":
-            target_end += 1
-        if target_end >= text_len:
+        parsed = _parse_markdown_target_span(text, start=match_idx, text_len=text_len)
+        if parsed is None:
             break
-
+        target_start, target_end, idx = parsed
         if target_end > target_start:
             url = _normalize_md_url(text[target_start:target_end])
             if url:
                 urls.append(url)
-        idx = target_end + 1
     return urls
 
 

@@ -369,6 +369,208 @@ async def _latest_user_history_at(session: AsyncSession, model: Any, user_id: UU
     )
 
 
+def _request_ip(request: Request) -> str | None:
+    return request.client.host if request.client else None
+
+
+def _request_user_agent(request: Request) -> str | None:
+    return request.headers.get("user-agent")
+
+
+def _require_registration_consents(accept_terms: bool, accept_privacy: bool) -> None:
+    if not accept_terms or not accept_privacy:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Legal consents required")
+
+
+def _record_registration_consents(
+    session: AsyncSession,
+    *,
+    user_id: UUID,
+    consent_versions: dict[str, int],
+) -> None:
+    accepted_at = datetime.now(timezone.utc)
+    for key, version in consent_versions.items():
+        session.add(
+            LegalConsent(
+                doc_key=key,
+                doc_version=version,
+                context=LegalConsentContext.register,
+                user_id=user_id,
+                accepted_at=accepted_at,
+            )
+        )
+
+
+def _queue_registration_emails(background_tasks: BackgroundTasks, user: User, verification_token: str) -> None:
+    background_tasks.add_task(
+        email_service.send_verification_email,
+        user.email,
+        verification_token,
+        user.preferred_language,
+    )
+    background_tasks.add_task(
+        email_service.send_welcome_email,
+        user.email,
+        first_name=user.first_name,
+        lang=user.preferred_language,
+    )
+
+
+async def _queue_registration_with_verification(
+    background_tasks: BackgroundTasks,
+    session: AsyncSession,
+    user: User,
+) -> None:
+    record = await auth_service.create_email_verification(session, user)
+    _queue_registration_emails(background_tasks, user, verification_token=record.token)
+
+
+def _validated_passkey_registration_token_payload(registration_token: str) -> dict[str, Any]:
+    token_payload = security.decode_token(registration_token)
+    if not token_payload:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token")
+    if token_payload.get("type") != "webauthn":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token")
+    if token_payload.get("purpose") != "register":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token")
+    return token_payload
+
+
+def _challenge_from_passkey_registration_token_payload(token_payload: dict[str, Any], *, expected_user_id: UUID) -> bytes:
+    token_user_id = str(token_payload.get("uid") or "").strip()
+    if token_user_id != str(expected_user_id):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token")
+    challenge_b64 = str(token_payload.get("challenge") or "").strip()
+    if not challenge_b64:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token")
+    try:
+        return base64url_to_bytes(challenge_b64)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token") from exc
+
+
+def _decode_passkey_registration_challenge(registration_token: str, *, expected_user_id: UUID) -> bytes:
+    token_payload = _validated_passkey_registration_token_payload(registration_token)
+    return _challenge_from_passkey_registration_token_payload(token_payload, expected_user_id=expected_user_id)
+
+
+async def _latest_export_job_for_user(session: AsyncSession, user_id: UUID) -> UserDataExportJob | None:
+    return (
+        (
+            await session.execute(
+                select(UserDataExportJob).where(UserDataExportJob.user_id == user_id).order_by(UserDataExportJob.created_at.desc()).limit(1)
+            )
+        )
+        .scalars()
+        .first()
+    )
+
+
+def _schedule_export_job(background_tasks: BackgroundTasks, session: AsyncSession, *, job_id: UUID) -> None:
+    engine = session.bind
+    if engine is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database engine unavailable")
+    background_tasks.add_task(user_export_service.run_user_export_job, engine, job_id=job_id)
+
+
+def _is_reusable_succeeded_export_job(job: UserDataExportJob | None) -> bool:
+    if not job or job.status != UserDataExportStatus.succeeded:
+        return False
+    expires_at = _ensure_utc_datetime(job.expires_at)
+    return not expires_at or expires_at > datetime.now(timezone.utc)
+
+
+async def _create_pending_export_job(session: AsyncSession, user_id: UUID) -> UserDataExportJob:
+    job = UserDataExportJob(user_id=user_id, status=UserDataExportStatus.pending, progress=0)
+    session.add(job)
+    await session.commit()
+    await session.refresh(job)
+    return job
+
+
+def _resolve_downloadable_export_path(job: UserDataExportJob | None, *, user_id: UUID) -> Path:
+    if not job or job.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found")
+    if job.status != UserDataExportStatus.succeeded or not job.file_path:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Export is not ready")
+    expires_at = _ensure_utc_datetime(job.expires_at)
+    if expires_at and expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found")
+    path = private_storage.resolve_private_path(job.file_path)
+    if not path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export file not found")
+    return path
+
+
+def _export_download_filename(job: UserDataExportJob) -> str:
+    stamp = (job.finished_at or job.created_at or datetime.now(timezone.utc)).date().isoformat()
+    return f"moment-studio-export-{stamp}.json"
+
+
+async def _complete_google_registration_user(
+    session: AsyncSession,
+    current_user: User,
+    payload: "GoogleCompleteRequest",
+) -> User:
+    return await auth_service.complete_google_registration(
+        session,
+        current_user,
+        username=payload.username,
+        display_name=payload.name,
+        first_name=payload.first_name,
+        middle_name=payload.middle_name,
+        last_name=payload.last_name,
+        date_of_birth=payload.date_of_birth,
+        phone=payload.phone,
+        password=payload.password,
+        preferred_language=payload.preferred_language,
+    )
+
+
+async def _queue_google_completion_emails(background_tasks: BackgroundTasks, session: AsyncSession, user: User) -> None:
+    background_tasks.add_task(
+        email_service.send_welcome_email,
+        user.email,
+        first_name=user.first_name,
+        lang=user.preferred_language,
+    )
+    if user.email_verified:
+        return
+    record = await auth_service.create_email_verification(session, user)
+    background_tasks.add_task(email_service.send_verification_email, user.email, record.token, user.preferred_language)
+
+
+def _extract_valid_google_profile(profile: dict[str, Any]) -> tuple[Any, str, Any, Any, bool]:
+    sub = profile.get("sub")
+    email = str(profile.get("email") or "").strip().lower()
+    name = profile.get("name")
+    picture = profile.get("picture")
+    email_verified = bool(profile.get("email_verified"))
+    if not sub or not email:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Google profile")
+    domain = email.split("@")[-1]
+    if settings.google_allowed_domains and domain not in settings.google_allowed_domains:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email domain not allowed")
+    return sub, email, name, picture, email_verified
+
+
+def _apply_google_link(
+    user: User,
+    *,
+    sub: Any,
+    email: str,
+    picture: Any,
+    name: Any,
+    email_verified: bool,
+) -> None:
+    user.google_sub = sub
+    user.google_email = email
+    user.google_picture_url = picture
+    user.email_verified = email_verified or user.email_verified
+    if not user.name:
+        user.name = name
+
+
 class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str = Field(min_length=6, max_length=128)
@@ -586,9 +788,10 @@ async def register(
     _: Annotated[None, Depends(register_rate_limit)],
     response: Response = None,
 ) -> AuthResponse:
-    await captcha_service.verify(payload.captcha_token, remote_ip=request.client.host if request.client else None)
-    if not payload.accept_terms or not payload.accept_privacy:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Legal consents required")
+    user_agent = _request_user_agent(request)
+    ip_address = _request_ip(request)
+    await captcha_service.verify(payload.captcha_token, remote_ip=ip_address)
+    _require_registration_consents(payload.accept_terms, payload.accept_privacy)
     consent_versions = await _require_published_consent_docs(session, _REQUIRED_REGISTRATION_CONSENT_KEYS)
     user = await auth_service.create_user(
         session,
@@ -605,38 +808,16 @@ async def register(
             preferred_language=payload.preferred_language,
         ),
     )
-    accepted_at = datetime.now(timezone.utc)
-    for key, version in consent_versions.items():
-        session.add(
-            LegalConsent(
-                doc_key=key,
-                doc_version=version,
-                context=LegalConsentContext.register,
-                user_id=user.id,
-                accepted_at=accepted_at,
-            )
-        )
+    _record_registration_consents(session, user_id=user.id, consent_versions=consent_versions)
     await session.commit()
     metrics.record_signup()
-    record = await auth_service.create_email_verification(session, user)
-    background_tasks.add_task(
-        email_service.send_verification_email,
-        user.email,
-        record.token,
-        user.preferred_language,
-    )
-    background_tasks.add_task(
-        email_service.send_welcome_email,
-        user.email,
-        first_name=user.first_name,
-        lang=user.preferred_language,
-    )
+    await _queue_registration_with_verification(background_tasks, session, user)
     tokens = await auth_service.issue_tokens_for_user(
         session,
         user,
         persistent=False,
-        user_agent=request.headers.get("user-agent"),
-        ip_address=request.client.host if request.client else None,
+        user_agent=user_agent,
+        ip_address=ip_address,
         country_code=_extract_country_code(request),
     )
     if response:
@@ -645,8 +826,8 @@ async def register(
         session,
         user.id,
         "login_password",
-        user_agent=request.headers.get("user-agent"),
-        ip_address=request.client.host if request.client else None,
+        user_agent=user_agent,
+        ip_address=ip_address,
     )
     return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
 
@@ -980,20 +1161,10 @@ async def passkey_register_verify(
     current_user: Annotated[User, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> PasskeyResponse:
-    token_payload = security.decode_token(payload.registration_token)
-    if not token_payload or token_payload.get("type") != "webauthn" or token_payload.get("purpose") != "register":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token")
-    token_user_id = str(token_payload.get("uid") or "").strip()
-    if token_user_id != str(current_user.id):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token")
-    challenge_b64 = str(token_payload.get("challenge") or "").strip()
-    if not challenge_b64:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token")
-    try:
-        expected_challenge = base64url_to_bytes(challenge_b64)
-    except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token") from exc
-
+    expected_challenge = _decode_passkey_registration_challenge(
+        payload.registration_token,
+        expected_user_id=current_user.id,
+    )
     passkey = await passkeys_service.register_passkey(
         session,
         user=current_user,
@@ -1005,8 +1176,8 @@ async def passkey_register_verify(
         session,
         current_user.id,
         "passkey_added",
-        user_agent=request.headers.get("user-agent"),
-        ip_address=request.client.host if request.client else None,
+        user_agent=_request_user_agent(request),
+        ip_address=_request_ip(request),
     )
     return PasskeyResponse.model_validate(passkey)
 
@@ -1669,42 +1840,15 @@ async def start_export_job(
     current_user: Annotated[User, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> UserDataExportJobResponse:
-    latest = (
-        (
-            await session.execute(
-                select(UserDataExportJob)
-                .where(UserDataExportJob.user_id == current_user.id)
-                .order_by(UserDataExportJob.created_at.desc())
-                .limit(1)
-            )
-        )
-        .scalars()
-        .first()
-    )
+    latest = await _latest_export_job_for_user(session, current_user.id)
     if latest and latest.status in (UserDataExportStatus.pending, UserDataExportStatus.running):
         if latest.status == UserDataExportStatus.pending:
-            engine = session.bind
-            if engine is None:
-                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database engine unavailable")
-            background_tasks.add_task(user_export_service.run_user_export_job, engine, job_id=latest.id)
+            _schedule_export_job(background_tasks, session, job_id=latest.id)
         return UserDataExportJobResponse.model_validate(latest, from_attributes=True)
-
-    if latest and latest.status == UserDataExportStatus.succeeded:
-        expires_at = latest.expires_at
-        if expires_at and expires_at.tzinfo is None:
-            expires_at = expires_at.replace(tzinfo=timezone.utc)
-        if not expires_at or expires_at > datetime.now(timezone.utc):
-            return UserDataExportJobResponse.model_validate(latest, from_attributes=True)
-
-    job = UserDataExportJob(user_id=current_user.id, status=UserDataExportStatus.pending, progress=0)
-    session.add(job)
-    await session.commit()
-    await session.refresh(job)
-
-    engine = session.bind
-    if engine is None:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database engine unavailable")
-    background_tasks.add_task(user_export_service.run_user_export_job, engine, job_id=job.id)
+    if _is_reusable_succeeded_export_job(latest):
+        return UserDataExportJobResponse.model_validate(latest, from_attributes=True)
+    job = await _create_pending_export_job(session, current_user.id)
+    _schedule_export_job(background_tasks, session, job_id=job.id)
     return UserDataExportJobResponse.model_validate(job, from_attributes=True)
 
 
@@ -1749,23 +1893,8 @@ async def download_export_job(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> FileResponse:
     job = await session.get(UserDataExportJob, job_id)
-    if not job or job.user_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found")
-    if job.status != UserDataExportStatus.succeeded or not job.file_path:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Export is not ready")
-
-    expires_at = job.expires_at
-    if expires_at and expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
-    if expires_at and expires_at < datetime.now(timezone.utc):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found")
-
-    path = private_storage.resolve_private_path(job.file_path)
-    if not path.exists():
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export file not found")
-
-    stamp = (job.finished_at or job.created_at or datetime.now(timezone.utc)).date().isoformat()
-    filename = f"moment-studio-export-{stamp}.json"
+    path = _resolve_downloadable_export_path(job, user_id=current_user.id)
+    filename = _export_download_filename(job)
     return FileResponse(path, media_type="application/json", filename=filename, headers={"Cache-Control": "no-store"})
 
 
@@ -2333,48 +2462,19 @@ async def google_complete_registration(
     session: Annotated[AsyncSession, Depends(get_session)],
     response: Response = None,
 ) -> AuthResponse:
-    if not payload.accept_terms or not payload.accept_privacy:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Legal consents required")
+    user_agent = _request_user_agent(request)
+    ip_address = _request_ip(request)
+    _require_registration_consents(payload.accept_terms, payload.accept_privacy)
     consent_versions = await _require_published_consent_docs(session, _REQUIRED_REGISTRATION_CONSENT_KEYS)
-    user = await auth_service.complete_google_registration(
-        session,
-        current_user,
-        username=payload.username,
-        display_name=payload.name,
-        first_name=payload.first_name,
-        middle_name=payload.middle_name,
-        last_name=payload.last_name,
-        date_of_birth=payload.date_of_birth,
-        phone=payload.phone,
-        password=payload.password,
-        preferred_language=payload.preferred_language,
-    )
-    accepted_at = datetime.now(timezone.utc)
-    for key, version in consent_versions.items():
-        session.add(
-            LegalConsent(
-                doc_key=key,
-                doc_version=version,
-                context=LegalConsentContext.register,
-                user_id=user.id,
-                accepted_at=accepted_at,
-            )
-        )
+    user = await _complete_google_registration_user(session, current_user, payload)
+    _record_registration_consents(session, user_id=user.id, consent_versions=consent_versions)
     await session.commit()
-    background_tasks.add_task(
-        email_service.send_welcome_email,
-        user.email,
-        first_name=user.first_name,
-        lang=user.preferred_language,
-    )
-    if not user.email_verified:
-        record = await auth_service.create_email_verification(session, user)
-        background_tasks.add_task(email_service.send_verification_email, user.email, record.token, user.preferred_language)
+    await _queue_google_completion_emails(background_tasks, session, user)
     tokens = await auth_service.issue_tokens_for_user(
         session,
         user,
-        user_agent=request.headers.get("user-agent"),
-        ip_address=request.client.host if request.client else None,
+        user_agent=user_agent,
+        ip_address=ip_address,
         country_code=_extract_country_code(request),
     )
     if response:
@@ -2383,8 +2483,8 @@ async def google_complete_registration(
         session,
         user.id,
         "login_google",
-        user_agent=request.headers.get("user-agent"),
-        ip_address=request.client.host if request.client else None,
+        user_agent=user_agent,
+        ip_address=ip_address,
     )
     return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
 
@@ -2424,24 +2524,18 @@ async def google_link(
     if not security.verify_password(payload.password, current_user.hashed_password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
     profile = await auth_service.exchange_google_code(payload.code)
-    sub = profile.get("sub")
-    email = str(profile.get("email") or "").strip().lower()
-    name = profile.get("name")
-    picture = profile.get("picture")
-    if not sub or not email:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Google profile")
-    domain = email.split("@")[-1]
-    if settings.google_allowed_domains and domain not in settings.google_allowed_domains:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email domain not allowed")
+    sub, email, name, picture, email_verified = _extract_valid_google_profile(profile)
     existing_sub = await auth_service.get_user_by_google_sub(session, sub)
     if existing_sub and existing_sub.id != current_user.id:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Google account already linked elsewhere")
-    current_user.google_sub = sub
-    current_user.google_email = email
-    current_user.google_picture_url = picture
-    current_user.email_verified = bool(profile.get("email_verified")) or current_user.email_verified
-    if not current_user.name:
-        current_user.name = name
+    _apply_google_link(
+        current_user,
+        sub=sub,
+        email=email,
+        picture=picture,
+        name=name,
+        email_verified=email_verified,
+    )
     session.add(current_user)
     await session.commit()
     await session.refresh(current_user)

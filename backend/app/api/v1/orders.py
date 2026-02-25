@@ -535,6 +535,116 @@ def _shipping_label_event_note(admin: object, filename: str) -> str:
     return f"{actor}: {filename}" if actor else filename
 
 
+def _normalize_batch_order_ids(order_ids: list[UUID], *, max_selected: int) -> list[UUID]:
+    ids = list(dict.fromkeys(order_ids))
+    if not ids:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No orders selected")
+    if len(ids) > max_selected:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Too many orders selected")
+    return ids
+
+
+async def _load_order_batch_or_404(
+    session: AsyncSession,
+    order_ids: list[UUID],
+    *,
+    load_options: tuple[Any, ...] = (),
+) -> list[Order]:
+    query = select(Order).execution_options(populate_existing=True).options(*load_options).where(Order.id.in_(order_ids))
+    result = await session.execute(query)
+    orders = list(result.scalars().unique())
+    missing_ids = _missing_batch_order_ids(order_ids, orders)
+    if missing_ids:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"missing_order_ids": missing_ids})
+    return _ordered_batch_orders(order_ids, orders)
+
+
+def _missing_batch_order_ids(order_ids: list[UUID], orders: list[Order]) -> list[str]:
+    found_ids = {order.id for order in orders}
+    return [str(order_id) for order_id in order_ids if order_id not in found_ids]
+
+
+def _ordered_batch_orders(order_ids: list[UUID], orders: list[Order]) -> list[Order]:
+    order_by_id = {order.id: order for order in orders}
+    return [order_by_id[order_id] for order_id in order_ids]
+
+
+async def _save_shipping_label_upload(file: UploadFile, *, order_id: UUID) -> tuple[str, str]:
+    return await anyio.to_thread.run_sync(
+        partial(
+            private_storage.save_private_upload,
+            file,
+            subdir=f"shipping-labels/{order_id}",
+            allowed_content_types=("application/pdf", "image/png", "image/jpeg", "image/webp"),
+            max_bytes=None,
+        )
+    )
+
+
+def _apply_shipping_label_upload(order: Order, *, rel_path: str, original_name: str) -> str | None:
+    old_path = getattr(order, "shipping_label_path", None)
+    order.shipping_label_path = rel_path
+    order.shipping_label_filename = _sanitize_filename(original_name)
+    order.shipping_label_uploaded_at = datetime.now(timezone.utc)
+    return old_path
+
+
+async def _create_shipping_label_export_record(
+    session: AsyncSession,
+    *,
+    order: Order,
+    rel_path: str,
+    fallback_name: str,
+    created_by_user_id: UUID | None,
+) -> None:
+    filename = _sanitize_filename(getattr(order, "shipping_label_filename", None) or fallback_name or "shipping-label")
+    mime_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    await order_exports_service.create_existing_file_export(
+        session,
+        kind=OrderDocumentExportKind.shipping_label,
+        filename=filename,
+        rel_path=rel_path,
+        mime_type=mime_type,
+        order_id=order.id,
+        created_by_user_id=created_by_user_id,
+    )
+
+
+async def _load_admin_order_or_404(session: AsyncSession, order_id: UUID) -> Order:
+    order = await order_service.get_order_by_id_admin(session, order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    return order
+
+
+def _can_manage_receipt_share(order: Order, current_user: object) -> bool:
+    role = getattr(current_user, "role", None)
+    role_value = (getattr(role, "value", None) or str(role or "")).strip().lower()
+    is_admin = role_value in {"admin", "owner"}
+    is_owner = bool(getattr(order, "user_id", None) and getattr(current_user, "id", None) == order.user_id)
+    return bool(is_admin or is_owner)
+
+
+def _require_receipt_share_access(order: Order, current_user: object) -> None:
+    if _can_manage_receipt_share(order, current_user):
+        return
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
+
+
+async def _build_receipt_share_token_read(session: AsyncSession, order: Order) -> ReceiptShareTokenRead:
+    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
+    expires_at = datetime.now(timezone.utc) + timedelta(days=int(checkout_settings.receipt_share_days))
+    token = create_receipt_token(
+        order_id=str(order.id),
+        expires_at=expires_at,
+        token_version=int(getattr(order, "receipt_token_version", 0) or 0),
+    )
+    frontend_origin = settings.frontend_origin.rstrip("/")
+    receipt_url = f"{frontend_origin}/receipt/{token}"
+    receipt_pdf_url = f"{frontend_origin}/api/v1/orders/receipt/{token}/pdf"
+    return ReceiptShareTokenRead(token=token, receipt_url=receipt_url, receipt_pdf_url=receipt_pdf_url, expires_at=expires_at)
+
+
 async def _load_user_cart_for_create_order(session: AsyncSession, user_id: UUID) -> Cart:
     cart_result = await session.execute(
         select(Cart).options(selectinload(Cart.items)).where(Cart.user_id == user_id).with_for_update()
@@ -2789,42 +2899,24 @@ async def admin_upload_shipping_label(
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
 
-    old_path = getattr(order, "shipping_label_path", None)
-    rel_path, original_name = await anyio.to_thread.run_sync(
-        partial(
-            private_storage.save_private_upload,
-            file,
-            subdir=f"shipping-labels/{order_id}",
-            allowed_content_types=("application/pdf", "image/png", "image/jpeg", "image/webp"),
-            max_bytes=None,
-        )
-    )
-    now = datetime.now(timezone.utc)
-    order.shipping_label_path = rel_path
-    order.shipping_label_filename = _sanitize_filename(original_name)
-    order.shipping_label_uploaded_at = now
+    rel_path, original_name = await _save_shipping_label_upload(file, order_id=order_id)
+    old_path = _apply_shipping_label_upload(order, rel_path=rel_path, original_name=original_name)
     session.add(order)
     session.add(OrderEvent(order_id=order.id, event="shipping_label_uploaded", note=order.shipping_label_filename))
     await session.commit()
 
-    filename = _sanitize_filename(getattr(order, "shipping_label_filename", None) or original_name or "shipping-label")
-    mime_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
-    await order_exports_service.create_existing_file_export(
+    await _create_shipping_label_export_record(
         session,
-        kind=OrderDocumentExportKind.shipping_label,
-        filename=filename,
+        order=order,
         rel_path=rel_path,
-        mime_type=mime_type,
-        order_id=order.id,
+        fallback_name=original_name,
         created_by_user_id=getattr(admin, "id", None),
     )
 
     if old_path and old_path != rel_path:
         private_storage.delete_private_file(old_path)
 
-    full = await order_service.get_order_by_id_admin(session, order_id)
-    if not full:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    full = await _load_admin_order_or_404(session, order_id)
     return await _serialize_admin_order(session, full, include_pii=include_pii, current_user=admin)
 
 
@@ -3201,31 +3293,17 @@ async def admin_batch_packing_slips(
     admin: User = Depends(require_admin_section("orders")),
 ):
     step_up_service.require_step_up(request, admin)
-    ids = list(dict.fromkeys(payload.order_ids))
-    if not ids:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No orders selected")
-    if len(ids) > 50:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Too many orders selected")
-
-    result = await session.execute(
-        select(Order)
-        .execution_options(populate_existing=True)
-        .options(
+    ids = _normalize_batch_order_ids(payload.order_ids, max_selected=50)
+    ordered = await _load_order_batch_or_404(
+        session,
+        ids,
+        load_options=(
             selectinload(Order.items).selectinload(OrderItem.product),
             selectinload(Order.user),
             selectinload(Order.shipping_address),
             selectinload(Order.billing_address),
-        )
-        .where(Order.id.in_(ids))
+        ),
     )
-    orders = list(result.scalars().unique())
-    found = {o.id for o in orders}
-    missing = [str(order_id) for order_id in ids if order_id not in found]
-    if missing:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"missing_order_ids": missing})
-
-    order_by_id = {o.id: o for o in orders}
-    ordered = [order_by_id[order_id] for order_id in ids if order_id in order_by_id]
     pdf = await anyio.to_thread.run_sync(
         partial(packing_slips_service.render_batch_packing_slips_pdf, ordered)
     )
@@ -3249,29 +3327,15 @@ async def admin_batch_pick_list_csv(
     admin: User = Depends(require_admin_section("orders")),
 ):
     step_up_service.require_step_up(request, admin)
-    ids = list(dict.fromkeys(payload.order_ids))
-    if not ids:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No orders selected")
-    if len(ids) > 100:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Too many orders selected")
-
-    result = await session.execute(
-        select(Order)
-        .execution_options(populate_existing=True)
-        .options(
+    ids = _normalize_batch_order_ids(payload.order_ids, max_selected=100)
+    ordered = await _load_order_batch_or_404(
+        session,
+        ids,
+        load_options=(
             selectinload(Order.items).selectinload(OrderItem.product),
             selectinload(Order.items).selectinload(OrderItem.variant),
-        )
-        .where(Order.id.in_(ids))
+        ),
     )
-    orders = list(result.scalars().unique())
-    found = {o.id for o in orders}
-    missing = [str(order_id) for order_id in ids if order_id not in found]
-    if missing:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"missing_order_ids": missing})
-
-    order_by_id = {o.id: o for o in orders}
-    ordered = [order_by_id[order_id] for order_id in ids if order_id in order_by_id]
     rows = pick_lists_service.build_pick_list_rows(ordered)
     csv_bytes = pick_lists_service.render_pick_list_csv(rows)
     headers = {
@@ -3289,29 +3353,15 @@ async def admin_batch_pick_list_pdf(
     admin: User = Depends(require_admin_section("orders")),
 ):
     step_up_service.require_step_up(request, admin)
-    ids = list(dict.fromkeys(payload.order_ids))
-    if not ids:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No orders selected")
-    if len(ids) > 100:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Too many orders selected")
-
-    result = await session.execute(
-        select(Order)
-        .execution_options(populate_existing=True)
-        .options(
+    ids = _normalize_batch_order_ids(payload.order_ids, max_selected=100)
+    ordered = await _load_order_batch_or_404(
+        session,
+        ids,
+        load_options=(
             selectinload(Order.items).selectinload(OrderItem.product),
             selectinload(Order.items).selectinload(OrderItem.variant),
-        )
-        .where(Order.id.in_(ids))
+        ),
     )
-    orders = list(result.scalars().unique())
-    found = {o.id for o in orders}
-    missing = [str(order_id) for order_id in ids if order_id not in found]
-    if missing:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"missing_order_ids": missing})
-
-    order_by_id = {o.id: o for o in orders}
-    ordered = [order_by_id[order_id] for order_id in ids if order_id in order_by_id]
     rows = pick_lists_service.build_pick_list_rows(ordered)
     pdf = pick_lists_service.render_pick_list_pdf(rows, orders=ordered)
     headers = {
@@ -3603,23 +3653,8 @@ async def create_receipt_share_token(
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
-    role = getattr(current_user, "role", None)
-    role_value = (getattr(role, "value", None) or str(role or "")).strip().lower()
-    is_admin = role_value in {"admin", "owner"}
-    is_owner = bool(getattr(order, "user_id", None) and getattr(current_user, "id", None) == order.user_id)
-    if not (is_admin or is_owner):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
-
-    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
-    expires_at = datetime.now(timezone.utc) + timedelta(days=int(checkout_settings.receipt_share_days))
-    token = create_receipt_token(
-        order_id=str(order.id),
-        expires_at=expires_at,
-        token_version=int(getattr(order, "receipt_token_version", 0) or 0),
-    )
-    receipt_url = f"{settings.frontend_origin.rstrip('/')}/receipt/{token}"
-    receipt_pdf_url = f"{settings.frontend_origin.rstrip('/')}/api/v1/orders/receipt/{token}/pdf"
-    return ReceiptShareTokenRead(token=token, receipt_url=receipt_url, receipt_pdf_url=receipt_pdf_url, expires_at=expires_at)
+    _require_receipt_share_access(order, current_user)
+    return await _build_receipt_share_token_read(session, order)
 
 
 @router.post("/{order_id}/receipt/revoke", response_model=ReceiptShareTokenRead)
@@ -3631,29 +3666,14 @@ async def revoke_receipt_share_token(
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
-    role = getattr(current_user, "role", None)
-    role_value = (getattr(role, "value", None) or str(role or "")).strip().lower()
-    is_admin = role_value in {"admin", "owner"}
-    is_owner = bool(getattr(order, "user_id", None) and getattr(current_user, "id", None) == order.user_id)
-    if not (is_admin or is_owner):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
+    _require_receipt_share_access(order, current_user)
 
     order.receipt_token_version = int(getattr(order, "receipt_token_version", 0) or 0) + 1
     session.add(order)
     session.add(OrderEvent(order_id=order.id, event="receipt_token_revoked", note=f"v{order.receipt_token_version}"))
     await session.commit()
     await session.refresh(order)
-
-    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
-    expires_at = datetime.now(timezone.utc) + timedelta(days=int(checkout_settings.receipt_share_days))
-    token = create_receipt_token(
-        order_id=str(order.id),
-        expires_at=expires_at,
-        token_version=int(getattr(order, "receipt_token_version", 0) or 0),
-    )
-    receipt_url = f"{settings.frontend_origin.rstrip('/')}/receipt/{token}"
-    receipt_pdf_url = f"{settings.frontend_origin.rstrip('/')}/api/v1/orders/receipt/{token}/pdf"
-    return ReceiptShareTokenRead(token=token, receipt_url=receipt_url, receipt_pdf_url=receipt_pdf_url, expires_at=expires_at)
+    return await _build_receipt_share_token_read(session, order)
 
 
 @router.post("/{order_id}/cancel-request", response_model=OrderRead)
