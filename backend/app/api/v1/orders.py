@@ -185,6 +185,8 @@ CHARGE_LABELS: dict[str, tuple[str, str]] = {
     "discount": ("Discount", "Reducere"),
 }
 
+DEFAULT_BINARY_MIME_TYPE = "application/octet-stream"
+
 
 def _charge_label(kind: str, lang: str | None) -> str:
     ro = (lang or "").strip().lower() == "ro"
@@ -569,6 +571,73 @@ def _ordered_batch_orders(order_ids: list[UUID], orders: list[Order]) -> list[Or
     return [order_by_id[order_id] for order_id in order_ids]
 
 
+MAX_BATCH_SHIPPING_LABEL_ARCHIVE_BYTES = 200 * 1024 * 1024
+CANCEL_REQUEST_ELIGIBLE_STATUSES = frozenset(
+    {OrderStatus.pending_payment, OrderStatus.pending_acceptance, OrderStatus.paid}
+)
+
+
+def _order_shipping_label_zip_entry(order: Order) -> tuple[Path, str] | None:
+    rel = getattr(order, "shipping_label_path", None)
+    if not rel:
+        return None
+    path = private_storage.resolve_private_path(rel)
+    if not path.exists():
+        return None
+    base_name = _sanitize_filename(getattr(order, "shipping_label_filename", None) or path.name)
+    ref = getattr(order, "reference_code", None) or str(order.id)[:8]
+    zip_name = _sanitize_filename(f"{ref}-{base_name}" if base_name else str(ref))
+    return path, zip_name
+
+
+def _collect_batch_shipping_label_files(orders: list[Order]) -> tuple[list[tuple[Order, Path, str]], list[str]]:
+    files: list[tuple[Order, Path, str]] = []
+    missing_labels: list[str] = []
+    total_bytes = 0
+    for order in orders:
+        zip_entry = _order_shipping_label_zip_entry(order)
+        if zip_entry is None:
+            missing_labels.append(str(order.id))
+            continue
+        path, zip_name = zip_entry
+        total_bytes += path.stat().st_size
+        if total_bytes > MAX_BATCH_SHIPPING_LABEL_ARCHIVE_BYTES:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Shipping labels archive too large")
+        files.append((order, path, zip_name))
+    return files, missing_labels
+
+
+def _raise_for_missing_shipping_labels(order_ids: list[str]) -> None:
+    if order_ids:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"missing_shipping_label_order_ids": order_ids})
+
+
+def _build_shipping_labels_zip_buffer(files: list[tuple[Order, Path, str]]) -> io.BytesIO:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for _, path, zip_name in files:
+            zf.write(path, arcname=zip_name)
+    buf.seek(0)
+    return buf
+
+
+def _iter_bytes_buffer(file_obj: io.BytesIO, chunk_size: int = 1024 * 1024):
+    while True:
+        chunk = file_obj.read(chunk_size)
+        if not chunk:
+            break
+        yield chunk
+
+
+async def _log_batch_shipping_label_downloads(
+    session: AsyncSession, files: list[tuple[Order, Path, str]], admin: object
+) -> None:
+    note = f"{_admin_actor_label(admin)}: batch"
+    for order, _, _ in files:
+        session.add(OrderEvent(order_id=order.id, event="shipping_label_downloaded", note=note))
+    await session.commit()
+
+
 async def _save_shipping_label_upload(file: UploadFile, *, order_id: UUID) -> tuple[str, str]:
     return await anyio.to_thread.run_sync(
         partial(
@@ -598,7 +667,7 @@ async def _create_shipping_label_export_record(
     created_by_user_id: UUID | None,
 ) -> None:
     filename = _sanitize_filename(getattr(order, "shipping_label_filename", None) or fallback_name or "shipping-label")
-    mime_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    mime_type = mimetypes.guess_type(filename)[0] or DEFAULT_BINARY_MIME_TYPE
     await order_exports_service.create_existing_file_export(
         session,
         kind=OrderDocumentExportKind.shipping_label,
@@ -1958,7 +2027,7 @@ async def admin_download_document_export(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export not found")
     filename = Path(export.filename).name or path.name
     headers = {"Cache-Control": "no-store"}
-    media_type = export.mime_type or mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    media_type = export.mime_type or mimetypes.guess_type(filename)[0] or DEFAULT_BINARY_MIME_TYPE
     return FileResponse(path, media_type=media_type, filename=filename, headers=headers)
 
 
@@ -2944,7 +3013,7 @@ async def admin_download_shipping_label(
     note = _shipping_label_event_note(admin, filename)
     session.add(OrderEvent(order_id=order.id, event=event, note=note))
     await session.commit()
-    media_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    media_type = mimetypes.guess_type(filename)[0] or DEFAULT_BINARY_MIME_TYPE
     headers = {"Cache-Control": "no-store"}
     return FileResponse(path, media_type=media_type, filename=filename, headers=headers)
 
@@ -2984,6 +3053,58 @@ async def admin_retry_payment(
     return await order_service.retry_payment(session, order)
 
 
+def _normalize_optional_note(note: str | None) -> str | None:
+    note_clean = (note or "").strip()
+    return note_clean or None
+
+
+def _queue_order_refunded_email(background_tasks: BackgroundTasks, order: Order) -> None:
+    customer_to, customer_lang = _order_customer_contact(order)
+    if not customer_to:
+        return
+    background_tasks.add_task(email_service.send_order_refunded_update, customer_to, order, lang=customer_lang)
+
+
+async def _notify_user_order_refunded(session: AsyncSession, order: Order) -> None:
+    if not (order.user and order.user.id):
+        return
+    title = "Comandă rambursată" if (order.user.preferred_language or "en") == "ro" else "Order refunded"
+    await notification_service.create_notification(
+        session,
+        user_id=order.user.id,
+        type="order",
+        title=title,
+        body=f"Reference {order.reference_code}" if order.reference_code else None,
+        url=_account_orders_url(order),
+    )
+
+
+def _refund_admin_customer_email(order: Order) -> str | None:
+    return getattr(order, "customer_email", None) or (order.user.email if order.user and order.user.email else None)
+
+
+def _queue_admin_refund_requested_email(
+    background_tasks: BackgroundTasks,
+    owner: User | None,
+    order: Order,
+    admin_user: object,
+    *,
+    note: str | None,
+) -> None:
+    admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+    if not admin_to:
+        return
+    background_tasks.add_task(
+        email_service.send_refund_requested_notification,
+        admin_to,
+        order,
+        customer_email=_refund_admin_customer_email(order),
+        requested_by_email=getattr(admin_user, "email", None),
+        note=note,
+        lang=owner.preferred_language if owner else None,
+    )
+
+
 @router.post("/admin/{order_id}/refund", response_model=OrderRead)
 async def admin_refund_order(
     background_tasks: BackgroundTasks,
@@ -2993,37 +3114,16 @@ async def admin_refund_order(
     session: AsyncSession = Depends(get_session),
     admin_user=Depends(require_admin),
 ):
-    note = (payload.note or "").strip() or None
+    note = _normalize_optional_note(payload.note)
     order = await order_service.get_order_by_id(session, order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
     updated = await order_service.refund_order(session, order, note=note)
     await coupons_service.release_coupon_for_order(session, order=updated, reason="refunded")
-    customer_to = (updated.user.email if updated.user and updated.user.email else None) or getattr(updated, "customer_email", None)
-    customer_lang = updated.user.preferred_language if updated.user else None
-    if customer_to:
-        background_tasks.add_task(email_service.send_order_refunded_update, customer_to, updated, lang=customer_lang)
-    if updated.user and updated.user.id:
-        await notification_service.create_notification(
-            session,
-            user_id=updated.user.id,
-            type="order",
-            title="Order refunded" if (updated.user.preferred_language or "en") != "ro" else "Comandă rambursată",
-            body=f"Reference {updated.reference_code}" if updated.reference_code else None,
-            url=_account_orders_url(updated),
-        )
+    _queue_order_refunded_email(background_tasks, updated)
+    await _notify_user_order_refunded(session, updated)
     owner = await auth_service.get_owner_user(session)
-    admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
-    if admin_to:
-        background_tasks.add_task(
-            email_service.send_refund_requested_notification,
-            admin_to,
-            updated,
-            customer_email=getattr(updated, "customer_email", None) or (updated.user.email if updated.user and updated.user.email else None),
-            requested_by_email=getattr(admin_user, "email", None),
-            note=note,
-            lang=owner.preferred_language if owner else None,
-        )
+    _queue_admin_refund_requested_email(background_tasks, owner, updated, admin_user, note=note)
     return updated
 
 
@@ -3379,75 +3479,17 @@ async def admin_batch_shipping_labels_zip(
     admin: User = Depends(require_admin_section("orders")),
 ):
     step_up_service.require_step_up(request, admin)
-    ids = list(dict.fromkeys(payload.order_ids))
-    if not ids:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No orders selected")
-    if len(ids) > 50:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Too many orders selected")
-
-    result = await session.execute(select(Order).execution_options(populate_existing=True).where(Order.id.in_(ids)))
-    orders = list(result.scalars().unique())
-    found = {o.id for o in orders}
-    missing = [str(order_id) for order_id in ids if order_id not in found]
-    if missing:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"missing_order_ids": missing})
-
-    order_by_id = {o.id: o for o in orders}
-    ordered = [order_by_id[order_id] for order_id in ids if order_id in order_by_id]
-
-    files: list[tuple[Order, Path, str]] = []
-    missing_labels: list[str] = []
-    total_bytes = 0
-    for order in ordered:
-        rel = getattr(order, "shipping_label_path", None)
-        if not rel:
-            missing_labels.append(str(order.id))
-            continue
-        path = private_storage.resolve_private_path(rel)
-        if not path.exists():
-            missing_labels.append(str(order.id))
-            continue
-
-        size = path.stat().st_size
-        total_bytes += size
-        if total_bytes > 200 * 1024 * 1024:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Shipping labels archive too large")
-
-        base_name = _sanitize_filename(getattr(order, "shipping_label_filename", None) or path.name)
-        ref = getattr(order, "reference_code", None) or str(order.id)[:8]
-        zip_name = _sanitize_filename(f"{ref}-{base_name}" if base_name else str(ref))
-        files.append((order, path, zip_name))
-
-    if missing_labels:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"missing_shipping_label_order_ids": missing_labels},
-        )
-
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
-        for _, path, zip_name in files:
-            zf.write(path, arcname=zip_name)
-    buf.seek(0)
-
-    actor = (getattr(admin, "email", None) or getattr(admin, "username", None) or "admin").strip()
-    note = f"{actor}: batch" if actor else "batch"
-    for order, _, _ in files:
-        session.add(OrderEvent(order_id=order.id, event="shipping_label_downloaded", note=note))
-    await session.commit()
-
-    def _iter_zip(file_obj: io.BytesIO, chunk_size: int = 1024 * 1024):
-        while True:
-            chunk = file_obj.read(chunk_size)
-            if not chunk:
-                break
-            yield chunk
-
+    ids = _normalize_batch_order_ids(payload.order_ids, max_selected=50)
+    ordered = await _load_order_batch_or_404(session, ids)
+    files, missing_labels = _collect_batch_shipping_label_files(ordered)
+    _raise_for_missing_shipping_labels(missing_labels)
+    buf = _build_shipping_labels_zip_buffer(files)
+    await _log_batch_shipping_label_downloads(session, files, admin)
     headers = {
         "Content-Disposition": 'attachment; filename="shipping-labels.zip"',
         "Cache-Control": "no-store",
     }
-    return StreamingResponse(_iter_zip(buf), media_type="application/zip", headers=headers)
+    return StreamingResponse(_iter_bytes_buffer(buf), media_type="application/zip", headers=headers)
 
 
 @router.get("/admin/{order_id}/receipt")
@@ -3676,6 +3718,79 @@ async def revoke_receipt_share_token(
     return await _build_receipt_share_token_read(session, order)
 
 
+def _validate_cancel_request_eligibility(order: Order) -> None:
+    if OrderStatus(order.status) not in CANCEL_REQUEST_ELIGIBLE_STATUSES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cancel request not eligible")
+
+
+def _require_cancel_request_reason(payload: OrderCancelRequest) -> str:
+    reason = (payload.reason or "").strip()
+    if not reason:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cancel reason is required")
+    return reason
+
+
+def _ensure_cancel_request_not_duplicate(order: Order) -> None:
+    if any(getattr(evt, "event", None) == "cancel_requested" for evt in (order.events or [])):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Cancel request already exists")
+
+
+def _cancel_request_owner_title(owner: User) -> str:
+    return "Cerere anulare" if _owner_prefers_romanian(owner) else "Cancel request"
+
+
+def _cancel_request_owner_body(order: Order, owner: User) -> str:
+    if _owner_prefers_romanian(owner):
+        return f"Cerere de anulare pentru comanda {order.reference_code or order.id}."
+    return f"Order {order.reference_code or order.id} cancellation requested."
+
+
+async def _notify_owner_cancel_request(session: AsyncSession, owner: User | None, order: Order) -> None:
+    if not (owner and owner.id):
+        return
+    await notification_service.create_notification(
+        session,
+        user_id=owner.id,
+        type="admin",
+        title=_cancel_request_owner_title(owner),
+        body=_cancel_request_owner_body(order, owner),
+        url=f"/admin/orders/{order.id}",
+    )
+
+
+def _queue_admin_cancel_request_email(
+    background_tasks: BackgroundTasks,
+    owner: User | None,
+    order: Order,
+    *,
+    requested_by_email: str | None,
+    reason: str,
+) -> None:
+    admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+    if not admin_to:
+        return
+    background_tasks.add_task(
+        email_service.send_order_cancel_request_notification,
+        admin_to,
+        order,
+        requested_by_email=requested_by_email,
+        reason=reason,
+        lang=owner.preferred_language if owner else None,
+    )
+
+
+async def _notify_user_cancel_requested(session: AsyncSession, current_user: object, order: Order) -> None:
+    title = "Anulare solicitată" if (getattr(current_user, "preferred_language", None) or "en") == "ro" else "Cancel requested"
+    await notification_service.create_notification(
+        session,
+        user_id=current_user.id,
+        type="order",
+        title=title,
+        body=f"Reference {order.reference_code}" if order.reference_code else None,
+        url=_account_orders_url(order),
+    )
+
+
 @router.post("/{order_id}/cancel-request", response_model=OrderRead)
 async def request_order_cancellation(
     order_id: UUID,
@@ -3688,54 +3803,24 @@ async def request_order_cancellation(
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
 
-    if OrderStatus(order.status) not in {OrderStatus.pending_payment, OrderStatus.pending_acceptance, OrderStatus.paid}:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cancel request not eligible")
-
-    reason = (payload.reason or "").strip()
-    if not reason:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cancel reason is required")
-
-    if any(getattr(evt, "event", None) == "cancel_requested" for evt in (order.events or [])):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Cancel request already exists")
+    _validate_cancel_request_eligibility(order)
+    reason = _require_cancel_request_reason(payload)
+    _ensure_cancel_request_not_duplicate(order)
 
     session.add(OrderEvent(order_id=order.id, event="cancel_requested", note=reason[:2000]))
     await session.commit()
     await session.refresh(order, attribute_names=["events"])
 
     owner = await auth_service.get_owner_user(session)
-    if owner and owner.id:
-        await notification_service.create_notification(
-            session,
-            user_id=owner.id,
-            type="admin",
-            title="Cancel request" if (owner.preferred_language or "en") != "ro" else "Cerere anulare",
-            body=(
-                f"Order {order.reference_code or order.id} cancellation requested."
-                if (owner.preferred_language or "en") != "ro"
-                else f"Cerere de anulare pentru comanda {order.reference_code or order.id}."
-            ),
-            url=f"/admin/orders/{order.id}",
-        )
-
-    admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
-    if admin_to:
-        background_tasks.add_task(
-            email_service.send_order_cancel_request_notification,
-            admin_to,
-            order,
-            requested_by_email=getattr(current_user, "email", None),
-            reason=reason,
-            lang=owner.preferred_language if owner else None,
-        )
-
-    await notification_service.create_notification(
-        session,
-        user_id=current_user.id,
-        type="order",
-        title="Cancel requested" if (current_user.preferred_language or "en") != "ro" else "Anulare solicitată",
-        body=f"Reference {order.reference_code}" if order.reference_code else None,
-        url=_account_orders_url(order),
+    await _notify_owner_cancel_request(session, owner, order)
+    _queue_admin_cancel_request_email(
+        background_tasks,
+        owner,
+        order,
+        requested_by_email=getattr(current_user, "email", None),
+        reason=reason,
     )
+    await _notify_user_cancel_requested(session, current_user, order)
 
     return order
 

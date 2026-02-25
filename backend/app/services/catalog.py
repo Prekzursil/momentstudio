@@ -840,9 +840,7 @@ async def reorder_categories(session: AsyncSession, payload: list[CategoryReorde
     return [CategoryRead.model_validate(cat) for cat in updated]
 
 
-async def create_product(
-    session: AsyncSession, payload: ProductCreate, commit: bool = True, user_id: uuid.UUID | None = None
-) -> Product:
+async def _resolve_create_product_slug(session: AsyncSession, payload: ProductCreate) -> str:
     requested_slug = (payload.slug or "").strip()
     base_slug = (requested_slug or slugify(payload.name or "") or "product")[:160]
     candidate_slug = base_slug
@@ -850,22 +848,20 @@ async def create_product(
     while True:
         try:
             await _ensure_slug_unique(session, candidate_slug)
-            break
+            return candidate_slug
         except HTTPException:
             suffix = f"-{counter}"
             candidate_slug = f"{base_slug[: 160 - len(suffix)]}{suffix}"
             counter += 1
 
+
+async def _resolve_create_product_sku(session: AsyncSession, payload: ProductCreate, candidate_slug: str) -> str:
     sku = payload.sku or await _generate_unique_sku(session, candidate_slug)
     await _ensure_sku_unique(session, sku)
-    _validate_price_currency(payload.base_price, payload.currency)
+    return sku
 
-    images_payload = payload.images or []
-    variants_payload: list[ProductVariantCreate] = getattr(payload, "variants", []) or []
-    product_data = payload.model_dump(exclude={"images", "variants", "tags", "badges", "options"})
-    product_data["slug"] = candidate_slug
-    product_data["sku"] = sku
-    product_data["currency"] = payload.currency.upper()
+
+async def _resolve_create_product_sort_order(session: AsyncSession, payload: ProductCreate) -> int:
     custom_count = await session.scalar(
         select(func.count(Product.id)).where(
             Product.is_deleted.is_(False),
@@ -873,34 +869,76 @@ async def create_product(
             Product.sort_order != 0,
         )
     )
-    if int(custom_count or 0) > 0:
-        max_sort = await session.scalar(
-            select(func.max(Product.sort_order)).where(
-                Product.is_deleted.is_(False),
-                Product.category_id == payload.category_id,
-            )
+    if int(custom_count or 0) <= 0:
+        return 0
+    max_sort = await session.scalar(
+        select(func.max(Product.sort_order)).where(
+            Product.is_deleted.is_(False),
+            Product.category_id == payload.category_id,
         )
-        product_data["sort_order"] = int(max_sort or 0) + 1
-    else:
-        product_data["sort_order"] = 0
-    product = Product(**product_data)
-    _sync_sale_fields(product)
-    _set_publish_timestamp(product, payload.status)
-    product.images = [ProductImage(**img.model_dump()) for img in images_payload]
-    product.variants = [ProductVariant(**variant.model_dump()) for variant in variants_payload]
+    )
+    return int(max_sort or 0) + 1
+
+
+def _build_create_product_images(payload: ProductCreate) -> list[ProductImage]:
+    return [ProductImage(**image.model_dump()) for image in (payload.images or [])]
+
+
+def _build_create_product_variants(payload: ProductCreate) -> list[ProductVariant]:
+    variants_payload: list[ProductVariantCreate] = getattr(payload, "variants", []) or []
+    return [ProductVariant(**variant.model_dump()) for variant in variants_payload]
+
+
+def _build_create_product_options(payload: ProductCreate) -> list[ProductOption]:
+    return [ProductOption(**option.model_dump()) for option in (payload.options or [])]
+
+
+async def _assign_create_product_relations(session: AsyncSession, product: Product, payload: ProductCreate) -> None:
+    product.images = _build_create_product_images(payload)
+    product.variants = _build_create_product_variants(payload)
     if payload.tags:
         product.tags = await _get_or_create_tags(session, payload.tags)
     if payload.badges:
-        product.badges = _build_product_badges([b.model_dump() for b in payload.badges])
+        product.badges = _build_product_badges([badge.model_dump() for badge in payload.badges])
     if payload.options:
-        product.options = [ProductOption(**opt.model_dump()) for opt in payload.options]
+        product.options = _build_create_product_options(payload)
+
+
+async def _build_product_from_create_payload(
+    session: AsyncSession, payload: ProductCreate, candidate_slug: str, sku: str
+) -> Product:
+    product_data = payload.model_dump(exclude={"images", "variants", "tags", "badges", "options"})
+    product_data["slug"] = candidate_slug
+    product_data["sku"] = sku
+    product_data["currency"] = payload.currency.upper()
+    product_data["sort_order"] = await _resolve_create_product_sort_order(session, payload)
+    product = Product(**product_data)
+    _sync_sale_fields(product)
+    _set_publish_timestamp(product, payload.status)
+    await _assign_create_product_relations(session, product, payload)
+    return product
+
+
+async def _persist_created_product(
+    session: AsyncSession, product: Product, *, commit: bool, user_id: uuid.UUID | None
+) -> None:
     session.add(product)
-    if commit:
-        await session.commit()
-        await session.refresh(product)
-        await _log_product_action(session, product.id, "create", user_id, {"slug": product.slug})
-    else:
+    if not commit:
         await session.flush()
+        return
+    await session.commit()
+    await session.refresh(product)
+    await _log_product_action(session, product.id, "create", user_id, {"slug": product.slug})
+
+
+async def create_product(
+    session: AsyncSession, payload: ProductCreate, commit: bool = True, user_id: uuid.UUID | None = None
+) -> Product:
+    candidate_slug = await _resolve_create_product_slug(session, payload)
+    sku = await _resolve_create_product_sku(session, payload, candidate_slug)
+    _validate_price_currency(payload.base_price, payload.currency)
+    product = await _build_product_from_create_payload(session, payload, candidate_slug, sku)
+    await _persist_created_product(session, product, commit=commit, user_id=user_id)
     return product
 
 
@@ -1770,6 +1808,63 @@ def _normalized_search_expr(column):
     return expr
 
 
+def _build_product_price_bounds_query(effective_price, *, include_unpublished: bool):
+    query = select(
+        func.min(effective_price),
+        func.max(effective_price),
+        func.count(func.distinct(Product.currency)),
+        func.min(Product.currency),
+    ).where(Product.is_deleted.is_(False))
+    if include_unpublished:
+        return query
+    return query.where(Product.is_active.is_(True), Product.status == ProductStatus.published)
+
+
+async def _apply_price_bounds_category_filter(
+    session: AsyncSession, query, category_slug: str | None, *, include_unpublished: bool
+):
+    if not category_slug:
+        return query
+    category_ids = await _get_category_and_descendant_ids_by_slug(session, category_slug)
+    if category_ids and not include_unpublished:
+        visible_ids = (
+            await session.execute(select(Category.id).where(Category.id.in_(category_ids), Category.is_visible.is_(True)))
+        ).scalars().all()
+        category_ids = list(visible_ids)
+    if category_ids:
+        return query.where(Product.category_id.in_(category_ids))
+    return query.where(false())
+
+
+def _apply_price_bounds_search_filter(query, search: str | None):
+    normalized_search = _normalize_search_text(search)
+    if not normalized_search:
+        return query
+    like = f"%{normalized_search}%"
+    return query.where(
+        _normalized_search_expr(Product.name).like(like)
+        | _normalized_search_expr(Product.short_description).like(like)
+        | _normalized_search_expr(Product.long_description).like(like)
+    )
+
+
+def _apply_price_bounds_state_filters(
+    query,
+    *,
+    sale_active,
+    on_sale: bool | None,
+    is_featured: bool | None,
+    tags: list[str] | None,
+):
+    if on_sale is not None:
+        query = query.where(sale_active if on_sale else ~sale_active)
+    if is_featured is not None:
+        query = query.where(Product.is_featured == is_featured)
+    if tags:
+        query = query.join(Product.tags).where(Tag.slug.in_(tags))
+    return query
+
+
 async def get_product_price_bounds(
     session: AsyncSession,
     category_slug: str | None,
@@ -1782,42 +1877,14 @@ async def get_product_price_bounds(
     now_dt = datetime.now(timezone.utc)
     sale_active = _sale_active_clause(now_dt)
     effective_price = case((sale_active, Product.sale_price), else_=Product.base_price)
-    query = select(
-        func.min(effective_price),
-        func.max(effective_price),
-        func.count(func.distinct(Product.currency)),
-        func.min(Product.currency),
-    ).where(Product.is_deleted.is_(False))
-    if not include_unpublished:
-        query = query.where(Product.is_active.is_(True), Product.status == ProductStatus.published)
-
-    if category_slug:
-        category_ids = await _get_category_and_descendant_ids_by_slug(session, category_slug)
-        if category_ids and not include_unpublished:
-            visible_ids = (
-                await session.execute(
-                    select(Category.id).where(Category.id.in_(category_ids), Category.is_visible.is_(True))
-                )
-            ).scalars().all()
-            category_ids = list(visible_ids)
-        if category_ids:
-            query = query.where(Product.category_id.in_(category_ids))
-        else:
-            query = query.where(false())
-    if on_sale is not None:
-        query = query.where(sale_active if on_sale else ~sale_active)
-    if is_featured is not None:
-        query = query.where(Product.is_featured == is_featured)
-    normalized_search = _normalize_search_text(search)
-    if normalized_search:
-        like = f"%{normalized_search}%"
-        query = query.where(
-            _normalized_search_expr(Product.name).like(like)
-            | _normalized_search_expr(Product.short_description).like(like)
-            | _normalized_search_expr(Product.long_description).like(like)
-        )
-    if tags:
-        query = query.join(Product.tags).where(Tag.slug.in_(tags))
+    query = _build_product_price_bounds_query(effective_price, include_unpublished=include_unpublished)
+    query = await _apply_price_bounds_category_filter(
+        session, query, category_slug, include_unpublished=include_unpublished
+    )
+    query = _apply_price_bounds_search_filter(query, search)
+    query = _apply_price_bounds_state_filters(
+        query, sale_active=sale_active, on_sale=on_sale, is_featured=is_featured, tags=tags
+    )
 
     row = (await session.execute(query)).one()
     min_price, max_price, currency_count, currency = row
@@ -2342,9 +2409,8 @@ async def export_products_csv(session: AsyncSession) -> str:
     return buf.getvalue()
 
 
-async def export_categories_csv(session: AsyncSession, template: bool = False) -> str:
-    buf = io.StringIO()
-    fieldnames = [
+def _category_export_fieldnames() -> list[str]:
+    return [
         "slug",
         "name",
         "parent_slug",
@@ -2356,37 +2422,65 @@ async def export_categories_csv(session: AsyncSession, template: bool = False) -
         "name_en",
         "description_en",
     ]
-    writer = csv.DictWriter(buf, fieldnames=fieldnames)
-    writer.writeheader()
-    if template:
-        return buf.getvalue()
 
+
+async def _load_categories_for_csv_export(session: AsyncSession) -> list[Category]:
     result = await session.execute(
         select(Category)
         .options(selectinload(Category.translations))
         .order_by(Category.sort_order.asc(), Category.slug.asc())
     )
-    categories = result.scalars().unique().all()
+    return result.scalars().unique().all()
+
+
+def _category_parent_slug(category: Category, id_to_slug: dict[uuid.UUID, str]) -> str:
+    if category.parent_id is None:
+        return ""
+    return id_to_slug.get(category.parent_id, "")
+
+
+def _translation_name(translation: CategoryTranslation | None) -> str:
+    if translation is None:
+        return ""
+    return translation.name
+
+
+def _translation_description(translation: CategoryTranslation | None) -> str:
+    if translation is None or translation.description is None:
+        return ""
+    return translation.description or ""
+
+
+def _build_category_export_row(category: Category, id_to_slug: dict[uuid.UUID, str]) -> dict[str, object]:
+    translations = {translation.lang: translation for translation in (category.translations or [])}
+    ro = translations.get("ro")
+    en = translations.get("en")
+    return {
+        "slug": category.slug,
+        "name": category.name,
+        "parent_slug": _category_parent_slug(category, id_to_slug),
+        "sort_order": category.sort_order,
+        "is_visible": "true" if category.is_visible else "false",
+        "description": category.description or "",
+        "name_ro": _translation_name(ro),
+        "description_ro": _translation_description(ro),
+        "name_en": _translation_name(en),
+        "description_en": _translation_description(en),
+    }
+
+
+async def export_categories_csv(session: AsyncSession, template: bool = False) -> str:
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=_category_export_fieldnames())
+    writer.writeheader()
+    if template:
+        return buf.getvalue()
+
+    categories = await _load_categories_for_csv_export(session)
     id_to_slug = {c.id: c.slug for c in categories}
 
-    for c in categories:
-        translations = {t.lang: t for t in (c.translations or [])}
-        ro = translations.get("ro")
-        en = translations.get("en")
-        writer.writerow(
-            {
-                "slug": c.slug,
-                "name": c.name,
-                "parent_slug": id_to_slug.get(c.parent_id, "") if c.parent_id else "",
-                "sort_order": c.sort_order,
-                "is_visible": "true" if c.is_visible else "false",
-                "description": c.description or "",
-                "name_ro": ro.name if ro else "",
-                "description_ro": ro.description or "" if ro and ro.description else "",
-                "name_en": en.name if en else "",
-                "description_en": en.description or "" if en and en.description else "",
-            }
-        )
+    for category in categories:
+        writer.writerow(_build_category_export_row(category, id_to_slug))
     return buf.getvalue()
 
 

@@ -705,6 +705,55 @@ async def admin_summary(
     }
 
 
+def _admin_request_metadata(request: Request) -> dict[str, str | None]:
+    return {
+        "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+        "ip_address": (request.client.host if request.client else None),
+    }
+
+
+def _admin_send_report_audit_data(
+    kind: str,
+    force: bool,
+    request_meta: dict[str, str | None],
+    *,
+    result: dict | None = None,
+    error: Exception | None = None,
+) -> dict[str, object]:
+    payload: dict[str, object] = {"kind": kind, "force": force, **request_meta}
+    if result is not None:
+        payload["result"] = result
+    if error is not None:
+        payload["error"] = str(error)[:500]
+    return payload
+
+
+async def _admin_send_report_audit_log(
+    session: AsyncSession,
+    actor_user_id: UUID,
+    action: str,
+    kind: str,
+    force: bool,
+    request_meta: dict[str, str | None],
+    *,
+    result: dict | None = None,
+    error: Exception | None = None,
+) -> None:
+    await audit_chain_service.add_admin_audit_log(
+        session,
+        action=action,
+        actor_user_id=actor_user_id,
+        subject_user_id=None,
+        data=_admin_send_report_audit_data(
+            kind=kind,
+            force=force,
+            request_meta=request_meta,
+            result=result,
+            error=error,
+        ),
+    )
+
+
 @router.post("/reports/send")
 async def admin_send_scheduled_report(
     request: Request,
@@ -714,58 +763,76 @@ async def admin_send_scheduled_report(
 ) -> dict:
     kind = str(payload.get("kind") or "").strip().lower()
     force = bool(payload.get("force", False))
+    request_meta = _admin_request_metadata(request)
     try:
         result = await admin_reports_service.send_report_now(session, kind=kind, force=force)
     except ValueError as exc:
         await session.rollback()
-        await audit_chain_service.add_admin_audit_log(
+        await _admin_send_report_audit_log(
             session,
             action="admin_reports.send_now_failed",
             actor_user_id=current_user.id,
-            subject_user_id=None,
-            data={
-                "kind": kind,
-                "force": force,
-                "error": str(exc)[:500],
-                "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
-                "ip_address": (request.client.host if request.client else None),
-            },
+            kind=kind,
+            force=force,
+            request_meta=request_meta,
+            error=exc,
         )
         await session.commit()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except Exception as exc:
         await session.rollback()
-        await audit_chain_service.add_admin_audit_log(
+        await _admin_send_report_audit_log(
             session,
             action="admin_reports.send_now_error",
             actor_user_id=current_user.id,
-            subject_user_id=None,
-            data={
-                "kind": kind,
-                "force": force,
-                "error": str(exc)[:500],
-                "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
-                "ip_address": (request.client.host if request.client else None),
-            },
+            kind=kind,
+            force=force,
+            request_meta=request_meta,
+            error=exc,
         )
         await session.commit()
         raise
 
-    await audit_chain_service.add_admin_audit_log(
+    await _admin_send_report_audit_log(
         session,
         action="admin_reports.send_now",
         actor_user_id=current_user.id,
-        subject_user_id=None,
-        data={
-            "kind": kind,
-            "force": force,
-            "result": result,
-            "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
-            "ip_address": (request.client.host if request.client else None),
-        },
+        kind=kind,
+        force=force,
+        request_meta=request_meta,
+        result=result,
     )
     await session.commit()
     return result
+
+
+async def _funnel_distinct_sessions(
+    session: AsyncSession, window_filters: tuple[Any, ...], event: str
+) -> int:
+    value = await session.scalar(
+        select(func.count(func.distinct(AnalyticsEvent.session_id))).where(
+            *window_filters,
+            AnalyticsEvent.event == event,
+        )
+    )
+    return int(value or 0)
+
+
+async def _funnel_counts(
+    session: AsyncSession, window_filters: tuple[Any, ...]
+) -> tuple[int, int, int, int]:
+    return (
+        await _funnel_distinct_sessions(session, window_filters, "session_start"),
+        await _funnel_distinct_sessions(session, window_filters, "view_cart"),
+        await _funnel_distinct_sessions(session, window_filters, "checkout_start"),
+        await _funnel_distinct_sessions(session, window_filters, "checkout_success"),
+    )
+
+
+def _funnel_rate(numerator: int, denominator: int) -> float | None:
+    if denominator <= 0:
+        return None
+    return numerator / denominator
 
 
 @router.get("/funnel")
@@ -777,46 +844,9 @@ async def admin_funnel_metrics(
     range_to: date | None = Query(default=None),
 ) -> AdminFunnelMetricsResponse:
     now = datetime.now(timezone.utc)
-    if (range_from is None) != (range_to is None):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="range_from and range_to must be provided together",
-        )
-
-    if range_from is not None and range_to is not None:
-        if range_to < range_from:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="range_to must be on/after range_from",
-            )
-        start = datetime.combine(range_from, datetime.min.time(), tzinfo=timezone.utc)
-        end = datetime.combine(range_to + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc)
-        effective_range_days = (range_to - range_from).days + 1
-    else:
-        start = now - timedelta(days=range_days)
-        end = now
-        effective_range_days = range_days
-
-    window_filters = [AnalyticsEvent.created_at >= start, AnalyticsEvent.created_at < end]
-
-    async def _distinct_sessions(event: str) -> int:
-        value = await session.scalar(
-            select(func.count(func.distinct(AnalyticsEvent.session_id))).where(
-                *window_filters,
-                AnalyticsEvent.event == event,
-            )
-        )
-        return int(value or 0)
-
-    sessions_count = await _distinct_sessions("session_start")
-    carts_count = await _distinct_sessions("view_cart")
-    checkouts_count = await _distinct_sessions("checkout_start")
-    orders_count = await _distinct_sessions("checkout_success")
-
-    def _rate(numer: int, denom: int) -> float | None:
-        if denom <= 0:
-            return None
-        return numer / denom
+    start, end, effective_range_days = _summary_resolve_range(now, range_days, range_from, range_to)
+    window_filters = (AnalyticsEvent.created_at >= start, AnalyticsEvent.created_at < end)
+    sessions_count, carts_count, checkouts_count, orders_count = await _funnel_counts(session, window_filters)
 
     return AdminFunnelMetricsResponse(
         range_days=int(effective_range_days),
@@ -829,11 +859,134 @@ async def admin_funnel_metrics(
             orders=orders_count,
         ),
         conversions=AdminFunnelConversions(
-            to_cart=_rate(carts_count, sessions_count),
-            to_checkout=_rate(checkouts_count, carts_count),
-            to_order=_rate(orders_count, checkouts_count),
+            to_cart=_funnel_rate(carts_count, sessions_count),
+            to_checkout=_funnel_rate(checkouts_count, carts_count),
+            to_order=_funnel_rate(orders_count, checkouts_count),
         ),
     )
+
+
+def _channel_window_filters(start: datetime, end: datetime, exclude_test_orders: Any) -> tuple[Any, ...]:
+    return (Order.created_at >= start, Order.created_at < end, exclude_test_orders)
+
+
+async def _channel_gross_rows(
+    session: AsyncSession,
+    start: datetime,
+    end: datetime,
+    sales_statuses: tuple[OrderStatus, ...],
+    exclude_test_orders: Any,
+    col: Any,
+) -> list[Any]:
+    rows = await session.execute(
+        select(
+            col,
+            func.count().label("orders"),
+            func.coalesce(func.sum(Order.total_amount), 0).label("gross_sales"),
+        )
+        .select_from(Order)
+        .where(
+            *_channel_window_filters(start, end, exclude_test_orders),
+            Order.status.in_(sales_statuses),
+        )
+        .group_by(col)
+    )
+    return rows.all()
+
+
+async def _channel_refunds_rows(
+    session: AsyncSession,
+    start: datetime,
+    end: datetime,
+    sales_statuses: tuple[OrderStatus, ...],
+    exclude_test_orders: Any,
+    col: Any,
+) -> list[Any]:
+    rows = await session.execute(
+        select(col, func.coalesce(func.sum(OrderRefund.amount), 0).label("refunds"))
+        .select_from(OrderRefund)
+        .join(Order, OrderRefund.order_id == Order.id)
+        .where(
+            *_channel_window_filters(start, end, exclude_test_orders),
+            Order.status.in_(sales_statuses),
+        )
+        .group_by(col)
+    )
+    return rows.all()
+
+
+async def _channel_missing_refunds_rows(
+    session: AsyncSession,
+    start: datetime,
+    end: datetime,
+    exclude_test_orders: Any,
+    col: Any,
+) -> list[Any]:
+    rows = await session.execute(
+        select(col, func.coalesce(func.sum(Order.total_amount), 0).label("missing"))
+        .select_from(Order)
+        .outerjoin(OrderRefund, OrderRefund.order_id == Order.id)
+        .where(
+            *_channel_window_filters(start, end, exclude_test_orders),
+            Order.status == OrderStatus.refunded,
+            OrderRefund.id.is_(None),
+        )
+        .group_by(col)
+    )
+    return rows.all()
+
+
+def _channel_rows_value_map(rows: list[Any]) -> dict[Any, Any]:
+    return {row[0]: row[1] for row in rows}
+
+
+def _channel_number_or_zero(value: Any) -> Any:
+    return value if value is not None else 0
+
+
+def _channel_int_or_zero(value: Any) -> int:
+    return int(_channel_number_or_zero(value))
+
+
+def _channel_items(
+    gross_rows: list[Any],
+    refunds_map: dict[Any, Any],
+    missing_map: dict[Any, Any],
+    label_unknown: str,
+) -> list[dict]:
+    items: list[dict] = []
+    for key, orders_count, gross in gross_rows:
+        gross_value = _channel_number_or_zero(gross)
+        refunds = _channel_number_or_zero(refunds_map.get(key))
+        missing = _channel_number_or_zero(missing_map.get(key))
+        net = gross_value - refunds - missing
+        items.append(
+            {
+                "key": key if key else label_unknown,
+                "orders": _channel_int_or_zero(orders_count),
+                "gross_sales": float(gross_value),
+                "net_sales": float(_channel_number_or_zero(net)),
+            }
+        )
+    items.sort(key=lambda row: (row.get("orders", 0), row.get("gross_sales", 0)), reverse=True)
+    return items
+
+
+async def _channel_breakdown_items(
+    session: AsyncSession,
+    start: datetime,
+    end: datetime,
+    sales_statuses: tuple[OrderStatus, ...],
+    exclude_test_orders: Any,
+    col: Any,
+    label_unknown: str = "unknown",
+) -> list[dict]:
+    gross_rows = await _channel_gross_rows(session, start, end, sales_statuses, exclude_test_orders, col)
+    refunds_rows = await _channel_refunds_rows(session, start, end, sales_statuses, exclude_test_orders, col)
+    missing_rows = await _channel_missing_refunds_rows(session, start, end, exclude_test_orders, col)
+    refunds_map = _channel_rows_value_map(refunds_rows)
+    missing_map = _channel_rows_value_map(missing_rows)
+    return _channel_items(gross_rows, refunds_map, missing_map, label_unknown)
 
 
 @router.get("/channel-breakdown")
@@ -845,114 +998,28 @@ async def admin_channel_breakdown(
     range_to: date | None = Query(default=None),
 ) -> dict:
     now = datetime.now(timezone.utc)
-    successful_statuses = (OrderStatus.paid, OrderStatus.shipped, OrderStatus.delivered)
-    sales_statuses = (*successful_statuses, OrderStatus.refunded)
-
-    if (range_from is None) != (range_to is None):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="range_from and range_to must be provided together",
-        )
-
-    if range_from is not None and range_to is not None:
-        if range_to < range_from:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="range_to must be on/after range_from",
-            )
-        start = datetime.combine(range_from, datetime.min.time(), tzinfo=timezone.utc)
-        end = datetime.combine(
-            range_to + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc
-        )
-        effective_range_days = (range_to - range_from).days + 1
-    else:
-        start = now - timedelta(days=range_days)
-        end = now
-        effective_range_days = range_days
-
-    test_order_ids = select(OrderTag.order_id).where(OrderTag.tag == "test")
-    exclude_test_orders = Order.id.notin_(test_order_ids)
-
-    async def _gross_by(col):
-        rows = await session.execute(
-            select(
-                col,
-                func.count().label("orders"),
-                func.coalesce(func.sum(Order.total_amount), 0).label("gross_sales"),
-            )
-            .select_from(Order)
-            .where(
-                Order.created_at >= start,
-                Order.created_at < end,
-                Order.status.in_(sales_statuses),
-                exclude_test_orders,
-            )
-            .group_by(col)
-        )
-        return rows.all()
-
-    async def _refunds_by(col):
-        rows = await session.execute(
-            select(col, func.coalesce(func.sum(OrderRefund.amount), 0).label("refunds"))
-            .select_from(OrderRefund)
-            .join(Order, OrderRefund.order_id == Order.id)
-            .where(
-                Order.created_at >= start,
-                Order.created_at < end,
-                Order.status.in_(sales_statuses),
-                exclude_test_orders,
-            )
-            .group_by(col)
-        )
-        return rows.all()
-
-    async def _missing_refunds_by(col):
-        rows = await session.execute(
-            select(col, func.coalesce(func.sum(Order.total_amount), 0).label("missing"))
-            .select_from(Order)
-            .outerjoin(OrderRefund, OrderRefund.order_id == Order.id)
-            .where(
-                Order.created_at >= start,
-                Order.created_at < end,
-                Order.status == OrderStatus.refunded,
-                OrderRefund.id.is_(None),
-                exclude_test_orders,
-            )
-            .group_by(col)
-        )
-        return rows.all()
-
-    async def _build(col, label_unknown: str = "unknown") -> list[dict]:
-        gross_rows = await _gross_by(col)
-        refunds_rows = await _refunds_by(col)
-        missing_rows = await _missing_refunds_by(col)
-
-        refunds_map = {row[0]: row[1] for row in refunds_rows}
-        missing_map = {row[0]: row[1] for row in missing_rows}
-
-        items: list[dict] = []
-        for key, orders_count, gross in gross_rows:
-            refunds = refunds_map.get(key, 0) or 0
-            missing = missing_map.get(key, 0) or 0
-            net = (gross or 0) - refunds - missing
-            items.append(
-                {
-                    "key": (key or label_unknown),
-                    "orders": int(orders_count or 0),
-                    "gross_sales": float(gross or 0),
-                    "net_sales": float(net or 0),
-                }
-            )
-        items.sort(key=lambda row: (row.get("orders", 0), row.get("gross_sales", 0)), reverse=True)
-        return items
+    sales_statuses = (
+        OrderStatus.paid,
+        OrderStatus.shipped,
+        OrderStatus.delivered,
+        OrderStatus.refunded,
+    )
+    start, end, effective_range_days = _summary_resolve_range(now, range_days, range_from, range_to)
+    exclude_test_orders = _exclude_test_orders_clause()
 
     return {
         "range_days": int(effective_range_days),
         "range_from": start.date().isoformat(),
         "range_to": (end - timedelta(microseconds=1)).date().isoformat(),
-        "payment_methods": await _build(Order.payment_method),
-        "couriers": await _build(Order.courier),
-        "delivery_types": await _build(Order.delivery_type),
+        "payment_methods": await _channel_breakdown_items(
+            session, start, end, sales_statuses, exclude_test_orders, Order.payment_method
+        ),
+        "couriers": await _channel_breakdown_items(
+            session, start, end, sales_statuses, exclude_test_orders, Order.courier
+        ),
+        "delivery_types": await _channel_breakdown_items(
+            session, start, end, sales_statuses, exclude_test_orders, Order.delivery_type
+        ),
     }
 
 
