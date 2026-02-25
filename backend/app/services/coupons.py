@@ -105,6 +105,35 @@ def _should_skip_sale_item(promotion: Promotion, product) -> bool:
     return not promotion.allow_on_sale_items and product is not None and is_sale_active(product)
 
 
+def _eligible_line_totals_for_item(
+    item,
+    *,
+    promotion: Promotion,
+    include_products: set[UUID],
+    exclude_products: set[UUID],
+    include_categories: set[UUID],
+    exclude_categories: set[UUID],
+    has_includes: bool,
+) -> tuple[Decimal, Decimal] | None:
+    quantity = int(getattr(item, "quantity", 0) or 0)
+    if quantity <= 0:
+        return None
+    product = getattr(item, "product", None)
+    product_id = getattr(item, "product_id", None) or getattr(product, "id", None)
+    if not product_id:
+        return None
+
+    category_id = getattr(product, "category_id", None) if product is not None else None
+    if not _matches_include_scope(product_id, category_id, include_products, include_categories, has_includes):
+        return None
+    if _matches_exclude_scope(product_id, category_id, exclude_products, exclude_categories):
+        return None
+
+    line_total = _line_total_for_item(item, quantity)
+    eligible_total = Decimal("0.00") if _should_skip_sale_item(promotion, product) else line_total
+    return line_total, eligible_total
+
+
 def cart_eligible_subtotals_for_promotion(
     cart: Cart, *, promotion: Promotion, rounding: pricing.MoneyRounding = "half_up"
 ) -> tuple[Decimal, Decimal, bool, bool]:
@@ -116,27 +145,20 @@ def cart_eligible_subtotals_for_promotion(
     scope_subtotal = Decimal("0.00")
 
     for item in cart.items:
-        quantity = int(getattr(item, "quantity", 0) or 0)
-        if quantity <= 0:
+        totals = _eligible_line_totals_for_item(
+            item,
+            promotion=promotion,
+            include_products=include_products,
+            exclude_products=exclude_products,
+            include_categories=include_categories,
+            exclude_categories=exclude_categories,
+            has_includes=has_includes,
+        )
+        if totals is None:
             continue
-        product = getattr(item, "product", None)
-        product_id = getattr(item, "product_id", None) or getattr(product, "id", None)
-        if not product_id:
-            continue
-        category_id = getattr(product, "category_id", None) if product is not None else None
-
-        if not _matches_include_scope(product_id, category_id, include_products, include_categories, has_includes):
-            continue
-        if _matches_exclude_scope(product_id, category_id, exclude_products, exclude_categories):
-            continue
-
-        line_total = _line_total_for_item(item, quantity)
+        line_total, eligible_line_total = totals
         scope_subtotal += line_total
-
-        if _should_skip_sale_item(promotion, product):
-            continue
-
-        eligible_subtotal += line_total
+        eligible_subtotal += eligible_line_total
 
     return (
         _quantize_money(eligible_subtotal, rounding=rounding),

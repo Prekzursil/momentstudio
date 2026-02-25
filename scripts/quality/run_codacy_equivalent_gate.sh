@@ -28,6 +28,7 @@ resolve_cmd_or() {
   else
     printf '%s' "$fallback"
   fi
+  return 0
 }
 
 run_check() {
