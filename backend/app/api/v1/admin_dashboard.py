@@ -3799,27 +3799,41 @@ async def _audit_export_rows(
     return (await session.execute(q)).mappings().all()
 
 
-def _audit_export_csv_row(row: Any, *, redact: bool) -> list[str]:
-    created_at = row.get("created_at")
-    actor_email = str(row.get("actor_email") or "")
-    subject_email = str(row.get("subject_email") or "")
-    data_raw = str(row.get("data") or "")
+def _audit_row_text(row: Any, key: str) -> str:
+    return str(row.get(key) or "")
 
-    if redact:
-        actor_email = _audit_mask_email(actor_email)
-        subject_email = _audit_mask_email(subject_email)
-        data_raw = _audit_redact_text(data_raw)
+
+def _audit_row_created_at_iso(row: Any) -> str:
+    created_at = row.get("created_at")
+    return created_at.isoformat() if isinstance(created_at, datetime) else ""
+
+
+def _audit_export_email_and_data_cells(row: Any, *, redact: bool) -> tuple[str, str, str]:
+    actor_email = _audit_row_text(row, "actor_email")
+    subject_email = _audit_row_text(row, "subject_email")
+    data_raw = _audit_row_text(row, "data")
+    if not redact:
+        return actor_email, subject_email, data_raw
+    return (
+        _audit_mask_email(actor_email),
+        _audit_mask_email(subject_email),
+        _audit_redact_text(data_raw),
+    )
+
+
+def _audit_export_csv_row(row: Any, *, redact: bool) -> list[str]:
+    actor_email, subject_email, data_raw = _audit_export_email_and_data_cells(row, redact=redact)
 
     return [
-        created_at.isoformat() if isinstance(created_at, datetime) else "",
-        _audit_csv_cell(str(row.get("entity") or "")),
-        _audit_csv_cell(str(row.get("action") or "")),
+        _audit_row_created_at_iso(row),
+        _audit_csv_cell(_audit_row_text(row, "entity")),
+        _audit_csv_cell(_audit_row_text(row, "action")),
         _audit_csv_cell(actor_email),
         _audit_csv_cell(subject_email),
-        _audit_csv_cell(str(row.get("ref_key") or "")),
-        _audit_csv_cell(str(row.get("ref_id") or "")),
-        _audit_csv_cell(str(row.get("actor_user_id") or "")),
-        _audit_csv_cell(str(row.get("subject_user_id") or "")),
+        _audit_csv_cell(_audit_row_text(row, "ref_key")),
+        _audit_csv_cell(_audit_row_text(row, "ref_id")),
+        _audit_csv_cell(_audit_row_text(row, "actor_user_id")),
+        _audit_csv_cell(_audit_row_text(row, "subject_user_id")),
         _audit_csv_cell(data_raw),
     ]
 
@@ -4627,6 +4641,35 @@ async def update_user_role(
     }
 
 
+def _normalized_admin_note(note: object | None) -> str | None:
+    if note is None:
+        return None
+    trimmed = str(note).strip()
+    return trimmed or None
+
+
+def _apply_user_internal_payload(user: User, data: dict[str, Any]) -> dict[str, object]:
+    before_vip = bool(getattr(user, "vip", False))
+    before_note = getattr(user, "admin_note", None)
+
+    if "vip" in data and data["vip"] is not None:
+        user.vip = bool(data["vip"])
+    if "admin_note" in data:
+        user.admin_note = _normalized_admin_note(data.get("admin_note"))
+
+    changes: dict[str, object] = {}
+    after_vip = bool(getattr(user, "vip", False))
+    after_note = getattr(user, "admin_note", None)
+    if before_vip != after_vip:
+        changes["vip"] = {"before": before_vip, "after": after_vip}
+    if before_note != after_note:
+        changes["admin_note"] = {
+            "before_length": len(before_note or ""),
+            "after_length": len(after_note or ""),
+        }
+    return changes
+
+
 @router.patch("/users/{user_id}/internal")
 async def update_user_internal(
     user_id: UUID,
@@ -4638,28 +4681,8 @@ async def update_user_internal(
     if not user or user.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    before_vip = bool(getattr(user, "vip", False))
-    before_note = getattr(user, "admin_note", None)
-
     data = payload.model_dump(exclude_unset=True)
-    if "vip" in data and data["vip"] is not None:
-        user.vip = bool(data["vip"])
-    if "admin_note" in data:
-        note = data.get("admin_note")
-        if note is None:
-            user.admin_note = None
-        else:
-            trimmed = str(note).strip()
-            user.admin_note = trimmed or None
-
-    changes: dict[str, object] = {}
-    if before_vip != bool(getattr(user, "vip", False)):
-        changes["vip"] = {"before": before_vip, "after": bool(getattr(user, "vip", False))}
-    if before_note != getattr(user, "admin_note", None):
-        changes["admin_note"] = {
-            "before_length": len(before_note or ""),
-            "after_length": len((getattr(user, "admin_note", None) or "")),
-        }
+    changes = _apply_user_internal_payload(user, data)
 
     session.add(user)
     await session.flush()
