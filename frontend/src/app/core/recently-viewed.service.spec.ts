@@ -1,31 +1,9 @@
 import { Product } from './catalog.service';
 import { RecentlyViewedService } from './recently-viewed.service';
 
-describe('RecentlyViewedService', () => {
-  function makeProduct(index: number, overrides: Partial<Product> = {}): Product {
-    return {
-      id: `id-${index}`,
-      slug: `slug-${index}`,
-      name: `Name ${index}`,
-      base_price: index + 1,
-      currency: 'RON',
-      images: [{ url: `/img-${index}.jpg` }],
-      ...overrides,
-    } as Product;
-  }
-
-  function clearStorageAndCookie(): void {
-    localStorage.removeItem('recently_viewed');
-    document.cookie = 'recently_viewed=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
-  }
-
-  beforeEach(() => {
-    clearStorageAndCookie();
-  });
-
-  afterEach(() => {
-    clearStorageAndCookie();
-  });
+describe('RecentlyViewedService item curation', () => {
+  beforeEach(() => clearStorageAndCookie());
+  afterEach(() => clearStorageAndCookie());
 
   it('adds items with dedupe and max cap behavior', () => {
     const service = new RecentlyViewedService();
@@ -65,6 +43,11 @@ describe('RecentlyViewedService', () => {
     expect(list[0].images).toEqual([{ url: '/ok.jpg' }]);
     expect(setItemSpy).toHaveBeenCalled();
   });
+});
+
+describe('RecentlyViewedService persistence fallbacks', () => {
+  beforeEach(() => clearStorageAndCookie());
+  afterEach(() => clearStorageAndCookie());
 
   it('falls back to cookie reads when localStorage access fails', () => {
     spyOn(localStorage, 'getItem').and.throwError('blocked');
@@ -80,3 +63,19 @@ describe('RecentlyViewedService', () => {
   });
 });
 
+function makeProduct(index: number, overrides: Partial<Product> = {}): Product {
+  return {
+    id: `id-${index}`,
+    slug: `slug-${index}`,
+    name: `Name ${index}`,
+    base_price: index + 1,
+    currency: 'RON',
+    images: [{ url: `/img-${index}.jpg` }],
+    ...overrides,
+  } as Product;
+}
+
+function clearStorageAndCookie(): void {
+  localStorage.removeItem('recently_viewed');
+  document.cookie = 'recently_viewed=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+}

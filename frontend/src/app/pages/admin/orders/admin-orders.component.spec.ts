@@ -1,43 +1,47 @@
 import { AdminOrdersComponent } from './admin-orders.component';
 
+const EXPECTED_DEFAULT_FILTERS = {
+  q: '',
+  status: 'all',
+  sla: 'all',
+  fraud: 'all',
+  tag: '',
+  fromDate: '',
+  toDate: '',
+  includeTestOrders: true,
+  limit: 20,
+};
+
 function createComponentHarness(userId = 'admin-user'): any {
   const component = Object.create(AdminOrdersComponent.prototype);
   component.auth = {
-    user: () => ({ id: userId })
+    user: () => ({ id: userId }),
   };
   return component;
 }
 
-describe('AdminOrdersComponent preset coercion and loading', () => {
-  it('coercePreset applies safe defaults when filters are null', () => {
+describe('AdminOrdersComponent coercePreset defaults', () => {
+  it('applies safe defaults when filters are null', () => {
     const component = createComponentHarness();
 
     const preset = component.coercePreset({
       id: 'preset-1',
       name: 'Null filters',
       createdAt: undefined,
-      filters: null
+      filters: null,
     });
 
     expect(preset).toEqual({
       id: 'preset-1',
       name: 'Null filters',
       createdAt: '',
-      filters: {
-        q: '',
-        status: 'all',
-        sla: 'all',
-        fraud: 'all',
-        tag: '',
-        fromDate: '',
-        toDate: '',
-        includeTestOrders: true,
-        limit: 20
-      }
+      filters: EXPECTED_DEFAULT_FILTERS,
     });
   });
+});
 
-  it('coercePreset normalizes malformed filter primitives', () => {
+describe('AdminOrdersComponent coercePreset malformed primitives', () => {
+  it('normalizes malformed filter values', () => {
     const component = createComponentHarness();
 
     const preset = component.coercePreset({
@@ -53,8 +57,8 @@ describe('AdminOrdersComponent preset coercion and loading', () => {
         fromDate: null,
         toDate: undefined,
         includeTestOrders: 'yes',
-        limit: '100'
-      }
+        limit: '100',
+      },
     });
 
     expect(preset.createdAt).toBe('1700000000');
@@ -67,8 +71,10 @@ describe('AdminOrdersComponent preset coercion and loading', () => {
     expect(preset.filters.includeTestOrders).toBeTrue();
     expect(preset.filters.limit).toBe(20);
   });
+});
 
-  it('loadPresets returns [] when localStorage has no saved value', () => {
+describe('AdminOrdersComponent loadPresets empty storage', () => {
+  it('returns [] when localStorage has no saved value', () => {
     const component = createComponentHarness('admin-1');
     const getItemSpy = spyOn(localStorage, 'getItem').and.returnValue(null);
 
@@ -77,22 +83,28 @@ describe('AdminOrdersComponent preset coercion and loading', () => {
     expect(getItemSpy).toHaveBeenCalledWith('admin.orders.filters.v1:admin-1');
     expect(presets).toEqual([]);
   });
+});
 
-  it('loadPresets returns [] for malformed localStorage JSON payloads', () => {
+describe('AdminOrdersComponent loadPresets malformed JSON', () => {
+  it('returns [] for malformed localStorage payloads', () => {
     const component = createComponentHarness();
     spyOn(localStorage, 'getItem').and.returnValue('{not-valid-json');
 
     expect(component.loadPresets()).toEqual([]);
   });
+});
 
-  it('loadPresets returns [] when localStorage payload is not an array', () => {
+describe('AdminOrdersComponent loadPresets non-array payload', () => {
+  it('returns [] when localStorage payload is not an array', () => {
     const component = createComponentHarness();
     spyOn(localStorage, 'getItem').and.returnValue(JSON.stringify({ id: 'preset-1' }));
 
     expect(component.loadPresets()).toEqual([]);
   });
+});
 
-  it('loadPresets filters malformed entries and coerces valid ones', () => {
+describe('AdminOrdersComponent loadPresets filtering', () => {
+  it('filters malformed entries and coerces valid ones', () => {
     const component = createComponentHarness();
     spyOn(localStorage, 'getItem').and.returnValue(
       JSON.stringify([
@@ -107,10 +119,10 @@ describe('AdminOrdersComponent preset coercion and loading', () => {
             sla: 'not-real',
             fraud: 'queue',
             includeTestOrders: 'false',
-            limit: Number.NaN
-          }
-        }
-      ])
+            limit: Number.NaN,
+          },
+        },
+      ]),
     );
 
     const presets = component.loadPresets();
@@ -121,20 +133,16 @@ describe('AdminOrdersComponent preset coercion and loading', () => {
       name: 'Valid preset',
       createdAt: '',
       filters: {
+        ...EXPECTED_DEFAULT_FILTERS,
         q: '7',
-        status: 'all',
-        sla: 'all',
         fraud: 'queue',
-        tag: '',
-        fromDate: '',
-        toDate: '',
-        includeTestOrders: true,
-        limit: 20
-      }
+      },
     });
   });
+});
 
-  it('applyKanbanResult writes empty defaults when response is null', () => {
+describe('AdminOrdersComponent applyKanbanResult', () => {
+  it('writes empty defaults when response is null', () => {
     const component = createComponentHarness();
     const itemsByStatus: Record<string, any[]> = {};
     const totalsByStatus: Record<string, number> = {};
@@ -144,25 +152,27 @@ describe('AdminOrdersComponent preset coercion and loading', () => {
     expect(itemsByStatus['pending']).toEqual([]);
     expect(totalsByStatus['pending']).toBe(0);
   });
+});
 
-  it('collectKanbanFirstError captures first error and keeps kanban buckets consistent', () => {
+describe('AdminOrdersComponent collectKanbanFirstError', () => {
+  it('captures first error and keeps kanban buckets consistent', () => {
     const component = createComponentHarness();
     const itemsByStatus: Record<string, any[]> = {};
     const totalsByStatus: Record<string, number> = {};
     const firstNetworkError = new Error('failed');
     const successfulResponse: any = {
       items: [{ id: 'order-1' }],
-      meta: { total_items: 1 }
+      meta: { total_items: 1 },
     };
 
     const firstError = component.collectKanbanFirstError(
       [
         { status: 'paid', res: successfulResponse },
         { status: 'cancelled', res: null, err: firstNetworkError },
-        { status: 'failed', res: null, err: new Error('second') }
+        { status: 'failed', res: null, err: new Error('second') },
       ],
       itemsByStatus,
-      totalsByStatus
+      totalsByStatus,
     );
 
     expect(firstError).toBe(firstNetworkError);

@@ -2,26 +2,26 @@ import { of, throwError } from 'rxjs';
 
 import { AdminFavoritesService } from './admin-favorites.service';
 
-describe('AdminFavoritesService', () => {
-  function createService() {
-    const api = jasmine.createSpyObj('ApiService', ['get', 'put']);
-    const toast = jasmine.createSpyObj('ToastService', ['error']);
-    const translate = { instant: (key: string) => key } as any;
-    const service = new AdminFavoritesService(api as any, toast as any, translate);
-    return { service, api, toast };
-  }
+function createService() {
+  const api = jasmine.createSpyObj('ApiService', ['get', 'put']);
+  const toast = jasmine.createSpyObj('ToastService', ['error']);
+  const translate = { instant: (key: string) => key } as any;
+  const service = new AdminFavoritesService(api as any, toast as any, translate);
+  return { service, api, toast };
+}
 
-  function favorite(key: string) {
-    return {
-      key,
-      type: 'filter' as const,
-      label: `Label ${key}`,
-      subtitle: `Subtitle ${key}`,
-      url: `/admin/${key}`,
-      state: null as Record<string, any> | null,
-    };
-  }
+function favorite(key: string) {
+  return {
+    key,
+    type: 'filter' as const,
+    label: `Label ${key}`,
+    subtitle: `Subtitle ${key}`,
+    url: `/admin/${key}`,
+    state: null as Record<string, any> | null,
+  };
+}
 
+describe('AdminFavoritesService loading behavior', () => {
   it('initializes only once and loads favorites', () => {
     const { service, api } = createService();
     api.get.and.returnValue(of({ items: [favorite('a')] }));
@@ -44,7 +44,9 @@ describe('AdminFavoritesService', () => {
     expect(service.loading()).toBeFalse();
     expect(service.error()).toBe('adminUi.favorites.errors.load');
   });
+});
 
+describe('AdminFavoritesService mutations', () => {
   it('adds and trims favorites using optimistic save', () => {
     const { service, api } = createService();
     api.put.and.callFake((_url: string, body: any) => of({ items: body.items }));
@@ -87,4 +89,3 @@ describe('AdminFavoritesService', () => {
     expect(service.items()).toEqual([]);
   });
 });
-

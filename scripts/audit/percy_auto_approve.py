@@ -161,6 +161,66 @@ def _validate_sha(sha: str) -> str:
     return value
 
 
+def _print_non_approvable(*, reason: str, builds_scanned: int) -> int:
+    print("approved=false")
+    print(f"reason={reason}")
+    print(f"builds_scanned={builds_scanned}")
+    return 0
+
+
+def _approve_selected_build(
+    build_id: str,
+    *,
+    token: str,
+    browserstack_username: str | None,
+    browserstack_access_key: str | None,
+) -> None:
+    approval_basic_auth: tuple[str, str] | None = None
+    if browserstack_username and browserstack_access_key:
+        approval_basic_auth = (browserstack_username, browserstack_access_key)
+    _request_json(
+        token=token if approval_basic_auth is None else None,
+        method="POST",
+        path="/reviews",
+        payload={
+            "data": {
+                "type": "reviews",
+                "attributes": {"state": "approved"},
+                "relationships": {
+                    "build": {
+                        "data": {
+                            "type": "builds",
+                            "id": build_id,
+                        }
+                    }
+                },
+            }
+        },
+        basic_auth=approval_basic_auth,
+    )
+
+
+def _approve_selected_build_with_error_details(
+    *,
+    build_id: str,
+    token: str,
+    browserstack_username: str | None,
+    browserstack_access_key: str | None,
+) -> None:
+    try:
+        _approve_selected_build(
+            build_id,
+            token=token,
+            browserstack_username=browserstack_username,
+            browserstack_access_key=browserstack_access_key,
+        )
+    except PercyApiError as exc:
+        print("approved=false")
+        print(f"reason=approval-error:{exc}")
+        print(f"selected_build_id={build_id}")
+        raise
+
+
 def run(
     *,
     token: str,
@@ -171,43 +231,6 @@ def run(
     browserstack_username: str | None = None,
     browserstack_access_key: str | None = None,
 ) -> int:
-    def _print_non_approvable(reason: str) -> int:
-        print("approved=false")
-        print(f"reason={reason}")
-        print(f"builds_scanned={len(builds)}")
-        return 0
-
-    def _approve_selected_build(
-        build_id: str,
-        *,
-        token: str,
-        browserstack_username: str | None,
-        browserstack_access_key: str | None,
-    ) -> None:
-        approval_basic_auth: tuple[str, str] | None = None
-        if browserstack_username and browserstack_access_key:
-            approval_basic_auth = (browserstack_username, browserstack_access_key)
-        _request_json(
-            token=token if approval_basic_auth is None else None,
-            method="POST",
-            path="/reviews",
-            payload={
-                "data": {
-                    "type": "reviews",
-                    "attributes": {"state": "approved"},
-                    "relationships": {
-                        "build": {
-                            "data": {
-                                "type": "builds",
-                                "id": build_id,
-                            }
-                        }
-                    },
-                }
-            },
-            basic_auth=approval_basic_auth,
-        )
-
     safe_sha = _validate_sha(sha)
     if limit < 1:
         raise ValueError("Limit must be >= 1")
@@ -222,11 +245,11 @@ def run(
 
     selected = select_build_for_approval(builds)
     if selected is None:
-        return _print_non_approvable("no-approvable-build")
+        return _print_non_approvable(reason="no-approvable-build", builds_scanned=len(builds))
 
     build_id = str(selected.get("id") or "")
     if not build_id:
-        return _print_non_approvable("missing-build-id")
+        return _print_non_approvable(reason="missing-build-id", builds_scanned=len(builds))
 
     print(f"selected_build_id={build_id}")
     print(f"builds_scanned={len(builds)}")
@@ -236,18 +259,12 @@ def run(
         print("reason=dry-run")
         return 0
 
-    try:
-        _approve_selected_build(
-            build_id,
-            token=token,
-            browserstack_username=browserstack_username,
-            browserstack_access_key=browserstack_access_key,
-        )
-    except PercyApiError as exc:
-        print("approved=false")
-        print(f"reason=approval-error:{exc}")
-        print(f"selected_build_id={build_id}")
-        raise
+    _approve_selected_build_with_error_details(
+        build_id=build_id,
+        token=token,
+        browserstack_username=browserstack_username,
+        browserstack_access_key=browserstack_access_key,
+    )
 
     print("approved=true")
     print("reason=build-approved")
