@@ -12,7 +12,7 @@ function mockSignal<T>(initial: T): SignalLike<T> {
 }
 
 function createStateHarness(): any {
-  const state = Object.create(AccountState.prototype) as any;
+  const state: any = Object.create(AccountState.prototype);
   const nowMs = Date.parse('2026-02-27T00:00:00Z');
 
   state.now = mockSignal(nowMs);
