@@ -16,81 +16,27 @@ from typing import Any
 
 
 SEVERE_LEVELS = {"s1", "s2"}
-ALLOWED_AUDIT_PATH_PREFIXES = ("artifacts/audit-evidence", "artifacts/audit-evidence-local")
-ALLOWED_FINDINGS_FILES = frozenset(
-    {
-        "artifacts/audit-evidence/deterministic-findings.json",
-        "artifacts/audit-evidence-local/deterministic-findings.json",
-    }
-)
-SEVERE_OUTPUT_TARGETS = {
-    "artifacts/audit-evidence/severe-issues.json": "repo",
-    "artifacts/audit-evidence-local/severe-issues.json": "local",
-}
-SEVERE_OUTPUT_REPO = "artifacts/audit-evidence/severe-issues.json"
-SEVERE_OUTPUT_LOCAL = "artifacts/audit-evidence-local/severe-issues.json"
 
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def _validated_repo_path(candidate: Path, *, allowed_prefixes: tuple[str, ...]) -> Path:
+def _resolve_repo_path(raw: str, *, allowed_prefixes: tuple[str, ...]) -> Path:
     root = _repo_root()
-    resolved = candidate.resolve()
+    candidate = (root / raw).resolve()
     try:
-        rel = resolved.relative_to(root).as_posix()
+        rel = candidate.relative_to(root).as_posix()
     except ValueError as exc:
-        raise ValueError(f"Path must stay inside repository: {candidate}") from exc
+        raise ValueError(f"Path must stay inside repository: {raw}") from exc
     if not any(rel == prefix or rel.startswith(f"{prefix}/") for prefix in allowed_prefixes):
-        raise ValueError(f"Path is outside allowed audit roots: {candidate}")
-    return resolved
+        raise ValueError(f"Path is outside allowed audit roots: {raw}")
+    return candidate
 
 
-def _resolve_findings_path(raw: str) -> Path:
-    normalized = str(raw or "").strip().replace("\\", "/")
-    if normalized not in ALLOWED_FINDINGS_FILES:
-        allowed = ", ".join(sorted(ALLOWED_FINDINGS_FILES))
-        raise ValueError(f"Unsupported --findings path '{raw}'. Allowed: {allowed}")
-    return _validated_repo_path(_repo_root() / normalized, allowed_prefixes=ALLOWED_AUDIT_PATH_PREFIXES)
-
-
-def _write_repo_severe_json(payload: Any) -> None:
-    safe_path = _validated_repo_path(_repo_root() / SEVERE_OUTPUT_REPO, allowed_prefixes=ALLOWED_AUDIT_PATH_PREFIXES)
-    safe_path.parent.mkdir(parents=True, exist_ok=True)
-    safe_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")  # NOSONAR
-
-
-def _write_local_severe_json(payload: Any) -> None:
-    safe_path = _validated_repo_path(_repo_root() / SEVERE_OUTPUT_LOCAL, allowed_prefixes=ALLOWED_AUDIT_PATH_PREFIXES)
-    safe_path.parent.mkdir(parents=True, exist_ok=True)
-    safe_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")  # NOSONAR
-
-
-def _resolve_severe_output_target(raw: str) -> str | None:
-    if not raw:
-        return None
-    normalized = str(raw).strip().replace("\\", "/")
-    target = SEVERE_OUTPUT_TARGETS.get(normalized)
-    if target is None:
-        allowed = ", ".join(sorted(SEVERE_OUTPUT_TARGETS))
-        raise ValueError(f"Unsupported --severe-output path '{raw}'. Allowed: {allowed}")
-    return target
-
-
-def _emit_severe_output(target: str | None, rows: list[dict[str, Any]]) -> None:
-    if target == "repo":
-        _write_repo_severe_json(rows)
-    elif target == "local":
-        _write_local_severe_json(rows)
-
-
-def _issue_candidate_fingerprints(findings: list[dict[str, Any]], *, include_s3_seo: bool) -> set[str]:
-    return {
-        str(row.get("fingerprint") or "")
-        for row in findings
-        if _should_upsert_issue(row, include_s3_seo=include_s3_seo)
-    }
+def _write_json(path: Path, payload: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
 @dataclass(frozen=True)
@@ -180,17 +126,17 @@ def _extract_fingerprint_marker(body: str) -> str:
     return body[idx + len(marker_prefix) : end_idx].strip()
 
 
-def _issue_body_for_finding(finding: dict[str, Any], run_url: str | None) -> str:
-    fingerprint = str(finding.get("fingerprint") or "")
-    title = str(finding.get("title") or "Audit finding")
-    route = str(finding.get("route") or "/")
-    surface = str(finding.get("surface") or "storefront")
-    severity = str(finding.get("severity") or "s3")
-    effort = str(finding.get("effort") or "M")
-    impact = finding.get("impact", 1)
-    description = str(finding.get("description") or "").strip()
-    evidence_files = finding.get("evidence_files") or []
-
+def _finding_metadata_lines(
+    *,
+    fingerprint: str,
+    title: str,
+    route: str,
+    surface: str,
+    severity: str,
+    effort: str,
+    impact: Any,
+    run_url: str | None,
+) -> list[str]:
     lines = [
         f"<!-- audit:fingerprint:{fingerprint} -->",
         "",
@@ -204,29 +150,64 @@ def _issue_body_for_finding(finding: dict[str, Any], run_url: str | None) -> str
     ]
     if run_url:
         lines.append(f"- Evidence run: {run_url}")
-    lines.extend(
-        [
-            "",
-            "### Evidence files",
-            "",
-        ]
+    return lines
+
+
+def _evidence_file_lines(evidence_files: list[Any]) -> list[str]:
+    return [f"- `artifacts/audit-evidence/{item}`" for item in evidence_files]
+
+
+def _finding_guidance_lines(description: str) -> list[str]:
+    return [
+        "",
+        "### Why this matters",
+        "",
+        description or "See evidence files for details.",
+        "",
+        "### Suggested fix",
+        "",
+        "- Reproduce from the evidence pack route and screenshot.",
+        "- Apply focused fix in the owning surface/module.",
+        "- Add or update tests to cover this behavior.",
+    ]
+
+
+def _finding_text(finding: dict[str, Any], key: str, default: str) -> str:
+    return str(finding.get(key) or default)
+
+
+def _finding_description(finding: dict[str, Any]) -> str:
+    return str(finding.get("description") or "").strip()
+
+
+def _finding_evidence_files(finding: dict[str, Any]) -> list[Any]:
+    return list(finding.get("evidence_files") or [])
+
+
+def _issue_body_for_finding(finding: dict[str, Any], run_url: str | None) -> str:
+    fingerprint = _finding_text(finding, "fingerprint", "")
+    title = _finding_text(finding, "title", "Audit finding")
+    route = _finding_text(finding, "route", "/")
+    surface = _finding_text(finding, "surface", "storefront")
+    severity = _finding_text(finding, "severity", "s3")
+    effort = _finding_text(finding, "effort", "M")
+    impact = finding.get("impact", 1)
+    description = _finding_description(finding)
+    evidence_files = _finding_evidence_files(finding)
+
+    lines = _finding_metadata_lines(
+        fingerprint=fingerprint,
+        title=title,
+        route=route,
+        surface=surface,
+        severity=severity,
+        effort=effort,
+        impact=impact,
+        run_url=run_url,
     )
-    for item in evidence_files:
-        lines.append(f"- `artifacts/audit-evidence/{item}`")
-    lines.extend(
-        [
-            "",
-            "### Why this matters",
-            "",
-            description or "See evidence files for details.",
-            "",
-            "### Suggested fix",
-            "",
-            "- Reproduce from the evidence pack route and screenshot.",
-            "- Apply focused fix in the owning surface/module.",
-            "- Add or update tests to cover this behavior.",
-        ]
-    )
+    lines.extend(["", "### Evidence files", ""])
+    lines.extend(_evidence_file_lines(evidence_files))
+    lines.extend(_finding_guidance_lines(description))
     return "\n".join(lines).strip() + "\n"
 
 
@@ -292,6 +273,89 @@ def _should_upsert_issue(finding: dict[str, Any], *, include_s3_seo: bool) -> bo
     return is_seo and is_indexable
 
 
+def _issue_title_for_finding(finding: dict[str, Any]) -> str:
+    return (
+        f"[Audit][{finding.get('severity','s3').upper()}]"
+        f"[{finding.get('surface','storefront')}] {finding.get('title','Audit finding')}"
+    )
+
+
+def _issue_labels_for_finding(finding: dict[str, Any]) -> list[str]:
+    return sorted(set(["ai:ready", *list(finding.get("labels") or [])]))
+
+
+def _issue_row_for_finding(
+    issue: dict[str, Any],
+    finding: dict[str, Any],
+    *,
+    fingerprint: str,
+    action: str,
+) -> dict[str, Any]:
+    return {
+        "issue_number": int(issue.get("number") or 0),
+        "issue_node_id": str(issue.get("node_id") or ""),
+        "fingerprint": fingerprint,
+        "route": str(finding.get("route") or "/"),
+        "surface": str(finding.get("surface") or "storefront"),
+        "severity": str(finding.get("severity") or "s2").lower(),
+        "action": action,
+    }
+
+
+def _issues_by_fingerprint_marker(open_issues: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    by_marker: dict[str, dict[str, Any]] = {}
+    for issue in open_issues:
+        body = str(issue.get("body") or "")
+        marker = _extract_fingerprint_marker(body)
+        if marker:
+            by_marker[marker] = issue
+    return by_marker
+
+
+def _iter_upsert_candidates(
+    findings: list[dict[str, Any]],
+    *,
+    include_s3_seo: bool,
+) -> list[tuple[dict[str, Any], str]]:
+    seen_fingerprints: set[str] = set()
+    candidates: list[tuple[dict[str, Any], str]] = []
+    for finding in findings:
+        if not _should_upsert_issue(finding, include_s3_seo=include_s3_seo):
+            continue
+        fingerprint = str(finding.get("fingerprint") or "")
+        if not fingerprint or fingerprint in seen_fingerprints:
+            continue
+        seen_fingerprints.add(fingerprint)
+        candidates.append((finding, fingerprint))
+    return candidates
+
+
+def _upsert_single_issue(
+    ctx: GitHubContext,
+    *,
+    by_marker: dict[str, dict[str, Any]],
+    finding: dict[str, Any],
+    fingerprint: str,
+    run_url: str | None,
+) -> tuple[str, dict[str, Any]]:
+    issue_title = _issue_title_for_finding(finding)
+    body = _issue_body_for_finding(finding, run_url)
+    labels = _issue_labels_for_finding(finding)
+    existing = by_marker.get(fingerprint)
+    if existing:
+        _request(
+            ctx,
+            "PATCH",
+            f"/repos/{ctx.owner}/{ctx.repo}/issues/{existing['number']}",
+            payload={"title": issue_title, "body": body, "state": "open"},
+        )
+        return "updated", existing
+
+    created = _safe_create_issue(ctx, title=issue_title, body=body, labels=labels)
+    by_marker[fingerprint] = created
+    return "created", created
+
+
 def _upsert_issues(
     ctx: GitHubContext,
     findings: list[dict[str, Any]],
@@ -299,69 +363,25 @@ def _upsert_issues(
     *,
     include_s3_seo: bool,
 ) -> tuple[int, int, list[dict[str, Any]]]:
-    open_issues = _list_open_issues(ctx)
-    by_marker: dict[str, dict[str, Any]] = {}
-    for issue in open_issues:
-        body = str(issue.get("body") or "")
-        marker = _extract_fingerprint_marker(body)
-        if marker:
-            by_marker[marker] = issue
+    by_marker = _issues_by_fingerprint_marker(_list_open_issues(ctx))
 
     created_count = 0
     updated_count = 0
-    seen_fingerprints: set[str] = set()
     issue_rows: list[dict[str, Any]] = []
-    for finding in findings:
-        if not _should_upsert_issue(finding, include_s3_seo=include_s3_seo):
-            continue
-        fp = str(finding.get("fingerprint") or "")
-        if not fp:
-            continue
-        if fp in seen_fingerprints:
-            continue
-        seen_fingerprints.add(fp)
-        issue_title = (
-            f"[Audit][{finding.get('severity','s3').upper()}]"
-            f"[{finding.get('surface','storefront')}] {finding.get('title','Audit finding')}"
+    for finding, fingerprint in _iter_upsert_candidates(findings, include_s3_seo=include_s3_seo):
+        action, issue = _upsert_single_issue(
+            ctx,
+            by_marker=by_marker,
+            finding=finding,
+            fingerprint=fingerprint,
+            run_url=run_url,
         )
-        body = _issue_body_for_finding(finding, run_url)
-        labels = sorted(set(["ai:ready", *list(finding.get("labels") or [])]))
-
-        existing = by_marker.get(fp)
-        if existing:
-            _request(
-                ctx,
-                "PATCH",
-                f"/repos/{ctx.owner}/{ctx.repo}/issues/{existing['number']}",
-                payload={"title": issue_title, "body": body, "state": "open"},
-            )
+        if action == "created":
+            created_count += 1
+        else:
             updated_count += 1
-            issue_rows.append(
-                {
-                    "issue_number": int(existing.get("number") or 0),
-                    "issue_node_id": str(existing.get("node_id") or ""),
-                    "fingerprint": fp,
-                    "route": str(finding.get("route") or "/"),
-                    "surface": str(finding.get("surface") or "storefront"),
-                    "severity": str(finding.get("severity") or "s2").lower(),
-                    "action": "updated",
-                }
-            )
-            continue
-
-        created = _safe_create_issue(ctx, title=issue_title, body=body, labels=labels)
-        by_marker[fp] = created
-        created_count += 1
         issue_rows.append(
-            {
-                "issue_number": int(created.get("number") or 0),
-                "issue_node_id": str(created.get("node_id") or ""),
-                "fingerprint": fp,
-                "route": str(finding.get("route") or "/"),
-                "surface": str(finding.get("surface") or "storefront"),
-                "severity": str(finding.get("severity") or "s2").lower(),
-                "action": "created",
-            }
+            _issue_row_for_finding(issue, finding, fingerprint=fingerprint, action=action)
         )
 
     return created_count, updated_count, issue_rows
@@ -373,37 +393,54 @@ def _close_stale_fingerprint_issues(
     active_fingerprints: set[str],
     run_url: str | None,
 ) -> int:
+    stale_issues = _iter_stale_fingerprint_issues(ctx, active_fingerprints=active_fingerprints)
     closed_count = 0
+    for issue in stale_issues:
+        _close_fingerprint_issue(ctx, issue_number=int(issue["number"]), run_url=run_url)
+        closed_count += 1
+    return closed_count
+
+
+def _issue_label_names(issue: dict[str, Any]) -> list[str]:
+    return [str(row.get("name") or "") for row in issue.get("labels") or []]
+
+
+def _iter_stale_fingerprint_issues(
+    ctx: GitHubContext,
+    *,
+    active_fingerprints: set[str],
+) -> list[dict[str, Any]]:
+    stale_issues: list[dict[str, Any]] = []
     for issue in _list_open_issues(ctx):
         marker = _extract_fingerprint_marker(str(issue.get("body") or ""))
         if not marker or marker in active_fingerprints:
             continue
-        labels = [str(row.get("name") or "") for row in issue.get("labels") or []]
-        if "ai:in-progress" in labels:
+        if "ai:in-progress" in _issue_label_names(issue):
             # Never auto-close issues currently being worked by an agent.
             continue
+        stale_issues.append(issue)
+    return stale_issues
 
-        issue_number = int(issue["number"])
-        comment = (
-            "Automated audit reconciliation closed this issue because its fingerprint "
-            "was not present in the latest deterministic evidence pack."
-        )
-        if run_url:
-            comment += f"\n\nEvidence run: {run_url}"
-        _request(
-            ctx,
-            "POST",
-            f"/repos/{ctx.owner}/{ctx.repo}/issues/{issue_number}/comments",
-            payload={"body": comment},
-        )
-        _request(
-            ctx,
-            "PATCH",
-            f"/repos/{ctx.owner}/{ctx.repo}/issues/{issue_number}",
-            payload={"state": "closed"},
-        )
-        closed_count += 1
-    return closed_count
+
+def _close_fingerprint_issue(ctx: GitHubContext, *, issue_number: int, run_url: str | None) -> None:
+    comment = (
+        "Automated audit reconciliation closed this issue because its fingerprint "
+        "was not present in the latest deterministic evidence pack."
+    )
+    if run_url:
+        comment += f"\n\nEvidence run: {run_url}"
+    _request(
+        ctx,
+        "POST",
+        f"/repos/{ctx.owner}/{ctx.repo}/issues/{issue_number}/comments",
+        payload={"body": comment},
+    )
+    _request(
+        ctx,
+        "PATCH",
+        f"/repos/{ctx.owner}/{ctx.repo}/issues/{issue_number}",
+        payload={"state": "closed"},
+    )
 
 
 def _upsert_severe(ctx: GitHubContext, findings: list[dict[str, Any]], run_url: str | None) -> list[dict[str, Any]]:
@@ -481,25 +518,150 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main() -> int:
-    args = _parse_args()
-    findings_path = _resolve_findings_path(args.findings)
+def _resolve_findings_path(raw: str) -> Path:
+    findings_path = _resolve_repo_path(
+        raw,
+        allowed_prefixes=("artifacts/audit-evidence", "artifacts/audit-evidence-local"),
+    )
     if not findings_path.exists():
         raise FileNotFoundError(f"Findings file not found: {findings_path}")
+    return findings_path
 
-    severe_output_target = _resolve_severe_output_target(args.severe_output)
 
-    findings = _load_findings(findings_path)
-    include_s3_seo = bool(args.include_s3_seo)
-    issue_candidate_fingerprints = _issue_candidate_fingerprints(findings, include_s3_seo=include_s3_seo)
-    issue_candidates = [row for row in findings if str(row.get("fingerprint") or "") in issue_candidate_fingerprints]
-    low = [row for row in findings if str(row.get("fingerprint") or "") not in issue_candidate_fingerprints]
+def _resolve_severe_output_path(raw: str) -> Path | None:
+    if not raw:
+        return None
+    return _resolve_repo_path(
+        raw,
+        allowed_prefixes=("artifacts/audit-evidence", "artifacts/audit-evidence-local"),
+    )
 
+
+def _finding_fingerprint(finding: dict[str, Any]) -> str:
+    return str(finding.get("fingerprint") or "")
+
+
+def _candidate_fingerprints(
+    findings: list[dict[str, Any]],
+    *,
+    include_s3_seo: bool,
+) -> set[str]:
+    candidates: set[str] = set()
+    for finding in findings:
+        if _should_upsert_issue(finding, include_s3_seo=include_s3_seo):
+            candidates.add(_finding_fingerprint(finding))
+    return candidates
+
+
+def _findings_matching_fingerprints(
+    findings: list[dict[str, Any]],
+    fingerprints: set[str],
+) -> list[dict[str, Any]]:
+    return [finding for finding in findings if _finding_fingerprint(finding) in fingerprints]
+
+
+def _findings_excluding_fingerprints(
+    findings: list[dict[str, Any]],
+    fingerprints: set[str],
+) -> list[dict[str, Any]]:
+    return [finding for finding in findings if _finding_fingerprint(finding) not in fingerprints]
+
+
+def _partition_findings(
+    findings: list[dict[str, Any]],
+    *,
+    include_s3_seo: bool,
+) -> tuple[set[str], list[dict[str, Any]], list[dict[str, Any]]]:
+    issue_candidate_fingerprints = _candidate_fingerprints(findings, include_s3_seo=include_s3_seo)
+    issue_candidates = _findings_matching_fingerprints(findings, issue_candidate_fingerprints)
+    low_findings = _findings_excluding_fingerprints(findings, issue_candidate_fingerprints)
+    return issue_candidate_fingerprints, issue_candidates, low_findings
+
+
+def _load_context_or_skip(repo_arg: str, severe_output_path: Path | None) -> GitHubContext | None:
     try:
-        ctx = _github_context(args.repo)
+        return _github_context(repo_arg)
     except Exception as exc:
         print(f"Audit issue upsert skipped: {exc}")
-        _emit_severe_output(severe_output_target, [])
+        if severe_output_path is not None:
+            _write_json(severe_output_path, [])
+        return None
+
+
+def _write_severe_rows(severe_output_path: Path | None, issue_rows: list[dict[str, Any]]) -> None:
+    if severe_output_path is None:
+        return
+    severe_rows = [row for row in issue_rows if str(row.get("severity") or "").lower() in SEVERE_LEVELS]
+    _write_json(severe_output_path, severe_rows)
+
+
+def _maybe_close_stale(
+    ctx: GitHubContext,
+    *,
+    should_close: bool,
+    issue_candidate_fingerprints: set[str],
+    run_url: str | None,
+) -> int:
+    if not should_close:
+        return 0
+    return _close_stale_fingerprint_issues(
+        ctx,
+        active_fingerprints=issue_candidate_fingerprints,
+        run_url=run_url,
+    )
+
+
+def _maybe_upsert_digest(
+    ctx: GitHubContext,
+    *,
+    skip_digest: bool,
+    digest_title: str,
+    low_findings: list[dict[str, Any]],
+    run_url: str | None,
+) -> None:
+    if skip_digest:
+        return
+    _upsert_digest(
+        ctx,
+        digest_title=digest_title.strip() or "Weekly UX/IA Audit Digest",
+        low_findings=low_findings,
+        run_url=run_url,
+    )
+
+
+def _print_summary(
+    *,
+    issue_candidates: int,
+    created: int,
+    updated: int,
+    closed: int,
+    low: int,
+    include_s3_seo: bool,
+    ctx: GitHubContext,
+    severe_output_path: Path | None,
+) -> None:
+    print(
+        f"Audit issue upsert complete: "
+        f"issue_candidates={issue_candidates} created={created} updated={updated} "
+        f"closed={closed} low={low} include_s3_seo={include_s3_seo} "
+        f"repo={ctx.owner}/{ctx.repo} "
+        f"severe_output={str(severe_output_path) if severe_output_path else 'disabled'}"
+    )
+
+
+def main() -> int:
+    args = _parse_args()
+    include_s3_seo = bool(args.include_s3_seo)
+    findings_path = _resolve_findings_path(args.findings)
+    severe_output_path = _resolve_severe_output_path(args.severe_output)
+    findings = _load_findings(findings_path)
+    issue_candidate_fingerprints, issue_candidates, low_findings = _partition_findings(
+        findings,
+        include_s3_seo=include_s3_seo,
+    )
+
+    ctx = _load_context_or_skip(args.repo, severe_output_path)
+    if ctx is None:
         return 0
 
     run_url = args.run_url.strip() or None
@@ -509,28 +671,29 @@ def main() -> int:
         run_url,
         include_s3_seo=include_s3_seo,
     )
-    severe_rows = [row for row in issue_rows if str(row.get("severity") or "").lower() in SEVERE_LEVELS]
-    _emit_severe_output(severe_output_target, severe_rows)
-    closed = 0
-    if args.close_stale:
-        closed = _close_stale_fingerprint_issues(
-            ctx,
-            active_fingerprints=issue_candidate_fingerprints,
-            run_url=run_url,
-        )
-    if not args.skip_digest:
-        _upsert_digest(
-            ctx,
-            digest_title=args.digest_title.strip() or "Weekly UX/IA Audit Digest",
-            low_findings=low,
-            run_url=run_url,
-        )
-    print(
-        f"Audit issue upsert complete: "
-        f"issue_candidates={len(issue_candidates)} created={created} updated={updated} "
-        f"closed={closed} low={len(low)} include_s3_seo={include_s3_seo} "
-        f"repo={ctx.owner}/{ctx.repo} "
-        f"severe_output={severe_output_target or 'disabled'}"
+    _write_severe_rows(severe_output_path, issue_rows)
+    closed = _maybe_close_stale(
+        ctx,
+        should_close=bool(args.close_stale),
+        issue_candidate_fingerprints=issue_candidate_fingerprints,
+        run_url=run_url,
+    )
+    _maybe_upsert_digest(
+        ctx,
+        skip_digest=bool(args.skip_digest),
+        digest_title=args.digest_title,
+        low_findings=low_findings,
+        run_url=run_url,
+    )
+    _print_summary(
+        issue_candidates=len(issue_candidates),
+        created=created,
+        updated=updated,
+        closed=closed,
+        low=len(low_findings),
+        include_s3_seo=include_s3_seo,
+        ctx=ctx,
+        severe_output_path=severe_output_path,
     )
     return 0
 

@@ -15,6 +15,19 @@ ALLOWED_RELATIVE_ROOTS = (
   "artifacts/audit-evidence",
   "docs/reports",
 )
+ISSUE_TYPE_RULES: tuple[tuple[str, tuple[str, str]], ...] = (
+  ("missing_h1", ("heading", "Add a unique route H1 and align above-the-fold copy with primary intent.")),
+  ("missing_canonical", ("canonical", "Set canonical URL and language alternates consistent with sitemap policy.")),
+  ("missing_title", ("title", "Add unique title template with primary keyword + brand suffix.")),
+  ("missing_description", ("description", "Add concise meta description with intent + differentiator.")),
+  ("no_meaningful_text", ("thin_content", "Add a meaningful introductory paragraph and internal links.")),
+  ("duplicate_title", ("duplicate_title", "Make title unique by route context (entity + intent).")),
+  ("duplicate_description", ("duplicate_description", "Make description unique with route-specific summary.")),
+  ("broken_link", ("broken_link", "Fix or remove broken links; replace with canonical destination.")),
+  ("low_internal_links", ("internal_links", "Add contextual internal links to related indexable routes.")),
+  ("canonical_policy_mismatch", ("canonical_policy", "Align canonical policy with sitemap language policy.")),
+)
+DEFAULT_ISSUE_TYPE = ("other", "Review route content and metadata for SEO intent clarity.")
 
 
 @dataclass
@@ -32,32 +45,40 @@ def _read_json(path: Path) -> Any:
   return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _resolve_repo_path(raw: str, *, must_exist: bool) -> Path:
+def _is_relative_to(path: Path, root: Path) -> bool:
+  try:
+    path.relative_to(root)
+    return True
+  except ValueError:
+    return False
+
+
+def _normalize_relative_path(raw: str) -> str:
   value = (raw or "").strip()
   if not value:
     raise SystemExit("path value cannot be empty")
-
   if os.path.isabs(value):
     raise SystemExit(f"absolute paths are not allowed: {value}")
+  return value
 
-  repo_root = Path.cwd().resolve()
+
+def _resolve_candidate_path(value: str, repo_root: Path) -> Path:
   candidate = (repo_root / value).resolve()
+  if not _is_relative_to(candidate, repo_root):
+    raise SystemExit(f"path escapes repository root: {value}")
+  return candidate
 
-  try:
-    candidate.relative_to(repo_root)
-  except ValueError as exc:
-    raise SystemExit(f"path escapes repository root: {value}") from exc
 
-  allowed = False
-  for root in ALLOWED_RELATIVE_ROOTS:
-    allowed_root = (repo_root / root).resolve()
-    try:
-      candidate.relative_to(allowed_root)
-      allowed = True
-      break
-    except ValueError:
-      continue
-  if not allowed:
+def _is_under_allowed_root(candidate: Path, repo_root: Path) -> bool:
+  allowed_roots = ((repo_root / root).resolve() for root in ALLOWED_RELATIVE_ROOTS)
+  return any(_is_relative_to(candidate, allowed_root) for allowed_root in allowed_roots)
+
+
+def _resolve_repo_path(raw: str, *, must_exist: bool) -> Path:
+  value = _normalize_relative_path(raw)
+  repo_root = Path.cwd().resolve()
+  candidate = _resolve_candidate_path(value, repo_root)
+  if not _is_under_allowed_root(candidate, repo_root):
     raise SystemExit(
       "path must be under one of: "
       + ", ".join(ALLOWED_RELATIVE_ROOTS)
@@ -71,27 +92,109 @@ def _resolve_repo_path(raw: str, *, must_exist: bool) -> Path:
 
 def _classify_issue_type(rule_id: str) -> tuple[str, str]:
   rid = (rule_id or "").lower()
-  if "missing_h1" in rid:
-    return "heading", "Add a unique route H1 and align above-the-fold copy with primary intent."
-  if "missing_canonical" in rid:
-    return "canonical", "Set canonical URL and language alternates consistent with sitemap policy."
-  if "missing_title" in rid:
-    return "title", "Add unique title template with primary keyword + brand suffix."
-  if "missing_description" in rid:
-    return "description", "Add concise meta description with intent + differentiator."
-  if "no_meaningful_text" in rid:
-    return "thin_content", "Add a meaningful introductory paragraph and internal links."
-  if "duplicate_title" in rid:
-    return "duplicate_title", "Make title unique by route context (entity + intent)."
-  if "duplicate_description" in rid:
-    return "duplicate_description", "Make description unique with route-specific summary."
-  if "broken_link" in rid:
-    return "broken_link", "Fix or remove broken links; replace with canonical destination."
-  if "low_internal_links" in rid:
-    return "internal_links", "Add contextual internal links to related indexable routes."
-  if "canonical_policy_mismatch" in rid:
-    return "canonical_policy", "Align canonical policy with sitemap language policy."
-  return "other", "Review route content and metadata for SEO intent clarity."
+  for marker, result in ISSUE_TYPE_RULES:
+    if marker in rid:
+      return result
+  return DEFAULT_ISSUE_TYPE
+
+
+def _extract_evidence_paths(finding: dict[str, Any]) -> list[str]:
+  return [
+    str(path).strip()
+    for path in list(finding.get("evidence_files") or [])
+    if str(path).strip()
+  ]
+
+
+def _finding_rule_id(finding: dict[str, Any]) -> str:
+  return str(finding.get("rule_id") or "")
+
+
+def _finding_labels(finding: dict[str, Any]) -> list[str]:
+  return [str(label).strip().lower() for label in list(finding.get("labels") or [])]
+
+
+def _is_seo_finding(rule_id: str, labels: list[str]) -> bool:
+  if rule_id.startswith("seo_"):
+    return True
+  return "audit:seo" in labels
+
+
+def _finding_route(finding: dict[str, Any]) -> str:
+  route = str(finding.get("route") or "").strip()
+  if route:
+    return route
+  return "/"
+
+
+def _finding_severity(finding: dict[str, Any]) -> str:
+  return str(finding.get("severity") or "s4").lower()
+
+
+def _finding_title(finding: dict[str, Any]) -> str:
+  return str(finding.get("title") or "SEO issue")
+
+
+def _parse_finding(
+  finding: dict[str, Any],
+) -> tuple[str, str, str, int, str, str, list[str]] | None:
+  rule_id = _finding_rule_id(finding)
+  labels = _finding_labels(finding)
+  if not _is_seo_finding(rule_id, labels):
+    return None
+  if not bool(finding.get("indexable")):
+    return None
+
+  route = _finding_route(finding)
+  severity = _finding_severity(finding)
+  title = _finding_title(finding)
+  issue_type, task = _classify_issue_type(rule_id)
+  score = SEVERITY_WEIGHT.get(severity, 0)
+  return route, issue_type, severity, score, title, task, _extract_evidence_paths(finding)
+
+
+def _merge_backlog_item(existing: BacklogItem, *, score: int, severity: str, title: str) -> None:
+  if score > existing.score:
+    existing.score = score
+    existing.severity = severity
+    existing.title = title
+    return
+  existing.score += max(1, score // 4)
+
+
+def _update_grouped_backlog(
+  grouped: dict[tuple[str, str], BacklogItem],
+  *,
+  key: tuple[str, str],
+  route: str,
+  issue_type: str,
+  severity: str,
+  score: int,
+  title: str,
+  task: str,
+) -> None:
+  existing = grouped.get(key)
+  if existing is None:
+    grouped[key] = BacklogItem(
+      route=route,
+      issue_type=issue_type,
+      severity=severity,
+      score=score,
+      title=title,
+      proposed_task=task,
+      evidence=[],
+    )
+    return
+  _merge_backlog_item(existing, score=score, severity=severity, title=title)
+
+
+def _attach_evidence(
+  backlog: list[BacklogItem],
+  by_key_evidence: dict[tuple[str, str], list[str]],
+) -> None:
+  for item in backlog:
+    key = (item.route, item.issue_type)
+    item.evidence = sorted(set(by_key_evidence[key]))[:5]
 
 
 def build_backlog(findings: list[dict[str, Any]]) -> list[BacklogItem]:
@@ -99,50 +202,26 @@ def build_backlog(findings: list[dict[str, Any]]) -> list[BacklogItem]:
   by_key_evidence: dict[tuple[str, str], list[str]] = defaultdict(list)
 
   for finding in findings:
-    rule_id = str(finding.get("rule_id") or "")
-    labels = [str(label).strip().lower() for label in list(finding.get("labels") or [])]
-    is_seo = rule_id.startswith("seo_") or "audit:seo" in labels
-    if not is_seo:
+    parsed = _parse_finding(finding)
+    if parsed is None:
       continue
-    if not bool(finding.get("indexable")):
-      continue
-    route = str(finding.get("route") or "").strip() or "/"
-    severity = str(finding.get("severity") or "s4").lower()
-    title = str(finding.get("title") or "SEO issue")
-    issue_type, task = _classify_issue_type(rule_id)
+    route, issue_type, severity, score, title, task, evidence_paths = parsed
     key = (route, issue_type)
-    score = SEVERITY_WEIGHT.get(severity, 0)
-    evidence_paths = [
-      str(path).strip()
-      for path in list(finding.get("evidence_files") or [])
-      if str(path).strip()
-    ]
-
-    existing = grouped.get(key)
-    if existing is None:
-      grouped[key] = BacklogItem(
-        route=route,
-        issue_type=issue_type,
-        severity=severity,
-        score=score,
-        title=title,
-        proposed_task=task,
-        evidence=[],
-      )
-    else:
-      if score > existing.score:
-        existing.score = score
-        existing.severity = severity
-        existing.title = title
-      else:
-        existing.score += max(1, score // 4)
-
+    _update_grouped_backlog(
+      grouped,
+      key=key,
+      route=route,
+      issue_type=issue_type,
+      severity=severity,
+      score=score,
+      title=title,
+      task=task,
+    )
     for evidence_path in evidence_paths:
       by_key_evidence[key].append(evidence_path)
 
   backlog = list(grouped.values())
-  for item in backlog:
-    item.evidence = sorted(set(by_key_evidence[(item.route, item.issue_type)]))[:5]
+  _attach_evidence(backlog, by_key_evidence)
   backlog.sort(key=lambda i: (-i.score, i.route, i.issue_type))
   return backlog
 
