@@ -610,42 +610,8 @@ export class ProductComponent implements OnInit, OnDestroy {
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     this.productLoadSub = this.catalog.getProduct(slug, lang).subscribe({
       next: (product) => {
-        if (this.slug !== slug) return;
-        if (Array.isArray(product.images)) {
-          product.images = [...product.images].sort(
-            (a: any, b: any) => Number(a?.sort_order ?? 0) - Number(b?.sort_order ?? 0)
-          );
-        }
-        this.product = product;
-        this.descriptionHtml = product.long_description ? this.markdown.render(product.long_description) : '';
-        this.seoFallbackDescription = this.seoCopyFallback.productIntro(
-          lang,
-          product.name,
-          product.tags?.[0]?.name ?? null
-        );
-        this.selectedVariantId = product.variants?.[0]?.id ?? null;
-        this.loading = false;
-        this.loadError = false;
-        this.cdr.detectChanges();
-        this.crumbs = [
-          { label: 'nav.home', url: '/' },
-          { label: 'nav.shop', url: this.shopReturnUrl || '/shop' },
-          { label: product.name, url: `/products/${product.slug}` }
-        ];
-	        this.updateMeta(product);
-	        this.updateStructuredData(product);
-	        const updated = this.recentlyViewedService.add(product);
-	        const currentSlug = (product.slug || slug || '').trim();
-	        this.recentlyViewed = updated
-	          .filter((p) => {
-	            const candidateSlug = (p?.slug || '').trim();
-	            return candidateSlug !== '' && candidateSlug !== currentSlug;
-	          })
-	          .slice(0, 8);
-	        this.loadBackInStockStatus();
-	        this.loadUpsells(product.slug, lang);
-	        this.loadRelated(product.slug, lang);
-	      },
+        this.handleProductLoadSuccess(product, slug, lang);
+      },
       error: (err) => {
         if (this.slug !== slug) return;
         this.product = null;
@@ -655,6 +621,67 @@ export class ProductComponent implements OnInit, OnDestroy {
         this.cdr.detectChanges();
       }
     });
+  }
+
+  private handleProductLoadSuccess(product: Product, slug: string, lang: 'en' | 'ro'): void {
+    if (this.slug !== slug) return;
+    this.sortProductImages(product);
+    this.applyLoadedProductState(product, lang);
+    this.updateMeta(product);
+    this.updateStructuredData(product);
+    this.refreshRecentlyViewed(product, slug);
+    this.loadBackInStockStatus();
+    this.loadUpsells(product.slug, lang);
+    this.loadRelated(product.slug, lang);
+  }
+
+  private sortProductImages(product: Product): void {
+    if (!Array.isArray(product.images)) return;
+    product.images = [...product.images].sort(
+      (a: any, b: any) => Number(a?.sort_order ?? 0) - Number(b?.sort_order ?? 0)
+    );
+  }
+
+  private applyLoadedProductState(product: Product, lang: 'en' | 'ro'): void {
+    this.product = product;
+    this.descriptionHtml = this.renderLongDescription(product);
+    this.seoFallbackDescription = this.buildSeoFallbackDescription(product, lang);
+    this.selectedVariantId = this.initialVariantId(product);
+    this.loading = false;
+    this.loadError = false;
+    this.cdr.detectChanges();
+    this.crumbs = this.productCrumbs(product);
+  }
+
+  private renderLongDescription(product: Product): string {
+    return product.long_description ? this.markdown.render(product.long_description) : '';
+  }
+
+  private buildSeoFallbackDescription(product: Product, lang: 'en' | 'ro'): string {
+    return this.seoCopyFallback.productIntro(lang, product.name, product.tags?.[0]?.name ?? null);
+  }
+
+  private initialVariantId(product: Product): string | null {
+    return product.variants?.[0]?.id ?? null;
+  }
+
+  private productCrumbs(product: Product): Array<{ label: string; url: string }> {
+    return [
+      { label: 'nav.home', url: '/' },
+      { label: 'nav.shop', url: this.shopReturnUrl || '/shop' },
+      { label: product.name, url: `/products/${product.slug}` }
+    ];
+  }
+
+  private refreshRecentlyViewed(product: Product, slug: string): void {
+    const updated = this.recentlyViewedService.add(product);
+    const currentSlug = (product.slug || slug || '').trim();
+    this.recentlyViewed = updated
+      .filter((item) => {
+        const candidateSlug = (item?.slug || '').trim();
+        return candidateSlug !== '' && candidateSlug !== currentSlug;
+      })
+      .slice(0, 8);
   }
 
   private loadUpsells(slug: string, lang: 'en' | 'ro'): void {
@@ -705,26 +732,39 @@ export class ProductComponent implements OnInit, OnDestroy {
   }
 
   addToCart(): void {
-    if (!this.product) return;
+    const product = this.product;
+    if (!product) return;
     if (this.isOutOfStock()) {
-      this.toast.error(this.translate.instant('product.soldOut'), this.translate.instant('product.notifyBackInStock'));
+      this.showSoldOutToast();
       return;
     }
-    const variant = this.selectedVariant(this.product);
-    this.cartStore.addFromProduct({
-      product_id: this.product.id,
+    const variant = this.selectedVariant(product);
+    this.cartStore.addFromProduct(this.buildCartPayload(product, variant));
+    this.showAddedToCartToast(product.name);
+  }
+
+  private buildCartPayload(product: Product, variant: ProductVariant | null) {
+    return {
+      product_id: product.id,
       variant_id: variant?.id ?? null,
       quantity: this.quantity,
-      name: this.product.name,
-      slug: this.product.slug,
-      image: this.product.images?.[0]?.url,
-      price: Number(this.displayPrice(this.product)),
-      currency: this.product.currency,
-      stock: (variant?.stock_quantity ?? this.product.stock_quantity ?? 99) || 0
-    });
+      name: product.name,
+      slug: product.slug,
+      image: product.images?.[0]?.url,
+      price: Number(this.displayPrice(product)),
+      currency: product.currency,
+      stock: (variant?.stock_quantity ?? product.stock_quantity ?? 99) || 0
+    };
+  }
+
+  private showSoldOutToast(): void {
+    this.toast.error(this.translate.instant('product.soldOut'), this.translate.instant('product.notifyBackInStock'));
+  }
+
+  private showAddedToCartToast(productName: string): void {
     this.toast.success(
       this.translate.instant('product.addedTitle'),
-      this.translate.instant('product.addedBody', { qty: this.quantity, name: this.product.name })
+      this.translate.instant('product.addedBody', { qty: this.quantity, name: productName })
     );
   }
 

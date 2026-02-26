@@ -680,56 +680,79 @@ export function parsePageBlocks(
   return blocks;
 }
 
-function htmlToPlainText(html: string): string {
-  return (html || '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
+const HTML_TAG_PATTERN = new RegExp('\\x3C[^\\x3E]+\\x3E', 'g');
+const WHITESPACE_PATTERN = /\s+/g;
 
-function appendTextLikeParts(parts: string[], bodyHtml: string, ctaLabel?: string | null): void {
+const htmlToPlainText = (html: string): string =>
+  (html || '').replace(HTML_TAG_PATTERN, ' ').replace(WHITESPACE_PATTERN, ' ').trim();
+
+const appendTextLikeParts = (parts: string[], bodyHtml: string, ctaLabel?: string): void => {
   const text = htmlToPlainText(bodyHtml || '');
   if (text) parts.push(text);
   if (ctaLabel) parts.push(ctaLabel);
-}
+};
 
-function appendFaqParts(parts: string[], block: Extract<PageBlock, { type: 'faq' }>): void {
+const appendFaqParts = (parts: string[], block: PageFaqBlock): void => {
   for (const item of block.items) {
     parts.push(item.question);
     appendTextLikeParts(parts, item.answer_html || '');
   }
-}
+};
 
-function appendTestimonialsParts(parts: string[], block: Extract<PageBlock, { type: 'testimonials' }>): void {
+const appendTestimonialsParts = (parts: string[], block: PageTestimonialsBlock): void => {
   for (const item of block.items) {
     appendTextLikeParts(parts, item.quote_html || '');
     if (item.author) parts.push(item.author);
     if (item.role) parts.push(item.role);
   }
-}
+};
 
-function appendGalleryParts(parts: string[], block: Extract<PageBlock, { type: 'gallery' }>): void {
+const appendImageParts = (parts: string[], block: PageImageBlock): void => {
+  if (block.caption) parts.push(block.caption);
+};
+
+const appendGalleryParts = (parts: string[], block: PageGalleryBlock): void => {
   for (const image of block.images) {
     if (image.caption) parts.push(image.caption);
   }
-}
+};
 
-function appendSlidesParts(
-  parts: string[],
-  slides: Array<{ headline?: string | null; subheadline?: string | null; cta_label?: string | null }>
-): void {
+const appendSlidesParts = (parts: string[], slides: Slide[]): void => {
   for (const slide of slides) {
     if (slide.headline) parts.push(slide.headline);
     if (slide.subheadline) parts.push(slide.subheadline);
     if (slide.cta_label) parts.push(slide.cta_label);
   }
-}
+};
 
-function appendColumnsParts(parts: string[], block: Extract<PageBlock, { type: 'columns' }>): void {
+const appendColumnsParts = (parts: string[], block: PageColumnsBlock): void => {
   for (const column of block.columns) {
     if (column.title) parts.push(column.title);
     appendTextLikeParts(parts, column.body_html || '');
   }
+};
+
+type PageBlockPlainTextAppender = (parts: string[], block: PageBlock) => void;
+
+const pageBlockPlainTextAppenders: Record<PageBlock['type'], PageBlockPlainTextAppender> = {
+  text: (parts, block) => appendTextLikeParts(parts, (block as PageTextBlock).body_html || ''),
+  image: (parts, block) => appendImageParts(parts, block as PageImageBlock),
+  gallery: (parts, block) => appendGalleryParts(parts, block as PageGalleryBlock),
+  banner: (parts, block) => appendSlidesParts(parts, [(block as PageBannerBlock).slide]),
+  carousel: (parts, block) => appendSlidesParts(parts, (block as PageCarouselBlock).slides),
+  columns: (parts, block) => appendColumnsParts(parts, block as PageColumnsBlock),
+  cta: (parts, block) => {
+    const cta = block as PageCtaBlock;
+    appendTextLikeParts(parts, cta.body_html || '', cta.cta_label || undefined);
+  },
+  faq: (parts, block) => appendFaqParts(parts, block as PageFaqBlock),
+  testimonials: (parts, block) => appendTestimonialsParts(parts, block as PageTestimonialsBlock),
+  product_grid: () => {},
+  form: () => {}
+};
+
+function appendBlockParts(parts: string[], block: PageBlock): void {
+  pageBlockPlainTextAppenders[block.type](parts, block);
 }
 
 export function pageBlocksToPlainText(blocks: PageBlock[]): string {
@@ -737,16 +760,7 @@ export function pageBlocksToPlainText(blocks: PageBlock[]): string {
   for (const block of blocks) {
     if (!block.enabled) continue;
     if (block.title) parts.push(block.title);
-
-    if (block.type === 'text') appendTextLikeParts(parts, block.body_html || '');
-    if (block.type === 'cta') appendTextLikeParts(parts, block.body_html || '', block.cta_label);
-    if (block.type === 'faq') appendFaqParts(parts, block);
-    if (block.type === 'testimonials') appendTestimonialsParts(parts, block);
-    if (block.type === 'image' && block.caption) parts.push(block.caption);
-    if (block.type === 'gallery') appendGalleryParts(parts, block);
-    if (block.type === 'banner') appendSlidesParts(parts, [block.slide]);
-    if (block.type === 'carousel') appendSlidesParts(parts, block.slides);
-    if (block.type === 'columns') appendColumnsParts(parts, block);
+    appendBlockParts(parts, block);
   }
-  return parts.join(' ').replace(/\s+/g, ' ').trim();
+  return parts.join(' ').replace(WHITESPACE_PATTERN, ' ').trim();
 }

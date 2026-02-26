@@ -21,7 +21,16 @@ import { CatalogService, Category, FeaturedCollection, Product } from '../../cor
 import { MarkdownService } from '../../core/markdown.service';
 import { NewsletterService } from '../../core/newsletter.service';
 import { ToastService } from '../../core/toast.service';
-import { BlogComment, BlogCommentSort, BlogPost, BlogPostListItem, BlogService, PaginationMeta } from '../../core/blog.service';
+import {
+  BlogComment,
+  BlogCommentSort,
+  BlogCommentThread,
+  BlogCommentThreadListResponse,
+  BlogPost,
+  BlogPostListItem,
+  BlogService,
+  PaginationMeta
+} from '../../core/blog.service';
 import { StorefrontAdminModeService } from '../../core/storefront-admin-mode.service';
 import { ContainerComponent } from '../../layout/container.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
@@ -1692,16 +1701,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     this.hasCommentsError.set(false);
     this.blog.listCommentThreads(this.slug, { page, limit: this.commentThreadsLimit, sort }).subscribe({
       next: (resp) => {
-        const flattened: BlogComment[] = [];
-        for (const thread of resp.items || []) {
-          if (thread?.root) flattened.push(thread.root);
-          if (Array.isArray(thread?.replies)) flattened.push(...thread.replies);
-        }
-        this.comments.set(flattened);
-        this.commentsMeta.set(resp.meta ?? null);
-        this.commentsTotal.set(Number(resp.total_comments ?? 0));
-        this.loadingComments.set(false);
-        this.hasCommentsError.set(false);
+        this.applyCommentThreadResponse(resp);
       },
       error: () => {
         this.comments.set([]);
@@ -1711,6 +1711,23 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         this.hasCommentsError.set(true);
       }
     });
+  }
+
+  private applyCommentThreadResponse(resp: BlogCommentThreadListResponse): void {
+    this.comments.set(this.flattenCommentThreads(resp.items));
+    this.commentsMeta.set(resp.meta ?? null);
+    this.commentsTotal.set(Number(resp.total_comments ?? 0));
+    this.loadingComments.set(false);
+    this.hasCommentsError.set(false);
+  }
+
+  private flattenCommentThreads(threads: BlogCommentThread[] | null | undefined): BlogComment[] {
+    const flattened: BlogComment[] = [];
+    for (const thread of threads || []) {
+      if (thread?.root) flattened.push(thread.root);
+      if (Array.isArray(thread?.replies)) flattened.push(...thread.replies);
+    }
+    return flattened;
   }
 
   loadCommentSubscription(): void {
@@ -1856,31 +1873,50 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         this.submitting.set(false);
         this.commentCaptchaToken = null;
         this.commentCaptcha?.reset();
-        const statusCode = typeof (err)?.status === 'number' ? (err).status : 0;
-        const detail = (err)?.error?.detail;
-        if (statusCode === 429) {
-          this.toast.error(this.translate.instant('blog.comments.rateLimitedTitle'), this.translate.instant('blog.comments.rateLimitedCopy'));
-          return;
-        }
-        if (statusCode === 400 && typeof detail === 'string') {
-          if (detail.toLowerCase().includes('link')) {
-            this.toast.error(this.translate.instant('blog.comments.linkLimitTitle'), this.translate.instant('blog.comments.linkLimitCopy'));
-            return;
-          }
-          if (detail.toLowerCase().includes('captcha')) {
-            const copy =
-              detail.toLowerCase().includes('required')
-                ? this.translate.instant('auth.captchaRequired')
-                : this.translate.instant('auth.captchaFailedTryAgain');
-            this.toast.error(this.translate.instant('blog.comments.createErrorTitle'), copy);
-            return;
-          }
-          this.toast.error(this.translate.instant('blog.comments.createErrorTitle'), detail);
-          return;
-        }
-        this.toast.error(this.translate.instant('blog.comments.createErrorTitle'), this.translate.instant('blog.comments.createErrorCopy'));
+        this.toastCommentCreateError(err);
       }
     });
+  }
+
+  private toastCommentCreateError(err: unknown): void {
+    const statusCode = this.commentErrorStatus(err);
+    if (statusCode === 429) {
+      this.toast.error(this.translate.instant('blog.comments.rateLimitedTitle'), this.translate.instant('blog.comments.rateLimitedCopy'));
+      return;
+    }
+    if (statusCode === 400) {
+      const handled = this.toastBadRequestCommentCreateError(err);
+      if (handled) return;
+    }
+    this.toast.error(this.translate.instant('blog.comments.createErrorTitle'), this.translate.instant('blog.comments.createErrorCopy'));
+  }
+
+  private commentErrorStatus(err: unknown): number {
+    const status = (err as { status?: unknown })?.status;
+    return typeof status === 'number' ? status : 0;
+  }
+
+  private toastBadRequestCommentCreateError(err: unknown): boolean {
+    const detail = (err as { error?: { detail?: unknown } })?.error?.detail;
+    if (typeof detail !== 'string') return false;
+    const lowerDetail = detail.toLowerCase();
+    if (lowerDetail.includes('link')) {
+      this.toast.error(this.translate.instant('blog.comments.linkLimitTitle'), this.translate.instant('blog.comments.linkLimitCopy'));
+      return true;
+    }
+    if (lowerDetail.includes('captcha')) {
+      this.toastCaptchaCommentCreateError(lowerDetail);
+      return true;
+    }
+    this.toast.error(this.translate.instant('blog.comments.createErrorTitle'), detail);
+    return true;
+  }
+
+  private toastCaptchaCommentCreateError(detail: string): void {
+    const copy = detail.includes('required')
+      ? this.translate.instant('auth.captchaRequired')
+      : this.translate.instant('auth.captchaFailedTryAgain');
+    this.toast.error(this.translate.instant('blog.comments.createErrorTitle'), copy);
   }
 
   submitNewsletter(event?: Event): void {
