@@ -135,6 +135,13 @@ admin_password_reset_resend_rate_limit = limiter(
 )
 
 
+def _request_audit_metadata(request: Request) -> dict[str, str | None]:
+    return {
+        "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+        "ip_address": (request.client.host if request.client else None),
+    }
+
+
 async def _get_dashboard_alert_thresholds(session: AsyncSession) -> AdminDashboardAlertThresholds:
     record = await session.scalar(
         select(AdminDashboardAlertThresholds).where(AdminDashboardAlertThresholds.key == "default")
@@ -1932,58 +1939,29 @@ async def admin_channel_attribution(
     limit: int = Query(default=12, ge=1, le=50),
 ) -> dict:
     now = datetime.now(timezone.utc)
-    sales_statuses = (
-        OrderStatus.paid,
-        OrderStatus.shipped,
-        OrderStatus.delivered,
-        OrderStatus.refunded,
-    )
-    start, end, effective_range_days = _summary_resolve_range(
+    start, end, effective_range_days = _channel_resolve_range(
         now,
-        int(range_days),
-        range_from,
-        range_to,
+        range_days=range_days,
+        range_from=range_from,
+        range_to=range_to,
     )
     exclude_test_orders = _exclude_test_orders_clause()
     total_orders, total_gross_sales = await _channel_totals(
         session,
         start,
         end,
-        sales_statuses,
+        _channel_sales_statuses(),
         exclude_test_orders,
     )
-    order_to_session, session_ids = await _channel_order_to_session_map(session, start, end)
-    if not order_to_session:
-        return _channel_attribution_response(
-            effective_range_days=effective_range_days,
-            start=start,
-            end=end,
-            total_orders=total_orders,
-            total_gross_sales=total_gross_sales,
-            tracked_orders=0,
-            tracked_gross_sales=0.0,
-            coverage_pct=None if total_orders == 0 else 0.0,
-            channels=[],
-        )
-    channels, tracked_orders, tracked_gross_sales = await _channel_tracked_data(
+    return await _channel_tracked_response(
         session,
-        order_to_session,
-        session_ids,
-        start,
-        end,
-        sales_statuses,
-        exclude_test_orders,
-    )
-    return _channel_attribution_response(
         effective_range_days=effective_range_days,
         start=start,
         end=end,
         total_orders=total_orders,
         total_gross_sales=total_gross_sales,
-        tracked_orders=tracked_orders,
-        tracked_gross_sales=tracked_gross_sales,
-        coverage_pct=_channel_coverage_pct(tracked_orders, total_orders),
-        channels=channels[: int(limit)],
+        exclude_test_orders=exclude_test_orders,
+        limit=limit,
     )
 
 
@@ -2091,6 +2069,48 @@ async def _channel_tracked_data(
     return _channel_aggregate(order_to_session, order_amounts, session_payload)
 
 
+async def _channel_tracked_response(
+    session: AsyncSession,
+    *,
+    effective_range_days: int,
+    start: datetime,
+    end: datetime,
+    total_orders: int,
+    total_gross_sales: float,
+    exclude_test_orders: Any,
+    limit: int,
+) -> dict:
+    order_to_session, session_ids = await _channel_order_to_session_map(session, start, end)
+    if not order_to_session:
+        return _channel_empty_response(
+            effective_range_days=effective_range_days,
+            start=start,
+            end=end,
+            total_orders=total_orders,
+            total_gross_sales=total_gross_sales,
+        )
+    channels, tracked_orders, tracked_gross_sales = await _channel_tracked_data(
+        session,
+        order_to_session,
+        session_ids,
+        start,
+        end,
+        _channel_sales_statuses(),
+        exclude_test_orders,
+    )
+    return _channel_limited_response(
+        effective_range_days=effective_range_days,
+        start=start,
+        end=end,
+        total_orders=total_orders,
+        total_gross_sales=total_gross_sales,
+        tracked_orders=tracked_orders,
+        tracked_gross_sales=tracked_gross_sales,
+        channels=channels,
+        limit=limit,
+    )
+
+
 async def _channel_session_payloads(session: AsyncSession, session_ids: set[str]) -> dict[str, dict | None]:
     if not session_ids:
         return {}
@@ -2190,6 +2210,71 @@ def _channel_attribution_response(
         "total_orders": int(total_orders),
         "total_gross_sales": float(total_gross_sales),
     }
+
+
+def _channel_sales_statuses() -> tuple[OrderStatus, ...]:
+    return (
+        OrderStatus.paid,
+        OrderStatus.shipped,
+        OrderStatus.delivered,
+        OrderStatus.refunded,
+    )
+
+
+def _channel_resolve_range(
+    now: datetime,
+    *,
+    range_days: int,
+    range_from: date | None,
+    range_to: date | None,
+) -> tuple[datetime, datetime, int]:
+    return _summary_resolve_range(now, int(range_days), range_from, range_to)
+
+
+def _channel_empty_response(
+    *,
+    effective_range_days: int,
+    start: datetime,
+    end: datetime,
+    total_orders: int,
+    total_gross_sales: float,
+) -> dict:
+    return _channel_attribution_response(
+        effective_range_days=effective_range_days,
+        start=start,
+        end=end,
+        total_orders=total_orders,
+        total_gross_sales=total_gross_sales,
+        tracked_orders=0,
+        tracked_gross_sales=0.0,
+        coverage_pct=None if total_orders == 0 else 0.0,
+        channels=[],
+    )
+
+
+def _channel_limited_response(
+    *,
+    effective_range_days: int,
+    start: datetime,
+    end: datetime,
+    total_orders: int,
+    total_gross_sales: float,
+    tracked_orders: int,
+    tracked_gross_sales: float,
+    channels: list[dict],
+    limit: int,
+) -> dict:
+    return _channel_attribution_response(
+        effective_range_days=effective_range_days,
+        start=start,
+        end=end,
+        total_orders=total_orders,
+        total_gross_sales=total_gross_sales,
+        tracked_orders=tracked_orders,
+        tracked_gross_sales=tracked_gross_sales,
+        coverage_pct=_channel_coverage_pct(tracked_orders, total_orders),
+        channels=channels[: int(limit)],
+    )
 
 
 @router.get("/search")
@@ -2473,6 +2558,38 @@ async def _search_products_translation_langs(
     return langs_by_product
 
 
+async def _search_products_total_and_pages(
+    session: AsyncSession,
+    stmt: Any,
+    *,
+    limit: int,
+) -> tuple[int, int]:
+    total = await session.scalar(
+        stmt.with_only_columns(func.count(func.distinct(Product.id))).order_by(None)
+    )
+    total_items = int(total or 0)
+    return total_items, _pagination_total_pages(total_items, limit)
+
+
+async def _search_products_rows(
+    session: AsyncSession,
+    stmt: Any,
+    *,
+    limit: int,
+    offset: int,
+) -> list[tuple[Product, Category]]:
+    return (await session.execute(stmt.order_by(Product.updated_at.desc()).limit(limit).offset(offset))).all()
+
+
+def _search_products_meta(*, total_items: int, total_pages: int, page: int, limit: int) -> dict[str, int]:
+    return {
+        "total_items": total_items,
+        "total_pages": total_pages,
+        "page": page,
+        "limit": limit,
+    }
+
+
 def _search_product_item(
     prod: Product,
     cat: Category,
@@ -2519,43 +2636,27 @@ async def search_products(
     limit: int = Query(default=25, ge=1, le=100),
 ) -> AdminProductListResponse:
     offset = (page - 1) * limit
-    stmt = _search_products_stmt(deleted)
-    stmt = _search_products_apply_filters(
-        stmt,
+    filtered_stmt = _search_products_apply_filters(
+        _search_products_stmt(deleted),
         q=q,
         status_filter=status,
         category_slug=category_slug,
         missing_translations=missing_translations,
         missing_translation_lang=missing_translation_lang,
     )
-
-    total = await session.scalar(
-        stmt.with_only_columns(func.count(func.distinct(Product.id))).order_by(None)
+    total_items, total_pages = await _search_products_total_and_pages(
+        session,
+        filtered_stmt,
+        limit=limit,
     )
-    total_items = int(total or 0)
-    total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
-
-    rows = (
-        await session.execute(
-            stmt.order_by(Product.updated_at.desc()).limit(limit).offset(offset)
-        )
-    ).all()
+    rows = await _search_products_rows(session, filtered_stmt, limit=limit, offset=offset)
 
     product_ids = [prod.id for prod, _ in rows]
     langs_by_product = await _search_products_translation_langs(session, product_ids)
-
-    items = [
-        _search_product_item(prod, cat, langs_by_product)
-        for prod, cat in rows
-    ]
+    items = [_search_product_item(prod, cat, langs_by_product) for prod, cat in rows]
     return AdminProductListResponse(
         items=items,
-        meta={
-            "total_items": total_items,
-            "total_pages": total_pages,
-            "page": page,
-            "limit": limit,
-        },
+        meta=_search_products_meta(total_items=total_items, total_pages=total_pages, page=page, limit=limit),
     )
 
 
@@ -2609,78 +2710,25 @@ async def duplicate_check_products(
     sku: str | None = Query(default=None),
     exclude_slug: str | None = Query(default=None),
 ) -> AdminProductDuplicateCheckResponse:
-    name_value = (name or "").strip()
-    sku_value = (sku or "").strip()
-    exclude_slug_value = (exclude_slug or "").strip()
-
-    def to_match(product: Product) -> AdminProductDuplicateMatch:
-        return AdminProductDuplicateMatch(
-            id=product.id,
-            slug=product.slug,
-            sku=product.sku,
-            name=product.name,
-            status=product.status,
-            is_active=product.is_active,
-        )
-
-    slug_base = (catalog_service.slugify(name_value) or "")[:160] if name_value else None
-    slug_matches: list[AdminProductDuplicateMatch] = []
-    suggested_slug: str | None = None
-
-    if slug_base:
-        slug_stmt = select(Product).where(
-            Product.is_deleted.is_(False),
-            or_(Product.slug == slug_base, Product.slug.like(f"{slug_base}-%")),
-        )
-        if exclude_slug_value:
-            slug_stmt = slug_stmt.where(Product.slug != exclude_slug_value)
-
-        slug_rows = (await session.execute(slug_stmt.order_by(Product.updated_at.desc()).limit(10))).scalars().all()
-        slug_matches = [to_match(prod) for prod in slug_rows]
-
-        slug_values = set(
-            await session.scalars(
-                select(Product.slug).where(
-                    Product.is_deleted.is_(False),
-                    or_(Product.slug == slug_base, Product.slug.like(f"{slug_base}-%")),
-                )
-            )
-        )
-        if exclude_slug_value:
-            slug_values.discard(exclude_slug_value)
-
-        if slug_base not in slug_values:
-            suggested_slug = slug_base
-        else:
-            counter = 2
-            while True:
-                suffix = f"-{counter}"
-                candidate = f"{slug_base[: 160 - len(suffix)]}{suffix}"
-                if candidate not in slug_values:
-                    suggested_slug = candidate
-                    break
-                counter += 1
-
-    sku_matches: list[AdminProductDuplicateMatch] = []
-    if sku_value:
-        sku_stmt = select(Product).where(Product.is_deleted.is_(False), Product.sku == sku_value)
-        if exclude_slug_value:
-            sku_stmt = sku_stmt.where(Product.slug != exclude_slug_value)
-        sku_rows = (await session.execute(sku_stmt.order_by(Product.updated_at.desc()).limit(10))).scalars().all()
-        sku_matches = [to_match(prod) for prod in sku_rows]
-
-    name_matches: list[AdminProductDuplicateMatch] = []
-    if name_value:
-        name_norm = name_value.lower()
-        name_stmt = select(Product).where(
-            Product.is_deleted.is_(False),
-            func.lower(Product.name) == name_norm,
-        )
-        if exclude_slug_value:
-            name_stmt = name_stmt.where(Product.slug != exclude_slug_value)
-        name_rows = (await session.execute(name_stmt.order_by(Product.updated_at.desc()).limit(10))).scalars().all()
-        name_matches = [to_match(prod) for prod in name_rows]
-
+    name_value = _duplicate_value(name)
+    sku_value = _duplicate_value(sku)
+    exclude_slug_value = _duplicate_value(exclude_slug)
+    slug_base = _duplicate_slug_base(name_value)
+    slug_matches, suggested_slug = await _duplicate_slug_matches_and_suggestion(
+        session,
+        slug_base=slug_base,
+        exclude_slug=exclude_slug_value,
+    )
+    sku_matches = await _duplicate_sku_matches(
+        session,
+        sku_value=sku_value,
+        exclude_slug=exclude_slug_value,
+    )
+    name_matches = await _duplicate_name_matches(
+        session,
+        name_value=name_value,
+        exclude_slug=exclude_slug_value,
+    )
     return AdminProductDuplicateCheckResponse(
         slug_base=slug_base,
         suggested_slug=suggested_slug,
@@ -2688,6 +2736,101 @@ async def duplicate_check_products(
         sku_matches=sku_matches,
         name_matches=name_matches,
     )
+
+
+def _duplicate_value(value: str | None) -> str:
+    return (value or "").strip()
+
+
+def _duplicate_slug_base(name_value: str) -> str | None:
+    if not name_value:
+        return None
+    return (catalog_service.slugify(name_value) or "")[:160]
+
+
+def _duplicate_match(product: Product) -> AdminProductDuplicateMatch:
+    return AdminProductDuplicateMatch(
+        id=product.id,
+        slug=product.slug,
+        sku=product.sku,
+        name=product.name,
+        status=product.status,
+        is_active=product.is_active,
+    )
+
+
+def _duplicate_stmt(*, exclude_slug: str) -> Any:
+    stmt = select(Product).where(Product.is_deleted.is_(False))
+    if exclude_slug:
+        stmt = stmt.where(Product.slug != exclude_slug)
+    return stmt
+
+
+async def _duplicate_matches_for_stmt(session: AsyncSession, stmt: Any) -> list[AdminProductDuplicateMatch]:
+    rows = (await session.execute(stmt.order_by(Product.updated_at.desc()).limit(10))).scalars().all()
+    return [_duplicate_match(product) for product in rows]
+
+
+def _duplicate_suggested_slug(slug_base: str, slug_values: set[str]) -> str:
+    if slug_base not in slug_values:
+        return slug_base
+    counter = 2
+    while True:
+        suffix = f"-{counter}"
+        candidate = f"{slug_base[: 160 - len(suffix)]}{suffix}"
+        if candidate not in slug_values:
+            return candidate
+        counter += 1
+
+
+async def _duplicate_slug_matches_and_suggestion(
+    session: AsyncSession,
+    *,
+    slug_base: str | None,
+    exclude_slug: str,
+) -> tuple[list[AdminProductDuplicateMatch], str | None]:
+    if not slug_base:
+        return [], None
+    slug_filter = or_(Product.slug == slug_base, Product.slug.like(f"{slug_base}-%"))
+    slug_matches = await _duplicate_matches_for_stmt(
+        session,
+        _duplicate_stmt(exclude_slug=exclude_slug).where(slug_filter),
+    )
+    slug_values = set(
+        await session.scalars(
+            select(Product.slug).where(
+                Product.is_deleted.is_(False),
+                slug_filter,
+            )
+        )
+    )
+    if exclude_slug:
+        slug_values.discard(exclude_slug)
+    return slug_matches, _duplicate_suggested_slug(slug_base, slug_values)
+
+
+async def _duplicate_sku_matches(
+    session: AsyncSession,
+    *,
+    sku_value: str,
+    exclude_slug: str,
+) -> list[AdminProductDuplicateMatch]:
+    if not sku_value:
+        return []
+    stmt = _duplicate_stmt(exclude_slug=exclude_slug).where(Product.sku == sku_value)
+    return await _duplicate_matches_for_stmt(session, stmt)
+
+
+async def _duplicate_name_matches(
+    session: AsyncSession,
+    *,
+    name_value: str,
+    exclude_slug: str,
+) -> list[AdminProductDuplicateMatch]:
+    if not name_value:
+        return []
+    stmt = _duplicate_stmt(exclude_slug=exclude_slug).where(func.lower(Product.name) == name_value.lower())
+    return await _duplicate_matches_for_stmt(session, stmt)
 
 
 @router.post("/products/by-ids")
@@ -2886,6 +3029,110 @@ def _user_order_stats_subquery() -> object:
     )
 
 
+def _user_segment_stmt(
+    stats: Any,
+    *,
+    min_orders: int,
+    q: str | None,
+    min_aov: float | None = None,
+) -> Any:
+    stmt = (
+        select(User, stats.c.orders_count, stats.c.total_spent, stats.c.avg_order_value)  # type: ignore[attr-defined]
+        .join(stats, stats.c.user_id == User.id)  # type: ignore[attr-defined]
+        .where(
+            User.deleted_at.is_(None),
+            User.role == UserRole.customer,
+            stats.c.orders_count >= min_orders,  # type: ignore[attr-defined]
+        )
+    )
+    if min_aov is not None:
+        stmt = stmt.where(stats.c.avg_order_value >= min_aov)  # type: ignore[attr-defined]
+    return _user_segment_apply_search(stmt, q)
+
+
+def _user_segment_apply_search(stmt: Any, q: str | None) -> Any:
+    if not q:
+        return stmt
+    like = f"%{q.strip().lower()}%"
+    return stmt.where(
+        func.lower(User.email).ilike(like)
+        | func.lower(User.username).ilike(like)
+        | func.lower(User.name).ilike(like)
+    )
+
+
+async def _user_segment_total_and_pages(
+    session: AsyncSession,
+    stmt: Any,
+    *,
+    limit: int,
+) -> tuple[int, int]:
+    total_items = int(await session.scalar(stmt.with_only_columns(func.count()).order_by(None)) or 0)
+    return total_items, _pagination_total_pages(total_items, limit)
+
+
+async def _user_segment_rows(
+    session: AsyncSession,
+    stmt: Any,
+    *,
+    order_by: tuple[Any, ...],
+    limit: int,
+    offset: int,
+) -> list[tuple[User, Any, Any, Any]]:
+    return (await session.execute(stmt.order_by(*order_by).limit(limit).offset(offset))).all()
+
+
+def _user_segment_admin_user(user: User, include_pii: bool) -> AdminUserListItem:
+    return AdminUserListItem(
+        id=user.id,
+        email=user.email if include_pii else (pii_service.mask_email(user.email) or user.email),
+        username=user.username,
+        name=user.name if include_pii else pii_service.mask_text(user.name, keep=1),
+        name_tag=user.name_tag,
+        role=user.role,
+        email_verified=bool(user.email_verified),
+        created_at=user.created_at,
+    )
+
+
+def _user_segment_items(rows: list[tuple[User, Any, Any, Any]], include_pii: bool) -> list[AdminUserSegmentListItem]:
+    return [
+        AdminUserSegmentListItem(
+            user=_user_segment_admin_user(user, include_pii),
+            orders_count=int(orders_count or 0),
+            total_spent=float(total_spent or 0),
+            avg_order_value=float(avg_order_value or 0),
+        )
+        for user, orders_count, total_spent, avg_order_value in rows
+    ]
+
+
+def _user_segment_meta(*, total_items: int, total_pages: int, page: int, limit: int) -> dict[str, int]:
+    return {
+        "total_items": total_items,
+        "total_pages": total_pages,
+        "page": page,
+        "limit": limit,
+    }
+
+
+def _repeat_buyers_order_by(stats: Any) -> tuple[Any, ...]:
+    return (
+        stats.c.orders_count.desc(),  # type: ignore[attr-defined]
+        stats.c.total_spent.desc(),  # type: ignore[attr-defined]
+        User.created_at.desc(),
+    )
+
+
+def _high_aov_order_by(stats: Any) -> tuple[Any, ...]:
+    return (
+        stats.c.avg_order_value.desc(),  # type: ignore[attr-defined]
+        stats.c.orders_count.desc(),  # type: ignore[attr-defined]
+        stats.c.total_spent.desc(),  # type: ignore[attr-defined]
+        User.created_at.desc(),
+    )
+
+
 @router.get("/users/segments/repeat-buyers")
 async def admin_user_segment_repeat_buyers(
     request: Request,
@@ -2901,69 +3148,23 @@ async def admin_user_segment_repeat_buyers(
         pii_service.require_pii_reveal(current_user, request=request)
     offset = (page - 1) * limit
     stats = _user_order_stats_subquery()
-
-    stmt = (
-        select(User, stats.c.orders_count, stats.c.total_spent, stats.c.avg_order_value)  # type: ignore[attr-defined]
-        .join(stats, stats.c.user_id == User.id)  # type: ignore[attr-defined]
-        .where(
-            User.deleted_at.is_(None),
-            User.role == UserRole.customer,
-            stats.c.orders_count >= min_orders,  # type: ignore[attr-defined]
-        )
+    stmt = _user_segment_stmt(
+        stats,
+        min_orders=min_orders,
+        q=q,
     )
-    if q:
-        like = f"%{q.strip().lower()}%"
-        stmt = stmt.where(
-            func.lower(User.email).ilike(like)
-            | func.lower(User.username).ilike(like)
-            | func.lower(User.name).ilike(like)
-        )
-
-    total_items = int(
-        await session.scalar(stmt.with_only_columns(func.count()).order_by(None)) or 0
+    total_items, total_pages = await _user_segment_total_and_pages(session, stmt, limit=limit)
+    rows = await _user_segment_rows(
+        session,
+        stmt,
+        order_by=_repeat_buyers_order_by(stats),
+        limit=limit,
+        offset=offset,
     )
-    total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
-
-    rows = (
-        await session.execute(
-            stmt.order_by(
-                stats.c.orders_count.desc(),  # type: ignore[attr-defined]
-                stats.c.total_spent.desc(),  # type: ignore[attr-defined]
-                User.created_at.desc(),
-            )
-            .limit(limit)
-            .offset(offset)
-        )
-    ).all()
-
-    items: list[AdminUserSegmentListItem] = []
-    for user, orders_count, total_spent, avg_order_value in rows:
-        items.append(
-            AdminUserSegmentListItem(
-                user=AdminUserListItem(
-                    id=user.id,
-                    email=user.email if include_pii else (pii_service.mask_email(user.email) or user.email),
-                    username=user.username,
-                    name=user.name if include_pii else pii_service.mask_text(user.name, keep=1),
-                    name_tag=user.name_tag,
-                    role=user.role,
-                    email_verified=bool(user.email_verified),
-                    created_at=user.created_at,
-                ),
-                orders_count=int(orders_count or 0),
-                total_spent=float(total_spent or 0),
-                avg_order_value=float(avg_order_value or 0),
-            )
-        )
 
     return AdminUserSegmentResponse(
-        items=items,
-        meta={
-            "total_items": total_items,
-            "total_pages": total_pages,
-            "page": page,
-            "limit": limit,
-        },
+        items=_user_segment_items(rows, include_pii),
+        meta=_user_segment_meta(total_items=total_items, total_pages=total_pages, page=page, limit=limit),
     )
 
 
@@ -2983,71 +3184,24 @@ async def admin_user_segment_high_aov(
         pii_service.require_pii_reveal(current_user, request=request)
     offset = (page - 1) * limit
     stats = _user_order_stats_subquery()
-
-    stmt = (
-        select(User, stats.c.orders_count, stats.c.total_spent, stats.c.avg_order_value)  # type: ignore[attr-defined]
-        .join(stats, stats.c.user_id == User.id)  # type: ignore[attr-defined]
-        .where(
-            User.deleted_at.is_(None),
-            User.role == UserRole.customer,
-            stats.c.orders_count >= min_orders,  # type: ignore[attr-defined]
-            stats.c.avg_order_value >= min_aov,  # type: ignore[attr-defined]
-        )
+    stmt = _user_segment_stmt(
+        stats,
+        min_orders=min_orders,
+        q=q,
+        min_aov=min_aov,
     )
-    if q:
-        like = f"%{q.strip().lower()}%"
-        stmt = stmt.where(
-            func.lower(User.email).ilike(like)
-            | func.lower(User.username).ilike(like)
-            | func.lower(User.name).ilike(like)
-        )
-
-    total_items = int(
-        await session.scalar(stmt.with_only_columns(func.count()).order_by(None)) or 0
+    total_items, total_pages = await _user_segment_total_and_pages(session, stmt, limit=limit)
+    rows = await _user_segment_rows(
+        session,
+        stmt,
+        order_by=_high_aov_order_by(stats),
+        limit=limit,
+        offset=offset,
     )
-    total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
-
-    rows = (
-        await session.execute(
-            stmt.order_by(
-                stats.c.avg_order_value.desc(),  # type: ignore[attr-defined]
-                stats.c.orders_count.desc(),  # type: ignore[attr-defined]
-                stats.c.total_spent.desc(),  # type: ignore[attr-defined]
-                User.created_at.desc(),
-            )
-            .limit(limit)
-            .offset(offset)
-        )
-    ).all()
-
-    items: list[AdminUserSegmentListItem] = []
-    for user, orders_count, total_spent, avg_order_value in rows:
-        items.append(
-            AdminUserSegmentListItem(
-                user=AdminUserListItem(
-                    id=user.id,
-                    email=user.email if include_pii else (pii_service.mask_email(user.email) or user.email),
-                    username=user.username,
-                    name=user.name if include_pii else pii_service.mask_text(user.name, keep=1),
-                    name_tag=user.name_tag,
-                    role=user.role,
-                    email_verified=bool(user.email_verified),
-                    created_at=user.created_at,
-                ),
-                orders_count=int(orders_count or 0),
-                total_spent=float(total_spent or 0),
-                avg_order_value=float(avg_order_value or 0),
-            )
-        )
 
     return AdminUserSegmentResponse(
-        items=items,
-        meta={
-            "total_items": total_items,
-            "total_pages": total_pages,
-            "page": page,
-            "limit": limit,
-        },
+        items=_user_segment_items(rows, include_pii),
+        meta=_user_segment_meta(total_items=total_items, total_pages=total_pages, page=page, limit=limit),
     )
 
 
@@ -3101,93 +3255,90 @@ async def admin_user_profile(
     user = await session.get(User, user_id)
     if not user or user.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-
-    addresses = (
-        (await session.execute(select(Address).where(Address.user_id == user_id).order_by(Address.created_at.desc())))
-        .scalars()
-        .all()
-    )
-    orders = (
-        (
-            await session.execute(
-                select(Order).where(Order.user_id == user_id).order_by(Order.created_at.desc()).limit(25)
-            )
-        )
-        .scalars()
-        .all()
-    )
-    tickets = (
-        (
-            await session.execute(
-                select(ContactSubmission)
-                .where(ContactSubmission.user_id == user_id)
-                .order_by(ContactSubmission.created_at.desc())
-                .limit(25)
-            )
-        )
-        .scalars()
-        .all()
-    )
-    security_events = (
-        (
-            await session.execute(
-                select(UserSecurityEvent)
-                .where(UserSecurityEvent.user_id == user_id)
-                .order_by(UserSecurityEvent.created_at.desc())
-                .limit(25)
-            )
-        )
-        .scalars()
-        .all()
-    )
-
-    addresses_payload: list[dict[str, Any]] | list[Address]
-    if include_pii:
-        addresses_payload = addresses
-    else:
-        addresses_payload = [
-            {
-                "id": addr.id,
-                "label": addr.label,
-                "phone": pii_service.mask_phone(addr.phone),
-                "line1": "***",
-                "line2": "***" if (addr.line2 or "").strip() else None,
-                "city": "***",
-                "region": "***" if (addr.region or "").strip() else None,
-                "postal_code": "***",
-                "country": addr.country,
-                "is_default_shipping": bool(getattr(addr, "is_default_shipping", False)),
-                "is_default_billing": bool(getattr(addr, "is_default_billing", False)),
-                "created_at": addr.created_at,
-                "updated_at": addr.updated_at,
-            }
-            for addr in addresses
-        ]
-
-    user_email = user.email if include_pii else (pii_service.mask_email(user.email) or user.email)
-    user_name = user.name if include_pii else pii_service.mask_text(user.name, keep=1)
+    addresses, orders, tickets, security_events = await _admin_user_profile_related(session, user_id)
 
     return AdminUserProfileResponse(
-        user=AdminUserProfileUser(
-            id=user.id,
-            email=user_email,
-            username=user.username,
-            name=user_name,
-            name_tag=user.name_tag,
-            role=user.role,
-            email_verified=bool(user.email_verified),
-            created_at=user.created_at,
-            vip=bool(getattr(user, "vip", False)),
-            admin_note=getattr(user, "admin_note", None),
-            locked_until=getattr(user, "locked_until", None),
-            locked_reason=getattr(user, "locked_reason", None),
-            password_reset_required=bool(getattr(user, "password_reset_required", False)),
-        ),
-        addresses=addresses_payload,
+        user=_admin_user_profile_view(user, include_pii=include_pii),
+        addresses=_admin_user_profile_addresses(addresses, include_pii=include_pii),
         orders=orders,
         tickets=tickets,
         security_events=security_events,
     )
+
+
+async def _admin_user_profile_related(
+    session: AsyncSession,
+    user_id: UUID,
+) -> tuple[list[Address], list[Order], list[ContactSubmission], list[UserSecurityEvent]]:
+    addresses = (
+        await session.execute(select(Address).where(Address.user_id == user_id).order_by(Address.created_at.desc()))
+    ).scalars().all()
+    orders = (
+        await session.execute(select(Order).where(Order.user_id == user_id).order_by(Order.created_at.desc()).limit(25))
+    ).scalars().all()
+    tickets = (
+        await session.execute(
+            select(ContactSubmission)
+            .where(ContactSubmission.user_id == user_id)
+            .order_by(ContactSubmission.created_at.desc())
+            .limit(25)
+        )
+    ).scalars().all()
+    security_events = (
+        await session.execute(
+            select(UserSecurityEvent)
+            .where(UserSecurityEvent.user_id == user_id)
+            .order_by(UserSecurityEvent.created_at.desc())
+            .limit(25)
+        )
+    ).scalars().all()
+    return addresses, orders, tickets, security_events
+
+
+def _admin_user_profile_view(user: User, *, include_pii: bool) -> AdminUserProfileUser:
+    return AdminUserProfileUser(
+        id=user.id,
+        email=user.email if include_pii else (pii_service.mask_email(user.email) or user.email),
+        username=user.username,
+        name=user.name if include_pii else pii_service.mask_text(user.name, keep=1),
+        name_tag=user.name_tag,
+        role=user.role,
+        email_verified=bool(user.email_verified),
+        created_at=user.created_at,
+        vip=bool(getattr(user, "vip", False)),
+        admin_note=getattr(user, "admin_note", None),
+        locked_until=getattr(user, "locked_until", None),
+        locked_reason=getattr(user, "locked_reason", None),
+        password_reset_required=bool(getattr(user, "password_reset_required", False)),
+    )
+
+
+def _admin_user_profile_masked_address(addr: Address) -> dict[str, Any]:
+    return {
+        "id": addr.id,
+        "label": addr.label,
+        "phone": pii_service.mask_phone(addr.phone),
+        "line1": "***",
+        "line2": "***" if (addr.line2 or "").strip() else None,
+        "city": "***",
+        "region": "***" if (addr.region or "").strip() else None,
+        "postal_code": "***",
+        "country": addr.country,
+        "is_default_shipping": bool(getattr(addr, "is_default_shipping", False)),
+        "is_default_billing": bool(getattr(addr, "is_default_billing", False)),
+        "created_at": addr.created_at,
+        "updated_at": addr.updated_at,
+    }
+
+
+def _admin_user_profile_addresses(
+    addresses: list[Address],
+    *,
+    include_pii: bool,
+) -> list[dict[str, Any]] | list[Address]:
+    if include_pii:
+        return addresses
+    return [_admin_user_profile_masked_address(addr) for addr in addresses]
 
 
 @router.get("/content")
@@ -3278,7 +3429,18 @@ async def scheduled_tasks_overview(
     limit: int = Query(default=10, ge=1, le=50),
 ) -> AdminDashboardScheduledTasksResponse:
     now = datetime.now(timezone.utc)
+    return AdminDashboardScheduledTasksResponse(
+        publish_schedules=await _scheduled_publish_items(session, now=now, limit=limit),
+        promo_schedules=await _scheduled_promo_items(session, now=now, limit=limit),
+    )
 
+
+async def _scheduled_publish_items(
+    session: AsyncSession,
+    *,
+    now: datetime,
+    limit: int,
+) -> list[ScheduledPublishItem]:
     publish_stmt = (
         select(
             Product.id,
@@ -3298,8 +3460,8 @@ async def scheduled_tasks_overview(
         .order_by(Product.sale_start_at.asc())
         .limit(limit)
     )
-    publish_rows = (await session.execute(publish_stmt)).all()
-    publish_items = [
+    rows = (await session.execute(publish_stmt)).all()
+    return [
         ScheduledPublishItem(
             id=str(row.id),
             slug=row.slug,
@@ -3307,9 +3469,11 @@ async def scheduled_tasks_overview(
             scheduled_for=row.sale_start_at,
             sale_end_at=row.sale_end_at,
         )
-        for row in publish_rows
+        for row in rows
     ]
 
+
+def _scheduled_promo_labels(now: datetime) -> tuple[Any, Any]:
     promo_next_at = case(
         (
             Promotion.starts_at.is_not(None) & (Promotion.starts_at > now),
@@ -3324,6 +3488,16 @@ async def scheduled_tasks_overview(
         ),
         else_=literal("ends_at"),
     ).label("next_event_type")
+    return promo_next_at, promo_next_type
+
+
+async def _scheduled_promo_items(
+    session: AsyncSession,
+    *,
+    now: datetime,
+    limit: int,
+) -> list[ScheduledPromoItem]:
+    promo_next_at, promo_next_type = _scheduled_promo_labels(now)
     promo_stmt = (
         select(
             Promotion.id,
@@ -3340,8 +3514,8 @@ async def scheduled_tasks_overview(
         .order_by(promo_next_at.asc())
         .limit(limit)
     )
-    promo_rows = (await session.execute(promo_stmt)).all()
-    promo_items = [
+    rows = (await session.execute(promo_stmt)).all()
+    return [
         ScheduledPromoItem(
             id=str(row.id),
             name=row.name,
@@ -3350,13 +3524,47 @@ async def scheduled_tasks_overview(
             next_event_at=row.next_event_at,
             next_event_type=row.next_event_type,
         )
-        for row in promo_rows
+        for row in rows
         if row.next_event_at is not None
     ]
 
-    return AdminDashboardScheduledTasksResponse(
-        publish_schedules=publish_items, promo_schedules=promo_items
-    )
+
+def _normalized_coupon_currency(value: object | None) -> str | None:
+    if not value:
+        return None
+    currency = str(value).strip().upper()
+    if currency != "RON":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only RON currency is supported",
+        )
+    return currency
+
+
+def _coupon_payload(promo: PromoCode) -> dict:
+    return {
+        "id": str(promo.id),
+        "code": promo.code,
+        "percentage_off": float(promo.percentage_off) if promo.percentage_off is not None else None,
+        "amount_off": float(promo.amount_off) if promo.amount_off is not None else None,
+        "currency": promo.currency,
+        "expires_at": promo.expires_at,
+        "active": promo.active,
+        "times_used": promo.times_used,
+        "max_uses": promo.max_uses,
+    }
+
+
+def _coupon_should_invalidate_stripe(payload: dict) -> bool:
+    return any(field in payload for field in ["percentage_off", "amount_off", "currency", "active"])
+
+
+def _apply_coupon_updates(promo: PromoCode, payload: dict) -> None:
+    for field in ["percentage_off", "amount_off", "expires_at", "max_uses", "active", "code"]:
+        if field in payload:
+            setattr(promo, field, payload[field])
+    if "currency" in payload:
+        promo.currency = _normalized_coupon_currency(payload.get("currency"))
 
 
 @router.post("/coupons/{coupon_id}/stripe/invalidate")
@@ -3386,38 +3594,18 @@ async def admin_create_coupon(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="code required"
         )
-    currency = payload.get("currency")
-    if currency:
-        currency = str(currency).strip().upper()
-        if currency != "RON":
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Only RON currency is supported",
-            )
     promo = PromoCode(
         code=code,
         percentage_off=payload.get("percentage_off"),
         amount_off=payload.get("amount_off"),
-        currency=currency or None,
+        currency=_normalized_coupon_currency(payload.get("currency")),
         expires_at=payload.get("expires_at"),
         max_uses=payload.get("max_uses"),
         active=payload.get("active", True),
     )
     session.add(promo)
     await session.commit()
-    return {
-        "id": str(promo.id),
-        "code": promo.code,
-        "percentage_off": float(promo.percentage_off)
-        if promo.percentage_off is not None
-        else None,
-        "amount_off": float(promo.amount_off) if promo.amount_off is not None else None,
-        "currency": promo.currency,
-        "expires_at": promo.expires_at,
-        "active": promo.active,
-        "times_used": promo.times_used,
-        "max_uses": promo.max_uses,
-    }
+    return _coupon_payload(promo)
 
 
 @router.patch("/coupons/{coupon_id}")
@@ -3432,50 +3620,14 @@ async def admin_update_coupon(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found"
         )
-    invalidate_stripe = any(
-        field in payload
-        for field in ["percentage_off", "amount_off", "currency", "active"]
-    )
-    for field in [
-        "percentage_off",
-        "amount_off",
-        "expires_at",
-        "max_uses",
-        "active",
-        "code",
-    ]:
-        if field in payload:
-            setattr(promo, field, payload[field])
-    if "currency" in payload:
-        currency = payload.get("currency")
-        if currency:
-            currency = str(currency).strip().upper()
-            if currency != "RON":
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Only RON currency is supported",
-                )
-            promo.currency = currency
-        else:
-            promo.currency = None
+    invalidate_stripe = _coupon_should_invalidate_stripe(payload)
+    _apply_coupon_updates(promo, payload)
     if invalidate_stripe:
         await _invalidate_stripe_coupon_mappings(session, promo.id)
     session.add(promo)
     await session.flush()
     await session.commit()
-    return {
-        "id": str(promo.id),
-        "code": promo.code,
-        "percentage_off": float(promo.percentage_off)
-        if promo.percentage_off is not None
-        else None,
-        "amount_off": float(promo.amount_off) if promo.amount_off is not None else None,
-        "currency": promo.currency,
-        "expires_at": promo.expires_at,
-        "active": promo.active,
-        "times_used": promo.times_used,
-        "max_uses": promo.max_uses,
-    }
+    return _coupon_payload(promo)
 
 
 @router.get("/audit")
@@ -3483,65 +3635,80 @@ async def admin_audit(
     session: Annotated[AsyncSession, Depends(get_session)],
     _: Annotated[User, Depends(require_admin_section("audit"))],
 ) -> dict:
-    product_audit_stmt = (
-        select(ProductAuditLog)
-        .options()
-        .order_by(ProductAuditLog.created_at.desc())
-        .limit(20)
-    )
-    content_audit_stmt = (
-        select(ContentAuditLog).order_by(ContentAuditLog.created_at.desc()).limit(20)
-    )
+    prod_logs = await _admin_audit_product_logs(session)
+    content_logs = await _admin_audit_content_logs(session)
+    security_rows = await _admin_audit_security_rows(session)
+    return {
+        "products": _admin_audit_product_payload(prod_logs),
+        "content": _admin_audit_content_payload(content_logs),
+        "security": _admin_audit_security_payload(security_rows),
+    }
+
+
+async def _admin_audit_product_logs(session: AsyncSession) -> list[ProductAuditLog]:
+    stmt = select(ProductAuditLog).options().order_by(ProductAuditLog.created_at.desc()).limit(20)
+    return (await session.execute(stmt)).scalars().all()
+
+
+async def _admin_audit_content_logs(session: AsyncSession) -> list[ContentAuditLog]:
+    stmt = select(ContentAuditLog).order_by(ContentAuditLog.created_at.desc()).limit(20)
+    return (await session.execute(stmt)).scalars().all()
+
+
+async def _admin_audit_security_rows(session: AsyncSession) -> list[tuple[AdminAuditLog, str | None, str | None]]:
     actor = aliased(User)
     subject = aliased(User)
-    security_audit_stmt = (
+    stmt = (
         select(AdminAuditLog, actor.email, subject.email)
         .join(actor, AdminAuditLog.actor_user_id == actor.id, isouter=True)
         .join(subject, AdminAuditLog.subject_user_id == subject.id, isouter=True)
         .order_by(AdminAuditLog.created_at.desc())
         .limit(20)
     )
-    prod_logs = (await session.execute(product_audit_stmt)).scalars().all()
-    content_logs = (await session.execute(content_audit_stmt)).scalars().all()
-    security_rows = (await session.execute(security_audit_stmt)).all()
-    return {
-        "products": [
-            {
-                "id": str(log.id),
-                "product_id": str(log.product_id),
-                "action": log.action,
-                "user_id": str(log.user_id) if log.user_id else None,
-                "created_at": log.created_at,
-            }
-            for log in prod_logs
-        ],
-        "content": [
-            {
-                "id": str(log.id),
-                "block_id": str(log.content_block_id),
-                "action": log.action,
-                "version": log.version,
-                "user_id": str(log.user_id) if log.user_id else None,
-                "created_at": log.created_at,
-            }
-            for log in content_logs
-        ],
-        "security": [
-            {
-                "id": str(log.id),
-                "action": log.action,
-                "actor_user_id": str(log.actor_user_id) if log.actor_user_id else None,
-                "actor_email": actor_email,
-                "subject_user_id": str(log.subject_user_id)
-                if log.subject_user_id
-                else None,
-                "subject_email": subject_email,
-                "data": log.data,
-                "created_at": log.created_at,
-            }
-            for log, actor_email, subject_email in security_rows
-        ],
-    }
+    return (await session.execute(stmt)).all()
+
+
+def _admin_audit_product_payload(logs: list[ProductAuditLog]) -> list[dict[str, Any]]:
+    return [
+        {
+            "id": str(log.id),
+            "product_id": str(log.product_id),
+            "action": log.action,
+            "user_id": str(log.user_id) if log.user_id else None,
+            "created_at": log.created_at,
+        }
+        for log in logs
+    ]
+
+
+def _admin_audit_content_payload(logs: list[ContentAuditLog]) -> list[dict[str, Any]]:
+    return [
+        {
+            "id": str(log.id),
+            "block_id": str(log.content_block_id),
+            "action": log.action,
+            "version": log.version,
+            "user_id": str(log.user_id) if log.user_id else None,
+            "created_at": log.created_at,
+        }
+        for log in logs
+    ]
+
+
+def _admin_audit_security_payload(rows: list[tuple[AdminAuditLog, str | None, str | None]]) -> list[dict[str, Any]]:
+    return [
+        {
+            "id": str(log.id),
+            "action": log.action,
+            "actor_user_id": str(log.actor_user_id) if log.actor_user_id else None,
+            "actor_email": actor_email,
+            "subject_user_id": str(log.subject_user_id) if log.subject_user_id else None,
+            "subject_email": subject_email,
+            "data": log.data,
+            "created_at": log.created_at,
+        }
+        for log, actor_email, subject_email in rows
+    ]
 
 
 def _audit_union_subquery() -> object:
@@ -3966,60 +4133,86 @@ def _iso_to_dt(value: str | None) -> datetime | None:
         return None
 
 
+def _audit_retention_cutoffs(policies: dict[str, dict]) -> dict[str, datetime | None]:
+    return {
+        "product": _iso_to_dt(policies["product"]["cutoff"]),
+        "content": _iso_to_dt(policies["content"]["cutoff"]),
+        "security": _iso_to_dt(policies["security"]["cutoff"]),
+    }
+
+
+async def _audit_retention_counts_by_cutoff(
+    session: AsyncSession,
+    cutoffs: dict[str, datetime | None],
+) -> dict[str, dict]:
+    return {
+        "product": await _audit_retention_counts(session, ProductAuditLog, cutoffs["product"]),
+        "content": await _audit_retention_counts(session, ContentAuditLog, cutoffs["content"]),
+        "security": await _audit_retention_counts(session, AdminAuditLog, cutoffs["security"]),
+    }
+
+
+def _audit_retention_deleted_template() -> dict[str, int]:
+    return {"product": 0, "content": 0, "security": 0}
+
+
+async def _audit_retention_delete_expired(
+    session: AsyncSession,
+    *,
+    cutoffs: dict[str, datetime | None],
+    counts: dict[str, dict],
+) -> dict[str, int]:
+    deleted = _audit_retention_deleted_template()
+    for key, model in (
+        ("product", ProductAuditLog),
+        ("content", ContentAuditLog),
+        ("security", AdminAuditLog),
+    ):
+        cutoff = cutoffs[key]
+        expired = int(counts[key]["expired"] or 0)
+        if cutoff is None or expired <= 0:
+            continue
+        await session.execute(delete(model.__table__).where(model.__table__.c.created_at < cutoff))
+        deleted[key] = expired
+    return deleted
+
+
 @router.post("/audit/retention/purge")
 async def admin_audit_retention_purge(
     payload: dict = Body(default_factory=dict),
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(require_admin_section("audit")),
 ) -> dict:
-    if current_user.role != UserRole.owner:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Owner access required")
-    confirm = str(payload.get("confirm") or "").strip()
-    if confirm.upper() != "PURGE":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Type "PURGE" to confirm')
+    _require_owner_access(current_user)
+    _require_confirm_keyword(payload, keyword="PURGE", detail='Type "PURGE" to confirm')
     dry_run = bool(payload.get("dry_run"))
 
     now = datetime.now(timezone.utc)
     policies = _audit_retention_policies(now)
-    cutoffs = {
-        "product": _iso_to_dt(policies["product"]["cutoff"]),
-        "content": _iso_to_dt(policies["content"]["cutoff"]),
-        "security": _iso_to_dt(policies["security"]["cutoff"]),
-    }
-
-    counts = {
-        "product": await _audit_retention_counts(session, ProductAuditLog, cutoffs["product"]),
-        "content": await _audit_retention_counts(session, ContentAuditLog, cutoffs["content"]),
-        "security": await _audit_retention_counts(session, AdminAuditLog, cutoffs["security"]),
-    }
-
-    deleted: dict[str, int] = {"product": 0, "content": 0, "security": 0}
-    if not dry_run:
-        for key, model in (
-            ("product", ProductAuditLog),
-            ("content", ContentAuditLog),
-            ("security", AdminAuditLog),
-        ):
-            cutoff = cutoffs[key]
-            expired = int(counts[key]["expired"] or 0)
-            if cutoff is None or expired <= 0:
-                continue
-            table = model.__table__
-            await session.execute(delete(table).where(table.c.created_at < cutoff))
-            deleted[key] = expired
-
-        await audit_chain_service.add_admin_audit_log(
-            session,
-            action="audit.retention.purge",
-            actor_user_id=current_user.id,
-            subject_user_id=None,
-            data={
-                "dry_run": dry_run,
-                "deleted": deleted,
-                "policies": {k: v["days"] for k, v in policies.items()},
-            },
-        )
-        await session.commit()
+    cutoffs = _audit_retention_cutoffs(policies)
+    counts = await _audit_retention_counts_by_cutoff(session, cutoffs)
+    deleted = _audit_retention_deleted_template()
+    if dry_run:
+        return {
+            "dry_run": dry_run,
+            "now": now.isoformat(),
+            "policies": policies,
+            "counts": counts,
+            "deleted": deleted,
+        }
+    deleted = await _audit_retention_delete_expired(session, cutoffs=cutoffs, counts=counts)
+    await audit_chain_service.add_admin_audit_log(
+        session,
+        action="audit.retention.purge",
+        actor_user_id=current_user.id,
+        subject_user_id=None,
+        data={
+            "dry_run": dry_run,
+            "deleted": deleted,
+            "policies": {k: v["days"] for k, v in policies.items()},
+        },
+    )
+    await session.commit()
 
     return {
         "dry_run": dry_run,
@@ -4398,6 +4591,40 @@ async def admin_gdpr_retry_export_job(
     )
 
 
+def _gdpr_downloadable_job(job: UserDataExportJob | None) -> UserDataExportJob:
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found")
+    if job.status != UserDataExportStatus.succeeded or not job.file_path:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Export is not ready")
+    return job
+
+
+def _gdpr_export_is_expired(job: UserDataExportJob, *, now: datetime) -> bool:
+    expires_at = job.expires_at
+    if expires_at and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    return bool(expires_at and expires_at < now)
+
+
+def _gdpr_export_file_path(file_path: str) -> Any:
+    path = private_storage.resolve_private_path(file_path)
+    if not path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export file not found")
+    return path
+
+
+async def _gdpr_export_user_or_404(session: AsyncSession, user_id: UUID) -> User:
+    user = await session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return user
+
+
+def _gdpr_export_download_filename(job: UserDataExportJob) -> str:
+    stamp = (job.finished_at or job.created_at or datetime.now(timezone.utc)).date().isoformat()
+    return f"moment-studio-export-{stamp}.json"
+
+
 @router.get("/gdpr/exports/{job_id}/download")
 async def admin_gdpr_download_export_job(
     job_id: UUID,
@@ -4406,25 +4633,12 @@ async def admin_gdpr_download_export_job(
     current_user: Annotated[User, Depends(require_admin)],
 ) -> FileResponse:
     step_up_service.require_step_up(request, current_user)
-    job = await session.get(UserDataExportJob, job_id)
-    if not job:
+    job = _gdpr_downloadable_job(await session.get(UserDataExportJob, job_id))
+    now = datetime.now(timezone.utc)
+    if _gdpr_export_is_expired(job, now=now):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found")
-    if job.status != UserDataExportStatus.succeeded or not job.file_path:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Export is not ready")
-
-    expires_at = job.expires_at
-    if expires_at and expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
-    if expires_at and expires_at < datetime.now(timezone.utc):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found")
-
-    path = private_storage.resolve_private_path(job.file_path)
-    if not path.exists():
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export file not found")
-
-    user = await session.get(User, job.user_id)
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    path = _gdpr_export_file_path(job.file_path)
+    user = await _gdpr_export_user_or_404(session, job.user_id)
 
     await audit_chain_service.add_admin_audit_log(
         session,
@@ -4433,15 +4647,16 @@ async def admin_gdpr_download_export_job(
         subject_user_id=user.id,
         data={
             "job_id": str(job.id),
-            "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
-            "ip_address": (request.client.host if request.client else None),
+            **_request_audit_metadata(request),
         },
     )
     await session.commit()
-
-    stamp = (job.finished_at or job.created_at or datetime.now(timezone.utc)).date().isoformat()
-    filename = f"moment-studio-export-{stamp}.json"
-    return FileResponse(path, media_type="application/json", filename=filename, headers={"Cache-Control": "no-store"})
+    return FileResponse(
+        path,
+        media_type="application/json",
+        filename=_gdpr_export_download_filename(job),
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @router.get("/gdpr/deletions")
@@ -4578,6 +4793,65 @@ async def admin_gdpr_cancel_deletion(
     return None
 
 
+def _require_owner_access(current_user: User) -> None:
+    if current_user.role != UserRole.owner:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Owner access required")
+
+
+def _require_owner_or_admin_access(current_user: User) -> None:
+    if current_user.role not in (UserRole.owner, UserRole.admin):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only owner/admin can change user roles")
+
+
+def _require_confirm_value(value: object | None, *, keyword: str, detail: str) -> None:
+    if str(value or "").strip().upper() != keyword:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+
+
+def _require_confirm_keyword(payload: dict, *, keyword: str, detail: str) -> None:
+    _require_confirm_value(payload.get("confirm"), keyword=keyword, detail=detail)
+
+
+def _require_admin_password(password: str, current_user: User) -> None:
+    if not security.verify_password(password, current_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+
+
+def _role_update_target_user(user: User | None) -> User:
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if user.role == UserRole.owner:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Owner role can only be transferred",
+        )
+    return user
+
+
+def _validated_role_value(role: str) -> UserRole:
+    if role not in (
+        UserRole.customer.value,
+        UserRole.support.value,
+        UserRole.fulfillment.value,
+        UserRole.content.value,
+        UserRole.admin.value,
+    ):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid role")
+    return UserRole(role)
+
+
+def _admin_user_summary_payload(user: User) -> dict:
+    return {
+        "id": str(user.id),
+        "email": user.email,
+        "username": user.username,
+        "name": user.name,
+        "name_tag": user.name_tag,
+        "role": user.role,
+        "created_at": user.created_at,
+    }
+
+
 @router.patch("/users/{user_id}/role")
 async def update_user_role(
     user_id: UUID,
@@ -4586,35 +4860,11 @@ async def update_user_role(
     session: Annotated[AsyncSession, Depends(get_session)],
     current_user: Annotated[User, Depends(require_admin)],
 ) -> dict:
-    if current_user.role not in (UserRole.owner, UserRole.admin):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only owner/admin can change user roles")
-
-    if not security.verify_password(payload.password, current_user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
-
-    user = await session.get(User, user_id)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
-    if user.role == UserRole.owner:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Owner role can only be transferred",
-        )
-    role = payload.role
-    if role not in (
-        UserRole.customer.value,
-        UserRole.support.value,
-        UserRole.fulfillment.value,
-        UserRole.content.value,
-        UserRole.admin.value,
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid role"
-        )
+    _require_owner_or_admin_access(current_user)
+    _require_admin_password(payload.password, current_user)
+    user = _role_update_target_user(await session.get(User, user_id))
     before_role = user.role
-    user.role = UserRole(role)
+    user.role = _validated_role_value(payload.role)
     session.add(user)
     await session.flush()
     await audit_chain_service.add_admin_audit_log(
@@ -4625,20 +4875,11 @@ async def update_user_role(
         data={
             "before": getattr(before_role, "value", str(before_role)),
             "after": getattr(user.role, "value", str(user.role)),
-            "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
-            "ip_address": (request.client.host if request.client else None),
+            **_request_audit_metadata(request),
         },
     )
     await session.commit()
-    return {
-        "id": str(user.id),
-        "email": user.email,
-        "username": user.username,
-        "name": user.name,
-        "name_tag": user.name_tag,
-        "role": user.role,
-        "created_at": user.created_at,
-    }
+    return _admin_user_summary_payload(user)
 
 
 def _normalized_admin_note(note: object | None) -> str | None:
@@ -4933,29 +5174,12 @@ async def resend_password_reset(
     current_user: Annotated[User, Depends(require_admin_section("users"))],
     _: Annotated[None, Depends(admin_password_reset_resend_rate_limit)],
 ) -> dict:
-    user = await session.get(User, user_id)
-    if not user or user.deleted_at is not None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-
-    requested_email = (payload.email or "").strip().lower()
-    target_email = (user.email or "").strip()
-    target_kind = "primary"
-    if requested_email:
-        if requested_email == (user.email or "").strip().lower():
-            target_email = (user.email or "").strip()
-        else:
-            secondary = await session.scalar(
-                select(UserSecondaryEmail).where(
-                    UserSecondaryEmail.user_id == user.id,
-                    func.lower(UserSecondaryEmail.email) == requested_email,
-                    UserSecondaryEmail.verified.is_(True),
-                )
-            )
-            if not secondary:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email")
-            target_email = (secondary.email or "").strip()
-            target_kind = "secondary"
-
+    user = _existing_active_user(await session.get(User, user_id))
+    target_email, target_kind = await _password_reset_target_email(
+        session,
+        user=user,
+        requested_email=(payload.email or "").strip().lower(),
+    )
     if not target_email:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User email missing")
 
@@ -4979,12 +5203,54 @@ async def resend_password_reset(
             "expires_at": reset.expires_at.isoformat() if reset.expires_at else None,
             "to_email_masked": pii_service.mask_email(target_email),
             "to_email_kind": target_kind,
-            "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
-            "ip_address": (request.client.host if request.client else None),
+            **_request_audit_metadata(request),
         },
     )
     await session.commit()
     return {"detail": "Password reset email sent"}
+
+
+def _existing_active_user(user: User | None) -> User:
+    if not user or user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return user
+
+
+async def _password_reset_target_email(
+    session: AsyncSession,
+    *,
+    user: User,
+    requested_email: str,
+) -> tuple[str, str]:
+    primary_email = (user.email or "").strip()
+    if not requested_email or requested_email == primary_email.lower():
+        return primary_email, "primary"
+    secondary = await session.scalar(
+        select(UserSecondaryEmail).where(
+            UserSecondaryEmail.user_id == user.id,
+            func.lower(UserSecondaryEmail.email) == requested_email,
+            UserSecondaryEmail.verified.is_(True),
+        )
+    )
+    if not secondary:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email")
+    return (secondary.email or "").strip(), "secondary"
+
+
+async def _set_unused_email_verification_tokens_used(session: AsyncSession, user_id: UUID) -> None:
+    tokens = (
+        await session.execute(
+            select(EmailVerificationToken).where(
+                EmailVerificationToken.user_id == user_id,
+                EmailVerificationToken.used.is_(False),
+            )
+        )
+    ).scalars().all()
+    if not tokens:
+        return
+    for token in tokens:
+        token.used = True
+    session.add_all(tokens)
 
 
 @router.post("/users/{user_id}/email/verification/override")
@@ -4995,27 +5261,13 @@ async def override_email_verification(
     session: Annotated[AsyncSession, Depends(get_session)],
     current_user: Annotated[User, Depends(require_admin)],
 ) -> AdminUserProfileUser:
-    if not security.verify_password(payload.password, current_user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
-
-    user = await session.get(User, user_id)
-    if not user or user.deleted_at is not None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    _require_admin_password(payload.password, current_user)
+    user = _existing_active_user(await session.get(User, user_id))
 
     before_verified = bool(getattr(user, "email_verified", False))
     if not before_verified:
         user.email_verified = True
-        tokens = (
-            await session.execute(
-                select(EmailVerificationToken).where(
-                    EmailVerificationToken.user_id == user.id, EmailVerificationToken.used.is_(False)
-                )
-            )
-        ).scalars().all()
-        for tok in tokens:
-            tok.used = True
-        if tokens:
-            session.add_all(tokens)
+        await _set_unused_email_verification_tokens_used(session, user.id)
 
     session.add(user)
     await session.flush()
@@ -5028,27 +5280,11 @@ async def override_email_verification(
             data={
                 "before": before_verified,
                 "after": bool(getattr(user, "email_verified", False)),
-                "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
-                "ip_address": (request.client.host if request.client else None),
+                **_request_audit_metadata(request),
             },
         )
     await session.commit()
-
-    return AdminUserProfileUser(
-        id=user.id,
-        email=user.email,
-        username=user.username,
-        name=user.name,
-        name_tag=user.name_tag,
-        role=user.role,
-        email_verified=bool(user.email_verified),
-        created_at=user.created_at,
-        vip=bool(getattr(user, "vip", False)),
-        admin_note=getattr(user, "admin_note", None),
-        locked_until=getattr(user, "locked_until", None),
-        locked_reason=getattr(user, "locked_reason", None),
-        password_reset_required=bool(getattr(user, "password_reset_required", False)),
-    )
+    return _admin_user_profile(user)
 
 
 @router.post("/users/{user_id}/impersonate")
@@ -5094,32 +5330,13 @@ async def transfer_owner(
     session: Annotated[AsyncSession, Depends(get_session)],
     current_owner: Annotated[User, Depends(require_owner)],
 ) -> dict:
-    identifier = str(payload.identifier or "").strip()
-    if not identifier:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Identifier is required"
-        )
-
-    confirm = str(payload.confirm or "").strip()
-    if confirm.upper() != "TRANSFER":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail='Type "TRANSFER" to confirm'
-        )
-
-    if not security.verify_password(payload.password, current_owner.hashed_password):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
-
-    if "@" in identifier:
-        target = await auth_service.get_user_by_any_email(session, identifier)
-    else:
-        target = await auth_service.get_user_by_username(session, identifier)
-    if not target:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
+    identifier = _owner_transfer_identifier(payload)
+    _require_confirm_value(payload.confirm, keyword="TRANSFER", detail='Type "TRANSFER" to confirm')
+    _require_admin_password(payload.password, current_owner)
+    target = await _owner_transfer_target(session, identifier)
 
     if target.id == current_owner.id:
-        return {"old_owner_id": str(current_owner.id), "new_owner_id": str(target.id)}
+        return _owner_transfer_ids_payload(current_owner.id, target.id)
 
     current_owner.role = UserRole.admin
     session.add(current_owner)
@@ -5141,9 +5358,36 @@ async def transfer_owner(
     await session.commit()
     await session.refresh(target)
 
+    return _owner_transfer_full_payload(current_owner.id, target)
+
+
+def _owner_transfer_identifier(payload: AdminOwnerTransferRequest) -> str:
+    identifier = str(payload.identifier or "").strip()
+    if not identifier:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Identifier is required")
+    return identifier
+
+
+async def _owner_transfer_target(session: AsyncSession, identifier: str) -> User:
+    if "@" in identifier:
+        target = await auth_service.get_user_by_any_email(session, identifier)
+    else:
+        target = await auth_service.get_user_by_username(session, identifier)
+    if not target:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return target
+
+
+def _owner_transfer_ids_payload(old_owner_id: UUID, new_owner_id: UUID) -> dict[str, str]:
     return {
-        "old_owner_id": str(current_owner.id),
-        "new_owner_id": str(target.id),
+        "old_owner_id": str(old_owner_id),
+        "new_owner_id": str(new_owner_id),
+    }
+
+
+def _owner_transfer_full_payload(old_owner_id: UUID, target: User) -> dict:
+    return {
+        **_owner_transfer_ids_payload(old_owner_id, target.id),
         "email": target.email,
         "username": target.username,
         "name": target.name,
@@ -5239,13 +5483,42 @@ async def export_stock_adjustments(
     admin: User = Depends(require_admin_section("inventory")),
 ) -> Response:
     step_up_service.require_step_up(request, admin)
+    _validate_stock_adjustments_date_range(from_date=from_date, to_date=to_date)
+    product = await _stock_adjustments_product_or_404(session, product_id=product_id)
+    stmt = _stock_adjustments_export_stmt(
+        product_id=product_id,
+        reason=reason,
+        from_date=from_date,
+        to_date=to_date,
+    )
+    rows = await _stock_adjustments_export_rows(session, stmt=stmt, limit=limit)
+    filename = _stock_adjustments_filename(product.slug)
+    return Response(
+        content=_stock_adjustments_csv_content(rows, product=product),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+def _validate_stock_adjustments_date_range(*, from_date: date | None, to_date: date | None) -> None:
     if from_date and to_date and to_date < from_date:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date range")
 
+
+async def _stock_adjustments_product_or_404(session: AsyncSession, *, product_id: UUID) -> Product:
     product = await session.get(Product, product_id)
     if not product or getattr(product, "is_deleted", False):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    return product
 
+
+def _stock_adjustments_export_stmt(
+    *,
+    product_id: UUID,
+    reason: StockAdjustmentReason | None,
+    from_date: date | None,
+    to_date: date | None,
+) -> Any:
     stmt = (
         select(StockAdjustment, ProductVariant, User)
         .select_from(StockAdjustment)
@@ -5259,57 +5532,76 @@ async def export_stock_adjustments(
         stmt = stmt.where(func.date(StockAdjustment.created_at) >= from_date)
     if to_date is not None:
         stmt = stmt.where(func.date(StockAdjustment.created_at) <= to_date)
+    return stmt
 
-    rows = (
-        (await session.execute(stmt.order_by(StockAdjustment.created_at.desc()).limit(limit)))
-        .all()
-    )
 
-    buf = io.StringIO()
-    writer = csv.writer(buf)
-    writer.writerow(
-        [
-            "created_at",
-            "product_slug",
-            "product_name",
-            "sku",
-            "variant_id",
-            "variant_name",
-            "reason",
-            "delta",
-            "before_quantity",
-            "after_quantity",
-            "note",
-            "actor_email",
-            "actor_user_id",
-        ]
-    )
+async def _stock_adjustments_export_rows(
+    session: AsyncSession,
+    *,
+    stmt: Any,
+    limit: int,
+) -> list[tuple[StockAdjustment, ProductVariant | None, User | None]]:
+    return (await session.execute(stmt.order_by(StockAdjustment.created_at.desc()).limit(limit))).all()
+
+
+def _stock_adjustments_csv_header() -> list[str]:
+    return [
+        "created_at",
+        "product_slug",
+        "product_name",
+        "sku",
+        "variant_id",
+        "variant_name",
+        "reason",
+        "delta",
+        "before_quantity",
+        "after_quantity",
+        "note",
+        "actor_email",
+        "actor_user_id",
+    ]
+
+
+def _stock_adjustments_csv_row(
+    adjustment: StockAdjustment,
+    variant: ProductVariant | None,
+    actor: User | None,
+    *,
+    product: Product,
+) -> list[Any]:
+    created_at = getattr(adjustment, "created_at", None)
+    return [
+        created_at.isoformat() if isinstance(created_at, datetime) else "",
+        product.slug,
+        product.name,
+        product.sku,
+        str(adjustment.variant_id) if adjustment.variant_id else "",
+        getattr(variant, "name", "") or "",
+        adjustment.reason.value,
+        int(adjustment.delta),
+        int(adjustment.before_quantity),
+        int(adjustment.after_quantity),
+        adjustment.note or "",
+        getattr(actor, "email", "") or "",
+        str(adjustment.actor_user_id) if adjustment.actor_user_id else "",
+    ]
+
+
+def _stock_adjustments_csv_content(
+    rows: list[tuple[StockAdjustment, ProductVariant | None, User | None]],
+    *,
+    product: Product,
+) -> str:
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(_stock_adjustments_csv_header())
     for adjustment, variant, actor in rows:
-        created_at = getattr(adjustment, "created_at", None)
-        writer.writerow(
-            [
-                created_at.isoformat() if isinstance(created_at, datetime) else "",
-                product.slug,
-                product.name,
-                product.sku,
-                str(adjustment.variant_id) if adjustment.variant_id else "",
-                getattr(variant, "name", "") or "",
-                adjustment.reason.value,
-                int(adjustment.delta),
-                int(adjustment.before_quantity),
-                int(adjustment.after_quantity),
-                (adjustment.note or ""),
-                getattr(actor, "email", "") or "",
-                str(adjustment.actor_user_id) if adjustment.actor_user_id else "",
-            ]
-        )
+        writer.writerow(_stock_adjustments_csv_row(adjustment, variant, actor, product=product))
+    return output.getvalue()
 
-    filename = f"stock-adjustments-{product.slug}-{datetime.now(timezone.utc).date().isoformat()}.csv"
-    return Response(
-        content=buf.getvalue(),
-        media_type="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
+
+def _stock_adjustments_filename(product_slug: str) -> str:
+    return f"stock-adjustments-{product_slug}-{datetime.now(timezone.utc).date().isoformat()}.csv"
 
 
 @router.post(
@@ -5479,55 +5771,61 @@ async def export_inventory_restock_list(
         include_variants=include_variants,
         default_threshold=default_threshold,
     )
-
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(
-        [
-            "kind",
-            "sku",
-            "product_slug",
-            "product_name",
-            "variant_name",
-            "stock_quantity",
-            "reserved_in_carts",
-            "reserved_in_orders",
-            "available_quantity",
-            "threshold",
-            "supplier",
-            "desired_quantity",
-            "note",
-            "restock_at",
-            "note_updated_at",
-            "product_id",
-            "variant_id",
-        ]
-    )
-    for row in rows:
-        writer.writerow(
-            [
-                row.kind,
-                row.sku,
-                row.product_slug,
-                row.product_name,
-                row.variant_name or "",
-                row.stock_quantity,
-                row.reserved_in_carts,
-                row.reserved_in_orders,
-                row.available_quantity,
-                row.threshold,
-                row.supplier or "",
-                "" if row.desired_quantity is None else row.desired_quantity,
-                row.note or "",
-                row.restock_at.isoformat() if row.restock_at else "",
-                row.note_updated_at.isoformat() if row.note_updated_at else "",
-                str(row.product_id),
-                str(row.variant_id) if row.variant_id else "",
-            ]
-        )
-
     return Response(
-        content=output.getvalue(),
+        content=_restock_export_csv_content(rows),
         media_type="text/csv",
         headers={"Content-Disposition": 'attachment; filename="restock-list.csv"'},
     )
+
+
+def _restock_export_csv_header() -> list[str]:
+    return [
+        "kind",
+        "sku",
+        "product_slug",
+        "product_name",
+        "variant_name",
+        "stock_quantity",
+        "reserved_in_carts",
+        "reserved_in_orders",
+        "available_quantity",
+        "threshold",
+        "supplier",
+        "desired_quantity",
+        "note",
+        "restock_at",
+        "note_updated_at",
+        "product_id",
+        "variant_id",
+    ]
+
+
+def _restock_export_csv_row(row: Any) -> list[Any]:
+    return [
+        row.kind,
+        row.sku,
+        row.product_slug,
+        row.product_name,
+        row.variant_name or "",
+        row.stock_quantity,
+        row.reserved_in_carts,
+        row.reserved_in_orders,
+        row.available_quantity,
+        row.threshold,
+        row.supplier or "",
+        "" if row.desired_quantity is None else row.desired_quantity,
+        row.note or "",
+        row.restock_at.isoformat() if row.restock_at else "",
+        row.note_updated_at.isoformat() if row.note_updated_at else "",
+        str(row.product_id),
+        str(row.variant_id) if row.variant_id else "",
+    ]
+
+
+def _restock_export_csv_content(rows: list[Any]) -> str:
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(_restock_export_csv_header())
+    for row in rows:
+        writer.writerow(_restock_export_csv_row(row))
+    return output.getvalue()

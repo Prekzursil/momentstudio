@@ -40,20 +40,32 @@ def _sanitize_log_text(value: str | None, *, max_len: int = 256) -> str | None:
     return cleaned
 
 
-def _sanitize_log_value(value: object) -> object:
-    if isinstance(value, dict):
-        out: dict[str, object] = {}
-        for raw_key, raw_value in value.items():
-            safe_key = _sanitize_log_text(str(raw_key), max_len=128) or "key"
-            out[safe_key] = _sanitize_log_value(raw_value)
-        return out
-    if isinstance(value, list):
-        return [_sanitize_log_value(item) for item in value[:50]]
+def _sanitize_log_dict(value: dict[object, object]) -> dict[str, object]:
+    out: dict[str, object] = {}
+    for raw_key, raw_value in value.items():
+        safe_key = _sanitize_log_text(str(raw_key), max_len=128) or "key"
+        out[safe_key] = _sanitize_log_value(raw_value)
+    return out
+
+
+def _sanitize_log_list(value: list[object]) -> list[object]:
+    return [_sanitize_log_value(item) for item in value[:50]]
+
+
+def _sanitize_log_scalar(value: object) -> object:
     if isinstance(value, str):
         return _sanitize_log_text(value, max_len=1024) or ""
     if isinstance(value, (int, float, bool)) or value is None:
         return value
     return _sanitize_log_text(str(value), max_len=1024) or ""
+
+
+def _sanitize_log_value(value: object) -> object:
+    if isinstance(value, dict):
+        return _sanitize_log_dict(value)
+    if isinstance(value, list):
+        return _sanitize_log_list(value)
+    return _sanitize_log_scalar(value)
 
 
 def _log_cart(event: str, cart: Cart, user_id: UUID | None = None) -> None:
@@ -300,34 +312,42 @@ def calculate_totals(
     return totals, discount_val
 
 
-async def calculate_totals_async(
-    session: AsyncSession,
-    cart: Cart,
-    shipping_method: ShippingMethod | None = None,
-    promo: PromoCodeRead | None = None,
-    *,
-    checkout_settings: CheckoutSettings | None = None,
-    shipping_fee_ron: Decimal | None = None,
-    free_shipping_threshold_ron: Decimal | None = None,
-    country_code: str | None = None,
-) -> tuple[Totals, Decimal]:
-    checkout = checkout_settings or CheckoutSettings()
-    rounding = checkout.money_rounding
-
-    subtotal_raw = sum(_to_decimal(item.unit_price_at_add) * item.quantity for item in cart.items)
-    subtotal = _to_decimal(subtotal_raw)
-    discount_val = _compute_discount(subtotal, promo)
-
+def _resolve_shipping_and_threshold(
+    checkout: CheckoutSettings,
+    shipping_fee_ron: Decimal | None,
+    free_shipping_threshold_ron: Decimal | None,
+) -> tuple[Decimal | None, Decimal | None]:
     shipping_fee = shipping_fee_ron if shipping_fee_ron is not None else checkout.shipping_fee_ron
     threshold = (
         free_shipping_threshold_ron if free_shipping_threshold_ron is not None else checkout.free_shipping_threshold_ron
     )
+    return shipping_fee, threshold
+
+
+def _compute_shipping_for_totals(
+    subtotal: Decimal,
+    discount_val: Decimal,
+    shipping_method: ShippingMethod | None,
+    shipping_fee: Decimal | None,
+    threshold: Decimal | None,
+) -> Decimal:
     shipping_amount = _calculate_shipping_amount(subtotal, shipping_method, shipping_fee_ron=shipping_fee)
     shipping = _to_decimal(shipping_amount)
-    if threshold is not None and threshold >= 0 and (subtotal - discount_val) >= threshold:
-        shipping = Decimal("0.00")
+    if threshold is None or threshold < 0:
+        return shipping
+    if (subtotal - discount_val) >= threshold:
+        return Decimal("0.00")
+    return shipping
 
-    base_breakdown = pricing.compute_totals(
+
+def _compute_base_breakdown(
+    checkout: CheckoutSettings,
+    subtotal: Decimal,
+    discount_val: Decimal,
+    shipping: Decimal,
+) -> pricing.PricingBreakdown:
+    rounding = checkout.money_rounding
+    return pricing.compute_totals(
         subtotal=subtotal,
         discount=discount_val,
         shipping=shipping,
@@ -341,6 +361,8 @@ async def calculate_totals_async(
         rounding=rounding,
     )
 
+
+def _build_taxable_lines(cart: Cart, rounding: pricing.MoneyRounding) -> list[TaxableProductLine]:
     lines: list[TaxableProductLine] = []
     for item in cart.items:
         product_id = getattr(item, "product_id", None)
@@ -348,16 +370,60 @@ async def calculate_totals_async(
             continue
         line_subtotal = pricing.quantize_money(_to_decimal(item.unit_price_at_add) * item.quantity, rounding=rounding)
         lines.append(TaxableProductLine(product_id=product_id, subtotal=line_subtotal))
+    return lines
 
-    if lines:
-        line_sum = sum((line.subtotal for line in lines), start=Decimal("0.00"))
-        diff = pricing.quantize_money(base_breakdown.subtotal - line_sum, rounding=rounding)
-        if diff != 0:
-            idx = max(range(len(lines)), key=lambda i: lines[i].subtotal)
-            adjusted = lines[idx].subtotal + diff
-            if adjusted < 0:
-                adjusted = Decimal("0.00")
-            lines[idx] = TaxableProductLine(product_id=lines[idx].product_id, subtotal=adjusted)
+
+def _rebalance_taxable_lines(lines: list[TaxableProductLine], subtotal: Decimal, rounding: pricing.MoneyRounding) -> None:
+    if not lines:
+        return
+    line_sum = sum((line.subtotal for line in lines), start=Decimal("0.00"))
+    diff = pricing.quantize_money(subtotal - line_sum, rounding=rounding)
+    if diff == 0:
+        return
+    idx = max(range(len(lines)), key=lambda i: lines[i].subtotal)
+    adjusted = lines[idx].subtotal + diff
+    if adjusted < 0:
+        adjusted = Decimal("0.00")
+    lines[idx] = TaxableProductLine(product_id=lines[idx].product_id, subtotal=adjusted)
+
+
+def _totals_from_breakdown(
+    breakdown: pricing.PricingBreakdown,
+    threshold: Decimal | None,
+    currency: str = "RON",
+) -> Totals:
+    return Totals(
+        subtotal=breakdown.subtotal,
+        fee=breakdown.fee,
+        tax=breakdown.vat,
+        shipping=breakdown.shipping,
+        total=breakdown.total,
+        currency=currency,
+        free_shipping_threshold_ron=threshold,
+    )
+
+
+async def calculate_totals_async(
+    session: AsyncSession,
+    cart: Cart,
+    shipping_method: ShippingMethod | None = None,
+    promo: PromoCodeRead | None = None,
+    *,
+    checkout_settings: CheckoutSettings | None = None,
+    shipping_fee_ron: Decimal | None = None,
+    free_shipping_threshold_ron: Decimal | None = None,
+    country_code: str | None = None,
+) -> tuple[Totals, Decimal]:
+    checkout = checkout_settings or CheckoutSettings()
+
+    subtotal = _to_decimal(sum(_to_decimal(item.unit_price_at_add) * item.quantity for item in cart.items))
+    discount_val = _compute_discount(subtotal, promo)
+    shipping_fee, threshold = _resolve_shipping_and_threshold(checkout, shipping_fee_ron, free_shipping_threshold_ron)
+    shipping = _compute_shipping_for_totals(subtotal, discount_val, shipping_method, shipping_fee, threshold)
+
+    base_breakdown = _compute_base_breakdown(checkout, subtotal, discount_val, shipping)
+    lines = _build_taxable_lines(cart, checkout.money_rounding)
+    _rebalance_taxable_lines(lines, base_breakdown.subtotal, checkout.money_rounding)
 
     vat_override = await taxes_service.compute_cart_vat_amount(
         session,
@@ -380,21 +446,104 @@ async def calculate_totals_async(
         vat_rate_percent=checkout.vat_rate_percent,
         vat_apply_to_shipping=checkout.vat_apply_to_shipping,
         vat_apply_to_fee=checkout.vat_apply_to_fee,
-        rounding=rounding,
+        rounding=checkout.money_rounding,
         vat_override=vat_override,
     )
 
-    return (
-        Totals(
-            subtotal=breakdown.subtotal,
-            fee=breakdown.fee,
-            tax=breakdown.vat,
-            shipping=breakdown.shipping,
-            total=breakdown.total,
-            currency="RON",
-            free_shipping_threshold_ron=threshold,
-        ),
-        discount_val,
+    return _totals_from_breakdown(breakdown, threshold), discount_val
+
+
+async def _load_hydrated_cart(session: AsyncSession, cart_id: UUID) -> Cart:
+    result = await session.execute(
+        select(Cart)
+        .options(
+            selectinload(Cart.items).selectinload(CartItem.product).selectinload(Product.images),
+            with_loader_criteria(ProductImage, ProductImage.is_deleted.is_(False), include_aliases=True),
+        )
+        .where(Cart.id == cart_id)
+    )
+    return result.scalar_one()
+
+
+def _cart_currency(cart: Cart) -> str:
+    currency = next((getattr(item.product, "currency", None) for item in cart.items if getattr(item, "product", None)), "RON")
+    return currency or "RON"
+
+
+def _resolve_free_shipping_threshold(
+    checkout: CheckoutSettings,
+    free_shipping_threshold_ron: Decimal | None,
+) -> Decimal | None:
+    if free_shipping_threshold_ron is not None:
+        return free_shipping_threshold_ron
+    return checkout.free_shipping_threshold_ron
+
+
+async def _resolve_serialized_totals(
+    session: AsyncSession,
+    cart: Cart,
+    totals_override: Totals | None,
+    currency: str,
+    shipping_method: ShippingMethod | None,
+    promo: PromoCodeRead | None,
+    checkout: CheckoutSettings,
+    shipping_fee_ron: Decimal | None,
+    free_shipping_threshold_ron: Decimal | None,
+    country_code: str | None,
+) -> Totals | None:
+    totals = totals_override
+    if not totals:
+        totals, _ = await calculate_totals_async(
+            session,
+            cart,
+            shipping_method=shipping_method,
+            promo=promo,
+            checkout_settings=checkout,
+            shipping_fee_ron=shipping_fee_ron,
+            free_shipping_threshold_ron=free_shipping_threshold_ron,
+            country_code=country_code,
+        )
+    if totals_override and getattr(totals_override, "currency", None) is None:
+        return Totals(**totals_override.model_dump(), currency=currency)
+    return totals
+
+
+def _apply_serialized_totals_metadata(
+    totals: Totals,
+    checkout: CheckoutSettings,
+    threshold: Decimal | None,
+    cart: Cart,
+) -> None:
+    totals.free_shipping_threshold_ron = threshold
+    totals.phone_required_home = bool(getattr(checkout, "phone_required_home", False))
+    totals.phone_required_locker = bool(getattr(checkout, "phone_required_locker", False))
+    locker_allowed, allowed_couriers = delivery_constraints(cart)
+    totals.delivery_locker_allowed = locker_allowed
+    totals.delivery_allowed_couriers = allowed_couriers
+
+
+def _cart_item_max_quantity(item: CartItem) -> int | None:
+    if item.max_quantity is not None:
+        return item.max_quantity
+    product = item.product
+    if product and getattr(product, "allow_backorder", False):
+        return None
+    return product.stock_quantity if product else None
+
+
+def _serialize_cart_item(item: CartItem) -> CartItemRead:
+    product = item.product
+    return CartItemRead(
+        id=item.id,
+        product_id=item.product_id,
+        variant_id=item.variant_id,
+        quantity=item.quantity,
+        max_quantity=_cart_item_max_quantity(item),
+        unit_price_at_add=Decimal(item.unit_price_at_add),
+        name=product.name if product else None,
+        slug=product.slug if product else None,
+        image_url=_get_first_image(product),
+        currency=getattr(product, "currency", None) or "RON",
     )
 
 
@@ -410,74 +559,100 @@ async def serialize_cart(
     totals_override: Totals | None = None,
     country_code: str | None = None,
 ) -> CartRead:
-    result = await session.execute(
-        select(Cart)
-            .options(
-                selectinload(Cart.items)
-                .selectinload(CartItem.product)
-                .selectinload(Product.images),
-                with_loader_criteria(ProductImage, ProductImage.is_deleted.is_(False), include_aliases=True),
-            )
-            .where(Cart.id == cart.id)
-    )
-    hydrated = result.scalar_one()
-    currency = next(
-        (getattr(item.product, "currency", None) for item in hydrated.items if getattr(item, "product", None)), "RON"
-    ) or "RON"
+    hydrated = await _load_hydrated_cart(session, cart.id)
+    currency = _cart_currency(hydrated)
     checkout = checkout_settings or CheckoutSettings()
-    threshold = (
-        free_shipping_threshold_ron if free_shipping_threshold_ron is not None else checkout.free_shipping_threshold_ron
+    threshold = _resolve_free_shipping_threshold(checkout, free_shipping_threshold_ron)
+    totals = await _resolve_serialized_totals(
+        session,
+        hydrated,
+        totals_override,
+        currency,
+        shipping_method,
+        promo,
+        checkout,
+        shipping_fee_ron,
+        free_shipping_threshold_ron,
+        country_code,
     )
-    totals = totals_override
-    if not totals:
-        totals, _ = await calculate_totals_async(
-            session,
-            hydrated,
-            shipping_method=shipping_method,
-            promo=promo,
-            checkout_settings=checkout,
-            shipping_fee_ron=shipping_fee_ron,
-            free_shipping_threshold_ron=free_shipping_threshold_ron,
-            country_code=country_code,
-        )
-    if totals_override and getattr(totals_override, "currency", None) is None:
-        totals = Totals(**totals_override.model_dump(), currency=currency)
     if totals is not None:
-        totals.free_shipping_threshold_ron = threshold
-        totals.phone_required_home = bool(getattr(checkout, "phone_required_home", False))
-        totals.phone_required_locker = bool(getattr(checkout, "phone_required_locker", False))
-        locker_allowed, allowed_couriers = delivery_constraints(hydrated)
-        totals.delivery_locker_allowed = locker_allowed
-        totals.delivery_allowed_couriers = allowed_couriers
+        _apply_serialized_totals_metadata(totals, checkout, threshold, hydrated)
     return CartRead(
         id=hydrated.id,
         user_id=hydrated.user_id,
         session_id=hydrated.session_id,
-        items=[
-            CartItemRead(
-                id=item.id,
-                product_id=item.product_id,
-                variant_id=item.variant_id,
-                quantity=item.quantity,
-                max_quantity=(
-                    item.max_quantity
-                    if item.max_quantity is not None
-                    else (
-                        None
-                        if item.product and getattr(item.product, "allow_backorder", False)
-                        else (item.product.stock_quantity if item.product else None)
-                    )
-                ),
-                unit_price_at_add=Decimal(item.unit_price_at_add),
-                name=item.product.name if item.product else None,
-                slug=item.product.slug if item.product else None,
-                image_url=_get_first_image(item.product),
-                currency=getattr(item.product, "currency", None) or "RON",
-            )
-            for item in hydrated.items
-        ],
+        items=[_serialize_cart_item(item) for item in hydrated.items],
         totals=totals,
     )
+
+
+def _is_published_product(product: Product | None) -> bool:
+    return bool(
+        product
+        and not product.is_deleted
+        and product.is_active
+        and getattr(product, "status", None) == ProductStatus.published
+    )
+
+
+async def _resolve_add_item_variant(
+    session: AsyncSession,
+    product: Product,
+    variant_id: UUID | None,
+) -> ProductVariant | None:
+    if not variant_id:
+        return None
+    variant = await session.get(ProductVariant, variant_id)
+    if not variant or variant.product_id != product.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid variant")
+    return variant
+
+
+def _resolve_add_item_limit(
+    payload: CartItemCreate,
+    product: Product,
+    variant: ProductVariant | None,
+) -> int | None:
+    if payload.max_quantity is not None:
+        return payload.max_quantity
+    if getattr(product, "allow_backorder", False):
+        return None
+    return variant.stock_quantity if variant else product.stock_quantity
+
+
+def _resolve_add_item_unit_price(product: Product, variant: ProductVariant | None) -> Decimal:
+    sale_price = product.sale_price if is_sale_active(product) else None
+    base_price = sale_price if sale_price is not None else product.base_price
+    unit_price = _to_decimal(base_price)
+    if variant:
+        unit_price += _to_decimal(variant.additional_price_delta)
+    return unit_price
+
+
+def _build_cart_item(
+    cart: Cart,
+    payload: CartItemCreate,
+    product: Product,
+    variant: ProductVariant | None,
+    unit_price: Decimal,
+) -> CartItem:
+    return CartItem(
+        cart=cart,
+        product_id=product.id,
+        variant_id=variant.id if variant else None,
+        quantity=payload.quantity,
+        unit_price_at_add=unit_price,
+        max_quantity=payload.max_quantity,
+    )
+
+
+async def _persist_added_item(session: AsyncSession, item: CartItem, commit: bool) -> None:
+    session.add(item)
+    if commit:
+        await session.commit()
+        await session.refresh(item)
+        return
+    await session.flush()
 
 
 async def add_item(
@@ -490,46 +665,19 @@ async def add_item(
     cart.last_order_id = None
     session.add(cart)
     product = await session.get(Product, payload.product_id)
-    if (
-        not product
-        or product.is_deleted
-        or not product.is_active
-        or getattr(product, "status", None) != ProductStatus.published
-    ):
+    if not _is_published_product(product):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    assert product is not None
 
-    variant = None
-    if payload.variant_id:
-        variant = await session.get(ProductVariant, payload.variant_id)
-        if not variant or variant.product_id != product.id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid variant")
+    variant = await _resolve_add_item_variant(session, product, payload.variant_id)
 
     await _validate_stock(product, variant, payload.quantity)
-    limit = payload.max_quantity
-    if limit is None and not getattr(product, "allow_backorder", False):
-        limit = variant.stock_quantity if variant else product.stock_quantity
+    limit = _resolve_add_item_limit(payload, product, variant)
     _enforce_max_quantity(payload.quantity, limit)
 
-    sale_price = product.sale_price if is_sale_active(product) else None
-    base_price = sale_price if sale_price is not None else product.base_price
-    unit_price = _to_decimal(base_price)
-    if variant:
-        unit_price += _to_decimal(variant.additional_price_delta)
-
-    item = CartItem(
-        cart=cart,
-        product_id=product.id,
-        variant_id=variant.id if variant else None,
-        quantity=payload.quantity,
-        unit_price_at_add=unit_price,
-        max_quantity=payload.max_quantity,
-    )
-    session.add(item)
-    if commit:
-        await session.commit()
-        await session.refresh(item)
-    else:
-        await session.flush()
+    unit_price = _resolve_add_item_unit_price(product, variant)
+    item = _build_cart_item(cart, payload, product, variant, unit_price)
+    await _persist_added_item(session, item, commit)
     record_cart_event(
         "add_item", {"cart_id": str(cart.id), "product_id": str(product.id), "quantity": payload.quantity}
     )
@@ -597,6 +745,48 @@ async def sync_cart(session: AsyncSession, cart: Cart, items: list[CartSyncItem]
     await session.refresh(cart)
 
 
+def _find_merge_match(user_cart: Cart, guest_item: CartItem) -> CartItem | None:
+    return next(
+        (i for i in user_cart.items if i.product_id == guest_item.product_id and i.variant_id == guest_item.variant_id),
+        None,
+    )
+
+
+def _upsert_merged_item(
+    session: AsyncSession,
+    user_cart: Cart,
+    guest_item: CartItem,
+    match: CartItem | None,
+    new_qty: int,
+) -> None:
+    unit_price = guest_item.unit_price_at_add
+    if match:
+        match.quantity = new_qty
+        match.unit_price_at_add = unit_price
+        session.add(match)
+        return
+    session.add(
+        CartItem(
+            cart=user_cart,
+            product_id=guest_item.product_id,
+            variant_id=guest_item.variant_id,
+            quantity=guest_item.quantity,
+            unit_price_at_add=unit_price,
+        )
+    )
+
+
+async def _merge_guest_item(session: AsyncSession, user_cart: Cart, guest_item: CartItem) -> None:
+    match = _find_merge_match(user_cart, guest_item)
+    product = await session.get(Product, guest_item.product_id)
+    if not product:
+        return
+    variant = await session.get(ProductVariant, guest_item.variant_id) if guest_item.variant_id else None
+    new_qty = guest_item.quantity + (match.quantity if match else 0)
+    await _validate_stock(product, variant, new_qty)
+    _upsert_merged_item(session, user_cart, guest_item, match, new_qty)
+
+
 async def merge_guest_cart(session: AsyncSession, user_cart: Cart, guest_session_id: str | None) -> Cart:
     if not guest_session_id:
         return user_cart
@@ -608,33 +798,7 @@ async def merge_guest_cart(session: AsyncSession, user_cart: Cart, guest_session
     user_cart.last_order_id = None
     session.add(user_cart)
     for guest_item in guest.items:
-        # try to find matching item
-        match = next(
-            (i for i in user_cart.items if i.product_id == guest_item.product_id and i.variant_id == guest_item.variant_id),
-            None,
-        )
-        product = await session.get(Product, guest_item.product_id)
-        if not product:
-            continue
-        variant = await session.get(ProductVariant, guest_item.variant_id) if guest_item.variant_id else None
-        new_qty = guest_item.quantity + (match.quantity if match else 0)
-        await _validate_stock(product, variant, new_qty)
-
-        unit_price = guest_item.unit_price_at_add
-        if match:
-            match.quantity = new_qty
-            match.unit_price_at_add = unit_price
-            session.add(match)
-        else:
-            session.add(
-                CartItem(
-                    cart=user_cart,
-                    product_id=guest_item.product_id,
-                    variant_id=guest_item.variant_id,
-                    quantity=guest_item.quantity,
-                    unit_price_at_add=unit_price,
-                )
-            )
+        await _merge_guest_item(session, user_cart, guest_item)
     await session.delete(guest)
     await session.commit()
     await session.refresh(user_cart)
