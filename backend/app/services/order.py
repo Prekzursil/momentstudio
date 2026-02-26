@@ -1101,24 +1101,51 @@ async def _ensure_order_address_snapshot(session: AsyncSession, order: Order, ki
     return snapshot
 
 
-def _apply_address_update(addr: Address, updates: dict) -> None:
-    forbidden = {"is_default_shipping", "is_default_billing", "user_id", "id", "created_at", "updated_at"}
-    cleaned = {k: v for k, v in (updates or {}).items() if k not in forbidden}
+_ADDRESS_UPDATE_FORBIDDEN_FIELDS = {
+    "is_default_shipping",
+    "is_default_billing",
+    "user_id",
+    "id",
+    "created_at",
+    "updated_at",
+}
+_ADDRESS_UPDATE_REQUIRED_FIELDS = ("line1", "city", "postal_code", "country")
 
-    for field in ("line1", "city", "postal_code", "country"):
-        if field in cleaned and (cleaned[field] is None or not str(cleaned[field]).strip()):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{field} is required")
 
+def _clean_address_update_payload(updates: dict | None) -> dict:
+    return {k: v for k, v in (updates or {}).items() if k not in _ADDRESS_UPDATE_FORBIDDEN_FIELDS}
+
+
+def _validate_required_address_fields(cleaned: dict) -> None:
+    for field in _ADDRESS_UPDATE_REQUIRED_FIELDS:
+        if field not in cleaned:
+            continue
+        if cleaned[field] is not None and str(cleaned[field]).strip():
+            continue
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{field} is required")
+
+
+def _resolve_validated_country_postal(addr: Address, cleaned: dict) -> tuple[str, str]:
     target_country = str(cleaned.get("country", getattr(addr, "country", "")) or "").strip()
     target_postal = str(cleaned.get("postal_code", getattr(addr, "postal_code", "")) or "").strip()
-    country, postal_code = address_service._validate_address_fields(target_country, target_postal)
-    cleaned["country"] = country
-    cleaned["postal_code"] = postal_code
+    return address_service._validate_address_fields(target_country, target_postal)
 
+
+def _assign_address_fields(addr: Address, cleaned: dict) -> None:
     for field, value in cleaned.items():
         if isinstance(value, str):
             value = value.strip()
         setattr(addr, field, value)
+
+
+def _apply_address_update(addr: Address, updates: dict) -> None:
+    cleaned = _clean_address_update_payload(updates)
+    _validate_required_address_fields(cleaned)
+
+    country, postal_code = _resolve_validated_country_postal(addr, cleaned)
+    cleaned["country"] = country
+    cleaned["postal_code"] = postal_code
+    _assign_address_fields(addr, cleaned)
     addr.is_default_shipping = False
     addr.is_default_billing = False
 
@@ -1483,14 +1510,7 @@ async def list_order_tag_stats(session: AsyncSession) -> list[tuple[str, int]]:
     return rows
 
 
-async def rename_order_tag(
-    session: AsyncSession,
-    *,
-    from_tag: str,
-    to_tag: str,
-    actor_user_id: UUID | None = None,
-    max_affected_orders: int = 5000,
-) -> dict[str, object]:
+def _validate_tag_rename_inputs(from_tag: str, to_tag: str) -> tuple[str, str]:
     from_clean = _normalize_order_tag(from_tag)
     to_clean = _normalize_order_tag(to_tag)
     if not from_clean:
@@ -1499,34 +1519,54 @@ async def rename_order_tag(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="to_tag is required")
     if from_clean == to_clean:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tags must be different")
+    return from_clean, to_clean
 
-    rows = (await session.execute(select(OrderTag).where(OrderTag.tag == from_clean))).scalars().all()
-    if not rows:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found")
 
-    affected_order_ids = {row.order_id for row in rows if getattr(row, "order_id", None)}
-    if len(affected_order_ids) > max_affected_orders:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Too many affected orders ({len(affected_order_ids)}); narrow the scope first.",
-        )
+def _collect_affected_order_ids(tag_rows: Sequence[OrderTag]) -> set[UUID]:
+    return {row.order_id for row in tag_rows if getattr(row, "order_id", None)}
+
+
+def _ensure_affected_order_limit(affected_order_ids: set[UUID], max_affected_orders: int) -> None:
+    if len(affected_order_ids) <= max_affected_orders:
+        return
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=f"Too many affected orders ({len(affected_order_ids)}); narrow the scope first.",
+    )
+
+
+async def _fetch_orders_with_target_tag(
+    session: AsyncSession, *, affected_order_ids: set[UUID], to_clean: str
+) -> set[UUID]:
+    if not affected_order_ids:
+        return set()
 
     existing_targets = (
         await session.execute(
             select(OrderTag.order_id).where(OrderTag.order_id.in_(affected_order_ids), OrderTag.tag == to_clean)
         )
     ).all()
-    orders_with_target = {row[0] for row in existing_targets if row and row[0]}
+    return {row[0] for row in existing_targets if row and row[0]}
 
+
+async def _apply_tag_rename_rows(
+    session: AsyncSession,
+    *,
+    tag_rows: Sequence[OrderTag],
+    to_clean: str,
+    orders_with_target: set[UUID],
+    from_clean: str,
+    actor_value: str | None,
+) -> tuple[int, int]:
     updated = 0
     merged = 0
     note = f"{from_clean} -> {to_clean}"
-    actor_value = str(actor_user_id) if actor_user_id else None
 
-    for tag_row in rows:
+    for tag_row in tag_rows:
         order_id = getattr(tag_row, "order_id", None)
         if not order_id:
             continue
+
         if order_id in orders_with_target:
             await session.delete(tag_row)
             merged += 1
@@ -1534,6 +1574,7 @@ async def rename_order_tag(
             tag_row.tag = to_clean
             session.add(tag_row)
             updated += 1
+
         session.add(
             OrderEvent(
                 order_id=order_id,
@@ -1542,6 +1583,41 @@ async def rename_order_tag(
                 data={"from": from_clean, "to": to_clean, "actor_user_id": actor_value},
             )
         )
+
+    return updated, merged
+
+
+async def rename_order_tag(
+    session: AsyncSession,
+    *,
+    from_tag: str,
+    to_tag: str,
+    actor_user_id: UUID | None = None,
+    max_affected_orders: int = 5000,
+) -> dict[str, object]:
+    from_clean, to_clean = _validate_tag_rename_inputs(from_tag, to_tag)
+
+    rows = (await session.execute(select(OrderTag).where(OrderTag.tag == from_clean))).scalars().all()
+    if not rows:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found")
+
+    affected_order_ids = _collect_affected_order_ids(rows)
+    _ensure_affected_order_limit(affected_order_ids, max_affected_orders)
+    orders_with_target = await _fetch_orders_with_target_tag(
+        session,
+        affected_order_ids=affected_order_ids,
+        to_clean=to_clean,
+    )
+    actor_value = str(actor_user_id) if actor_user_id else None
+
+    updated, merged = await _apply_tag_rename_rows(
+        session,
+        tag_rows=rows,
+        to_clean=to_clean,
+        orders_with_target=orders_with_target,
+        from_clean=from_clean,
+        actor_value=actor_value,
+    )
 
     await session.commit()
     total = updated + merged
@@ -1588,6 +1664,54 @@ async def remove_order_tag(session: AsyncSession, order: Order, *, tag: str, act
     return hydrated or order
 
 
+def _normalize_fraud_decision(decision: str) -> str:
+    decision_clean = (decision or "").strip().lower()
+    if decision_clean in {"approve", "deny"}:
+        return decision_clean
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid fraud review decision")
+
+
+def _fraud_tags_for_decision(decision_clean: str) -> tuple[str, str]:
+    if decision_clean == "approve":
+        return "fraud_approved", "fraud_denied"
+    return "fraud_denied", "fraud_approved"
+
+
+def _normalize_fraud_note(note: str | None) -> str | None:
+    note_clean = (note or "").strip() or None
+    if not note_clean:
+        return None
+    return note_clean[:500]
+
+
+async def _sync_fraud_decision_tags(
+    session: AsyncSession,
+    *,
+    order_id: UUID,
+    by_tag: dict[str, OrderTag],
+    target_tag: str,
+    remove_tag: str,
+    actor_user_id: UUID | None,
+) -> None:
+    removed = by_tag.get(remove_tag)
+    if removed is not None:
+        await session.delete(removed)
+
+    if target_tag in by_tag:
+        return
+    session.add(OrderTag(order_id=order_id, actor_user_id=actor_user_id, tag=target_tag))
+
+
+def _build_fraud_audit_note(decision_clean: str, note_clean: str | None) -> str:
+    if not note_clean:
+        return decision_clean
+    return f"{decision_clean}: {note_clean}"
+
+
+def _build_fraud_admin_note(decision_clean: str, note_clean: str | None) -> str:
+    return f"Fraud review: {decision_clean}" + (f" - {note_clean}" if note_clean else "")
+
+
 async def review_order_fraud(
     session: AsyncSession,
     order: Order,
@@ -1596,16 +1720,9 @@ async def review_order_fraud(
     note: str | None = None,
     actor_user_id: UUID | None = None,
 ) -> Order:
-    decision_clean = (decision or "").strip().lower()
-    if decision_clean not in {"approve", "deny"}:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid fraud review decision")
-
-    target_tag = "fraud_approved" if decision_clean == "approve" else "fraud_denied"
-    remove_tag = "fraud_denied" if decision_clean == "approve" else "fraud_approved"
-
-    note_clean = (note or "").strip() or None
-    if note_clean:
-        note_clean = note_clean[:500]
+    decision_clean = _normalize_fraud_decision(decision)
+    target_tag, remove_tag = _fraud_tags_for_decision(decision_clean)
+    note_clean = _normalize_fraud_note(note)
 
     tags = (
         await session.execute(
@@ -1614,14 +1731,16 @@ async def review_order_fraud(
     ).scalars().all()
     by_tag = {row.tag: row for row in tags if row and row.tag}
 
-    removed = by_tag.get(remove_tag)
-    if removed is not None:
-        await session.delete(removed)
+    await _sync_fraud_decision_tags(
+        session,
+        order_id=order.id,
+        by_tag=by_tag,
+        target_tag=target_tag,
+        remove_tag=remove_tag,
+        actor_user_id=actor_user_id,
+    )
 
-    if target_tag not in by_tag:
-        session.add(OrderTag(order_id=order.id, actor_user_id=actor_user_id, tag=target_tag))
-
-    audit_note = f"{decision_clean}: {note_clean}" if note_clean else decision_clean
+    audit_note = _build_fraud_audit_note(decision_clean, note_clean)
     session.add(
         OrderEvent(
             order_id=order.id,
@@ -1634,7 +1753,7 @@ async def review_order_fraud(
             },
         )
     )
-    admin_note = f"Fraud review: {decision_clean}" + (f" - {note_clean}" if note_clean else "")
+    admin_note = _build_fraud_admin_note(decision_clean, note_clean)
     session.add(OrderAdminNote(order_id=order.id, actor_user_id=actor_user_id, note=admin_note[:5000]))
 
     await session.commit()

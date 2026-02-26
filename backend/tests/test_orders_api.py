@@ -26,6 +26,8 @@ from app.schemas.user import UserCreate
 from app.services import order as order_service
 from app.services import payments as payments_service
 from app.services import email as email_service
+from app.services import coupons as coupons_service
+from app.services import notifications as notification_service
 from app.schemas.order import ShippingMethodCreate
 from app.core.config import settings
 from app.core import security
@@ -1380,6 +1382,104 @@ def test_capture_void_export_and_reorder(monkeypatch: pytest.MonkeyPatch, test_a
     assert reorder_resp.status_code == 200
     assert len(reorder_resp.json()["items"]) == 1
     assert reorder_resp.json()["items"][0]["product_id"]
+
+
+def test_admin_capture_and_void_payment_intent_mismatch_and_idempotency(
+    monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]
+) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+
+    _token, user_id = create_user_token(SessionLocal, email="buyer-capture-idem@example.com")
+    admin_token, _ = create_user_token(SessionLocal, email="admin-capture-idem@example.com", admin=True)
+
+    async def seed_order() -> UUID:
+        async with SessionLocal() as session:
+            order = Order(
+                user_id=user_id,
+                status=OrderStatus.pending_payment,
+                reference_code="IDEMCAP",
+                customer_email="buyer-capture-idem@example.com",
+                customer_name="Buyer",
+                total_amount=Decimal("19.00"),
+                tax_amount=Decimal("0.00"),
+                shipping_amount=Decimal("0.00"),
+                currency="RON",
+                payment_method="stripe",
+                stripe_payment_intent_id="pi_expected_123",
+            )
+            session.add(order)
+            await session.commit()
+            await session.refresh(order)
+            return order.id
+
+    order_id = str(asyncio.run(seed_order()))
+
+    capture_calls: list[str] = []
+    void_calls: list[str] = []
+
+    async def fake_capture(intent_id: str) -> dict[str, str]:
+        capture_calls.append(intent_id)
+        return {"id": intent_id, "status": "succeeded"}
+
+    async def fake_void(intent_id: str) -> dict[str, str]:
+        void_calls.append(intent_id)
+        return {"id": intent_id, "status": "canceled"}
+
+    async def fake_redeem(*_args, **_kwargs):
+        return None
+
+    async def fake_release(*_args, **_kwargs):
+        return None
+
+    async def fake_notify(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr(payments_service, "capture_payment_intent", fake_capture)
+    monkeypatch.setattr(payments_service, "void_payment_intent", fake_void)
+    monkeypatch.setattr(coupons_service, "redeem_coupon_for_order", fake_redeem)
+    monkeypatch.setattr(coupons_service, "release_coupon_for_order", fake_release)
+    monkeypatch.setattr(notification_service, "create_notification", fake_notify)
+
+    mismatch_capture = client.post(
+        f"/api/v1/orders/admin/{order_id}/capture-payment",
+        params={"intent_id": "pi_other_999"},
+        headers=auth_headers(admin_token),
+    )
+    assert mismatch_capture.status_code == 400, mismatch_capture.text
+    assert "Payment intent mismatch" in mismatch_capture.text
+
+    first_capture = client.post(
+        f"/api/v1/orders/admin/{order_id}/capture-payment",
+        headers=auth_headers(admin_token),
+    )
+    assert first_capture.status_code == 200, first_capture.text
+    assert first_capture.json()["status"] == "pending_acceptance"
+    assert capture_calls == ["pi_expected_123"]
+
+    second_capture = client.post(
+        f"/api/v1/orders/admin/{order_id}/capture-payment",
+        headers=auth_headers(admin_token),
+    )
+    assert second_capture.status_code == 200, second_capture.text
+    assert second_capture.json()["status"] == "pending_acceptance"
+    assert capture_calls == ["pi_expected_123"]
+
+    mismatch_void = client.post(
+        f"/api/v1/orders/admin/{order_id}/void-payment",
+        params={"intent_id": "pi_other_999"},
+        headers=auth_headers(admin_token),
+    )
+    assert mismatch_void.status_code == 400, mismatch_void.text
+    assert "Payment intent mismatch" in mismatch_void.text
+
+    void_ok = client.post(
+        f"/api/v1/orders/admin/{order_id}/void-payment",
+        headers=auth_headers(admin_token),
+    )
+    assert void_ok.status_code == 200, void_ok.text
+    assert void_ok.json()["status"] == "cancelled"
+    assert void_calls == ["pi_expected_123"]
 
 
 def test_admin_order_shipments_crud(test_app: Dict[str, object]) -> None:
