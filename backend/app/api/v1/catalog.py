@@ -519,6 +519,55 @@ async def preview_merge_category(
     )
 
 
+async def _get_merge_source_and_target_categories(
+    session: AsyncSession, source_slug: str, target_slug: str
+) -> tuple[Category, Category]:
+    source = await catalog_service.get_category_by_slug(session, source_slug)
+    if not source:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
+    target = await catalog_service.get_category_by_slug(session, target_slug)
+    if not target:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target category not found")
+    return source, target
+
+
+def _validate_merge_category_pair(source: Category, target: Category) -> None:
+    if source.slug == target.slug:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot merge a category into itself")
+    if source.parent_id != target.parent_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Categories must share the same parent")
+
+
+async def _ensure_category_has_no_children(session: AsyncSession, category: Category) -> None:
+    child_count = (await session.execute(select(func.count(Category.id)).where(Category.parent_id == category.id))).scalar_one()
+    if int(child_count or 0) > 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot merge a category with subcategories")
+
+
+async def _audit_category_merge_if_requested(
+    session: AsyncSession,
+    *,
+    audit_source: str | None,
+    current_user: User,
+    result_model: CategoryMergeResult,
+) -> None:
+    if not audit_source:
+        return
+    await audit_chain_service.add_admin_audit_log(
+        session,
+        action="catalog.category.merge",
+        actor_user_id=current_user.id,
+        subject_user_id=None,
+        data={
+            "source": audit_source,
+            "source_slug": result_model.source_slug,
+            "target_slug": result_model.target_slug,
+            "moved_products": result_model.moved_products,
+        },
+    )
+    await session.commit()
+
+
 @router.post("/categories/{slug}/merge", response_model=CategoryMergeResult)
 async def merge_category(
     slug: str,
@@ -527,22 +576,9 @@ async def merge_category(
     current_user=Depends(require_admin_section("products")),
     audit_source: str | None = Query(default=None, alias="source", pattern="^(storefront)$"),
 ) -> CategoryMergeResult:
-    source = await catalog_service.get_category_by_slug(session, slug)
-    if not source:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
-    target = await catalog_service.get_category_by_slug(session, payload.target_slug)
-    if not target:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target category not found")
-    if source.slug == target.slug:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot merge a category into itself")
-    if source.parent_id != target.parent_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Categories must share the same parent")
-
-    child_count = (
-        await session.execute(select(func.count(Category.id)).where(Category.parent_id == source.id))
-    ).scalar_one()
-    if int(child_count or 0) > 0:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot merge a category with subcategories")
+    source, target = await _get_merge_source_and_target_categories(session, slug, payload.target_slug)
+    _validate_merge_category_pair(source, target)
+    await _ensure_category_has_no_children(session, source)
 
     result = await session.execute(
         update(Product)
@@ -554,20 +590,9 @@ async def merge_category(
     await session.delete(source)
     await session.commit()
     result_model = CategoryMergeResult(source_slug=source.slug, target_slug=target.slug, moved_products=moved_products)
-    if audit_source:
-        await audit_chain_service.add_admin_audit_log(
-            session,
-            action="catalog.category.merge",
-            actor_user_id=current_user.id,
-            subject_user_id=None,
-            data={
-                "source": audit_source,
-                "source_slug": result_model.source_slug,
-                "target_slug": result_model.target_slug,
-                "moved_products": result_model.moved_products,
-            },
-        )
-        await session.commit()
+    await _audit_category_merge_if_requested(
+        session, audit_source=audit_source, current_user=current_user, result_model=result_model
+    )
     return result_model
 
 
@@ -1196,6 +1221,34 @@ async def approve_review(
     return review
 
 
+async def _get_product_for_relationships(
+    session: AsyncSession,
+    slug: str,
+    current_user: User | None,
+) -> tuple[Product, bool]:
+    product = await catalog_service.get_product_by_slug(
+        session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
+    )
+    if not product or product.is_deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    is_admin = current_user is not None and getattr(current_user, "role", None) != UserRole.customer
+    if not is_admin and (not product.is_active or product.status != ProductStatus.published):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    return product, is_admin
+
+
+def _serialize_relationship_products(products: list[Product], lang: str | None) -> list[ProductRead]:
+    payload_items: list[ProductRead] = []
+    for p in products:
+        if lang:
+            catalog_service.apply_product_translation(p, lang)
+        model = ProductRead.model_validate(p)
+        if not catalog_service.is_sale_active(p):
+            model.sale_price = None
+        payload_items.append(model)
+    return payload_items
+
+
 @router.get("/products/{slug}/related", response_model=list[ProductRead])
 async def related_products(
     slug: str,
@@ -1205,14 +1258,7 @@ async def related_products(
 ) -> list[Product]:
     await catalog_service.auto_publish_due_sales(session)
     await catalog_service.apply_due_product_schedules(session)
-    product = await catalog_service.get_product_by_slug(
-        session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
-    )
-    if not product or product.is_deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    is_admin = current_user is not None and getattr(current_user, "role", None) != UserRole.customer
-    if not is_admin and (not product.is_active or product.status != ProductStatus.published):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    product, is_admin = await _get_product_for_relationships(session, slug, current_user)
     curated = await catalog_service.get_curated_relationship_products(
         session,
         product_id=product.id,
@@ -1221,15 +1267,7 @@ async def related_products(
         include_inactive=is_admin,
     )
     related = curated or await catalog_service.get_related_products(session, product, limit=4)
-    payload_items = []
-    for p in related:
-        if lang:
-            catalog_service.apply_product_translation(p, lang)
-        model = ProductRead.model_validate(p)
-        if not catalog_service.is_sale_active(p):
-            model.sale_price = None
-        payload_items.append(model)
-    return payload_items
+    return _serialize_relationship_products(related, lang)
 
 
 @router.get("/products/{slug}/upsells", response_model=list[ProductRead])
@@ -1241,15 +1279,7 @@ async def upsell_products(
 ) -> list[Product]:
     await catalog_service.auto_publish_due_sales(session)
     await catalog_service.apply_due_product_schedules(session)
-    product = await catalog_service.get_product_by_slug(
-        session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
-    )
-    if not product or product.is_deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    is_admin = current_user is not None and getattr(current_user, "role", None) != UserRole.customer
-    if not is_admin and (not product.is_active or product.status != ProductStatus.published):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-
+    product, is_admin = await _get_product_for_relationships(session, slug, current_user)
     upsells = await catalog_service.get_curated_relationship_products(
         session,
         product_id=product.id,
@@ -1257,12 +1287,4 @@ async def upsell_products(
         limit=4,
         include_inactive=is_admin,
     )
-    payload_items = []
-    for p in upsells:
-        if lang:
-            catalog_service.apply_product_translation(p, lang)
-        model = ProductRead.model_validate(p)
-        if not catalog_service.is_sale_active(p):
-            model.sale_price = None
-        payload_items.append(model)
-    return payload_items
+    return _serialize_relationship_products(upsells, lang)

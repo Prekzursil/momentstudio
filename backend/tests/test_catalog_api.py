@@ -861,6 +861,79 @@ def test_bulk_category_assignment_and_publish_scheduling(test_app: Dict[str, obj
     assert public_after_unpublish.status_code == 404
 
 
+def test_merge_category_moves_products_and_removes_source(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_admin_token(SessionLocal, email="mergecat-admin@example.com")
+
+    parent = client.post(
+        "/api/v1/catalog/categories",
+        json={"name": "Merge Parent"},
+        headers=auth_headers(admin_token),
+    )
+    assert parent.status_code == 201, parent.text
+    parent_id = parent.json()["id"]
+
+    source = client.post(
+        "/api/v1/catalog/categories",
+        json={"name": "Merge Source", "parent_id": parent_id},
+        headers=auth_headers(admin_token),
+    )
+    assert source.status_code == 201, source.text
+    source_category = source.json()
+
+    target = client.post(
+        "/api/v1/catalog/categories",
+        json={"name": "Merge Target", "parent_id": parent_id},
+        headers=auth_headers(admin_token),
+    )
+    assert target.status_code == 201, target.text
+    target_category = target.json()
+
+    product = client.post(
+        "/api/v1/catalog/products",
+        json={
+            "category_id": source_category["id"],
+            "slug": "merge-prod",
+            "name": "Merge Product",
+            "base_price": 10.0,
+            "currency": "RON",
+            "stock_quantity": 2,
+            "status": "published",
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert product.status_code == 201, product.text
+
+    same_category = client.post(
+        f"/api/v1/catalog/categories/{source_category['slug']}/merge",
+        json={"target_slug": source_category["slug"]},
+        headers=auth_headers(admin_token),
+    )
+    assert same_category.status_code == 400, same_category.text
+    assert "Cannot merge a category into itself" in same_category.text
+
+    merged = client.post(
+        f"/api/v1/catalog/categories/{source_category['slug']}/merge",
+        json={"target_slug": target_category["slug"]},
+        headers=auth_headers(admin_token),
+    )
+    assert merged.status_code == 200, merged.text
+    assert merged.json()["source_slug"] == source_category["slug"]
+    assert merged.json()["target_slug"] == target_category["slug"]
+    assert merged.json()["moved_products"] == 1
+
+    updated_product = client.get("/api/v1/catalog/products/merge-prod", headers=auth_headers(admin_token))
+    assert updated_product.status_code == 200, updated_product.text
+    assert updated_product.json()["category"]["id"] == target_category["id"]
+
+    categories = client.get("/api/v1/catalog/categories", headers=auth_headers(admin_token))
+    assert categories.status_code == 200, categories.text
+    slugs = {item["slug"] for item in categories.json()}
+    assert source_category["slug"] not in slugs
+    assert target_category["slug"] in slugs
+
+
 def test_product_reviews_and_related(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]

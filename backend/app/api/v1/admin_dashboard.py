@@ -4702,23 +4702,46 @@ def _user_security_snapshot(user: User) -> tuple[datetime | None, str | None, bo
     )
 
 
-def _apply_user_security_update(user: User, data: dict[str, Any], *, now: datetime) -> None:
-    if "locked_until" in data:
-        locked_until = _as_utc(data.get("locked_until"))
-        if locked_until and locked_until <= now:
-            locked_until = None
-        user.locked_until = locked_until
+def _normalized_locked_until(value: Any, *, now: datetime) -> datetime | None:
+    locked_until = _as_utc(value)
+    if locked_until and locked_until <= now:
+        return None
+    return locked_until
 
-    if "locked_reason" in data:
-        raw_reason = data.get("locked_reason")
-        user.locked_reason = (raw_reason or "").strip()[:255] or None
 
-    if getattr(user, "locked_until", None) is None:
-        user.locked_reason = None
+def _apply_locked_until_update(user: User, data: dict[str, Any], *, now: datetime) -> None:
+    if "locked_until" not in data:
+        return
+    user.locked_until = _normalized_locked_until(data.get("locked_until"), now=now)
 
+
+def _apply_locked_reason_update(user: User, data: dict[str, Any]) -> None:
+    if "locked_reason" not in data:
+        return
+    raw_reason = data.get("locked_reason")
+    user.locked_reason = (raw_reason or "").strip()[:255] or None
+
+
+def _clear_locked_reason_for_unlocked_user(user: User) -> None:
+    if getattr(user, "locked_until", None) is not None:
+        return
+    user.locked_reason = None
+
+
+def _apply_password_reset_required_update(user: User, data: dict[str, Any]) -> None:
+    if "password_reset_required" not in data:
+        return
     password_reset_required = data.get("password_reset_required")
-    if "password_reset_required" in data and password_reset_required is not None:
-        user.password_reset_required = bool(password_reset_required)
+    if password_reset_required is None:
+        return
+    user.password_reset_required = bool(password_reset_required)
+
+
+def _apply_user_security_update(user: User, data: dict[str, Any], *, now: datetime) -> None:
+    _apply_locked_until_update(user, data, now=now)
+    _apply_locked_reason_update(user, data)
+    _clear_locked_reason_for_unlocked_user(user)
+    _apply_password_reset_required_update(user, data)
 
 
 def _user_security_changes(
@@ -4746,6 +4769,39 @@ def _user_security_changes(
     return changes
 
 
+def _require_security_update_target(user: User | None, current_user: User) -> User:
+    if not user or user.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if user.role == UserRole.owner:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot modify owner security settings")
+    if user.id == current_user.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot modify your own security settings")
+    return user
+
+
+async def _audit_user_security_update(
+    session: AsyncSession,
+    *,
+    changes: dict[str, object],
+    actor_user_id: UUID,
+    subject_user_id: UUID,
+    request: Request,
+) -> None:
+    if not changes:
+        return
+    await audit_chain_service.add_admin_audit_log(
+        session,
+        action="user.security.update",
+        actor_user_id=actor_user_id,
+        subject_user_id=subject_user_id,
+        data={
+            "changes": changes,
+            "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
+            "ip_address": (request.client.host if request.client else None),
+        },
+    )
+
+
 @router.patch("/users/{user_id}/security")
 async def update_user_security(
     user_id: UUID,
@@ -4754,13 +4810,7 @@ async def update_user_security(
     session: Annotated[AsyncSession, Depends(get_session)],
     current_user: Annotated[User, Depends(require_admin_section("users"))],
 ) -> AdminUserProfileUser:
-    user = await session.get(User, user_id)
-    if not user or user.deleted_at is not None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    if user.role == UserRole.owner:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot modify owner security settings")
-    if user.id == current_user.id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot modify your own security settings")
+    user = _require_security_update_target(await session.get(User, user_id), current_user)
 
     now = datetime.now(timezone.utc)
     before_snapshot = _user_security_snapshot(user)
@@ -4771,18 +4821,13 @@ async def update_user_security(
 
     session.add(user)
     await session.flush()
-    if changes:
-        await audit_chain_service.add_admin_audit_log(
-            session,
-            action="user.security.update",
-            actor_user_id=current_user.id,
-            subject_user_id=user.id,
-            data={
-                "changes": changes,
-                "user_agent": (request.headers.get("user-agent") or "")[:255] or None,
-                "ip_address": (request.client.host if request.client else None),
-            },
-        )
+    await _audit_user_security_update(
+        session,
+        changes=changes,
+        actor_user_id=current_user.id,
+        subject_user_id=user.id,
+        request=request,
+    )
     await session.commit()
 
     return _admin_user_profile(user)

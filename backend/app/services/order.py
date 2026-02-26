@@ -1916,6 +1916,25 @@ async def update_order_shipment(
     return hydrated or order
 
 
+def _require_order_shipment(shipment: OrderShipment | None, order_id: UUID) -> OrderShipment:
+    if not shipment or shipment.order_id != order_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipment not found")
+    return shipment
+
+
+def _build_deleted_shipment_note(actor: str | None, tracking_number: object | None) -> object | None:
+    actor_clean = (actor or "").strip() or None
+    return f"{actor_clean}: {tracking_number}" if actor_clean and tracking_number else (actor_clean or tracking_number)
+
+
+async def _commit_deleted_shipment(session: AsyncSession) -> None:
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Could not delete shipment") from exc
+
+
 async def delete_order_shipment(
     session: AsyncSession,
     order: Order,
@@ -1924,22 +1943,15 @@ async def delete_order_shipment(
     actor: str | None = None,
     actor_user_id: UUID | None = None,
 ) -> Order:
-    shipment = await session.get(OrderShipment, shipment_id)
-    if not shipment or shipment.order_id != order.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipment not found")
+    shipment = _require_order_shipment(await session.get(OrderShipment, shipment_id), order.id)
 
     tracking_number = getattr(shipment, "tracking_number", None)
     await session.delete(shipment)
 
-    actor_clean = (actor or "").strip() or None
-    note = f"{actor_clean}: {tracking_number}" if actor_clean and tracking_number else (actor_clean or tracking_number)
+    note = _build_deleted_shipment_note(actor, tracking_number)
     session.add(OrderEvent(order_id=order.id, event="shipment_deleted", note=note, data={"shipment_id": str(shipment_id)}))
 
-    try:
-        await session.commit()
-    except IntegrityError as exc:
-        await session.rollback()
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Could not delete shipment") from exc
+    await _commit_deleted_shipment(session)
 
     hydrated = await get_order_by_id_admin(session, order.id)
     return hydrated or order
