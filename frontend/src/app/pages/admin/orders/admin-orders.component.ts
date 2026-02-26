@@ -2679,13 +2679,15 @@ export class AdminOrdersComponent implements OnInit {
     itemsByStatus: Record<string, AdminOrderListItem[]>,
     totalsByStatus: Record<string, number>
   ): void {
-    if (result?.res) {
-      itemsByStatus[result.status] = result.res.items ?? [];
-      totalsByStatus[result.status] = result.res.meta?.total_items ?? (result.res.items ?? []).length;
+    const status = result.status;
+    const response = result.res;
+    if (response) {
+      itemsByStatus[status] = response.items ?? [];
+      totalsByStatus[status] = response.meta?.total_items ?? (response.items ?? []).length;
       return;
     }
-    itemsByStatus[result.status] = [];
-    totalsByStatus[result.status] = 0;
+    itemsByStatus[status] = [];
+    totalsByStatus[status] = 0;
   }
 
   retryLoad(): void {
