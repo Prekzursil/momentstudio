@@ -70,6 +70,63 @@ def select_build_for_approval(builds: Iterable[dict[str, Any]]) -> dict[str, Any
     return candidates[0]
 
 
+def _request_url(path: str, query: dict[str, str] | None) -> str:
+    if not query:
+        return f"{API_BASE}{path}"
+    return f"{API_BASE}{path}?" + urllib.parse.urlencode(query)
+
+
+def _authorization_header(
+    *,
+    token: str | None,
+    basic_auth: tuple[str, str] | None,
+) -> str:
+    if basic_auth is not None:
+        username, access_key = basic_auth
+        auth_pair = f"{username}:{access_key}".encode("utf-8")
+        return "Basic " + base64.b64encode(auth_pair).decode("ascii")
+    if token:
+        return f"Token token={token}"
+    raise ValueError("Token or basic_auth credentials are required")
+
+
+def _request_body(payload: dict[str, Any] | None) -> bytes | None:
+    if payload is None:
+        return None
+    return json.dumps(payload).encode("utf-8")
+
+
+def _read_response_text(
+    request: urllib.request.Request,
+    *,
+    method: str,
+    path: str,
+) -> str:
+    try:
+        with urllib.request.urlopen(request, timeout=20) as resp:
+            return resp.read().decode("utf-8")
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        msg = f"Percy API {method} {path} failed (HTTP {exc.code})"
+        if body:
+            msg += ": " + body[:300]
+        raise PercyApiError(msg) from exc
+    except urllib.error.URLError as exc:
+        raise PercyApiError(f"Percy API {method} {path} failed: {exc}") from exc
+
+
+def _parse_response_dict(raw: str, *, method: str, path: str) -> dict[str, Any]:
+    if not raw:
+        return {}
+    try:
+        data_json = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise PercyApiError(f"Percy API {method} {path} returned non-JSON response") from exc
+    if not isinstance(data_json, dict):
+        raise PercyApiError(f"Percy API {method} {path} returned unexpected payload")
+    return data_json
+
+
 def _request_json(
     *,
     token: str | None,
@@ -79,48 +136,8 @@ def _request_json(
     payload: dict[str, Any] | None = None,
     basic_auth: tuple[str, str] | None = None,
 ) -> dict[str, Any]:
-    def _read_response(request: urllib.request.Request) -> str:
-        try:
-            with urllib.request.urlopen(request, timeout=20) as resp:
-                return resp.read().decode("utf-8")
-        except urllib.error.HTTPError as exc:
-            body = exc.read().decode("utf-8", errors="replace")
-            msg = f"Percy API {method} {path} failed (HTTP {exc.code})"
-            if body:
-                msg += ": " + body[:300]
-            raise PercyApiError(msg) from exc
-        except urllib.error.URLError as exc:
-            raise PercyApiError(f"Percy API {method} {path} failed: {exc}") from exc
-
-    def _parse_dict_response(raw: str) -> dict[str, Any]:
-        if not raw:
-            return {}
-        try:
-            data_json = json.loads(raw)
-        except json.JSONDecodeError as exc:
-            raise PercyApiError(f"Percy API {method} {path} returned non-JSON response") from exc
-        if not isinstance(data_json, dict):
-            raise PercyApiError(f"Percy API {method} {path} returned unexpected payload")
-        return data_json
-
-    def _request_url() -> str:
-        if not query:
-            return f"{API_BASE}{path}"
-        return f"{API_BASE}{path}?" + urllib.parse.urlencode(query)
-
-    def _authorization_header() -> str:
-        if basic_auth is not None:
-            username, access_key = basic_auth
-            auth_pair = f"{username}:{access_key}".encode("utf-8")
-            return "Basic " + base64.b64encode(auth_pair).decode("ascii")
-        if token:
-            return f"Token token={token}"
-        raise ValueError("Token or basic_auth credentials are required")
-
-    url = _request_url()
-    data = None
-    if payload is not None:
-        data = json.dumps(payload).encode("utf-8")
+    url = _request_url(path, query)
+    data = _request_body(payload)
 
     headers: dict[str, str] = {
         "Accept": "application/json",
@@ -128,10 +145,11 @@ def _request_json(
     }
     if data is not None:
         headers["Content-Type"] = "application/json"
-    headers["Authorization"] = _authorization_header()
+    headers["Authorization"] = _authorization_header(token=token, basic_auth=basic_auth)
 
     req = urllib.request.Request(url=url, method=method, data=data, headers=headers)
-    return _parse_dict_response(_read_response(req))
+    raw = _read_response_text(req, method=method, path=path)
+    return _parse_response_dict(raw, method=method, path=path)
 
 
 def _validate_sha(sha: str) -> str:

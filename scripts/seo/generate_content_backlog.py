@@ -99,9 +99,10 @@ def _classify_issue_type(rule_id: str) -> tuple[str, str]:
 
 
 def _extract_evidence_paths(finding: dict[str, Any]) -> list[str]:
+  evidence_files = finding.get("evidence_files") or []
   return [
     str(path).strip()
-    for path in list(finding.get("evidence_files") or [])
+    for path in evidence_files
     if str(path).strip()
   ]
 
@@ -111,7 +112,7 @@ def _finding_rule_id(finding: dict[str, Any]) -> str:
 
 
 def _finding_labels(finding: dict[str, Any]) -> list[str]:
-  return [str(label).strip().lower() for label in list(finding.get("labels") or [])]
+  return [str(label).strip().lower() for label in (finding.get("labels") or [])]
 
 
 def _is_seo_finding(rule_id: str, labels: list[str]) -> bool:

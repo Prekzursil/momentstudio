@@ -281,7 +281,8 @@ def _issue_title_for_finding(finding: dict[str, Any]) -> str:
 
 
 def _issue_labels_for_finding(finding: dict[str, Any]) -> list[str]:
-    return sorted(set(["ai:ready", *list(finding.get("labels") or [])]))
+    labels = [str(label) for label in (finding.get("labels") or [])]
+    return sorted({"ai:ready", *labels})
 
 
 def _issue_row_for_finding(

@@ -221,7 +221,7 @@ def _line_item_rows(order: object, *, base: ParagraphStyle) -> list[list[object]
         return [Paragraph(name, base), Paragraph(str(qty), base), Paragraph(sku, base)]
 
     rows: list[list[object]] = [[Paragraph("Product / Produs", base), Paragraph("Qty", base), Paragraph("SKU", base)]]
-    line_items = [_row_for_item(item) for item in list(getattr(order, "items", []) or [])]
+    line_items = [_row_for_item(item) for item in (getattr(order, "items", []) or [])]
     if not line_items:
         line_items = [[Paragraph("—", base), Paragraph("0", base), Paragraph("—", base)]]
     rows.extend(line_items)
