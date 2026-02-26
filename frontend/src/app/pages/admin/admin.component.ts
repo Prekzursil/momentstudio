@@ -25,6 +25,7 @@ import {
   AdminCategory,
   AdminProductDetail,
   FeaturedCollection,
+  ContentBlock,
   ContentImageAssetRead,
   ContentBlockVersionListItem,
   ContentBlockVersionRead,
@@ -15278,7 +15279,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
-  private applyLoadedSections(block: AdminContent): void {
+  private applyLoadedSections(block: ContentBlock): void {
     this.rememberContentVersion('home.sections', block);
     const meta = this.toRecord(block.meta);
     const configured = this.parseConfiguredHomeBlocks(meta['blocks']);

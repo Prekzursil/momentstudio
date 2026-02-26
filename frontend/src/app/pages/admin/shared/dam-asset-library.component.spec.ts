@@ -1,7 +1,19 @@
 import { TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 
-import { AdminService, MediaAsset } from '../../../core/admin.service';
+import {
+  AdminService,
+  MediaAsset,
+  MediaAssetListResponse,
+  MediaJob,
+  MediaJobListResponse,
+  MediaRetryPolicy,
+  MediaRetryPolicyEvent,
+  MediaRetryPolicyHistoryResponse,
+  MediaRetryPolicyListResponse,
+  MediaRetryPolicyPresetsResponse,
+  MediaTelemetryResponse
+} from '../../../core/admin.service';
 import { AuthService } from '../../../core/auth.service';
 import { ToastService } from '../../../core/toast.service';
 import { DamAssetLibraryComponent } from './dam-asset-library.component';
@@ -71,17 +83,17 @@ const BASE_ASSET: MediaAsset = {
   variants: []
 };
 
-const DEFAULT_MEDIA_ASSET_LIST = {
+const DEFAULT_MEDIA_ASSET_LIST: MediaAssetListResponse = {
   items: [BASE_ASSET],
   meta: { total_items: 1, total_pages: 1, page: 1, limit: 24 }
 };
 
-const DEFAULT_MEDIA_JOB_LIST = {
+const DEFAULT_MEDIA_JOB_LIST: MediaJobListResponse = {
   items: [],
   meta: { total_items: 0, total_pages: 1, page: 1, limit: 20 }
 };
 
-const DEFAULT_MEDIA_TELEMETRY = {
+const DEFAULT_MEDIA_TELEMETRY: MediaTelemetryResponse = {
   queue_depth: 0,
   online_workers: 0,
   workers: [],
@@ -95,7 +107,7 @@ const DEFAULT_MEDIA_TELEMETRY = {
   type_counts: {}
 };
 
-const DEFAULT_USAGE_RECONCILE_JOB = {
+const DEFAULT_USAGE_RECONCILE_JOB: MediaJob = {
   id: 'job-1',
   asset_id: null,
   job_type: 'usage_reconcile',
@@ -118,7 +130,7 @@ const DEFAULT_USAGE_RECONCILE_JOB = {
   completed_at: null
 };
 
-const DEFAULT_RETRY_MEDIA_JOB = {
+const DEFAULT_RETRY_MEDIA_JOB: MediaJob = {
   id: 'job-2',
   asset_id: 'asset-1',
   job_type: 'ingest',
@@ -141,12 +153,12 @@ const DEFAULT_RETRY_MEDIA_JOB = {
   completed_at: null
 };
 
-const DEFAULT_RETRY_MEDIA_JOBS_BULK = {
+const DEFAULT_RETRY_MEDIA_JOBS_BULK: MediaJobListResponse = {
   items: [],
   meta: { total_items: 0, total_pages: 1, page: 1, limit: 1 }
 };
 
-const DEFAULT_UPDATE_MEDIA_JOB_TRIAGE = {
+const DEFAULT_UPDATE_MEDIA_JOB_TRIAGE: MediaJob = {
   id: 'job-2',
   asset_id: 'asset-1',
   job_type: 'ingest',
@@ -169,7 +181,7 @@ const DEFAULT_UPDATE_MEDIA_JOB_TRIAGE = {
   completed_at: '2026-02-16T00:00:00Z'
 };
 
-const DEFAULT_RETRY_POLICIES = {
+const DEFAULT_RETRY_POLICIES: MediaRetryPolicyListResponse = {
   items: [
     {
       job_type: 'ingest',
@@ -184,7 +196,7 @@ const DEFAULT_RETRY_POLICIES = {
   ]
 };
 
-const DEFAULT_UPDATE_RETRY_POLICY = {
+const DEFAULT_UPDATE_RETRY_POLICY: MediaRetryPolicy = {
   job_type: 'ingest',
   max_attempts: 6,
   backoff_schedule_seconds: [10, 30, 120],
@@ -195,7 +207,7 @@ const DEFAULT_UPDATE_RETRY_POLICY = {
   updated_at: '2026-02-16T01:00:00Z'
 };
 
-const DEFAULT_RESET_RETRY_POLICY = {
+const DEFAULT_RESET_RETRY_POLICY: MediaRetryPolicy = {
   job_type: 'ingest',
   max_attempts: 5,
   backoff_schedule_seconds: [30, 120, 600, 1800],
@@ -206,7 +218,7 @@ const DEFAULT_RESET_RETRY_POLICY = {
   updated_at: '2026-02-16T02:00:00Z'
 };
 
-const DEFAULT_RESET_ALL_RETRY_POLICIES = {
+const DEFAULT_RESET_ALL_RETRY_POLICIES: MediaRetryPolicyListResponse = {
   items: [
     {
       job_type: 'ingest',
@@ -221,7 +233,7 @@ const DEFAULT_RESET_ALL_RETRY_POLICIES = {
   ]
 };
 
-const DEFAULT_RETRY_POLICY_HISTORY = {
+const DEFAULT_RETRY_POLICY_HISTORY: MediaRetryPolicyHistoryResponse = {
   items: [
     {
       id: 'evt-1',
@@ -250,7 +262,7 @@ const DEFAULT_RETRY_POLICY_HISTORY = {
   meta: { total_items: 1, total_pages: 1, page: 1, limit: 10 }
 };
 
-const DEFAULT_RETRY_POLICY_PRESETS = {
+const DEFAULT_RETRY_POLICY_PRESETS: MediaRetryPolicyPresetsResponse = {
   job_type: 'ingest',
   items: [
     {
@@ -270,7 +282,7 @@ const DEFAULT_RETRY_POLICY_PRESETS = {
   ]
 };
 
-const DEFAULT_ROLLBACK_RETRY_POLICY = {
+const DEFAULT_ROLLBACK_RETRY_POLICY: MediaRetryPolicy = {
   job_type: 'ingest',
   max_attempts: 5,
   backoff_schedule_seconds: [30, 120, 600, 1800],
@@ -281,7 +293,7 @@ const DEFAULT_ROLLBACK_RETRY_POLICY = {
   updated_at: '2026-02-16T04:00:00Z'
 };
 
-const DEFAULT_KNOWN_GOOD_EVENT = {
+const DEFAULT_KNOWN_GOOD_EVENT: MediaRetryPolicyEvent = {
   id: 'evt-2',
   job_type: 'ingest',
   action: 'mark_known_good',
