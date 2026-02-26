@@ -68,7 +68,7 @@ function initializeEnglishTranslations(translate: TranslateService): void {
   translate.use('en');
 }
 
-function createHomeContext(apiGet: <T>(url: string, params?: unknown, headers?: Record<string, string>) => any): HomeTestContext {
+function createHomeContext(apiGet: (url: string, params?: unknown, headers?: Record<string, string>) => any): HomeTestContext {
   const meta = jasmine.createSpyObj<Meta>('Meta', ['updateTag']);
   const title = jasmine.createSpyObj<Title>('Title', ['setTitle']);
   const api = jasmine.createSpyObj<ApiService>('ApiService', ['get']);
@@ -120,7 +120,7 @@ describe('HomeComponent section rendering', () => {
   });
 
   it('renders sections in CMS order', () => {
-    const { fixture } = createHomeContext(<T>(url: string) => {
+    const { fixture } = createHomeContext((url: string) => {
       if (url === '/content/home.sections') {
         return of({
           title: 'Home layout',
@@ -137,7 +137,7 @@ describe('HomeComponent section rendering', () => {
             ],
           },
           images: [],
-        } as unknown as T);
+        });
       }
       throw new Error(`Unexpected ApiService.get(${url})`);
     });
@@ -157,7 +157,7 @@ describe('HomeComponent CMS data loading', () => {
   });
 
   it('loads section data for enabled CMS sections', () => {
-    const { api, catalog } = createHomeContext(<T>(url: string, params?: unknown) => {
+    const { api, catalog } = createHomeContext((url: string, params?: unknown) => {
       if (url === '/content/home.sections') {
         return of({
           title: 'Home layout',
@@ -171,11 +171,11 @@ describe('HomeComponent CMS data loading', () => {
             ],
           },
           images: [],
-        } as unknown as T);
+        });
       }
       if (url === '/content/home.story') {
         expect(params).toEqual({ lang: 'en' });
-        return of({ title: 'Story', body_markdown: 'Story copy', meta: {}, images: [] } as unknown as T);
+        return of({ title: 'Story', body_markdown: 'Story copy', meta: {}, images: [] });
       }
       throw new Error(`Unexpected ApiService.get(${url})`);
     });
