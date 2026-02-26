@@ -7,15 +7,15 @@ import {
   toPublicKeyCredentialRequestOptions,
 } from './webauthn';
 
+function bytes(value: number[]): Uint8Array<ArrayBuffer> {
+  return Uint8Array.from(value);
+}
+
+function buffer(value: number[]): ArrayBuffer {
+  return bytes(value).buffer;
+}
+
 describe('webauthn helpers', () => {
-  function bytes(value: number[]): Uint8Array<ArrayBuffer> {
-    return Uint8Array.from(value);
-  }
-
-  function buffer(value: number[]): ArrayBuffer {
-    return bytes(value).buffer as ArrayBuffer;
-  }
-
   it('decodes empty and non-empty base64url strings', () => {
     expect(base64urlToUint8Array('')).toEqual(new Uint8Array());
     expect(Array.from(base64urlToUint8Array('AQI'))).toEqual([1, 2]);
@@ -29,14 +29,14 @@ describe('webauthn helpers', () => {
   });
 
   it('returns false when secure context or credential API is missing', () => {
-    const secureSpy = spyOnProperty(window, 'isSecureContext', 'get').and.returnValue(false);
+    const secureSpy = spyOnProperty(globalThis, 'isSecureContext', 'get').and.returnValue(false);
     expect(isWebAuthnSupported()).toBeFalse();
 
     secureSpy.and.returnValue(true);
-    const original = (window as any).PublicKeyCredential;
-    Object.defineProperty(window, 'PublicKeyCredential', { configurable: true, value: undefined });
+    const original = (globalThis as any).PublicKeyCredential;
+    Object.defineProperty(globalThis, 'PublicKeyCredential', { configurable: true, value: undefined });
     expect(isWebAuthnSupported()).toBeFalse();
-    Object.defineProperty(window, 'PublicKeyCredential', { configurable: true, value: original });
+    Object.defineProperty(globalThis, 'PublicKeyCredential', { configurable: true, value: original });
   });
 
   it('maps credential creation options into binary fields', () => {
