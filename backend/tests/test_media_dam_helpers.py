@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,6 +27,7 @@ class _SessionStub:
         self._rows_by_call = list(rows_by_call)
 
     async def execute(self, _stmt):
+        await asyncio.sleep(0)
         rows = self._rows_by_call.pop(0)
         return _ExecResult(rows)
 
@@ -36,9 +38,11 @@ class _SessionDeleteStub:
     committed: bool = False
 
     async def delete(self, obj) -> None:
+        await asyncio.sleep(0)
         self.deleted = obj
 
     async def commit(self) -> None:
+        await asyncio.sleep(0)
         self.committed = True
 
 
@@ -178,6 +182,7 @@ async def test_usage_ref_helpers(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
     async def _fake_usage_keys(_session, *, url: str):
+        await asyncio.sleep(0)
         assert url == "/media/a.jpg"
         return ["block-key"]
 

@@ -2404,6 +2404,107 @@ async def admin_products(
     ]
 
 
+def _search_products_stmt(deleted: bool) -> Any:
+    return (
+        select(Product, Category)
+        .join(Category, Product.category_id == Category.id)
+        .where(Product.is_deleted.is_(deleted))
+    )
+
+
+def _search_products_apply_filters(
+    stmt: Any,
+    *,
+    q: str | None,
+    status_filter: ProductStatus | None,
+    category_slug: str | None,
+    missing_translations: bool,
+    missing_translation_lang: str | None,
+) -> Any:
+    if q:
+        like = f"%{q.strip().lower()}%"
+        stmt = stmt.where(
+            Product.name.ilike(like) | Product.slug.ilike(like) | Product.sku.ilike(like)
+        )
+    if status_filter is not None:
+        stmt = stmt.where(Product.status == status_filter)
+    if category_slug:
+        stmt = stmt.where(Category.slug == category_slug)
+
+    missing_lang = (missing_translation_lang or "").strip().lower() or None
+    if missing_lang:
+        has_lang = exists().where(
+            ProductTranslation.product_id == Product.id,
+            ProductTranslation.lang == missing_lang,
+        )
+        return stmt.where(~has_lang)
+    if missing_translations:
+        has_en = exists().where(
+            ProductTranslation.product_id == Product.id,
+            ProductTranslation.lang == "en",
+        )
+        has_ro = exists().where(
+            ProductTranslation.product_id == Product.id,
+            ProductTranslation.lang == "ro",
+        )
+        return stmt.where(or_(~has_en, ~has_ro))
+    return stmt
+
+
+async def _search_products_translation_langs(
+    session: AsyncSession, product_ids: list[UUID]
+) -> dict[UUID, set[str]]:
+    langs_by_product: dict[UUID, set[str]] = {}
+    if not product_ids:
+        return langs_by_product
+
+    translation_rows = (
+        await session.execute(
+            select(ProductTranslation.product_id, ProductTranslation.lang).where(
+                ProductTranslation.product_id.in_(product_ids),
+                ProductTranslation.lang.in_(["en", "ro"]),
+            )
+        )
+    ).all()
+    for pid, lang in translation_rows:
+        if not pid or not lang:
+            continue
+        langs_by_product.setdefault(pid, set()).add(str(lang))
+    return langs_by_product
+
+
+def _search_product_item(
+    prod: Product,
+    cat: Category,
+    langs_by_product: dict[UUID, set[str]],
+) -> AdminProductListItem:
+    return AdminProductListItem(
+        id=prod.id,
+        slug=prod.slug,
+        deleted_slug=getattr(prod, "deleted_slug", None),
+        sku=prod.sku,
+        name=prod.name,
+        base_price=float(prod.base_price),
+        sale_type=prod.sale_type,
+        sale_value=float(prod.sale_value) if prod.sale_value is not None else None,
+        currency=prod.currency,
+        status=prod.status,
+        is_active=prod.is_active,
+        is_featured=prod.is_featured,
+        stock_quantity=prod.stock_quantity,
+        category_slug=cat.slug,
+        category_name=cat.name,
+        updated_at=prod.updated_at,
+        deleted_at=getattr(prod, "deleted_at", None),
+        publish_at=prod.publish_at,
+        publish_scheduled_for=getattr(prod, "publish_scheduled_for", None),
+        unpublish_scheduled_for=getattr(prod, "unpublish_scheduled_for", None),
+        missing_translations=[
+            lang for lang in ["en", "ro"] if lang not in langs_by_product.get(prod.id, set())
+        ],
+    )
+
+
 @router.get("/products/search")
 async def search_products(
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -2418,30 +2519,15 @@ async def search_products(
     limit: int = Query(default=25, ge=1, le=100),
 ) -> AdminProductListResponse:
     offset = (page - 1) * limit
-    stmt = (
-        select(Product, Category)
-        .join(Category, Product.category_id == Category.id)
-        .where(Product.is_deleted.is_(deleted))
+    stmt = _search_products_stmt(deleted)
+    stmt = _search_products_apply_filters(
+        stmt,
+        q=q,
+        status_filter=status,
+        category_slug=category_slug,
+        missing_translations=missing_translations,
+        missing_translation_lang=missing_translation_lang,
     )
-    if q:
-        like = f"%{q.strip().lower()}%"
-        stmt = stmt.where(
-            Product.name.ilike(like)
-            | Product.slug.ilike(like)
-            | Product.sku.ilike(like)
-        )
-    if status is not None:
-        stmt = stmt.where(Product.status == status)
-    if category_slug:
-        stmt = stmt.where(Category.slug == category_slug)
-    missing_lang = (missing_translation_lang or "").strip().lower() or None
-    if missing_lang:
-        has_lang = exists().where(ProductTranslation.product_id == Product.id, ProductTranslation.lang == missing_lang)
-        stmt = stmt.where(~has_lang)
-    elif missing_translations:
-        has_en = exists().where(ProductTranslation.product_id == Product.id, ProductTranslation.lang == "en")
-        has_ro = exists().where(ProductTranslation.product_id == Product.id, ProductTranslation.lang == "ro")
-        stmt = stmt.where(or_(~has_en, ~has_ro))
 
     total = await session.scalar(
         stmt.with_only_columns(func.count(func.distinct(Product.id))).order_by(None)
@@ -2455,48 +2541,11 @@ async def search_products(
         )
     ).all()
 
-    langs_by_product: dict[UUID, set[str]] = {}
     product_ids = [prod.id for prod, _ in rows]
-    if product_ids:
-        translation_rows = (
-            await session.execute(
-                select(ProductTranslation.product_id, ProductTranslation.lang).where(
-                    ProductTranslation.product_id.in_(product_ids),
-                    ProductTranslation.lang.in_(["en", "ro"]),
-                )
-            )
-        ).all()
-        for pid, lang in translation_rows:
-            if not pid or not lang:
-                continue
-            langs_by_product.setdefault(pid, set()).add(str(lang))
+    langs_by_product = await _search_products_translation_langs(session, product_ids)
 
     items = [
-        AdminProductListItem(
-            id=prod.id,
-            slug=prod.slug,
-            deleted_slug=getattr(prod, "deleted_slug", None),
-            sku=prod.sku,
-            name=prod.name,
-            base_price=float(prod.base_price),
-            sale_type=prod.sale_type,
-            sale_value=float(prod.sale_value) if prod.sale_value is not None else None,
-            currency=prod.currency,
-            status=prod.status,
-            is_active=prod.is_active,
-            is_featured=prod.is_featured,
-            stock_quantity=prod.stock_quantity,
-            category_slug=cat.slug,
-            category_name=cat.name,
-            updated_at=prod.updated_at,
-            deleted_at=getattr(prod, "deleted_at", None),
-            publish_at=prod.publish_at,
-            publish_scheduled_for=getattr(prod, "publish_scheduled_for", None),
-            unpublish_scheduled_for=getattr(prod, "unpublish_scheduled_for", None),
-            missing_translations=[
-                lang for lang in ["en", "ro"] if lang not in langs_by_product.get(prod.id, set())
-            ],
-        )
+        _search_product_item(prod, cat, langs_by_product)
         for prod, cat in rows
     ]
     return AdminProductListResponse(
@@ -3714,6 +3763,81 @@ def _audit_entry_item(row: Any) -> dict[str, Any]:
     }
 
 
+_AUDIT_EXPORT_CSV_HEADER = [
+    "created_at",
+    "entity",
+    "action",
+    "actor_email",
+    "subject_email",
+    "ref_key",
+    "ref_id",
+    "actor_user_id",
+    "subject_user_id",
+    "data",
+]
+
+
+def _audit_export_query(audit: object, filters: list) -> object:
+    return (
+        select(audit)
+        .where(*filters)
+        .order_by(getattr(audit.c, "created_at").desc())
+        .limit(5000)
+    )  # type: ignore[attr-defined]
+
+
+async def _audit_export_rows(
+    session: AsyncSession,
+    *,
+    entity: str | None,
+    action: str | None,
+    user: str | None,
+) -> list[Any]:
+    audit = _audit_union_subquery()
+    filters = _audit_filters(audit, entity=entity, action=action, user=user)
+    q = _audit_export_query(audit, filters)
+    return (await session.execute(q)).mappings().all()
+
+
+def _audit_export_csv_row(row: Any, *, redact: bool) -> list[str]:
+    created_at = row.get("created_at")
+    actor_email = str(row.get("actor_email") or "")
+    subject_email = str(row.get("subject_email") or "")
+    data_raw = str(row.get("data") or "")
+
+    if redact:
+        actor_email = _audit_mask_email(actor_email)
+        subject_email = _audit_mask_email(subject_email)
+        data_raw = _audit_redact_text(data_raw)
+
+    return [
+        created_at.isoformat() if isinstance(created_at, datetime) else "",
+        _audit_csv_cell(str(row.get("entity") or "")),
+        _audit_csv_cell(str(row.get("action") or "")),
+        _audit_csv_cell(actor_email),
+        _audit_csv_cell(subject_email),
+        _audit_csv_cell(str(row.get("ref_key") or "")),
+        _audit_csv_cell(str(row.get("ref_id") or "")),
+        _audit_csv_cell(str(row.get("actor_user_id") or "")),
+        _audit_csv_cell(str(row.get("subject_user_id") or "")),
+        _audit_csv_cell(data_raw),
+    ]
+
+
+def _audit_export_csv_content(rows: list[Any], *, redact: bool) -> str:
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(_AUDIT_EXPORT_CSV_HEADER)
+    for row in rows:
+        writer.writerow(_audit_export_csv_row(row, redact=redact))
+    return buf.getvalue()
+
+
+def _audit_export_filename(entity: str | None) -> str:
+    date_part = datetime.now(timezone.utc).date().isoformat()
+    return f"audit-{(entity or 'all').strip().lower()}-{date_part}.csv"
+
+
 @router.get("/audit/entries")
 async def admin_audit_entries(
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -3765,62 +3889,11 @@ async def admin_audit_export_csv(
             detail="Owner access required for unredacted exports",
         )
 
-    audit = _audit_union_subquery()
-    filters = _audit_filters(audit, entity=entity, action=action, user=user)
-
-    q = (
-        select(audit)
-        .where(*filters)
-        .order_by(getattr(audit.c, "created_at").desc())
-        .limit(5000)
-    )  # type: ignore[attr-defined]
-    rows = (await session.execute(q)).mappings().all()
-
-    buf = io.StringIO()
-    writer = csv.writer(buf)
-    writer.writerow(
-        [
-            "created_at",
-            "entity",
-            "action",
-            "actor_email",
-            "subject_email",
-            "ref_key",
-            "ref_id",
-            "actor_user_id",
-            "subject_user_id",
-            "data",
-        ]
-    )
-    for row in rows:
-        created_at = row.get("created_at")
-        actor_email = str(row.get("actor_email") or "")
-        subject_email = str(row.get("subject_email") or "")
-        data_raw = str(row.get("data") or "")
-
-        if redact:
-            actor_email = _audit_mask_email(actor_email)
-            subject_email = _audit_mask_email(subject_email)
-            data_raw = _audit_redact_text(data_raw)
-
-        writer.writerow(
-            [
-                created_at.isoformat() if isinstance(created_at, datetime) else "",
-                _audit_csv_cell(str(row.get("entity") or "")),
-                _audit_csv_cell(str(row.get("action") or "")),
-                _audit_csv_cell(actor_email),
-                _audit_csv_cell(subject_email),
-                _audit_csv_cell(str(row.get("ref_key") or "")),
-                _audit_csv_cell(str(row.get("ref_id") or "")),
-                _audit_csv_cell(str(row.get("actor_user_id") or "")),
-                _audit_csv_cell(str(row.get("subject_user_id") or "")),
-                _audit_csv_cell(data_raw),
-            ]
-        )
-
-    filename = f"audit-{(entity or 'all').strip().lower()}-{datetime.now(timezone.utc).date().isoformat()}.csv"
+    rows = await _audit_export_rows(session, entity=entity, action=action, user=user)
+    content = _audit_export_csv_content(rows, redact=redact)
+    filename = _audit_export_filename(entity)
     return Response(
-        content=buf.getvalue(),
+        content=content,
         media_type="text/csv",
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"',
@@ -4067,6 +4140,170 @@ async def admin_revoke_user_session(
     return None
 
 
+def _gdpr_user_text_filter(stmt: Any, q: str | None) -> Any:
+    if not q:
+        return stmt
+    like = f"%{q.strip().lower()}%"
+    return stmt.where(
+        func.lower(User.email).ilike(like)
+        | func.lower(User.username).ilike(like)
+        | func.lower(User.name).ilike(like)
+    )
+
+
+def _gdpr_export_jobs_stmt(
+    q: str | None, status_filter: UserDataExportStatus | None
+) -> Any:
+    stmt = select(UserDataExportJob, User).join(User, UserDataExportJob.user_id == User.id)
+    stmt = _gdpr_user_text_filter(stmt, q)
+    if status_filter is not None:
+        stmt = stmt.where(UserDataExportJob.status == status_filter)
+    return stmt
+
+
+async def _gdpr_export_jobs_page(
+    session: AsyncSession, stmt: Any, *, limit: int, offset: int
+) -> tuple[int, int, list[Any]]:
+    total_items = int(
+        await session.scalar(stmt.with_only_columns(func.count()).order_by(None)) or 0
+    )
+    total_pages = _pagination_total_pages(total_items, limit)
+    rows = (
+        await session.execute(
+            stmt.order_by(UserDataExportJob.created_at.desc()).limit(limit).offset(offset)
+        )
+    ).all()
+    return total_items, total_pages, rows
+
+
+def _gdpr_export_sla_days() -> int:
+    return max(1, int(getattr(settings, "gdpr_export_sla_days", 30) or 30))
+
+
+def _gdpr_user_ref(user: User, *, include_pii: bool) -> AdminGdprUserRef:
+    return AdminGdprUserRef(
+        id=user.id,
+        email=user.email if include_pii else (pii_service.mask_email(user.email) or user.email),
+        username=user.username,
+        role=user.role,
+    )
+
+
+def _gdpr_export_job_item(
+    job: UserDataExportJob,
+    user: User,
+    *,
+    include_pii: bool,
+    now: datetime,
+    sla_days: int,
+) -> AdminGdprExportJobItem:
+    created_at = _as_utc(job.created_at) or job.created_at
+    updated_at = _as_utc(job.updated_at) or job.updated_at
+    started_at = _as_utc(job.started_at)
+    finished_at = _as_utc(job.finished_at)
+    expires_at = _as_utc(job.expires_at)
+    sla_due_at = created_at + timedelta(days=sla_days)
+    sla_breached = job.status != UserDataExportStatus.succeeded and now > sla_due_at
+    return AdminGdprExportJobItem(
+        id=job.id,
+        user=_gdpr_user_ref(user, include_pii=include_pii),
+        status=job.status,
+        progress=int(job.progress or 0),
+        created_at=created_at,
+        updated_at=updated_at,
+        started_at=started_at,
+        finished_at=finished_at,
+        expires_at=expires_at,
+        has_file=bool(job.file_path),
+        sla_due_at=sla_due_at,
+        sla_breached=sla_breached,
+    )
+
+
+async def _gdpr_export_job_and_user(
+    session: AsyncSession, job_id: UUID
+) -> tuple[UserDataExportJob, User]:
+    job = await session.get(UserDataExportJob, job_id)
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found")
+    user = await session.get(User, job.user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return job, user
+
+
+def _gdpr_require_engine(session: AsyncSession) -> Any:
+    engine = session.bind
+    if engine is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database engine unavailable")
+    return engine
+
+
+def _gdpr_reset_export_job(job: UserDataExportJob) -> None:
+    job.status = UserDataExportStatus.pending
+    job.progress = 0
+    job.error_message = None
+    job.started_at = None
+    job.finished_at = None
+    job.expires_at = None
+    job.file_path = None
+
+
+def _gdpr_deletion_requests_stmt(q: str | None) -> Any:
+    stmt = select(User).where(User.deleted_at.is_(None), User.deletion_requested_at.is_not(None))
+    return _gdpr_user_text_filter(stmt, q)
+
+
+async def _gdpr_deletion_requests_page(
+    session: AsyncSession, stmt: Any, *, limit: int, offset: int
+) -> tuple[int, int, list[User]]:
+    total_items = int(await session.scalar(stmt.with_only_columns(func.count()).order_by(None)) or 0)
+    total_pages = _pagination_total_pages(total_items, limit)
+    rows = (
+        (
+            await session.execute(
+                stmt.order_by(User.deletion_requested_at.desc()).limit(limit).offset(offset)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return total_items, total_pages, rows
+
+
+def _gdpr_deletion_sla_days() -> int:
+    return max(1, int(getattr(settings, "gdpr_deletion_sla_days", 30) or 30))
+
+
+def _gdpr_deletion_status(scheduled_for: datetime | None, now: datetime) -> str:
+    if not scheduled_for:
+        return "scheduled"
+    if scheduled_for <= now:
+        return "due"
+    return "cooldown"
+
+
+def _gdpr_deletion_request_item(
+    user: User,
+    *,
+    include_pii: bool,
+    now: datetime,
+    sla_days: int,
+) -> AdminGdprDeletionRequestItem:
+    requested_at = _as_utc(user.deletion_requested_at)
+    scheduled_for = _as_utc(user.deletion_scheduled_for)
+    resolved_requested_at = requested_at or now
+    sla_due_at = resolved_requested_at + timedelta(days=sla_days)
+    return AdminGdprDeletionRequestItem(
+        user=_gdpr_user_ref(user, include_pii=include_pii),
+        requested_at=resolved_requested_at,
+        scheduled_for=scheduled_for,
+        status=_gdpr_deletion_status(scheduled_for, now),
+        sla_due_at=sla_due_at,
+        sla_breached=bool(now > sla_due_at),
+    )
+
+
 @router.get("/gdpr/exports")
 async def admin_gdpr_export_jobs(
     request: Request,
@@ -4081,72 +4318,23 @@ async def admin_gdpr_export_jobs(
     if include_pii:
         pii_service.require_pii_reveal(current_user, request=request)
     offset = (page - 1) * limit
-    stmt = select(UserDataExportJob, User).join(User, UserDataExportJob.user_id == User.id)
-
-    if q:
-        like = f"%{q.strip().lower()}%"
-        stmt = stmt.where(
-            func.lower(User.email).ilike(like)
-            | func.lower(User.username).ilike(like)
-            | func.lower(User.name).ilike(like)
-        )
-
-    if status_filter is not None:
-        stmt = stmt.where(UserDataExportJob.status == status_filter)
-
-    total_items = int(
-        await session.scalar(stmt.with_only_columns(func.count()).order_by(None)) or 0
+    stmt = _gdpr_export_jobs_stmt(q, status_filter)
+    total_items, total_pages, rows = await _gdpr_export_jobs_page(
+        session, stmt, limit=limit, offset=offset
     )
-    total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
-
-    rows = (
-        await session.execute(
-            stmt.order_by(UserDataExportJob.created_at.desc()).limit(limit).offset(offset)
-        )
-    ).all()
 
     now = datetime.now(timezone.utc)
-    sla_days = max(1, int(getattr(settings, "gdpr_export_sla_days", 30) or 30))
-    items: list[AdminGdprExportJobItem] = []
-    for job, user in rows:
-        created_at = job.created_at if job.created_at.tzinfo else job.created_at.replace(tzinfo=timezone.utc)
-        updated_at = job.updated_at if job.updated_at.tzinfo else job.updated_at.replace(tzinfo=timezone.utc)
-        started_at = job.started_at
-        if started_at and started_at.tzinfo is None:
-            started_at = started_at.replace(tzinfo=timezone.utc)
-        finished_at = job.finished_at
-        if finished_at and finished_at.tzinfo is None:
-            finished_at = finished_at.replace(tzinfo=timezone.utc)
-        expires_at = job.expires_at
-        if expires_at and expires_at.tzinfo is None:
-            expires_at = expires_at.replace(tzinfo=timezone.utc)
-
-        sla_due_at = created_at + timedelta(days=sla_days)
-        sla_breached = False
-        if job.status != UserDataExportStatus.succeeded and now > sla_due_at:
-            sla_breached = True
-
-        items.append(
-            AdminGdprExportJobItem(
-                id=job.id,
-                user=AdminGdprUserRef(
-                    id=user.id,
-                    email=user.email if include_pii else (pii_service.mask_email(user.email) or user.email),
-                    username=user.username,
-                    role=user.role,
-                ),
-                status=job.status,
-                progress=int(job.progress or 0),
-                created_at=created_at,
-                updated_at=updated_at,
-                started_at=started_at,
-                finished_at=finished_at,
-                expires_at=expires_at,
-                has_file=bool(job.file_path),
-                sla_due_at=sla_due_at,
-                sla_breached=sla_breached,
-            )
+    sla_days = _gdpr_export_sla_days()
+    items = [
+        _gdpr_export_job_item(
+            job,
+            user,
+            include_pii=include_pii,
+            now=now,
+            sla_days=sla_days,
         )
+        for job, user in rows
+    ]
 
     return AdminGdprExportJobsResponse(
         items=items,
@@ -4167,24 +4355,9 @@ async def admin_gdpr_retry_export_job(
     session: Annotated[AsyncSession, Depends(get_session)],
     current_user: Annotated[User, Depends(require_admin)],
 ) -> AdminGdprExportJobItem:
-    job = await session.get(UserDataExportJob, job_id)
-    if not job:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found")
-    user = await session.get(User, job.user_id)
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-
-    engine = session.bind
-    if engine is None:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database engine unavailable")
-
-    job.status = UserDataExportStatus.pending
-    job.progress = 0
-    job.error_message = None
-    job.started_at = None
-    job.finished_at = None
-    job.expires_at = None
-    job.file_path = None
+    job, user = await _gdpr_export_job_and_user(session, job_id)
+    engine = _gdpr_require_engine(session)
+    _gdpr_reset_export_job(job)
     session.add(job)
     await audit_chain_service.add_admin_audit_log(
         session,
@@ -4202,28 +4375,12 @@ async def admin_gdpr_retry_export_job(
     background_tasks.add_task(user_export_service.run_user_export_job, engine, job_id=job.id)
 
     now = datetime.now(timezone.utc)
-    created_at = job.created_at if job.created_at.tzinfo else job.created_at.replace(tzinfo=timezone.utc)
-    updated_at = job.updated_at if job.updated_at.tzinfo else job.updated_at.replace(tzinfo=timezone.utc)
-    sla_days = max(1, int(getattr(settings, "gdpr_export_sla_days", 30) or 30))
-    sla_due_at = created_at + timedelta(days=sla_days)
-    return AdminGdprExportJobItem(
-        id=job.id,
-        user=AdminGdprUserRef(
-            id=user.id,
-            email=user.email,
-            username=user.username,
-            role=user.role,
-        ),
-        status=job.status,
-        progress=int(job.progress or 0),
-        created_at=created_at,
-        updated_at=updated_at,
-        started_at=None,
-        finished_at=None,
-        expires_at=None,
-        has_file=False,
-        sla_due_at=sla_due_at,
-        sla_breached=bool(now > sla_due_at),
+    return _gdpr_export_job_item(
+        job,
+        user,
+        include_pii=True,
+        now=now,
+        sla_days=_gdpr_export_sla_days(),
     )
 
 
@@ -4286,62 +4443,22 @@ async def admin_gdpr_deletion_requests(
     if include_pii:
         pii_service.require_pii_reveal(current_user, request=request)
     offset = (page - 1) * limit
-    stmt = select(User).where(User.deleted_at.is_(None), User.deletion_requested_at.is_not(None))
-
-    if q:
-        like = f"%{q.strip().lower()}%"
-        stmt = stmt.where(
-            func.lower(User.email).ilike(like)
-            | func.lower(User.username).ilike(like)
-            | func.lower(User.name).ilike(like)
-        )
-
-    total_items = int(await session.scalar(stmt.with_only_columns(func.count()).order_by(None)) or 0)
-    total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
-
-    rows = (
-        (
-            await session.execute(
-                stmt.order_by(User.deletion_requested_at.desc()).limit(limit).offset(offset)
-            )
-        )
-        .scalars()
-        .all()
+    stmt = _gdpr_deletion_requests_stmt(q)
+    total_items, total_pages, rows = await _gdpr_deletion_requests_page(
+        session, stmt, limit=limit, offset=offset
     )
 
     now = datetime.now(timezone.utc)
-    sla_days = max(1, int(getattr(settings, "gdpr_deletion_sla_days", 30) or 30))
-    items: list[AdminGdprDeletionRequestItem] = []
-    for user in rows:
-        requested_at = user.deletion_requested_at
-        if requested_at and requested_at.tzinfo is None:
-            requested_at = requested_at.replace(tzinfo=timezone.utc)
-        scheduled_for = user.deletion_scheduled_for
-        if scheduled_for and scheduled_for.tzinfo is None:
-            scheduled_for = scheduled_for.replace(tzinfo=timezone.utc)
-
-        sla_due_at = (requested_at or now) + timedelta(days=sla_days)
-        status_label = "scheduled"
-        if scheduled_for and scheduled_for <= now:
-            status_label = "due"
-        elif scheduled_for:
-            status_label = "cooldown"
-
-        items.append(
-            AdminGdprDeletionRequestItem(
-                user=AdminGdprUserRef(
-                    id=user.id,
-                    email=user.email if include_pii else (pii_service.mask_email(user.email) or user.email),
-                    username=user.username,
-                    role=user.role,
-                ),
-                requested_at=requested_at or now,
-                scheduled_for=scheduled_for,
-                status=status_label,
-                sla_due_at=sla_due_at,
-                sla_breached=bool(now > sla_due_at),
-            )
+    sla_days = _gdpr_deletion_sla_days()
+    items = [
+        _gdpr_deletion_request_item(
+            user,
+            include_pii=include_pii,
+            now=now,
+            sla_days=sla_days,
         )
+        for user in rows
+    ]
 
     return AdminGdprDeletionRequestsResponse(
         items=items,
