@@ -863,8 +863,8 @@ def test_bulk_category_assignment_and_publish_scheduling(test_app: Dict[str, obj
 
 def test_merge_category_moves_products_and_removes_source(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
-    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
-    admin_token = create_admin_token(SessionLocal, email="mergecat-admin@example.com")
+    session_local = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_admin_token(session_local, email="mergecat-admin@example.com")
 
     parent = client.post(
         "/api/v1/catalog/categories",

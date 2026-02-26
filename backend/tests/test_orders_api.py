@@ -1388,13 +1388,13 @@ def test_admin_capture_and_void_payment_intent_mismatch_and_idempotency(
     monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
-    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+    session_local = test_app["session_factory"]  # type: ignore[assignment]
 
-    _token, user_id = create_user_token(SessionLocal, email="buyer-capture-idem@example.com")
-    admin_token, _ = create_user_token(SessionLocal, email="admin-capture-idem@example.com", admin=True)
+    _token, user_id = create_user_token(session_local, email="buyer-capture-idem@example.com")
+    admin_token, _ = create_user_token(session_local, email="admin-capture-idem@example.com", admin=True)
 
     async def seed_order() -> UUID:
-        async with SessionLocal() as session:
+        async with session_local() as session:
             order = Order(
                 user_id=user_id,
                 status=OrderStatus.pending_payment,
@@ -1419,20 +1419,25 @@ def test_admin_capture_and_void_payment_intent_mismatch_and_idempotency(
     void_calls: list[str] = []
 
     async def fake_capture(intent_id: str) -> dict[str, str]:
+        await asyncio.sleep(0)
         capture_calls.append(intent_id)
         return {"id": intent_id, "status": "succeeded"}
 
     async def fake_void(intent_id: str) -> dict[str, str]:
+        await asyncio.sleep(0)
         void_calls.append(intent_id)
         return {"id": intent_id, "status": "canceled"}
 
     async def fake_redeem(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return None
 
     async def fake_release(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return None
 
     async def fake_notify(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return None
 
     monkeypatch.setattr(payments_service, "capture_payment_intent", fake_capture)
