@@ -23,7 +23,7 @@ function mockSignal<T>(initial: T): SignalLike<T> {
 }
 
 function createHarness(): Harness {
-  const component = Object.create(AdminOrdersComponent.prototype) as any;
+  const component = Object.create(AdminOrdersComponent.prototype);
   const toast = jasmine.createSpyObj('ToastService', ['success', 'error']);
   const favorites = {
     items: () => [] as any[],
