@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import secrets
 from datetime import datetime, timezone, timedelta
-from typing import Any
+from typing import Any, Sequence
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -105,14 +105,16 @@ async def execute_account_deletion(session: AsyncSession, user: User) -> None:
 
 
 def _is_profile_complete(user: User) -> bool:
-    return bool(
-        (user.name or "").strip()
-        and (user.username or "").strip()
-        and (getattr(user, "first_name", None) or "").strip()
-        and (getattr(user, "last_name", None) or "").strip()
-        and getattr(user, "date_of_birth", None)
-        and (getattr(user, "phone", None) or "").strip()
-    )
+    required_strings = [
+        user.name,
+        user.username,
+        getattr(user, "first_name", None),
+        getattr(user, "last_name", None),
+        getattr(user, "phone", None),
+    ]
+    if not all((value or "").strip() for value in required_strings):
+        return False
+    return bool(getattr(user, "date_of_birth", None))
 
 
 async def cleanup_incomplete_google_accounts(session: AsyncSession, *, max_age_hours: int = 24 * 30) -> int:
@@ -157,10 +159,6 @@ async def maybe_cleanup_incomplete_google_accounts(session: AsyncSession) -> int
 
 
 async def export_user_data(session: AsyncSession, user: User) -> dict[str, Any]:
-    def iso(dt: datetime | None) -> str | None:
-        value = _ensure_utc(dt)
-        return value.isoformat() if value else None
-
     orders = (
         (
             await session.execute(
@@ -200,73 +198,123 @@ async def export_user_data(session: AsyncSession, user: User) -> dict[str, Any]:
     ).all()
 
     return {
-        "exported_at": iso(datetime.now(timezone.utc)),
+        "exported_at": _iso_or_none(datetime.now(timezone.utc)),
         "app": {"name": settings.app_name, "version": settings.app_version},
-        "user": {
-            "id": str(user.id),
-            "email": user.email,
-            "username": user.username,
-            "name": user.name,
-            "first_name": getattr(user, "first_name", None),
-            "middle_name": getattr(user, "middle_name", None),
-            "last_name": getattr(user, "last_name", None),
-            "date_of_birth": user.date_of_birth.isoformat() if user.date_of_birth else None,
-            "phone": user.phone,
-            "avatar_url": user.avatar_url,
-            "preferred_language": user.preferred_language,
-            "email_verified": user.email_verified,
-            "role": user.role.value,
-            "created_at": iso(user.created_at),
-            "updated_at": iso(user.updated_at),
-        },
-        "orders": [
-            {
-                "id": str(o.id),
-                "reference_code": o.reference_code,
-                "status": o.status.value,
-                "currency": o.currency,
-                "tax_amount": float(o.tax_amount),
-                "shipping_amount": float(o.shipping_amount),
-                "total_amount": float(o.total_amount),
-                "tracking_number": o.tracking_number,
-                "created_at": iso(o.created_at),
-                "updated_at": iso(o.updated_at),
-                "items": [
-                    {
-                        "id": str(oi.id),
-                        "product_id": str(oi.product_id),
-                        "product_slug": oi.product.slug if oi.product else None,
-                        "product_name": oi.product.name if oi.product else None,
-                        "quantity": oi.quantity,
-                        "unit_price": float(oi.unit_price),
-                        "subtotal": float(oi.subtotal),
-                    }
-                    for oi in o.items
-                ],
-            }
-            for o in orders
-        ],
-        "wishlist": [
-            {
-                "id": str(item.id),
-                "product_id": str(item.product_id),
-                "product_slug": item.product.slug if item.product else None,
-                "product_name": item.product.name if item.product else None,
-                "created_at": iso(item.created_at),
-            }
-            for item in wishlist_items
-        ],
-        "comments": [
-            {
-                "id": str(c.id),
-                "post_slug": str(post_key).split("blog.", 1)[-1] if str(post_key).startswith("blog.") else str(post_key),
-                "post_title": post_title,
-                "parent_id": str(c.parent_id) if c.parent_id else None,
-                "status": "deleted" if c.is_deleted else "hidden" if c.is_hidden else "posted",
-                "created_at": iso(c.created_at),
-                "updated_at": iso(c.updated_at),
-                "body": "" if c.is_deleted or c.is_hidden else c.body,
-            }
-            for c, post_key, post_title in comment_rows
-        ],
+        "user": _export_user_profile(user),
+        "orders": _export_orders(orders),
+        "wishlist": _export_wishlist(wishlist_items),
+        "comments": _export_comments(comment_rows),
     }
+
+
+def _iso_or_none(dt: datetime | None) -> str | None:
+    value = _ensure_utc(dt)
+    return value.isoformat() if value else None
+
+
+def _export_user_profile(user: User) -> dict[str, Any]:
+    return {
+        "id": str(user.id),
+        "email": user.email,
+        "username": user.username,
+        "name": user.name,
+        "first_name": getattr(user, "first_name", None),
+        "middle_name": getattr(user, "middle_name", None),
+        "last_name": getattr(user, "last_name", None),
+        "date_of_birth": user.date_of_birth.isoformat() if user.date_of_birth else None,
+        "phone": user.phone,
+        "avatar_url": user.avatar_url,
+        "preferred_language": user.preferred_language,
+        "email_verified": user.email_verified,
+        "role": user.role.value,
+        "created_at": _iso_or_none(user.created_at),
+        "updated_at": _iso_or_none(user.updated_at),
+    }
+
+
+def _export_orders(orders: Sequence[Order]) -> list[dict[str, Any]]:
+    payload: list[dict[str, Any]] = []
+    for order in orders:
+        payload.append(
+            {
+                "id": str(order.id),
+                "reference_code": order.reference_code,
+                "status": order.status.value,
+                "currency": order.currency,
+                "tax_amount": float(order.tax_amount),
+                "shipping_amount": float(order.shipping_amount),
+                "total_amount": float(order.total_amount),
+                "tracking_number": order.tracking_number,
+                "created_at": _iso_or_none(order.created_at),
+                "updated_at": _iso_or_none(order.updated_at),
+                "items": _export_order_items(order.items),
+            }
+        )
+    return payload
+
+
+def _export_order_items(items: list[OrderItem]) -> list[dict[str, Any]]:
+    return [
+        {
+            "id": str(item.id),
+            "product_id": str(item.product_id),
+            "product_slug": item.product.slug if item.product else None,
+            "product_name": item.product.name if item.product else None,
+            "quantity": item.quantity,
+            "unit_price": float(item.unit_price),
+            "subtotal": float(item.subtotal),
+        }
+        for item in items
+    ]
+
+
+def _export_wishlist(items: Sequence[WishlistItem]) -> list[dict[str, Any]]:
+    return [
+        {
+            "id": str(item.id),
+            "product_id": str(item.product_id),
+            "product_slug": item.product.slug if item.product else None,
+            "product_name": item.product.name if item.product else None,
+            "created_at": _iso_or_none(item.created_at),
+        }
+        for item in items
+    ]
+
+
+def _comment_status(comment: BlogComment) -> str:
+    if comment.is_deleted:
+        return "deleted"
+    if comment.is_hidden:
+        return "hidden"
+    return "posted"
+
+
+def _comment_body(comment: BlogComment) -> str:
+    if comment.is_deleted or comment.is_hidden:
+        return ""
+    return comment.body
+
+
+def _comment_post_slug(post_key: Any) -> str:
+    as_text = str(post_key)
+    if as_text.startswith("blog."):
+        return as_text.split("blog.", 1)[-1]
+    return as_text
+
+
+def _export_comments(comment_rows: Sequence[Any]) -> list[dict[str, Any]]:
+    payload: list[dict[str, Any]] = []
+    for comment, post_key, post_title in comment_rows:
+        payload.append(
+            {
+                "id": str(comment.id),
+                "post_slug": _comment_post_slug(post_key),
+                "post_title": post_title,
+                "parent_id": str(comment.parent_id) if comment.parent_id else None,
+                "status": _comment_status(comment),
+                "created_at": _iso_or_none(comment.created_at),
+                "updated_at": _iso_or_none(comment.updated_at),
+                "body": _comment_body(comment),
+            }
+        )
+    return payload
