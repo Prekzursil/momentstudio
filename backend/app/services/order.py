@@ -1954,9 +1954,8 @@ async def _apply_status_change_update(
         if not _has_payment_captured(order):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment is not captured yet. Wait for payment confirmation before accepting the order.")
     requires_reason = _status_requires_cancel_reason(current_status=current_status, next_status=next_status)
-    if requires_reason:
-        if not cancel_reason_clean:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cancel reason is required")
+    if requires_reason and not cancel_reason_clean:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cancel reason is required")
     if next_status not in _allowed_next_order_statuses(current_status=current_status, payment_method=payment_method):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status transition")
     order.status = next_status
@@ -1971,7 +1970,7 @@ async def _apply_status_change_update(
     )
 
 
-async def _apply_cancel_reason_update(
+def _apply_cancel_reason_update(
     session: AsyncSession,
     *,
     order: Order,
@@ -2171,7 +2170,7 @@ async def update_order(
     cancel_reason_clean = _clean_cancel_reason(data.pop("cancel_reason", None))
 
     await _apply_status_change_update(session, order=order, data=data, cancel_reason_clean=cancel_reason_clean)
-    await _apply_cancel_reason_update(session, order=order, cancel_reason_clean=cancel_reason_clean)
+    _apply_cancel_reason_update(session, order=order, cancel_reason_clean=cancel_reason_clean)
     _validate_tracking_update_payload(order, data)
     await _apply_shipping_method_update(
         session,
@@ -2997,7 +2996,7 @@ def _normalize_refund_note(note: str) -> str:
 
 def _refund_item_rows(existing_refund: OrderRefund) -> list[object]:
     payload = existing_refund.data if isinstance(existing_refund.data, dict) else {}
-    rows = payload.get("items") if isinstance(payload, dict) else None
+    rows = payload.get("items")
     return rows if isinstance(rows, list) else []
 
 

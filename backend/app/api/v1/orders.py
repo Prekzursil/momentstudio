@@ -3507,7 +3507,7 @@ async def _finalize_guest_checkout(
     )
 
 
-@router.post("/guest-checkout", response_model=GuestCheckoutResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/guest-checkout", status_code=status.HTTP_201_CREATED)
 async def guest_checkout(
     payload: GuestCheckoutRequest,
     request: Request,

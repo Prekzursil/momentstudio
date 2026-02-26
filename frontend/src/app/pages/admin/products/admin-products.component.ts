@@ -5204,13 +5204,13 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
   }
 
   private formatLoadedWeight(value: unknown): string {
-    const parsed = this.toNumberOrDefault(value, NaN);
+    const parsed = this.toNumberOrDefault(value, Number.NaN);
     if (!Number.isFinite(parsed) || parsed < 0) return '';
     return String(Math.round(parsed));
   }
 
   private formatLoadedDimension(value: unknown): string {
-    const parsed = this.toNumberOrDefault(value, NaN);
+    const parsed = this.toNumberOrDefault(value, Number.NaN);
     if (!Number.isFinite(parsed) || parsed < 0) return '';
     return String(parsed);
   }

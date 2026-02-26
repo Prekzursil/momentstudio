@@ -551,7 +551,7 @@ def _payload_optional_text(payload: Dict[str, Any], key: str) -> str | None:
     return None
 
 
-async def _create_import_user(
+def _create_import_user(
     session,
     *,
     user_payload: Dict[str, Any],
@@ -586,7 +586,7 @@ async def _create_import_user(
     return user_obj
 
 
-async def _ensure_import_user_username(
+def _ensure_import_user_username(
     session,
     *,
     user_obj: User,
@@ -602,7 +602,7 @@ async def _ensure_import_user_username(
     session.add(UserUsernameHistory(user_id=user_obj.id, username=username))
 
 
-async def _sync_import_user_display_name(
+def _sync_import_user_display_name(
     session,
     *,
     user_obj: User,
@@ -641,7 +641,7 @@ async def _import_users(
         user_obj: User | None = await session.get(User, user_id)
 
         if not user_obj:
-            user_obj = await _create_import_user(
+            user_obj = _create_import_user(
                 session,
                 user_payload=user_payload,
                 user_id=user_id,
@@ -650,7 +650,7 @@ async def _import_users(
                 next_tag_by_name=next_tag_by_name,
             )
         else:
-            await _ensure_import_user_username(
+            _ensure_import_user_username(
                 session,
                 user_obj=user_obj,
                 user_payload=user_payload,
@@ -658,7 +658,7 @@ async def _import_users(
                 used_usernames=used_usernames,
             )
 
-        await _sync_import_user_display_name(
+        _sync_import_user_display_name(
             session,
             user_obj=user_obj,
             user_payload=user_payload,

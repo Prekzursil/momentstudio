@@ -124,6 +124,7 @@ verify_request_rate_limit = per_identifier_limiter(
 )
 
 _REQUIRED_REGISTRATION_CONSENT_KEYS = ("page.terms-and-conditions", "page.privacy-policy")
+_INVALID_REFRESH_TOKEN_DETAIL = "Invalid refresh token"
 
 
 async def _require_published_consent_docs(session: AsyncSession, keys: tuple[str, ...]) -> dict[str, int]:
@@ -957,7 +958,7 @@ def _invalid_refresh_identity_response(*, silent_refresh_probe: bool, response: 
     return _silent_or_unauthorized_response(
         silent_refresh_probe=silent_refresh_probe,
         response=response,
-        detail="Invalid refresh token",
+        detail=_INVALID_REFRESH_TOKEN_DETAIL,
     )
 
 
@@ -1034,7 +1035,7 @@ async def _load_valid_stored_refresh_session(
     ).scalar_one_or_none()
     stored_expires_at = _ensure_utc_datetime(stored.expires_at) if stored else None
     if not stored or stored.user_id != token_user_id or not stored_expires_at or stored_expires_at < now:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_INVALID_REFRESH_TOKEN_DETAIL)
     return stored, stored_expires_at
 
 
@@ -1596,7 +1597,7 @@ async def refresh_tokens(
         )
         if replacement_pair:
             return replacement_pair
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=_INVALID_REFRESH_TOKEN_DETAIL)
     persistent = bool(getattr(stored, "persistent", True))
     if not settings.refresh_token_rotation:
         return _build_refresh_token_pair(

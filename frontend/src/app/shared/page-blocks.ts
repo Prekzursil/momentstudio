@@ -680,11 +680,11 @@ export function parsePageBlocks(
   return blocks;
 }
 
-const HTML_TAG_PATTERN = new RegExp('\\x3C[^\\x3E]+\\x3E', 'g');
+const HTML_TAG_PATTERN = /<[^>]+>/g;
 const WHITESPACE_PATTERN = /\s+/g;
 
 const htmlToPlainText = (html: string): string =>
-  (html || '').replace(HTML_TAG_PATTERN, ' ').replace(WHITESPACE_PATTERN, ' ').trim();
+  (html || '').replaceAll(HTML_TAG_PATTERN, ' ').replaceAll(WHITESPACE_PATTERN, ' ').trim();
 
 const appendTextLikeParts = (parts: string[], bodyHtml: string, ctaLabel?: string): void => {
   const text = htmlToPlainText(bodyHtml || '');
@@ -762,5 +762,5 @@ export function pageBlocksToPlainText(blocks: PageBlock[]): string {
     if (block.title) parts.push(block.title);
     appendBlockParts(parts, block);
   }
-  return parts.join(' ').replace(WHITESPACE_PATTERN, ' ').trim();
+  return parts.join(' ').replaceAll(WHITESPACE_PATTERN, ' ').trim();
 }

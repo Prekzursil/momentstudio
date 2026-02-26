@@ -178,7 +178,19 @@ const emitGlobalHttpError = (err: unknown, silent: boolean, errors: HttpErrorBus
   }
 };
 
-const handleInterceptorError = (err: unknown, req: HttpRequest<unknown>, next: HttpHandlerFn, auth: AuthService, errors: HttpErrorBusService, apiBase: string, isApiRequest: boolean, hasAuthHeader: boolean, silent: boolean) => {
+type InterceptorErrorContext = {
+  req: HttpRequest<unknown>;
+  next: HttpHandlerFn;
+  auth: AuthService;
+  errors: HttpErrorBusService;
+  apiBase: string;
+  isApiRequest: boolean;
+  hasAuthHeader: boolean;
+  silent: boolean;
+};
+
+const handleInterceptorError = (err: unknown, context: InterceptorErrorContext) => {
+  const { req, next, auth, errors, apiBase, isApiRequest, hasAuthHeader, silent } = context;
   if (canAttemptRefresh(err, req, apiBase, isApiRequest, hasAuthHeader, auth)) {
     return retryAfterRefresh(req, next, auth, err as HttpErrorResponse);
   }
@@ -220,6 +232,17 @@ export const authAndErrorInterceptor: HttpInterceptorFn = (req, next) => {
   });
 
   return next(authReq).pipe(
-    catchError((err) => handleInterceptorError(err, req, next, auth, errors, apiBase, isApiRequest, hasAuthHeader, silent))
+    catchError((err) =>
+      handleInterceptorError(err, {
+        req,
+        next,
+        auth,
+        errors,
+        apiBase,
+        isApiRequest,
+        hasAuthHeader,
+        silent
+      })
+    )
   );
 };

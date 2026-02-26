@@ -12,11 +12,15 @@ logger = logging.getLogger(__name__)
 
 _CHUNK_SIZE = 1024 * 1024
 _DEFAULT_ADMIN_UPLOAD_CEILING = 512 * 1024 * 1024
+_MIME_APPLICATION_PDF = "application/pdf"
+_MIME_IMAGE_PNG = "image/png"
+_MIME_IMAGE_JPEG = "image/jpeg"
+_MIME_IMAGE_WEBP = "image/webp"
 _MIME_SUFFIX_RULES: dict[str, tuple[str, frozenset[str]]] = {
-    "application/pdf": (".pdf", frozenset()),
-    "image/png": (".png", frozenset({".png"})),
-    "image/jpeg": (".jpg", frozenset({".jpg", ".jpeg"})),
-    "image/webp": (".webp", frozenset({".webp"})),
+    _MIME_APPLICATION_PDF: (".pdf", frozenset()),
+    _MIME_IMAGE_PNG: (".png", frozenset({".png"})),
+    _MIME_IMAGE_JPEG: (".jpg", frozenset({".jpg", ".jpeg"})),
+    _MIME_IMAGE_WEBP: (".webp", frozenset({".webp"})),
 }
 
 
@@ -94,7 +98,12 @@ def save_private_upload(
     *,
     subdir: str,
     root: str | Path | None = None,
-    allowed_content_types: tuple[str, ...] = ("application/pdf", "image/png", "image/jpeg", "image/webp"),
+    allowed_content_types: tuple[str, ...] = (
+        _MIME_APPLICATION_PDF,
+        _MIME_IMAGE_PNG,
+        _MIME_IMAGE_JPEG,
+        _MIME_IMAGE_WEBP,
+    ),
     max_bytes: int | None = 10 * 1024 * 1024,
 ) -> tuple[str, str]:
     private_root = Path(root or settings.private_media_root).resolve()

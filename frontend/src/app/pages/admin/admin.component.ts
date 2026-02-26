@@ -15321,7 +15321,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     seenBuiltIns: Set<HomeSectionId>
   ): HomeBlockDraft | null {
     const typeRaw = typeof rec['type'] === 'string' ? String(rec['type']).trim() : '';
-    const enabled = rec['enabled'] === false ? false : true;
+    const enabled = rec['enabled'] !== false;
     const builtIn = this.normalizeHomeSectionId(typeRaw);
     if (builtIn) {
       return this.buildConfiguredHomeBuiltInBlock(builtIn, enabled, seenKeys, seenBuiltIns);
@@ -15492,7 +15492,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     for (const raw of rawSections) {
       if (!raw || typeof raw !== 'object') continue;
       const rec = raw as { id?: unknown; enabled?: unknown };
-      this.appendDerivedHomeSection(derived, seen, rec.id, rec.enabled === false ? false : true);
+      this.appendDerivedHomeSection(derived, seen, rec.id, rec.enabled !== false);
     }
     return derived;
   }

@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from contextlib import suppress
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Literal, TypeVar, cast
+from typing import Any, Awaitable, Callable, Literal, cast
 from uuid import UUID
 
 from fastapi import BackgroundTasks, HTTPException, status
@@ -36,7 +36,7 @@ from app.services import pricing
 from app.services.payment_provider import payments_provider
 from app.services import webhook_handlers
 
-WebhookEventModel = TypeVar("WebhookEventModel", StripeWebhookEvent, PayPalWebhookEvent)
+WebhookEventModel = StripeWebhookEvent | PayPalWebhookEvent
 
 
 async def list_maintenance_banners(session: AsyncSession) -> list[MaintenanceBanner]:
