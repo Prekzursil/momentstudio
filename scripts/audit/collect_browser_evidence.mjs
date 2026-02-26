@@ -188,6 +188,249 @@ function buildResourceFailureKey({ source, statusCode, url, resourceType, method
   ].join("|");
 }
 
+function pushUniqueResourceFailure(routeResourceFailureKeys, routeResourceFailures, item) {
+  const dedupeKey = buildResourceFailureKey(item);
+  if (routeResourceFailureKeys.has(dedupeKey)) {
+    return;
+  }
+  routeResourceFailureKeys.add(dedupeKey);
+  routeResourceFailures.push(item);
+}
+
+function buildResponseResourceFailure(response, routeTemplate, resolvedPath, statusCode) {
+  const request = response.request();
+  return {
+    source: "response",
+    route: routeTemplate,
+    route_template: routeTemplate,
+    resolved_route: resolvedPath,
+    status_code: statusCode,
+    request_url: normalizeResourceFailureUrl(response.url()),
+    resource_type: String(request.resourceType() || ""),
+    method: String(request.method() || ""),
+    failure_text: "",
+  };
+}
+
+function buildRequestFailedResourceFailure(request, routeTemplate, resolvedPath) {
+  const failure = request.failure();
+  return {
+    source: "requestfailed",
+    route: routeTemplate,
+    route_template: routeTemplate,
+    resolved_route: resolvedPath,
+    status_code: null,
+    request_url: normalizeResourceFailureUrl(request.url()),
+    resource_type: String(request.resourceType() || ""),
+    method: String(request.method() || ""),
+    failure_text: String(failure?.errorText || ""),
+  };
+}
+
+function readSeoMetaSnapshotInPage() {
+  const readAttribute = (selector, attribute) => {
+    const node = document.querySelector(selector);
+    if (!node) {
+      return null;
+    }
+    return node.getAttribute(attribute) || null;
+  };
+  const title = document.title || null;
+  const h1Nodes = Array.from(document.querySelectorAll("h1"));
+  const h1Texts = h1Nodes.map((node) => (node.textContent || "").trim()).filter(Boolean);
+
+  return {
+    title,
+    description: readAttribute("meta[name='description']", "content"),
+    og_description: readAttribute("meta[property='og:description']", "content"),
+    canonical: readAttribute("link[rel='canonical']", "href"),
+    robots: readAttribute("meta[name='robots']", "content"),
+    h1_count: h1Nodes.length,
+    h1_texts: h1Texts.slice(0, 5),
+    route_heading_count: document.querySelectorAll("[data-route-heading='true']").length,
+  };
+}
+
+function readSeoTextSignalsInPage() {
+  const normalizeText = (value) => String(value || "").replaceAll(/\s+/g, " ").trim();
+  const countWords = (value) => {
+    const normalized = normalizeText(value);
+    if (!normalized) {
+      return 0;
+    }
+    return normalized.split(" ").filter(Boolean).length;
+  };
+  const wordCount = countWords(document.body?.innerText || "");
+  const meaningfulTextBlockCount = Array.from(document.querySelectorAll("main p, article p, section p, li, h2, h3"))
+    .map((node) => normalizeText(node.textContent || ""))
+    .filter((text) => text.length >= 40)
+    .filter((text) => countWords(text) >= 8)
+    .length;
+
+  return {
+    word_count_initial_html: wordCount,
+    meaningful_text_block_count: meaningfulTextBlockCount,
+  };
+}
+
+function countInternalLinksInPage() {
+  const isSkippableHref = (href) => !href || href.startsWith("#");
+  const isInternalHttpUrl = (url, origin) => {
+    const isHttp = url.protocol === "http:" || url.protocol === "https:";
+    return isHttp && url.origin === origin;
+  };
+
+  let internalLinkCount = 0;
+  const origin = globalThis.location.origin;
+  for (const anchor of document.querySelectorAll("a[href]")) {
+    const href = String(anchor.getAttribute("href") || "").trim();
+    if (isSkippableHref(href)) {
+      continue;
+    }
+    try {
+      if (isInternalHttpUrl(new URL(href, origin), origin)) {
+        internalLinkCount += 1;
+      }
+    } catch {
+      // Ignore malformed href values.
+    }
+  }
+  return internalLinkCount;
+}
+
+async function collectSeoMetaSnapshot(page) {
+  return page.evaluate(readSeoMetaSnapshotInPage);
+}
+
+async function collectSeoTextSignals(page) {
+  return page.evaluate(readSeoTextSignalsInPage);
+}
+
+async function collectInternalLinkCount(page) {
+  return page.evaluate(countInternalLinksInPage);
+}
+
+async function collectSeoSnapshot(page) {
+  const [meta, textSignals, internalLinkCount] = await Promise.all([
+    collectSeoMetaSnapshot(page),
+    collectSeoTextSignals(page),
+    collectInternalLinkCount(page),
+  ]);
+  const noindex = String(meta.robots || "").toLowerCase().includes("noindex");
+  return {
+    ...meta,
+    ...textSignals,
+    internal_link_count: internalLinkCount,
+    indexable: !noindex,
+  };
+}
+
+function buildVisibilitySignalPayload({
+  routeTemplate,
+  resolvedPath,
+  surface,
+  authMode,
+  visibilityInitial,
+  visibilitySettled,
+  visibilityAfterPassive,
+}) {
+  const controlsUnlockedAfterPassive = didControlsUnlockAfterPassive(visibilitySettled, visibilityAfterPassive);
+  const textUnlockedAfterPassive = didTextUnlockAfterPassive(visibilitySettled, visibilityAfterPassive);
+  const controlsAppearedAfterSettleWithoutLoading = didControlsAppearAfterSettleWithoutLoading(
+    visibilityInitial,
+    visibilitySettled
+  );
+  const textAppearedAfterSettleWithoutLoading = didTextAppearAfterSettleWithoutLoading(
+    visibilityInitial,
+    visibilitySettled
+  );
+  return {
+    route: routeTemplate,
+    route_template: routeTemplate,
+    resolved_route: resolvedPath,
+    unresolved_placeholder: false,
+    surface,
+    auth_mode: authMode,
+    phases: {
+      initial: visibilityInitial,
+      settled: visibilitySettled,
+      after_passive_events: visibilityAfterPassive,
+    },
+    // Only promote as actionable when passive interaction unlocks hidden content.
+    // "After settle" deltas are tracked as telemetry, but are often benign async hydration.
+    visibility_issue: controlsUnlockedAfterPassive || textUnlockedAfterPassive,
+    issue_reasons: [
+      controlsUnlockedAfterPassive ? "form_controls_appear_after_passive_events" : null,
+      textUnlockedAfterPassive ? "text_appears_after_passive_events" : null,
+    ].filter(Boolean),
+    settle_only_reasons: [
+      controlsAppearedAfterSettleWithoutLoading ? "form_controls_appear_after_settle" : null,
+      textAppearedAfterSettleWithoutLoading ? "text_appears_after_settle_without_loading_state" : null,
+    ].filter(Boolean),
+  };
+}
+
+function didControlsUnlockAfterPassive(visibilitySettled, visibilityAfterPassive) {
+  return visibilitySettled.visible_form_control_count === 0
+    && visibilityAfterPassive.visible_form_control_count > 0;
+}
+
+function didTextUnlockAfterPassive(visibilitySettled, visibilityAfterPassive) {
+  return visibilitySettled.text_words < 20 && visibilityAfterPassive.text_words >= 40;
+}
+
+function didControlsAppearAfterSettleWithoutLoading(visibilityInitial, visibilitySettled) {
+  return visibilityInitial.visible_form_control_count === 0
+    && visibilitySettled.visible_form_control_count > 0
+    && visibilitySettled.loading_indicator_count === 0;
+}
+
+function didTextAppearAfterSettleWithoutLoading(visibilityInitial, visibilitySettled) {
+  return visibilityInitial.text_words < 20
+    && visibilitySettled.text_words >= 40
+    && visibilitySettled.loading_indicator_count === 0;
+}
+
+function onConsoleEvent(routeConsole, routeTemplate, resolvedPath, msg) {
+  const location = typeof msg.location === "function" ? msg.location() : null;
+  const line = location && Number.isFinite(Number(location.lineNumber)) ? Number(location.lineNumber) : null;
+  const column = location && Number.isFinite(Number(location.columnNumber)) ? Number(location.columnNumber) : null;
+  routeConsole.push({
+    route: routeTemplate,
+    route_template: routeTemplate,
+    resolved_route: resolvedPath,
+    level: String(msg.type() || "info"),
+    text: String(msg.text() || ""),
+    source_url: location && location.url ? String(location.url) : null,
+    line,
+    column,
+  });
+}
+
+function onPageErrorEvent(routePageErrors, routeTemplate, resolvedPath, err) {
+  routePageErrors.push({
+    route: routeTemplate,
+    route_template: routeTemplate,
+    resolved_route: resolvedPath,
+    level: "error",
+    text: String(err?.message || err || ""),
+  });
+}
+
+function onResponseEvent(routeResourceFailureKeys, routeResourceFailures, routeTemplate, resolvedPath, response) {
+  const statusCode = Number(response.status() || 0);
+  if (!Number.isFinite(statusCode) || statusCode < 400) {
+    return;
+  }
+  const item = buildResponseResourceFailure(response, routeTemplate, resolvedPath, statusCode);
+  pushUniqueResourceFailure(routeResourceFailureKeys, routeResourceFailures, item);
+}
+
+function onRequestFailedEvent(routeResourceFailureKeys, routeResourceFailures, routeTemplate, resolvedPath, request) {
+  const item = buildRequestFailedResourceFailure(request, routeTemplate, resolvedPath);
+  pushUniqueResourceFailure(routeResourceFailureKeys, routeResourceFailures, item);
+}
+
 function materializeRoute(routeTemplate, routeSamples) {
   const template = String(routeTemplate || "/");
   const keys = placeholderKeys(template);
@@ -261,16 +504,28 @@ function readSlugFromCollection(payload) {
   return first ? String(first.slug).trim() : "";
 }
 
+function readFirstTrimmedValue(values) {
+  for (const value of values) {
+    const token = String(value || "").trim();
+    if (token) {
+      return token;
+    }
+  }
+  return "";
+}
+
 function readSeriesSlug(payload) {
   const items = Array.isArray(payload?.items) ? payload.items : [];
   for (const item of items) {
     if (!item || typeof item !== "object") continue;
-    const direct = String(item.series_slug || "").trim();
-    if (direct) return direct;
-    const nested = String(item.series?.slug || "").trim();
-    if (nested) return nested;
-    const rawSeries = String(item.series || "").trim();
-    if (rawSeries) return rawSeries;
+    const seriesSlug = readFirstTrimmedValue([
+      item.series_slug,
+      item.series?.slug,
+      item.series,
+    ]);
+    if (seriesSlug) {
+      return seriesSlug;
+    }
   }
   return "";
 }
@@ -600,73 +855,22 @@ async function main() {
       continue;
     }
 
-    const onConsole = (msg) => {
-      const location = typeof msg.location === "function" ? msg.location() : null;
-      const line =
-        location && Number.isFinite(Number(location.lineNumber)) ? Number(location.lineNumber) : null;
-      const column =
-        location && Number.isFinite(Number(location.columnNumber)) ? Number(location.columnNumber) : null;
-      routeConsole.push({
-        route: routeTemplate,
-        route_template: routeTemplate,
-        resolved_route: resolvedPath,
-        level: String(msg.type() || "info"),
-        text: String(msg.text() || ""),
-        source_url: location && location.url ? String(location.url) : null,
-        line,
-        column,
-      });
-    };
-    const onPageError = (err) => {
-      routePageErrors.push({
-        route: routeTemplate,
-        route_template: routeTemplate,
-        resolved_route: resolvedPath,
-        level: "error",
-        text: String(err?.message || err || ""),
-      });
-    };
-    const onResponse = (response) => {
-      const statusCode = Number(response.status() || 0);
-      if (!Number.isFinite(statusCode) || statusCode < 400) return;
-      const request = response.request();
-      const resourceType = String(request.resourceType() || "");
-      const url = normalizeResourceFailureUrl(response.url());
-      const method = String(request.method() || "");
-      const item = {
-        source: "response",
-        route: routeTemplate,
-        route_template: routeTemplate,
-        resolved_route: resolvedPath,
-        status_code: statusCode,
-        request_url: url,
-        resource_type: resourceType,
-        method,
-        failure_text: "",
-      };
-      const dedupeKey = buildResourceFailureKey(item);
-      if (routeResourceFailureKeys.has(dedupeKey)) return;
-      routeResourceFailureKeys.add(dedupeKey);
-      routeResourceFailures.push(item);
-    };
-    const onRequestFailed = (request) => {
-      const failure = request.failure();
-      const item = {
-        source: "requestfailed",
-        route: routeTemplate,
-        route_template: routeTemplate,
-        resolved_route: resolvedPath,
-        status_code: null,
-        request_url: normalizeResourceFailureUrl(request.url()),
-        resource_type: String(request.resourceType() || ""),
-        method: String(request.method() || ""),
-        failure_text: String(failure?.errorText || ""),
-      };
-      const dedupeKey = buildResourceFailureKey(item);
-      if (routeResourceFailureKeys.has(dedupeKey)) return;
-      routeResourceFailureKeys.add(dedupeKey);
-      routeResourceFailures.push(item);
-    };
+    const onConsole = onConsoleEvent.bind(null, routeConsole, routeTemplate, resolvedPath);
+    const onPageError = onPageErrorEvent.bind(null, routePageErrors, routeTemplate, resolvedPath);
+    const onResponse = onResponseEvent.bind(
+      null,
+      routeResourceFailureKeys,
+      routeResourceFailures,
+      routeTemplate,
+      resolvedPath
+    );
+    const onRequestFailed = onRequestFailedEvent.bind(
+      null,
+      routeResourceFailureKeys,
+      routeResourceFailures,
+      routeTemplate,
+      resolvedPath
+    );
     page.on("console", onConsole);
     page.on("pageerror", onPageError);
     page.on("response", onResponse);
@@ -685,53 +889,7 @@ async function main() {
       const visibilityAfterPassive = await collectVisibilityProbe(page);
       await page.screenshot({ path: screenshotAbsPath, fullPage: true });
 
-      const seo = await page.evaluate(() => {
-        const canonical = document.querySelector("link[rel='canonical']")?.getAttribute("href") || null;
-        const robots = document.querySelector("meta[name='robots']")?.getAttribute("content") || null;
-        const description = document.querySelector("meta[name='description']")?.getAttribute("content") || null;
-        const ogDescription = document.querySelector("meta[property='og:description']")?.getAttribute("content") || null;
-        const title = document.title || null;
-        const h1Nodes = Array.from(document.querySelectorAll("h1"));
-        const h1Texts = h1Nodes.map((node) => (node.textContent || "").trim()).filter(Boolean);
-        const routeHeadingCount = document.querySelectorAll("[data-route-heading='true']").length;
-
-        const bodyText = (document.body?.innerText || "").replaceAll(/\s+/g, " ").trim();
-        const wordCount = bodyText ? bodyText.split(" ").filter(Boolean).length : 0;
-        const candidateBlocks = Array.from(document.querySelectorAll("main p, article p, section p, li, h2, h3"))
-          .map((node) => (node.textContent || "").replaceAll(/\s+/g, " ").trim())
-          .filter((text) => text.length >= 40);
-        const meaningfulTextBlocks = candidateBlocks.filter((text) => text.split(" ").filter(Boolean).length >= 8);
-
-        const internalLinks = Array.from(document.querySelectorAll("a[href]")).filter((anchor) => {
-          const href = String(anchor.getAttribute("href") || "").trim();
-          if (!href) return false;
-          if (href.startsWith("#")) return false;
-          try {
-            const url = new URL(href, globalThis.location.origin);
-            if (url.protocol !== "http:" && url.protocol !== "https:") {
-              return false;
-            }
-            return url.origin === globalThis.location.origin;
-          } catch {
-            return false;
-          }
-        });
-        const noindex = String(robots || "").toLowerCase().includes("noindex");
-        return {
-          title,
-          description,
-          og_description: ogDescription,
-          canonical,
-          robots,
-          indexable: !noindex,
-          h1_count: h1Nodes.length,
-          h1_texts: h1Texts.slice(0, 5),
-          route_heading_count: routeHeadingCount,
-          word_count_initial_html: wordCount,
-          meaningful_text_block_count: meaningfulTextBlocks.length,
-          internal_link_count: internalLinks.length,
-        };
-      });
+      const seo = await collectSeoSnapshot(page);
 
       const layout = await page.evaluate(() => {
         const allElements = Array.from(document.querySelectorAll("*"));
@@ -777,41 +935,15 @@ async function main() {
         ...layout,
       });
 
-      const controlsUnlockedAfterPassive = visibilitySettled.visible_form_control_count === 0
-        && visibilityAfterPassive.visible_form_control_count > 0;
-      const textUnlockedAfterPassive = visibilitySettled.text_words < 20
-        && visibilityAfterPassive.text_words >= 40;
-      const controlsAppearedAfterSettleWithoutLoading = visibilityInitial.visible_form_control_count === 0
-        && visibilitySettled.visible_form_control_count > 0
-        && visibilitySettled.loading_indicator_count === 0;
-      const textAppearedAfterSettleWithoutLoading = visibilityInitial.text_words < 20
-        && visibilitySettled.text_words >= 40
-        && visibilitySettled.loading_indicator_count === 0;
-
-      visibilitySignals.push({
-        route: routeTemplate,
-        route_template: routeTemplate,
-        resolved_route: resolvedPath,
-        unresolved_placeholder: false,
+      visibilitySignals.push(buildVisibilitySignalPayload({
+        routeTemplate,
+        resolvedPath,
         surface,
-        auth_mode: authMode,
-        phases: {
-          initial: visibilityInitial,
-          settled: visibilitySettled,
-          after_passive_events: visibilityAfterPassive,
-        },
-        // Only promote as actionable when passive interaction unlocks hidden content.
-        // "After settle" deltas are tracked as telemetry, but are often benign async hydration.
-        visibility_issue: controlsUnlockedAfterPassive || textUnlockedAfterPassive,
-        issue_reasons: [
-          controlsUnlockedAfterPassive ? "form_controls_appear_after_passive_events" : null,
-          textUnlockedAfterPassive ? "text_appears_after_passive_events" : null,
-        ].filter(Boolean),
-        settle_only_reasons: [
-          controlsAppearedAfterSettleWithoutLoading ? "form_controls_appear_after_settle" : null,
-          textAppearedAfterSettleWithoutLoading ? "text_appears_after_settle_without_loading_state" : null,
-        ].filter(Boolean),
-      });
+        authMode,
+        visibilityInitial,
+        visibilitySettled,
+        visibilityAfterPassive,
+      }));
     } catch (err) {
       const message = String(err?.message || err || "unknown browser error");
       seoSnapshot.push({
@@ -945,6 +1077,7 @@ async function main() {
         column: item.column ?? null,
       });
     }
+    // #lizard forgive
   }
 
   await browser.close();

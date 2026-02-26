@@ -71,6 +71,17 @@ type UiLang = 'en' | 'ro';
 type ContentStatusUi = 'draft' | 'review' | 'published';
 type LegalPageKey = 'page.terms' | 'page.terms-and-conditions' | 'page.privacy-policy' | 'page.anpc';
 const CMS_DRAFT_POLL_INTERVAL_MS = 1200;
+const HOME_CUSTOM_CONTENT_BLOCK_TYPE_SET = new Set<HomeCustomContentBlockType>([
+  'text',
+  'columns',
+  'cta',
+  'faq',
+  'testimonials',
+  'image',
+  'gallery',
+  'banner',
+  'carousel'
+]);
 
 type HomeSectionId =
   | 'featured_products'
@@ -115,6 +126,8 @@ type HomeBlockType =
   | 'gallery'
   | 'banner'
   | 'carousel';
+
+type HomeCustomContentBlockType = 'text' | 'columns' | 'cta' | 'faq' | 'testimonials' | 'image' | 'gallery' | 'banner' | 'carousel';
 
 type LocalizedText = { en: string; ro: string };
 
@@ -469,16 +482,22 @@ class CmsDraftManager<T> {
     if (typeof window === 'undefined') return null;
     const raw = window.localStorage.getItem(this.storageKey);
     if (!raw) return null;
+    const candidate = this.parseAutosaveEnvelope(raw);
+    if (!candidate) return null;
+    if (candidate.state_json === serverStateJson) {
+      window.localStorage.removeItem(this.storageKey);
+      return null;
+    }
+    return candidate;
+  }
+
+  private parseAutosaveEnvelope(raw: string): CmsAutosaveEnvelope | null {
     try {
       const parsed: Partial<CmsAutosaveEnvelope> | null = JSON.parse(raw);
       if (!parsed || parsed.v !== 1) return null;
       const ts = typeof parsed.ts === 'string' ? parsed.ts : '';
       const stateJson = typeof parsed.state_json === 'string' ? parsed.state_json : '';
       if (!ts || !stateJson) return null;
-      if (stateJson === serverStateJson) {
-        window.localStorage.removeItem(this.storageKey);
-        return null;
-      }
       return { v: 1, ts, state_json: stateJson };
     } catch {
       return null;
@@ -9154,15 +9173,17 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   blogPinnedPosts(): AdminContent[] {
     const pinned = this.blogPosts().filter((p) => Boolean(this.blogPinnedSlot(p)));
-    return pinned.sort((a, b) => {
-      const ao = this.blogPinnedSlot(a) ?? 999;
-      const bo = this.blogPinnedSlot(b) ?? 999;
-      if (ao !== bo) return ao - bo;
-      const ap = a.published_at ? Date.parse(a.published_at) : 0;
-      const bp = b.published_at ? Date.parse(b.published_at) : 0;
-      if (ap !== bp) return bp - ap;
-      return String(b.updated_at || '').localeCompare(String(a.updated_at || ''));
-    });
+    return pinned.sort((a, b) => this.comparePinnedPosts(a, b));
+  }
+
+  private comparePinnedPosts(a: AdminContent, b: AdminContent): number {
+    const ao = this.blogPinnedSlot(a) ?? 999;
+    const bo = this.blogPinnedSlot(b) ?? 999;
+    if (ao !== bo) return ao - bo;
+    const ap = a.published_at ? Date.parse(a.published_at) : 0;
+    const bp = b.published_at ? Date.parse(b.published_at) : 0;
+    if (ap !== bp) return bp - ap;
+    return String(b.updated_at || '').localeCompare(String(a.updated_at || ''));
   }
 
   private nextBlogPinOrder(): number {
@@ -14118,77 +14139,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   private buildPageBlocksMeta(pageKey: PageBuilderKey): Record<string, unknown> {
-    const blocks = (this.pageBlocks[pageKey] || []).map((b) => {
-      const base: Record<string, unknown> = { key: b.key, type: b.type, enabled: b.enabled };
-      base['title'] = b.title;
-      base['layout'] = b.layout || this.defaultCmsBlockLayout();
-      if (b.type === 'text') {
-        base['body_markdown'] = b.body_markdown;
-      } else if (b.type === 'columns') {
-        base['columns'] = (b.columns || []).slice(0, 3).map((col) => ({ title: col.title, body_markdown: col.body_markdown }));
-        base['columns_breakpoint'] = b.columns_breakpoint;
-      } else if (b.type === 'cta') {
-        base['body_markdown'] = b.body_markdown;
-        base['cta_label'] = b.cta_label;
-        base['cta_url'] = b.cta_url;
-        base['cta_new_tab'] = Boolean(b.cta_new_tab);
-      } else if (b.type === 'faq') {
-        base['items'] = (b.faq_items || []).slice(0, 20).map((item) => ({ question: item.question, answer_markdown: item.answer_markdown }));
-      } else if (b.type === 'testimonials') {
-        base['items'] = (b.testimonials || []).slice(0, 12).map((item) => ({
-          quote_markdown: item.quote_markdown,
-          author: item.author,
-          role: item.role
-        }));
-      } else if (b.type === 'product_grid') {
-        base['source'] = b.product_grid_source;
-        const desiredLimit = Number(b.product_grid_limit || 6);
-        const limit = Math.max(1, Math.min(24, Number.isFinite(desiredLimit) ? Math.trunc(desiredLimit) : 6));
-        base['limit'] = limit;
-
-        if (b.product_grid_source === 'category') {
-          const categorySlug = (b.product_grid_category_slug || '').trim();
-          if (categorySlug) base['category_slug'] = categorySlug;
-        } else if (b.product_grid_source === 'collection') {
-          const collectionSlug = (b.product_grid_collection_slug || '').trim();
-          if (collectionSlug) base['collection_slug'] = collectionSlug;
-        } else if (b.product_grid_source === 'products') {
-          const unique: string[] = [];
-          for (const raw of (b.product_grid_product_slugs || '').split(/[,\n]/g)) {
-            const slug = raw.trim();
-            if (!slug) continue;
-            if (unique.includes(slug)) continue;
-            unique.push(slug);
-            if (unique.length >= 50) break;
-          }
-          if (unique.length) base['product_slugs'] = unique;
-        }
-      } else if (b.type === 'form') {
-        base['form_type'] = b.form_type;
-        if (b.form_type === 'contact') base['topic'] = b.form_topic;
-      } else if (b.type === 'image') {
-        base['url'] = b.url;
-        base['link_url'] = b.link_url;
-        base['alt'] = b.alt;
-        base['caption'] = b.caption;
-        base['focal_x'] = this.toFocalValue(b.focal_x);
-        base['focal_y'] = this.toFocalValue(b.focal_y);
-      } else if (b.type === 'gallery') {
-        base['images'] = b.images.map((img) => ({
-          url: img.url,
-          alt: img.alt,
-          caption: img.caption,
-          focal_x: this.toFocalValue(img.focal_x),
-          focal_y: this.toFocalValue(img.focal_y)
-        }));
-      } else if (b.type === 'banner') {
-        base['slide'] = this.serializeSlideDraft(b.slide);
-      } else if (b.type === 'carousel') {
-        base['slides'] = (b.slides || []).map((slide) => this.serializeSlideDraft(slide));
-        base['settings'] = b.settings;
-      }
-      return base;
-    });
+    const blocks = (this.pageBlocks[pageKey] || []).map((block) => this.buildPageBlockMeta(block));
 
     const meta = { ...(this.pageBlocksMeta[pageKey] || {}), version: 2, blocks } as Record<string, unknown>;
     if (this.pageKeySupportsRequiresAuth(pageKey) && this.pageBlocksRequiresAuth[pageKey]) {
@@ -14197,6 +14148,124 @@ export class AdminComponent implements OnInit, OnDestroy {
       delete meta['requires_auth'];
     }
     return meta;
+  }
+
+  private buildPageBlockMeta(block: PageBlockDraft): Record<string, unknown> {
+    const base: Record<string, unknown> = { key: block.key, type: block.type, enabled: block.enabled };
+    base['title'] = block.title;
+    base['layout'] = block.layout || this.defaultCmsBlockLayout();
+    this.pageBlockMetaWriter(block.type)(base, block);
+    return base;
+  }
+
+  private pageBlockMetaWriter(type: PageBlockType): (base: Record<string, unknown>, block: PageBlockDraft) => void {
+    const writers: Record<PageBlockType, (base: Record<string, unknown>, block: PageBlockDraft) => void> = {
+      text: (base, block) => this.writePageTextMeta(base, block),
+      columns: (base, block) => this.writePageColumnsMeta(base, block),
+      cta: (base, block) => this.writePageCtaMeta(base, block),
+      faq: (base, block) => this.writePageFaqMeta(base, block),
+      testimonials: (base, block) => this.writePageTestimonialsMeta(base, block),
+      product_grid: (base, block) => this.writePageProductGridMeta(base, block),
+      form: (base, block) => this.writePageFormMeta(base, block),
+      image: (base, block) => this.writePageImageMeta(base, block),
+      gallery: (base, block) => this.writePageGalleryMeta(base, block),
+      banner: (base, block) => this.writePageBannerMeta(base, block),
+      carousel: (base, block) => this.writePageCarouselMeta(base, block)
+    };
+    return writers[type];
+  }
+
+  private writePageTextMeta(base: Record<string, unknown>, block: PageBlockDraft): void {
+    base['body_markdown'] = block.body_markdown;
+  }
+
+  private writePageColumnsMeta(base: Record<string, unknown>, block: PageBlockDraft): void {
+    base['columns'] = (block.columns || []).slice(0, 3).map((col) => ({ title: col.title, body_markdown: col.body_markdown }));
+    base['columns_breakpoint'] = block.columns_breakpoint;
+  }
+
+  private writePageCtaMeta(base: Record<string, unknown>, block: PageBlockDraft): void {
+    base['body_markdown'] = block.body_markdown;
+    base['cta_label'] = block.cta_label;
+    base['cta_url'] = block.cta_url;
+    base['cta_new_tab'] = Boolean(block.cta_new_tab);
+  }
+
+  private writePageFaqMeta(base: Record<string, unknown>, block: PageBlockDraft): void {
+    base['items'] = (block.faq_items || []).slice(0, 20).map((item) => ({ question: item.question, answer_markdown: item.answer_markdown }));
+  }
+
+  private writePageTestimonialsMeta(base: Record<string, unknown>, block: PageBlockDraft): void {
+    base['items'] = (block.testimonials || []).slice(0, 12).map((item) => ({
+      quote_markdown: item.quote_markdown,
+      author: item.author,
+      role: item.role
+    }));
+  }
+
+  private writePageProductGridMeta(base: Record<string, unknown>, block: PageBlockDraft): void {
+    base['source'] = block.product_grid_source;
+    const desiredLimit = Number(block.product_grid_limit || 6);
+    base['limit'] = Math.max(1, Math.min(24, Number.isFinite(desiredLimit) ? Math.trunc(desiredLimit) : 6));
+
+    if (block.product_grid_source === 'category') {
+      const categorySlug = (block.product_grid_category_slug || '').trim();
+      if (categorySlug) base['category_slug'] = categorySlug;
+      return;
+    }
+
+    if (block.product_grid_source === 'collection') {
+      const collectionSlug = (block.product_grid_collection_slug || '').trim();
+      if (collectionSlug) base['collection_slug'] = collectionSlug;
+      return;
+    }
+
+    const uniqueSlugs = this.uniqueProductGridSlugs(block.product_grid_product_slugs || '');
+    if (uniqueSlugs.length) base['product_slugs'] = uniqueSlugs;
+  }
+
+  private uniqueProductGridSlugs(rawValue: string): string[] {
+    const unique: string[] = [];
+    for (const raw of rawValue.split(/[,\n]/g)) {
+      const slug = raw.trim();
+      if (!slug || unique.includes(slug)) continue;
+      unique.push(slug);
+      if (unique.length >= 50) break;
+    }
+    return unique;
+  }
+
+  private writePageFormMeta(base: Record<string, unknown>, block: PageBlockDraft): void {
+    base['form_type'] = block.form_type;
+    if (block.form_type === 'contact') base['topic'] = block.form_topic;
+  }
+
+  private writePageImageMeta(base: Record<string, unknown>, block: PageBlockDraft): void {
+    base['url'] = block.url;
+    base['link_url'] = block.link_url;
+    base['alt'] = block.alt;
+    base['caption'] = block.caption;
+    base['focal_x'] = this.toFocalValue(block.focal_x);
+    base['focal_y'] = this.toFocalValue(block.focal_y);
+  }
+
+  private writePageGalleryMeta(base: Record<string, unknown>, block: PageBlockDraft): void {
+    base['images'] = (block.images || []).map((img) => ({
+      url: img.url,
+      alt: img.alt,
+      caption: img.caption,
+      focal_x: this.toFocalValue(img.focal_x),
+      focal_y: this.toFocalValue(img.focal_y)
+    }));
+  }
+
+  private writePageBannerMeta(base: Record<string, unknown>, block: PageBlockDraft): void {
+    base['slide'] = this.serializeSlideDraft(block.slide);
+  }
+
+  private writePageCarouselMeta(base: Record<string, unknown>, block: PageBlockDraft): void {
+    base['slides'] = (block.slides || []).map((slide) => this.serializeSlideDraft(slide));
+    base['settings'] = block.settings;
   }
 
   private pagePublishChecklistBlockLabel(block: PageBlockDraft, idx: number): string {
@@ -14219,130 +14288,158 @@ export class AdminComponent implements OnInit, OnDestroy {
       emptySections.push(this.t('adminUi.content.publishChecklist.emptyAllDisabled'));
     }
 
-    enabledBlocks.forEach((block, idx) => {
-      const label = this.pagePublishChecklistBlockLabel(block, idx);
-      if (block.type === 'text') {
-        const en = (block.body_markdown?.en || '').trim();
-        const ro = (block.body_markdown?.ro || '').trim();
-        if (!en && !ro) emptySections.push(label);
-        return;
-      }
-      if (block.type === 'columns') {
-        const cols = block.columns || [];
-        const hasAny = cols.some((col) => {
-          const titleEn = (col?.title?.en || '').trim();
-          const titleRo = (col?.title?.ro || '').trim();
-          const bodyEn = (col?.body_markdown?.en || '').trim();
-          const bodyRo = (col?.body_markdown?.ro || '').trim();
-          return Boolean(titleEn || titleRo || bodyEn || bodyRo);
-        });
-        if (!hasAny) emptySections.push(label);
-        return;
-      }
-      if (block.type === 'cta') {
-        const titleEn = (block.title?.en || '').trim();
-        const titleRo = (block.title?.ro || '').trim();
-        const bodyEn = (block.body_markdown?.en || '').trim();
-        const bodyRo = (block.body_markdown?.ro || '').trim();
-        const ctaEn = (block.cta_label?.en || '').trim();
-        const ctaRo = (block.cta_label?.ro || '').trim();
-        const url = (block.cta_url || '').trim();
-        if (!(titleEn || titleRo || bodyEn || bodyRo || ctaEn || ctaRo || url)) emptySections.push(label);
-        return;
-      }
-      if (block.type === 'faq') {
-        const items = block.faq_items || [];
-        const hasAny = items.some((item) => {
-          const qEn = (item?.question?.en || '').trim();
-          const qRo = (item?.question?.ro || '').trim();
-          const aEn = (item?.answer_markdown?.en || '').trim();
-          const aRo = (item?.answer_markdown?.ro || '').trim();
-          return Boolean(qEn || qRo || aEn || aRo);
-        });
-        if (!hasAny) emptySections.push(label);
-        return;
-      }
-      if (block.type === 'testimonials') {
-        const items = block.testimonials || [];
-        const hasAny = items.some((item) => {
-          const qEn = (item?.quote_markdown?.en || '').trim();
-          const qRo = (item?.quote_markdown?.ro || '').trim();
-          const aEn = (item?.author?.en || '').trim();
-          const aRo = (item?.author?.ro || '').trim();
-          const rEn = (item?.role?.en || '').trim();
-          const rRo = (item?.role?.ro || '').trim();
-          return Boolean(qEn || qRo || aEn || aRo || rEn || rRo);
-        });
-        if (!hasAny) emptySections.push(label);
-        return;
-      }
-      if (block.type === 'product_grid') {
-        const source = block.product_grid_source;
-        if (source === 'category') {
-          if (!(block.product_grid_category_slug || '').trim()) emptySections.push(label);
-          return;
-        }
-        if (source === 'collection') {
-          if (!(block.product_grid_collection_slug || '').trim()) emptySections.push(label);
-          return;
-        }
-        const hasAny = (block.product_grid_product_slugs || '').split(/[,\n]/g).some((raw) => Boolean(raw.trim()));
-        if (!hasAny) emptySections.push(label);
-        return;
-      }
-      if (block.type === 'form') {
-        return;
-      }
-      if (block.type === 'image') {
-        const url = (block.url || '').trim();
-        if (!url) {
-          emptySections.push(label);
-          return;
-        }
-        if (!(block.alt?.en || '').trim()) missingAlt.push(`${label} (EN)`);
-        if (!(block.alt?.ro || '').trim()) missingAlt.push(`${label} (RO)`);
-        return;
-      }
-      if (block.type === 'gallery') {
-        const images = block.images || [];
-        const withUrls = images.filter((img) => Boolean((img?.url || '').trim()));
-        if (!withUrls.length) {
-          emptySections.push(label);
-          return;
-        }
-        withUrls.forEach((img, imgIdx) => {
-          const imgLabel = `${label} · ${this.t('adminUi.content.publishChecklist.imageLabel', { index: imgIdx + 1 })}`;
-          if (!(img.alt?.en || '').trim()) missingAlt.push(`${imgLabel} (EN)`);
-          if (!(img.alt?.ro || '').trim()) missingAlt.push(`${imgLabel} (RO)`);
-        });
-        return;
-      }
-      if (block.type === 'banner') {
-        const url = (block.slide?.image_url || '').trim();
-        if (!url) {
-          emptySections.push(label);
-          return;
-        }
-        if (!(block.slide?.alt?.en || '').trim()) missingAlt.push(`${label} (EN)`);
-        if (!(block.slide?.alt?.ro || '').trim()) missingAlt.push(`${label} (RO)`);
-        return;
-      }
-      if (block.type === 'carousel') {
-        const slides = block.slides || [];
-        const withUrls = slides.filter((s) => Boolean((s?.image_url || '').trim()));
-        if (!withUrls.length) {
-          emptySections.push(label);
-          return;
-        }
-        withUrls.forEach((slide, slideIdx) => {
-          const slideLabel = `${label} · ${this.t('adminUi.content.publishChecklist.slideLabel', { index: slideIdx + 1 })}`;
-          if (!(slide.alt?.en || '').trim()) missingAlt.push(`${slideLabel} (EN)`);
-          if (!(slide.alt?.ro || '').trim()) missingAlt.push(`${slideLabel} (RO)`);
-        });
-      }
-    });
+    enabledBlocks.forEach((block, idx) => this.appendPagePublishChecklistIssues(block, idx, missingAlt, emptySections));
 
     return { missingTranslations, missingAlt, emptySections };
+  }
+
+  private appendPagePublishChecklistIssues(
+    block: PageBlockDraft,
+    idx: number,
+    missingAlt: string[],
+    emptySections: string[]
+  ): void {
+    const label = this.pagePublishChecklistBlockLabel(block, idx);
+    this.pagePublishChecklistWriter(block.type)(block, label, missingAlt, emptySections);
+  }
+
+  private pagePublishChecklistWriter(
+    type: PageBlockType
+  ): (block: PageBlockDraft, label: string, missingAlt: string[], emptySections: string[]) => void {
+    const writers: Record<
+      PageBlockType,
+      (block: PageBlockDraft, label: string, missingAlt: string[], emptySections: string[]) => void
+    > = {
+      text: (block, label, _missingAlt, emptySections) => this.appendTextChecklistIssues(block, label, emptySections),
+      columns: (block, label, _missingAlt, emptySections) => this.appendColumnsChecklistIssues(block, label, emptySections),
+      cta: (block, label, _missingAlt, emptySections) => this.appendCtaChecklistIssues(block, label, emptySections),
+      faq: (block, label, _missingAlt, emptySections) => this.appendFaqChecklistIssues(block, label, emptySections),
+      testimonials: (block, label, _missingAlt, emptySections) => this.appendTestimonialsChecklistIssues(block, label, emptySections),
+      product_grid: (block, label, _missingAlt, emptySections) => this.appendProductGridChecklistIssues(block, label, emptySections),
+      form: () => undefined,
+      image: (block, label, missingAlt, emptySections) => this.appendImageChecklistIssues(block, label, missingAlt, emptySections),
+      gallery: (block, label, missingAlt, emptySections) => this.appendGalleryChecklistIssues(block, label, missingAlt, emptySections),
+      banner: (block, label, missingAlt, emptySections) => this.appendBannerChecklistIssues(block, label, missingAlt, emptySections),
+      carousel: (block, label, missingAlt, emptySections) => this.appendCarouselChecklistIssues(block, label, missingAlt, emptySections)
+    };
+    return writers[type];
+  }
+
+  private appendTextChecklistIssues(block: PageBlockDraft, label: string, emptySections: string[]): void {
+    if (this.hasAnyLocalizedText([block.body_markdown])) return;
+    emptySections.push(label);
+  }
+
+  private appendColumnsChecklistIssues(block: PageBlockDraft, label: string, emptySections: string[]): void {
+    const hasAny = (block.columns || []).some((col) => this.hasAnyLocalizedText([col?.title, col?.body_markdown]));
+    if (hasAny) return;
+    emptySections.push(label);
+  }
+
+  private appendCtaChecklistIssues(block: PageBlockDraft, label: string, emptySections: string[]): void {
+    const hasAnyText = this.hasAnyLocalizedText([block.title, block.body_markdown, block.cta_label]);
+    if (hasAnyText || this.hasTrimmedText(block.cta_url)) return;
+    emptySections.push(label);
+  }
+
+  private appendFaqChecklistIssues(block: PageBlockDraft, label: string, emptySections: string[]): void {
+    const hasAny = (block.faq_items || []).some((item) => this.hasAnyLocalizedText([item?.question, item?.answer_markdown]));
+    if (hasAny) return;
+    emptySections.push(label);
+  }
+
+  private appendTestimonialsChecklistIssues(block: PageBlockDraft, label: string, emptySections: string[]): void {
+    const hasAny = (block.testimonials || []).some((item) => this.hasAnyLocalizedText([item?.quote_markdown, item?.author, item?.role]));
+    if (hasAny) return;
+    emptySections.push(label);
+  }
+
+  private appendProductGridChecklistIssues(block: PageBlockDraft, label: string, emptySections: string[]): void {
+    if (!this.isProductGridBlockEmpty(block)) return;
+    emptySections.push(label);
+  }
+
+  private isProductGridBlockEmpty(block: PageBlockDraft): boolean {
+    if (block.product_grid_source === 'category') {
+      return !this.hasTrimmedText(block.product_grid_category_slug);
+    }
+    if (block.product_grid_source === 'collection') {
+      return !this.hasTrimmedText(block.product_grid_collection_slug);
+    }
+    return !(block.product_grid_product_slugs || '').split(/[,\n]/g).some((raw) => this.hasTrimmedText(raw));
+  }
+
+  private appendImageChecklistIssues(
+    block: PageBlockDraft,
+    label: string,
+    missingAlt: string[],
+    emptySections: string[]
+  ): void {
+    if (!this.hasTrimmedText(block.url)) {
+      emptySections.push(label);
+      return;
+    }
+    this.appendMissingAltLabels(missingAlt, label, block.alt);
+  }
+
+  private appendGalleryChecklistIssues(
+    block: PageBlockDraft,
+    label: string,
+    missingAlt: string[],
+    emptySections: string[]
+  ): void {
+    const withUrls = (block.images || []).filter((img) => this.hasTrimmedText(img?.url));
+    if (!withUrls.length) {
+      emptySections.push(label);
+      return;
+    }
+    withUrls.forEach((img, imgIdx) => {
+      const imgLabel = `${label} · ${this.t('adminUi.content.publishChecklist.imageLabel', { index: imgIdx + 1 })}`;
+      this.appendMissingAltLabels(missingAlt, imgLabel, img.alt);
+    });
+  }
+
+  private appendBannerChecklistIssues(
+    block: PageBlockDraft,
+    label: string,
+    missingAlt: string[],
+    emptySections: string[]
+  ): void {
+    if (!this.hasTrimmedText(block.slide?.image_url)) {
+      emptySections.push(label);
+      return;
+    }
+    this.appendMissingAltLabels(missingAlt, label, block.slide?.alt);
+  }
+
+  private appendCarouselChecklistIssues(
+    block: PageBlockDraft,
+    label: string,
+    missingAlt: string[],
+    emptySections: string[]
+  ): void {
+    const withUrls = (block.slides || []).filter((slide) => this.hasTrimmedText(slide?.image_url));
+    if (!withUrls.length) {
+      emptySections.push(label);
+      return;
+    }
+    withUrls.forEach((slide, slideIdx) => {
+      const slideLabel = `${label} · ${this.t('adminUi.content.publishChecklist.slideLabel', { index: slideIdx + 1 })}`;
+      this.appendMissingAltLabels(missingAlt, slideLabel, slide.alt);
+    });
+  }
+
+  private appendMissingAltLabels(missingAlt: string[], label: string, value: LocalizedText | null | undefined): void {
+    if (!this.hasTrimmedText(value?.en)) missingAlt.push(`${label} (EN)`);
+    if (!this.hasTrimmedText(value?.ro)) missingAlt.push(`${label} (RO)`);
+  }
+
+  private hasAnyLocalizedText(values: Array<LocalizedText | null | undefined>): boolean {
+    return values.some((value) => this.hasTrimmedText(value?.en) || this.hasTrimmedText(value?.ro));
+  }
+
+  private hasTrimmedText(value: unknown): value is string {
+    return typeof value === 'string' && value.trim().length > 0;
   }
 
   openPagePublishChecklist(pageKey: PageBuilderKey): void {
@@ -15173,256 +15270,351 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   loadSections(): void {
     this.admin.getContent('home.sections').subscribe({
-      next: (block) => {
-        this.rememberContentVersion('home.sections', block);
-        const meta = block.meta || {};
-        const rawBlocks = meta['blocks'];
-        if (Array.isArray(rawBlocks) && rawBlocks.length) {
-          const configured: HomeBlockDraft[] = [];
-          const seenKeys = new Set<string>();
-          const seenBuiltIns = new Set<HomeSectionId>();
+      next: (block) => this.applyLoadedSections(block),
+      error: () => {
+        delete this.contentVersions['home.sections'];
+        this.resetHomeSectionsFromServer([]);
+      }
+    });
+  }
 
-          const ensureUniqueKey = (raw: unknown, fallback: string): string => {
-            const base = (typeof raw === 'string' ? raw.trim() : '') || fallback;
-            let key = base;
-            let i = 1;
-            while (!key || seenKeys.has(key)) {
-              key = `${base}-${i}`;
-              i += 1;
-            }
-            seenKeys.add(key);
-            return key;
-          };
+  private applyLoadedSections(block: AdminContent): void {
+    this.rememberContentVersion('home.sections', block);
+    const meta = this.toRecord(block.meta);
+    const configured = this.parseConfiguredHomeBlocks(meta['blocks']);
+    if (this.applyHomeSectionsFromServer(configured)) return;
+    const derivedFromSections = this.deriveHomeSectionsFromMeta(meta['sections']);
+    if (this.applyHomeSectionsFromServer(derivedFromSections)) return;
+    const derivedFromOrder = this.deriveHomeSectionsFromOrder(meta['order']);
+    if (this.applyHomeSectionsFromServer(derivedFromOrder)) return;
+    this.resetHomeSectionsFromServer([]);
+  }
 
-          for (const raw of rawBlocks) {
-            if (!raw || typeof raw !== 'object') continue;
-            const rec = raw as Record<string, unknown>;
-            const typeRaw = typeof rec['type'] === 'string' ? String(rec['type']).trim() : '';
-            const enabledRaw = rec['enabled'];
-            const enabled = enabledRaw === false ? false : true;
-            const builtIn = this.normalizeHomeSectionId(typeRaw);
-              const type: HomeBlockType | null =
-                builtIn ||
-                (typeRaw === 'text' ||
-                typeRaw === 'columns' ||
-                typeRaw === 'cta' ||
-                typeRaw === 'faq' ||
-                typeRaw === 'testimonials' ||
-                typeRaw === 'image' ||
-                typeRaw === 'gallery' ||
-                typeRaw === 'banner' ||
-                typeRaw === 'carousel'
-                  ? (typeRaw as HomeBlockType)
-                : null);
-            if (!type) continue;
+  private applyHomeSectionsFromServer(blocks: HomeBlockDraft[]): boolean {
+    if (!blocks.length) return false;
+    this.resetHomeSectionsFromServer(blocks);
+    return true;
+  }
 
-            if (builtIn) {
-              if (seenBuiltIns.has(builtIn)) continue;
-              seenBuiltIns.add(builtIn);
-              seenKeys.add(builtIn);
-              configured.push(this.makeHomeBlockDraft(builtIn, builtIn, enabled));
-              continue;
-            }
+  private resetHomeSectionsFromServer(blocks: HomeBlockDraft[]): void {
+    this.homeBlocks = this.ensureAllDefaultHomeBlocks(blocks);
+    this.cmsHomeDraft.initFromServer(this.homeBlocks);
+  }
 
-            const key = ensureUniqueKey(rec['key'], this.nextCustomBlockKey(type));
-            const draft = this.makeHomeBlockDraft(key, type, enabled);
-            draft.title = this.toLocalizedText(rec['title']);
-            if (type === 'text') {
-              draft.body_markdown = this.toLocalizedText(rec['body_markdown']);
-            } else if (type === 'columns') {
-              const columnsRaw = rec['columns'];
-              const cols: CmsColumnsColumnDraft[] = [];
-              if (Array.isArray(columnsRaw)) {
-                for (const colRaw of columnsRaw) {
-                  if (!colRaw || typeof colRaw !== 'object') continue;
-                  const colRec = colRaw as Record<string, unknown>;
-                  cols.push({ title: this.toLocalizedText(colRec['title']), body_markdown: this.toLocalizedText(colRec['body_markdown']) });
-                  if (cols.length >= 3) break;
-                }
-              }
-              if (cols.length >= 2) draft.columns = cols;
-              const bpRaw = rec['columns_breakpoint'] ?? rec['breakpoint'] ?? rec['stack_at'];
-              const bp = typeof bpRaw === 'string' ? String(bpRaw).trim() : '';
-              draft.columns_breakpoint = bp === 'sm' || bp === 'md' || bp === 'lg' ? bp : 'md';
-            } else if (type === 'cta') {
-              draft.body_markdown = this.toLocalizedText(rec['body_markdown']);
-              draft.cta_label = this.toLocalizedText(rec['cta_label']);
-              draft.cta_url = typeof rec['cta_url'] === 'string' ? String(rec['cta_url']).trim() : '';
-              draft.cta_new_tab = this.toBooleanValue(rec['cta_new_tab'], false);
-            } else if (type === 'faq') {
-              const itemsRaw = rec['items'];
-              const items: CmsFaqItemDraft[] = [];
-              if (Array.isArray(itemsRaw)) {
-                for (const itemRaw of itemsRaw) {
-                  if (!itemRaw || typeof itemRaw !== 'object') continue;
-                  const itemRec = itemRaw as Record<string, unknown>;
-                  items.push({
-                    question: this.toLocalizedText(itemRec['question']),
-                    answer_markdown: this.toLocalizedText(itemRec['answer_markdown'])
-                  });
-                  if (items.length >= 20) break;
-                }
-              }
-              if (items.length) draft.faq_items = items;
-            } else if (type === 'testimonials') {
-              const itemsRaw = rec['items'];
-              const items: CmsTestimonialDraft[] = [];
-              if (Array.isArray(itemsRaw)) {
-                for (const itemRaw of itemsRaw) {
-                  if (!itemRaw || typeof itemRaw !== 'object') continue;
-                  const itemRec = itemRaw as Record<string, unknown>;
-                  items.push({
-                    quote_markdown: this.toLocalizedText(itemRec['quote_markdown']),
-                    author: this.toLocalizedText(itemRec['author']),
-                    role: this.toLocalizedText(itemRec['role'])
-                  });
-                  if (items.length >= 12) break;
-                }
-              }
-              if (items.length) draft.testimonials = items;
-            } else if (type === 'image') {
-              draft.url = typeof rec['url'] === 'string' ? String(rec['url']).trim() : '';
-              draft.link_url = typeof rec['link_url'] === 'string' ? String(rec['link_url']).trim() : '';
-              draft.alt = this.toLocalizedText(rec['alt']);
-              draft.caption = this.toLocalizedText(rec['caption']);
-              draft.focal_x = this.toFocalValue(rec['focal_x']);
-              draft.focal_y = this.toFocalValue(rec['focal_y']);
-            } else if (type === 'gallery') {
-              const imagesRaw = rec['images'];
-              if (Array.isArray(imagesRaw)) {
-                for (const imgRaw of imagesRaw) {
-                  if (!imgRaw || typeof imgRaw !== 'object') continue;
-                  const imgRec = imgRaw as Record<string, unknown>;
-                  const url = typeof imgRec['url'] === 'string' ? String(imgRec['url']).trim() : '';
-                  if (!url) continue;
-                  draft.images.push({
-                    url,
-                    alt: this.toLocalizedText(imgRec['alt']),
-                    caption: this.toLocalizedText(imgRec['caption']),
-                    focal_x: this.toFocalValue(imgRec['focal_x']),
-                    focal_y: this.toFocalValue(imgRec['focal_y'])
-                  });
-                }
-              }
-            } else if (type === 'banner') {
-              draft.slide = this.toSlideDraft(rec['slide']);
-            } else if (type === 'carousel') {
-              const slidesRaw = rec['slides'];
-              const slides: SlideDraft[] = [];
-              if (Array.isArray(slidesRaw)) {
-                for (const slideRaw of slidesRaw) slides.push(this.toSlideDraft(slideRaw));
-              }
-              draft.slides = slides.length ? slides : [this.emptySlideDraft()];
-              draft.settings = this.toCarouselSettingsDraft(rec['settings']);
-            }
-            configured.push(draft);
-          }
+  private parseConfiguredHomeBlocks(rawBlocks: unknown): HomeBlockDraft[] {
+    if (!Array.isArray(rawBlocks) || rawBlocks.length === 0) return [];
+    const configured: HomeBlockDraft[] = [];
+    const seenKeys = new Set<string>();
+    const seenBuiltIns = new Set<HomeSectionId>();
+    for (const raw of rawBlocks) {
+      if (!raw || typeof raw !== 'object') continue;
+      const parsed = this.parseConfiguredHomeBlock(raw as Record<string, unknown>, seenKeys, seenBuiltIns);
+      if (parsed) configured.push(parsed);
+    }
+    return configured;
+  }
 
-	          if (configured.length) {
-	            this.homeBlocks = this.ensureAllDefaultHomeBlocks(configured);
-	            this.cmsHomeDraft.initFromServer(this.homeBlocks);
-	            return;
-	          }
-	        }
+  private parseConfiguredHomeBlock(
+    rec: Record<string, unknown>,
+    seenKeys: Set<string>,
+    seenBuiltIns: Set<HomeSectionId>
+  ): HomeBlockDraft | null {
+    const typeRaw = typeof rec['type'] === 'string' ? String(rec['type']).trim() : '';
+    const enabled = rec['enabled'] === false ? false : true;
+    const builtIn = this.normalizeHomeSectionId(typeRaw);
+    if (builtIn) {
+      return this.buildConfiguredHomeBuiltInBlock(builtIn, enabled, seenKeys, seenBuiltIns);
+    }
+    const type = this.normalizeHomeCustomContentBlockType(typeRaw);
+    if (!type) return null;
+    const key = this.ensureUniqueConfiguredHomeBlockKey(rec['key'], this.nextCustomBlockKey(type), seenKeys);
+    const draft = this.makeHomeBlockDraft(key, type, enabled);
+    draft.title = this.toLocalizedText(rec['title']);
+    this.homeConfiguredBlockHydrator(type)(draft, rec);
+    return draft;
+  }
 
-        const derived: HomeBlockDraft[] = [];
-        const seen = new Set<HomeSectionId>();
-        const addSection = (rawId: unknown, enabled: boolean) => {
-          const id = this.normalizeHomeSectionId(rawId);
-          if (!id || seen.has(id)) return;
-          seen.add(id);
-          derived.push(this.makeHomeBlockDraft(id, id, enabled));
-        };
+  private buildConfiguredHomeBuiltInBlock(
+    type: HomeSectionId,
+    enabled: boolean,
+    seenKeys: Set<string>,
+    seenBuiltIns: Set<HomeSectionId>
+  ): HomeBlockDraft | null {
+    if (seenBuiltIns.has(type)) return null;
+    seenBuiltIns.add(type);
+    seenKeys.add(type);
+    return this.makeHomeBlockDraft(type, type, enabled);
+  }
 
-        const rawSections = meta['sections'];
-        if (Array.isArray(rawSections)) {
-          for (const raw of rawSections) {
-            if (!raw || typeof raw !== 'object') continue;
-            addSection((raw as { id?: unknown }).id, (raw as { enabled?: unknown }).enabled === false ? false : true);
-          }
-	          if (derived.length) {
-	            this.homeBlocks = this.ensureAllDefaultHomeBlocks(derived);
-	            this.cmsHomeDraft.initFromServer(this.homeBlocks);
-	            return;
-	          }
-	        }
+  private ensureUniqueConfiguredHomeBlockKey(raw: unknown, fallback: string, seenKeys: Set<string>): string {
+    const base = (typeof raw === 'string' ? raw.trim() : '') || fallback;
+    let key = base;
+    let i = 1;
+    while (!key || seenKeys.has(key)) {
+      key = `${base}-${i}`;
+      i += 1;
+    }
+    seenKeys.add(key);
+    return key;
+  }
 
-        const legacyOrder = meta['order'];
-        if (Array.isArray(legacyOrder) && legacyOrder.length) {
-          for (const raw of legacyOrder) {
-            addSection(raw, true);
-          }
-	          if (derived.length) {
-	            this.homeBlocks = this.ensureAllDefaultHomeBlocks(derived);
-	            this.cmsHomeDraft.initFromServer(this.homeBlocks);
-	            return;
-	          }
-	        }
+  private normalizeHomeCustomContentBlockType(value: string): HomeCustomContentBlockType | null {
+    const type = value as HomeCustomContentBlockType;
+    return HOME_CUSTOM_CONTENT_BLOCK_TYPE_SET.has(type) ? type : null;
+  }
 
-	        this.homeBlocks = this.ensureAllDefaultHomeBlocks([]);
-	        this.cmsHomeDraft.initFromServer(this.homeBlocks);
-	      },
-	      error: () => {
-	        delete this.contentVersions['home.sections'];
-	        this.homeBlocks = this.ensureAllDefaultHomeBlocks([]);
-	        this.cmsHomeDraft.initFromServer(this.homeBlocks);
-	      }
-	    });
-	  }
+  private homeConfiguredBlockHydrator(
+    type: HomeCustomContentBlockType
+  ): (draft: HomeBlockDraft, rec: Record<string, unknown>) => void {
+    const hydrators: Record<HomeCustomContentBlockType, (draft: HomeBlockDraft, rec: Record<string, unknown>) => void> = {
+      text: (draft, rec) => this.hydrateConfiguredHomeTextBlock(draft, rec),
+      columns: (draft, rec) => this.hydrateConfiguredHomeColumnsBlock(draft, rec),
+      cta: (draft, rec) => this.hydrateConfiguredHomeCtaBlock(draft, rec),
+      faq: (draft, rec) => this.hydrateConfiguredHomeFaqBlock(draft, rec),
+      testimonials: (draft, rec) => this.hydrateConfiguredHomeTestimonialsBlock(draft, rec),
+      image: (draft, rec) => this.hydrateConfiguredHomeImageBlock(draft, rec),
+      gallery: (draft, rec) => this.hydrateConfiguredHomeGalleryBlock(draft, rec),
+      banner: (draft, rec) => this.hydrateConfiguredHomeBannerBlock(draft, rec),
+      carousel: (draft, rec) => this.hydrateConfiguredHomeCarouselBlock(draft, rec)
+    };
+    return hydrators[type];
+  }
+
+  private hydrateConfiguredHomeTextBlock(draft: HomeBlockDraft, rec: Record<string, unknown>): void {
+    draft.body_markdown = this.toLocalizedText(rec['body_markdown']);
+  }
+
+  private hydrateConfiguredHomeColumnsBlock(draft: HomeBlockDraft, rec: Record<string, unknown>): void {
+    const columnsRaw = rec['columns'];
+    const cols: CmsColumnsColumnDraft[] = [];
+    if (Array.isArray(columnsRaw)) {
+      for (const colRaw of columnsRaw) {
+        if (!colRaw || typeof colRaw !== 'object') continue;
+        const colRec = colRaw as Record<string, unknown>;
+        cols.push({ title: this.toLocalizedText(colRec['title']), body_markdown: this.toLocalizedText(colRec['body_markdown']) });
+        if (cols.length >= 3) break;
+      }
+    }
+    if (cols.length >= 2) draft.columns = cols;
+    const bpRaw = rec['columns_breakpoint'] ?? rec['breakpoint'] ?? rec['stack_at'];
+    const bp = typeof bpRaw === 'string' ? String(bpRaw).trim() : '';
+    draft.columns_breakpoint = bp === 'sm' || bp === 'md' || bp === 'lg' ? bp : 'md';
+  }
+
+  private hydrateConfiguredHomeCtaBlock(draft: HomeBlockDraft, rec: Record<string, unknown>): void {
+    draft.body_markdown = this.toLocalizedText(rec['body_markdown']);
+    draft.cta_label = this.toLocalizedText(rec['cta_label']);
+    draft.cta_url = typeof rec['cta_url'] === 'string' ? String(rec['cta_url']).trim() : '';
+    draft.cta_new_tab = this.toBooleanValue(rec['cta_new_tab'], false);
+  }
+
+  private hydrateConfiguredHomeFaqBlock(draft: HomeBlockDraft, rec: Record<string, unknown>): void {
+    const itemsRaw = rec['items'];
+    const items: CmsFaqItemDraft[] = [];
+    if (Array.isArray(itemsRaw)) {
+      for (const itemRaw of itemsRaw) {
+        if (!itemRaw || typeof itemRaw !== 'object') continue;
+        const itemRec = itemRaw as Record<string, unknown>;
+        items.push({
+          question: this.toLocalizedText(itemRec['question']),
+          answer_markdown: this.toLocalizedText(itemRec['answer_markdown'])
+        });
+        if (items.length >= 20) break;
+      }
+    }
+    if (items.length) draft.faq_items = items;
+  }
+
+  private hydrateConfiguredHomeTestimonialsBlock(draft: HomeBlockDraft, rec: Record<string, unknown>): void {
+    const itemsRaw = rec['items'];
+    const items: CmsTestimonialDraft[] = [];
+    if (Array.isArray(itemsRaw)) {
+      for (const itemRaw of itemsRaw) {
+        if (!itemRaw || typeof itemRaw !== 'object') continue;
+        const itemRec = itemRaw as Record<string, unknown>;
+        items.push({
+          quote_markdown: this.toLocalizedText(itemRec['quote_markdown']),
+          author: this.toLocalizedText(itemRec['author']),
+          role: this.toLocalizedText(itemRec['role'])
+        });
+        if (items.length >= 12) break;
+      }
+    }
+    if (items.length) draft.testimonials = items;
+  }
+
+  private hydrateConfiguredHomeImageBlock(draft: HomeBlockDraft, rec: Record<string, unknown>): void {
+    draft.url = typeof rec['url'] === 'string' ? String(rec['url']).trim() : '';
+    draft.link_url = typeof rec['link_url'] === 'string' ? String(rec['link_url']).trim() : '';
+    draft.alt = this.toLocalizedText(rec['alt']);
+    draft.caption = this.toLocalizedText(rec['caption']);
+    draft.focal_x = this.toFocalValue(rec['focal_x']);
+    draft.focal_y = this.toFocalValue(rec['focal_y']);
+  }
+
+  private hydrateConfiguredHomeGalleryBlock(draft: HomeBlockDraft, rec: Record<string, unknown>): void {
+    const imagesRaw = rec['images'];
+    if (!Array.isArray(imagesRaw)) return;
+    for (const imgRaw of imagesRaw) {
+      if (!imgRaw || typeof imgRaw !== 'object') continue;
+      const imgRec = imgRaw as Record<string, unknown>;
+      const url = typeof imgRec['url'] === 'string' ? String(imgRec['url']).trim() : '';
+      if (!url) continue;
+      draft.images.push({
+        url,
+        alt: this.toLocalizedText(imgRec['alt']),
+        caption: this.toLocalizedText(imgRec['caption']),
+        focal_x: this.toFocalValue(imgRec['focal_x']),
+        focal_y: this.toFocalValue(imgRec['focal_y'])
+      });
+    }
+  }
+
+  private hydrateConfiguredHomeBannerBlock(draft: HomeBlockDraft, rec: Record<string, unknown>): void {
+    draft.slide = this.toSlideDraft(rec['slide']);
+  }
+
+  private hydrateConfiguredHomeCarouselBlock(draft: HomeBlockDraft, rec: Record<string, unknown>): void {
+    const slidesRaw = rec['slides'];
+    const slides: SlideDraft[] = [];
+    if (Array.isArray(slidesRaw)) {
+      for (const slideRaw of slidesRaw) slides.push(this.toSlideDraft(slideRaw));
+    }
+    draft.slides = slides.length ? slides : [this.emptySlideDraft()];
+    draft.settings = this.toCarouselSettingsDraft(rec['settings']);
+  }
+
+  private deriveHomeSectionsFromMeta(rawSections: unknown): HomeBlockDraft[] {
+    if (!Array.isArray(rawSections)) return [];
+    const derived: HomeBlockDraft[] = [];
+    const seen = new Set<HomeSectionId>();
+    for (const raw of rawSections) {
+      if (!raw || typeof raw !== 'object') continue;
+      const rec = raw as { id?: unknown; enabled?: unknown };
+      this.appendDerivedHomeSection(derived, seen, rec.id, rec.enabled === false ? false : true);
+    }
+    return derived;
+  }
+
+  private deriveHomeSectionsFromOrder(rawOrder: unknown): HomeBlockDraft[] {
+    if (!Array.isArray(rawOrder) || !rawOrder.length) return [];
+    const derived: HomeBlockDraft[] = [];
+    const seen = new Set<HomeSectionId>();
+    for (const raw of rawOrder) {
+      this.appendDerivedHomeSection(derived, seen, raw, true);
+    }
+    return derived;
+  }
+
+  private appendDerivedHomeSection(
+    derived: HomeBlockDraft[],
+    seen: Set<HomeSectionId>,
+    rawId: unknown,
+    enabled: boolean
+  ): void {
+    const id = this.normalizeHomeSectionId(rawId);
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    derived.push(this.makeHomeBlockDraft(id, id, enabled));
+  }
+
+  private buildHomeSectionBlockMeta(block: HomeBlockDraft): Record<string, unknown> {
+    const base: Record<string, unknown> = { key: block.key, type: block.type, enabled: block.enabled };
+    this.homeSectionBlockMetaWriter(block.type)(base, block);
+    return base;
+  }
+
+  private homeSectionBlockMetaWriter(type: HomeBlockType): (base: Record<string, unknown>, block: HomeBlockDraft) => void {
+    const writers: Record<HomeBlockType, (base: Record<string, unknown>, block: HomeBlockDraft) => void> = {
+      featured_products: () => undefined,
+      sale_products: () => undefined,
+      new_arrivals: () => undefined,
+      featured_collections: () => undefined,
+      story: () => undefined,
+      recently_viewed: () => undefined,
+      why: () => undefined,
+      product_grid: () => undefined,
+      form: () => undefined,
+      text: (base, block) => this.writeHomeTextSectionMeta(base, block),
+      columns: (base, block) => this.writeHomeColumnsSectionMeta(base, block),
+      cta: (base, block) => this.writeHomeCtaSectionMeta(base, block),
+      faq: (base, block) => this.writeHomeFaqSectionMeta(base, block),
+      testimonials: (base, block) => this.writeHomeTestimonialsSectionMeta(base, block),
+      image: (base, block) => this.writeHomeImageSectionMeta(base, block),
+      gallery: (base, block) => this.writeHomeGallerySectionMeta(base, block),
+      banner: (base, block) => this.writeHomeBannerSectionMeta(base, block),
+      carousel: (base, block) => this.writeHomeCarouselSectionMeta(base, block)
+    };
+    return writers[type];
+  }
+
+  private writeHomeTextSectionMeta(base: Record<string, unknown>, block: HomeBlockDraft): void {
+    base['title'] = block.title;
+    base['body_markdown'] = block.body_markdown;
+  }
+
+  private writeHomeColumnsSectionMeta(base: Record<string, unknown>, block: HomeBlockDraft): void {
+    base['title'] = block.title;
+    base['columns'] = (block.columns || []).slice(0, 3).map((col) => ({ title: col.title, body_markdown: col.body_markdown }));
+    base['columns_breakpoint'] = block.columns_breakpoint;
+  }
+
+  private writeHomeCtaSectionMeta(base: Record<string, unknown>, block: HomeBlockDraft): void {
+    base['title'] = block.title;
+    base['body_markdown'] = block.body_markdown;
+    base['cta_label'] = block.cta_label;
+    base['cta_url'] = block.cta_url;
+    base['cta_new_tab'] = Boolean(block.cta_new_tab);
+  }
+
+  private writeHomeFaqSectionMeta(base: Record<string, unknown>, block: HomeBlockDraft): void {
+    base['title'] = block.title;
+    base['items'] = (block.faq_items || []).slice(0, 20).map((item) => ({ question: item.question, answer_markdown: item.answer_markdown }));
+  }
+
+  private writeHomeTestimonialsSectionMeta(base: Record<string, unknown>, block: HomeBlockDraft): void {
+    base['title'] = block.title;
+    base['items'] = (block.testimonials || []).slice(0, 12).map((item) => ({
+      quote_markdown: item.quote_markdown,
+      author: item.author,
+      role: item.role
+    }));
+  }
+
+  private writeHomeImageSectionMeta(base: Record<string, unknown>, block: HomeBlockDraft): void {
+    base['title'] = block.title;
+    base['url'] = block.url;
+    base['link_url'] = block.link_url;
+    base['alt'] = block.alt;
+    base['caption'] = block.caption;
+    base['focal_x'] = this.toFocalValue(block.focal_x);
+    base['focal_y'] = this.toFocalValue(block.focal_y);
+  }
+
+  private writeHomeGallerySectionMeta(base: Record<string, unknown>, block: HomeBlockDraft): void {
+    base['title'] = block.title;
+    base['images'] = (block.images || []).map((img) => ({
+      url: img.url,
+      alt: img.alt,
+      caption: img.caption,
+      focal_x: this.toFocalValue(img.focal_x),
+      focal_y: this.toFocalValue(img.focal_y)
+    }));
+  }
+
+  private writeHomeBannerSectionMeta(base: Record<string, unknown>, block: HomeBlockDraft): void {
+    base['title'] = block.title;
+    base['slide'] = this.serializeSlideDraft(block.slide);
+  }
+
+  private writeHomeCarouselSectionMeta(base: Record<string, unknown>, block: HomeBlockDraft): void {
+    base['title'] = block.title;
+    base['slides'] = (block.slides || []).map((slide) => this.serializeSlideDraft(slide));
+    base['settings'] = block.settings;
+  }
 
   saveSections(): void {
-    const blocks = this.homeBlocks.map((b) => {
-      const base: Record<string, unknown> = { key: b.key, type: b.type, enabled: b.enabled };
-      if (b.type === 'text') {
-        base['title'] = b.title;
-        base['body_markdown'] = b.body_markdown;
-      } else if (b.type === 'columns') {
-        base['title'] = b.title;
-        base['columns'] = (b.columns || []).slice(0, 3).map((col) => ({ title: col.title, body_markdown: col.body_markdown }));
-        base['columns_breakpoint'] = b.columns_breakpoint;
-      } else if (b.type === 'cta') {
-        base['title'] = b.title;
-        base['body_markdown'] = b.body_markdown;
-        base['cta_label'] = b.cta_label;
-        base['cta_url'] = b.cta_url;
-        base['cta_new_tab'] = Boolean(b.cta_new_tab);
-      } else if (b.type === 'faq') {
-        base['title'] = b.title;
-        base['items'] = (b.faq_items || []).slice(0, 20).map((item) => ({ question: item.question, answer_markdown: item.answer_markdown }));
-      } else if (b.type === 'testimonials') {
-        base['title'] = b.title;
-        base['items'] = (b.testimonials || []).slice(0, 12).map((item) => ({
-          quote_markdown: item.quote_markdown,
-          author: item.author,
-          role: item.role
-        }));
-      } else if (b.type === 'image') {
-        base['title'] = b.title;
-        base['url'] = b.url;
-        base['link_url'] = b.link_url;
-        base['alt'] = b.alt;
-        base['caption'] = b.caption;
-        base['focal_x'] = this.toFocalValue(b.focal_x);
-        base['focal_y'] = this.toFocalValue(b.focal_y);
-      } else if (b.type === 'gallery') {
-        base['title'] = b.title;
-        base['images'] = b.images.map((img) => ({
-          url: img.url,
-          alt: img.alt,
-          caption: img.caption,
-          focal_x: this.toFocalValue(img.focal_x),
-          focal_y: this.toFocalValue(img.focal_y)
-        }));
-      } else if (b.type === 'banner') {
-        base['title'] = b.title;
-        base['slide'] = this.serializeSlideDraft(b.slide);
-      } else if (b.type === 'carousel') {
-        base['title'] = b.title;
-        base['slides'] = (b.slides || []).map((slide) => this.serializeSlideDraft(slide));
-        base['settings'] = b.settings;
-      }
-      return base;
-    });
+    const blocks = this.homeBlocks.map((block) => this.buildHomeSectionBlockMeta(block));
 
     const sections: Array<{ id: HomeSectionId; enabled: boolean }> = [];
     const seen = new Set<HomeSectionId>();

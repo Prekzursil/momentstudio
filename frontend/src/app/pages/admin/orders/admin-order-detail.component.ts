@@ -1733,6 +1733,22 @@ export class AdminOrderDetailComponent implements OnInit {
     'cancelled',
     'refunded'
   ];
+  private readonly statusTransitions: Record<OrderStatus, OrderStatus[]> = {
+    pending: ['pending_payment', 'pending_acceptance', 'cancelled'],
+    pending_payment: ['pending_acceptance', 'cancelled'],
+    pending_acceptance: ['paid', 'cancelled'],
+    paid: ['shipped', 'refunded', 'cancelled'],
+    shipped: ['delivered', 'refunded'],
+    delivered: ['refunded'],
+    cancelled: [],
+    refunded: []
+  };
+  private readonly shippingLabelEvents = new Set([
+    'shipping_label_uploaded',
+    'shipping_label_downloaded',
+    'shipping_label_printed',
+    'shipping_label_deleted'
+  ]);
 
   private isOrderStatus(value: unknown): value is OrderStatus {
     return (
@@ -1776,33 +1792,36 @@ export class AdminOrderDetailComponent implements OnInit {
     return !this.hasPaymentCaptured(o);
   }
 
-  private allowedNextStatuses(current: OrderStatus, method: string, order: AdminOrderDetail | null): Set<OrderStatus> {
-    const transitions: Record<OrderStatus, OrderStatus[]> = {
-      pending: ['pending_payment', 'pending_acceptance', 'cancelled'],
-      pending_payment: ['pending_acceptance', 'cancelled'],
-      pending_acceptance: ['paid', 'cancelled'],
-      paid: ['shipped', 'refunded', 'cancelled'],
-      shipped: ['delivered', 'refunded'],
-      delivered: ['refunded'],
-      cancelled: [],
-      refunded: []
-    };
+  private isCapturedPaymentMethod(method: string): boolean {
+    return method === 'stripe' || method === 'paypal';
+  }
 
-    const allowed = new Set<OrderStatus>([current, ...(transitions[current] ?? [])]);
+  private canCodProgressWithoutCapture(current: OrderStatus, method: string): boolean {
+    return method === 'cod' && current === 'pending_acceptance';
+  }
+
+  private shouldBlockPaidTransition(
+    current: OrderStatus,
+    method: string,
+    order: AdminOrderDetail | null,
+    allowed: Set<OrderStatus>
+  ): boolean {
+    if (current !== 'pending_acceptance' || !allowed.has('paid')) return false;
+    if (!this.isCapturedPaymentMethod(method)) return false;
+    return !this.hasPaymentCaptured(order);
+  }
+
+  private allowedNextStatuses(current: OrderStatus, method: string, order: AdminOrderDetail | null): Set<OrderStatus> {
+    const allowed = new Set<OrderStatus>([current, ...(this.statusTransitions[current] ?? [])]);
 
     // COD orders start in pending_acceptance and can ship/complete without payment capture.
-    if (method === 'cod' && current === 'pending_acceptance') {
+    if (this.canCodProgressWithoutCapture(current, method)) {
       allowed.add('shipped');
       allowed.add('delivered');
     }
 
     // Mirror backend guard: Stripe/PayPal orders can only be accepted once payment is captured.
-    if (
-      current === 'pending_acceptance' &&
-      allowed.has('paid') &&
-      (method === 'stripe' || method === 'paypal') &&
-      !this.hasPaymentCaptured(order)
-    ) {
+    if (this.shouldBlockPaidTransition(current, method, order, allowed)) {
       allowed.delete('paid');
     }
 
@@ -3132,18 +3151,22 @@ export class AdminOrderDetailComponent implements OnInit {
     });
   }
 
+  private isShippingLabelEvent(eventName: string): boolean {
+    return this.shippingLabelEvents.has((eventName || '').trim());
+  }
+
+  private compareByCreatedAtDesc(this: void, a: { created_at: string }, b: { created_at: string }): number {
+    if (a.created_at > b.created_at) return -1;
+    if (a.created_at < b.created_at) return 1;
+    return 0;
+  }
+
   shippingLabelHistory(): { event: string; note?: string | null; created_at: string }[] {
     const events = this.order()?.events ?? [];
-    const shippingEvents = new Set([
-      'shipping_label_uploaded',
-      'shipping_label_downloaded',
-      'shipping_label_printed',
-      'shipping_label_deleted'
-    ]);
     return events
-      .filter((evt) => shippingEvents.has((evt.event || '').trim()))
+      .filter((evt) => this.isShippingLabelEvent((evt.event || '').toString()))
       .slice()
-      .sort((a, b) => (a.created_at > b.created_at ? -1 : a.created_at < b.created_at ? 1 : 0))
+      .sort(this.compareByCreatedAtDesc)
       .slice(0, 6);
   }
 
@@ -3309,6 +3332,41 @@ export class AdminOrderDetailComponent implements OnInit {
     });
   }
 
+  private addOrderToRecent(order: AdminOrderDetail): void {
+    const ref = order.reference_code || order.id.slice(0, 8);
+    const email = (order.customer_email || '').toString().trim();
+    this.recent.add({
+      key: `order:${order.id}`,
+      type: 'order',
+      label: ref,
+      subtitle: email,
+      url: `/admin/orders/${order.id}`,
+      state: null
+    });
+  }
+
+  private hydrateEditableOrderState(order: AdminOrderDetail): void {
+    this.statusValue = (order.status as OrderStatus) || 'pending_acceptance';
+    this.trackingNumber = order.tracking_number ?? '';
+    this.trackingUrl = order.tracking_url ?? '';
+    this.cancelReason = order.cancel_reason ?? '';
+    this.returnQty = {};
+    this.fulfillmentQty = {};
+    (order.items || []).forEach((it) => {
+      this.returnQty[it.id] = 0;
+      this.fulfillmentQty[it.id] = Number(it.shipped_quantity ?? 0);
+    });
+  }
+
+  private handleOrderLoadSuccess(order: AdminOrderDetail): void {
+    this.order.set(order);
+    this.addOrderToRecent(order);
+    this.hydrateEditableOrderState(order);
+    this.loadReturns(order.id);
+    this.loadComms(order.id);
+    this.loading.set(false);
+  }
+
   private load(orderId: string): void {
     this.loading.set(true);
     this.error.set(null);
@@ -3320,28 +3378,7 @@ export class AdminOrderDetailComponent implements OnInit {
     this.commsEvents.set([]);
     this.api.get(orderId, { include_pii: this.piiReveal() }).subscribe({
       next: (o) => {
-        this.order.set(o);
-        const ref = o.reference_code || o.id.slice(0, 8);
-        const email = (o.customer_email || '').toString().trim();
-        this.recent.add({
-          key: `order:${o.id}`,
-          type: 'order',
-          label: ref,
-          subtitle: email,
-          url: `/admin/orders/${o.id}`,
-          state: null
-        });
-        this.statusValue = (o.status as OrderStatus) || 'pending_acceptance';
-        this.trackingNumber = o.tracking_number ?? '';
-        this.trackingUrl = o.tracking_url ?? '';
-        this.cancelReason = o.cancel_reason ?? '';
-        this.returnQty = {};
-        this.fulfillmentQty = {};
-        (o.items || []).forEach((it) => (this.returnQty[it.id] = 0));
-        (o.items || []).forEach((it) => (this.fulfillmentQty[it.id] = Number(it.shipped_quantity ?? 0)));
-        this.loadReturns(o.id);
-        this.loadComms(o.id);
-        this.loading.set(false);
+        this.handleOrderLoadSuccess(o);
       },
       error: (err) => {
         this.error.set(this.translate.instant('adminUi.orders.errors.load'));
