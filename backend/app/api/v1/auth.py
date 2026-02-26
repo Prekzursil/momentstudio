@@ -779,6 +779,511 @@ class UserCooldownsResponse(BaseModel):
     email: CooldownInfo
 
 
+def _is_admin_or_owner(user: User) -> bool:
+    return user.role in (UserRole.admin, UserRole.owner)
+
+
+async def _authenticate_user_with_metrics(session: AsyncSession, identifier: str, password: str) -> User:
+    try:
+        return await auth_service.authenticate_user(session, identifier, password)
+    except HTTPException:
+        metrics.record_login_failure()
+        raise
+
+
+async def _ensure_user_account_active(session: AsyncSession, user: User) -> None:
+    if getattr(user, "deleted_at", None) is not None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
+    if not getattr(user, "deletion_scheduled_for", None):
+        return
+    if not self_service.is_deletion_due(user):
+        return
+    await self_service.execute_account_deletion(session, user)
+    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
+
+
+def _decode_two_factor_login_token(two_factor_token: str) -> tuple[UUID, bool, str]:
+    token_payload = security.decode_token(two_factor_token)
+    if not token_payload or token_payload.get("type") != "two_factor":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid two-factor token")
+    sub = token_payload.get("sub")
+    try:
+        user_id = UUID(str(sub))
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid two-factor token")
+    remember = bool(token_payload.get("remember"))
+    method = str(token_payload.get("method") or "password").strip() or "password"
+    return user_id, remember, method
+
+
+def _validated_passkey_login_token_payload(authentication_token: str) -> dict[str, Any]:
+    token_payload = security.decode_token(authentication_token)
+    if not token_payload:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token")
+    if token_payload.get("type") != "webauthn":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token")
+    if token_payload.get("purpose") != "login":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token")
+    return token_payload
+
+
+def _challenge_from_passkey_login_token_payload(token_payload: dict[str, Any]) -> bytes:
+    challenge_b64 = str(token_payload.get("challenge") or "").strip()
+    if not challenge_b64:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token")
+    try:
+        return base64url_to_bytes(challenge_b64)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token") from exc
+
+
+def _decode_passkey_login_token(authentication_token: str) -> tuple[bytes, bool, str | None]:
+    token_payload = _validated_passkey_login_token_payload(authentication_token)
+    expected_challenge = _challenge_from_passkey_login_token_payload(token_payload)
+    remember = bool(token_payload.get("remember"))
+    token_user_id = str(token_payload.get("uid") or "").strip() or None
+    return expected_challenge, remember, token_user_id
+
+
+async def _admin_login_known_device(session: AsyncSession, user: User, *, user_agent: str | None) -> bool:
+    if not _is_admin_or_owner(user):
+        return True
+    return await auth_service.has_seen_refresh_device(session, user_id=user.id, user_agent=user_agent)
+
+
+async def _maybe_queue_admin_login_alert(
+    background_tasks: BackgroundTasks,
+    session: AsyncSession,
+    *,
+    user: User,
+    known_device: bool,
+    ip_address: str | None,
+    country_code: str | None,
+    user_agent: str | None,
+) -> None:
+    if not _is_admin_or_owner(user) or known_device:
+        return
+    owner = await auth_service.get_owner_user(session)
+    to_email = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+    if not to_email:
+        return
+    background_tasks.add_task(
+        email_service.send_admin_login_alert,
+        to_email,
+        admin_username=user.username,
+        admin_display_name=user.name,
+        admin_role=str(user.role),
+        ip_address=ip_address,
+        country_code=country_code,
+        user_agent=user_agent,
+        occurred_at=datetime.now(timezone.utc),
+        lang=owner.preferred_language if owner else None,
+    )
+
+
+async def _issue_login_tokens_and_record_event(
+    session: AsyncSession,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    user: User,
+    *,
+    response: Response | None,
+    persistent: bool,
+    event_type: str,
+) -> TokenPair:
+    user_agent = _request_user_agent(request)
+    ip_address = _request_ip(request)
+    country_code = _extract_country_code(request)
+    known_device = await _admin_login_known_device(session, user, user_agent=user_agent)
+    tokens = await auth_service.issue_tokens_for_user(
+        session,
+        user,
+        persistent=persistent,
+        user_agent=user_agent,
+        ip_address=ip_address,
+        country_code=country_code,
+    )
+    if response:
+        set_refresh_cookie(response, tokens["refresh_token"], persistent=persistent)
+    await auth_service.record_security_event(
+        session,
+        user.id,
+        event_type,
+        user_agent=user_agent,
+        ip_address=ip_address,
+    )
+    await _maybe_queue_admin_login_alert(
+        background_tasks,
+        session,
+        user=user,
+        known_device=known_device,
+        ip_address=ip_address,
+        country_code=country_code,
+        user_agent=user_agent,
+    )
+    return TokenPair(**tokens)
+
+
+def _is_silent_refresh_probe(request: Request) -> bool:
+    silent_header = str(request.headers.get("X-Silent") or "").strip().lower()
+    return silent_header in {"1", "true", "yes", "on"}
+
+
+def _silent_no_content_response(response: Response | None) -> Response:
+    if response:
+        clear_refresh_cookie(response)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+def _silent_or_unauthorized_response(
+    *,
+    silent_refresh_probe: bool,
+    response: Response | None,
+    detail: str,
+) -> Response:
+    if silent_refresh_probe:
+        return _silent_no_content_response(response)
+    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=detail)
+
+
+def _refresh_token_from_request(refresh_request: RefreshRequest, request: Request) -> str:
+    refresh_token = (refresh_request.refresh_token or "").strip()
+    if refresh_token:
+        return refresh_token
+    return (request.cookies.get("refresh_token") or "").strip()
+
+
+def _invalid_refresh_identity_response(*, silent_refresh_probe: bool, response: Response | None) -> Response:
+    return _silent_or_unauthorized_response(
+        silent_refresh_probe=silent_refresh_probe,
+        response=response,
+        detail="Invalid refresh token",
+    )
+
+
+def _decode_refresh_payload_for_identity(
+    refresh_token: str,
+    *,
+    silent_refresh_probe: bool,
+    response: Response | None,
+) -> dict[str, Any] | Response:
+    payload = security.decode_token(refresh_token)
+    if not payload:
+        return _invalid_refresh_identity_response(silent_refresh_probe=silent_refresh_probe, response=response)
+    if payload.get("type") != "refresh":
+        return _invalid_refresh_identity_response(silent_refresh_probe=silent_refresh_probe, response=response)
+    return payload
+
+
+def _refresh_identity_from_payload(
+    payload: dict[str, Any],
+    *,
+    silent_refresh_probe: bool,
+    response: Response | None,
+) -> tuple[str, UUID] | Response:
+    jti = str(payload.get("jti") or "").strip()
+    if not jti:
+        return _invalid_refresh_identity_response(silent_refresh_probe=silent_refresh_probe, response=response)
+    sub = payload.get("sub")
+    if not sub:
+        return _invalid_refresh_identity_response(silent_refresh_probe=silent_refresh_probe, response=response)
+    try:
+        token_user_id = UUID(str(sub))
+    except Exception:
+        return _invalid_refresh_identity_response(silent_refresh_probe=silent_refresh_probe, response=response)
+    return jti, token_user_id
+
+
+def _extract_refresh_identity(
+    refresh_request: RefreshRequest,
+    request: Request,
+    *,
+    silent_refresh_probe: bool,
+    response: Response | None,
+) -> tuple[str, UUID] | Response:
+    refresh_token = _refresh_token_from_request(refresh_request, request)
+    if not refresh_token:
+        return _silent_or_unauthorized_response(
+            silent_refresh_probe=silent_refresh_probe,
+            response=response,
+            detail="Refresh token missing",
+        )
+    payload = _decode_refresh_payload_for_identity(
+        refresh_token,
+        silent_refresh_probe=silent_refresh_probe,
+        response=response,
+    )
+    if isinstance(payload, Response):
+        return payload
+    return _refresh_identity_from_payload(
+        payload,
+        silent_refresh_probe=silent_refresh_probe,
+        response=response,
+    )
+
+
+async def _load_valid_stored_refresh_session(
+    session: AsyncSession,
+    *,
+    jti: str,
+    token_user_id: UUID,
+    now: datetime,
+) -> tuple[RefreshSession, datetime]:
+    stored = (
+        await session.execute(select(RefreshSession).where(RefreshSession.jti == jti).with_for_update())
+    ).scalar_one_or_none()
+    stored_expires_at = _ensure_utc_datetime(stored.expires_at) if stored else None
+    if not stored or stored.user_id != token_user_id or not stored_expires_at or stored_expires_at < now:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+    return stored, stored_expires_at
+
+
+async def _load_refresh_user_for_rotation(session: AsyncSession, *, user_id: UUID, now: datetime) -> User:
+    user = await session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    await _ensure_user_account_active(session, user)
+    locked_until = _ensure_utc_datetime(getattr(user, "locked_until", None))
+    if locked_until and locked_until > now:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account temporarily locked")
+    if bool(getattr(user, "password_reset_required", False)):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Password reset required")
+    return user
+
+
+async def _prepare_refresh_rotation_context(
+    refresh_request: RefreshRequest,
+    request: Request,
+    session: AsyncSession,
+    *,
+    response: Response | None,
+) -> tuple[User, RefreshSession, datetime, datetime] | Response:
+    now = datetime.now(timezone.utc)
+    refresh_identity = _extract_refresh_identity(
+        refresh_request,
+        request,
+        silent_refresh_probe=_is_silent_refresh_probe(request),
+        response=response,
+    )
+    if isinstance(refresh_identity, Response):
+        return refresh_identity
+    jti, token_user_id = refresh_identity
+    stored, stored_expires_at = await _load_valid_stored_refresh_session(
+        session,
+        jti=jti,
+        token_user_id=token_user_id,
+        now=now,
+    )
+    user = await _load_refresh_user_for_rotation(session, user_id=stored.user_id, now=now)
+    return user, stored, stored_expires_at, now
+
+
+def _rotated_replacement_jti_within_grace(stored: RefreshSession, *, now: datetime) -> str | None:
+    grace_seconds = max(0, int(settings.refresh_token_rotation_grace_seconds or 0))
+    rotated_at = _ensure_utc_datetime(getattr(stored, "rotated_at", None))
+    replaced_by = (getattr(stored, "replaced_by_jti", None) or "").strip()
+    if stored.revoked_reason != "rotated":
+        return None
+    if grace_seconds <= 0 or not rotated_at or not replaced_by:
+        return None
+    if rotated_at + timedelta(seconds=grace_seconds) < now:
+        return None
+    return replaced_by
+
+
+async def _load_valid_replacement_refresh_session(
+    session: AsyncSession,
+    *,
+    replacement_jti: str,
+    user_id: UUID,
+    now: datetime,
+) -> RefreshSession | None:
+    replacement = (
+        await session.execute(select(RefreshSession).where(RefreshSession.jti == replacement_jti))
+    ).scalar_one_or_none()
+    if not replacement or replacement.user_id != user_id or replacement.revoked:
+        return None
+    replacement_expires_at = _ensure_utc_datetime(replacement.expires_at)
+    if not replacement_expires_at or replacement_expires_at < now:
+        return None
+    return replacement
+
+
+async def _reused_rotated_refresh_token_pair(
+    session: AsyncSession,
+    *,
+    stored: RefreshSession,
+    user: User,
+    now: datetime,
+    response: Response | None,
+) -> TokenPair | None:
+    replacement_jti = _rotated_replacement_jti_within_grace(stored, now=now)
+    if not replacement_jti:
+        return None
+    replacement = await _load_valid_replacement_refresh_session(
+        session,
+        replacement_jti=replacement_jti,
+        user_id=stored.user_id,
+        now=now,
+    )
+    if not replacement:
+        return None
+    replacement_expires_at = _ensure_utc_datetime(replacement.expires_at)
+    if not replacement_expires_at:
+        return None
+    replacement_persistent = bool(getattr(replacement, "persistent", True))
+    return _build_refresh_token_pair(
+        user=user,
+        refresh_jti=replacement.jti,
+        refresh_expires_at=replacement_expires_at,
+        persistent=replacement_persistent,
+        response=response,
+    )
+
+
+def _build_refresh_token_pair(
+    *,
+    user: User,
+    refresh_jti: str,
+    refresh_expires_at: datetime,
+    persistent: bool,
+    response: Response | None,
+) -> TokenPair:
+    access = security.create_access_token(str(user.id), refresh_jti)
+    refresh = security.create_refresh_token(str(user.id), refresh_jti, refresh_expires_at)
+    if response:
+        set_refresh_cookie(response, refresh, persistent=persistent)
+    return TokenPair(access_token=access, refresh_token=refresh)
+
+
+async def _rotate_refresh_session(
+    session: AsyncSession,
+    request: Request,
+    *,
+    user: User,
+    stored: RefreshSession,
+    now: datetime,
+    persistent: bool,
+    response: Response | None,
+) -> TokenPair:
+    replacement_session = await auth_service.create_refresh_session(
+        session,
+        user.id,
+        persistent=persistent,
+        user_agent=_request_user_agent(request),
+        ip_address=_request_ip(request),
+        country_code=_extract_country_code(request),
+    )
+    stored.revoked = True
+    stored.revoked_reason = "rotated"
+    stored.rotated_at = now
+    stored.replaced_by_jti = replacement_session.jti
+    session.add(stored)
+    await session.flush()
+    access = security.create_access_token(str(user.id), replacement_session.jti)
+    refresh = security.create_refresh_token(str(user.id), replacement_session.jti, replacement_session.expires_at)
+    await session.commit()
+    if response:
+        set_refresh_cookie(response, refresh, persistent=persistent)
+    return TokenPair(access_token=access, refresh_token=refresh)
+
+
+def _validate_profile_update_required_fields(data: dict[str, Any], payload: ProfileUpdate) -> None:
+    required_fields = {
+        "phone": "Phone is required",
+        "first_name": "First name is required",
+        "last_name": "Last name is required",
+        "date_of_birth": "Date of birth is required",
+    }
+    for field, detail in required_fields.items():
+        if field in data and getattr(payload, field) is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+
+
+def _apply_profile_update_values(data: dict[str, Any], payload: ProfileUpdate, current_user: User) -> None:
+    for field in ("phone", "first_name", "middle_name", "last_name", "date_of_birth"):
+        if field in data:
+            setattr(current_user, field, getattr(payload, field))
+    if "preferred_language" in data and payload.preferred_language is not None:
+        current_user.preferred_language = payload.preferred_language
+
+
+def _google_completion_required_response(user: User) -> GoogleCallbackResponse:
+    completion_token = security.create_google_completion_token(str(user.id))
+    return GoogleCallbackResponse(
+        user=UserResponse.model_validate(user),
+        requires_completion=True,
+        completion_token=completion_token,
+    )
+
+
+def _raise_google_email_conflict(existing_email: User | None, *, sub: Any) -> None:
+    if not existing_email:
+        return
+    if existing_email.google_sub and existing_email.google_sub != sub:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Google account already linked elsewhere")
+    if not existing_email.google_sub:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This email is already registered. Sign in with your password and link Google in your account settings.",
+        )
+
+
+async def _handle_existing_google_user_callback(
+    existing_user: User,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession,
+    *,
+    response: Response | None,
+) -> GoogleCallbackResponse:
+    await _ensure_user_account_active(session, existing_user)
+    if not auth_service.is_profile_complete(existing_user):
+        logger.info("google_login_needs_completion", extra={"user_id": str(existing_user.id)})
+        return _google_completion_required_response(existing_user)
+    if bool(getattr(existing_user, "two_factor_enabled", False)):
+        token = security.create_two_factor_token(str(existing_user.id), remember=True, method="google")
+        return GoogleCallbackResponse(
+            user=UserResponse.model_validate(existing_user),
+            requires_two_factor=True,
+            two_factor_token=token,
+        )
+    tokens = await _issue_login_tokens_and_record_event(
+        session,
+        request,
+        background_tasks,
+        existing_user,
+        response=response,
+        persistent=True,
+        event_type="login_google",
+    )
+    logger.info("google_login_existing", extra={"user_id": str(existing_user.id)})
+    return GoogleCallbackResponse(user=UserResponse.model_validate(existing_user), tokens=tokens)
+
+
+async def _create_google_first_time_user(
+    session: AsyncSession,
+    profile: dict[str, Any],
+    *,
+    sub: Any,
+    email: str,
+    name: Any,
+    picture: Any,
+    email_verified: bool,
+) -> User:
+    return await auth_service.create_google_user(
+        session,
+        email=email,
+        name=name,
+        first_name=str(profile.get("given_name") or "").strip() or None,
+        last_name=str(profile.get("family_name") or "").strip() or None,
+        picture=picture,
+        sub=sub,
+        email_verified=email_verified,
+        preferred_language="en",
+    )
+
+
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(
     payload: RegisterRequest,
@@ -849,64 +1354,26 @@ async def login(
     _: Annotated[None, Depends(login_rate_limit)],
     response: Response = None,
 ) -> AuthResponse | TwoFactorChallengeResponse:
-    await captcha_service.verify(payload.captcha_token, remote_ip=request.client.host if request.client else None)
+    await captcha_service.verify(payload.captcha_token, remote_ip=_request_ip(request))
     identifier = (payload.identifier or payload.email or "").strip()
     if not identifier:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Identifier is required")
-    try:
-        user = await auth_service.authenticate_user(session, identifier, payload.password)
-    except HTTPException:
-        metrics.record_login_failure()
-        raise
+    user = await _authenticate_user_with_metrics(session, identifier, payload.password)
     metrics.record_login_success()
     persistent = bool(payload.remember)
     if bool(getattr(user, "two_factor_enabled", False)):
         token = security.create_two_factor_token(str(user.id), remember=persistent, method="password")
         return TwoFactorChallengeResponse(user=UserResponse.model_validate(user), two_factor_token=token)
-
-    is_admin_login = user.role in (UserRole.admin, UserRole.owner)
-    known_device = True
-    if is_admin_login:
-        known_device = await auth_service.has_seen_refresh_device(
-            session,
-            user_id=user.id,
-            user_agent=request.headers.get("user-agent"),
-        )
-
-    tokens = await auth_service.issue_tokens_for_user(
+    tokens = await _issue_login_tokens_and_record_event(
         session,
+        request,
+        background_tasks,
         user,
+        response=response,
         persistent=persistent,
-        user_agent=request.headers.get("user-agent"),
-        ip_address=request.client.host if request.client else None,
-        country_code=_extract_country_code(request),
+        event_type="login_password",
     )
-    if response:
-        set_refresh_cookie(response, tokens["refresh_token"], persistent=persistent)
-    await auth_service.record_security_event(
-        session,
-        user.id,
-        "login_password",
-        user_agent=request.headers.get("user-agent"),
-        ip_address=request.client.host if request.client else None,
-    )
-    if is_admin_login and not known_device:
-        owner = await auth_service.get_owner_user(session)
-        to_email = (owner.email if owner and owner.email else None) or settings.admin_alert_email
-        if to_email:
-            background_tasks.add_task(
-                email_service.send_admin_login_alert,
-                to_email,
-                admin_username=user.username,
-                admin_display_name=user.name,
-                admin_role=str(user.role),
-                ip_address=request.client.host if request.client else None,
-                country_code=_extract_country_code(request),
-                user_agent=request.headers.get("user-agent"),
-                occurred_at=datetime.now(timezone.utc),
-                lang=owner.preferred_language if owner else None,
-            )
-    return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
+    return AuthResponse(user=UserResponse.model_validate(user), tokens=tokens)
 
 
 @router.post("/login/2fa", summary="Complete login with two-factor code")
@@ -918,78 +1385,26 @@ async def login_two_factor(
     _: Annotated[None, Depends(two_factor_rate_limit)],
     response: Response = None,
 ) -> AuthResponse:
-    token_payload = security.decode_token(payload.two_factor_token)
-    if not token_payload or token_payload.get("type") != "two_factor":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid two-factor token")
-
-    sub = token_payload.get("sub")
-    try:
-        user_id = UUID(str(sub))
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid two-factor token")
-    remember = bool(token_payload.get("remember"))
-    method = str(token_payload.get("method") or "password").strip() or "password"
-
+    user_id, remember, method = _decode_two_factor_login_token(payload.two_factor_token)
     user = await session.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid two-factor token")
-    if getattr(user, "deleted_at", None) is not None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
-    if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(user):
-        await self_service.execute_account_deletion(session, user)
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
-
+    await _ensure_user_account_active(session, user)
     if not bool(getattr(user, "two_factor_enabled", False)):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Two-factor is not enabled")
     if not await auth_service.verify_two_factor_code(session, user, payload.code):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid two-factor code")
-
-    is_admin_login = user.role in (UserRole.admin, UserRole.owner)
-    known_device = True
-    if is_admin_login:
-        known_device = await auth_service.has_seen_refresh_device(
-            session,
-            user_id=user.id,
-            user_agent=request.headers.get("user-agent"),
-        )
-
-    tokens = await auth_service.issue_tokens_for_user(
-        session,
-        user,
-        persistent=remember,
-        user_agent=request.headers.get("user-agent"),
-        ip_address=request.client.host if request.client else None,
-        country_code=_extract_country_code(request),
-    )
-    if response:
-        set_refresh_cookie(response, tokens["refresh_token"], persistent=remember)
-
     event_type = "login_google" if method == "google" else "login_password"
-    await auth_service.record_security_event(
+    tokens = await _issue_login_tokens_and_record_event(
         session,
-        user.id,
-        event_type,
-        user_agent=request.headers.get("user-agent"),
-        ip_address=request.client.host if request.client else None,
+        request,
+        background_tasks,
+        user,
+        response=response,
+        persistent=remember,
+        event_type=event_type,
     )
-    if is_admin_login and not known_device:
-        owner = await auth_service.get_owner_user(session)
-        to_email = (owner.email if owner and owner.email else None) or settings.admin_alert_email
-        if to_email:
-            background_tasks.add_task(
-                email_service.send_admin_login_alert,
-                to_email,
-                admin_username=user.username,
-                admin_display_name=user.name,
-                admin_role=str(user.role),
-                ip_address=request.client.host if request.client else None,
-                country_code=_extract_country_code(request),
-                user_agent=request.headers.get("user-agent"),
-                occurred_at=datetime.now(timezone.utc),
-                lang=owner.preferred_language if owner else None,
-            )
-
-    return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
+    return AuthResponse(user=UserResponse.model_validate(user), tokens=tokens)
 
 
 @router.post(
@@ -1037,20 +1452,7 @@ async def passkey_login_verify(
     _: Annotated[None, Depends(login_rate_limit)],
     response: Response = None,
 ) -> AuthResponse:
-    token_payload = security.decode_token(payload.authentication_token)
-    if not token_payload or token_payload.get("type") != "webauthn" or token_payload.get("purpose") != "login":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token")
-    challenge_b64 = str(token_payload.get("challenge") or "").strip()
-    if not challenge_b64:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token")
-    try:
-        expected_challenge = base64url_to_bytes(challenge_b64)
-    except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token") from exc
-
-    remember = bool(token_payload.get("remember"))
-    token_user_id = str(token_payload.get("uid") or "").strip() or None
-
+    expected_challenge, remember, token_user_id = _decode_passkey_login_token(payload.authentication_token)
     user, _passkey = await passkeys_service.verify_passkey_authentication(
         session,
         credential=payload.credential,
@@ -1063,56 +1465,18 @@ async def passkey_login_verify(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Complete your Google sign-in registration before using passkey login.",
         )
-    if getattr(user, "deleted_at", None) is not None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
-    if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(user):
-        await self_service.execute_account_deletion(session, user)
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
-
+    await _ensure_user_account_active(session, user)
     metrics.record_login_success()
-    is_admin_login = user.role in (UserRole.admin, UserRole.owner)
-    known_device = True
-    if is_admin_login:
-        known_device = await auth_service.has_seen_refresh_device(
-            session,
-            user_id=user.id,
-            user_agent=request.headers.get("user-agent"),
-        )
-    tokens = await auth_service.issue_tokens_for_user(
+    tokens = await _issue_login_tokens_and_record_event(
         session,
+        request,
+        background_tasks,
         user,
+        response=response,
         persistent=remember,
-        user_agent=request.headers.get("user-agent"),
-        ip_address=request.client.host if request.client else None,
-        country_code=_extract_country_code(request),
+        event_type="login_passkey",
     )
-    if response:
-        set_refresh_cookie(response, tokens["refresh_token"], persistent=remember)
-
-    await auth_service.record_security_event(
-        session,
-        user.id,
-        "login_passkey",
-        user_agent=request.headers.get("user-agent"),
-        ip_address=request.client.host if request.client else None,
-    )
-    if is_admin_login and not known_device:
-        owner = await auth_service.get_owner_user(session)
-        to_email = (owner.email if owner and owner.email else None) or settings.admin_alert_email
-        if to_email:
-            background_tasks.add_task(
-                email_service.send_admin_login_alert,
-                to_email,
-                admin_username=user.username,
-                admin_display_name=user.name,
-                admin_role=str(user.role),
-                ip_address=request.client.host if request.client else None,
-                country_code=_extract_country_code(request),
-                user_agent=request.headers.get("user-agent"),
-                occurred_at=datetime.now(timezone.utc),
-                lang=owner.preferred_language if owner else None,
-            )
-    return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
+    return AuthResponse(user=UserResponse.model_validate(user), tokens=tokens)
 
 
 @router.get("/me/passkeys", summary="List my passkeys")
@@ -1213,129 +1577,44 @@ async def refresh_tokens(
     _: Annotated[None, Depends(refresh_rate_limit)],
     response: Response = None,
 ) -> TokenPair | Response:
-    silent_header = str(request.headers.get("X-Silent") or "").strip().lower()
-    silent_refresh_probe = silent_header in {"1", "true", "yes", "on"}
-
-    def _silent_no_content() -> Response:
-        if response:
-            clear_refresh_cookie(response)
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-    refresh_token = (refresh_request.refresh_token or "").strip()
-    if not refresh_token:
-        refresh_token = (request.cookies.get("refresh_token") or "").strip()
-    if not refresh_token:
-        if silent_refresh_probe:
-            return _silent_no_content()
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token missing")
-
-    payload = security.decode_token(refresh_token)
-    if not payload or payload.get("type") != "refresh":
-        if silent_refresh_probe:
-            return _silent_no_content()
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
-    jti = str(payload.get("jti") or "").strip()
-    sub = payload.get("sub")
-    if not jti or not sub:
-        if silent_refresh_probe:
-            return _silent_no_content()
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
-    try:
-        token_user_id = UUID(str(sub))
-    except Exception:
-        if silent_refresh_probe:
-            return _silent_no_content()
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
-
-    # Lock the refresh session row during rotation to make concurrent refreshes multi-tab safe.
-    stored = (
-        await session.execute(select(RefreshSession).where(RefreshSession.jti == jti).with_for_update())
-    ).scalar_one_or_none()
-    now = datetime.now(timezone.utc)
-    stored_expires_at = stored.expires_at if stored else None
-    if stored_expires_at and stored_expires_at.tzinfo is None:
-        stored_expires_at = stored_expires_at.replace(tzinfo=timezone.utc)
-    if not stored or stored.user_id != token_user_id or not stored_expires_at or stored_expires_at < now:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
-
-    user = await session.get(User, stored.user_id)
-    if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
-    if getattr(user, "deleted_at", None) is not None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
-    if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(user):
-        await self_service.execute_account_deletion(session, user)
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
-    locked_until = getattr(user, "locked_until", None)
-    if locked_until and locked_until.tzinfo is None:
-        locked_until = locked_until.replace(tzinfo=timezone.utc)
-    if locked_until and locked_until > now:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account temporarily locked")
-    if bool(getattr(user, "password_reset_required", False)):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Password reset required")
-
-    # If the token was already rotated very recently (multi-tab refresh), allow
-    # reusing it by issuing tokens for the replacement session without rotating again.
+    refresh_context = await _prepare_refresh_rotation_context(
+        refresh_request,
+        request,
+        session,
+        response=response,
+    )
+    if isinstance(refresh_context, Response):
+        return refresh_context
+    user, stored, stored_expires_at, now = refresh_context
     if stored.revoked:
-        grace_seconds = max(0, int(settings.refresh_token_rotation_grace_seconds or 0))
-        rotated_at = getattr(stored, "rotated_at", None)
-        replaced_by = (getattr(stored, "replaced_by_jti", None) or "").strip()
-        if stored.revoked_reason == "rotated" and grace_seconds > 0 and rotated_at and replaced_by:
-            rotated_at_norm = rotated_at
-            if rotated_at_norm.tzinfo is None:
-                rotated_at_norm = rotated_at_norm.replace(tzinfo=timezone.utc)
-            if rotated_at_norm + timedelta(seconds=grace_seconds) >= now:
-                replacement = (
-                    await session.execute(select(RefreshSession).where(RefreshSession.jti == replaced_by))
-                ).scalar_one_or_none()
-                replacement_expires_at = replacement.expires_at if replacement else None
-                if replacement_expires_at and replacement_expires_at.tzinfo is None:
-                    replacement_expires_at = replacement_expires_at.replace(tzinfo=timezone.utc)
-                if (
-                    replacement
-                    and replacement.user_id == stored.user_id
-                    and not replacement.revoked
-                    and replacement_expires_at
-                    and replacement_expires_at >= now
-                ):
-                    persistent = bool(getattr(replacement, "persistent", True))
-                    access = security.create_access_token(str(user.id), replacement.jti)
-                    refresh = security.create_refresh_token(str(user.id), replacement.jti, replacement_expires_at)
-                    if response:
-                        set_refresh_cookie(response, refresh, persistent=persistent)
-                    return TokenPair(access_token=access, refresh_token=refresh)
-
+        replacement_pair = await _reused_rotated_refresh_token_pair(
+            session,
+            stored=stored,
+            user=user,
+            now=now,
+            response=response,
+        )
+        if replacement_pair:
+            return replacement_pair
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
-
     persistent = bool(getattr(stored, "persistent", True))
     if not settings.refresh_token_rotation:
-        access = security.create_access_token(str(user.id), stored.jti)
-        refresh = security.create_refresh_token(str(user.id), stored.jti, stored_expires_at)
-        if response:
-            set_refresh_cookie(response, refresh, persistent=persistent)
-        return TokenPair(access_token=access, refresh_token=refresh)
-
-    # Rotate the token by revoking the current refresh session and issuing a replacement.
-    replacement_session = await auth_service.create_refresh_session(
+        return _build_refresh_token_pair(
+            user=user,
+            refresh_jti=stored.jti,
+            refresh_expires_at=stored_expires_at,
+            persistent=persistent,
+            response=response,
+        )
+    return await _rotate_refresh_session(
         session,
-        user.id,
+        request,
+        user=user,
+        stored=stored,
+        now=now,
         persistent=persistent,
-        user_agent=request.headers.get("user-agent"),
-        ip_address=request.client.host if request.client else None,
-        country_code=_extract_country_code(request),
+        response=response,
     )
-    stored.revoked = True
-    stored.revoked_reason = "rotated"
-    stored.rotated_at = now
-    stored.replaced_by_jti = replacement_session.jti
-    session.add(stored)
-    await session.flush()
-    access = security.create_access_token(str(user.id), replacement_session.jti)
-    refresh = security.create_refresh_token(str(user.id), replacement_session.jti, replacement_session.expires_at)
-    await session.commit()
-    if response:
-        set_refresh_cookie(response, refresh, persistent=persistent)
-    return TokenPair(access_token=access, refresh_token=refresh)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
@@ -2128,28 +2407,10 @@ async def update_me(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> UserResponse:
     data = payload.model_dump(exclude_unset=True)
-    if "phone" in data and payload.phone is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Phone is required")
-    if "first_name" in data and payload.first_name is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="First name is required")
-    if "last_name" in data and payload.last_name is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Last name is required")
-    if "date_of_birth" in data and payload.date_of_birth is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Date of birth is required")
+    _validate_profile_update_required_fields(data, payload)
     if "name" in data and payload.name is not None:
         await auth_service.update_display_name(session, current_user, payload.name)
-    if "phone" in data:
-        current_user.phone = payload.phone
-    if "first_name" in data:
-        current_user.first_name = payload.first_name
-    if "middle_name" in data:
-        current_user.middle_name = payload.middle_name
-    if "last_name" in data:
-        current_user.last_name = payload.last_name
-    if "date_of_birth" in data:
-        current_user.date_of_birth = payload.date_of_birth
-    if "preferred_language" in data and payload.preferred_language is not None:
-        current_user.preferred_language = payload.preferred_language
+    _apply_profile_update_values(data, payload, current_user)
     session.add(current_user)
     await session.commit()
     await session.refresh(current_user)
@@ -2297,113 +2558,30 @@ async def google_callback(
 ) -> GoogleCallbackResponse:
     _validate_google_state(payload.state, "google_state")
     profile = await auth_service.exchange_google_code(payload.code)
-    sub = profile.get("sub")
-    email = str(profile.get("email") or "").strip().lower()
-    name = profile.get("name")
-    picture = profile.get("picture")
-    email_verified = bool(profile.get("email_verified"))
-    if not sub or not email:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Google profile")
-    domain = email.split("@")[-1]
-    if settings.google_allowed_domains and domain not in settings.google_allowed_domains:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email domain not allowed")
-
+    sub, email, name, picture, email_verified = _extract_valid_google_profile(profile)
     await self_service.maybe_cleanup_incomplete_google_accounts(session)
-
     existing_sub = await auth_service.get_user_by_google_sub(session, sub)
     if existing_sub:
-        if getattr(existing_sub, "deletion_scheduled_for", None) and self_service.is_deletion_due(existing_sub):
-            await self_service.execute_account_deletion(session, existing_sub)
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
-        if getattr(existing_sub, "deleted_at", None) is not None:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
-        if auth_service.is_profile_complete(existing_sub):
-            if bool(getattr(existing_sub, "two_factor_enabled", False)):
-                token = security.create_two_factor_token(str(existing_sub.id), remember=True, method="google")
-                return GoogleCallbackResponse(
-                    user=UserResponse.model_validate(existing_sub),
-                    requires_two_factor=True,
-                    two_factor_token=token,
-                )
-
-            is_admin_login = existing_sub.role in (UserRole.admin, UserRole.owner)
-            known_device = True
-            if is_admin_login:
-                known_device = await auth_service.has_seen_refresh_device(
-                    session,
-                    user_id=existing_sub.id,
-                    user_agent=request.headers.get("user-agent"),
-                )
-            tokens = await auth_service.issue_tokens_for_user(
-                session,
-                existing_sub,
-                user_agent=request.headers.get("user-agent"),
-                ip_address=request.client.host if request.client else None,
-                country_code=_extract_country_code(request),
-            )
-            if response:
-                set_refresh_cookie(response, tokens["refresh_token"], persistent=True)
-            await auth_service.record_security_event(
-                session,
-                existing_sub.id,
-                "login_google",
-                user_agent=request.headers.get("user-agent"),
-                ip_address=request.client.host if request.client else None,
-            )
-            if is_admin_login and not known_device:
-                owner = await auth_service.get_owner_user(session)
-                to_email = (owner.email if owner and owner.email else None) or settings.admin_alert_email
-                if to_email:
-                    background_tasks.add_task(
-                        email_service.send_admin_login_alert,
-                        to_email,
-                        admin_username=existing_sub.username,
-                        admin_display_name=existing_sub.name,
-                        admin_role=str(existing_sub.role),
-                        ip_address=request.client.host if request.client else None,
-                        country_code=_extract_country_code(request),
-                        user_agent=request.headers.get("user-agent"),
-                        occurred_at=datetime.now(timezone.utc),
-                        lang=owner.preferred_language if owner else None,
-                    )
-            logger.info("google_login_existing", extra={"user_id": str(existing_sub.id)})
-            return GoogleCallbackResponse(user=UserResponse.model_validate(existing_sub), tokens=TokenPair(**tokens))
-
-        completion_token = security.create_google_completion_token(str(existing_sub.id))
-        logger.info("google_login_needs_completion", extra={"user_id": str(existing_sub.id)})
-        return GoogleCallbackResponse(
-            user=UserResponse.model_validate(existing_sub),
-            requires_completion=True,
-            completion_token=completion_token,
+        return await _handle_existing_google_user_callback(
+            existing_sub,
+            request,
+            background_tasks,
+            session,
+            response=response,
         )
-
     existing_email = await auth_service.get_user_by_any_email(session, email)
-    if existing_email and existing_email.google_sub and existing_email.google_sub != sub:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Google account already linked elsewhere")
-    if existing_email and not existing_email.google_sub:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="This email is already registered. Sign in with your password and link Google in your account settings.",
-        )
-
-    user = await auth_service.create_google_user(
+    _raise_google_email_conflict(existing_email, sub=sub)
+    user = await _create_google_first_time_user(
         session,
+        profile,
+        sub=sub,
         email=email,
         name=name,
-        first_name=str(profile.get("given_name") or "").strip() or None,
-        last_name=str(profile.get("family_name") or "").strip() or None,
         picture=picture,
-        sub=sub,
         email_verified=email_verified,
-        preferred_language="en",
     )
     logger.info("google_login_first_time", extra={"user_id": str(user.id)})
-    completion_token = security.create_google_completion_token(str(user.id))
-    return GoogleCallbackResponse(
-        user=UserResponse.model_validate(user),
-        requires_completion=True,
-        completion_token=completion_token,
-    )
+    return _google_completion_required_response(user)
 
 
 class GoogleCompleteRequest(BaseModel):

@@ -200,34 +200,19 @@ async def _replace_promotion_scopes(
 
     await session.execute(delete(PromotionScope).where(PromotionScope.promotion_id == promotion_id))
 
-    _add_promotion_scopes(
-        session,
-        promotion_id=promotion_id,
-        entity_type=PromotionScopeEntityType.product,
-        mode=PromotionScopeMode.include,
-        entity_ids=include_product_ids,
-    )
-    _add_promotion_scopes(
-        session,
-        promotion_id=promotion_id,
-        entity_type=PromotionScopeEntityType.product,
-        mode=PromotionScopeMode.exclude,
-        entity_ids=exclude_product_ids,
-    )
-    _add_promotion_scopes(
-        session,
-        promotion_id=promotion_id,
-        entity_type=PromotionScopeEntityType.category,
-        mode=PromotionScopeMode.include,
-        entity_ids=include_category_ids,
-    )
-    _add_promotion_scopes(
-        session,
-        promotion_id=promotion_id,
-        entity_type=PromotionScopeEntityType.category,
-        mode=PromotionScopeMode.exclude,
-        entity_ids=exclude_category_ids,
-    )
+    for entity_type, mode, entity_ids in (
+        (PromotionScopeEntityType.product, PromotionScopeMode.include, include_product_ids),
+        (PromotionScopeEntityType.product, PromotionScopeMode.exclude, exclude_product_ids),
+        (PromotionScopeEntityType.category, PromotionScopeMode.include, include_category_ids),
+        (PromotionScopeEntityType.category, PromotionScopeMode.exclude, exclude_category_ids),
+    ):
+        _add_promotion_scopes(
+            session,
+            promotion_id=promotion_id,
+            entity_type=entity_type,
+            mode=mode,
+            entity_ids=entity_ids,
+        )
 
 
 def _add_promotion_scopes(
@@ -732,30 +717,22 @@ def _resolve_issue_coupon_should_email(*, send_email: bool, user: User) -> bool:
     return should_email
 
 
-@router.post("/admin/coupons/issue", status_code=status.HTTP_201_CREATED)
-async def admin_issue_coupon_to_user(
-    payload: CouponIssueToUserRequest,
-    background_tasks: BackgroundTasks,
-    session: SessionDep,
-    actor: AdminCouponsDep,
-) -> CouponRead:
-    user = await session.get(User, payload.user_id)
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DETAIL_USER_NOT_FOUND)
-
+async def _get_promotion_with_scopes_or_404(session: AsyncSession, *, promotion_id: UUID) -> Promotion:
     promotion = (
-        (await session.execute(select(Promotion).options(selectinload(Promotion.scopes)).where(Promotion.id == payload.promotion_id)))
+        (await session.execute(select(Promotion).options(selectinload(Promotion.scopes)).where(Promotion.id == promotion_id)))
         .scalars()
         .first()
     )
     if not promotion:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DETAIL_PROMOTION_NOT_FOUND)
+    return promotion
 
-    prefix_source = payload.prefix or promotion.key or promotion.name or _DEFAULT_COUPON_PREFIX
-    prefix = _sanitize_coupon_prefix(prefix_source) or _DEFAULT_COUPON_PREFIX
-    code = await coupons_service.generate_unique_coupon_code(session, prefix=prefix, length=12)
 
-    starts_at = datetime.now(timezone.utc)
+def _resolve_issue_coupon_ends_at_or_400(
+    *,
+    payload: CouponIssueToUserRequest,
+    starts_at: datetime,
+) -> datetime | None:
     ends_at = _normalize_issue_coupon_ends_at(
         ends_at=payload.ends_at,
         validity_days=payload.validity_days,
@@ -763,7 +740,20 @@ async def admin_issue_coupon_to_user(
     )
     if ends_at and ends_at < starts_at:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Coupon ends_at must be in the future")
+    return ends_at
 
+
+async def _create_coupon_assignment_and_audit(
+    session: AsyncSession,
+    *,
+    promotion: Promotion,
+    user: User,
+    actor: User,
+    code: str,
+    starts_at: datetime,
+    ends_at: datetime | None,
+    per_customer_max_redemptions: int,
+) -> Coupon:
     coupon = Coupon(
         promotion_id=promotion.id,
         code=code,
@@ -772,7 +762,7 @@ async def admin_issue_coupon_to_user(
         starts_at=starts_at,
         ends_at=ends_at,
         global_max_redemptions=None,
-        per_customer_max_redemptions=int(payload.per_customer_max_redemptions or 1),
+        per_customer_max_redemptions=per_customer_max_redemptions,
     )
     session.add(coupon)
     await session.flush()
@@ -788,27 +778,99 @@ async def admin_issue_coupon_to_user(
             "code": coupon.code,
         },
     )
+    return coupon
 
-    should_email = _resolve_issue_coupon_should_email(send_email=bool(payload.send_email), user=user)
-    await session.commit()
 
-    if should_email:
-        background_tasks.add_task(
-            email_service.send_coupon_assigned,
-            user.email,
-            coupon_code=coupon.code,
-            promotion_name=promotion.name,
-            promotion_description=promotion.description,
-            ends_at=ends_at,
-            lang=user.preferred_language,
-        )
+def _queue_coupon_assigned_notification(
+    *,
+    background_tasks: BackgroundTasks,
+    to_email: str,
+    coupon_code: str,
+    promotion_name: str,
+    promotion_description: str | None,
+    ends_at: datetime | None,
+    preferred_language: str | None,
+) -> None:
+    background_tasks.add_task(
+        email_service.send_coupon_assigned,
+        to_email,
+        coupon_code=coupon_code,
+        promotion_name=promotion_name,
+        promotion_description=promotion_description,
+        ends_at=ends_at,
+        lang=preferred_language,
+    )
 
+
+def _queue_coupon_revoked_notification(
+    *,
+    background_tasks: BackgroundTasks,
+    to_email: str,
+    coupon_code: str,
+    promotion_name: str,
+    reason: str | None,
+    preferred_language: str | None,
+) -> None:
+    background_tasks.add_task(
+        email_service.send_coupon_revoked,
+        to_email,
+        coupon_code=coupon_code,
+        promotion_name=promotion_name,
+        reason=reason,
+        lang=preferred_language,
+    )
+
+
+async def _refresh_coupon_for_read(session: AsyncSession, *, coupon: Coupon) -> CouponRead:
     await session.refresh(coupon, attribute_names=["promotion"])
     if coupon.promotion:
         await session.refresh(coupon.promotion, attribute_names=["scopes"])
     coupon_read = CouponRead.model_validate(coupon, from_attributes=True)
     coupon_read.promotion = _to_promotion_read(coupon.promotion) if coupon.promotion else None
     return coupon_read
+
+
+@router.post("/admin/coupons/issue", status_code=status.HTTP_201_CREATED)
+async def admin_issue_coupon_to_user(
+    payload: CouponIssueToUserRequest,
+    background_tasks: BackgroundTasks,
+    session: SessionDep,
+    actor: AdminCouponsDep,
+) -> CouponRead:
+    user = await _find_user(session, user_id=payload.user_id, email=None)
+    promotion = await _get_promotion_with_scopes_or_404(session, promotion_id=payload.promotion_id)
+
+    prefix_source = payload.prefix or promotion.key or promotion.name or _DEFAULT_COUPON_PREFIX
+    prefix = _sanitize_coupon_prefix(prefix_source) or _DEFAULT_COUPON_PREFIX
+    code = await coupons_service.generate_unique_coupon_code(session, prefix=prefix, length=12)
+
+    starts_at = datetime.now(timezone.utc)
+    ends_at = _resolve_issue_coupon_ends_at_or_400(payload=payload, starts_at=starts_at)
+    coupon = await _create_coupon_assignment_and_audit(
+        session,
+        promotion=promotion,
+        user=user,
+        actor=actor,
+        code=code,
+        starts_at=starts_at,
+        ends_at=ends_at,
+        per_customer_max_redemptions=int(payload.per_customer_max_redemptions or 1),
+    )
+    should_email = _resolve_issue_coupon_should_email(send_email=bool(payload.send_email), user=user)
+    await session.commit()
+
+    if should_email and user.email:
+        _queue_coupon_assigned_notification(
+            background_tasks=background_tasks,
+            to_email=user.email,
+            coupon_code=coupon.code,
+            promotion_name=promotion.name,
+            promotion_description=promotion.description,
+            ends_at=ends_at,
+            preferred_language=user.preferred_language,
+        )
+
+    return await _refresh_coupon_for_read(session, coupon=coupon)
 
 
 @dataclass
@@ -1140,6 +1202,82 @@ async def _get_coupon_with_promotion_or_404(session: AsyncSession, *, coupon_id:
     if not coupon:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DETAIL_COUPON_NOT_FOUND)
     return coupon
+
+
+async def _coupon_assignment_for_user(
+    session: AsyncSession,
+    *,
+    coupon_id: UUID,
+    user_id: UUID,
+) -> CouponAssignment | None:
+    return (
+        (
+            await session.execute(
+                select(CouponAssignment).where(CouponAssignment.coupon_id == coupon_id, CouponAssignment.user_id == user_id)
+            )
+        )
+        .scalars()
+        .first()
+    )
+
+
+def _activate_coupon_assignment(
+    session: AsyncSession,
+    *,
+    coupon_id: UUID,
+    user_id: UUID,
+    assignment: CouponAssignment | None,
+) -> bool:
+    if assignment and assignment.revoked_at is None:
+        return False
+    if assignment and assignment.revoked_at is not None:
+        assignment.revoked_at = None
+        assignment.revoked_reason = None
+        session.add(assignment)
+        return True
+    session.add(CouponAssignment(coupon_id=coupon_id, user_id=user_id))
+    return True
+
+
+def _revoke_coupon_assignment(
+    session: AsyncSession,
+    *,
+    assignment: CouponAssignment | None,
+    now: datetime,
+    reason: str | None,
+) -> bool:
+    if not assignment or assignment.revoked_at is not None:
+        return False
+    assignment.revoked_at = now
+    assignment.revoked_reason = reason
+    session.add(assignment)
+    return True
+
+
+def _normalize_bulk_email_request(emails: list[str] | None) -> tuple[int, list[str], list[str]]:
+    requested = len(emails or [])
+    normalized, invalid = _normalize_bulk_emails(emails or [])
+    if len(normalized) > 500:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_DETAIL_TOO_MANY_EMAILS)
+    return requested, normalized, invalid
+
+
+def _not_found_emails(emails: list[str], users_by_email: dict[str, User]) -> list[str]:
+    return [email for email in emails if email not in users_by_email]
+
+
+async def _bulk_coupon_context(
+    session: AsyncSession,
+    *,
+    coupon_id: UUID,
+    emails: list[str],
+) -> tuple[Coupon, dict[str, User], list[str], dict[UUID, CouponAssignment]]:
+    coupon = await _get_coupon_with_promotion_or_404(session, coupon_id=coupon_id)
+    users_by_email = await _users_by_email(session, emails=emails)
+    not_found = _not_found_emails(emails, users_by_email)
+    user_ids = [user.id for user in users_by_email.values()]
+    assignments_by_user_id = await _coupon_assignments_by_user_id(session, coupon_id=coupon.id, user_ids=user_ids)
+    return coupon, users_by_email, not_found, assignments_by_user_id
 
 
 async def _users_by_email(
@@ -1776,16 +1914,98 @@ async def _send_bulk_job_notifications(
     await _send_bulk_revoke_notifications(notify=notify, context=context, revoke_reason=revoke_reason)
 
 
+def _is_bulk_job_runnable(job: CouponBulkJob | None) -> bool:
+    return bool(job and job.status in (CouponBulkJobStatus.pending, CouponBulkJobStatus.running))
+
+
+async def _process_bulk_segment_batch(
+    session: AsyncSession,
+    *,
+    job: CouponBulkJob,
+    rows: list[tuple[UUID, str | None, str | None]],
+    context: _CouponEmailContext,
+    now: datetime,
+    revoke_reason: str | None,
+    revoke_notify_reason: str | None,
+) -> bool:
+    user_ids = [row[0] for row in rows]
+    assignments_by_user_id = await _coupon_assignments_by_user_id(session, coupon_id=job.coupon_id, user_ids=user_ids)
+    notify = _apply_bulk_job_rows(
+        session=session,
+        job=job,
+        rows=rows,
+        assignments_by_user_id=assignments_by_user_id,
+        now=now,
+        revoke_reason=revoke_reason,
+    )
+    await session.commit()
+    if await _finish_bulk_job_if_cancelled(session, job=job):
+        return True
+    await _send_bulk_job_notifications(
+        job=job,
+        notify=notify,
+        context=context,
+        revoke_reason=revoke_notify_reason,
+    )
+    return False
+
+
+async def _run_bulk_segment_batches(
+    session: AsyncSession,
+    *,
+    job: CouponBulkJob,
+    bucket: _BucketConfig | None,
+    filters: list[object],
+    context: _CouponEmailContext,
+    now: datetime,
+    revoke_reason: str | None,
+    revoke_notify_reason: str | None,
+) -> bool:
+    last_id: UUID | None = None
+    while True:
+        if await _finish_bulk_job_if_cancelled(session, job=job):
+            return True
+        rows = await _segment_user_batch_with_language(session, filters=filters, last_id=last_id)
+        if not rows:
+            return False
+        last_id = rows[-1][0]
+        bucketed_rows = _bucket_job_rows(rows, bucket=bucket)
+        if not bucketed_rows:
+            continue
+        if await _process_bulk_segment_batch(
+            session,
+            job=job,
+            rows=bucketed_rows,
+            context=context,
+            now=now,
+            revoke_reason=revoke_reason,
+            revoke_notify_reason=revoke_notify_reason,
+        ):
+            return True
+
+
+async def _mark_bulk_job_succeeded(session: AsyncSession, *, job: CouponBulkJob) -> None:
+    job.status = CouponBulkJobStatus.succeeded
+    job.finished_at = datetime.now(timezone.utc)
+    await session.commit()
+
+
+async def _mark_bulk_job_failed(session: AsyncSession, *, job: CouponBulkJob, error: Exception) -> None:
+    job.status = CouponBulkJobStatus.failed
+    job.error_message = str(error)[:1000]
+    job.finished_at = datetime.now(timezone.utc)
+    await session.commit()
+
+
 async def _run_bulk_segment_job(engine: AsyncEngine, *, job_id: UUID) -> None:
     session_local = async_sessionmaker(engine, expire_on_commit=False, autoflush=False, class_=AsyncSession)
     async with session_local() as session:
         job = await _load_bulk_job_for_run(session, job_id=job_id)
-        if not job:
-            return
-        if job.status not in (CouponBulkJobStatus.pending, CouponBulkJobStatus.running):
+        if not _is_bulk_job_runnable(job):
             return
 
         try:
+            assert job is not None
             await _mark_bulk_job_running(session, job=job)
 
             bucket = _parse_bucket_config(
@@ -1799,57 +2019,25 @@ async def _run_bulk_segment_job(engine: AsyncEngine, *, job_id: UUID) -> None:
             context = _coupon_email_context(job.coupon)
             revoke_reason = _trimmed_revoke_reason(job.revoke_reason)
             revoke_notify_reason = _notification_revoke_reason(job.revoke_reason)
-            last_id: UUID | None = None
             now = datetime.now(timezone.utc)
-            while True:
-                if await _finish_bulk_job_if_cancelled(session, job=job):
-                    return
-
-                rows = await _segment_user_batch_with_language(session, filters=filters, last_id=last_id)
-                if not rows:
-                    break
-                last_id = rows[-1][0]
-                bucketed_rows = _bucket_job_rows(rows, bucket=bucket)
-                if not bucketed_rows:
-                    continue
-
-                user_ids = [row[0] for row in bucketed_rows]
-                assignments_by_user_id = await _coupon_assignments_by_user_id(
-                    session,
-                    coupon_id=job.coupon_id,
-                    user_ids=user_ids,
-                )
-                notify = _apply_bulk_job_rows(
-                    session=session,
-                    job=job,
-                    rows=bucketed_rows,
-                    assignments_by_user_id=assignments_by_user_id,
-                    now=now,
-                    revoke_reason=revoke_reason,
-                )
-                await session.commit()
-                if await _finish_bulk_job_if_cancelled(session, job=job):
-                    return
-                await _send_bulk_job_notifications(
-                    job=job,
-                    notify=notify,
-                    context=context,
-                    revoke_reason=revoke_notify_reason,
-                )
-
+            if await _run_bulk_segment_batches(
+                session,
+                job=job,
+                bucket=bucket,
+                filters=filters,
+                context=context,
+                now=now,
+                revoke_reason=revoke_reason,
+                revoke_notify_reason=revoke_notify_reason,
+            ):
+                return
             if await _finish_bulk_job_if_cancelled(session, job=job):
                 return
-
-            job.status = CouponBulkJobStatus.succeeded
-            job.finished_at = datetime.now(timezone.utc)
-            await session.commit()
+            await _mark_bulk_job_succeeded(session, job=job)
         except Exception as exc:
             if await _finish_bulk_job_if_cancelled(session, job=job):
                 return
-            job.status = CouponBulkJobStatus.failed
-            job.error_message = str(exc)[:1000]
-            job.finished_at = datetime.now(timezone.utc)
-            await session.commit()
+            await _mark_bulk_job_failed(session, job=job, error=exc)
 
 
 @router.post("/admin/coupons/{coupon_id}/assign", status_code=status.HTTP_204_NO_CONTENT)
@@ -1860,51 +2048,28 @@ async def admin_assign_coupon(
     session: SessionDep,
     _: AdminCouponsDep,
 ) -> Response:
-    coupon = (
-        (
-            await session.execute(select(Coupon).options(selectinload(Coupon.promotion)).where(Coupon.id == coupon_id))
-        )
-        .scalars()
-        .first()
-    )
-    if not coupon:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DETAIL_COUPON_NOT_FOUND)
-
+    coupon = await _get_coupon_with_promotion_or_404(session, coupon_id=coupon_id)
     user = await _find_user(session, user_id=payload.user_id, email=payload.email)
-
-    assignment = (
-        (
-            await session.execute(
-                select(CouponAssignment).where(CouponAssignment.coupon_id == coupon.id, CouponAssignment.user_id == user.id)
-            )
-        )
-        .scalars()
-        .first()
-    )
-    if assignment and assignment.revoked_at is None:
+    assignment = await _coupon_assignment_for_user(session, coupon_id=coupon.id, user_id=user.id)
+    if not _activate_coupon_assignment(
+        session,
+        coupon_id=coupon.id,
+        user_id=user.id,
+        assignment=assignment,
+    ):
         return Response(status_code=status.HTTP_204_NO_CONTENT)
-    if assignment and assignment.revoked_at is not None:
-        assignment.revoked_at = None
-        assignment.revoked_reason = None
-        session.add(assignment)
-    else:
-        session.add(CouponAssignment(coupon_id=coupon.id, user_id=user.id))
-
-    should_email = bool(payload.send_email and user.email)
-    if should_email and not bool(getattr(user, "notify_marketing", False)):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_DETAIL_MARKETING_OPT_IN_REQUIRED)
+    should_email = _resolve_issue_coupon_should_email(send_email=bool(payload.send_email), user=user)
     await session.commit()
 
-    if should_email:
-        ends_at = getattr(coupon, "ends_at", None)
-        background_tasks.add_task(
-            email_service.send_coupon_assigned,
-            user.email,
+    if should_email and user.email:
+        _queue_coupon_assigned_notification(
+            background_tasks=background_tasks,
+            to_email=user.email,
             coupon_code=coupon.code,
             promotion_name=coupon.promotion.name if coupon.promotion else _FALLBACK_PROMOTION_NAME,
             promotion_description=coupon.promotion.description if coupon.promotion else None,
-            ends_at=ends_at,
-            lang=user.preferred_language,
+            ends_at=getattr(coupon, "ends_at", None),
+            preferred_language=user.preferred_language,
         )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -1974,27 +2139,14 @@ async def admin_bulk_assign_coupon(
     session: SessionDep,
     _: AdminCouponsDep,
 ) -> CouponBulkResult:
-    requested = len(payload.emails or [])
-    emails, invalid = _normalize_bulk_emails(payload.emails or [])
+    requested, emails, invalid = _normalize_bulk_email_request(payload.emails)
     if not emails:
         return CouponBulkResult(requested=requested, unique=0, invalid_emails=invalid)
-    if len(emails) > 500:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_DETAIL_TOO_MANY_EMAILS)
-
-    coupon = (
-        (
-            await session.execute(select(Coupon).options(selectinload(Coupon.promotion)).where(Coupon.id == coupon_id))
-        )
-        .scalars()
-        .first()
+    coupon, users_by_email, not_found, assignments_by_user_id = await _bulk_coupon_context(
+        session,
+        coupon_id=coupon_id,
+        emails=emails,
     )
-    if not coupon:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DETAIL_COUPON_NOT_FOUND)
-
-    users_by_email = await _users_by_email(session, emails=emails)
-    not_found = [e for e in emails if e not in users_by_email]
-    user_ids = [u.id for u in users_by_email.values()]
-    assignments_by_user_id = await _coupon_assignments_by_user_id(session, coupon_id=coupon.id, user_ids=user_ids)
     created, restored, already_active, notify_user_ids = _apply_bulk_assignments(
         session=session,
         coupon=coupon,
@@ -2087,46 +2239,28 @@ async def admin_revoke_coupon(
     session: SessionDep,
     _: AdminCouponsDep,
 ) -> Response:
-    coupon = (
-        (
-            await session.execute(select(Coupon).options(selectinload(Coupon.promotion)).where(Coupon.id == coupon_id))
-        )
-        .scalars()
-        .first()
-    )
-    if not coupon:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DETAIL_COUPON_NOT_FOUND)
-
+    coupon = await _get_coupon_with_promotion_or_404(session, coupon_id=coupon_id)
     user = await _find_user(session, user_id=payload.user_id, email=payload.email)
-    assignment = (
-        (
-            await session.execute(
-                select(CouponAssignment).where(CouponAssignment.coupon_id == coupon.id, CouponAssignment.user_id == user.id)
-            )
-        )
-        .scalars()
-        .first()
-    )
-    if not assignment or assignment.revoked_at is not None:
+    assignment = await _coupon_assignment_for_user(session, coupon_id=coupon.id, user_id=user.id)
+    if not _revoke_coupon_assignment(
+        session,
+        assignment=assignment,
+        now=datetime.now(timezone.utc),
+        reason=_trimmed_revoke_reason(payload.reason),
+    ):
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-    assignment.revoked_at = datetime.now(timezone.utc)
-    assignment.revoked_reason = (payload.reason or "").strip()[:255] or None
-    session.add(assignment)
-
-    should_email = bool(payload.send_email and user.email)
-    if should_email and not bool(getattr(user, "notify_marketing", False)):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_DETAIL_MARKETING_OPT_IN_REQUIRED)
+    should_email = _resolve_issue_coupon_should_email(send_email=bool(payload.send_email), user=user)
     await session.commit()
 
-    if should_email:
-        background_tasks.add_task(
-            email_service.send_coupon_revoked,
-            user.email,
+    if should_email and user.email and assignment:
+        _queue_coupon_revoked_notification(
+            background_tasks=background_tasks,
+            to_email=user.email,
             coupon_code=coupon.code,
             promotion_name=coupon.promotion.name if coupon.promotion else _FALLBACK_PROMOTION_NAME,
             reason=assignment.revoked_reason,
-            lang=user.preferred_language,
+            preferred_language=user.preferred_language,
         )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -2139,30 +2273,16 @@ async def admin_bulk_revoke_coupon(
     session: SessionDep,
     _: AdminCouponsDep,
 ) -> CouponBulkResult:
-    requested = len(payload.emails or [])
-    emails, invalid = _normalize_bulk_emails(payload.emails or [])
+    requested, emails, invalid = _normalize_bulk_email_request(payload.emails)
     if not emails:
         return CouponBulkResult(requested=requested, unique=0, invalid_emails=invalid)
-    if len(emails) > 500:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_DETAIL_TOO_MANY_EMAILS)
-
-    coupon = (
-        (
-            await session.execute(select(Coupon).options(selectinload(Coupon.promotion)).where(Coupon.id == coupon_id))
-        )
-        .scalars()
-        .first()
+    coupon, users_by_email, not_found, assignments_by_user_id = await _bulk_coupon_context(
+        session,
+        coupon_id=coupon_id,
+        emails=emails,
     )
-    if not coupon:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_DETAIL_COUPON_NOT_FOUND)
-
-    users_by_email = await _users_by_email(session, emails=emails)
-    not_found = [e for e in emails if e not in users_by_email]
-    user_ids = [u.id for u in users_by_email.values()]
-
-    assignments_by_user_id = await _coupon_assignments_by_user_id(session, coupon_id=coupon.id, user_ids=user_ids)
     now = datetime.now(timezone.utc)
-    reason = (payload.reason or "").strip()[:255] or None
+    reason = _trimmed_revoke_reason(payload.reason)
     revoked, already_revoked, not_assigned, revoked_user_ids = _apply_bulk_revocations(
         session=session,
         emails=emails,
