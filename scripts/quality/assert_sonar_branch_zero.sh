@@ -70,19 +70,32 @@ curl -sS --fail-with-body -u "$SONAR_TOKEN:" --get "$SONAR_HOST/api/issues/searc
 
 jq '.issues' "$summary_file" > "$issues_file"
 
-unresolved_total="$(jq -r '.total // 0' "$summary_file")"
+api_total="$(jq -r '.total // 0' "$summary_file")"
+unresolved_total="$(
+  jq -r '
+    [.issues[]?
+      | select(
+          ((.issueStatus // .status // "")
+            | ascii_upcase
+            | test("^(OPEN|CONFIRMED|REOPENED)$"))
+        )
+    ] | length
+  ' "$summary_file"
+)"
 
 jq -n \
   --arg branch "$SONAR_BRANCH_NAME" \
   --arg pull_request "$SONAR_PULL_REQUEST_KEY" \
   --arg component "$SONAR_PROJECT_KEY" \
   --arg host "$SONAR_HOST" \
+  --argjson api_total "$api_total" \
   --argjson unresolved "$unresolved_total" \
   '{
     branch:$branch,
     pull_request:$pull_request,
     component:$component,
     host:$host,
+    api_total:$api_total,
     unresolved:$unresolved,
     gate:(if $unresolved == 0 then "pass" else "fail" end)
   }' > "$digest_file"
