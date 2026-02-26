@@ -36,8 +36,6 @@ from app.services import pricing
 from app.services.payment_provider import payments_provider
 from app.services import webhook_handlers
 
-WebhookEventModel = StripeWebhookEvent | PayPalWebhookEvent
-
 
 async def list_maintenance_banners(session: AsyncSession) -> list[MaintenanceBanner]:
     result = await session.execute(select(MaintenanceBanner).order_by(MaintenanceBanner.starts_at.desc()))
@@ -562,7 +560,9 @@ async def count_email_failures(session: AsyncSession, *, since_hours: int = 24) 
     return int(total or 0)
 
 
-def _ensure_retryable_webhook(row: WebhookEventModel | None) -> tuple[WebhookEventModel, Any]:
+def _ensure_retryable_webhook[TWebhook: StripeWebhookEvent | PayPalWebhookEvent](
+    row: TWebhook | None,
+) -> tuple[TWebhook, Any]:
     webhook_row = _require_webhook_row(row)
     if bool(getattr(webhook_row, "processed_at", None)) and not (getattr(webhook_row, "last_error", None) or "").strip():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Webhook already processed")
@@ -572,17 +572,22 @@ def _ensure_retryable_webhook(row: WebhookEventModel | None) -> tuple[WebhookEve
     return webhook_row, payload
 
 
-async def _save_retry_attempt(session: AsyncSession, *, row: WebhookEventModel, attempted_at: datetime) -> None:
+async def _save_retry_attempt[TWebhook: StripeWebhookEvent | PayPalWebhookEvent](
+    session: AsyncSession,
+    *,
+    row: TWebhook,
+    attempted_at: datetime,
+) -> None:
     row.attempts = int(getattr(row, "attempts", 0) or 0) + 1
     row.last_attempt_at = attempted_at
     session.add(row)
     await session.commit()
 
 
-async def _mark_retry_success(
+async def _mark_retry_success[TWebhook: StripeWebhookEvent | PayPalWebhookEvent](
     session: AsyncSession,
     *,
-    model: type[WebhookEventModel],
+    model: type[TWebhook],
     row_id: UUID,
     provider: Literal["stripe", "paypal"],
     event_id_attr: str,
@@ -597,10 +602,10 @@ async def _mark_retry_success(
     return _build_webhook_event_read(provider=provider, event_id=str(getattr(updated, event_id_attr)), row=updated)
 
 
-async def _mark_retry_failure(
+async def _mark_retry_failure[TWebhook: StripeWebhookEvent | PayPalWebhookEvent](
     session: AsyncSession,
     *,
-    model: type[WebhookEventModel],
+    model: type[TWebhook],
     row_id: UUID,
     error_message: str,
 ) -> None:
@@ -614,10 +619,10 @@ async def _mark_retry_failure(
     await session.commit()
 
 
-async def _run_webhook_retry(
+async def _run_webhook_retry[TWebhook: StripeWebhookEvent | PayPalWebhookEvent](
     session: AsyncSession,
     *,
-    model: type[WebhookEventModel],
+    model: type[TWebhook],
     row_id: UUID,
     provider: Literal["stripe", "paypal"],
     event_id_attr: str,
