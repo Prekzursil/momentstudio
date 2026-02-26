@@ -169,20 +169,33 @@ def _meta_cover_fit(meta: dict | None) -> str:
     return "cover"
 
 
+def _meta_summary_translation(summary_map: dict, lang: str | None) -> str | None:
+    if not lang:
+        return None
+    translated = summary_map.get(lang)
+    if not isinstance(translated, str):
+        return None
+    cleaned = translated.strip()
+    return cleaned or None
+
+
+def _meta_summary_plain(summary_text: str, *, lang: str | None, base_lang: str | None) -> str | None:
+    cleaned = summary_text.strip()
+    if not cleaned:
+        return None
+    if lang and base_lang and lang != base_lang:
+        return None
+    return cleaned
+
+
 def _meta_summary(meta: dict | None, *, lang: str | None, base_lang: str | None) -> str | None:
     if not meta:
         return None
     value = meta.get("summary")
     if isinstance(value, dict):
-        if lang:
-            tr = value.get(lang)
-            if isinstance(tr, str) and tr.strip():
-                return tr.strip()
-        return None
-    if isinstance(value, str) and value.strip():
-        if lang and base_lang and lang != base_lang:
-            return None
-        return value.strip()
+        return _meta_summary_translation(value, lang)
+    if isinstance(value, str):
+        return _meta_summary_plain(value, lang=lang, base_lang=base_lang)
     return None
 
 
@@ -200,6 +213,137 @@ def _normalize_search_text(value: str | None) -> str:
     return without_marks.lower()
 
 
+def _published_block_filters(now: datetime, *, author_id: UUID | None) -> list:
+    filters = [
+        ContentBlock.key.like(f"{BLOG_KEY_PREFIX}%"),
+        ContentBlock.status == ContentStatus.published,
+        or_(ContentBlock.published_at.is_(None), ContentBlock.published_at <= now),
+        or_(ContentBlock.published_until.is_(None), ContentBlock.published_until > now),
+    ]
+    if author_id:
+        filters.append(ContentBlock.author_id == author_id)
+    return filters
+
+
+def _blog_comment_counts_subquery():
+    return (
+        select(
+            BlogComment.content_block_id.label("content_block_id"),
+            func.count(BlogComment.id).label("comment_count"),
+        )
+        .where(
+            BlogComment.is_deleted.is_(False),
+            BlogComment.is_hidden.is_(False),
+        )
+        .group_by(BlogComment.content_block_id)
+        .subquery()
+    )
+
+
+def _blog_ordering(sort_key: str):
+    pinned_flag = ContentBlock.meta["pinned"].as_boolean().is_(True)
+    pin_order = ContentBlock.meta["pin_order"].as_integer()
+    pinned_rank = case((pinned_flag, 0), else_=1)
+    pin_order_rank = case((pinned_flag, func.coalesce(pin_order, 999)), else_=999)
+    newest_ordering = [
+        pinned_rank.asc(),
+        pin_order_rank.asc(),
+        ContentBlock.published_at.desc().nullslast(),
+        ContentBlock.updated_at.desc(),
+    ]
+    if sort_key == "oldest":
+        return [
+            pinned_rank.asc(),
+            pin_order_rank.asc(),
+            ContentBlock.published_at.asc().nullslast(),
+            ContentBlock.updated_at.asc(),
+        ], None
+    if sort_key == "most_viewed":
+        return [
+            pinned_rank.asc(),
+            pin_order_rank.asc(),
+            ContentBlock.view_count.desc(),
+            ContentBlock.published_at.desc().nullslast(),
+            ContentBlock.updated_at.desc(),
+        ], None
+    if sort_key != "most_commented":
+        return newest_ordering, None
+    comment_counts = _blog_comment_counts_subquery()
+    return [
+        pinned_rank.asc(),
+        pin_order_rank.asc(),
+        func.coalesce(comment_counts.c.comment_count, 0).desc(),
+        ContentBlock.published_at.desc().nullslast(),
+        ContentBlock.updated_at.desc(),
+    ], comment_counts
+
+
+def _published_posts_query(filters: list, ordering: list, comment_counts, *, lang: str | None):
+    query = (
+        select(ContentBlock)
+        .options(selectinload(ContentBlock.images), selectinload(ContentBlock.author))
+        .where(*filters)
+    )
+    if comment_counts is not None:
+        query = query.outerjoin(comment_counts, comment_counts.c.content_block_id == ContentBlock.id)
+    query = query.order_by(*ordering)
+    if lang:
+        query = query.options(selectinload(ContentBlock.translations))
+    return query
+
+
+async def _fetch_content_blocks(session: AsyncSession, query, *, lang: str | None) -> list[ContentBlock]:
+    result = await session.execute(query)
+    blocks = list(result.scalars().unique())
+    for block in blocks:
+        _apply_translation(block, lang)
+    return blocks
+
+
+def _has_search_terms(query_text: str, tag_text: str, series_text: str) -> bool:
+    return bool(query_text or tag_text or series_text)
+
+
+def _block_matches_tag(meta: dict, tag_text: str) -> bool:
+    if not tag_text:
+        return True
+    tags = _normalize_tags(meta.get("tags"))
+    return tag_text in {_normalize_search_text(tag) for tag in tags}
+
+
+def _block_matches_series(meta: dict, series_text: str) -> bool:
+    if not series_text:
+        return True
+    series_value = meta.get("series")
+    return isinstance(series_value, str) and series_text == _normalize_search_text(series_value)
+
+
+def _block_matches_query(block: ContentBlock, query_text: str) -> bool:
+    if not query_text:
+        return True
+    haystack = _normalize_search_text(f"{block.title}\n{_plain_text_from_markdown(block.body_markdown)}")
+    return query_text in haystack
+
+
+def _block_matches_search(block: ContentBlock, *, query_text: str, tag_text: str, series_text: str) -> bool:
+    meta = getattr(block, "meta", None) or {}
+    return (
+        _block_matches_tag(meta, tag_text)
+        and _block_matches_series(meta, series_text)
+        and _block_matches_query(block, query_text)
+    )
+
+
+def _filter_published_blocks(
+    blocks: list[ContentBlock], *, query_text: str, tag_text: str, series_text: str
+) -> list[ContentBlock]:
+    return [
+        block
+        for block in blocks
+        if _block_matches_search(block, query_text=query_text, tag_text=tag_text, series_text=series_text)
+    ]
+
+
 async def list_published_posts(
     session: AsyncSession,
     *,
@@ -215,125 +359,31 @@ async def list_published_posts(
     now = datetime.now(timezone.utc)
     page = max(1, page)
     limit = max(1, min(limit, 50))
-
-    filters = [
-        ContentBlock.key.like(f"{BLOG_KEY_PREFIX}%"),
-        ContentBlock.status == ContentStatus.published,
-        or_(ContentBlock.published_at.is_(None), ContentBlock.published_at <= now),
-        or_(ContentBlock.published_until.is_(None), ContentBlock.published_until > now),
-    ]
-    if author_id:
-        filters.append(ContentBlock.author_id == author_id)
-    pinned_flag = ContentBlock.meta["pinned"].as_boolean().is_(True)
-    pin_order = ContentBlock.meta["pin_order"].as_integer()
-    pinned_rank = case((pinned_flag, 0), else_=1)
-    pin_order_rank = case((pinned_flag, func.coalesce(pin_order, 999)), else_=999)
-    sort_key = _normalize_blog_sort(sort)
-    comment_counts = None
-    if sort_key == "oldest":
-        ordering = [
-            pinned_rank.asc(),
-            pin_order_rank.asc(),
-            ContentBlock.published_at.asc().nullslast(),
-            ContentBlock.updated_at.asc(),
-        ]
-    elif sort_key == "most_viewed":
-        ordering = [
-            pinned_rank.asc(),
-            pin_order_rank.asc(),
-            ContentBlock.view_count.desc(),
-            ContentBlock.published_at.desc().nullslast(),
-            ContentBlock.updated_at.desc(),
-        ]
-    elif sort_key == "most_commented":
-        comment_counts = (
-            select(
-                BlogComment.content_block_id.label("content_block_id"),
-                func.count(BlogComment.id).label("comment_count"),
-            )
-            .where(
-                BlogComment.is_deleted.is_(False),
-                BlogComment.is_hidden.is_(False),
-            )
-            .group_by(BlogComment.content_block_id)
-            .subquery()
-        )
-        ordering = [
-            pinned_rank.asc(),
-            pin_order_rank.asc(),
-            func.coalesce(comment_counts.c.comment_count, 0).desc(),
-            ContentBlock.published_at.desc().nullslast(),
-            ContentBlock.updated_at.desc(),
-        ]
-    else:
-        ordering = [
-            pinned_rank.asc(),
-            pin_order_rank.asc(),
-            ContentBlock.published_at.desc().nullslast(),
-            ContentBlock.updated_at.desc(),
-        ]
+    filters = _published_block_filters(now, author_id=author_id)
+    ordering, comment_counts = _blog_ordering(_normalize_blog_sort(sort))
     query_text = _normalize_search_text(q)
     tag_text = _normalize_search_text(tag)
     series_text = _normalize_search_text(series)
+    has_search_terms = _has_search_terms(query_text, tag_text, series_text)
 
-    if not query_text and not tag_text and not series_text:
+    if not has_search_terms:
         offset = (page - 1) * limit
         total = await session.scalar(select(func.count()).select_from(ContentBlock).where(*filters))
-        query = (
-            select(ContentBlock)
-            .options(selectinload(ContentBlock.images), selectinload(ContentBlock.author))
-            .where(*filters)
-        )
-        if comment_counts is not None:
-            query = query.outerjoin(comment_counts, comment_counts.c.content_block_id == ContentBlock.id)
-        query = query.order_by(*ordering).limit(limit).offset(offset)
-        if lang:
-            query = query.options(selectinload(ContentBlock.translations))
-
-        result = await session.execute(query)
-        blocks = list(result.scalars().unique())
-        for block in blocks:
-            _apply_translation(block, lang)
+        query = _published_posts_query(filters, ordering, comment_counts, lang=lang).limit(limit).offset(offset)
+        blocks = await _fetch_content_blocks(session, query, lang=lang)
         return blocks, int(total or 0)
 
-    query = (
-        select(ContentBlock)
-        .options(selectinload(ContentBlock.images), selectinload(ContentBlock.author))
-        .where(*filters)
+    query = _published_posts_query(filters, ordering, comment_counts, lang=lang)
+    blocks = await _fetch_content_blocks(session, query, lang=lang)
+    filtered_blocks = _filter_published_blocks(
+        blocks,
+        query_text=query_text,
+        tag_text=tag_text,
+        series_text=series_text,
     )
-    if comment_counts is not None:
-        query = query.outerjoin(comment_counts, comment_counts.c.content_block_id == ContentBlock.id)
-    query = query.order_by(*ordering)
-    if lang:
-        query = query.options(selectinload(ContentBlock.translations))
-
-    result = await session.execute(query)
-    blocks = list(result.scalars().unique())
-    for block in blocks:
-        _apply_translation(block, lang)
-
-    if query_text or tag_text or series_text:
-        filtered: list[ContentBlock] = []
-        for block in blocks:
-            meta = getattr(block, "meta", None) or {}
-            if tag_text:
-                tags = _normalize_tags(meta.get("tags"))
-                if tag_text not in {_normalize_search_text(t) for t in tags}:
-                    continue
-            if series_text:
-                series_value = meta.get("series")
-                if not isinstance(series_value, str) or series_text != _normalize_search_text(series_value):
-                    continue
-            if query_text:
-                haystack = _normalize_search_text(f"{block.title}\n{_plain_text_from_markdown(block.body_markdown)}")
-                if query_text not in haystack:
-                    continue
-            filtered.append(block)
-        blocks = filtered
-
-    total = len(blocks)
+    total = len(filtered_blocks)
     offset = (page - 1) * limit
-    page_items = blocks[offset : offset + limit]
+    page_items = filtered_blocks[offset : offset + limit]
     return page_items, total
 
 
@@ -416,22 +466,56 @@ async def get_post_neighbors(
     return newer, older
 
 
+def _sorted_block_images(block: ContentBlock) -> list:
+    return sorted(getattr(block, "images", []) or [], key=lambda img: img.sort_order)
+
+
+def _cover_image_by_url(images: list, cover_url: str | None):
+    if not cover_url:
+        return None
+    return next((img for img in images if img.url == cover_url), None)
+
+
+def _resolve_cover(images: list, meta: dict) -> tuple[str | None, object | None]:
+    cover_url = _meta_cover_image_url(meta)
+    if not cover_url and images:
+        cover_url = images[0].url
+    return cover_url, _cover_image_by_url(images, cover_url)
+
+
+def _cover_focal_pair(cover_image: object | None) -> tuple[float | None, float | None]:
+    if not cover_image:
+        return None, None
+    return getattr(cover_image, "focal_x", None), getattr(cover_image, "focal_y", None)
+
+
+def _meta_reading_time_minutes(meta: dict, body_markdown: str) -> int | None:
+    override_minutes = _coerce_positive_int(meta.get("reading_time_minutes") or meta.get("reading_time"))
+    return override_minutes or _compute_reading_time_minutes(body_markdown)
+
+
+def _meta_series(meta: dict) -> str | None:
+    series = meta.get("series")
+    if not isinstance(series, str):
+        return None
+    cleaned = series.strip()
+    return cleaned or None
+
+
+def _meta_summary_or_excerpt(meta: dict, *, block: ContentBlock, lang: str | None) -> str:
+    summary = _meta_summary(meta, lang=lang, base_lang=getattr(block, "lang", None))
+    if summary:
+        return summary
+    return _excerpt(_plain_text_from_markdown(block.body_markdown))
+
+
 def to_list_item(block: ContentBlock, *, lang: str | None = None) -> dict:
     meta = getattr(block, "meta", None) or {}
-    images = sorted(getattr(block, "images", []) or [], key=lambda img: img.sort_order)
-    cover = _meta_cover_image_url(meta)
-    cover_image = None
-    if cover:
-        cover_image = next((img for img in images if img.url == cover), None)
-    elif images:
-        cover_image = images[0]
-        cover = cover_image.url
-
-    override_minutes = _coerce_positive_int(meta.get("reading_time_minutes") or meta.get("reading_time"))
-    reading_time_minutes = override_minutes or _compute_reading_time_minutes(block.body_markdown)
-    summary = _meta_summary(meta, lang=lang, base_lang=getattr(block, "lang", None))
-    excerpt = summary or _excerpt(_plain_text_from_markdown(block.body_markdown))
-    series = meta.get("series")
+    images = _sorted_block_images(block)
+    cover, cover_image = _resolve_cover(images, meta)
+    cover_focal_x, cover_focal_y = _cover_focal_pair(cover_image)
+    reading_time_minutes = _meta_reading_time_minutes(meta, block.body_markdown)
+    excerpt = _meta_summary_or_excerpt(meta, block=block, lang=lang)
     author_name = _author_public_name(getattr(block, "author", None))
     return {
         "slug": _extract_slug(block.key),
@@ -439,25 +523,23 @@ def to_list_item(block: ContentBlock, *, lang: str | None = None) -> dict:
         "excerpt": excerpt,
         "published_at": block.published_at,
         "cover_image_url": cover,
-        "cover_focal_x": getattr(cover_image, "focal_x", None) if cover_image else None,
-        "cover_focal_y": getattr(cover_image, "focal_y", None) if cover_image else None,
+        "cover_focal_x": cover_focal_x,
+        "cover_focal_y": cover_focal_y,
         "cover_fit": _meta_cover_fit(meta),
         "tags": _normalize_tags(meta.get("tags")),
-        "series": series.strip() if isinstance(series, str) and series.strip() else None,
+        "series": _meta_series(meta),
         "author_name": author_name,
         "reading_time_minutes": reading_time_minutes,
     }
 
 
 def to_read(block: ContentBlock, *, lang: str | None = None) -> dict:
-    images = sorted(getattr(block, "images", []) or [], key=lambda img: img.sort_order)
     meta = getattr(block, "meta", None) or {}
-    cover = _meta_cover_image_url(meta) or (images[0].url if images else None)
-    cover_image = next((img for img in images if img.url == cover), None) if cover else None
-    override_minutes = _coerce_positive_int(meta.get("reading_time_minutes") or meta.get("reading_time"))
-    reading_time_minutes = override_minutes or _compute_reading_time_minutes(block.body_markdown)
+    images = _sorted_block_images(block)
+    cover, cover_image = _resolve_cover(images, meta)
+    cover_focal_x, cover_focal_y = _cover_focal_pair(cover_image)
+    reading_time_minutes = _meta_reading_time_minutes(meta, block.body_markdown)
     summary = _meta_summary(meta, lang=lang, base_lang=getattr(block, "lang", None))
-    series = meta.get("series")
     author = getattr(block, "author", None)
     author_name = _author_public_name(author)
     return {
@@ -471,11 +553,11 @@ def to_read(block: ContentBlock, *, lang: str | None = None) -> dict:
         "meta": block.meta,
         "summary": summary,
         "cover_image_url": cover,
-        "cover_focal_x": getattr(cover_image, "focal_x", None) if cover_image else None,
-        "cover_focal_y": getattr(cover_image, "focal_y", None) if cover_image else None,
+        "cover_focal_x": cover_focal_x,
+        "cover_focal_y": cover_focal_y,
         "cover_fit": _meta_cover_fit(meta),
         "tags": _normalize_tags(meta.get("tags")),
-        "series": series.strip() if isinstance(series, str) and series.strip() else None,
+        "series": _meta_series(meta),
         "author_name": author_name,
         "author": _author_payload(author),
         "reading_time_minutes": reading_time_minutes,
@@ -508,6 +590,62 @@ async def list_comments(
     return items, int(total or 0)
 
 
+def _normalize_page_limit(page: int, limit: int) -> tuple[int, int, int]:
+    safe_page = max(1, page)
+    safe_limit = max(1, min(limit, 50))
+    return safe_page, safe_limit, (safe_page - 1) * safe_limit
+
+
+def _list_comment_threads_query(content_block_id: UUID, *, sort: str):
+    roots = (
+        select(BlogComment)
+        .options(selectinload(BlogComment.author))
+        .where(BlogComment.content_block_id == content_block_id, BlogComment.parent_id.is_(None))
+    )
+    cleaned_sort = (sort or "").strip().lower()
+    if cleaned_sort == "oldest":
+        return roots.order_by(BlogComment.created_at.asc(), BlogComment.id.asc())
+    if cleaned_sort != "top":
+        return roots.order_by(BlogComment.created_at.desc(), BlogComment.id.desc())
+    reply_counts = (
+        select(BlogComment.parent_id.label("parent_id"), func.count().label("reply_count"))
+        .where(
+            BlogComment.content_block_id == content_block_id,
+            BlogComment.parent_id.isnot(None),
+            BlogComment.is_deleted.is_(False),
+            BlogComment.is_hidden.is_(False),
+        )
+        .group_by(BlogComment.parent_id)
+        .subquery()
+    )
+    return roots.outerjoin(reply_counts, BlogComment.id == reply_counts.c.parent_id).order_by(
+        func.coalesce(reply_counts.c.reply_count, 0).desc(),
+        BlogComment.created_at.desc(),
+        BlogComment.id.desc(),
+    )
+
+
+async def _replies_by_parent(
+    session: AsyncSession, *, content_block_id: UUID, root_ids: list[UUID]
+) -> dict[UUID, list[BlogComment]]:
+    replies: dict[UUID, list[BlogComment]] = {cid: [] for cid in root_ids}
+    if not root_ids:
+        return replies
+    replies_result = await session.execute(
+        select(BlogComment)
+        .options(selectinload(BlogComment.author))
+        .where(
+            BlogComment.content_block_id == content_block_id,
+            BlogComment.parent_id.in_(root_ids),
+        )
+        .order_by(BlogComment.created_at.asc(), BlogComment.id.asc())
+    )
+    for reply in replies_result.scalars().unique():
+        if reply.parent_id:
+            replies.setdefault(reply.parent_id, []).append(reply)
+    return replies
+
+
 async def list_comment_threads(
     session: AsyncSession,
     *,
@@ -516,9 +654,7 @@ async def list_comment_threads(
     limit: int,
     sort: str = "newest",
 ) -> tuple[list[tuple[BlogComment, list[BlogComment]]], int, int]:
-    page = max(1, page)
-    limit = max(1, min(limit, 50))
-    offset = (page - 1) * limit
+    _, limit, offset = _normalize_page_limit(page, limit)
 
     total_threads = await session.scalar(
         select(func.count())
@@ -529,77 +665,18 @@ async def list_comment_threads(
         select(func.count()).select_from(BlogComment).where(BlogComment.content_block_id == content_block_id)
     )
 
-    roots = (
-        select(BlogComment)
-        .options(selectinload(BlogComment.author))
-        .where(BlogComment.content_block_id == content_block_id, BlogComment.parent_id.is_(None))
-    )
-
-    cleaned_sort = (sort or "").strip().lower()
-    if cleaned_sort == "oldest":
-        roots = roots.order_by(BlogComment.created_at.asc(), BlogComment.id.asc())
-    elif cleaned_sort == "top":
-        reply_counts = (
-            select(BlogComment.parent_id.label("parent_id"), func.count().label("reply_count"))
-            .where(
-                BlogComment.content_block_id == content_block_id,
-                BlogComment.parent_id.isnot(None),
-                BlogComment.is_deleted.is_(False),
-                BlogComment.is_hidden.is_(False),
-            )
-            .group_by(BlogComment.parent_id)
-            .subquery()
-        )
-        roots = (
-            roots.outerjoin(reply_counts, BlogComment.id == reply_counts.c.parent_id)
-            .order_by(
-                func.coalesce(reply_counts.c.reply_count, 0).desc(),
-                BlogComment.created_at.desc(),
-                BlogComment.id.desc(),
-            )
-        )
-    else:
-        roots = roots.order_by(BlogComment.created_at.desc(), BlogComment.id.desc())
-
+    roots = _list_comment_threads_query(content_block_id, sort=sort)
     roots_result = await session.execute(roots.limit(limit).offset(offset))
     root_comments = list(roots_result.scalars().unique())
     root_ids = [c.id for c in root_comments]
-
-    replies_by_parent: dict[UUID, list[BlogComment]] = {cid: [] for cid in root_ids}
-    if root_ids:
-        replies_result = await session.execute(
-            select(BlogComment)
-            .options(selectinload(BlogComment.author))
-            .where(
-                BlogComment.content_block_id == content_block_id,
-                BlogComment.parent_id.in_(root_ids),
-            )
-            .order_by(BlogComment.created_at.asc(), BlogComment.id.asc())
-        )
-        for reply in replies_result.scalars().unique():
-            if reply.parent_id:
-                replies_by_parent.setdefault(reply.parent_id, []).append(reply)
-
-    threads: list[tuple[BlogComment, list[BlogComment]]] = []
-    for root in root_comments:
-        threads.append((root, replies_by_parent.get(root.id, [])))
-
+    replies_by_parent = await _replies_by_parent(session, content_block_id=content_block_id, root_ids=root_ids)
+    threads = [(root, replies_by_parent.get(root.id, [])) for root in root_comments]
     return threads, int(total_threads or 0), int(total_comments or 0)
 
 
-async def list_user_comments(
-    session: AsyncSession,
-    *,
-    user_id: UUID,
-    lang: str | None,
-    page: int,
-    limit: int,
-) -> tuple[list[dict], int]:
-    page = max(1, page)
-    limit = max(1, min(limit, 50))
-    offset = (page - 1) * limit
-
-    total = await session.scalar(select(func.count()).select_from(BlogComment).where(BlogComment.user_id == user_id))
+async def _list_user_comments_rows(
+    session: AsyncSession, *, user_id: UUID, limit: int, offset: int
+) -> list[BlogComment]:
     result = await session.execute(
         select(BlogComment)
         .options(
@@ -612,97 +689,193 @@ async def list_user_comments(
         .limit(limit)
         .offset(offset)
     )
-    comments = list(result.scalars().unique())
+    return list(result.scalars().unique())
 
-    if lang:
-        seen_posts: set[UUID] = set()
-        for comment in comments:
-            post = getattr(comment, "post", None)
-            if not post or post.id in seen_posts:
-                continue
-            seen_posts.add(post.id)
-            _apply_translation(post, lang)
 
-    comment_ids = [c.id for c in comments]
-    reply_counts: dict[UUID, int] = {}
-    last_replies: dict[UUID, BlogComment] = {}
-    if comment_ids:
-        counts_rows = await session.execute(
-            select(BlogComment.parent_id, func.count().label("cnt"))
-            .where(
-                BlogComment.parent_id.in_(comment_ids),
-                BlogComment.is_deleted.is_(False),
-                BlogComment.is_hidden.is_(False),
-            )
-            .group_by(BlogComment.parent_id)
-        )
-        for parent_id, cnt in counts_rows.all():
-            if parent_id:
-                reply_counts[parent_id] = int(cnt or 0)
-
-        reply_rows = await session.execute(
-            select(BlogComment)
-            .options(selectinload(BlogComment.author))
-            .where(
-                BlogComment.parent_id.in_(comment_ids),
-                BlogComment.is_deleted.is_(False),
-                BlogComment.is_hidden.is_(False),
-            )
-            .order_by(BlogComment.created_at.desc())
-        )
-        for reply_comment in reply_rows.scalars().unique():
-            parent_id = reply_comment.parent_id
-            if parent_id and parent_id not in last_replies:
-                last_replies[parent_id] = reply_comment
-
-    items: list[dict] = []
+def _apply_user_comment_post_translations(comments: list[BlogComment], *, lang: str | None) -> None:
+    if not lang:
+        return
+    seen_posts: set[UUID] = set()
     for comment in comments:
         post = getattr(comment, "post", None)
-        post_key = getattr(post, "key", "") if post else ""
-        post_title = getattr(post, "title", "") if post else ""
+        if not post or post.id in seen_posts:
+            continue
+        seen_posts.add(post.id)
+        _apply_translation(post, lang)
 
-        status_value = "deleted" if comment.is_deleted else "hidden" if comment.is_hidden else "posted"
-        body_value = "" if comment.is_deleted or comment.is_hidden else comment.body
 
-        parent_ctx = None
-        if getattr(comment, "parent", None):
-            parent = comment.parent
-            parent_body = "" if parent.is_deleted or parent.is_hidden else parent.body
-            author = getattr(parent, "author", None)
-            parent_ctx = {
-                "id": parent.id,
-                "author_name": _author_display(author),
-                "snippet": _snippet(parent_body),
-            }
+async def _user_comment_reply_context(
+    session: AsyncSession, *, comment_ids: list[UUID]
+) -> tuple[dict[UUID, int], dict[UUID, BlogComment]]:
+    reply_counts: dict[UUID, int] = {}
+    last_replies: dict[UUID, BlogComment] = {}
+    if not comment_ids:
+        return reply_counts, last_replies
 
-        last_reply_ctx = None
-        last_reply = last_replies.get(comment.id)
-        if last_reply:
-            author = getattr(last_reply, "author", None)
-            last_reply_ctx = {
-                "id": last_reply.id,
-                "author_name": _author_display(author),
-                "snippet": _snippet(last_reply.body),
-                "created_at": last_reply.created_at,
-            }
-
-        items.append(
-            {
-                "id": comment.id,
-                "post_slug": _extract_slug(post_key),
-                "post_title": post_title,
-                "parent_id": comment.parent_id,
-                "body": body_value,
-                "status": status_value,
-                "created_at": comment.created_at,
-                "updated_at": comment.updated_at,
-                "reply_count": reply_counts.get(comment.id, 0),
-                "parent": parent_ctx,
-                "last_reply": last_reply_ctx,
-            }
+    counts_rows = await session.execute(
+        select(BlogComment.parent_id, func.count().label("cnt"))
+        .where(
+            BlogComment.parent_id.in_(comment_ids),
+            BlogComment.is_deleted.is_(False),
+            BlogComment.is_hidden.is_(False),
         )
+        .group_by(BlogComment.parent_id)
+    )
+    for parent_id, count in counts_rows.all():
+        if parent_id:
+            reply_counts[parent_id] = int(count or 0)
 
+    reply_rows = await session.execute(
+        select(BlogComment)
+        .options(selectinload(BlogComment.author))
+        .where(
+            BlogComment.parent_id.in_(comment_ids),
+            BlogComment.is_deleted.is_(False),
+            BlogComment.is_hidden.is_(False),
+        )
+        .order_by(BlogComment.created_at.desc())
+    )
+    for reply_comment in reply_rows.scalars().unique():
+        parent_id = reply_comment.parent_id
+        if parent_id and parent_id not in last_replies:
+            last_replies[parent_id] = reply_comment
+    return reply_counts, last_replies
+
+
+def _masked_comment_body(comment: BlogComment) -> str:
+    if comment.is_deleted or comment.is_hidden:
+        return ""
+    return comment.body
+
+
+def _comment_status(comment: BlogComment) -> str:
+    if comment.is_deleted:
+        return "deleted"
+    if comment.is_hidden:
+        return "hidden"
+    return "posted"
+
+
+def _parent_comment_context(comment: BlogComment) -> dict | None:
+    parent = getattr(comment, "parent", None)
+    if not parent:
+        return None
+    parent_body = _masked_comment_body(parent)
+    author = getattr(parent, "author", None)
+    return {
+        "id": parent.id,
+        "author_name": _author_display(author),
+        "snippet": _snippet(parent_body),
+    }
+
+
+def _last_reply_context(reply_comment: BlogComment | None) -> dict | None:
+    if not reply_comment:
+        return None
+    author = getattr(reply_comment, "author", None)
+    return {
+        "id": reply_comment.id,
+        "author_name": _author_display(author),
+        "snippet": _snippet(reply_comment.body),
+        "created_at": reply_comment.created_at,
+    }
+
+
+def _user_comment_item(
+    comment: BlogComment,
+    *,
+    reply_counts: dict[UUID, int],
+    last_replies: dict[UUID, BlogComment],
+) -> dict:
+    post = getattr(comment, "post", None)
+    post_key = getattr(post, "key", "") if post else ""
+    post_title = getattr(post, "title", "") if post else ""
+    return {
+        "id": comment.id,
+        "post_slug": _extract_slug(post_key),
+        "post_title": post_title,
+        "parent_id": comment.parent_id,
+        "body": _masked_comment_body(comment),
+        "status": _comment_status(comment),
+        "created_at": comment.created_at,
+        "updated_at": comment.updated_at,
+        "reply_count": reply_counts.get(comment.id, 0),
+        "parent": _parent_comment_context(comment),
+        "last_reply": _last_reply_context(last_replies.get(comment.id)),
+    }
+
+
+async def list_user_comments(
+    session: AsyncSession,
+    *,
+    user_id: UUID,
+    lang: str | None,
+    page: int,
+    limit: int,
+) -> tuple[list[dict], int]:
+    _, limit, offset = _normalize_page_limit(page, limit)
+
+    total = await session.scalar(select(func.count()).select_from(BlogComment).where(BlogComment.user_id == user_id))
+    comments = await _list_user_comments_rows(session, user_id=user_id, limit=limit, offset=offset)
+    _apply_user_comment_post_translations(comments, lang=lang)
+    comment_ids = [c.id for c in comments]
+    reply_counts, last_replies = await _user_comment_reply_context(session, comment_ids=comment_ids)
+    items = [
+        _user_comment_item(comment, reply_counts=reply_counts, last_replies=last_replies)
+        for comment in comments
+    ]
     return items, int(total or 0)
+
+
+def _clean_comment_body(body: str) -> str:
+    cleaned = (body or "").strip()
+    if not cleaned:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Comment body is required")
+    return cleaned
+
+
+async def _comment_parent(
+    session: AsyncSession, *, parent_id: UUID | None, content_block_id: UUID
+) -> BlogComment | None:
+    if not parent_id:
+        return None
+    parent = await session.get(BlogComment, parent_id)
+    if not parent or parent.content_block_id != content_block_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid parent comment")
+    return parent
+
+
+def _enforce_comment_link_limit(body: str) -> None:
+    max_links = int(settings.blog_comments_max_links or 0)
+    if max_links < 0:
+        return
+    if len(_COMMENT_LINK_RE.findall(body)) <= max_links:
+        return
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Too many links in comment")
+
+
+async def _enforce_comment_rate_limit(session: AsyncSession, *, user: User) -> None:
+    if getattr(user, "role", None) in (UserRole.admin, UserRole.owner):
+        return
+    limit_count = int(settings.blog_comments_rate_limit_count or 0)
+    window_seconds = int(settings.blog_comments_rate_limit_window_seconds or 0)
+    if limit_count <= 0 or window_seconds <= 0:
+        return
+    cutoff = datetime.now(timezone.utc) - timedelta(seconds=window_seconds)
+    recent = await session.scalar(
+        select(func.count())
+        .select_from(BlogComment)
+        .where(
+            BlogComment.user_id == user.id,
+            BlogComment.created_at >= cutoff,
+        )
+    )
+    if int(recent or 0) < limit_count:
+        return
+    raise HTTPException(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        detail="Too many comments. Please wait a moment and try again.",
+    )
 
 
 async def create_comment(
@@ -713,38 +886,10 @@ async def create_comment(
     body: str,
     parent_id: UUID | None = None,
 ) -> BlogComment:
-    body = (body or "").strip()
-    if not body:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Comment body is required")
-
-    parent = None
-    if parent_id:
-        parent = await session.get(BlogComment, parent_id)
-        if not parent or parent.content_block_id != content_block_id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid parent comment")
-
-    max_links = int(settings.blog_comments_max_links or 0)
-    if max_links >= 0 and len(_COMMENT_LINK_RE.findall(body)) > max_links:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Too many links in comment")
-
-    if getattr(user, "role", None) not in (UserRole.admin, UserRole.owner):
-        limit_count = int(settings.blog_comments_rate_limit_count or 0)
-        window_seconds = int(settings.blog_comments_rate_limit_window_seconds or 0)
-        if limit_count > 0 and window_seconds > 0:
-            cutoff = datetime.now(timezone.utc) - timedelta(seconds=window_seconds)
-            recent = await session.scalar(
-                select(func.count())
-                .select_from(BlogComment)
-                .where(
-                    BlogComment.user_id == user.id,
-                    BlogComment.created_at >= cutoff,
-                )
-            )
-            if int(recent or 0) >= limit_count:
-                raise HTTPException(
-                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail="Too many comments. Please wait a moment and try again.",
-                )
+    body = _clean_comment_body(body)
+    parent = await _comment_parent(session, parent_id=parent_id, content_block_id=content_block_id)
+    _enforce_comment_link_limit(body)
+    await _enforce_comment_rate_limit(session, user=user)
 
     comment = BlogComment(
         content_block_id=content_block_id,
@@ -827,6 +972,35 @@ def to_flag_read(flag: BlogCommentFlag) -> dict:
     }
 
 
+def _comment_admin_author(comment: BlogComment) -> dict:
+    author = comment.author
+    if not author:
+        return {
+            "id": comment.user_id,
+            "name": None,
+            "name_tag": None,
+            "username": None,
+            "avatar_url": None,
+        }
+    return {
+        "id": author.id,
+        "name": author.name,
+        "name_tag": getattr(author, "name_tag", None),
+        "username": getattr(author, "username", None),
+        "avatar_url": author.avatar_url or author.google_picture_url,
+    }
+
+
+def _comment_admin_body(comment: BlogComment) -> str:
+    if comment.is_deleted:
+        return ""
+    return comment.body
+
+
+def _comment_admin_flags(flags: list[BlogCommentFlag] | None) -> list[dict]:
+    return [to_flag_read(flag) for flag in (flags or [])]
+
+
 def to_comment_admin_read(
     comment: BlogComment,
     *,
@@ -834,13 +1008,12 @@ def to_comment_admin_read(
     flags: list[BlogCommentFlag] | None = None,
     flag_count: int = 0,
 ) -> dict:
-    author = comment.author
     return {
         "id": comment.id,
         "content_block_id": comment.content_block_id,
         "post_slug": _extract_slug(post_key),
         "parent_id": comment.parent_id,
-        "body": "" if comment.is_deleted else comment.body,
+        "body": _comment_admin_body(comment),
         "is_deleted": comment.is_deleted,
         "deleted_at": comment.deleted_at,
         "deleted_by": comment.deleted_by,
@@ -850,15 +1023,9 @@ def to_comment_admin_read(
         "hidden_reason": comment.hidden_reason,
         "created_at": comment.created_at,
         "updated_at": comment.updated_at,
-        "author": {
-            "id": author.id if author else comment.user_id,
-            "name": author.name if author else None,
-            "name_tag": getattr(author, "name_tag", None) if author else None,
-            "username": getattr(author, "username", None) if author else None,
-            "avatar_url": (author.avatar_url or author.google_picture_url) if author else None,
-        },
+        "author": _comment_admin_author(comment),
         "flag_count": int(flag_count or 0),
-        "flags": [to_flag_read(f) for f in (flags or [])],
+        "flags": _comment_admin_flags(flags),
     }
 
 
@@ -895,11 +1062,19 @@ async def list_flagged_comments(
     page: int,
     limit: int,
 ) -> tuple[list[dict], int]:
-    page = max(1, page)
-    limit = max(1, min(limit, 50))
-    offset = (page - 1) * limit
+    _, limit, offset = _normalize_page_limit(page, limit)
+    summary = _list_flagged_comments_summary()
+    total = await session.scalar(select(func.count()).select_from(summary))
+    rows = await _list_flagged_comment_rows(session, summary=summary, limit=limit, offset=offset)
+    if not rows:
+        return [], int(total or 0)
+    flags_by_comment = await _flags_by_comment_id(session, rows=rows)
+    out = _flagged_comment_items(rows, flags_by_comment=flags_by_comment)
+    return out, int(total or 0)
 
-    summary = (
+
+def _list_flagged_comments_summary():
+    return (
         select(
             BlogCommentFlag.comment_id.label("comment_id"),
             func.count().label("flag_count"),
@@ -910,7 +1085,10 @@ async def list_flagged_comments(
         .subquery()
     )
 
-    total = await session.scalar(select(func.count()).select_from(summary))
+
+async def _list_flagged_comment_rows(
+    session: AsyncSession, *, summary, limit: int, offset: int
+) -> list[tuple[BlogComment, str, int]]:
     rows = await session.execute(
         select(BlogComment, ContentBlock.key, summary.c.flag_count)
         .join(summary, summary.c.comment_id == BlogComment.id)
@@ -920,11 +1098,13 @@ async def list_flagged_comments(
         .limit(limit)
         .offset(offset)
     )
-    items = list(rows.all())
-    if not items:
-        return [], int(total or 0)
+    return [(comment, str(post_key), int(flag_count or 0)) for comment, post_key, flag_count in rows.all()]
 
-    comment_ids = [c.id for c, _, _ in items]
+
+async def _flags_by_comment_id(
+    session: AsyncSession, *, rows: list[tuple[BlogComment, str, int]]
+) -> dict[UUID, list[BlogCommentFlag]]:
+    comment_ids = [comment.id for comment, _, _ in rows]
     flag_rows = await session.execute(
         select(BlogCommentFlag)
         .where(BlogCommentFlag.comment_id.in_(comment_ids), BlogCommentFlag.resolved_at.is_(None))
@@ -933,18 +1113,23 @@ async def list_flagged_comments(
     flags_by_comment: dict[UUID, list[BlogCommentFlag]] = {}
     for flag in flag_rows.scalars().all():
         flags_by_comment.setdefault(flag.comment_id, []).append(flag)
+    return flags_by_comment
 
-    out: list[dict] = []
-    for comment, post_key, flag_count in items:
-        out.append(
-            to_comment_admin_read(
-                comment,
-                post_key=str(post_key),
-                flag_count=int(flag_count or 0),
-                flags=flags_by_comment.get(comment.id, []),
-            )
+
+def _flagged_comment_items(
+    rows: list[tuple[BlogComment, str, int]],
+    *,
+    flags_by_comment: dict[UUID, list[BlogCommentFlag]],
+) -> list[dict]:
+    return [
+        to_comment_admin_read(
+            comment,
+            post_key=str(post_key),
+            flag_count=int(flag_count or 0),
+            flags=flags_by_comment.get(comment.id, []),
         )
-    return out, int(total or 0)
+        for comment, post_key, flag_count in rows
+    ]
 
 
 async def set_comment_hidden(

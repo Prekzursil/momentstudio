@@ -167,13 +167,15 @@ EMAIL_CHANGE_COOLDOWN = timedelta(days=30)
 
 
 def _profile_is_complete(user: User) -> bool:
-    return bool(
-        (user.name or "").strip()
-        and (user.username or "").strip()
-        and (user.first_name or "").strip()
-        and (user.last_name or "").strip()
-        and user.date_of_birth
-        and (user.phone or "").strip()
+    return all(
+        (
+            bool((user.name or "").strip()),
+            bool((user.username or "").strip()),
+            bool((user.first_name or "").strip()),
+            bool((user.last_name or "").strip()),
+            bool(user.date_of_birth),
+            bool((user.phone or "").strip()),
+        )
     )
 
 
@@ -278,13 +280,14 @@ async def _enforce_username_change_cooldown(session: AsyncSession, user: User) -
         )
 
 
-async def create_user(session: AsyncSession, user_in: UserCreate) -> User:
-    normalized_email = (user_in.email or "").strip().lower()
+def _require_registration_email(user_in: UserCreate) -> str:
+    normalized_email = _normalize_email_value(user_in.email)
     if not normalized_email:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email is required")
-    if await is_email_taken(session, normalized_email):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
+    return normalized_email
 
+
+async def _resolve_registration_username(session: AsyncSession, user_in: UserCreate, normalized_email: str) -> str:
     username = (
         _validate_username(user_in.username)
         if user_in.username
@@ -292,53 +295,113 @@ async def create_user(session: AsyncSession, user_in: UserCreate) -> User:
     )
     if await get_user_by_username(session, username):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already taken")
+    return username
 
-    display_name = (user_in.name or "").strip() or username
-    display_name = display_name[:255]
+
+async def _resolve_registration_display_name(
+    session: AsyncSession,
+    requested_name: str | None,
+    username: str,
+) -> tuple[str, int]:
+    display_name = ((requested_name or "").strip() or username)[:255]
     name_tag = await _allocate_name_tag(session, display_name)
+    return display_name, name_tag
 
-    db_user = User(
+
+def _build_registration_user(
+    user_in: UserCreate,
+    *,
+    normalized_email: str,
+    username: str,
+    display_name: str,
+    name_tag: int,
+) -> User:
+    return User(
         email=normalized_email,
         username=username,
         hashed_password=security.hash_password(user_in.password),
         name=display_name,
         name_tag=name_tag,
-        first_name=(user_in.first_name or "").strip() or None,
-        middle_name=(user_in.middle_name or "").strip() or None,
-        last_name=(user_in.last_name or "").strip() or None,
+        first_name=_normalize_optional_text(user_in.first_name),
+        middle_name=_normalize_optional_text(user_in.middle_name),
+        last_name=_normalize_optional_text(user_in.last_name),
         date_of_birth=user_in.date_of_birth,
-        phone=(user_in.phone or "").strip() or None,
+        phone=_normalize_optional_text(user_in.phone),
         preferred_language=user_in.preferred_language or "en",
     )
-    session.add(db_user)
+
+
+async def _store_initial_user_history(
+    session: AsyncSession,
+    user: User,
+    *,
+    username: str,
+    display_name: str,
+    name_tag: int,
+) -> None:
+    session.add(user)
     await session.flush()
     now = datetime.now(timezone.utc)
-    session.add(UserUsernameHistory(user_id=db_user.id, username=username, created_at=now))
-    session.add(UserDisplayNameHistory(user_id=db_user.id, name=display_name, name_tag=name_tag, created_at=now))
-    session.add(UserEmailHistory(user_id=db_user.id, email=db_user.email, created_at=now))
+    session.add(UserUsernameHistory(user_id=user.id, username=username, created_at=now))
+    session.add(UserDisplayNameHistory(user_id=user.id, name=display_name, name_tag=name_tag, created_at=now))
+    session.add(UserEmailHistory(user_id=user.id, email=user.email, created_at=now))
     await session.commit()
-    await session.refresh(db_user)
+    await session.refresh(user)
+
+
+async def create_user(session: AsyncSession, user_in: UserCreate) -> User:
+    normalized_email = _require_registration_email(user_in)
+    if await is_email_taken(session, normalized_email):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
+    username = await _resolve_registration_username(session, user_in, normalized_email)
+    display_name, name_tag = await _resolve_registration_display_name(session, user_in.name, username)
+    db_user = _build_registration_user(
+        user_in,
+        normalized_email=normalized_email,
+        username=username,
+        display_name=display_name,
+        name_tag=name_tag,
+    )
+    await _store_initial_user_history(
+        session,
+        db_user,
+        username=username,
+        display_name=display_name,
+        name_tag=name_tag,
+    )
     return db_user
 
 
-async def authenticate_user(session: AsyncSession, identifier: str, password: str) -> User:
-    identifier = (identifier or "").strip()
-    if "@" in identifier:
-        user = await get_user_by_login_email(session, identifier)
-    else:
-        user = await get_user_by_username(session, identifier)
+async def _get_user_for_identifier(session: AsyncSession, identifier: str) -> User | None:
+    cleaned = (identifier or "").strip()
+    if "@" in cleaned:
+        return await get_user_by_login_email(session, cleaned)
+    return await get_user_by_username(session, cleaned)
+
+
+def _require_valid_password_login(user: User | None, password: str) -> User:
     if not user or not security.verify_password(password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    return user
+
+
+def _enforce_google_registration_completed(user: User) -> None:
     if getattr(user, "google_sub", None) and not _profile_is_complete(user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Complete your Google sign-in registration before using password login.",
         )
+
+
+async def _enforce_not_deleted_for_login(session: AsyncSession, user: User) -> None:
     if getattr(user, "deleted_at", None) is not None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
     if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(user):
         await self_service.execute_account_deletion(session, user)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
+
+
+def _enforce_login_access_state(user: User) -> None:
     locked_until = getattr(user, "locked_until", None)
     if locked_until and locked_until.tzinfo is None:
         locked_until = locked_until.replace(tzinfo=timezone.utc)
@@ -346,7 +409,68 @@ async def authenticate_user(session: AsyncSession, identifier: str, password: st
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account temporarily locked")
     if bool(getattr(user, "password_reset_required", False)):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Password reset required")
+
+
+async def authenticate_user(session: AsyncSession, identifier: str, password: str) -> User:
+    user = await _get_user_for_identifier(session, identifier)
+    user = _require_valid_password_login(user, password)
+    _enforce_google_registration_completed(user)
+    await _enforce_not_deleted_for_login(session, user)
+    _enforce_login_access_state(user)
     return user
+
+
+def _ensure_google_registration_available(user: User) -> None:
+    if not user.google_sub:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Google account required")
+    if _profile_is_complete(user):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Profile already complete")
+
+
+async def _update_google_registration_username(session: AsyncSession, user: User, username: str) -> None:
+    new_username = _validate_username(username)
+    if new_username == user.username:
+        return
+    existing = await get_user_by_username(session, new_username)
+    if existing and existing.id != user.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already taken")
+    user.username = new_username
+    session.add(UserUsernameHistory(user_id=user.id, username=new_username, created_at=datetime.now(timezone.utc)))
+
+
+async def _update_google_registration_display_name(session: AsyncSession, user: User, display_name: str) -> None:
+    cleaned_name = (display_name or "").strip()
+    if not cleaned_name:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Display name is required")
+    cleaned_name = cleaned_name[:255]
+    if cleaned_name == (user.name or ""):
+        return
+    reused = await _try_reuse_name_tag(session, user_id=user.id, name=cleaned_name)
+    tag = reused if reused is not None else await _allocate_name_tag(session, cleaned_name, exclude_user_id=user.id)
+    user.name = cleaned_name
+    user.name_tag = tag
+    session.add(UserDisplayNameHistory(user_id=user.id, name=cleaned_name, name_tag=tag, created_at=datetime.now(timezone.utc)))
+
+
+def _apply_google_registration_profile(
+    user: User,
+    *,
+    first_name: str,
+    middle_name: str | None,
+    last_name: str,
+    date_of_birth: date,
+    phone: str,
+    password: str,
+    preferred_language: str | None,
+) -> None:
+    user.first_name = _normalize_optional_text(first_name)
+    user.middle_name = _normalize_optional_text(middle_name)
+    user.last_name = _normalize_optional_text(last_name)
+    user.date_of_birth = date_of_birth
+    user.phone = (phone or "").strip()
+    if preferred_language:
+        user.preferred_language = preferred_language
+    user.hashed_password = security.hash_password(password)
 
 
 async def complete_google_registration(
@@ -363,39 +487,19 @@ async def complete_google_registration(
     password: str,
     preferred_language: str | None = None,
 ) -> User:
-    if not user.google_sub:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Google account required")
-    if _profile_is_complete(user):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Profile already complete")
-
-    new_username = _validate_username(username)
-    if new_username != user.username:
-        existing = await get_user_by_username(session, new_username)
-        if existing and existing.id != user.id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already taken")
-        user.username = new_username
-        session.add(UserUsernameHistory(user_id=user.id, username=new_username, created_at=datetime.now(timezone.utc)))
-
-    cleaned_name = (display_name or "").strip()
-    if not cleaned_name:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Display name is required")
-    cleaned_name = cleaned_name[:255]
-    if cleaned_name != (user.name or ""):
-        reused = await _try_reuse_name_tag(session, user_id=user.id, name=cleaned_name)
-        tag = reused if reused is not None else await _allocate_name_tag(session, cleaned_name, exclude_user_id=user.id)
-        user.name = cleaned_name
-        user.name_tag = tag
-        session.add(UserDisplayNameHistory(user_id=user.id, name=cleaned_name, name_tag=tag, created_at=datetime.now(timezone.utc)))
-
-    user.first_name = (first_name or "").strip() or None
-    user.middle_name = (middle_name or "").strip() or None
-    user.last_name = (last_name or "").strip() or None
-    user.date_of_birth = date_of_birth
-    user.phone = (phone or "").strip()
-    if preferred_language:
-        user.preferred_language = preferred_language
-
-    user.hashed_password = security.hash_password(password)
+    _ensure_google_registration_available(user)
+    await _update_google_registration_username(session, user, username)
+    await _update_google_registration_display_name(session, user, display_name)
+    _apply_google_registration_profile(
+        user,
+        first_name=first_name,
+        middle_name=middle_name,
+        last_name=last_name,
+        date_of_birth=date_of_birth,
+        phone=phone,
+        password=password,
+        preferred_language=preferred_language,
+    )
     session.add(user)
     await session.commit()
     await session.refresh(user)
@@ -421,32 +525,40 @@ async def update_username(session: AsyncSession, user: User, new_username: str) 
     return user
 
 
-async def update_display_name(session: AsyncSession, user: User, new_name: str) -> User:
-    cleaned = (new_name or "").strip()
+def _normalize_required_display_name(value: str) -> str:
+    cleaned = (value or "").strip()
     if not cleaned:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Display name is required")
-    cleaned = cleaned[:255]
+    return cleaned[:255]
+
+
+async def _enforce_display_name_change_cooldown(session: AsyncSession, user: User) -> None:
+    if not _profile_is_complete(user):
+        return
+    last = await session.scalar(
+        select(UserDisplayNameHistory.created_at)
+        .where(UserDisplayNameHistory.user_id == user.id)
+        .order_by(UserDisplayNameHistory.created_at.desc())
+        .limit(1)
+    )
+    if not isinstance(last, datetime):
+        return
+    if last.tzinfo is None:
+        last = last.replace(tzinfo=timezone.utc)
+    if datetime.now(timezone.utc) - last < DISPLAY_NAME_CHANGE_COOLDOWN:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="You can change your display name once per hour.",
+        )
+
+
+async def update_display_name(session: AsyncSession, user: User, new_name: str) -> User:
+    cleaned = _normalize_required_display_name(new_name)
     if cleaned == (user.name or ""):
         return user
-    # If the user is reverting to a previously used display name, allow it even inside the cooldown window.
     reused = await _try_reuse_name_tag(session, user_id=user.id, name=cleaned)
-
-    if _profile_is_complete(user) and reused is None:
-        last = await session.scalar(
-            select(UserDisplayNameHistory.created_at)
-            .where(UserDisplayNameHistory.user_id == user.id)
-            .order_by(UserDisplayNameHistory.created_at.desc())
-            .limit(1)
-        )
-        if last and isinstance(last, datetime):
-            if last.tzinfo is None:
-                last = last.replace(tzinfo=timezone.utc)
-            if datetime.now(timezone.utc) - last < DISPLAY_NAME_CHANGE_COOLDOWN:
-                raise HTTPException(
-                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail="You can change your display name once per hour.",
-                )
-
+    if reused is None:
+        await _enforce_display_name_change_cooldown(session, user)
     tag = reused if reused is not None else await _allocate_name_tag(session, cleaned, exclude_user_id=user.id)
     user.name = cleaned
     user.name_tag = tag
@@ -520,22 +632,47 @@ async def create_google_user(
     return user
 
 
-async def update_email(session: AsyncSession, user: User, new_email: str) -> User:
-    cleaned = (new_email or "").strip().lower()
-    if not cleaned:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email is required")
+def _require_email_change_allowed(user: User) -> None:
     if user.google_sub:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email cannot be changed while Google is linked. Unlink Google first.",
         )
-    if cleaned == (user.email or "").strip().lower():
-        return user
 
-    secondary = await session.scalar(
-        select(UserSecondaryEmail).where(
-            UserSecondaryEmail.user_id == user.id, func.lower(UserSecondaryEmail.email) == cleaned
+
+def _normalize_required_email(value: str) -> str:
+    cleaned = _normalize_email_value(value)
+    if not cleaned:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email is required")
+    return cleaned
+
+
+async def _enforce_email_change_cooldown(session: AsyncSession, user: User) -> None:
+    history_count = await session.scalar(
+        select(func.count()).select_from(UserEmailHistory).where(UserEmailHistory.user_id == user.id)
+    )
+    if int(history_count or 0) <= 1:
+        return
+    last = await session.scalar(
+        select(UserEmailHistory.created_at)
+        .where(UserEmailHistory.user_id == user.id)
+        .order_by(UserEmailHistory.created_at.desc())
+        .limit(1)
+    )
+    if not isinstance(last, datetime):
+        return
+    if last.tzinfo is None:
+        last = last.replace(tzinfo=timezone.utc)
+    if datetime.now(timezone.utc) - last < EMAIL_CHANGE_COOLDOWN:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="You can change your email once every 30 days.",
         )
+
+
+async def _ensure_not_primary_secondary_collision(session: AsyncSession, user: User, cleaned: str) -> None:
+    secondary = await session.scalar(
+        select(UserSecondaryEmail).where(UserSecondaryEmail.user_id == user.id, func.lower(UserSecondaryEmail.email) == cleaned)
     )
     if secondary:
         raise HTTPException(
@@ -543,28 +680,20 @@ async def update_email(session: AsyncSession, user: User, new_email: str) -> Use
             detail="That email is already attached as a secondary email. Use the secondary email controls to make it primary.",
         )
 
-    history_count = await session.scalar(
-        select(func.count()).select_from(UserEmailHistory).where(UserEmailHistory.user_id == user.id)
-    )
-    if int(history_count or 0) > 1:
-        last = await session.scalar(
-            select(UserEmailHistory.created_at)
-            .where(UserEmailHistory.user_id == user.id)
-            .order_by(UserEmailHistory.created_at.desc())
-            .limit(1)
-        )
-        if last and isinstance(last, datetime):
-            if last.tzinfo is None:
-                last = last.replace(tzinfo=timezone.utc)
-            if datetime.now(timezone.utc) - last < EMAIL_CHANGE_COOLDOWN:
-                raise HTTPException(
-                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail="You can change your email once every 30 days.",
-                )
 
+async def _ensure_primary_email_available(session: AsyncSession, user: User, cleaned: str) -> None:
     if await is_email_taken(session, cleaned, exclude_user_id=user.id):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
 
+
+async def update_email(session: AsyncSession, user: User, new_email: str) -> User:
+    cleaned = _normalize_required_email(new_email)
+    _require_email_change_allowed(user)
+    if cleaned == (user.email or "").strip().lower():
+        return user
+    await _ensure_not_primary_secondary_collision(session, user, cleaned)
+    await _enforce_email_change_cooldown(session, user)
+    await _ensure_primary_email_available(session, user, cleaned)
     user.email = cleaned
     user.email_verified = False
     now = datetime.now(timezone.utc)
@@ -702,74 +831,82 @@ async def delete_secondary_email(session: AsyncSession, user: User, secondary_em
     await session.commit()
 
 
-async def make_secondary_email_primary(session: AsyncSession, user: User, secondary_email_id: uuid.UUID) -> User:
-    if user.google_sub:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email cannot be changed while Google is linked. Unlink Google first.",
-        )
+async def _require_owned_secondary_email(
+    session: AsyncSession,
+    user: User,
+    secondary_email_id: uuid.UUID,
+) -> UserSecondaryEmail:
     secondary = await session.get(UserSecondaryEmail, secondary_email_id)
     if not secondary or secondary.user_id != user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Secondary email not found")
+    return secondary
+
+
+def _require_verified_secondary_email(secondary: UserSecondaryEmail) -> None:
     if not secondary.verified:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Verify this email before making it primary")
 
-    history_count = await session.scalar(
-        select(func.count()).select_from(UserEmailHistory).where(UserEmailHistory.user_id == user.id)
-    )
-    if int(history_count or 0) > 1:
-        last = await session.scalar(
-            select(UserEmailHistory.created_at)
-            .where(UserEmailHistory.user_id == user.id)
-            .order_by(UserEmailHistory.created_at.desc())
-            .limit(1)
-        )
-        if last and isinstance(last, datetime):
-            if last.tzinfo is None:
-                last = last.replace(tzinfo=timezone.utc)
-            if datetime.now(timezone.utc) - last < EMAIL_CHANGE_COOLDOWN:
-                raise HTTPException(
-                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail="You can change your email once every 30 days.",
-                )
 
-    new_primary = (secondary.email or "").strip().lower()
-    existing_primary = await get_user_by_email(session, new_primary)
+async def _ensure_primary_email_unclaimed(session: AsyncSession, user: User, email: str) -> None:
+    existing_primary = await get_user_by_email(session, email)
     if existing_primary and existing_primary.id != user.id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
 
+
+async def _preserve_old_primary_as_secondary(
+    session: AsyncSession,
+    *,
+    user: User,
+    old_primary: str,
+    old_primary_verified: bool,
+    now: datetime,
+) -> None:
+    if not old_primary:
+        return
+    existing_old_secondary = await session.scalar(
+        select(UserSecondaryEmail).where(
+            UserSecondaryEmail.user_id == user.id,
+            func.lower(UserSecondaryEmail.email) == old_primary,
+        )
+    )
+    if existing_old_secondary:
+        if old_primary_verified and not existing_old_secondary.verified:
+            existing_old_secondary.verified = True
+            existing_old_secondary.verified_at = now
+        session.add(existing_old_secondary)
+        return
+    session.add(
+        UserSecondaryEmail(
+            user_id=user.id,
+            email=old_primary,
+            verified=old_primary_verified,
+            verified_at=now if old_primary_verified else None,
+        )
+    )
+
+
+async def make_secondary_email_primary(session: AsyncSession, user: User, secondary_email_id: uuid.UUID) -> User:
+    _require_email_change_allowed(user)
+    secondary = await _require_owned_secondary_email(session, user, secondary_email_id)
+    _require_verified_secondary_email(secondary)
+    await _enforce_email_change_cooldown(session, user)
+    new_primary = (secondary.email or "").strip().lower()
+    await _ensure_primary_email_unclaimed(session, user, new_primary)
     old_primary = (user.email or "").strip().lower()
     old_primary_verified = bool(getattr(user, "email_verified", False))
-
     user.email = new_primary
     user.email_verified = True
     now = datetime.now(timezone.utc)
     session.add(UserEmailHistory(user_id=user.id, email=new_primary, created_at=now))
-
     await session.delete(secondary)
-
-    if old_primary and old_primary != new_primary:
-        existing_old_secondary = await session.scalar(
-            select(UserSecondaryEmail).where(
-                UserSecondaryEmail.user_id == user.id,
-                func.lower(UserSecondaryEmail.email) == old_primary,
-            )
+    if old_primary != new_primary:
+        await _preserve_old_primary_as_secondary(
+            session,
+            user=user,
+            old_primary=old_primary,
+            old_primary_verified=old_primary_verified,
+            now=now,
         )
-        if existing_old_secondary:
-            if old_primary_verified and not existing_old_secondary.verified:
-                existing_old_secondary.verified = True
-                existing_old_secondary.verified_at = now
-            session.add(existing_old_secondary)
-        else:
-            session.add(
-                UserSecondaryEmail(
-                    user_id=user.id,
-                    email=old_primary,
-                    verified=old_primary_verified,
-                    verified_at=now if old_primary_verified else None,
-                )
-            )
-
     await session.commit()
     await session.refresh(user)
     return user
@@ -1092,21 +1229,36 @@ async def revoke_refresh_token(session: AsyncSession, jti: str, reason: str = "r
         await session.commit()
 
 
-async def validate_refresh_token(session: AsyncSession, token: str) -> RefreshSession:
+def _invalid_refresh_token_exception() -> HTTPException:
+    return HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+
+
+def _extract_refresh_jti(token: str) -> Any:
     payload = security.decode_token(token)
     if not payload or payload.get("type") != "refresh":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+        raise _invalid_refresh_token_exception()
     jti = payload.get("jti")
     sub = payload.get("sub")
     if not jti or not sub:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
-    result = await session.execute(select(RefreshSession).where(RefreshSession.jti == jti))
-    stored = result.scalar_one_or_none()
-    expires_at = stored.expires_at if stored else None
+        raise _invalid_refresh_token_exception()
+    return jti
+
+
+def _is_refresh_session_valid(stored: RefreshSession | None) -> bool:
+    if not stored or stored.revoked:
+        return False
+    expires_at = stored.expires_at
     if expires_at and expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
-    if not stored or stored.revoked or not expires_at or expires_at < datetime.now(timezone.utc):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+    return bool(expires_at and expires_at >= datetime.now(timezone.utc))
+
+
+async def validate_refresh_token(session: AsyncSession, token: str) -> RefreshSession:
+    jti = _extract_refresh_jti(token)
+    result = await session.execute(select(RefreshSession).where(RefreshSession.jti == jti))
+    stored = result.scalar_one_or_none()
+    if stored is None or not _is_refresh_session_valid(stored):
+        raise _invalid_refresh_token_exception()
     return stored
 
 
