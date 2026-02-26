@@ -8,7 +8,7 @@ import secrets
 import string
 import unicodedata
 import uuid
-from typing import cast
+from typing import Any, cast
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, delete, func, select, update, or_, case, false
@@ -1571,6 +1571,102 @@ async def list_stock_adjustments(
     return list(rows)
 
 
+def _adjusted_quantity_or_400(*, before_quantity: int, delta: int) -> int:
+    after_quantity = before_quantity + int(delta)
+    if after_quantity < 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Stock cannot be negative")
+    return after_quantity
+
+
+async def _load_adjustment_product_or_404(session: AsyncSession, product_id: uuid.UUID) -> Product:
+    product = await session.get(Product, product_id)
+    if not product or getattr(product, "is_deleted", False):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    return product
+
+
+async def _apply_variant_stock_adjustment(
+    session: AsyncSession,
+    *,
+    product: Product,
+    variant_id: uuid.UUID,
+    delta: int,
+) -> tuple[uuid.UUID, int, int]:
+    variant = await session.get(ProductVariant, variant_id)
+    if not variant or variant.product_id != product.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid variant")
+    before_quantity = int(getattr(variant, "stock_quantity", 0) or 0)
+    after_quantity = _adjusted_quantity_or_400(before_quantity=before_quantity, delta=delta)
+    variant.stock_quantity = after_quantity
+    session.add(variant)
+    return variant.id, before_quantity, after_quantity
+
+
+def _apply_product_stock_adjustment(*, product: Product, delta: int) -> tuple[int, int, bool]:
+    was_out_of_stock = is_out_of_stock(product)
+    before_quantity = int(getattr(product, "stock_quantity", 0) or 0)
+    after_quantity = _adjusted_quantity_or_400(before_quantity=before_quantity, delta=delta)
+    product.stock_quantity = after_quantity
+    return before_quantity, after_quantity, was_out_of_stock
+
+
+async def _finalize_product_level_stock_adjustment(
+    session: AsyncSession,
+    *,
+    payload: StockAdjustmentCreate,
+    product: Product,
+    was_out_of_stock: bool,
+) -> None:
+    if payload.variant_id is not None:
+        return
+    await session.refresh(product)
+    if was_out_of_stock and not is_out_of_stock(product):
+        await fulfill_back_in_stock_requests(session, product=product)
+    await _maybe_alert_low_stock(session, product)
+
+
+def _build_stock_adjustment(
+    *,
+    product_id: uuid.UUID,
+    variant_id: uuid.UUID | None,
+    user_id: uuid.UUID | None,
+    payload: StockAdjustmentCreate,
+    delta: int,
+    before_quantity: int,
+    after_quantity: int,
+    note: str | None,
+) -> StockAdjustment:
+    return StockAdjustment(
+        product_id=product_id,
+        variant_id=variant_id,
+        actor_user_id=user_id,
+        reason=payload.reason,
+        delta=delta,
+        before_quantity=before_quantity,
+        after_quantity=after_quantity,
+        note=note,
+    )
+
+
+def _stock_adjustment_audit_payload(
+    *,
+    variant_id: uuid.UUID | None,
+    payload: StockAdjustmentCreate,
+    delta: int,
+    before_quantity: int,
+    after_quantity: int,
+    note: str | None,
+) -> dict[str, Any]:
+    return {
+        "variant_id": str(variant_id) if variant_id else None,
+        "reason": str(payload.reason),
+        "delta": delta,
+        "before": before_quantity,
+        "after": after_quantity,
+        "note": note,
+    }
+
+
 async def apply_stock_adjustment(
     session: AsyncSession,
     *,
@@ -1580,43 +1676,32 @@ async def apply_stock_adjustment(
     if payload.delta == 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Delta cannot be zero")
 
-    product = await session.get(Product, payload.product_id)
-    if not product or getattr(product, "is_deleted", False):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    product = await _load_adjustment_product_or_404(session, payload.product_id)
 
     note = (payload.note or "").strip() or None
     variant_id: uuid.UUID | None = None
-    before_quantity = 0
-    after_quantity = 0
+    delta = int(payload.delta)
+    before_quantity: int
+    after_quantity: int
     was_out_of_stock = False
-    affected_variant: ProductVariant | None = None
 
     if payload.variant_id is not None:
-        affected_variant = await session.get(ProductVariant, payload.variant_id)
-        if not affected_variant or affected_variant.product_id != product.id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid variant")
-        variant_id = affected_variant.id
-        before_quantity = int(getattr(affected_variant, "stock_quantity", 0) or 0)
-        after_quantity = before_quantity + int(payload.delta)
-        if after_quantity < 0:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Stock cannot be negative")
-        affected_variant.stock_quantity = after_quantity
-        session.add(affected_variant)
+        variant_id, before_quantity, after_quantity = await _apply_variant_stock_adjustment(
+            session,
+            product=product,
+            variant_id=payload.variant_id,
+            delta=delta,
+        )
     else:
-        was_out_of_stock = is_out_of_stock(product)
-        before_quantity = int(getattr(product, "stock_quantity", 0) or 0)
-        after_quantity = before_quantity + int(payload.delta)
-        if after_quantity < 0:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Stock cannot be negative")
-        product.stock_quantity = after_quantity
+        before_quantity, after_quantity, was_out_of_stock = _apply_product_stock_adjustment(product=product, delta=delta)
         session.add(product)
 
-    adjustment = StockAdjustment(
+    adjustment = _build_stock_adjustment(
         product_id=product.id,
         variant_id=variant_id,
-        actor_user_id=user_id,
-        reason=payload.reason,
-        delta=int(payload.delta),
+        user_id=user_id,
+        payload=payload,
+        delta=delta,
         before_quantity=before_quantity,
         after_quantity=after_quantity,
         note=note,
@@ -1625,25 +1710,26 @@ async def apply_stock_adjustment(
     await session.commit()
     await session.refresh(adjustment)
 
-    if payload.variant_id is None:
-        await session.refresh(product)
-        if was_out_of_stock and not is_out_of_stock(product):
-            await fulfill_back_in_stock_requests(session, product=product)
-        await _maybe_alert_low_stock(session, product)
+    await _finalize_product_level_stock_adjustment(
+        session,
+        payload=payload,
+        product=product,
+        was_out_of_stock=was_out_of_stock,
+    )
 
     await _log_product_action(
         session,
         product.id,
         "stock_adjustment",
         user_id,
-        {
-            "variant_id": str(variant_id) if variant_id else None,
-            "reason": str(payload.reason),
-            "delta": int(payload.delta),
-            "before": before_quantity,
-            "after": after_quantity,
-            "note": note,
-        },
+        _stock_adjustment_audit_payload(
+            variant_id=variant_id,
+            payload=payload,
+            delta=delta,
+            before_quantity=before_quantity,
+            after_quantity=after_quantity,
+            note=note,
+        ),
     )
     return adjustment
 
@@ -2231,6 +2317,61 @@ async def get_product_relationships(session: AsyncSession, product_id: uuid.UUID
     )
 
 
+def _normalized_relationship_ids(
+    *,
+    product_id: uuid.UUID,
+    payload: ProductRelationshipsUpdate,
+) -> tuple[list[uuid.UUID], list[uuid.UUID]]:
+    related_ids = _dedupe_uuid_list(list(payload.related_product_ids or []))
+    upsell_ids = _dedupe_uuid_list(list(payload.upsell_product_ids or []))
+    if product_id in related_ids or product_id in upsell_ids:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Product cannot reference itself")
+    related_set = set(related_ids)
+    filtered_upsells = [pid for pid in upsell_ids if pid not in related_set]
+    return related_ids, filtered_upsells
+
+
+async def _ensure_relationship_candidates_exist(session: AsyncSession, candidate_ids: list[uuid.UUID]) -> None:
+    if not candidate_ids:
+        return
+    found = set(
+        await session.scalars(
+            select(Product.id).where(Product.id.in_(candidate_ids), Product.is_deleted.is_(False))
+        )
+    )
+    missing = set(candidate_ids) - found
+    if missing:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="One or more related products not found")
+
+
+def _build_relationship_rows(
+    *,
+    product_id: uuid.UUID,
+    related_ids: list[uuid.UUID],
+    upsell_ids: list[uuid.UUID],
+) -> list[ProductRelationship]:
+    rows: list[ProductRelationship] = []
+    rows.extend(
+        ProductRelationship(
+            product_id=product_id,
+            related_product_id=pid,
+            relationship_type=ProductRelationshipType.related,
+            sort_order=idx,
+        )
+        for idx, pid in enumerate(related_ids)
+    )
+    rows.extend(
+        ProductRelationship(
+            product_id=product_id,
+            related_product_id=pid,
+            relationship_type=ProductRelationshipType.upsell,
+            sort_order=idx,
+        )
+        for idx, pid in enumerate(upsell_ids)
+    )
+    return rows
+
+
 async def update_product_relationships(
     session: AsyncSession,
     *,
@@ -2238,48 +2379,12 @@ async def update_product_relationships(
     payload: ProductRelationshipsUpdate,
     user_id: uuid.UUID | None = None,
 ) -> ProductRelationshipsUpdate:
-    related_ids = _dedupe_uuid_list(list(payload.related_product_ids or []))
-    upsell_ids = _dedupe_uuid_list(list(payload.upsell_product_ids or []))
-
-    if product.id in related_ids or product.id in upsell_ids:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Product cannot reference itself")
-
-    # Prevent overlap: if an id appears in related, drop it from upsells.
-    related_set = set(related_ids)
-    upsell_ids = [pid for pid in upsell_ids if pid not in related_set]
-
+    related_ids, upsell_ids = _normalized_relationship_ids(product_id=product.id, payload=payload)
     candidate_ids = _dedupe_uuid_list([*related_ids, *upsell_ids])
-    if candidate_ids:
-        found = set(
-            await session.scalars(
-                select(Product.id).where(Product.id.in_(candidate_ids), Product.is_deleted.is_(False))
-            )
-        )
-        missing = set(candidate_ids) - found
-        if missing:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="One or more related products not found")
+    await _ensure_relationship_candidates_exist(session, candidate_ids)
 
     await session.execute(delete(ProductRelationship).where(ProductRelationship.product_id == product.id))
-
-    rows: list[ProductRelationship] = []
-    for idx, pid in enumerate(related_ids):
-        rows.append(
-            ProductRelationship(
-                product_id=product.id,
-                related_product_id=pid,
-                relationship_type=ProductRelationshipType.related,
-                sort_order=idx,
-            )
-        )
-    for idx, pid in enumerate(upsell_ids):
-        rows.append(
-            ProductRelationship(
-                product_id=product.id,
-                related_product_id=pid,
-                relationship_type=ProductRelationshipType.upsell,
-                sort_order=idx,
-            )
-        )
+    rows = _build_relationship_rows(product_id=product.id, related_ids=related_ids, upsell_ids=upsell_ids)
     if rows:
         session.add_all(rows)
 
