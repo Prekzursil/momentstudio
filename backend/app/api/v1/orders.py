@@ -705,6 +705,37 @@ def _require_receipt_share_access(order: Order, current_user: object) -> None:
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
 
 
+def _decode_receipt_token_order(token: str) -> tuple[UUID, int]:
+    decoded = decode_receipt_token(token)
+    if not decoded:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid receipt token")
+    order_id, token_version = decoded
+    try:
+        return UUID(order_id), int(token_version)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid receipt token") from exc
+
+
+async def _load_receipt_order_from_token(session: AsyncSession, token: str) -> Order:
+    order_uuid, token_version = _decode_receipt_token_order(token)
+    order = await order_service.get_order_by_id(session, order_uuid)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Receipt not found")
+    if int(getattr(order, "receipt_token_version", 0) or 0) != token_version:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid receipt token")
+    return order
+
+
+def _allow_receipt_full_details(order: Order, current_user: object, *, reveal: bool) -> bool:
+    if not reveal:
+        return False
+    role = getattr(current_user, "role", None) if current_user else None
+    role_value = (getattr(role, "value", None) or str(role or "")).strip().lower()
+    is_admin = role_value in {"admin", "owner"}
+    is_owner = bool(current_user and getattr(order, "user_id", None) and getattr(current_user, "id", None) == order.user_id)
+    return bool(is_admin or is_owner)
+
+
 async def _build_receipt_share_token_read(session: AsyncSession, order: Order) -> ReceiptShareTokenRead:
     checkout_settings = await checkout_settings_service.get_checkout_settings(session)
     expires_at = datetime.now(timezone.utc) + timedelta(days=int(checkout_settings.receipt_share_days))
@@ -2734,6 +2765,80 @@ async def admin_download_document_export(
     return FileResponse(path, media_type=media_type, filename=filename, headers=headers)
 
 
+def _masked_admin_address(addr: Address | None) -> dict[str, Any] | None:
+    if not addr:
+        return None
+    return {
+        "id": addr.id,
+        "user_id": addr.user_id,
+        "label": addr.label,
+        "phone": None,
+        "line1": "***",
+        "line2": "***" if (addr.line2 or "").strip() else None,
+        "city": "***",
+        "region": "***" if (addr.region or "").strip() else None,
+        "postal_code": "***",
+        "country": addr.country,
+        "is_default_shipping": bool(getattr(addr, "is_default_shipping", False)),
+        "is_default_billing": bool(getattr(addr, "is_default_billing", False)),
+        "created_at": addr.created_at,
+        "updated_at": addr.updated_at,
+    }
+
+
+def _admin_order_base_payload(order: Order, *, include_pii: bool) -> dict[str, Any]:
+    base = OrderRead.model_validate(order).model_dump()
+    if include_pii:
+        return base
+    base["invoice_company"] = pii_service.mask_text(base.get("invoice_company"), keep=1)
+    base["invoice_vat_id"] = pii_service.mask_text(base.get("invoice_vat_id"), keep=2)
+    base["locker_address"] = "***" if (base.get("locker_address") or "").strip() else base.get("locker_address")
+    return base
+
+
+def _admin_order_customer_email(order: Order, *, include_pii: bool) -> str | None:
+    customer_email = getattr(order, "customer_email", None) or (
+        getattr(order.user, "email", None) if getattr(order, "user", None) else None
+    )
+    if include_pii:
+        return customer_email
+    return pii_service.mask_email(customer_email)
+
+
+def _admin_order_tags(order: Order) -> list[str]:
+    return [tag.tag for tag in (getattr(order, "tags", None) or [])]
+
+
+def _normalized_admin_order_customer_email(order: Order) -> str:
+    customer_email = getattr(order, "customer_email", None) or (
+        getattr(order.user, "email", None) if getattr(order, "user", None) else None
+    )
+    return (customer_email or "").strip().lower()
+
+
+def _admin_order_reference_for_email_filter(order: Order) -> str:
+    return ((getattr(order, "reference_code", None) or str(getattr(order, "id", "")) or "").strip()).lower()
+
+
+def _build_admin_order_email_events_stmt(
+    *,
+    cleaned_email: str,
+    since: datetime,
+    limit: int,
+    ref_lower: str,
+):
+    stmt = (
+        select(EmailDeliveryEvent)
+        .where(EmailDeliveryEvent.created_at >= since)
+        .where(func.lower(EmailDeliveryEvent.to_email) == cleaned_email)
+        .order_by(EmailDeliveryEvent.created_at.desc())
+        .limit(max(1, min(int(limit or 0), 200)))
+    )
+    if ref_lower:
+        stmt = stmt.where(func.lower(EmailDeliveryEvent.subject).like(f"%{ref_lower}%"))
+    return stmt
+
+
 async def _serialize_admin_order(
     session: AsyncSession,
     order: Order,
@@ -2742,51 +2847,20 @@ async def _serialize_admin_order(
     current_user: User | None = None,
 ) -> AdminOrderRead:
     fraud_signals = await order_service.compute_fraud_signals(session, order)
-    base = OrderRead.model_validate(order).model_dump()
-
-    def _masked_address(addr: Address | None) -> dict[str, Any] | None:
-        if not addr:
-            return None
-        return {
-            "id": addr.id,
-            "user_id": addr.user_id,
-            "label": addr.label,
-            "phone": None,
-            "line1": "***",
-            "line2": "***" if (addr.line2 or "").strip() else None,
-            "city": "***",
-            "region": "***" if (addr.region or "").strip() else None,
-            "postal_code": "***",
-            "country": addr.country,
-            "is_default_shipping": bool(getattr(addr, "is_default_shipping", False)),
-            "is_default_billing": bool(getattr(addr, "is_default_billing", False)),
-            "created_at": addr.created_at,
-            "updated_at": addr.updated_at,
-        }
-
-    if not include_pii:
-        base["invoice_company"] = pii_service.mask_text(base.get("invoice_company"), keep=1)
-        base["invoice_vat_id"] = pii_service.mask_text(base.get("invoice_vat_id"), keep=2)
-        base["locker_address"] = "***" if (base.get("locker_address") or "").strip() else base.get("locker_address")
-
-    customer_email = getattr(order, "customer_email", None) or (
-        getattr(order.user, "email", None) if getattr(order, "user", None) else None
-    )
-    if not include_pii:
-        customer_email = pii_service.mask_email(customer_email)
+    base = _admin_order_base_payload(order, include_pii=include_pii)
     return AdminOrderRead(
         **base,
-        customer_email=customer_email,
+        customer_email=_admin_order_customer_email(order, include_pii=include_pii),
         customer_username=getattr(order.user, "username", None) if getattr(order, "user", None) else None,
-        shipping_address=order.shipping_address if include_pii else _masked_address(getattr(order, "shipping_address", None)),
-        billing_address=order.billing_address if include_pii else _masked_address(getattr(order, "billing_address", None)),
+        shipping_address=order.shipping_address if include_pii else _masked_admin_address(getattr(order, "shipping_address", None)),
+        billing_address=order.billing_address if include_pii else _masked_admin_address(getattr(order, "billing_address", None)),
         tracking_url=getattr(order, "tracking_url", None),
         shipping_label_filename=getattr(order, "shipping_label_filename", None),
         shipping_label_uploaded_at=getattr(order, "shipping_label_uploaded_at", None),
         has_shipping_label=bool(getattr(order, "shipping_label_path", None)),
         refunds=getattr(order, "refunds", []) or [],
         admin_notes=getattr(order, "admin_notes", []) or [],
-        tags=[t.tag for t in (getattr(order, "tags", None) or [])],
+        tags=_admin_order_tags(order),
         fraud_signals=fraud_signals,
         shipments=getattr(order, "shipments", []) or [],
     )
@@ -2827,28 +2901,17 @@ async def admin_list_order_email_events(
     if include_pii:
         pii_service.require_pii_reveal(admin, request=request)
 
-    customer_email = getattr(order, "customer_email", None) or (
-        getattr(order.user, "email", None) if getattr(order, "user", None) else None
-    )
-    cleaned_email = (customer_email or "").strip().lower()
+    cleaned_email = _normalized_admin_order_customer_email(order)
     if not cleaned_email:
         return []
 
-    ref = (getattr(order, "reference_code", None) or str(getattr(order, "id", "")) or "").strip()
-    ref_lower = ref.lower()
-
-    now = datetime.now(timezone.utc)
-    since = now - timedelta(hours=max(1, int(since_hours or 0)))
-
-    stmt = (
-        select(EmailDeliveryEvent)
-        .where(EmailDeliveryEvent.created_at >= since)
-        .where(func.lower(EmailDeliveryEvent.to_email) == cleaned_email)
-        .order_by(EmailDeliveryEvent.created_at.desc())
-        .limit(max(1, min(int(limit or 0), 200)))
+    since = datetime.now(timezone.utc) - timedelta(hours=max(1, int(since_hours or 0)))
+    stmt = _build_admin_order_email_events_stmt(
+        cleaned_email=cleaned_email,
+        since=since,
+        limit=limit,
+        ref_lower=_admin_order_reference_for_email_filter(order),
     )
-    if ref_lower:
-        stmt = stmt.where(func.lower(EmailDeliveryEvent.subject).like(f"%{ref_lower}%"))
 
     rows = (await session.execute(stmt)).scalars().all()
     to_email_value = cleaned_email if include_pii else pii_service.mask_email(cleaned_email)
@@ -3419,6 +3482,44 @@ def _order_customer_contact(order: Order) -> tuple[str | None, str | None]:
     customer_email = (order.user.email if order.user and order.user.email else None) or getattr(order, "customer_email", None)
     customer_lang = order.user.preferred_language if order.user else None
     return customer_email, customer_lang
+
+
+def _queue_order_processing_email(background_tasks: BackgroundTasks, order: Order) -> None:
+    customer_email, customer_lang = _order_customer_contact(order)
+    if customer_email:
+        background_tasks.add_task(email_service.send_order_processing_update, customer_email, order, lang=customer_lang)
+
+
+def _queue_order_cancelled_email(background_tasks: BackgroundTasks, order: Order) -> None:
+    customer_email, customer_lang = _order_customer_contact(order)
+    if customer_email:
+        background_tasks.add_task(email_service.send_order_cancelled_update, customer_email, order, lang=customer_lang)
+
+
+async def _notify_user_order_processing(session: AsyncSession, order: Order) -> None:
+    if not (order.user and order.user.id):
+        return
+    await notification_service.create_notification(
+        session,
+        user_id=order.user.id,
+        type="order",
+        title="Order processing" if (order.user.preferred_language or "en") != "ro" else "Comandă în procesare",
+        body=f"Reference {order.reference_code}" if order.reference_code else None,
+        url=_account_orders_url(order),
+    )
+
+
+async def _notify_user_order_cancelled(session: AsyncSession, order: Order) -> None:
+    if not (order.user and order.user.id):
+        return
+    await notification_service.create_notification(
+        session,
+        user_id=order.user.id,
+        type="order",
+        title="Order cancelled" if (order.user.preferred_language or "en") != "ro" else "Comandă anulată",
+        body=f"Reference {order.reference_code}" if order.reference_code else None,
+        url=_account_orders_url(order),
+    )
 
 
 async def _queue_first_order_reward_email(
@@ -4240,19 +4341,8 @@ async def admin_capture_payment(
         order=updated,
         note=f"Stripe {intent_id or updated.stripe_payment_intent_id}".strip(),
     )
-    customer_to = (updated.user.email if updated.user and updated.user.email else None) or getattr(updated, "customer_email", None)
-    customer_lang = updated.user.preferred_language if updated.user else None
-    if customer_to:
-        background_tasks.add_task(email_service.send_order_processing_update, customer_to, updated, lang=customer_lang)
-    if updated.user and updated.user.id:
-        await notification_service.create_notification(
-            session,
-            user_id=updated.user.id,
-            type="order",
-            title="Order processing" if (updated.user.preferred_language or "en") != "ro" else "Comandă în procesare",
-            body=f"Reference {updated.reference_code}" if updated.reference_code else None,
-            url=_account_orders_url(updated),
-        )
+    _queue_order_processing_email(background_tasks, updated)
+    await _notify_user_order_processing(session, updated)
     return updated
 
 
@@ -4269,19 +4359,8 @@ async def admin_void_payment(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
     updated = await order_service.void_payment(session, order, intent_id=intent_id)
     await coupons_service.release_coupon_for_order(session, order=updated, reason="payment_voided")
-    customer_to = (updated.user.email if updated.user and updated.user.email else None) or getattr(updated, "customer_email", None)
-    customer_lang = updated.user.preferred_language if updated.user else None
-    if customer_to:
-        background_tasks.add_task(email_service.send_order_cancelled_update, customer_to, updated, lang=customer_lang)
-    if updated.user and updated.user.id:
-        await notification_service.create_notification(
-            session,
-            user_id=updated.user.id,
-            type="order",
-            title="Order cancelled" if (updated.user.preferred_language or "en") != "ro" else "Comandă anulată",
-            body=f"Reference {updated.reference_code}" if updated.reference_code else None,
-            url=_account_orders_url(updated),
-        )
+    _queue_order_cancelled_email(background_tasks, updated)
+    await _notify_user_order_cancelled(session, updated)
     return updated
 
 
@@ -4332,25 +4411,8 @@ async def read_receipt_by_token(
     session: AsyncSession = Depends(get_session),
     current_user=Depends(get_current_user_optional),
 ) -> ReceiptRead:
-    decoded = decode_receipt_token(token)
-    if not decoded:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid receipt token")
-    order_id, token_version = decoded
-    try:
-        order_uuid = UUID(order_id)
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid receipt token")
-
-    order = await order_service.get_order_by_id(session, order_uuid)
-    if not order:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Receipt not found")
-    if int(getattr(order, "receipt_token_version", 0) or 0) != int(token_version):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid receipt token")
-    role = getattr(current_user, "role", None) if current_user else None
-    role_value = (getattr(role, "value", None) or str(role or "")).strip().lower()
-    is_admin = role_value in {"admin", "owner"}
-    is_owner = bool(current_user and getattr(order, "user_id", None) and getattr(current_user, "id", None) == order.user_id)
-    allow_full = bool(reveal and (is_admin or is_owner))
+    order = await _load_receipt_order_from_token(session, token)
+    allow_full = _allow_receipt_full_details(order, current_user, reveal=reveal)
     return receipt_service.build_order_receipt(order, order.items, redacted=not allow_full)
 
 
@@ -4361,25 +4423,8 @@ async def download_receipt_by_token(
     session: AsyncSession = Depends(get_session),
     current_user=Depends(get_current_user_optional),
 ):
-    decoded = decode_receipt_token(token)
-    if not decoded:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid receipt token")
-    order_id, token_version = decoded
-    try:
-        order_uuid = UUID(order_id)
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid receipt token")
-
-    order = await order_service.get_order_by_id(session, order_uuid)
-    if not order:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Receipt not found")
-    if int(getattr(order, "receipt_token_version", 0) or 0) != int(token_version):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid receipt token")
-    role = getattr(current_user, "role", None) if current_user else None
-    role_value = (getattr(role, "value", None) or str(role or "")).strip().lower()
-    is_admin = role_value in {"admin", "owner"}
-    is_owner = bool(current_user and getattr(order, "user_id", None) and getattr(current_user, "id", None) == order.user_id)
-    allow_full = bool(reveal and (is_admin or is_owner))
+    order = await _load_receipt_order_from_token(session, token)
+    allow_full = _allow_receipt_full_details(order, current_user, reveal=reveal)
     ref = order.reference_code or str(order.id)
     filename = f"receipt-{ref}.pdf"
     headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
