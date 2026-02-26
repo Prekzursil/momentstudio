@@ -507,6 +507,20 @@ class AppliedDiscount:
     totals: Totals
 
 
+def _applied_discount_result(
+    coupon: Coupon | None,
+    discount_ron: Decimal,
+    shipping_discount_ron: Decimal,
+    totals: Totals,
+) -> AppliedDiscount:
+    return AppliedDiscount(
+        coupon=coupon,
+        discount_ron=discount_ron,
+        shipping_discount_ron=shipping_discount_ron,
+        totals=totals,
+    )
+
+
 async def _zero_discount_totals(
     session: AsyncSession,
     *,
@@ -525,6 +539,56 @@ async def _zero_discount_totals(
         discount_ron=Decimal("0.00"),
         free_shipping=False,
         country_code=country_code,
+    )
+
+
+async def _applied_discount_without_code(
+    session: AsyncSession,
+    *,
+    cart: Cart,
+    checkout: CheckoutSettings,
+    shipping_method_rate_flat: Decimal | None,
+    shipping_method_rate_per_kg: Decimal | None,
+    country_code: str | None,
+) -> AppliedDiscount:
+    totals = await _zero_discount_totals(
+        session,
+        cart=cart,
+        checkout=checkout,
+        shipping_method_rate_flat=shipping_method_rate_flat,
+        shipping_method_rate_per_kg=shipping_method_rate_per_kg,
+        country_code=country_code,
+    )
+    return _applied_discount_result(None, Decimal("0.00"), Decimal("0.00"), totals)
+
+
+async def _applied_discount_with_coupon(
+    session: AsyncSession,
+    *,
+    cart: Cart,
+    checkout: CheckoutSettings,
+    shipping_method_rate_flat: Decimal | None,
+    shipping_method_rate_per_kg: Decimal | None,
+    country_code: str | None,
+    coupon: Coupon,
+    eval_result: CouponEligibility,
+) -> AppliedDiscount:
+    free_shipping = coupon.promotion.discount_type == PromotionDiscountType.free_shipping
+    totals = await compute_totals_with_coupon(
+        session,
+        cart=cart,
+        checkout=checkout,
+        shipping_method_rate_flat=shipping_method_rate_flat,
+        shipping_method_rate_per_kg=shipping_method_rate_per_kg,
+        discount_ron=eval_result.estimated_discount_ron,
+        free_shipping=free_shipping,
+        country_code=country_code,
+    )
+    return _applied_discount_result(
+        coupon,
+        eval_result.estimated_discount_ron,
+        eval_result.estimated_shipping_discount_ron,
+        totals,
     )
 
 
@@ -566,17 +630,9 @@ async def apply_discount_code_to_cart(
     code: str | None,
     country_code: str | None = None,
 ) -> AppliedDiscount:
-    def _result(coupon: Coupon | None, discount_ron: Decimal, shipping_discount_ron: Decimal, totals: Totals) -> AppliedDiscount:
-        return AppliedDiscount(
-            coupon=coupon,
-            discount_ron=discount_ron,
-            shipping_discount_ron=shipping_discount_ron,
-            totals=totals,
-        )
-
     cleaned = _normalize_code(code or "")
     if not cleaned:
-        totals = await _zero_discount_totals(
+        return await _applied_discount_without_code(
             session,
             cart=cart,
             checkout=checkout,
@@ -584,7 +640,7 @@ async def apply_discount_code_to_cart(
             shipping_method_rate_per_kg=shipping_method_rate_per_kg,
             country_code=country_code,
         )
-        return _result(None, Decimal("0.00"), Decimal("0.00"), totals)
+
     coupon, eval_result = await _validated_coupon_eval(
         session,
         user_id=user.id,
@@ -594,19 +650,16 @@ async def apply_discount_code_to_cart(
         shipping_method_rate_flat=shipping_method_rate_flat,
         shipping_method_rate_per_kg=shipping_method_rate_per_kg,
     )
-
-    free_shipping = coupon.promotion.discount_type == PromotionDiscountType.free_shipping
-    totals = await compute_totals_with_coupon(
+    return await _applied_discount_with_coupon(
         session,
         cart=cart,
         checkout=checkout,
         shipping_method_rate_flat=shipping_method_rate_flat,
         shipping_method_rate_per_kg=shipping_method_rate_per_kg,
-        discount_ron=eval_result.estimated_discount_ron,
-        free_shipping=free_shipping,
         country_code=country_code,
+        coupon=coupon,
+        eval_result=eval_result,
     )
-    return _result(coupon, eval_result.estimated_discount_ron, eval_result.estimated_shipping_discount_ron, totals)
 
 
 def _promotion_reasons(promotion: Promotion, now: datetime) -> list[str]:
@@ -858,6 +911,90 @@ async def _remaining_redemption_caps(
     return global_remaining, customer_remaining
 
 
+def _append_cart_coupon_reasons(
+    *,
+    reasons: list[str],
+    promotion: Promotion,
+    cart: Cart,
+    rounding: pricing.MoneyRounding,
+) -> None:
+    subtotal = cart_subtotal(cart, rounding=rounding)
+    eligible_subtotal, scope_subtotal, has_includes, has_excludes = cart_eligible_subtotals_for_promotion(
+        cart, promotion=promotion, rounding=rounding
+    )
+    _append_scope_and_subtotal_reasons(
+        reasons=reasons,
+        promotion=promotion,
+        eligible_subtotal=eligible_subtotal,
+        scope_subtotal=scope_subtotal,
+        has_includes=has_includes,
+        has_excludes=has_excludes,
+    )
+    _append_min_subtotal_reason(reasons=reasons, promotion=promotion, subtotal=subtotal)
+
+
+async def _collect_coupon_reasons_and_savings(
+    session: AsyncSession,
+    *,
+    user_id: UUID,
+    coupon: Coupon,
+    cart: Cart,
+    checkout: CheckoutSettings,
+    shipping_method_rate_flat: Decimal | None,
+    shipping_method_rate_per_kg: Decimal | None,
+    user_has_delivered_orders: bool | None,
+) -> tuple[list[str], CouponComputation, int | None, int | None]:
+    now = _now()
+    promotion = coupon.promotion
+    reasons: list[str] = []
+    reasons.extend(_promotion_reasons(promotion, now))
+    reasons.extend(_coupon_reasons(coupon, now))
+
+    _append_cart_coupon_reasons(
+        reasons=reasons,
+        promotion=promotion,
+        cart=cart,
+        rounding=checkout.money_rounding,
+    )
+    await _maybe_append_first_order_reason(
+        session,
+        reasons=reasons,
+        promotion=promotion,
+        user_id=user_id,
+        user_has_delivered_orders=user_has_delivered_orders,
+    )
+
+    savings = compute_coupon_savings(
+        promotion=promotion,
+        coupon=coupon,
+        cart=cart,
+        checkout=checkout,
+        shipping_method_rate_flat=shipping_method_rate_flat,
+        shipping_method_rate_per_kg=shipping_method_rate_per_kg,
+    )
+    _append_shipping_coupon_reason(reasons=reasons, promotion=promotion, savings=savings)
+    await _append_assigned_coupon_reason(session, reasons=reasons, coupon=coupon, user_id=user_id)
+    global_remaining, customer_remaining = await _remaining_redemption_caps(
+        session,
+        coupon=coupon,
+        user_id=user_id,
+        now=now,
+        reasons=reasons,
+    )
+    return reasons, savings, global_remaining, customer_remaining
+
+
+def _dedupe_reasons(reasons: list[str]) -> list[str]:
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for reason in reasons:
+        if reason in seen:
+            continue
+        deduped.append(reason)
+        seen.add(reason)
+    return deduped
+
+
 async def evaluate_coupon_for_cart(
     session: AsyncSession,
     *,
@@ -869,65 +1006,16 @@ async def evaluate_coupon_for_cart(
     shipping_method_rate_per_kg: Decimal | None,
     user_has_delivered_orders: bool | None = None,
 ) -> CouponEligibility:
-    async def _collect_reasons_and_savings() -> tuple[list[str], CouponComputation, int | None, int | None]:
-        now = _now()
-        promotion = coupon.promotion
-        reasons: list[str] = []
-        reasons.extend(_promotion_reasons(promotion, now))
-        reasons.extend(_coupon_reasons(coupon, now))
-
-        rounding = checkout.money_rounding
-        subtotal = cart_subtotal(cart, rounding=rounding)
-        eligible_subtotal, scope_subtotal, has_includes, has_excludes = cart_eligible_subtotals_for_promotion(
-            cart, promotion=promotion, rounding=rounding
-        )
-        _append_scope_and_subtotal_reasons(
-            reasons=reasons,
-            promotion=promotion,
-            eligible_subtotal=eligible_subtotal,
-            scope_subtotal=scope_subtotal,
-            has_includes=has_includes,
-            has_excludes=has_excludes,
-        )
-        _append_min_subtotal_reason(reasons=reasons, promotion=promotion, subtotal=subtotal)
-        await _maybe_append_first_order_reason(
-            session,
-            reasons=reasons,
-            promotion=promotion,
-            user_id=user_id,
-            user_has_delivered_orders=user_has_delivered_orders,
-        )
-
-        savings = compute_coupon_savings(
-            promotion=promotion,
-            coupon=coupon,
-            cart=cart,
-            checkout=checkout,
-            shipping_method_rate_flat=shipping_method_rate_flat,
-            shipping_method_rate_per_kg=shipping_method_rate_per_kg,
-        )
-        _append_shipping_coupon_reason(reasons=reasons, promotion=promotion, savings=savings)
-        await _append_assigned_coupon_reason(session, reasons=reasons, coupon=coupon, user_id=user_id)
-        global_remaining, customer_remaining = await _remaining_redemption_caps(
-            session,
-            coupon=coupon,
-            user_id=user_id,
-            now=now,
-            reasons=reasons,
-        )
-        return reasons, savings, global_remaining, customer_remaining
-
-    def _dedupe_reasons(reasons: list[str]) -> list[str]:
-        deduped: list[str] = []
-        seen: set[str] = set()
-        for reason in reasons:
-            if reason in seen:
-                continue
-            deduped.append(reason)
-            seen.add(reason)
-        return deduped
-
-    reasons, savings, global_remaining, customer_remaining = await _collect_reasons_and_savings()
+    reasons, savings, global_remaining, customer_remaining = await _collect_coupon_reasons_and_savings(
+        session,
+        user_id=user_id,
+        coupon=coupon,
+        cart=cart,
+        checkout=checkout,
+        shipping_method_rate_flat=shipping_method_rate_flat,
+        shipping_method_rate_per_kg=shipping_method_rate_per_kg,
+        user_has_delivered_orders=user_has_delivered_orders,
+    )
     deduped = _dedupe_reasons(reasons)
 
     eligible = not deduped

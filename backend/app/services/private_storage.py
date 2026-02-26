@@ -12,6 +12,12 @@ logger = logging.getLogger(__name__)
 
 _CHUNK_SIZE = 1024 * 1024
 _DEFAULT_ADMIN_UPLOAD_CEILING = 512 * 1024 * 1024
+_MIME_SUFFIX_RULES: dict[str, tuple[str, frozenset[str]]] = {
+    "application/pdf": (".pdf", frozenset()),
+    "image/png": (".png", frozenset({".png"})),
+    "image/jpeg": (".jpg", frozenset({".jpg", ".jpeg"})),
+    "image/webp": (".webp", frozenset({".webp"})),
+}
 
 
 def _effective_max_bytes(max_bytes: int | None) -> int:
@@ -43,6 +49,40 @@ def _stream_copy(file: UploadFile, dest: Path, *, max_bytes: int) -> int:
     return written
 
 
+def _validate_content_type(content_type: str | None, allowed_content_types: tuple[str, ...]) -> None:
+    if not content_type or content_type not in allowed_content_types:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
+
+
+def _detect_allowed_mime(path: Path, allowed_content_types: tuple[str, ...]) -> str:
+    sniff = _detect_mime_path(path)
+    if not sniff or sniff not in allowed_content_types:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
+    return sniff
+
+
+def _resolve_private_subdir(private_root: Path, subdir: str) -> Path:
+    dest_dir = (private_root / subdir).resolve()
+    try:
+        dest_dir.relative_to(private_root)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload destination")
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    return dest_dir
+
+
+def _private_upload_identity(file: UploadFile) -> tuple[str, str]:
+    original_name = Path(file.filename or "").name or "shipping-label"
+    original_suffix = Path(original_name).suffix.lower() or ".bin"
+    return original_name, original_suffix
+
+
+def _target_upload_path(destination: Path, suffix: str) -> Path:
+    if not suffix or destination.suffix.lower() == suffix.lower():
+        return destination
+    return destination.with_name(f"{destination.stem}{suffix}")
+
+
 def ensure_private_root(root: str | Path | None = None) -> Path:
     path = Path(root or settings.private_media_root)
     path.mkdir(parents=True, exist_ok=True)
@@ -59,18 +99,10 @@ def save_private_upload(
 ) -> tuple[str, str]:
     private_root = Path(root or settings.private_media_root).resolve()
     private_root.mkdir(parents=True, exist_ok=True)
-
-    dest_dir = (private_root / subdir).resolve()
-    try:
-        dest_dir.relative_to(private_root)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload destination")
-    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest_dir = _resolve_private_subdir(private_root, subdir)
 
     effective_max_bytes = _effective_max_bytes(max_bytes)
-
-    original_name = Path(file.filename or "").name or "shipping-label"
-    original_suffix = Path(original_name).suffix.lower() or ".bin"
+    original_name, original_suffix = _private_upload_identity(file)
     temp_name = f"{uuid.uuid4().hex}{original_suffix}"
     destination = dest_dir / temp_name
     final_path = destination
@@ -78,16 +110,11 @@ def save_private_upload(
     try:
         _stream_copy(file, destination, max_bytes=effective_max_bytes)
 
-        if not file.content_type or file.content_type not in allowed_content_types:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
-
-        sniff = _detect_mime_path(destination)
-        if not sniff or sniff not in allowed_content_types:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
-
+        _validate_content_type(file.content_type, allowed_content_types)
+        sniff = _detect_allowed_mime(destination, allowed_content_types)
         suffix = _suffix_for_mime(sniff, original_name)
-        if suffix and destination.suffix.lower() != suffix.lower():
-            final_path = destination.with_name(f"{destination.stem}{suffix}")
+        final_path = _target_upload_path(destination, suffix)
+        if final_path != destination:
             destination.rename(final_path)
 
         rel_path = final_path.relative_to(private_root).as_posix()
@@ -109,13 +136,7 @@ def save_private_bytes(
 ) -> str:
     private_root = Path(root or settings.private_media_root).resolve()
     private_root.mkdir(parents=True, exist_ok=True)
-
-    dest_dir = (private_root / subdir).resolve()
-    try:
-        dest_dir.relative_to(private_root)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload destination")
-    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest_dir = _resolve_private_subdir(private_root, subdir)
 
     safe_name = Path(filename).name
     destination = (dest_dir / safe_name).resolve()
@@ -210,12 +231,10 @@ def _detect_image_mime(content: bytes) -> str | None:
 
 def _suffix_for_mime(mime: str, original_name: str) -> str:
     original_suffix = Path(original_name).suffix.lower()
-    if mime == "application/pdf":
-        return ".pdf"
-    if mime == "image/png":
-        return original_suffix if original_suffix == ".png" else ".png"
-    if mime == "image/jpeg":
-        return original_suffix if original_suffix in {".jpg", ".jpeg"} else ".jpg"
-    if mime == "image/webp":
-        return original_suffix if original_suffix == ".webp" else ".webp"
-    return original_suffix or ".bin"
+    default_suffix, accepted_original_suffixes = _MIME_SUFFIX_RULES.get(
+        mime,
+        (original_suffix or ".bin", frozenset()),
+    )
+    if original_suffix in accepted_original_suffixes:
+        return original_suffix
+    return default_suffix

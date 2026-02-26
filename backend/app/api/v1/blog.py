@@ -88,7 +88,7 @@ def _is_probable_bot(user_agent: str) -> bool:
     return any(token in ua for token in bot_tokens)
 
 
-def _decode_view_cookie(value: str) -> list[tuple[str, int]]:
+def _decode_view_cookie_payload(value: str) -> list[object]:
     raw = (value or "").strip()
     if not raw:
         return []
@@ -97,22 +97,31 @@ def _decode_view_cookie(value: str) -> list[tuple[str, int]]:
         data = json.loads(decoded)
     except Exception:
         return []
-    if not isinstance(data, list):
-        return []
+    return data if isinstance(data, list) else []
+
+
+def _decode_view_cookie_item(item: object) -> tuple[str, int] | None:
+    if not isinstance(item, dict):
+        return None
+    post_id = _normalize_cookie_post_id(item.get("pid"))
+    if not post_id:
+        return None
+    ts = item.get("ts")
+    if not isinstance(ts, int):
+        try:
+            ts = int(ts)
+        except Exception:
+            return None
+    return (post_id, ts)
+
+
+def _decode_view_cookie(value: str) -> list[tuple[str, int]]:
     out: list[tuple[str, int]] = []
-    for item in data:
-        if not isinstance(item, dict):
+    for item in _decode_view_cookie_payload(value):
+        parsed = _decode_view_cookie_item(item)
+        if parsed is None:
             continue
-        post_id = _normalize_cookie_post_id(item.get("pid"))
-        ts = item.get("ts")
-        if not post_id:
-            continue
-        if not isinstance(ts, int):
-            try:
-                ts = int(ts)
-            except Exception:
-                continue
-        out.append((post_id, ts))
+        out.append(parsed)
     return out
 
 
@@ -130,6 +139,353 @@ def _normalize_cookie_post_id(value: object) -> str:
         return str(uuid.UUID(candidate))
     except Exception:
         return ""
+
+
+def _feed_sort_key(block: ContentBlock) -> tuple[datetime, datetime]:
+    min_time = datetime.min.replace(tzinfo=timezone.utc)
+    return (
+        block.published_at or min_time,
+        block.updated_at or min_time,
+    )
+
+
+async def _recent_feed_blocks(session: AsyncSession, lang: str | None) -> list[ContentBlock]:
+    blocks, _ = await blog_service.list_published_posts(
+        session,
+        lang=lang,
+        page=1,
+        limit=50,
+        sort="newest",
+    )
+    return sorted(blocks, key=_feed_sort_key, reverse=True)[:20]
+
+
+def _latest_feed_timestamp(blocks: list[ContentBlock]) -> datetime | None:
+    if not blocks:
+        return None
+    now = datetime.now(timezone.utc)
+    return max((b.updated_at or b.published_at or now for b in blocks), default=now)
+
+
+def _create_rss_document(
+    *,
+    base: str,
+    chosen_lang: str,
+    blocks: list[ContentBlock],
+) -> tuple[ElementTree.Element, ElementTree.Element]:
+    ns_atom = "http://www.w3.org/2005/Atom"
+    ElementTree.register_namespace("atom", ns_atom)
+
+    rss = ElementTree.Element("rss", {"version": "2.0"})
+    channel = ElementTree.SubElement(rss, "channel")
+    feed_url = f"{base}/api/v1/blog/rss.xml?lang={chosen_lang}"
+    ElementTree.SubElement(
+        channel,
+        f"{{{ns_atom}}}link",
+        {"href": feed_url, "rel": "self", "type": "application/rss+xml"},
+    )
+    ElementTree.SubElement(channel, "title").text = f"{settings.site_name} Blog"
+    ElementTree.SubElement(channel, "link").text = f"{base}/blog?lang={chosen_lang}"
+    ElementTree.SubElement(channel, "description").text = _site_description(chosen_lang)
+    ElementTree.SubElement(channel, "language").text = _site_locale(chosen_lang)
+
+    latest = _latest_feed_timestamp(blocks)
+    if latest:
+        ElementTree.SubElement(channel, "lastBuildDate").text = format_datetime(latest)
+    return rss, channel
+
+
+def _append_rss_item(
+    *,
+    channel: ElementTree.Element,
+    base: str,
+    chosen_lang: str,
+    block: ContentBlock,
+    lang: str | None,
+) -> None:
+    item = ElementTree.SubElement(channel, "item")
+    data = blog_service.to_list_item(block, lang=lang)
+    slug = str(data.get("slug") or "")
+    link = f"{base}/blog/{slug}?lang={chosen_lang}"
+
+    ElementTree.SubElement(item, "title").text = str(data.get("title") or "")
+    ElementTree.SubElement(item, "link").text = link
+    ElementTree.SubElement(item, "guid").text = link
+    if block.published_at:
+        ElementTree.SubElement(item, "pubDate").text = format_datetime(block.published_at)
+    ElementTree.SubElement(item, "description").text = str(data.get("excerpt") or "")
+
+
+def _set_json_feed_item_date(item: dict, published: datetime | None) -> None:
+    if published:
+        item["date_published"] = published.isoformat()
+
+
+def _set_json_feed_item_authors(item: dict, author_name: object) -> None:
+    if author_name:
+        item["authors"] = [{"name": author_name}]
+
+
+def _set_json_feed_item_image(item: dict, image: object) -> None:
+    if image:
+        item["image"] = image
+
+
+def _set_json_feed_item_tags(item: dict, tags: object) -> None:
+    if tags:
+        item["tags"] = tags
+
+
+def _set_json_feed_item_series(item: dict, series: object) -> None:
+    if series:
+        item["_series"] = series
+
+
+def _build_json_feed_item(*, base: str, chosen_lang: str, block: ContentBlock, lang: str | None) -> dict:
+    data = blog_service.to_list_item(block, lang=lang)
+    slug = str(data.get("slug") or "")
+    url = f"{base}/blog/{slug}?lang={chosen_lang}"
+    item: dict = {
+        "id": url,
+        "url": url,
+        "title": data.get("title") or "",
+        "summary": data.get("excerpt") or "",
+    }
+    _set_json_feed_item_date(item, block.published_at or block.updated_at)
+    _set_json_feed_item_authors(item, data.get("author_name"))
+    _set_json_feed_item_image(item, data.get("cover_image_url"))
+    _set_json_feed_item_tags(item, data.get("tags") or [])
+    _set_json_feed_item_series(item, data.get("series"))
+    return item
+
+
+def _build_json_feed(*, base: str, chosen_lang: str, blocks: list[ContentBlock], lang: str | None) -> dict:
+    return {
+        "version": "https://jsonfeed.org/version/1.1",
+        "title": f"{settings.site_name} Blog",
+        "home_page_url": f"{base}/blog?lang={chosen_lang}",
+        "feed_url": f"{base}/api/v1/blog/feed.json?lang={chosen_lang}",
+        "description": _site_description(chosen_lang),
+        "language": _site_locale(chosen_lang),
+        "items": [_build_json_feed_item(base=base, chosen_lang=chosen_lang, block=block, lang=lang) for block in blocks],
+    }
+
+
+def _view_tracking_decision(
+    *,
+    post_cookie_id: str,
+    cookie_value: str,
+    now: int,
+) -> tuple[bool, bool]:
+    existing = _decode_view_cookie(cookie_value)
+    fresh = [(post_id, ts) for post_id, ts in existing if now - ts < BLOG_VIEW_COOKIE_TTL_SECONDS]
+    cookie_needs_update = len(fresh) != len(existing)
+    seen = any(post_id == post_cookie_id for post_id, _ in fresh)
+    should_count_view = not seen
+    if should_count_view:
+        cookie_needs_update = True
+    return should_count_view, cookie_needs_update
+
+
+def _set_view_cookie(response: Response, *, post_cookie_id: str, now: int) -> None:
+    response.set_cookie(
+        BLOG_VIEW_COOKIE,
+        _encode_view_cookie([(post_cookie_id, now)]),
+        httponly=True,
+        secure=settings.secure_cookies,
+        samesite=settings.cookie_samesite.lower(),
+        path="/",
+        max_age=BLOG_VIEW_COOKIE_TTL_SECONDS,
+    )
+
+
+async def _increment_post_view_count(session: AsyncSession, *, block_id: uuid.UUID) -> None:
+    try:
+        await session.execute(
+            sa.update(ContentBlock)
+            .where(ContentBlock.id == block_id)
+            .values(
+                view_count=ContentBlock.view_count + 1,
+                updated_at=ContentBlock.updated_at,
+            )
+            .execution_options(synchronize_session=False)
+        )
+        await session.commit()
+    except Exception:
+        await session.rollback()
+
+
+def _blog_post_og_etag(*, slug: str, version: int, lang: str | None) -> str:
+    return f'W/"blog-og-{slug}-v{version}-{lang or "base"}"'
+
+
+def _etag_matches(*, if_none_match: str, etag: str) -> bool:
+    if if_none_match == "*":
+        return False
+    normalized_etag = etag[2:] if etag.startswith("W/") else etag
+    for raw_candidate in if_none_match.split(","):
+        candidate = raw_candidate.strip()
+        if not candidate:
+            continue
+        normalized_candidate = candidate[2:] if candidate.startswith("W/") else candidate
+        if normalized_candidate == normalized_etag:
+            return True
+    return False
+
+
+def _comment_snippet(body: str) -> str:
+    snippet = (body or "").strip()
+    return (snippet[:400] + "…") if len(snippet) > 400 else snippet
+
+
+async def _notify_admins_about_comment(
+    *,
+    session: AsyncSession,
+    background_tasks: BackgroundTasks,
+    actor: User,
+    post_title: str,
+    post_url: str,
+    comment_body: str,
+) -> None:
+    admins = await session.execute(
+        sa.select(User).where(User.role.in_([UserRole.admin, UserRole.owner]), User.notify_blog_comments.is_(True))
+    )
+    for admin in admins.scalars().all():
+        if not admin.email or admin.id == actor.id:
+            continue
+        background_tasks.add_task(
+            email_service.send_blog_comment_admin_notification,
+            admin.email,
+            post_title=post_title,
+            post_url=post_url,
+            commenter_name=actor.name or actor.email,
+            comment_body=comment_body,
+            lang=admin.preferred_language,
+        )
+
+
+def _reply_recipient_is_notifiable(recipient: User | None, *, actor_id: uuid.UUID) -> bool:
+    if recipient is None:
+        return False
+    if not recipient.email:
+        return False
+    if recipient.id == actor_id:
+        return False
+    if not recipient.notify_blog_comment_replies:
+        return False
+    return True
+
+
+async def _notify_parent_comment_author(
+    *,
+    session: AsyncSession,
+    background_tasks: BackgroundTasks,
+    actor: User,
+    payload: BlogCommentCreate,
+    post_title: str,
+    post_url: str,
+    comment_body: str,
+    slug: str,
+) -> None:
+    if not payload.parent_id:
+        return
+    parent = await session.execute(
+        sa.select(BlogComment).options(selectinload(BlogComment.author)).where(BlogComment.id == payload.parent_id)
+    )
+    parent_comment = parent.scalar_one_or_none()
+    recipient = parent_comment.author if parent_comment else None
+    if not _reply_recipient_is_notifiable(recipient, actor_id=actor.id):
+        return
+    assert recipient is not None
+    background_tasks.add_task(
+        email_service.send_blog_comment_reply_notification,
+        recipient.email,
+        post_title=post_title,
+        post_url=post_url,
+        replier_name=actor.name or actor.email,
+        comment_body=comment_body,
+        lang=recipient.preferred_language,
+    )
+    await notification_service.create_notification(
+        session,
+        user_id=recipient.id,
+        type="blog_reply",
+        title=(
+            "New reply to your comment"
+            if (recipient.preferred_language or "en") != "ro"
+            else "Răspuns nou la comentariul tău"
+        ),
+        body=post_title,
+        url=f"/blog/{slug}",
+    )
+
+
+async def _notify_comment_subscribers(
+    *,
+    session: AsyncSession,
+    background_tasks: BackgroundTasks,
+    actor: User,
+    content_block_id: uuid.UUID,
+    post_title: str,
+    post_url: str,
+    comment_body: str,
+) -> None:
+    subscribers = await blog_service.list_comment_subscription_recipients(session, content_block_id=content_block_id)
+    for subscriber in subscribers:
+        if not subscriber.email or subscriber.id == actor.id:
+            continue
+        background_tasks.add_task(
+            email_service.send_blog_comment_subscriber_notification,
+            subscriber.email,
+            post_title=post_title,
+            post_url=post_url,
+            commenter_name=actor.name or actor.email,
+            comment_body=comment_body,
+            lang=subscriber.preferred_language,
+        )
+
+
+async def _dispatch_comment_notifications(
+    *,
+    session: AsyncSession,
+    background_tasks: BackgroundTasks,
+    actor: User,
+    post: ContentBlock,
+    slug: str,
+    payload: BlogCommentCreate,
+) -> None:
+    if not settings.smtp_enabled:
+        return
+    post_url = f"{settings.frontend_origin.rstrip('/')}/blog/{slug}"
+    snippet = _comment_snippet(payload.body)
+    await _notify_admins_about_comment(
+        session=session,
+        background_tasks=background_tasks,
+        actor=actor,
+        post_title=post.title,
+        post_url=post_url,
+        comment_body=snippet,
+    )
+    await _notify_parent_comment_author(
+        session=session,
+        background_tasks=background_tasks,
+        actor=actor,
+        payload=payload,
+        post_title=post.title,
+        post_url=post_url,
+        comment_body=snippet,
+        slug=slug,
+    )
+    if payload.parent_id is None:
+        await _notify_comment_subscribers(
+            session=session,
+            background_tasks=background_tasks,
+            actor=actor,
+            content_block_id=post.id,
+            post_title=post.title,
+            post_url=post_url,
+            comment_body=snippet,
+        )
 
 
 class BlogCommentSubscriptionRequest(BaseModel):
@@ -173,49 +529,16 @@ async def blog_rss_feed(
 ) -> Response:
     base = _site_base_url()
     chosen_lang = lang or settings.default_locale or "en"
-    blocks, _ = await blog_service.list_published_posts(session, lang=lang, page=1, limit=50, sort="newest")
-    blocks = sorted(
-        blocks,
-        key=lambda b: (
-            b.published_at or datetime.min.replace(tzinfo=timezone.utc),
-            b.updated_at or datetime.min.replace(tzinfo=timezone.utc),
-        ),
-        reverse=True,
-    )[:20]
-
-    ns_atom = "http://www.w3.org/2005/Atom"
-    ElementTree.register_namespace("atom", ns_atom)
-
-    rss = ElementTree.Element("rss", {"version": "2.0"})
-    channel = ElementTree.SubElement(rss, "channel")
-
-    feed_url = f"{base}/api/v1/blog/rss.xml?lang={chosen_lang}"
-    ElementTree.SubElement(channel, f"{{{ns_atom}}}link", {"href": feed_url, "rel": "self", "type": "application/rss+xml"})
-    ElementTree.SubElement(channel, "title").text = f"{settings.site_name} Blog"
-    ElementTree.SubElement(channel, "link").text = f"{base}/blog?lang={chosen_lang}"
-    ElementTree.SubElement(channel, "description").text = _site_description(chosen_lang)
-    ElementTree.SubElement(channel, "language").text = _site_locale(chosen_lang)
-    if blocks:
-        latest = max(
-            (b.updated_at or b.published_at or datetime.now(timezone.utc) for b in blocks),
-            default=datetime.now(timezone.utc),
-        )
-        ElementTree.SubElement(channel, "lastBuildDate").text = format_datetime(latest)
-
+    blocks = await _recent_feed_blocks(session, lang)
+    rss, channel = _create_rss_document(base=base, chosen_lang=chosen_lang, blocks=blocks)
     for block in blocks:
-        item = ElementTree.SubElement(channel, "item")
-        data = blog_service.to_list_item(block, lang=lang)
-        slug = str(data.get("slug") or "")
-        title = str(data.get("title") or "")
-        excerpt = str(data.get("excerpt") or "")
-        link = f"{base}/blog/{slug}?lang={chosen_lang}"
-
-        ElementTree.SubElement(item, "title").text = title
-        ElementTree.SubElement(item, "link").text = link
-        ElementTree.SubElement(item, "guid").text = link
-        if block.published_at:
-            ElementTree.SubElement(item, "pubDate").text = format_datetime(block.published_at)
-        ElementTree.SubElement(item, "description").text = excerpt
+        _append_rss_item(
+            channel=channel,
+            base=base,
+            chosen_lang=chosen_lang,
+            block=block,
+            lang=lang,
+        )
 
     payload = ElementTree.tostring(rss, encoding="utf-8", xml_declaration=True)
     return Response(content=payload, media_type="application/rss+xml; charset=utf-8")
@@ -228,53 +551,13 @@ async def blog_json_feed(
 ) -> Response:
     base = _site_base_url()
     chosen_lang = lang or settings.default_locale or "en"
-    blocks, _ = await blog_service.list_published_posts(session, lang=lang, page=1, limit=50, sort="newest")
-    blocks = sorted(
-        blocks,
-        key=lambda b: (
-            b.published_at or datetime.min.replace(tzinfo=timezone.utc),
-            b.updated_at or datetime.min.replace(tzinfo=timezone.utc),
-        ),
-        reverse=True,
-    )[:20]
-
-    items: list[dict] = []
-    for block in blocks:
-        data = blog_service.to_list_item(block, lang=lang)
-        slug = str(data.get("slug") or "")
-        url = f"{base}/blog/{slug}?lang={chosen_lang}"
-        published = block.published_at or block.updated_at
-        item: dict = {
-            "id": url,
-            "url": url,
-            "title": data.get("title") or "",
-            "summary": data.get("excerpt") or "",
-        }
-        if published:
-            item["date_published"] = published.isoformat()
-        author_name = data.get("author_name")
-        if author_name:
-            item["authors"] = [{"name": author_name}]
-        image = data.get("cover_image_url")
-        if image:
-            item["image"] = image
-        tags = data.get("tags") or []
-        if tags:
-            item["tags"] = tags
-        series = data.get("series")
-        if series:
-            item["_series"] = series
-        items.append(item)
-
-    feed = {
-        "version": "https://jsonfeed.org/version/1.1",
-        "title": f"{settings.site_name} Blog",
-        "home_page_url": f"{base}/blog?lang={chosen_lang}",
-        "feed_url": f"{base}/api/v1/blog/feed.json?lang={chosen_lang}",
-        "description": _site_description(chosen_lang),
-        "language": _site_locale(chosen_lang),
-        "items": items,
-    }
+    blocks = await _recent_feed_blocks(session, lang)
+    feed = _build_json_feed(
+        base=base,
+        chosen_lang=chosen_lang,
+        blocks=blocks,
+        lang=lang,
+    )
     return Response(content=json.dumps(feed, ensure_ascii=False), media_type="application/feed+json; charset=utf-8")
 
 
@@ -291,46 +574,20 @@ async def get_blog_post(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
     payload = blog_service.to_read(block, lang=lang)
     should_count_view = False
-    cookie_needs_update = False
     ua = request.headers.get("user-agent") or ""
-    if not _is_probable_bot(ua):
-        post_cookie_id = _normalize_cookie_post_id(block.id)
-        if not post_cookie_id:
-            return BlogPostRead.model_validate(payload)
+    post_cookie_id = _normalize_cookie_post_id(block.id)
+    if post_cookie_id and not _is_probable_bot(ua):
         now = int(time.time())
-        existing = _decode_view_cookie(request.cookies.get(BLOG_VIEW_COOKIE) or "")
-        fresh = [(post_id, ts) for post_id, ts in existing if now - ts < BLOG_VIEW_COOKIE_TTL_SECONDS]
-        if len(fresh) != len(existing):
-            cookie_needs_update = True
-        seen = any(post_id == post_cookie_id for post_id, _ in fresh)
-        if not seen:
-            should_count_view = True
-            cookie_needs_update = True
+        should_count_view, cookie_needs_update = _view_tracking_decision(
+            post_cookie_id=post_cookie_id,
+            cookie_value=request.cookies.get(BLOG_VIEW_COOKIE) or "",
+            now=now,
+        )
         if cookie_needs_update:
-            response.set_cookie(
-                BLOG_VIEW_COOKIE,
-                _encode_view_cookie([(post_cookie_id, now)]),
-                httponly=True,
-                secure=settings.secure_cookies,
-                samesite=settings.cookie_samesite.lower(),
-                path="/",
-                max_age=BLOG_VIEW_COOKIE_TTL_SECONDS,
-            )
+            _set_view_cookie(response, post_cookie_id=post_cookie_id, now=now)
 
     if should_count_view:
-        try:
-            await session.execute(
-                sa.update(ContentBlock)
-                .where(ContentBlock.id == block.id)
-                .values(
-                    view_count=ContentBlock.view_count + 1,
-                    updated_at=ContentBlock.updated_at,
-                )
-                .execution_options(synchronize_session=False)
-            )
-            await session.commit()
-        except Exception:
-            await session.rollback()
+        await _increment_post_view_count(session, block_id=block.id)
     return BlogPostRead.model_validate(payload)
 
 
@@ -399,21 +656,14 @@ async def blog_post_og_image(
     if not block:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
 
-    etag = f'W/"blog-og-{slug}-v{block.version}-{lang or "base"}"'
+    etag = _blog_post_og_etag(slug=slug, version=block.version, lang=lang)
     cache_control = "public, max-age=3600"
     if_none_match = request.headers.get("if-none-match")
-    if if_none_match and if_none_match != "*":
-        normalized_etag = etag[2:] if etag.startswith("W/") else etag
-        for raw_candidate in if_none_match.split(","):
-            candidate = raw_candidate.strip()
-            if not candidate:
-                continue
-            normalized_candidate = candidate[2:] if candidate.startswith("W/") else candidate
-            if normalized_candidate == normalized_etag:
-                return Response(
-                    status_code=status.HTTP_304_NOT_MODIFIED,
-                    headers={"ETag": etag, "Cache-Control": cache_control},
-                )
+    if if_none_match and _etag_matches(if_none_match=if_none_match, etag=etag):
+        return Response(
+            status_code=status.HTTP_304_NOT_MODIFIED,
+            headers={"ETag": etag, "Cache-Control": cache_control},
+        )
 
     data = blog_service.to_read(block, lang=lang)
     png = og_images.render_blog_post_og(title=str(data.get("title") or ""), subtitle=data.get("summary") or None)
@@ -555,81 +805,14 @@ async def create_blog_comment(
         body=payload.body,
         parent_id=payload.parent_id,
     )
-    if settings.smtp_enabled:
-        post_url = f"{settings.frontend_origin.rstrip('/')}/blog/{slug}"
-        snippet = (payload.body or "").strip()
-        snippet = (snippet[:400] + "…") if len(snippet) > 400 else snippet
-
-        admins = await session.execute(
-            sa.select(User).where(User.role.in_([UserRole.admin, UserRole.owner]), User.notify_blog_comments.is_(True))
-        )
-        for admin in admins.scalars().all():
-            if not admin.email:
-                continue
-            if admin.id == current_user.id:
-                continue
-            background_tasks.add_task(
-                email_service.send_blog_comment_admin_notification,
-                admin.email,
-                post_title=post.title,
-                post_url=post_url,
-                commenter_name=current_user.name or current_user.email,
-                comment_body=snippet,
-                lang=admin.preferred_language,
-            )
-
-        if payload.parent_id:
-            parent = await session.execute(
-                sa.select(BlogComment)
-                .options(selectinload(BlogComment.author))
-                .where(BlogComment.id == payload.parent_id)
-            )
-            parent_comment = parent.scalar_one_or_none()
-            recipient = parent_comment.author if parent_comment else None
-            if (
-                recipient
-                and recipient.email
-                and recipient.id != current_user.id
-                and recipient.notify_blog_comment_replies
-            ):
-                background_tasks.add_task(
-                    email_service.send_blog_comment_reply_notification,
-                    recipient.email,
-                    post_title=post.title,
-                    post_url=post_url,
-                    replier_name=current_user.name or current_user.email,
-                    comment_body=snippet,
-                    lang=recipient.preferred_language,
-                )
-                await notification_service.create_notification(
-                    session,
-                    user_id=recipient.id,
-                    type="blog_reply",
-                    title=(
-                        "New reply to your comment"
-                        if (recipient.preferred_language or "en") != "ro"
-                        else "Răspuns nou la comentariul tău"
-                    ),
-                    body=post.title,
-                    url=f"/blog/{slug}",
-                )
-
-        if payload.parent_id is None:
-            subscribers = await blog_service.list_comment_subscription_recipients(session, content_block_id=post.id)
-            for subscriber in subscribers:
-                if not subscriber.email:
-                    continue
-                if subscriber.id == current_user.id:
-                    continue
-                background_tasks.add_task(
-                    email_service.send_blog_comment_subscriber_notification,
-                    subscriber.email,
-                    post_title=post.title,
-                    post_url=post_url,
-                    commenter_name=current_user.name or current_user.email,
-                    comment_body=snippet,
-                    lang=subscriber.preferred_language,
-                )
+    await _dispatch_comment_notifications(
+        session=session,
+        background_tasks=background_tasks,
+        actor=current_user,
+        post=post,
+        slug=slug,
+        payload=payload,
+    )
     return BlogCommentRead.model_validate(blog_service.to_comment_read(comment))
 
 

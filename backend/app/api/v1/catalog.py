@@ -80,6 +80,114 @@ async def _read_upload_csv_bytes(file: UploadFile, *, max_bytes: int = _CSV_IMPO
     return raw
 
 
+def _normalize_sale_filter(category_slug: str | None, on_sale: bool | None) -> tuple[str | None, bool | None]:
+    if category_slug == "sale" and on_sale is None:
+        return None, True
+    return category_slug, on_sale
+
+
+def _is_catalog_staff(user: User | None) -> bool:
+    return user is not None and user.role in {UserRole.admin, UserRole.owner, UserRole.content}
+
+
+def _build_product_list_payload(items: list[Product]) -> list[ProductRead]:
+    payload_items: list[ProductRead] = []
+    for item in items:
+        model = ProductRead.model_validate(item)
+        if not catalog_service.is_sale_active(item):
+            model.sale_price = None
+        payload_items.append(model)
+    return payload_items
+
+
+def _build_product_list_meta(total_items: int, page: int, limit: int) -> dict[str, int]:
+    total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
+    return {"total_items": total_items, "total_pages": total_pages, "page": page, "limit": limit}
+
+
+async def _fetch_product_listing_data(
+    session: AsyncSession,
+    *,
+    category_slug: str | None,
+    on_sale: bool | None,
+    is_featured: bool | None,
+    include_unpublished: bool,
+    search: str | None,
+    min_price: float | None,
+    max_price: float | None,
+    tags: list[str] | None,
+    sort: str | None,
+    limit: int,
+    offset: int,
+    lang: str | None,
+):
+    min_bound, max_bound, currency = await catalog_service.get_product_price_bounds(
+        session,
+        category_slug=category_slug,
+        on_sale=on_sale,
+        is_featured=is_featured,
+        search=search,
+        tags=tags,
+        include_unpublished=include_unpublished,
+    )
+    items, total_items = await catalog_service.list_products_with_filters(
+        session,
+        category_slug,
+        on_sale,
+        is_featured,
+        search,
+        min_price,
+        max_price,
+        tags,
+        sort,
+        limit,
+        offset,
+        lang=lang,
+        include_unpublished=include_unpublished,
+    )
+    return items, total_items, ProductPriceBounds(min_price=min_bound, max_price=max_bound, currency=currency)
+
+
+def _build_product_query_options(lang: str | None):
+    image_loader = selectinload(Product.images)
+    if lang:
+        image_loader = image_loader.selectinload(ProductImage.translations)
+        return [
+            image_loader,
+            selectinload(Product.translations),
+            selectinload(Product.category).selectinload(Category.translations),
+        ]
+    return [image_loader, selectinload(Product.category)]
+
+
+def _is_catalog_admin_viewer(user: User | None) -> bool:
+    return user is not None and getattr(user, "role", None) != UserRole.customer
+
+
+def _is_product_publicly_visible(product: Product) -> bool:
+    return product.is_active and product.status == ProductStatus.published
+
+
+def _product_is_missing(product: Product | None) -> bool:
+    return product is None or product.is_deleted
+
+
+def _should_hide_product_from_view(product: Product, *, is_admin: bool) -> bool:
+    return not is_admin and not _is_product_publicly_visible(product)
+
+
+def _recently_viewed_user_id(user: User | None):
+    return getattr(user, "id", None) if user else None
+
+
+def _should_hide_sale_price(product: Product, *, is_admin: bool) -> bool:
+    return not is_admin and not catalog_service.is_sale_active(product)
+
+
+def _raise_product_not_found() -> None:
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+
+
 @router.get("/categories", response_model=list[CategoryRead])
 async def list_categories(
     session: AsyncSession = Depends(get_session),
@@ -118,51 +226,32 @@ async def list_products(
     lang: str | None = Query(default=None, pattern="^(en|ro)$"),
     current_user: User | None = Depends(get_current_user_optional),
 ) -> ProductListResponse:
-    if category_slug == "sale" and on_sale is None:
-        on_sale = True
-        category_slug = None
-
-    is_staff = current_user is not None and current_user.role in {UserRole.admin, UserRole.owner, UserRole.content}
-    include_unpublished = bool(include_unpublished and is_staff)
+    category_slug, on_sale = _normalize_sale_filter(category_slug, on_sale)
+    include_unpublished = bool(include_unpublished and _is_catalog_staff(current_user))
 
     await catalog_service.auto_publish_due_sales(session)
     await catalog_service.apply_due_product_schedules(session)
     offset = (page - 1) * limit
-    min_bound, max_bound, currency = await catalog_service.get_product_price_bounds(
+    items, total_items, bounds = await _fetch_product_listing_data(
         session,
         category_slug=category_slug,
         on_sale=on_sale,
         is_featured=is_featured,
+        include_unpublished=include_unpublished,
         search=search,
+        min_price=min_price,
+        max_price=max_price,
         tags=tags,
-        include_unpublished=include_unpublished,
-    )
-    items, total_items = await catalog_service.list_products_with_filters(
-        session,
-        category_slug,
-        on_sale,
-        is_featured,
-        search,
-        min_price,
-        max_price,
-        tags,
-        sort,
-        limit,
-        offset,
+        sort=sort,
+        limit=limit,
+        offset=offset,
         lang=lang,
-        include_unpublished=include_unpublished,
     )
-    payload_items = []
-    for item in items:
-        model = ProductRead.model_validate(item)
-        if not catalog_service.is_sale_active(item):
-            model.sale_price = None
-        payload_items.append(model)
-    total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
+    payload_items = _build_product_list_payload(items)
     return ProductListResponse(
         items=payload_items,
-        meta={"total_items": total_items, "total_pages": total_pages, "page": page, "limit": limit},
-        bounds=ProductPriceBounds(min_price=min_bound, max_price=max_bound, currency=currency),
+        meta=_build_product_list_meta(total_items, page, limit),
+        bounds=bounds,
     )
 
 
@@ -932,29 +1021,23 @@ async def get_product(
 ) -> Product:
     await catalog_service.auto_publish_due_sales(session)
     await catalog_service.apply_due_product_schedules(session)
-    image_loader = selectinload(Product.images)
-    if lang:
-        image_loader = image_loader.selectinload(ProductImage.translations)
-    product_options = [image_loader]
-    if lang:
-        product_options.append(selectinload(Product.translations))
-        product_options.append(selectinload(Product.category).selectinload(Category.translations))
-    else:
-        product_options.append(selectinload(Product.category))
+    product_options = _build_product_query_options(lang)
     product = await catalog_service.get_product_by_slug(
         session, slug, options=product_options, follow_history=True, lang=lang
     )
-    if not product or product.is_deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    is_admin = current_user is not None and getattr(current_user, "role", None) != UserRole.customer
-    if not is_admin and (not product.is_active or product.status != ProductStatus.published):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    if product.is_active and product.status == ProductStatus.published:
+    if _product_is_missing(product):
+        _raise_product_not_found()
+
+    is_admin = _is_catalog_admin_viewer(current_user)
+    if _should_hide_product_from_view(product, is_admin=is_admin):
+        _raise_product_not_found()
+    if _is_product_publicly_visible(product):
         await catalog_service.record_recently_viewed(
-            session, product, getattr(current_user, "id", None) if current_user else None, session_id
+            session, product, _recently_viewed_user_id(current_user), session_id
         )
+
     model = ProductRead.model_validate(product)
-    if not is_admin and not catalog_service.is_sale_active(product):
+    if _should_hide_sale_price(product, is_admin=is_admin):
         model.sale_price = None
     return model
 

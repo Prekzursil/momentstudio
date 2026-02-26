@@ -1774,6 +1774,315 @@ async def _maybe_create_guest_checkout_user(
     return user.id
 
 
+@dataclass(frozen=True)
+class _CheckoutResolvedInputs:
+    shipping_method: Any
+    checkout_settings: Any
+    delivery: tuple[str, str, str | None, str | None, str | None, float | None, float | None]
+    phone: str | None
+    promo: Any
+    applied_discount: Any
+    applied_coupon: Any
+    coupon_shipping_discount: Decimal
+
+
+@dataclass(frozen=True)
+class _CheckoutPreparedData:
+    order: Order
+    checkout_settings: Any
+    payment_method: str
+    stripe_session_id: str | None
+    stripe_checkout_url: str | None
+    paypal_order_id: str | None
+    paypal_approval_url: str | None
+    shipping_addr: Address
+    billing_addr: Address
+    phone: str | None
+    applied_coupon: Any
+    discount_val: Decimal
+    coupon_shipping_discount: Decimal
+
+
+@dataclass(frozen=True)
+class _CheckoutPaymentData:
+    shipping_addr: Address
+    billing_addr: Address
+    totals: Totals
+    discount_val: Decimal
+    payment_method: str
+    stripe_session_id: str | None
+    stripe_checkout_url: str | None
+    paypal_order_id: str | None
+    paypal_approval_url: str | None
+
+
+async def _resolve_logged_checkout_inputs(
+    session: AsyncSession,
+    *,
+    payload: CheckoutRequest,
+    current_user: User,
+    cart: Cart,
+) -> _CheckoutResolvedInputs:
+    shipping_method = await _resolve_shipping_method_for_create_order(session, payload.shipping_method_id)
+    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
+    delivery, phone = _resolve_delivery_and_phone(
+        cart,
+        checkout_settings=checkout_settings,
+        courier=payload.courier,
+        delivery_type=payload.delivery_type,
+        locker_id=payload.locker_id,
+        locker_name=payload.locker_name,
+        locker_address=payload.locker_address,
+        locker_lat=payload.locker_lat,
+        locker_lng=payload.locker_lng,
+        payload_phone=payload.phone,
+        fallback_phone=getattr(current_user, "phone", None),
+    )
+    promo, applied_discount, applied_coupon, coupon_shipping_discount = await _resolve_logged_checkout_discount(
+        session,
+        payload=payload,
+        current_user=current_user,
+        cart=cart,
+        checkout_settings=checkout_settings,
+        shipping_method=shipping_method,
+    )
+    return _CheckoutResolvedInputs(
+        shipping_method=shipping_method,
+        checkout_settings=checkout_settings,
+        delivery=delivery,
+        phone=phone,
+        promo=promo,
+        applied_discount=applied_discount,
+        applied_coupon=applied_coupon,
+        coupon_shipping_discount=coupon_shipping_discount,
+    )
+
+
+async def _build_logged_checkout_data(
+    session: AsyncSession,
+    *,
+    payload: CheckoutRequest,
+    current_user: User,
+    cart: Cart,
+    base: str,
+    resolved: _CheckoutResolvedInputs,
+) -> _CheckoutPreparedData:
+    payment = await _resolve_logged_checkout_payment_data(
+        session,
+        payload=payload,
+        current_user=current_user,
+        cart=cart,
+        base=base,
+        resolved=resolved,
+    )
+    order = await _build_checkout_order(
+        session,
+        payload=_CheckoutOrderBuildInput(
+            user_id=current_user.id,
+            customer_email=current_user.email,
+            customer_name=getattr(current_user, "name", None) or current_user.email,
+            cart=cart,
+            shipping_addr=payment.shipping_addr,
+            billing_addr=payment.billing_addr,
+            shipping_method=resolved.shipping_method,
+            payment_method=payment.payment_method,
+            stripe_session_id=payment.stripe_session_id,
+            stripe_checkout_url=payment.stripe_checkout_url,
+            paypal_order_id=payment.paypal_order_id,
+            paypal_approval_url=payment.paypal_approval_url,
+            delivery=resolved.delivery,
+            discount_val=payment.discount_val,
+            promo_code=payload.promo_code,
+            invoice_company=payload.invoice_company,
+            invoice_vat_id=payload.invoice_vat_id,
+            totals=payment.totals,
+        ),
+    )
+    return _logged_checkout_prepared_data(order=order, resolved=resolved, payment=payment)
+
+
+def _logged_checkout_prepared_data(
+    *,
+    order: Order,
+    resolved: _CheckoutResolvedInputs,
+    payment: _CheckoutPaymentData,
+) -> _CheckoutPreparedData:
+    return _CheckoutPreparedData(
+        order=order,
+        checkout_settings=resolved.checkout_settings,
+        payment_method=payment.payment_method,
+        stripe_session_id=payment.stripe_session_id,
+        stripe_checkout_url=payment.stripe_checkout_url,
+        paypal_order_id=payment.paypal_order_id,
+        paypal_approval_url=payment.paypal_approval_url,
+        shipping_addr=payment.shipping_addr,
+        billing_addr=payment.billing_addr,
+        phone=resolved.phone,
+        applied_coupon=resolved.applied_coupon,
+        discount_val=payment.discount_val,
+        coupon_shipping_discount=resolved.coupon_shipping_discount,
+    )
+
+
+async def _resolve_logged_checkout_payment_data(
+    session: AsyncSession,
+    *,
+    payload: CheckoutRequest,
+    current_user: User,
+    cart: Cart,
+    base: str,
+    resolved: _CheckoutResolvedInputs,
+) -> _CheckoutPaymentData:
+    shipping_addr, billing_addr = await _create_checkout_addresses(
+        session,
+        payload=payload,
+        current_user=current_user,
+        phone=resolved.phone,
+    )
+    totals, discount_val = await _resolve_checkout_totals(
+        session,
+        cart=cart,
+        shipping_method=resolved.shipping_method,
+        promo=resolved.promo,
+        checkout_settings=resolved.checkout_settings,
+        country_code=shipping_addr.country,
+        applied_coupon=resolved.applied_coupon,
+        applied_discount=resolved.applied_discount,
+    )
+    payment_method, stripe_session_id, stripe_checkout_url, paypal_order_id, paypal_approval_url = await _initialize_checkout_payment(
+        session=session,
+        cart=cart,
+        totals=totals,
+        discount_val=discount_val,
+        payment_method=payload.payment_method,
+        base=base,
+        lang=current_user.preferred_language,
+        customer_email=current_user.email,
+        user_id=current_user.id,
+        promo_code=payload.promo_code,
+    )
+    return _CheckoutPaymentData(
+        shipping_addr=shipping_addr,
+        billing_addr=billing_addr,
+        totals=totals,
+        discount_val=discount_val,
+        payment_method=payment_method,
+        stripe_session_id=stripe_session_id,
+        stripe_checkout_url=stripe_checkout_url,
+        paypal_order_id=paypal_order_id,
+        paypal_approval_url=paypal_approval_url,
+    )
+
+
+async def _prepare_logged_checkout_data(
+    session: AsyncSession,
+    *,
+    payload: CheckoutRequest,
+    current_user: User,
+    cart: Cart,
+    base: str,
+) -> _CheckoutPreparedData:
+    resolved = await _resolve_logged_checkout_inputs(
+        session,
+        payload=payload,
+        current_user=current_user,
+        cart=cart,
+    )
+    return await _build_logged_checkout_data(
+        session,
+        payload=payload,
+        current_user=current_user,
+        cart=cart,
+        base=base,
+        resolved=resolved,
+    )
+
+
+async def _run_logged_checkout_side_effects(
+    session: AsyncSession,
+    background_tasks: BackgroundTasks,
+    *,
+    current_user: User,
+    required_versions: Any,
+    needs_consent: bool,
+    prepared: _CheckoutPreparedData,
+) -> None:
+    await _add_checkout_consents(
+        session,
+        required_versions=required_versions,
+        user_id=current_user.id,
+        order_id=prepared.order.id,
+        should_add=needs_consent,
+        commit=True,
+    )
+    await _reserve_checkout_coupon(
+        session,
+        current_user=current_user,
+        order=prepared.order,
+        applied_coupon=prepared.applied_coupon,
+        discount_val=prepared.discount_val,
+        coupon_shipping_discount=prepared.coupon_shipping_discount,
+        payment_method=prepared.payment_method,
+    )
+    await _create_checkout_notification(
+        session,
+        user_id=current_user.id,
+        preferred_language=current_user.preferred_language,
+        order=prepared.order,
+    )
+    await _queue_cod_checkout_emails(
+        session,
+        background_tasks,
+        payment_method=prepared.payment_method,
+        customer_email=current_user.email,
+        preferred_language=current_user.preferred_language,
+        order=prepared.order,
+        receipt_share_days=prepared.checkout_settings.receipt_share_days,
+    )
+
+
+async def _finalize_logged_checkout(
+    session: AsyncSession,
+    background_tasks: BackgroundTasks,
+    *,
+    current_user: User,
+    base: str,
+    required_versions: Any,
+    needs_consent: bool,
+    prepared: _CheckoutPreparedData,
+) -> GuestCheckoutResponse:
+    netopia_ntp_id, netopia_payment_url = await _maybe_start_new_order_netopia_payment(
+        session,
+        prepared.order,
+        payment_method=prepared.payment_method,
+        base=base,
+        email=current_user.email,
+        phone=prepared.phone,
+        lang=current_user.preferred_language,
+        shipping_fallback=prepared.shipping_addr,
+        billing_fallback=prepared.billing_addr,
+        commit=True,
+    )
+    await _run_logged_checkout_side_effects(
+        session,
+        background_tasks,
+        current_user=current_user,
+        required_versions=required_versions,
+        needs_consent=needs_consent,
+        prepared=prepared,
+    )
+    return _guest_checkout_response_with_payment(
+        order=prepared.order,
+        payment_method=prepared.payment_method,
+        stripe_session_id=prepared.stripe_session_id,
+        stripe_checkout_url=prepared.stripe_checkout_url,
+        paypal_order_id=prepared.paypal_order_id,
+        paypal_approval_url=prepared.paypal_approval_url,
+        netopia_ntp_id=netopia_ntp_id,
+        netopia_payment_url=netopia_payment_url,
+    )
+
+
 @router.post("/checkout", response_model=GuestCheckoutResponse, status_code=status.HTTP_201_CREATED)
 async def checkout(
     payload: CheckoutRequest,
@@ -1804,133 +2113,21 @@ async def checkout(
     if existing_response:
         response.status_code = status.HTTP_200_OK
         return existing_response
-    shipping_method = await _resolve_shipping_method_for_create_order(session, payload.shipping_method_id)
-    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
-    delivery, phone = _resolve_delivery_and_phone(
-        user_cart,
-        checkout_settings=checkout_settings,
-        courier=payload.courier,
-        delivery_type=payload.delivery_type,
-        locker_id=payload.locker_id,
-        locker_name=payload.locker_name,
-        locker_address=payload.locker_address,
-        locker_lat=payload.locker_lat,
-        locker_lng=payload.locker_lng,
-        payload_phone=payload.phone,
-        fallback_phone=getattr(current_user, "phone", None),
-    )
-    promo, applied_discount, applied_coupon, coupon_shipping_discount = await _resolve_logged_checkout_discount(
+    prepared = await _prepare_logged_checkout_data(
         session,
         payload=payload,
         current_user=current_user,
         cart=user_cart,
-        checkout_settings=checkout_settings,
-        shipping_method=shipping_method,
-    )
-    shipping_addr, billing_addr = await _create_checkout_addresses(
-        session,
-        payload=payload,
-        current_user=current_user,
-        phone=phone,
-    )
-    totals, discount_val = await _resolve_checkout_totals(
-        session,
-        cart=user_cart,
-        shipping_method=shipping_method,
-        promo=promo,
-        checkout_settings=checkout_settings,
-        country_code=shipping_addr.country,
-        applied_coupon=applied_coupon,
-        applied_discount=applied_discount,
-    )
-    payment_method, stripe_session_id, stripe_checkout_url, paypal_order_id, paypal_approval_url = await _initialize_checkout_payment(
-        session=session,
-        cart=user_cart,
-        totals=totals,
-        discount_val=discount_val,
-        payment_method=payload.payment_method,
         base=base,
-        lang=current_user.preferred_language,
-        customer_email=current_user.email,
-        user_id=current_user.id,
-        promo_code=payload.promo_code,
     )
-    order = await _build_checkout_order(
-        session,
-        payload=_CheckoutOrderBuildInput(
-            user_id=current_user.id,
-            customer_email=current_user.email,
-            customer_name=getattr(current_user, "name", None) or current_user.email,
-            cart=user_cart,
-            shipping_addr=shipping_addr,
-            billing_addr=billing_addr,
-            shipping_method=shipping_method,
-            payment_method=payment_method,
-            stripe_session_id=stripe_session_id,
-            stripe_checkout_url=stripe_checkout_url,
-            paypal_order_id=paypal_order_id,
-            paypal_approval_url=paypal_approval_url,
-            delivery=delivery,
-            discount_val=discount_val,
-            promo_code=payload.promo_code,
-            invoice_company=payload.invoice_company,
-            invoice_vat_id=payload.invoice_vat_id,
-            totals=totals,
-        ),
-    )
-    netopia_ntp_id, netopia_payment_url = await _maybe_start_new_order_netopia_payment(
-        session,
-        order,
-        payment_method=payment_method,
-        base=base,
-        email=current_user.email,
-        phone=phone,
-        lang=current_user.preferred_language,
-        shipping_fallback=shipping_addr,
-        billing_fallback=billing_addr,
-        commit=True,
-    )
-    await _add_checkout_consents(
-        session,
-        required_versions=required_versions,
-        user_id=current_user.id,
-        order_id=order.id,
-        should_add=needs_consent,
-        commit=True,
-    )
-    await _reserve_checkout_coupon(
-        session,
-        current_user=current_user,
-        order=order,
-        applied_coupon=applied_coupon,
-        discount_val=discount_val,
-        coupon_shipping_discount=coupon_shipping_discount,
-        payment_method=payment_method,
-    )
-    await _create_checkout_notification(
-        session,
-        user_id=current_user.id,
-        preferred_language=current_user.preferred_language,
-        order=order,
-    )
-    await _queue_cod_checkout_emails(
+    return await _finalize_logged_checkout(
         session,
         background_tasks,
-        payment_method=payment_method,
-        customer_email=current_user.email,
-        preferred_language=current_user.preferred_language,
-        order=order,
-        receipt_share_days=checkout_settings.receipt_share_days,
-    )
-    return _guest_checkout_response_with_payment(
-        order=order,
-        payment_method=payment_method,
-        stripe_session_id=stripe_session_id,
-        stripe_checkout_url=stripe_checkout_url,
-        paypal_order_id=paypal_order_id,
-        paypal_approval_url=paypal_approval_url,
-        netopia_ntp_id=netopia_ntp_id,
-        netopia_payment_url=netopia_payment_url,
+        current_user=current_user,
+        base=base,
+        required_versions=required_versions,
+        needs_consent=needs_consent,
+        prepared=prepared,
     )
 
 
@@ -3046,6 +3243,270 @@ async def guest_email_verification_status(
     return GuestEmailVerificationStatus(email=cart.guest_email, verified=cart.guest_email_verified_at is not None)
 
 
+def _assert_guest_email_verified_for_checkout(cart: Cart, *, email: str) -> None:
+    if cart.guest_email_verified_at and _normalized_cart_guest_email(cart) == email:
+        return
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email verification required")
+
+
+@dataclass(frozen=True)
+class _GuestCheckoutPreparedData:
+    order: Order
+    required_versions: Any
+    user_id: UUID | None
+    checkout_settings: Any
+    payment_method: str
+    stripe_session_id: str | None
+    stripe_checkout_url: str | None
+    paypal_order_id: str | None
+    paypal_approval_url: str | None
+    shipping_addr: Address
+    billing_addr: Address
+    phone: str | None
+
+
+@dataclass(frozen=True)
+class _GuestCheckoutContext:
+    required_versions: Any
+    user_id: UUID | None
+    customer_name: str
+    shipping_method: Any
+    checkout_settings: Any
+    delivery: tuple[str, str, str | None, str | None, str | None, float | None, float | None]
+    phone: str | None
+    shipping_addr: Address
+    billing_addr: Address
+
+
+async def _resolve_guest_checkout_context(
+    session: AsyncSession,
+    background_tasks: BackgroundTasks,
+    *,
+    payload: GuestCheckoutRequest,
+    cart: Cart,
+    email: str,
+) -> _GuestCheckoutContext:
+    await _assert_guest_email_available(session, email)
+    required_versions = await legal_consents_service.required_doc_versions(session)
+    _assert_guest_checkout_consents(payload)
+    customer_name = _require_guest_customer_name(payload)
+    user_id = await _maybe_create_guest_checkout_user(session, background_tasks, payload=payload, email=email, customer_name=customer_name)
+    shipping_method = await _resolve_shipping_method_for_create_order(session, payload.shipping_method_id)
+    _assert_guest_checkout_no_coupon(payload)
+    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
+    delivery, phone = _resolve_delivery_and_phone(
+        cart,
+        checkout_settings=checkout_settings,
+        courier=payload.courier,
+        delivery_type=payload.delivery_type,
+        locker_id=payload.locker_id,
+        locker_name=payload.locker_name,
+        locker_address=payload.locker_address,
+        locker_lat=payload.locker_lat,
+        locker_lng=payload.locker_lng,
+        payload_phone=payload.phone,
+        fallback_phone=None,
+    )
+    shipping_addr, billing_addr = await _create_guest_checkout_addresses(session, payload=payload, user_id=user_id, phone=phone)
+    return _GuestCheckoutContext(
+        required_versions=required_versions,
+        user_id=user_id,
+        customer_name=customer_name,
+        shipping_method=shipping_method,
+        checkout_settings=checkout_settings,
+        delivery=delivery,
+        phone=phone,
+        shipping_addr=shipping_addr,
+        billing_addr=billing_addr,
+    )
+
+
+async def _resolve_guest_checkout_payment_data(
+    session: AsyncSession,
+    *,
+    payload: GuestCheckoutRequest,
+    cart: Cart,
+    email: str,
+    base: str,
+    context: _GuestCheckoutContext,
+) -> _CheckoutPaymentData:
+    totals, discount_val = await _resolve_checkout_totals(
+        session,
+        cart=cart,
+        shipping_method=context.shipping_method,
+        promo=None,
+        checkout_settings=context.checkout_settings,
+        country_code=context.shipping_addr.country,
+        applied_coupon=None,
+        applied_discount=None,
+    )
+    payment_method, stripe_session_id, stripe_checkout_url, paypal_order_id, paypal_approval_url = await _initialize_checkout_payment(
+        session=session,
+        cart=cart,
+        totals=totals,
+        discount_val=discount_val,
+        payment_method=payload.payment_method,
+        base=base,
+        lang=payload.preferred_language,
+        customer_email=email,
+        user_id=context.user_id,
+        promo_code=None,
+    )
+    return _CheckoutPaymentData(
+        shipping_addr=context.shipping_addr,
+        billing_addr=context.billing_addr,
+        totals=totals,
+        discount_val=discount_val,
+        payment_method=payment_method,
+        stripe_session_id=stripe_session_id,
+        stripe_checkout_url=stripe_checkout_url,
+        paypal_order_id=paypal_order_id,
+        paypal_approval_url=paypal_approval_url,
+    )
+
+
+def _guest_checkout_prepared_data(
+    *,
+    order: Order,
+    context: _GuestCheckoutContext,
+    payment: _CheckoutPaymentData,
+) -> _GuestCheckoutPreparedData:
+    return _GuestCheckoutPreparedData(
+        order=order,
+        required_versions=context.required_versions,
+        user_id=context.user_id,
+        checkout_settings=context.checkout_settings,
+        payment_method=payment.payment_method,
+        stripe_session_id=payment.stripe_session_id,
+        stripe_checkout_url=payment.stripe_checkout_url,
+        paypal_order_id=payment.paypal_order_id,
+        paypal_approval_url=payment.paypal_approval_url,
+        shipping_addr=context.shipping_addr,
+        billing_addr=context.billing_addr,
+        phone=context.phone,
+    )
+
+
+async def _build_guest_checkout_prepared_data(
+    session: AsyncSession,
+    *,
+    payload: GuestCheckoutRequest,
+    cart: Cart,
+    email: str,
+    base: str,
+    context: _GuestCheckoutContext,
+) -> _GuestCheckoutPreparedData:
+    payment = await _resolve_guest_checkout_payment_data(
+        session,
+        payload=payload,
+        cart=cart,
+        email=email,
+        base=base,
+        context=context,
+    )
+    order = await _build_checkout_order(
+        session,
+        payload=_CheckoutOrderBuildInput(
+            user_id=context.user_id,
+            customer_email=email,
+            customer_name=context.customer_name,
+            cart=cart,
+            shipping_addr=context.shipping_addr,
+            billing_addr=context.billing_addr,
+            shipping_method=context.shipping_method,
+            payment_method=payment.payment_method,
+            stripe_session_id=payment.stripe_session_id,
+            stripe_checkout_url=payment.stripe_checkout_url,
+            paypal_order_id=payment.paypal_order_id,
+            paypal_approval_url=payment.paypal_approval_url,
+            delivery=context.delivery,
+            discount_val=payment.discount_val,
+            promo_code=None,
+            invoice_company=payload.invoice_company,
+            invoice_vat_id=payload.invoice_vat_id,
+            totals=payment.totals,
+        ),
+    )
+    return _guest_checkout_prepared_data(order=order, context=context, payment=payment)
+
+
+async def _prepare_guest_checkout_data(
+    session: AsyncSession,
+    background_tasks: BackgroundTasks,
+    *,
+    payload: GuestCheckoutRequest,
+    cart: Cart,
+    email: str,
+    base: str,
+) -> _GuestCheckoutPreparedData:
+    context = await _resolve_guest_checkout_context(
+        session,
+        background_tasks,
+        payload=payload,
+        cart=cart,
+        email=email,
+    )
+    return await _build_guest_checkout_prepared_data(
+        session,
+        payload=payload,
+        cart=cart,
+        email=email,
+        base=base,
+        context=context,
+    )
+
+
+async def _finalize_guest_checkout(
+    session: AsyncSession,
+    background_tasks: BackgroundTasks,
+    *,
+    payload: GuestCheckoutRequest,
+    email: str,
+    base: str,
+    prepared: _GuestCheckoutPreparedData,
+) -> GuestCheckoutResponse:
+    netopia_ntp_id, netopia_payment_url = await _maybe_start_new_order_netopia_payment(
+        session,
+        prepared.order,
+        payment_method=prepared.payment_method,
+        base=base,
+        email=email,
+        phone=prepared.phone,
+        lang=payload.preferred_language,
+        shipping_fallback=prepared.shipping_addr,
+        billing_fallback=prepared.billing_addr,
+        commit=False,
+    )
+    legal_consents_service.add_consent_records(
+        session,
+        context=LegalConsentContext.checkout,
+        required_versions=prepared.required_versions,
+        accepted_at=datetime.now(timezone.utc),
+        user_id=prepared.user_id,
+        order_id=prepared.order.id,
+    )
+    await session.commit()
+    await _queue_cod_checkout_emails(
+        session,
+        background_tasks,
+        payment_method=prepared.payment_method,
+        customer_email=email,
+        preferred_language=payload.preferred_language,
+        order=prepared.order,
+        receipt_share_days=prepared.checkout_settings.receipt_share_days,
+    )
+    return _guest_checkout_response_with_payment(
+        order=prepared.order,
+        payment_method=prepared.payment_method,
+        stripe_session_id=prepared.stripe_session_id,
+        stripe_checkout_url=prepared.stripe_checkout_url,
+        paypal_order_id=prepared.paypal_order_id,
+        paypal_approval_url=prepared.paypal_approval_url,
+        netopia_ntp_id=netopia_ntp_id,
+        netopia_payment_url=netopia_payment_url,
+    )
+
+
 @router.post("/guest-checkout", response_model=GuestCheckoutResponse, status_code=status.HTTP_201_CREATED)
 async def guest_checkout(
     payload: GuestCheckoutRequest,
@@ -3055,387 +3516,41 @@ async def guest_checkout(
     _: None = Depends(guest_checkout_rate_limit),
     session: AsyncSession = Depends(get_session),
     session_id: str | None = Depends(cart_api.session_header),
-):
+) -> GuestCheckoutResponse:
     if not session_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing guest session id")
-
     cart = await cart_service.get_cart(session, None, session_id)
-    if not cart.items:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty")
-
+    _assert_cart_has_items(cart)
     email = _normalize_email(str(payload.email))
-    if not cart.guest_email_verified_at or _normalize_email(cart.guest_email or "") != email:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email verification required")
-
+    _assert_guest_email_verified_for_checkout(cart, email=email)
     base = _frontend_base_from_request(request)
-
-    last_order_id = await session.scalar(
-        select(Cart.last_order_id).where(Cart.id == cart.id).with_for_update()
-    )
-    if last_order_id:
-        existing_order = await order_service.get_order_by_id(session, last_order_id)
-        if existing_order:
-            existing_method = (existing_order.payment_method or "").strip().lower()
-            existing_netopia_url = (getattr(existing_order, "netopia_payment_url", None) or "").strip()
-            if (
-                existing_method == "netopia"
-                and not existing_netopia_url
-                and settings.netopia_enabled
-                and netopia_service.is_netopia_configured()
-            ):
-                first_name, last_name = _split_customer_name(getattr(existing_order, "customer_name", None) or "")
-                shipping_addr_obj = existing_order.shipping_address
-                billing_addr_obj = existing_order.billing_address or shipping_addr_obj
-                if shipping_addr_obj and billing_addr_obj:
-                    billing_payload = _netopia_address_payload(
-                        email=getattr(existing_order, "customer_email", None) or email,
-                        phone=getattr(shipping_addr_obj, "phone", None),
-                        first_name=first_name,
-                        last_name=last_name,
-                        addr=billing_addr_obj,
-                    )
-                    shipping_payload = _netopia_address_payload(
-                        email=getattr(existing_order, "customer_email", None) or email,
-                        phone=getattr(shipping_addr_obj, "phone", None),
-                        first_name=first_name,
-                        last_name=last_name,
-                        addr=shipping_addr_obj,
-                    )
-                    cancel_url = f"{base}/checkout/netopia/cancel?order_id={existing_order.id}"
-                    redirect_url = f"{base}/checkout/netopia/return?order_id={existing_order.id}"
-                    notify_url = f"{base}/api/v1/payments/netopia/webhook"
-                    netopia_ntp_id, netopia_payment_url = await netopia_service.start_payment(
-                        order_id=str(existing_order.id),
-                        amount_ron=pricing.quantize_money(existing_order.total_amount),
-                        description=f"Order {existing_order.reference_code}"
-                        if existing_order.reference_code
-                        else f"Order {existing_order.id}",
-                        billing=billing_payload,
-                        shipping=shipping_payload,
-                        products=_build_netopia_products(existing_order, lang=payload.preferred_language),
-                        language=(payload.preferred_language or "ro"),
-                        cancel_url=cancel_url,
-                        notify_url=notify_url,
-                        redirect_url=redirect_url,
-                    )
-                    existing_order.netopia_ntp_id = netopia_ntp_id
-                    existing_order.netopia_payment_url = netopia_payment_url
-                    session.add(existing_order)
-                    await session.commit()
-                    await session.refresh(existing_order)
-            response.status_code = status.HTTP_200_OK
-            return GuestCheckoutResponse(
-                order_id=existing_order.id,
-                reference_code=existing_order.reference_code,
-                paypal_order_id=existing_order.paypal_order_id,
-                paypal_approval_url=getattr(existing_order, "paypal_approval_url", None),
-                netopia_ntp_id=getattr(existing_order, "netopia_ntp_id", None),
-                netopia_payment_url=getattr(existing_order, "netopia_payment_url", None),
-                stripe_session_id=existing_order.stripe_checkout_session_id,
-                stripe_checkout_url=getattr(existing_order, "stripe_checkout_url", None),
-                payment_method=existing_order.payment_method,
-            )
-        cart.last_order_id = None
-        session.add(cart)
-
-    if await auth_service.is_email_taken(session, email):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=EMAIL_ALREADY_REGISTERED_CHECKOUT_DETAIL,
-        )
-
-    required_versions = await legal_consents_service.required_doc_versions(session)
-    if not payload.accept_terms or not payload.accept_privacy:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=LEGAL_CONSENTS_REQUIRED_DETAIL)
-
-    user_id = None
-    customer_name = (payload.name or "").strip()
-    if not customer_name:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Name is required")
-
-    if payload.create_account:
-        if not payload.password:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Password is required")
-        if not payload.username:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username is required")
-        if not payload.first_name:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="First name is required")
-        if not payload.last_name:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Last name is required")
-        if not payload.date_of_birth:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Date of birth is required")
-        if not payload.phone:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Phone is required")
-
-        user = await auth_service.create_user(
-            session,
-            UserCreate(
-                email=email,
-                username=payload.username,
-                password=payload.password,
-                name=customer_name,
-                first_name=payload.first_name,
-                middle_name=payload.middle_name,
-                last_name=payload.last_name,
-                date_of_birth=payload.date_of_birth,
-                phone=payload.phone,
-                preferred_language=payload.preferred_language or "en",
-            ),
-        )
-        user.email_verified = True
-        session.add(user)
-        await session.commit()
-        await session.refresh(user)
-        user_id = user.id
-        background_tasks.add_task(
-            email_service.send_welcome_email,
-            user.email,
-            first_name=user.first_name,
-            lang=user.preferred_language,
-        )
-
-    shipping_method = None
-    if payload.shipping_method_id:
-        shipping_method = await order_service.get_shipping_method(session, payload.shipping_method_id)
-        if not shipping_method:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping method not found")
-
-    if (payload.promo_code or "").strip():
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sign in to use coupons.")
-    promo = None
-
-    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
-    courier, delivery_type, locker_id, locker_name, locker_address, locker_lat, locker_lng = _delivery_from_payload(
-        courier=payload.courier,
-        delivery_type=payload.delivery_type,
-        locker_id=payload.locker_id,
-        locker_name=payload.locker_name,
-        locker_address=payload.locker_address,
-        locker_lat=payload.locker_lat,
-        locker_lng=payload.locker_lng,
-    )
-    locker_allowed, allowed_couriers = cart_service.delivery_constraints(cart)
-    if not allowed_couriers:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No couriers available for cart items")
-    if courier not in allowed_couriers:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Selected courier is not available for cart items")
-    if delivery_type == "locker" and not locker_allowed:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Locker delivery is not available for cart items")
-    phone_required = bool(
-        checkout_settings.phone_required_locker if delivery_type == "locker" else checkout_settings.phone_required_home
-    )
-    phone = (payload.phone or "").strip() or None
-    if phone_required and not phone:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Phone is required")
-
-    has_billing = bool((payload.billing_line1 or "").strip())
-    billing_same_as_shipping = not has_billing
-
-    shipping_addr = await address_service.create_address(
+    existing_response = await _resolve_existing_checkout_response(
         session,
-        user_id,
-        AddressCreate(
-            label="Guest Checkout" if not payload.create_account else "Checkout",
-            phone=phone,
-            line1=payload.line1,
-            line2=payload.line2,
-            city=payload.city,
-            region=payload.region,
-            postal_code=payload.postal_code,
-            country=payload.country,
-            is_default_shipping=bool(payload.save_address and payload.create_account),
-            is_default_billing=bool(payload.save_address and payload.create_account and billing_same_as_shipping),
-        ),
+        cart_id=cart.id,
+        base=base,
+        email=email,
+        phone=None,
+        lang=payload.preferred_language,
+        cart_row=cart,
     )
-
-    billing_addr = shipping_addr
-    if has_billing:
-        if not (
-            (payload.billing_line1 or "").strip()
-            and (payload.billing_city or "").strip()
-            and (payload.billing_postal_code or "").strip()
-            and (payload.billing_country or "").strip()
-        ):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=BILLING_ADDRESS_INCOMPLETE_DETAIL)
-        billing_addr = await address_service.create_address(
-            session,
-            user_id,
-            AddressCreate(
-                label=f"Guest {CHECKOUT_BILLING_LABEL}" if not payload.create_account else CHECKOUT_BILLING_LABEL,
-                phone=phone,
-                line1=payload.billing_line1 or payload.line1,
-                line2=payload.billing_line2,
-                city=payload.billing_city,
-                region=payload.billing_region,
-                postal_code=payload.billing_postal_code,
-                country=payload.billing_country,
-                is_default_shipping=False,
-                is_default_billing=bool(payload.save_address and payload.create_account),
-            ),
-        )
-
-    totals, discount_val = await cart_service.calculate_totals_async(
+    if existing_response:
+        response.status_code = status.HTTP_200_OK
+        return existing_response
+    prepared = await _prepare_guest_checkout_data(
         session,
-        cart,
-        shipping_method=shipping_method,
-        promo=promo,
-        checkout_settings=checkout_settings,
-        country_code=shipping_addr.country,
-    )
-    payment_method = payload.payment_method or "stripe"
-    stripe_session_id = None
-    stripe_checkout_url = None
-    payment_intent_id = None
-    paypal_order_id = None
-    paypal_approval_url = None
-    netopia_ntp_id = None
-    netopia_payment_url = None
-    if payment_method == "stripe":
-        stripe_line_items = _build_stripe_line_items(cart, totals, lang=payload.preferred_language)
-        discount_cents = _money_to_cents(discount_val) if discount_val and discount_val > 0 else None
-        stripe_session = await payments.create_checkout_session(
-            session=session,
-            amount_cents=_money_to_cents(totals.total),
-            customer_email=email,
-            success_url=f"{base}/checkout/stripe/return?session_id={{CHECKOUT_SESSION_ID}}",
-            cancel_url=f"{base}/checkout/stripe/cancel?session_id={{CHECKOUT_SESSION_ID}}",
-            lang=payload.preferred_language,
-            metadata={"cart_id": str(cart.id), "user_id": str(user_id) if user_id else ""},
-            line_items=stripe_line_items,
-            discount_cents=discount_cents,
-            promo_code=None,
-        )
-        stripe_session_id = str(stripe_session.get("session_id"))
-        stripe_checkout_url = str(stripe_session.get("checkout_url"))
-    elif payment_method == "paypal":
-        paypal_items = _build_paypal_items(cart, lang=payload.preferred_language)
-        paypal_order_id, paypal_approval_url = await paypal_service.create_order(
-            total_ron=totals.total,
-            reference=str(cart.id),
-            return_url=f"{base}/checkout/paypal/return",
-            cancel_url=f"{base}/checkout/paypal/cancel",
-            item_total_ron=totals.subtotal,
-            shipping_ron=totals.shipping,
-            tax_ron=totals.tax,
-            fee_ron=totals.fee,
-            discount_ron=discount_val,
-            items=paypal_items,
-        )
-    order = await order_service.build_order_from_cart(
-        session,
-        user_id,
-        customer_email=email,
-        customer_name=customer_name,
+        background_tasks,
+        payload=payload,
         cart=cart,
-        shipping_address_id=shipping_addr.id,
-        billing_address_id=billing_addr.id,
-        shipping_method=shipping_method,
-        payment_method=payment_method,
-        payment_intent_id=payment_intent_id,
-        stripe_checkout_session_id=stripe_session_id,
-        stripe_checkout_url=stripe_checkout_url,
-        paypal_order_id=paypal_order_id,
-        paypal_approval_url=paypal_approval_url,
-        courier=courier,
-        delivery_type=delivery_type,
-        locker_id=locker_id,
-        locker_name=locker_name,
-        locker_address=locker_address,
-        locker_lat=locker_lat,
-        locker_lng=locker_lng,
-        discount=discount_val,
-        promo_code=None,
-        invoice_company=payload.invoice_company,
-        invoice_vat_id=payload.invoice_vat_id,
-        tax_amount=totals.tax,
-        fee_amount=totals.fee,
-        shipping_amount=totals.shipping,
-        total_amount=totals.total,
+        email=email,
+        base=base,
     )
-    if payment_method == "netopia":
-        if not settings.netopia_enabled:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Netopia is disabled")
-        netopia_configured, netopia_reason = netopia_service.netopia_configuration_status()
-        if not netopia_configured:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=netopia_reason or "Netopia is not configured",
-            )
-        first_name, last_name = _split_customer_name(getattr(order, "customer_name", None) or "")
-        shipping_addr_obj = order.shipping_address or shipping_addr
-        billing_addr_obj = order.billing_address or billing_addr or shipping_addr_obj
-        billing_payload = _netopia_address_payload(
-            email=getattr(order, "customer_email", None) or email,
-            phone=getattr(shipping_addr_obj, "phone", None),
-            first_name=first_name,
-            last_name=last_name,
-            addr=billing_addr_obj,
-        )
-        shipping_payload = _netopia_address_payload(
-            email=getattr(order, "customer_email", None) or email,
-            phone=getattr(shipping_addr_obj, "phone", None),
-            first_name=first_name,
-            last_name=last_name,
-            addr=shipping_addr_obj,
-        )
-        cancel_url = f"{base}/checkout/netopia/cancel?order_id={order.id}"
-        redirect_url = f"{base}/checkout/netopia/return?order_id={order.id}"
-        notify_url = f"{base}/api/v1/payments/netopia/webhook"
-        netopia_ntp_id, netopia_payment_url = await netopia_service.start_payment(
-            order_id=str(order.id),
-            amount_ron=pricing.quantize_money(order.total_amount),
-            description=f"Order {order.reference_code}" if order.reference_code else f"Order {order.id}",
-            billing=billing_payload,
-            shipping=shipping_payload,
-            products=_build_netopia_products(order, lang=payload.preferred_language),
-            language=(payload.preferred_language or "ro"),
-            cancel_url=cancel_url,
-            notify_url=notify_url,
-            redirect_url=redirect_url,
-        )
-        order.netopia_ntp_id = netopia_ntp_id
-        order.netopia_payment_url = netopia_payment_url
-        session.add(order)
-    legal_consents_service.add_consent_records(
+    return await _finalize_guest_checkout(
         session,
-        context=LegalConsentContext.checkout,
-        required_versions=required_versions,
-        accepted_at=datetime.now(timezone.utc),
-        user_id=user_id,
-        order_id=order.id,
-    )
-    await session.commit()
-
-    if (payment_method or "").strip().lower() == "cod":
-        background_tasks.add_task(
-            email_service.send_order_confirmation,
-            email,
-            order,
-            order.items,
-            payload.preferred_language,
-            receipt_share_days=checkout_settings.receipt_share_days,
-        )
-        owner = await auth_service.get_owner_user(session)
-        admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
-        if admin_to:
-            background_tasks.add_task(
-                email_service.send_new_order_notification,
-                admin_to,
-                order,
-                email,
-                owner.preferred_language if owner else None,
-            )
-
-    return GuestCheckoutResponse(
-        order_id=order.id,
-        reference_code=order.reference_code,
-        paypal_order_id=paypal_order_id,
-        paypal_approval_url=paypal_approval_url,
-        netopia_ntp_id=netopia_ntp_id,
-        netopia_payment_url=netopia_payment_url,
-        stripe_session_id=stripe_session_id,
-        stripe_checkout_url=stripe_checkout_url,
-        payment_method=payment_method,
+        background_tasks,
+        payload=payload,
+        email=email,
+        base=base,
+        prepared=prepared,
     )
 
 
