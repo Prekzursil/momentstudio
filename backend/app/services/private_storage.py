@@ -184,7 +184,7 @@ def delete_private_file(rel_path: str, *, root: str | Path | None = None) -> Non
 def _detect_mime(content: bytes) -> str | None:
     # PDF magic header
     if content.startswith(b"%PDF"):
-        return "application/pdf"
+        return _MIME_APPLICATION_PDF
     return _detect_image_mime(content)
 
 
@@ -195,7 +195,7 @@ def _detect_mime_path(path: Path) -> str | None:
     except OSError:
         return None
     if head.startswith(b"%PDF"):
-        return "application/pdf"
+        return _MIME_APPLICATION_PDF
 
     try:
         with Image.open(path) as img:
@@ -209,11 +209,11 @@ def _detect_mime_path(path: Path) -> str | None:
 
     normalized = image_format.upper()
     if normalized == "JPEG":
-        return "image/jpeg"
+        return _MIME_IMAGE_JPEG
     if normalized == "PNG":
-        return "image/png"
+        return _MIME_IMAGE_PNG
     if normalized == "WEBP":
-        return "image/webp"
+        return _MIME_IMAGE_WEBP
     return None
 
 
@@ -230,11 +230,11 @@ def _detect_image_mime(content: bytes) -> str | None:
 
     normalized = image_format.upper()
     if normalized == "JPEG":
-        return "image/jpeg"
+        return _MIME_IMAGE_JPEG
     if normalized == "PNG":
-        return "image/png"
+        return _MIME_IMAGE_PNG
     if normalized == "WEBP":
-        return "image/webp"
+        return _MIME_IMAGE_WEBP
     return None
 
 
