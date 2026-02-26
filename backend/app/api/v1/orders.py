@@ -943,6 +943,41 @@ def _assert_netopia_enabled_and_configured() -> None:
     )
 
 
+def _order_contact_email_for_netopia(order: Order, *, fallback_email: str) -> str:
+    return getattr(order, "customer_email", None) or fallback_email
+
+
+def _order_contact_phone_for_netopia(shipping_addr: Address, *, fallback_phone: str | None) -> str | None:
+    return getattr(shipping_addr, "phone", None) or fallback_phone
+
+
+def _netopia_customer_payloads(
+    order: Order,
+    *,
+    email: str,
+    phone: str | None,
+    shipping_addr: Address,
+    billing_addr: Address,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    first_name, last_name = _split_customer_name(getattr(order, "customer_name", None) or "")
+    return (
+        _netopia_address_payload(
+            email=email,
+            phone=phone,
+            first_name=first_name,
+            last_name=last_name,
+            addr=billing_addr,
+        ),
+        _netopia_address_payload(
+            email=email,
+            phone=phone,
+            first_name=first_name,
+            last_name=last_name,
+            addr=shipping_addr,
+        ),
+    )
+
+
 async def _start_netopia_payment_for_order(
     order: Order,
     *,
@@ -957,20 +992,14 @@ async def _start_netopia_payment_for_order(
     billing_addr_obj = order.billing_address or billing_fallback or shipping_addr_obj
     if not shipping_addr_obj or not billing_addr_obj:
         return None
-    first_name, last_name = _split_customer_name(getattr(order, "customer_name", None) or "")
-    billing_payload = _netopia_address_payload(
-        email=getattr(order, "customer_email", None) or email,
-        phone=getattr(shipping_addr_obj, "phone", None) or phone,
-        first_name=first_name,
-        last_name=last_name,
-        addr=billing_addr_obj,
-    )
-    shipping_payload = _netopia_address_payload(
-        email=getattr(order, "customer_email", None) or email,
-        phone=getattr(shipping_addr_obj, "phone", None) or phone,
-        first_name=first_name,
-        last_name=last_name,
-        addr=shipping_addr_obj,
+    contact_email = _order_contact_email_for_netopia(order, fallback_email=email)
+    contact_phone = _order_contact_phone_for_netopia(shipping_addr_obj, fallback_phone=phone)
+    billing_payload, shipping_payload = _netopia_customer_payloads(
+        order,
+        email=contact_email,
+        phone=contact_phone,
+        shipping_addr=shipping_addr_obj,
+        billing_addr=billing_addr_obj,
     )
     netopia_ntp_id, netopia_payment_url = await netopia_service.start_payment(
         order_id=str(order.id),
@@ -1115,14 +1144,9 @@ async def _resolve_logged_checkout_discount(
     checkout_settings: Any,
     shipping_method: Any,
 ) -> tuple[Any, Any, Any, Decimal]:
-    promo = None
-    applied_discount = None
-    applied_coupon = None
-    coupon_shipping_discount = Decimal("0.00")
     if not payload.promo_code:
-        return promo, applied_discount, applied_coupon, coupon_shipping_discount
-    rate_flat = Decimal(getattr(shipping_method, "rate_flat", None) or 0) if shipping_method else None
-    rate_per = Decimal(getattr(shipping_method, "rate_per_kg", None) or 0) if shipping_method else None
+        return None, None, None, Decimal("0.00")
+    rate_flat, rate_per = _shipping_rate_tuple(shipping_method)
     try:
         applied_discount = await coupons_service.apply_discount_code_to_cart(
             session,
@@ -1136,12 +1160,21 @@ async def _resolve_logged_checkout_discount(
         )
         applied_coupon = applied_discount.coupon if applied_discount else None
         coupon_shipping_discount = applied_discount.shipping_discount_ron if applied_discount else Decimal("0.00")
+        return None, applied_discount, applied_coupon, coupon_shipping_discount
     except HTTPException as exc:
         if exc.status_code == status.HTTP_404_NOT_FOUND:
             promo = await cart_service.validate_promo(session, payload.promo_code, currency=None)
-        else:
-            raise
-    return promo, applied_discount, applied_coupon, coupon_shipping_discount
+            return promo, None, None, Decimal("0.00")
+        raise
+
+
+def _shipping_rate_tuple(shipping_method: Any) -> tuple[Decimal | None, Decimal | None]:
+    if not shipping_method:
+        return None, None
+    return (
+        Decimal(getattr(shipping_method, "rate_flat", None) or 0),
+        Decimal(getattr(shipping_method, "rate_per_kg", None) or 0),
+    )
 
 
 def _has_complete_billing_address(
@@ -2424,6 +2457,32 @@ def _admin_order_list_item_from_row(
     )
 
 
+def _admin_order_list_response(
+    rows: list[tuple[Order, str | None, str | None, str | None, datetime | None, Any, Any]],
+    *,
+    include_pii: bool,
+    total_items: int,
+    page: int,
+    limit: int,
+) -> AdminOrderListResponse:
+    now = datetime.now(timezone.utc)
+    accept_hours = max(1, int(getattr(settings, "order_sla_accept_hours", 24) or 24))
+    ship_hours = max(1, int(getattr(settings, "order_sla_ship_hours", 48) or 48))
+    items = [
+        _admin_order_list_item_from_row(
+            row,
+            include_pii=include_pii,
+            now=now,
+            accept_hours=accept_hours,
+            ship_hours=ship_hours,
+        )
+        for row in rows
+    ]
+    total_pages = max(1, (int(total_items) + limit - 1) // limit)
+    meta = AdminPaginationMeta(total_items=int(total_items), total_pages=total_pages, page=page, limit=limit)
+    return AdminOrderListResponse(items=items, meta=meta)
+
+
 @router.get("/admin/search", response_model=AdminOrderListResponse)
 async def admin_search_orders(
     request: Request,
@@ -2463,22 +2522,7 @@ async def admin_search_orders(
         limit=limit,
         include_test=include_test,
     )
-    now = datetime.now(timezone.utc)
-    accept_hours = max(1, int(getattr(settings, "order_sla_accept_hours", 24) or 24))
-    ship_hours = max(1, int(getattr(settings, "order_sla_ship_hours", 48) or 48))
-    items = [
-        _admin_order_list_item_from_row(
-            row,
-            include_pii=include_pii,
-            now=now,
-            accept_hours=accept_hours,
-            ship_hours=ship_hours,
-        )
-        for row in rows
-    ]
-    total_pages = max(1, (int(total_items) + limit - 1) // limit)
-    meta = AdminPaginationMeta(total_items=int(total_items), total_pages=total_pages, page=page, limit=limit)
-    return AdminOrderListResponse(items=items, meta=meta)
+    return _admin_order_list_response(rows, include_pii=include_pii, total_items=total_items, page=page, limit=limit)
 
 
 @router.get("/admin/tags", response_model=OrderTagsResponse)
@@ -2540,6 +2584,16 @@ def _order_shipping_method_name(order: Order) -> str:
     return getattr(shipping_method, "name", "") or ""
 
 
+def _masked_order_export_columns() -> dict[str, Callable[[Order], Any]]:
+    return {
+        "customer_email": lambda o: pii_service.mask_email(_order_attr_as_str(o, "customer_email")) or "",
+        "customer_name": lambda o: pii_service.mask_text(_order_attr_as_str(o, "customer_name"), keep=1) or "",
+        "invoice_company": lambda o: pii_service.mask_text(_order_attr_as_str(o, "invoice_company"), keep=1) or "",
+        "invoice_vat_id": lambda o: pii_service.mask_text(_order_attr_as_str(o, "invoice_vat_id"), keep=2) or "",
+        "locker_address": lambda o: "***" if _order_attr_as_str(o, "locker_address").strip() else "",
+    }
+
+
 def _order_export_allowed_columns(*, include_pii: bool) -> dict[str, Callable[[Order], Any]]:
     allowed: dict[str, Callable[[Order], Any]] = {
         "id": lambda o: str(o.id),
@@ -2567,13 +2621,8 @@ def _order_export_allowed_columns(*, include_pii: bool) -> dict[str, Callable[[O
         "created_at": lambda o: _order_attr_iso(o, "created_at"),
         "updated_at": lambda o: _order_attr_iso(o, "updated_at"),
     }
-    if include_pii:
-        return allowed
-    allowed["customer_email"] = lambda o: pii_service.mask_email(_order_attr_as_str(o, "customer_email")) or ""
-    allowed["customer_name"] = lambda o: pii_service.mask_text(_order_attr_as_str(o, "customer_name"), keep=1) or ""
-    allowed["invoice_company"] = lambda o: pii_service.mask_text(_order_attr_as_str(o, "invoice_company"), keep=1) or ""
-    allowed["invoice_vat_id"] = lambda o: pii_service.mask_text(_order_attr_as_str(o, "invoice_vat_id"), keep=2) or ""
-    allowed["locker_address"] = lambda o: "***" if _order_attr_as_str(o, "locker_address").strip() else ""
+    if not include_pii:
+        allowed.update(_masked_order_export_columns())
     return allowed
 
 
