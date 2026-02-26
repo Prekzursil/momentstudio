@@ -2669,7 +2669,7 @@ export class AdminOrdersComponent implements OnInit {
     let firstError: unknown = null;
     for (const result of results) {
       this.applyKanbanResult(result, itemsByStatus, totalsByStatus);
-      if (!firstError && !result?.res && 'err' in result) firstError = result.err;
+      if (!firstError && !result.res && 'err' in result) firstError = result.err;
     }
     return firstError;
   }
