@@ -2637,28 +2637,7 @@ export class AdminOrdersComponent implements OnInit {
       )
       .subscribe({
         next: (results) => {
-          const itemsByStatus: Record<string, AdminOrderListItem[]> = {};
-          const totalsByStatus: Record<string, number> = {};
-          let firstError: any = null;
-
-          for (const result of results) {
-            if (result?.res) {
-              itemsByStatus[result.status] = result.res.items ?? [];
-              totalsByStatus[result.status] = result.res.meta?.total_items ?? (result.res.items ?? []).length;
-              continue;
-            }
-            itemsByStatus[result.status] = [];
-            totalsByStatus[result.status] = 0;
-            if (!firstError && 'err' in result) firstError = result.err;
-          }
-
-          this.kanbanItemsByStatus.set(itemsByStatus);
-          this.kanbanTotalsByStatus.set(totalsByStatus);
-          if (firstError) {
-            this.error.set(this.translate.instant('adminUi.orders.errors.load'));
-            this.errorRequestId.set(extractRequestId(firstError));
-          }
-          this.loading.set(false);
+          this.applyKanbanLoadResults(results);
         },
         error: (err) => {
           this.error.set(this.translate.instant('adminUi.orders.errors.load'));
@@ -2666,6 +2645,47 @@ export class AdminOrdersComponent implements OnInit {
           this.loading.set(false);
         }
       });
+  }
+
+  private applyKanbanLoadResults(results: Array<{ status: string; res: AdminOrderListResponse | null; err?: unknown }>): void {
+    const itemsByStatus: Record<string, AdminOrderListItem[]> = {};
+    const totalsByStatus: Record<string, number> = {};
+    const firstError = this.collectKanbanFirstError(results, itemsByStatus, totalsByStatus);
+
+    this.kanbanItemsByStatus.set(itemsByStatus);
+    this.kanbanTotalsByStatus.set(totalsByStatus);
+    if (firstError) {
+      this.error.set(this.translate.instant('adminUi.orders.errors.load'));
+      this.errorRequestId.set(extractRequestId(firstError));
+    }
+    this.loading.set(false);
+  }
+
+  private collectKanbanFirstError(
+    results: Array<{ status: string; res: AdminOrderListResponse | null; err?: unknown }>,
+    itemsByStatus: Record<string, AdminOrderListItem[]>,
+    totalsByStatus: Record<string, number>
+  ): unknown {
+    let firstError: unknown = null;
+    for (const result of results) {
+      this.applyKanbanResult(result, itemsByStatus, totalsByStatus);
+      if (!firstError && !result?.res && 'err' in result) firstError = result.err;
+    }
+    return firstError;
+  }
+
+  private applyKanbanResult(
+    result: { status: string; res: AdminOrderListResponse | null; err?: unknown },
+    itemsByStatus: Record<string, AdminOrderListItem[]>,
+    totalsByStatus: Record<string, number>
+  ): void {
+    if (result?.res) {
+      itemsByStatus[result.status] = result.res.items ?? [];
+      totalsByStatus[result.status] = result.res.meta?.total_items ?? (result.res.items ?? []).length;
+      return;
+    }
+    itemsByStatus[result.status] = [];
+    totalsByStatus[result.status] = 0;
   }
 
   retryLoad(): void {

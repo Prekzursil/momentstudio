@@ -152,26 +152,35 @@ def _extract_location_lat_lng(location: Any) -> tuple[float | None, float | None
     return lat, lng
 
 
+def _validated_coordinate_pair(lat: float | None, lng: float | None) -> tuple[float, float] | None:
+    if lat is None or lng is None:
+        return None
+    if not _is_valid_coordinate_pair(lat, lng):
+        return None
+    return lat, lng
+
+
+def _extract_geometry_lat_lng(candidate: dict[str, Any]) -> tuple[float | None, float | None]:
+    geometry = candidate.get("geometry")
+    if not isinstance(geometry, dict):
+        return None, None
+    coords = geometry.get("coordinates")
+    if not isinstance(coords, (list, tuple)) or len(coords) < 2:
+        return None, None
+    return _to_float(coords[1]), _to_float(coords[0])
+
+
 def _to_lat_lng(candidate: dict[str, Any]) -> tuple[float, float] | None:
     for lat_key, lng_key in _PRIMARY_LAT_LNG_KEYS:
-        lat, lng = _extract_lat_lng(candidate, lat_key, lng_key)
-        if lat is not None and lng is not None and _is_valid_coordinate_pair(lat, lng):
-            return lat, lng
+        lat_lng = _validated_coordinate_pair(*_extract_lat_lng(candidate, lat_key, lng_key))
+        if lat_lng is not None:
+            return lat_lng
 
-    geometry = candidate.get("geometry")
-    if isinstance(geometry, dict):
-        coords = geometry.get("coordinates")
-        if isinstance(coords, (list, tuple)) and len(coords) >= 2:
-            lng = _to_float(coords[0])
-            lat = _to_float(coords[1])
-            if lat is not None and lng is not None and _is_valid_coordinate_pair(lat, lng):
-                return lat, lng
+    geometry_lat_lng = _validated_coordinate_pair(*_extract_geometry_lat_lng(candidate))
+    if geometry_lat_lng is not None:
+        return geometry_lat_lng
 
-    lat, lng = _extract_location_lat_lng(candidate.get("location"))
-    if lat is not None and lng is not None and _is_valid_coordinate_pair(lat, lng):
-        return lat, lng
-
-    return None
+    return _validated_coordinate_pair(*_extract_location_lat_lng(candidate.get("location")))
 
 
 def _collect_candidate_rows(payload: Any) -> list[dict[str, Any]]:

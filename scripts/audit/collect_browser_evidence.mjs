@@ -735,37 +735,377 @@ async function collectVisibilityProbe(page) {
   });
 }
 
-async function main() {
-  const args = parseArgs(process.argv);
+function readLayoutSignalsInPage() {
+  const allElements = Array.from(document.querySelectorAll("*"));
+  const stickyElements = allElements.filter((el) => getComputedStyle(el).position === "sticky");
+  const scrollables = allElements.filter((el) => {
+    const style = getComputedStyle(el);
+    const overflowY = style.overflowY;
+    return (overflowY === "auto" || overflowY === "scroll") && el.scrollHeight > el.clientHeight + 8;
+  });
+  const nestedScrollables = scrollables.filter((el) => {
+    const parent = el.parentElement;
+    if (!parent) return false;
+    const style = getComputedStyle(parent);
+    const overflowY = style.overflowY;
+    return (overflowY === "auto" || overflowY === "scroll") && parent.scrollHeight > parent.clientHeight + 8;
+  });
+  return {
+    sticky_count: stickyElements.length,
+    scrollable_count: scrollables.length,
+    nested_scrollables_count: nestedScrollables.length,
+  };
+}
+
+async function collectLayoutSignals(page) {
+  return page.evaluate(readLayoutSignalsInPage);
+}
+
+function buildBaseRouteRecord(routeState) {
+  return {
+    route: routeState.routeTemplate,
+    route_template: routeState.routeTemplate,
+    resolved_route: routeState.resolvedPath,
+  };
+}
+
+function buildSeoRecord(routeState, overrides = {}) {
+  return {
+    ...buildBaseRouteRecord(routeState),
+    unresolved_placeholder: false,
+    auth_mode: routeState.authMode,
+    url: null,
+    screenshot: null,
+    title: null,
+    description: null,
+    og_description: null,
+    canonical: null,
+    robots: null,
+    indexable: null,
+    h1_count: 0,
+    h1_texts: [],
+    route_heading_count: 0,
+    word_count_initial_html: 0,
+    meaningful_text_block_count: 0,
+    internal_link_count: 0,
+    ...overrides,
+  };
+}
+
+function buildLayoutRecord(routeState, overrides = {}) {
+  return {
+    ...buildBaseRouteRecord(routeState),
+    unresolved_placeholder: false,
+    auth_mode: routeState.authMode,
+    surface: routeState.surface,
+    sticky_count: 0,
+    scrollable_count: 0,
+    nested_scrollables_count: 0,
+    ...overrides,
+  };
+}
+
+function buildVisibilityRecord(routeState, overrides = {}) {
+  return {
+    ...buildBaseRouteRecord(routeState),
+    unresolved_placeholder: false,
+    surface: routeState.surface,
+    auth_mode: routeState.authMode,
+    ...overrides,
+  };
+}
+
+function createRouteState(route, routeSamples, outputDirAbsPath, baseUrl, authMode) {
+  const routeTemplate = String(route?.full_path || "/");
+  const surface = String(route?.surface || "storefront");
+  const materialized = materializeRoute(routeTemplate, routeSamples);
+  const rawResolvedPath = materialized.resolvedRoute;
+  const resolvedPath = rawResolvedPath.startsWith("/") ? rawResolvedPath : `/${rawResolvedPath}`;
+  const slug = routeSlug(resolvedPath || routeTemplate);
+  const screenshotPath = path.join("screenshots", `${slug}.png`);
+  return {
+    routeTemplate,
+    surface,
+    materialized,
+    resolvedPath,
+    url: `${baseUrl}${resolvedPath}`,
+    screenshotPath,
+    screenshotAbsPath: resolvePathUnderBase(outputDirAbsPath, screenshotPath),
+    authMode,
+    routeConsole: [],
+    routePageErrors: [],
+    routeResourceFailures: [],
+    routeResourceFailureKeys: new Set(),
+  };
+}
+
+function appendUnresolvedPlaceholderArtifacts(artifacts, routeState) {
+  const skipped = {
+    unresolved_placeholder: true,
+    skipped_reason: "unresolved_placeholder",
+  };
+  artifacts.seoSnapshot.push(
+    buildSeoRecord(routeState, {
+      ...skipped,
+      unresolved_keys: routeState.materialized.unresolvedKeys,
+    })
+  );
+  artifacts.layoutSignals.push(buildLayoutRecord(routeState, skipped));
+  artifacts.visibilitySignals.push(buildVisibilityRecord(routeState, skipped));
+}
+
+function appendRouteSuccessArtifacts(artifacts, routeState, seo, layout, visibilitySignal) {
+  artifacts.seoSnapshot.push(buildSeoRecord(routeState, {
+    surface: routeState.surface,
+    url: routeState.url,
+    screenshot: routeState.screenshotPath,
+    ...seo,
+  }));
+  artifacts.layoutSignals.push(buildLayoutRecord(routeState, layout));
+  artifacts.visibilitySignals.push(visibilitySignal);
+}
+
+function appendRouteFailureArtifacts(artifacts, routeState, message) {
+  artifacts.seoSnapshot.push(buildSeoRecord(routeState, {
+    surface: routeState.surface,
+    url: routeState.url,
+    error: message,
+  }));
+  artifacts.layoutSignals.push(buildLayoutRecord(routeState, { error: message }));
+  artifacts.visibilitySignals.push(buildVisibilityRecord(routeState, { error: message }));
+}
+
+function bindRouteEventHandlers(page, routeState) {
+  const onConsole = onConsoleEvent.bind(null, routeState.routeConsole, routeState.routeTemplate, routeState.resolvedPath);
+  const onPageError = onPageErrorEvent.bind(null, routeState.routePageErrors, routeState.routeTemplate, routeState.resolvedPath);
+  const onResponse = onResponseEvent.bind(
+    null,
+    routeState.routeResourceFailureKeys,
+    routeState.routeResourceFailures,
+    routeState.routeTemplate,
+    routeState.resolvedPath
+  );
+  const onRequestFailed = onRequestFailedEvent.bind(
+    null,
+    routeState.routeResourceFailureKeys,
+    routeState.routeResourceFailures,
+    routeState.routeTemplate,
+    routeState.resolvedPath
+  );
+  page.on("console", onConsole);
+  page.on("pageerror", onPageError);
+  page.on("response", onResponse);
+  page.on("requestfailed", onRequestFailed);
+  return () => {
+    page.off("console", onConsole);
+    page.off("pageerror", onPageError);
+    page.off("response", onResponse);
+    page.off("requestfailed", onRequestFailed);
+  };
+}
+
+async function collectVisibilityPhases(page) {
+  const visibilityInitial = await collectVisibilityProbe(page);
+  await page.waitForTimeout(2000);
+  const visibilitySettled = await collectVisibilityProbe(page);
+  await page.evaluate(() => {
+    globalThis.dispatchEvent(new Event("scroll"));
+    globalThis.dispatchEvent(new Event("resize"));
+  });
+  await page.waitForTimeout(250);
+  const visibilityAfterPassive = await collectVisibilityProbe(page);
+  return {
+    visibilityInitial,
+    visibilitySettled,
+    visibilityAfterPassive,
+  };
+}
+
+async function collectRouteEvidence(page, routeState) {
+  await page.goto(routeState.url, { waitUntil: "networkidle", timeout: 45000 });
+  const visibility = await collectVisibilityPhases(page);
+  await page.screenshot({ path: routeState.screenshotAbsPath, fullPage: true });
+  const [seo, layout] = await Promise.all([
+    collectSeoSnapshot(page),
+    collectLayoutSignals(page),
+  ]);
+  const visibilitySignal = buildVisibilitySignalPayload({
+    routeTemplate: routeState.routeTemplate,
+    resolvedPath: routeState.resolvedPath,
+    surface: routeState.surface,
+    authMode: routeState.authMode,
+    visibilityInitial: visibility.visibilityInitial,
+    visibilitySettled: visibility.visibilitySettled,
+    visibilityAfterPassive: visibility.visibilityAfterPassive,
+  });
+  return { seo, layout, visibilitySignal };
+}
+
+function fallbackString(value, fallback) {
+  const token = String(value || "").trim();
+  return token || fallback;
+}
+
+function nullableString(value) {
+  const token = String(value || "").trim();
+  return token || null;
+}
+
+function buildResourceFailureStatusLabel(item) {
+  if (item.status_code) {
+    return `status ${item.status_code}`;
+  }
+  return fallbackString(item.failure_text, "requestfailed");
+}
+
+function buildResourceFailureDescriptor(item) {
+  return [
+    buildResourceFailureStatusLabel(item),
+    fallbackString(item.resource_type, "resource"),
+    fallbackString(item.method, "GET"),
+    fallbackString(item.request_url, "(unknown-url)"),
+  ].join(" | ");
+}
+
+function buildResourceFailureConsoleError(item, surface) {
+  return {
+    route: item.route,
+    route_template: item.route_template,
+    resolved_route: item.resolved_route,
+    surface,
+    level: "error",
+    severity: "s4",
+    text: `Failed resource request: ${buildResourceFailureDescriptor(item)}`,
+    source: item.source,
+    request_url: nullableString(item.request_url),
+    status_code: item.status_code,
+    resource_type: nullableString(item.resource_type),
+    method: nullableString(item.method),
+    failure_text: nullableString(item.failure_text),
+    source_url: null,
+    line: null,
+    column: null,
+  };
+}
+
+function appendResourceFailureConsoleErrors(consoleErrors, routeResourceFailures, surface) {
+  for (const item of routeResourceFailures) {
+    consoleErrors.push(buildResourceFailureConsoleError(item, surface));
+  }
+}
+
+function appendClassifiedConsoleErrors(consoleErrors, entries, surface, severitySelector = (classification) => classification.severity) {
+  for (const item of entries) {
+    const lowerText = String(item.text || "").toLowerCase();
+    if (lowerText.includes("failed to load resource")) {
+      continue;
+    }
+    const classification = classifyConsoleMessage(item.text, item.level);
+    if (classification.skip) {
+      continue;
+    }
+    consoleErrors.push({
+      route: item.route,
+      route_template: item.route_template,
+      resolved_route: item.resolved_route,
+      surface,
+      level: classification.level,
+      severity: severitySelector(classification),
+      text: item.text,
+      source_url: item.source_url ?? null,
+      line: item.line ?? null,
+      column: item.column ?? null,
+    });
+  }
+}
+
+function flushRouteConsoleErrors(routeState, consoleErrors) {
+  appendResourceFailureConsoleErrors(consoleErrors, routeState.routeResourceFailures, routeState.surface);
+  appendClassifiedConsoleErrors(consoleErrors, routeState.routeConsole, routeState.surface);
+  appendClassifiedConsoleErrors(
+    consoleErrors,
+    routeState.routePageErrors,
+    routeState.surface,
+    (classification) => (classification.severity === "s4" ? "s4" : "s2")
+  );
+}
+
+async function processRoute(page, route, runtime) {
+  const routeState = createRouteState(route, runtime.routeSamples, runtime.outputDirAbsPath, runtime.baseUrl, runtime.authMode);
+  if (routeState.materialized.unresolvedPlaceholder) {
+    appendUnresolvedPlaceholderArtifacts(runtime.artifacts, routeState);
+    return;
+  }
+  const cleanup = bindRouteEventHandlers(page, routeState);
+  try {
+    const evidence = await collectRouteEvidence(page, routeState);
+    appendRouteSuccessArtifacts(
+      runtime.artifacts,
+      routeState,
+      evidence.seo,
+      evidence.layout,
+      evidence.visibilitySignal
+    );
+  } catch (err) {
+    const message = String(err?.message || err || "unknown browser error");
+    appendRouteFailureArtifacts(runtime.artifacts, routeState, message);
+    routeState.routeConsole.push({
+      ...buildBaseRouteRecord(routeState),
+      level: "error",
+      text: message,
+    });
+  } finally {
+    cleanup();
+  }
+  flushRouteConsoleErrors(routeState, runtime.artifacts.consoleErrors);
+}
+
+function parseRunArgs(argv) {
+  const args = parseArgs(argv);
   const baseUrl = normalizeUrl(args["base-url"]);
   const apiBaseUrl = normalizeUrl(args["api-base-url"] || "");
   const routesJsonPath = String(args["routes-json"] || "").trim();
   const outputDir = String(args["output-dir"] || "").trim();
-  const routeSamplesPath = String(args["route-samples"] || "").trim();
-  const authMode = normalizeAuthMode(args["auth-mode"]);
-  const ownerIdentifier = String(args["owner-identifier"] || "").trim();
-  const ownerPassword = String(args["owner-password"] || "").trim();
-  const maxRoutes = resolveMaxRoutes(args["max-routes"]);
-
   if (!baseUrl || !routesJsonPath || !outputDir) {
     throw new Error("Required args: --base-url --routes-json --output-dir");
   }
+  return {
+    baseUrl,
+    apiBaseUrl,
+    routesJsonPath,
+    outputDir,
+    routeSamplesPath: String(args["route-samples"] || "").trim(),
+    authMode: normalizeAuthMode(args["auth-mode"]),
+    ownerIdentifier: String(args["owner-identifier"] || "").trim(),
+    ownerPassword: String(args["owner-password"] || "").trim(),
+    maxRoutes: resolveMaxRoutes(args["max-routes"]),
+  };
+}
 
+function resolveRunPaths(config, cwdPath = process.cwd()) {
   const allowedRoots = [repoRoot];
-  const cwdPath = path.resolve(process.cwd());
-  if (isPathWithinRoot(repoRoot, cwdPath)) {
-    allowedRoots.push(cwdPath);
+  const cwdAbsPath = path.resolve(cwdPath);
+  if (isPathWithinRoot(repoRoot, cwdAbsPath)) {
+    allowedRoots.push(cwdAbsPath);
   }
-  const routesJsonAbsPath = resolvePathUnderAllowedBases(routesJsonPath, allowedRoots, "--routes-json");
-  const outputDirAbsPath = resolvePathUnderAllowedBases(outputDir, allowedRoots, "--output-dir");
+  return {
+    allowedRoots,
+    routesJsonAbsPath: resolvePathUnderAllowedBases(config.routesJsonPath, allowedRoots, "--routes-json"),
+    outputDirAbsPath: resolvePathUnderAllowedBases(config.outputDir, allowedRoots, "--output-dir"),
+  };
+}
 
-  const routesPayload = JSON.parse(await readUtf8FileUnderAllowedBases(routesJsonAbsPath, allowedRoots, "--routes-json"));
-  const routes = Array.isArray(routesPayload?.routes) ? routesPayload.routes.slice(0, maxRoutes) : [];
-  let routeSamples = await loadRouteSamples(routeSamplesPath, allowedRoots);
+async function loadRoutes(routesJsonAbsPath, allowedRoots, maxRoutes) {
+  const payload = JSON.parse(await readUtf8FileUnderAllowedBases(routesJsonAbsPath, allowedRoots, "--routes-json"));
+  return Array.isArray(payload?.routes) ? payload.routes.slice(0, maxRoutes) : [];
+}
 
+async function prepareOutputDirectory(outputDirAbsPath) {
   await ensureDirectoryUnderBase(outputDirAbsPath);
   await ensureDirectoryUnderBase(outputDirAbsPath, "screenshots");
+}
 
+async function createBrowserRuntime(baseUrl, apiBaseUrl) {
   const { chromium } = require("@playwright/test");
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
@@ -773,332 +1113,76 @@ async function main() {
     baseUrl,
     apiBaseUrl: apiBaseUrl || baseUrl,
   });
-  let ownerAuth = null;
-  if (authMode === "owner") {
-    ownerAuth = await primeOwnerSession(context, {
-      apiBaseUrl: apiBaseUrl || baseUrl,
-      ownerIdentifier,
-      ownerPassword,
-    });
-  }
-  routeSamples = await hydrateRouteSamplesFromApi(context, {
-    apiBaseUrl: apiBaseUrl || baseUrl,
-    routeSamples,
-    accessToken: ownerAuth?.accessToken || "",
-  });
   const page = await context.newPage();
+  return { browser, context, page };
+}
 
-  const seoSnapshot = [];
-  const consoleErrors = [];
-  const layoutSignals = [];
-  const visibilitySignals = [];
+async function maybePrimeOwnerAuth(context, config) {
+  if (config.authMode !== "owner") {
+    return null;
+  }
+  return primeOwnerSession(context, {
+    apiBaseUrl: config.apiBaseUrl || config.baseUrl,
+    ownerIdentifier: config.ownerIdentifier,
+    ownerPassword: config.ownerPassword,
+  });
+}
 
-  for (const route of routes) {
-    const routeTemplate = String(route?.full_path || "/");
-    const surface = String(route?.surface || "storefront");
-    const materialized = materializeRoute(routeTemplate, routeSamples);
-    const resolvedPath = materialized.resolvedRoute.startsWith("/") ? materialized.resolvedRoute : `/${materialized.resolvedRoute}`;
-    const url = `${baseUrl}${resolvedPath}`;
-    const slug = routeSlug(resolvedPath || routeTemplate);
-    const screenshotPath = path.join("screenshots", `${slug}.png`);
-    const screenshotAbsPath = resolvePathUnderBase(outputDirAbsPath, screenshotPath);
-    const routeConsole = [];
-    const routePageErrors = [];
-    const routeResourceFailures = [];
-    const routeResourceFailureKeys = new Set();
+function createArtifacts() {
+  return {
+    seoSnapshot: [],
+    consoleErrors: [],
+    layoutSignals: [],
+    visibilitySignals: [],
+  };
+}
 
-    if (materialized.unresolvedPlaceholder) {
-      seoSnapshot.push({
-        route: routeTemplate,
-        route_template: routeTemplate,
-        resolved_route: resolvedPath,
-        unresolved_placeholder: true,
-        auth_mode: authMode,
-        unresolved_keys: materialized.unresolvedKeys,
-        url: null,
-        screenshot: null,
-        title: null,
-        description: null,
-        og_description: null,
-        canonical: null,
-        robots: null,
-        indexable: null,
-        h1_count: 0,
-        h1_texts: [],
-        route_heading_count: 0,
-        word_count_initial_html: 0,
-        meaningful_text_block_count: 0,
-        internal_link_count: 0,
-        skipped_reason: "unresolved_placeholder"
-      });
-      layoutSignals.push({
-        route: routeTemplate,
-        route_template: routeTemplate,
-        resolved_route: resolvedPath,
-        unresolved_placeholder: true,
-        auth_mode: authMode,
-        surface,
-        sticky_count: 0,
-        scrollable_count: 0,
-        nested_scrollables_count: 0,
-        skipped_reason: "unresolved_placeholder"
-      });
-      visibilitySignals.push({
-        route: routeTemplate,
-        route_template: routeTemplate,
-        resolved_route: resolvedPath,
-        unresolved_placeholder: true,
-        surface,
-        auth_mode: authMode,
-        skipped_reason: "unresolved_placeholder",
-      });
-      continue;
-    }
+function toPrettyJson(payload) {
+  return `${JSON.stringify(payload, null, 2)}\n`;
+}
 
-    const onConsole = onConsoleEvent.bind(null, routeConsole, routeTemplate, resolvedPath);
-    const onPageError = onPageErrorEvent.bind(null, routePageErrors, routeTemplate, resolvedPath);
-    const onResponse = onResponseEvent.bind(
-      null,
-      routeResourceFailureKeys,
-      routeResourceFailures,
-      routeTemplate,
-      resolvedPath
-    );
-    const onRequestFailed = onRequestFailedEvent.bind(
-      null,
-      routeResourceFailureKeys,
-      routeResourceFailures,
-      routeTemplate,
-      resolvedPath
-    );
-    page.on("console", onConsole);
-    page.on("pageerror", onPageError);
-    page.on("response", onResponse);
-    page.on("requestfailed", onRequestFailed);
+async function writeArtifacts(outputDirAbsPath, artifacts, metadata) {
+  await writeUtf8FileUnderBase(outputDirAbsPath, "seo-snapshot.json", toPrettyJson(artifacts.seoSnapshot));
+  await writeUtf8FileUnderBase(outputDirAbsPath, "console-errors.json", toPrettyJson(artifacts.consoleErrors));
+  await writeUtf8FileUnderBase(outputDirAbsPath, "layout-signals.json", toPrettyJson(artifacts.layoutSignals));
+  await writeUtf8FileUnderBase(outputDirAbsPath, "visibility-signals.json", toPrettyJson(artifacts.visibilitySignals));
+  await writeUtf8FileUnderBase(outputDirAbsPath, "browser-evidence-meta.json", toPrettyJson(metadata));
+}
 
-    try {
-      await page.goto(url, { waitUntil: "networkidle", timeout: 45000 });
-      const visibilityInitial = await collectVisibilityProbe(page);
-      await page.waitForTimeout(2000);
-      const visibilitySettled = await collectVisibilityProbe(page);
-      await page.evaluate(() => {
-        globalThis.dispatchEvent(new Event("scroll"));
-        globalThis.dispatchEvent(new Event("resize"));
-      });
-      await page.waitForTimeout(250);
-      const visibilityAfterPassive = await collectVisibilityProbe(page);
-      await page.screenshot({ path: screenshotAbsPath, fullPage: true });
+async function main() {
+  const config = parseRunArgs(process.argv);
+  const paths = resolveRunPaths(config);
+  const routes = await loadRoutes(paths.routesJsonAbsPath, paths.allowedRoots, config.maxRoutes);
+  let routeSamples = await loadRouteSamples(config.routeSamplesPath, paths.allowedRoots);
+  await prepareOutputDirectory(paths.outputDirAbsPath);
 
-      const seo = await collectSeoSnapshot(page);
-
-      const layout = await page.evaluate(() => {
-        const allElements = Array.from(document.querySelectorAll("*"));
-        const stickyElements = allElements.filter((el) => getComputedStyle(el).position === "sticky");
-        const scrollables = allElements.filter((el) => {
-          const style = getComputedStyle(el);
-          const overflowY = style.overflowY;
-          const scrollable = (overflowY === "auto" || overflowY === "scroll") && el.scrollHeight > el.clientHeight + 8;
-          return scrollable;
-        });
-        const nestedScrollables = scrollables.filter((el) => {
-          const parent = el.parentElement;
-          if (!parent) return false;
-          const style = getComputedStyle(parent);
-          const overflowY = style.overflowY;
-          return (overflowY === "auto" || overflowY === "scroll") && parent.scrollHeight > parent.clientHeight + 8;
-        });
-        return {
-          sticky_count: stickyElements.length,
-          scrollable_count: scrollables.length,
-          nested_scrollables_count: nestedScrollables.length,
-        };
-      });
-
-      seoSnapshot.push({
-        route: routeTemplate,
-        route_template: routeTemplate,
-        resolved_route: resolvedPath,
-        unresolved_placeholder: false,
-        auth_mode: authMode,
-        surface,
-        url,
-        screenshot: screenshotPath,
-        ...seo,
-      });
-      layoutSignals.push({
-        route: routeTemplate,
-        route_template: routeTemplate,
-        resolved_route: resolvedPath,
-        unresolved_placeholder: false,
-        auth_mode: authMode,
-        surface,
-        ...layout,
-      });
-
-      visibilitySignals.push(buildVisibilitySignalPayload({
-        routeTemplate,
-        resolvedPath,
-        surface,
-        authMode,
-        visibilityInitial,
-        visibilitySettled,
-        visibilityAfterPassive,
-      }));
-    } catch (err) {
-      const message = String(err?.message || err || "unknown browser error");
-      seoSnapshot.push({
-        route: routeTemplate,
-        route_template: routeTemplate,
-        resolved_route: resolvedPath,
-        unresolved_placeholder: false,
-        auth_mode: authMode,
-        surface,
-        url,
-        screenshot: null,
-        title: null,
-        description: null,
-        og_description: null,
-        canonical: null,
-        robots: null,
-        indexable: null,
-        h1_count: 0,
-        h1_texts: [],
-        route_heading_count: 0,
-        word_count_initial_html: 0,
-        meaningful_text_block_count: 0,
-        internal_link_count: 0,
-        error: message,
-      });
-      layoutSignals.push({
-        route: routeTemplate,
-        route_template: routeTemplate,
-        resolved_route: resolvedPath,
-        unresolved_placeholder: false,
-        auth_mode: authMode,
-        surface,
-        sticky_count: 0,
-        scrollable_count: 0,
-        nested_scrollables_count: 0,
-        error: message,
-      });
-      visibilitySignals.push({
-        route: routeTemplate,
-        route_template: routeTemplate,
-        resolved_route: resolvedPath,
-        unresolved_placeholder: false,
-        surface,
-        auth_mode: authMode,
-        error: message,
-      });
-      routeConsole.push({
-        route: routeTemplate,
-        route_template: routeTemplate,
-        resolved_route: resolvedPath,
-        level: "error",
-        text: message,
-      });
-    } finally {
-      page.off("console", onConsole);
-      page.off("pageerror", onPageError);
-      page.off("response", onResponse);
-      page.off("requestfailed", onRequestFailed);
-    }
-
-    for (const item of routeResourceFailures) {
-      const statusLabel = item.status_code ? `status ${item.status_code}` : (item.failure_text || "requestfailed");
-      const descriptor = [statusLabel, item.resource_type || "resource", item.method || "GET", item.request_url || "(unknown-url)"]
-        .filter(Boolean)
-        .join(" | ");
-      consoleErrors.push({
-        route: item.route,
-        route_template: item.route_template,
-        resolved_route: item.resolved_route,
-        surface,
-        level: "error",
-        severity: "s4",
-        text: `Failed resource request: ${descriptor}`,
-        source: item.source,
-        request_url: item.request_url || null,
-        status_code: item.status_code,
-        resource_type: item.resource_type || null,
-        method: item.method || null,
-        failure_text: item.failure_text || null,
-        source_url: null,
-        line: null,
-        column: null,
+  const artifacts = createArtifacts();
+  const runtime = await createBrowserRuntime(config.baseUrl, config.apiBaseUrl);
+  try {
+    const ownerAuth = await maybePrimeOwnerAuth(runtime.context, config);
+    routeSamples = await hydrateRouteSamplesFromApi(runtime.context, {
+      apiBaseUrl: config.apiBaseUrl || config.baseUrl,
+      routeSamples,
+      accessToken: ownerAuth?.accessToken || "",
+    });
+    for (const route of routes) {
+      await processRoute(runtime.page, route, {
+        baseUrl: config.baseUrl,
+        authMode: config.authMode,
+        routeSamples,
+        outputDirAbsPath: paths.outputDirAbsPath,
+        artifacts,
       });
     }
-
-    for (const item of routeConsole) {
-      const lowerText = String(item.text || "").toLowerCase();
-      if (lowerText.includes("failed to load resource")) {
-        // Prefer structured resource-failure events above; generic console messages
-        // are noisy and omit URL/status.
-        continue;
-      }
-      const classification = classifyConsoleMessage(item.text, item.level);
-      if (classification.skip) {
-        continue;
-      }
-      consoleErrors.push({
-        route: item.route,
-        route_template: item.route_template,
-        resolved_route: item.resolved_route,
-        surface,
-        level: classification.level,
-        severity: classification.severity,
-        text: item.text,
-        source_url: item.source_url ?? null,
-        line: item.line ?? null,
-        column: item.column ?? null,
-      });
-    }
-    for (const item of routePageErrors) {
-      const lowerText = String(item.text || "").toLowerCase();
-      if (lowerText.includes("failed to load resource")) {
-        // Prefer structured resource-failure events above; generic page errors
-        // are noisy and omit URL/status.
-        continue;
-      }
-      const classification = classifyConsoleMessage(item.text, item.level);
-      if (classification.skip) {
-        continue;
-      }
-      consoleErrors.push({
-        route: item.route,
-        route_template: item.route_template,
-        resolved_route: item.resolved_route,
-        surface,
-        level: classification.level,
-        severity: classification.severity === "s4" ? "s4" : "s2",
-        text: item.text,
-        source_url: item.source_url ?? null,
-        line: item.line ?? null,
-        column: item.column ?? null,
-      });
-    }
-    // #lizard forgive
+  } finally {
+    await runtime.browser.close();
   }
 
-  await browser.close();
-
-  await writeUtf8FileUnderBase(outputDirAbsPath, "seo-snapshot.json", `${JSON.stringify(seoSnapshot, null, 2)}\n`);
-  await writeUtf8FileUnderBase(outputDirAbsPath, "console-errors.json", `${JSON.stringify(consoleErrors, null, 2)}\n`);
-  await writeUtf8FileUnderBase(outputDirAbsPath, "layout-signals.json", `${JSON.stringify(layoutSignals, null, 2)}\n`);
-  await writeUtf8FileUnderBase(outputDirAbsPath, "visibility-signals.json", `${JSON.stringify(visibilitySignals, null, 2)}\n`);
-  await writeUtf8FileUnderBase(
-    outputDirAbsPath,
-    "browser-evidence-meta.json",
-    `${JSON.stringify(
-      {
-        auth_mode: authMode,
-        base_url: baseUrl,
-        api_base_url: apiBaseUrl || baseUrl,
-      },
-      null,
-      2
-    )}\n`
-  );
+  await writeArtifacts(paths.outputDirAbsPath, artifacts, {
+    auth_mode: config.authMode,
+    base_url: config.baseUrl,
+    api_base_url: config.apiBaseUrl || config.baseUrl,
+  });
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
