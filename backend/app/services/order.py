@@ -2062,31 +2062,80 @@ async def create_order_refund(
     return hydrated or order
 
 
-async def capture_payment(session: AsyncSession, order: Order, intent_id: str | None = None) -> Order:
+_PAYMENT_ACTION_ALLOWED_STATUSES = {
+    OrderStatus.pending_payment,
+    OrderStatus.pending_acceptance,
+    OrderStatus.paid,
+}
+
+
+def _resolve_payment_intent_id(order: Order, intent_id: str | None) -> str:
     payment_intent_id = intent_id or order.stripe_payment_intent_id
     if not payment_intent_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment intent id required")
-    if (
-        intent_id
-        and (getattr(order, "stripe_payment_intent_id", None) or "").strip()
-        and intent_id != (getattr(order, "stripe_payment_intent_id", None) or "").strip()
-    ):
+
+    current_intent_id = (getattr(order, "stripe_payment_intent_id", None) or "").strip()
+    if intent_id and current_intent_id and intent_id != current_intent_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment intent mismatch")
-    if order.status not in {OrderStatus.pending_payment, OrderStatus.pending_acceptance, OrderStatus.paid}:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Capture only allowed for pending_payment, pending_acceptance, or paid orders",
-        )
-    order.stripe_payment_intent_id = payment_intent_id
+
+    return payment_intent_id
+
+
+def _require_payment_action_status(order: Order, *, detail: str) -> None:
+    if order.status in _PAYMENT_ACTION_ALLOWED_STATUSES:
+        return
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+
+
+async def _capture_payment_if_needed(session: AsyncSession, order: Order, payment_intent_id: str) -> None:
     await session.refresh(order, attribute_names=["events"])
     already_captured = any(getattr(evt, "event", None) == "payment_captured" for evt in (order.events or []))
-    if not already_captured:
-        await payments.capture_payment_intent(payment_intent_id)
-        session.add(OrderEvent(order_id=order.id, event="payment_captured", note=f"Intent {payment_intent_id}"))
-        await promo_usage.record_promo_usage(session, order=order, note=f"Stripe {payment_intent_id}".strip())
-    if order.status == OrderStatus.pending_payment:
-        order.status = OrderStatus.pending_acceptance
-        session.add(OrderEvent(order_id=order.id, event="status_change", note="pending_payment -> pending_acceptance"))
+    if already_captured:
+        return
+
+    await payments.capture_payment_intent(payment_intent_id)
+    session.add(OrderEvent(order_id=order.id, event="payment_captured", note=f"Intent {payment_intent_id}"))
+    await promo_usage.record_promo_usage(session, order=order, note=f"Stripe {payment_intent_id}".strip())
+
+
+def _mark_pending_acceptance_after_capture(session: AsyncSession, order: Order) -> None:
+    if order.status != OrderStatus.pending_payment:
+        return
+
+    order.status = OrderStatus.pending_acceptance
+    session.add(OrderEvent(order_id=order.id, event="status_change", note="pending_payment -> pending_acceptance"))
+
+
+async def _void_or_refund_payment_intent(payment_intent_id: str) -> tuple[str, str]:
+    try:
+        await payments.void_payment_intent(payment_intent_id)
+        return "payment_voided", f"Intent {payment_intent_id}"
+    except HTTPException:
+        # If the intent is already captured, cancel will fail. Fall back to a best-effort refund.
+        refund = await payments.refund_payment_intent(payment_intent_id)
+        refund_id = refund.get("id") if isinstance(refund, dict) else None
+        note = f"Stripe refund {refund_id}".strip() if refund_id else "Stripe refund"
+        return "payment_refunded", note
+
+
+def _mark_cancelled_for_void(order: Order, payment_intent_id: str) -> None:
+    order.stripe_payment_intent_id = payment_intent_id
+    order.status = OrderStatus.cancelled
+    if (getattr(order, "cancel_reason", None) or "").strip():
+        return
+    order.cancel_reason = "Cancelled via payment void/refund."
+
+
+async def capture_payment(session: AsyncSession, order: Order, intent_id: str | None = None) -> Order:
+    payment_intent_id = _resolve_payment_intent_id(order, intent_id)
+    _require_payment_action_status(
+        order,
+        detail="Capture only allowed for pending_payment, pending_acceptance, or paid orders",
+    )
+
+    order.stripe_payment_intent_id = payment_intent_id
+    await _capture_payment_if_needed(session, order, payment_intent_id)
+    _mark_pending_acceptance_after_capture(session, order)
     session.add(order)
     await session.commit()
     hydrated = await get_order_by_id(session, order.id)
@@ -2094,34 +2143,14 @@ async def capture_payment(session: AsyncSession, order: Order, intent_id: str | 
 
 
 async def void_payment(session: AsyncSession, order: Order, intent_id: str | None = None) -> Order:
-    payment_intent_id = intent_id or order.stripe_payment_intent_id
-    if not payment_intent_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment intent id required")
-    if (
-        intent_id
-        and (getattr(order, "stripe_payment_intent_id", None) or "").strip()
-        and intent_id != (getattr(order, "stripe_payment_intent_id", None) or "").strip()
-    ):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment intent mismatch")
-    if order.status not in {OrderStatus.pending_payment, OrderStatus.pending_acceptance, OrderStatus.paid}:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Void only allowed for pending_payment, pending_acceptance, or paid orders",
-        )
-    event = "payment_voided"
-    note = f"Intent {payment_intent_id}"
-    try:
-        await payments.void_payment_intent(payment_intent_id)
-    except HTTPException:
-        # If the intent is already captured, cancel will fail. Fall back to a best-effort refund.
-        refund = await payments.refund_payment_intent(payment_intent_id)
-        refund_id = refund.get("id") if isinstance(refund, dict) else None
-        event = "payment_refunded"
-        note = f"Stripe refund {refund_id}".strip() if refund_id else "Stripe refund"
-    order.stripe_payment_intent_id = payment_intent_id
-    order.status = OrderStatus.cancelled
-    if not (getattr(order, "cancel_reason", None) or "").strip():
-        order.cancel_reason = "Cancelled via payment void/refund."
+    payment_intent_id = _resolve_payment_intent_id(order, intent_id)
+    _require_payment_action_status(
+        order,
+        detail="Void only allowed for pending_payment, pending_acceptance, or paid orders",
+    )
+
+    event, note = await _void_or_refund_payment_intent(payment_intent_id)
+    _mark_cancelled_for_void(order, payment_intent_id)
     await _log_event(session, order.id, event, note)
     await _restore_stock_for_order(session, order)
     session.add(order)
