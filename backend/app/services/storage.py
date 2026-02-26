@@ -3,6 +3,7 @@ import uuid
 from io import BytesIO
 from pathlib import Path, PurePosixPath
 from typing import Iterable, Iterator, Protocol, cast
+from urllib.parse import urlsplit
 
 from PIL import Image
 from fastapi import HTTPException, UploadFile, status
@@ -502,8 +503,26 @@ def _style_segment_blocked(lowered_segment: str) -> bool:
         return True
     if "url(" not in lowered_segment:
         return False
-    blocked_refs = ("javascript:", "data:", "http://", "https://")
-    return any(ref in lowered_segment for ref in blocked_refs)
+    return _contains_blocked_style_url(lowered_segment)
+
+
+def _contains_blocked_style_url(lowered_segment: str) -> bool:
+    blocked_schemes = {"javascript", "data", "http", "https"}
+    scan_start = 0
+    while True:
+        marker = lowered_segment.find("url(", scan_start)
+        if marker < 0:
+            return False
+        value_start = marker + len("url(")
+        value_end = lowered_segment.find(")", value_start)
+        if value_end < 0:
+            return True
+        raw_value = lowered_segment[value_start:value_end].strip().strip("'\"")
+        if raw_value and not raw_value.startswith("#"):
+            parsed = urlsplit(raw_value)
+            if parsed.scheme in blocked_schemes or bool(parsed.netloc):
+                return True
+        scan_start = value_end + 1
 
 
 def _sanitize_svg_style(value: str) -> str:

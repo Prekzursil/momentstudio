@@ -680,11 +680,30 @@ export function parsePageBlocks(
   return blocks;
 }
 
-const HTML_TAG_PATTERN = /<[^>]+>/g;
 const WHITESPACE_PATTERN = /\s+/g;
 
+const stripHtmlTagsLinear = (input: string): string => {
+  const plainChars: string[] = [];
+  let insideTag = false;
+  for (const char of input) {
+    if (char === '<') {
+      insideTag = true;
+      continue;
+    }
+    if (char === '>') {
+      insideTag = false;
+      plainChars.push(' ');
+      continue;
+    }
+    if (!insideTag) {
+      plainChars.push(char);
+    }
+  }
+  return plainChars.join('');
+};
+
 const htmlToPlainText = (html: string): string =>
-  (html || '').replaceAll(HTML_TAG_PATTERN, ' ').replaceAll(WHITESPACE_PATTERN, ' ').trim();
+  stripHtmlTagsLinear(html || '').replaceAll(WHITESPACE_PATTERN, ' ').trim();
 
 const appendTextLikeParts = (parts: string[], bodyHtml: string, ctaLabel?: string): void => {
   const text = htmlToPlainText(bodyHtml || '');
