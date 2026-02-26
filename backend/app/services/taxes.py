@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal, ROUND_DOWN
+from typing import Any
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -179,29 +180,64 @@ async def vat_rates_for_products(
         return {}
 
     default_group_id = await _get_default_group_id(session)
+    group_by_product = await _group_for_products(
+        session,
+        product_ids=product_ids,
+        default_group_id=default_group_id,
+    )
+    group_ids = {gid for gid in group_by_product.values() if gid is not None}
+    if not group_ids:
+        return {pid: Decimal(fallback_rate_percent) for pid in product_ids}
+    rate_by_group = await _rate_by_group(session, group_ids=group_ids, country=country)
+    default_rate = rate_by_group.get(default_group_id) if default_group_id else None
+    fallback = Decimal(fallback_rate_percent)
+    return _resolved_rate_by_product(
+        group_by_product=group_by_product,
+        rate_by_group=rate_by_group,
+        default_rate=default_rate,
+        fallback_rate=fallback,
+    )
+
+
+async def _group_for_products(
+    session: AsyncSession,
+    *,
+    product_ids: set[UUID],
+    default_group_id: UUID | None,
+) -> dict[UUID, UUID | None]:
     result = await session.execute(
         select(Product.id, Category.tax_group_id)
         .join(Category, Product.category_id == Category.id)
         .where(Product.id.in_(product_ids))
     )
-    group_by_product: dict[UUID, UUID | None] = {pid: (group_id or default_group_id) for pid, group_id in result.all()}
-    group_ids = {gid for gid in group_by_product.values() if gid is not None}
-    if not group_ids:
-        return {pid: Decimal(fallback_rate_percent) for pid in product_ids}
+    return {pid: (group_id or default_group_id) for pid, group_id in result.all()}
 
+
+async def _rate_by_group(
+    session: AsyncSession,
+    *,
+    group_ids: set[UUID],
+    country: str,
+) -> dict[UUID, Decimal]:
     rates = await session.execute(
         select(TaxRate.group_id, TaxRate.vat_rate_percent).where(TaxRate.group_id.in_(group_ids), TaxRate.country_code == country)
     )
-    rate_by_group: dict[UUID, Decimal] = {gid: Decimal(rate) for gid, rate in rates.all()}
-    default_rate = rate_by_group.get(default_group_id) if default_group_id else None
-    fallback = Decimal(fallback_rate_percent)
+    return {gid: Decimal(rate) for gid, rate in rates.all()}
 
+
+def _resolved_rate_by_product(
+    *,
+    group_by_product: dict[UUID, UUID | None],
+    rate_by_group: dict[UUID, Decimal],
+    default_rate: Decimal | None,
+    fallback_rate: Decimal,
+) -> dict[UUID, Decimal]:
     resolved: dict[UUID, Decimal] = {}
     for product_id, group_id in group_by_product.items():
         if group_id is None:
-            resolved[product_id] = fallback
+            resolved[product_id] = fallback_rate
             continue
-        resolved[product_id] = rate_by_group.get(group_id) or default_rate or fallback
+        resolved[product_id] = rate_by_group.get(group_id) or default_rate or fallback_rate
     return resolved
 
 
@@ -212,16 +248,10 @@ class TaxableProductLine:
 
 
 def _allocate_discount(lines: list[TaxableProductLine], discount: Decimal) -> list[Decimal]:
-    if not lines:
-        return []
-    subtotal = sum((line.subtotal for line in lines), start=Decimal("0.00"))
-    if discount <= 0 or subtotal <= 0:
+    subtotal_and_discount = _discount_allocation_inputs(lines, discount)
+    if subtotal_and_discount is None:
         return [Decimal("0.00")] * len(lines)
-    discount_q = Decimal(discount).quantize(pricing.MONEY_QUANT)
-    if discount_q <= 0:
-        return [Decimal("0.00")] * len(lines)
-    if discount_q > subtotal:
-        discount_q = subtotal
+    subtotal, discount_q = subtotal_and_discount
 
     raw_shares = [(line.subtotal / subtotal) * discount_q for line in lines]
     floored = [share.quantize(pricing.MONEY_QUANT, rounding=ROUND_DOWN) for share in raw_shares]
@@ -229,12 +259,43 @@ def _allocate_discount(lines: list[TaxableProductLine], discount: Decimal) -> li
     pennies = int((remainder * 100).to_integral_value())
     if pennies <= 0:
         return floored
-    frac_parts = [(raw_shares[i] - floored[i], i) for i in range(len(lines))]
+    return _distribute_discount_remainder(raw_shares=raw_shares, floored=floored, pennies=pennies)
+
+
+def _discount_allocation_inputs(
+    lines: list[TaxableProductLine],
+    discount: Decimal,
+) -> tuple[Decimal, Decimal] | None:
+    if not lines:
+        return None
+    subtotal = sum((line.subtotal for line in lines), start=Decimal("0.00"))
+    if discount <= 0 or subtotal <= 0:
+        return None
+    discount_q = _normalized_discount_amount(discount, subtotal=subtotal)
+    if discount_q is None:
+        return None
+    return subtotal, discount_q
+
+
+def _distribute_discount_remainder(
+    *,
+    raw_shares: list[Decimal],
+    floored: list[Decimal],
+    pennies: int,
+) -> list[Decimal]:
+    frac_parts = [(raw_shares[i] - floored[i], i) for i in range(len(raw_shares))]
     frac_parts.sort(key=lambda pair: (pair[0], pair[1]), reverse=True)
     allocations = list(floored)
     for _, idx in frac_parts[:pennies]:
         allocations[idx] += pricing.MONEY_QUANT
     return allocations
+
+
+def _normalized_discount_amount(discount: Decimal, *, subtotal: Decimal) -> Decimal | None:
+    discount_q = Decimal(discount).quantize(pricing.MONEY_QUANT)
+    if discount_q <= 0:
+        return None
+    return min(discount_q, subtotal)
 
 
 async def compute_cart_vat_amount(
@@ -251,53 +312,153 @@ async def compute_cart_vat_amount(
     if not checkout.vat_enabled:
         return Decimal("0.00")
 
-    subtotal = pricing.quantize_money(sum((line.subtotal for line in lines), start=Decimal("0.00")), rounding=rounding)
-    discount_q = pricing.quantize_money(discount, rounding=rounding) if discount > 0 else Decimal("0.00")
-    taxable_subtotal = subtotal - discount_q
-    if taxable_subtotal < 0:
-        taxable_subtotal = Decimal("0.00")
-    taxable_subtotal = pricing.quantize_money(taxable_subtotal, rounding=rounding)
-    shipping_q = pricing.quantize_money(shipping, rounding=rounding) if shipping > 0 else Decimal("0.00")
-    fee_q = pricing.quantize_money(fee, rounding=rounding) if fee > 0 else Decimal("0.00")
+    subtotal, discount_q, taxable_subtotal, shipping_q, fee_q = _normalized_vat_inputs(
+        lines=lines,
+        discount=discount,
+        shipping=shipping,
+        fee=fee,
+        rounding=rounding,
+    )
 
     country = _normalize_country_code(country_code)
     if not country:
-        return pricing.compute_vat(
+        return _compute_default_country_vat(
             taxable_subtotal=taxable_subtotal,
             shipping=shipping_q,
             fee=fee_q,
-            enabled=True,
-            vat_rate_percent=checkout.vat_rate_percent,
-            apply_to_shipping=checkout.vat_apply_to_shipping,
-            apply_to_fee=checkout.vat_apply_to_fee,
+            checkout=checkout,
             rounding=rounding,
         )
+    return await _compute_country_vat(
+        session,
+        country=country,
+        lines=lines,
+        discount_q=discount_q,
+        shipping_q=shipping_q,
+        fee_q=fee_q,
+        checkout=checkout,
+        rounding=rounding,
+    )
 
+
+async def _compute_country_vat(
+    session: AsyncSession,
+    *,
+    country: str,
+    lines: list[TaxableProductLine],
+    discount_q: Decimal,
+    shipping_q: Decimal,
+    fee_q: Decimal,
+    checkout: CheckoutSettings,
+    rounding: Any,
+) -> Decimal:
     product_ids = {line.product_id for line in lines}
     rates_by_product = await vat_rates_for_products(
-        session, product_ids=product_ids, country_code=country, fallback_rate_percent=checkout.vat_rate_percent
+        session,
+        product_ids=product_ids,
+        country_code=country,
+        fallback_rate_percent=checkout.vat_rate_percent,
     )
-    default_rate = await default_country_vat_rate_percent(session, country_code=country, fallback_rate_percent=checkout.vat_rate_percent)
+    default_rate = await default_country_vat_rate_percent(
+        session,
+        country_code=country,
+        fallback_rate_percent=checkout.vat_rate_percent,
+    )
+    default_decimal = Decimal(default_rate)
+    base_by_rate = _vat_base_by_rate(
+        lines=lines,
+        discount_q=discount_q,
+        rounding=rounding,
+        rates_by_product=rates_by_product,
+        default_rate=default_decimal,
+    )
+    _apply_extra_vat_base(
+        base_by_rate=base_by_rate,
+        shipping_q=shipping_q,
+        fee_q=fee_q,
+        default_rate=default_decimal,
+        apply_to_shipping=checkout.vat_apply_to_shipping,
+        apply_to_fee=checkout.vat_apply_to_fee,
+    )
+    return _vat_total(base_by_rate, rounding=rounding)
 
+
+def _normalized_vat_inputs(
+    *,
+    lines: list[TaxableProductLine],
+    discount: Decimal,
+    shipping: Decimal,
+    fee: Decimal,
+    rounding: Any,
+) -> tuple[Decimal, Decimal, Decimal, Decimal, Decimal]:
+    subtotal = pricing.quantize_money(sum((line.subtotal for line in lines), start=Decimal("0.00")), rounding=rounding)
+    discount_q = pricing.quantize_money(discount, rounding=rounding) if discount > 0 else Decimal("0.00")
+    taxable_subtotal = pricing.quantize_money(max(Decimal("0.00"), subtotal - discount_q), rounding=rounding)
+    shipping_q = pricing.quantize_money(shipping, rounding=rounding) if shipping > 0 else Decimal("0.00")
+    fee_q = pricing.quantize_money(fee, rounding=rounding) if fee > 0 else Decimal("0.00")
+    return subtotal, discount_q, taxable_subtotal, shipping_q, fee_q
+
+
+def _compute_default_country_vat(
+    *,
+    taxable_subtotal: Decimal,
+    shipping: Decimal,
+    fee: Decimal,
+    checkout: CheckoutSettings,
+    rounding: Any,
+) -> Decimal:
+    return pricing.compute_vat(
+        taxable_subtotal=taxable_subtotal,
+        shipping=shipping,
+        fee=fee,
+        enabled=True,
+        vat_rate_percent=checkout.vat_rate_percent,
+        apply_to_shipping=checkout.vat_apply_to_shipping,
+        apply_to_fee=checkout.vat_apply_to_fee,
+        rounding=rounding,
+    )
+
+
+def _vat_base_by_rate(
+    *,
+    lines: list[TaxableProductLine],
+    discount_q: Decimal,
+    rounding: Any,
+    rates_by_product: dict[UUID, Decimal],
+    default_rate: Decimal,
+) -> dict[Decimal, Decimal]:
     allocations = _allocate_discount(lines, discount_q)
     base_by_rate: dict[Decimal, Decimal] = {}
     for line, allocated in zip(lines, allocations, strict=False):
-        rate = rates_by_product.get(line.product_id, Decimal(default_rate))
+        rate = rates_by_product.get(line.product_id, default_rate)
         if rate <= 0:
             continue
         base = pricing.quantize_money(line.subtotal, rounding=rounding) - pricing.quantize_money(allocated, rounding=rounding)
         if base <= 0:
             continue
         base_by_rate[rate] = base_by_rate.get(rate, Decimal("0.00")) + base
+    return base_by_rate
 
+
+def _apply_extra_vat_base(
+    *,
+    base_by_rate: dict[Decimal, Decimal],
+    shipping_q: Decimal,
+    fee_q: Decimal,
+    default_rate: Decimal,
+    apply_to_shipping: bool,
+    apply_to_fee: bool,
+) -> None:
     extra_base = Decimal("0.00")
-    if checkout.vat_apply_to_shipping:
+    if apply_to_shipping:
         extra_base += shipping_q
-    if checkout.vat_apply_to_fee:
+    if apply_to_fee:
         extra_base += fee_q
     if extra_base > 0 and default_rate > 0:
-        base_by_rate[Decimal(default_rate)] = base_by_rate.get(Decimal(default_rate), Decimal("0.00")) + extra_base
+        base_by_rate[default_rate] = base_by_rate.get(default_rate, Decimal("0.00")) + extra_base
 
+
+def _vat_total(base_by_rate: dict[Decimal, Decimal], *, rounding: Any) -> Decimal:
     vat_total = Decimal("0.00")
     for rate, base in base_by_rate.items():
         if base <= 0 or rate <= 0:
