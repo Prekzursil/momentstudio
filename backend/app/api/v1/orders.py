@@ -2964,6 +2964,55 @@ async def request_guest_email_verification(
     return GuestEmailVerificationRequestResponse(sent=True)
 
 
+def _normalized_cart_guest_email(cart: Cart) -> str:
+    return _normalize_email(getattr(cart, "guest_email", None) or "")
+
+
+def _normalized_guest_email_token(token: str | None) -> str:
+    return (token or "").strip()
+
+
+def _cart_guest_email_token_expiry(cart: Cart) -> datetime | None:
+    expires = cart.guest_email_verification_expires_at
+    if expires and expires.tzinfo is None:
+        return expires.replace(tzinfo=timezone.utc)
+    return expires
+
+
+def _assert_guest_email_token_state(cart: Cart, *, email: str, now: datetime) -> tuple[str, int]:
+    if not cart.guest_email or _normalized_cart_guest_email(cart) != email:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email mismatch")
+
+    expires = _cart_guest_email_token_expiry(cart)
+    stored_token = _normalized_guest_email_token(getattr(cart, "guest_email_verification_token", None))
+    if not stored_token or not expires or expires < now:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token")
+
+    attempts = int(getattr(cart, "guest_email_verification_attempts", 0) or 0)
+    if attempts >= GUEST_EMAIL_TOKEN_MAX_ATTEMPTS:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many attempts; request a new code.")
+    return stored_token, attempts
+
+
+async def _record_guest_email_token_failure(session: AsyncSession, cart: Cart, *, attempts: int, now: datetime) -> None:
+    cart.guest_email_verification_attempts = attempts + 1
+    cart.guest_email_verification_last_attempt_at = now
+    session.add(cart)
+    await session.commit()
+
+
+async def _mark_guest_email_verified(session: AsyncSession, cart: Cart, *, now: datetime) -> GuestEmailVerificationStatus:
+    cart.guest_email_verified_at = now
+    cart.guest_email_verification_token = None
+    cart.guest_email_verification_expires_at = None
+    cart.guest_email_verification_attempts = 0
+    cart.guest_email_verification_last_attempt_at = None
+    session.add(cart)
+    await session.commit()
+    await session.refresh(cart)
+    return GuestEmailVerificationStatus(email=cart.guest_email, verified=True)
+
+
 @router.post("/guest-checkout/email/confirm", response_model=GuestEmailVerificationStatus)
 async def confirm_guest_email_verification(
     payload: GuestEmailVerificationConfirmRequest,
@@ -2975,38 +3024,15 @@ async def confirm_guest_email_verification(
 
     cart = await cart_service.get_cart(session, None, session_id)
     email = _normalize_email(str(payload.email))
-    token = (payload.token or "").strip()
+    token = _normalized_guest_email_token(payload.token)
     now = datetime.now(timezone.utc)
+    stored_token, attempts = _assert_guest_email_token_state(cart, email=email, now=now)
 
-    if not cart.guest_email or _normalize_email(cart.guest_email) != email:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email mismatch")
-
-    expires = cart.guest_email_verification_expires_at
-    if expires and expires.tzinfo is None:
-        expires = expires.replace(tzinfo=timezone.utc)
-    if not cart.guest_email_verification_token or not expires or expires < now:
+    if stored_token != token:
+        await _record_guest_email_token_failure(session, cart, attempts=attempts, now=now)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token")
 
-    attempts = int(getattr(cart, "guest_email_verification_attempts", 0) or 0)
-    if attempts >= GUEST_EMAIL_TOKEN_MAX_ATTEMPTS:
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many attempts; request a new code.")
-
-    if cart.guest_email_verification_token != token:
-        cart.guest_email_verification_attempts = attempts + 1
-        cart.guest_email_verification_last_attempt_at = now
-        session.add(cart)
-        await session.commit()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token")
-
-    cart.guest_email_verified_at = now
-    cart.guest_email_verification_token = None
-    cart.guest_email_verification_expires_at = None
-    cart.guest_email_verification_attempts = 0
-    cart.guest_email_verification_last_attempt_at = None
-    session.add(cart)
-    await session.commit()
-    await session.refresh(cart)
-    return GuestEmailVerificationStatus(email=cart.guest_email, verified=True)
+    return await _mark_guest_email_verified(session, cart, now=now)
 
 
 @router.get("/guest-checkout/email/status", response_model=GuestEmailVerificationStatus)
@@ -3909,6 +3935,61 @@ def _queue_admin_refund_requested_email(
     )
 
 
+def _admin_refund_items(payload: AdminOrderRefundCreate) -> list[tuple[UUID, int]]:
+    return [(row.order_item_id, int(row.quantity)) for row in (payload.items or [])]
+
+
+def _admin_refund_actor_label(admin_user: object) -> str:
+    return (getattr(admin_user, "email", None) or getattr(admin_user, "username", None) or "admin").strip()
+
+
+def _latest_order_refund_record(order: Order):
+    refunds = getattr(order, "refunds", None) or []
+    return refunds[-1] if refunds else None
+
+
+def _queue_partial_refund_customer_email(
+    background_tasks: BackgroundTasks,
+    order: Order,
+    refund_record: object,
+) -> None:
+    customer_to, customer_lang = _order_customer_contact(order)
+    if customer_to:
+        background_tasks.add_task(email_service.send_order_partial_refund_update, customer_to, order, refund_record, lang=customer_lang)
+
+
+async def _notify_partial_refund_user(session: AsyncSession, order: Order, refund_record: object) -> None:
+    if not (order.user and order.user.id):
+        return
+    amount = getattr(refund_record, "amount", None)
+    currency = getattr(order, "currency", None) or "RON"
+    body = f"{amount} {currency}" if amount is not None else None
+    await notification_service.create_notification(
+        session,
+        user_id=order.user.id,
+        type="order",
+        title="Partial refund issued" if (order.user.preferred_language or "en") != "ro" else "Rambursare parțială",
+        body=body,
+        url="/account/orders",
+    )
+
+
+async def _post_create_order_refund_side_effects(
+    session: AsyncSession,
+    background_tasks: BackgroundTasks,
+    updated: Order,
+) -> None:
+    if updated.status == OrderStatus.refunded:
+        await coupons_service.release_coupon_for_order(session, order=updated, reason="refunded")
+
+    refund_record = _latest_order_refund_record(updated)
+    if not refund_record:
+        return
+
+    _queue_partial_refund_customer_email(background_tasks, updated, refund_record)
+    await _notify_partial_refund_user(session, updated, refund_record)
+
+
 @router.post("/admin/{order_id}/refund", response_model=OrderRead)
 async def admin_refund_order(
     background_tasks: BackgroundTasks,
@@ -3944,42 +4025,16 @@ async def admin_create_order_refund(
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
 
-    items = [(row.order_item_id, int(row.quantity)) for row in (payload.items or [])]
     updated = await order_service.create_order_refund(
         session,
         order,
         amount=payload.amount,
         note=payload.note,
-        items=items,
+        items=_admin_refund_items(payload),
         process_payment=bool(payload.process_payment),
-        actor=(getattr(admin_user, "email", None) or getattr(admin_user, "username", None) or "admin").strip(),
+        actor=_admin_refund_actor_label(admin_user),
     )
-    if updated.status == OrderStatus.refunded:
-        await coupons_service.release_coupon_for_order(session, order=updated, reason="refunded")
-
-    refund_record = (getattr(updated, "refunds", None) or [])[-1] if (getattr(updated, "refunds", None) or []) else None
-    if refund_record:
-        customer_to = (updated.user.email if updated.user and updated.user.email else None) or getattr(updated, "customer_email", None)
-        customer_lang = updated.user.preferred_language if updated.user else None
-        if customer_to:
-            background_tasks.add_task(email_service.send_order_partial_refund_update, customer_to, updated, refund_record, lang=customer_lang)
-        if updated.user and updated.user.id:
-            amount = getattr(refund_record, "amount", None)
-            currency = getattr(updated, "currency", None) or "RON"
-            body = f"{amount} {currency}" if amount is not None else None
-            await notification_service.create_notification(
-                session,
-                user_id=updated.user.id,
-                type="order",
-                title=(
-                    "Partial refund issued"
-                    if (updated.user.preferred_language or "en") != "ro"
-                    else "Rambursare parțială"
-                ),
-                body=body,
-                url="/account/orders",
-            )
-
+    await _post_create_order_refund_side_effects(session, background_tasks, updated)
     return await _serialize_admin_order(session, updated)
 
 
