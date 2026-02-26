@@ -133,4 +133,44 @@ describe('AdminOrdersComponent preset coercion and loading', () => {
       }
     });
   });
+
+  it('applyKanbanResult writes empty defaults when response is null', () => {
+    const component = createComponentHarness();
+    const itemsByStatus: Record<string, any[]> = {};
+    const totalsByStatus: Record<string, number> = {};
+
+    component.applyKanbanResult({ status: 'pending', res: null }, itemsByStatus, totalsByStatus);
+
+    expect(itemsByStatus['pending']).toEqual([]);
+    expect(totalsByStatus['pending']).toBe(0);
+  });
+
+  it('collectKanbanFirstError captures first error and keeps kanban buckets consistent', () => {
+    const component = createComponentHarness();
+    const itemsByStatus: Record<string, any[]> = {};
+    const totalsByStatus: Record<string, number> = {};
+    const firstNetworkError = new Error('failed');
+    const successfulResponse: any = {
+      items: [{ id: 'order-1' }],
+      meta: { total_items: 1 }
+    };
+
+    const firstError = component.collectKanbanFirstError(
+      [
+        { status: 'paid', res: successfulResponse },
+        { status: 'cancelled', res: null, err: firstNetworkError },
+        { status: 'failed', res: null, err: new Error('second') }
+      ],
+      itemsByStatus,
+      totalsByStatus
+    );
+
+    expect(firstError).toBe(firstNetworkError);
+    expect(itemsByStatus['paid']).toEqual(successfulResponse.items);
+    expect(totalsByStatus['paid']).toBe(1);
+    expect(itemsByStatus['cancelled']).toEqual([]);
+    expect(totalsByStatus['cancelled']).toBe(0);
+    expect(itemsByStatus['failed']).toEqual([]);
+    expect(totalsByStatus['failed']).toBe(0);
+  });
 });
