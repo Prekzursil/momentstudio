@@ -312,7 +312,7 @@ async def compute_cart_vat_amount(
     if not checkout.vat_enabled:
         return Decimal("0.00")
 
-    subtotal, discount_q, taxable_subtotal, shipping_q, fee_q = _normalized_vat_inputs(
+    _subtotal, discount_q, taxable_subtotal, shipping_q, fee_q = _normalized_vat_inputs(
         lines=lines,
         discount=discount,
         shipping=shipping,
