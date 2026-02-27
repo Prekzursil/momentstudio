@@ -42,7 +42,7 @@ def test_add_message_attachments_only_accepts_binary_content() -> None:
         ],
     )
 
-    attachments = [part for part in msg.iter_attachments()]
+    attachments = list(msg.iter_attachments())
     assert len(attachments) == 1
     assert attachments[0].get_filename() == 'valid.txt'
 

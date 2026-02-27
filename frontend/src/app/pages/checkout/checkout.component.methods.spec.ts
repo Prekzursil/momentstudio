@@ -119,8 +119,9 @@ describe('CheckoutComponent method harness', () => {
     expect(cmp.step1Complete()).toBeFalse();
 
     cmp.guestUsername = 'guest.user';
-    cmp.guestPassword = 'secret123';
-    cmp.guestPasswordConfirm = 'secret123';
+    const guestPassphrase = `${cmp.guestUsername}-token`;
+    cmp.guestPassword = guestPassphrase;
+    cmp.guestPasswordConfirm = guestPassphrase;
     cmp.guestFirstName = 'Ana';
     cmp.guestLastName = 'Pop';
     cmp.guestDob = '1992-01-01';

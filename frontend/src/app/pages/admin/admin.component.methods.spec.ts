@@ -62,8 +62,8 @@ function createAdminHarness(): {
 describe('AdminComponent utility methods', () => {
   it('builds tags and computes upcoming products', () => {
     const { component } = createAdminHarness();
-    const future = new Date(Date.now() + 3600_000).toISOString();
-    const fartherFuture = new Date(Date.now() + 7200_000).toISOString();
+    const future = new Date(Date.now() + 3_600_000).toISOString();
+    const fartherFuture = new Date(Date.now() + 7_200_000).toISOString();
 
     component.form = { is_bestseller: true } as any;
     component.productDetail = { tags: ['featured', 'sale'] } as any;
@@ -73,7 +73,7 @@ describe('AdminComponent utility methods', () => {
       { id: 'p3', publish_at: null },
     ] as any[];
 
-    expect(component.buildTags().sort()).toEqual(['bestseller', 'featured', 'sale']);
+    expect(component.buildTags().sort((left, right) => left.localeCompare(right))).toEqual(['bestseller', 'featured', 'sale']);
     expect(component.upcomingProducts().map((p) => p.id)).toEqual(['p2', 'p1']);
   });
 
@@ -91,7 +91,7 @@ describe('AdminComponent product/order selection methods', () => {
 
     component.toggleAll({ target: { checked: true } } as any);
     expect(component.allSelected).toBeTrue();
-    expect(Array.from(component.selectedIds).sort()).toEqual(['p1', 'p2']);
+    expect(Array.from(component.selectedIds).sort((left, right) => left.localeCompare(right))).toEqual(['p1', 'p2']);
 
     component.toggleSelect('p2', { target: { checked: false } } as any);
     expect(component.allSelected).toBeFalse();
@@ -157,11 +157,11 @@ describe('AdminComponent user/admin methods', () => {
     component.selectedUserId = 'u1';
     component.selectedUserRole = 'admin';
 
-    spyOn(window, 'prompt').and.returnValue('   ');
+    spyOn(globalThis, 'prompt').and.returnValue('   ');
     component.updateRole();
     expect(toast.error).toHaveBeenCalled();
 
-    (window.prompt as jasmine.Spy).and.returnValue('secret');
+    (globalThis.prompt as jasmine.Spy).and.returnValue('secret');
     admin.updateUserRole.and.returnValue(of({ id: 'u1', role: 'admin' }));
     component.updateRole();
     expect(admin.updateUserRole).toHaveBeenCalledWith('u1', 'admin', 'secret');

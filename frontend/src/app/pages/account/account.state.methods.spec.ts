@@ -372,7 +372,7 @@ describe('AccountState order helper request methods', () => {
   it('opens and submits cancel requests across validation and success paths', () => {
     const state = createStateHarness();
     const order = { id: 'o1', reference_code: 'REF', status: 'paid', events: [] };
-    spyOn(window, 'confirm').and.returnValue(true);
+    spyOn(globalThis, 'confirm').and.returnValue(true);
     state.account.requestOrderCancellation.and.returnValue(of({ ...order, status: 'cancel_requested' }));
     state.updateOrderInList = jasmine.createSpy('updateOrderInList');
     state.closeReturnRequest = jasmine.createSpy('closeReturnRequest');
@@ -420,7 +420,7 @@ describe('AccountState receipt flows', () => {
   it('handles receipt copy/share/revoke branches', () => {
     const state = createStateHarness();
     const order = { id: 'o1' };
-    spyOn(window, 'confirm').and.returnValue(true);
+    spyOn(globalThis, 'confirm').and.returnValue(true);
     state.account.shareReceipt.and.returnValue(of({ receipt_url: 'https://r', expires_at: '2099-01-01T00:00:00Z' }));
     state.account.revokeReceiptShare.and.returnValue(of({}));
 
@@ -447,7 +447,7 @@ describe('AccountState receipt flows', () => {
 describe('AccountState address flows', () => {
   it('normalizes address labels and executes address CRUD helpers', () => {
     const state = createStateHarness();
-    spyOn(window, 'confirm').and.returnValue(true);
+    spyOn(globalThis, 'confirm').and.returnValue(true);
     state.account.createAddress.and.returnValue(of({ id: 'a1', label: 'home' }));
     state.account.updateAddress.and.returnValue(of({ id: 'a1', label: 'work' }));
     state.account.deleteAddress.and.returnValue(of({}));
@@ -510,7 +510,7 @@ describe('AccountState comments and pagination helpers', () => {
   it('handles submit flow errors for cancel and return requests', () => {
     const state = createStateHarness();
     const order = { id: 'o1', status: 'paid', reference_code: 'REF', items: [{ id: 'it1', quantity: 1 }] };
-    spyOn(window, 'confirm').and.returnValue(true);
+    spyOn(globalThis, 'confirm').and.returnValue(true);
 
     state.cancelOrderId = 'o1';
     state.cancelReason = 'reason';
