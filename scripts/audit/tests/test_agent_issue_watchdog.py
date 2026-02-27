@@ -17,7 +17,7 @@ def _load_module():
 
 def test_split_repo_rejects_malformed_tokens() -> None:
     module = _load_module()
-    owner, repo = module._split_repo("Prekzursil/AdrianaArt")
+    owner, repo = module._split_repo("Prekzursil/momentstudio")
     assert owner == "Prekzursil"
     assert repo == "AdrianaArt"
 
@@ -73,7 +73,7 @@ def test_run_outputs_counters_and_applies_issue_updates(capsys) -> None:
     module._list_open_in_progress_issues = fake_list_open_in_progress_issues
     module._request = fake_request
 
-    assert module.run(repo="Prekzursil/AdrianaArt", stale_days=5, audit_filter="audit:*") == 0
+    assert module.run(repo="Prekzursil/momentstudio", stale_days=5, audit_filter="audit:*") == 0
 
     out = capsys.readouterr().out
     assert "scanned=1" in out

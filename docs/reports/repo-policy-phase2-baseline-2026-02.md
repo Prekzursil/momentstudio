@@ -1,7 +1,7 @@
 # Repo policy phase 2 evaluation
 
 - Generated at: `2026-02-15T20:48:47+00:00`
-- Repository: `Prekzursil/AdrianaArt`
+- Repository: `Prekzursil/momentstudio`
 - Base branch: `main`
 - Window: last `60` days
 

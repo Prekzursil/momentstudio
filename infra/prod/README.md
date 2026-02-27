@@ -35,7 +35,7 @@ docker compose version
 From your deploy directory (example: `/opt/<APP_SLUG>`):
 
 ```bash
-git clone https://github.com/Prekzursil/AdrianaArt.git <APP_SLUG>
+git clone https://github.com/Prekzursil/momentstudio.git <APP_SLUG>
 cd <APP_SLUG>
 git checkout main
 ```
