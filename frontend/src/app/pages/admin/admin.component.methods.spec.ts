@@ -204,3 +204,65 @@ describe('AdminComponent category reorder methods', () => {
     expect(component.draggingSlug).toBeNull();
   });
 });
+
+describe('AdminComponent SEO and page visibility helpers', () => {
+  it('computes blog slug and SEO preview metadata', () => {
+    const { component } = createAdminHarness();
+    component.selectedBlogKey = 'blog.hello-world';
+    component.blogEditLang = 'en';
+    component.blogBaseLang = 'en';
+    component.blogPreviewToken = null;
+    component.blogForm = {
+      title: 'Hello world',
+      body_markdown: 'This is **markdown** content with [link](https://example.com).',
+      status: 'draft',
+    } as any;
+    component.blogMeta = {
+      summary: { en: 'Short summary for SEO', ro: 'Rezumat' },
+    } as any;
+
+    expect(component.extractBlogSlug('blog.hello-world')).toBe('hello-world');
+    expect(component.currentBlogSlug()).toBe('hello-world');
+    expect(component.blogSeoHasContent('en')).toBeTrue();
+    expect(component.blogSeoTitleFull('en')).toBe('Hello world | momentstudio');
+    expect(component.blogSeoDescriptionFull('en')).toContain('Short summary for SEO');
+    expect(component.blogSeoTitlePreview('en').length).toBeLessThanOrEqual(62);
+    expect(component.blogSeoDescriptionPreview('en').length).toBeLessThanOrEqual(160);
+
+    const issues = component.blogSeoIssues('en');
+    expect(issues.some((issue) => issue.key === 'adminUi.blog.seo.issues.previewTokenRecommended')).toBeTrue();
+  });
+
+  it('normalizes public urls and hide toggles for content pages', () => {
+    const { component } = createAdminHarness();
+    component.contentPages = [
+      { key: 'page.custom', hidden: true },
+      { key: 'page.about', hidden: false },
+    ] as any[];
+
+    expect(component.pagePublicUrlForKey('page.about')).toBe('/about');
+    expect(component.pagePublicUrlForKey('page.contact')).toBe('/contact');
+    expect(component.pagePublicUrlForKey('page.terms and conditions')).toContain('/pages/terms%20and%20conditions');
+    expect(component.pagePublicUrlForKey('')).toBe('/pages');
+
+    expect(component.isPageHidden('page.custom' as any)).toBeTrue();
+    expect(component.isPageHidden('page.about' as any)).toBeFalse();
+    expect(component.canTogglePageHidden('page.about' as any)).toBeFalse();
+    expect(component.canTogglePageHidden('page.custom' as any)).toBeTrue();
+
+    const setPageHiddenSpy = spyOn(component as any, 'setPageHidden').and.stub();
+    component.togglePageHidden('page.custom' as any);
+    expect(setPageHiddenSpy).toHaveBeenCalledWith('page.custom', false);
+  });
+
+  it('switches info language and exposes blog urls', () => {
+    const { component } = createAdminHarness();
+    component.selectedBlogKey = 'blog.slug-value';
+    component.blogPreviewToken = 'preview-token';
+
+    component.selectInfoLang('ro');
+    expect(component.infoLang).toBe('ro');
+    expect(component.blogPublicUrl('en')).toContain('/blog/slug-value?lang=en');
+    expect(component.blogPreviewOgImageUrl('ro')).toContain('token=preview-token');
+  });
+});
