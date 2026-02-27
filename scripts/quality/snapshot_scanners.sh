@@ -7,8 +7,8 @@ mkdir -p "$OUT_DIR"
 scripts/quality/fetch_sonar_snapshot.sh "$OUT_DIR"
 scripts/quality/fetch_codacy_snapshot.sh "$OUT_DIR"
 
-gh api '/repos/Prekzursil/AdrianaArt/dependabot/alerts?state=open&per_page=100' > "$OUT_DIR/github-dependabot-open.json"
-gh api '/repos/Prekzursil/AdrianaArt/code-scanning/alerts?state=open&per_page=100' > "$OUT_DIR/github-code-scanning-open.json"
+gh api '/repos/Prekzursil/momentstudio/dependabot/alerts?state=open&per_page=100' > "$OUT_DIR/github-dependabot-open.json"
+gh api '/repos/Prekzursil/momentstudio/code-scanning/alerts?state=open&per_page=100' > "$OUT_DIR/github-code-scanning-open.json"
 
 SONAR_TOTAL=$(jq -r '.total' "$OUT_DIR/sonar-unresolved-summary.json")
 CODACY_TOTAL=$(jq -r '.total' "$OUT_DIR/codacy-issues-aggregated.json")

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="${1:-Prekzursil/AdrianaArt}"
+REPO="${1:-Prekzursil/momentstudio}"
 
 if ! command -v gh >/dev/null 2>&1; then
   echo "gh CLI is required." >&2

@@ -1,6 +1,6 @@
 # AI-Native Engineering Playbook
 
-This playbook defines how `Prekzursil/AdrianaArt` executes engineering work with humans + agents.
+This playbook defines how `Prekzursil/momentstudio` executes engineering work with humans + agents.
 It is process/governance guidance (soft-enforced) and applies to backend, frontend, infra, CI, and audit automation.
 
 References:

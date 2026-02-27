@@ -1,6 +1,6 @@
 # Repository Policy
 
-This document defines the collaboration baseline for `Prekzursil/AdrianaArt`.
+This document defines the collaboration baseline for `Prekzursil/momentstudio`.
 
 AI-native execution details live in `docs/AI_NATIVE_ENGINEERING_PLAYBOOK.md` and are applied repository-wide with soft enforcement.
 
@@ -283,7 +283,7 @@ JSON
 
 gh api \
   --method PUT \
-  repos/Prekzursil/AdrianaArt/branches/main/protection \
+  repos/Prekzursil/momentstudio/branches/main/protection \
   -H "Accept: application/vnd.github+json" \
   --input /tmp/adrianaart-main-protection.json
 
@@ -292,17 +292,17 @@ rm -f /tmp/adrianaart-main-protection.json
 
 ```bash
 # Optional helper: apply AI governance labels + required checks
-bash scripts/repo/apply_ai_governance.sh Prekzursil/AdrianaArt
+bash scripts/repo/apply_ai_governance.sh Prekzursil/momentstudio
 ```
 
 ```bash
 # Repository metadata
-gh repo edit Prekzursil/AdrianaArt \
+gh repo edit Prekzursil/momentstudio \
   --description "Bilingual RO/EN e-commerce storefront + admin suite with local-first DAM, SEO reliability, and production-safe payments." \
   --enable-issues \
   --disable-wiki
 
-gh repo edit Prekzursil/AdrianaArt \
+gh repo edit Prekzursil/momentstudio \
   --add-topic fastapi \
   --add-topic angular \
   --add-topic ecommerce \
