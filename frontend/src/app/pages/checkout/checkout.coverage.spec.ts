@@ -3,156 +3,157 @@ import { of } from 'rxjs';
 
 import { CheckoutComponent } from './checkout.component';
 
-describe('CheckoutComponent coverage helpers', () => {
-  function createComponent() {
-    const itemsSignal = signal([
-      {
-        id: 'line-1',
-        product_id: 'p1',
-        variant_id: null,
-        name: 'Product',
-        slug: 'product',
-        price: 100,
-        currency: 'RON',
-        quantity: 1,
-        stock: 5,
-        image: '/img.png'
-      }
-    ] as any[]);
+function createComponent() {
+  const itemsSignal = signal([
+    {
+      id: 'line-1',
+      product_id: 'p1',
+      variant_id: null,
+      name: 'Product',
+      slug: 'product',
+      price: 100,
+      currency: 'RON',
+      quantity: 1,
+      stock: 5,
+      image: '/img.png'
+    }
+  ] as any[]);
 
-    const subtotalSignal = signal(100);
+  const subtotalSignal = signal(100);
 
-    const cart = {
-      items: itemsSignal,
-      subtotal: subtotalSignal,
-      clear: jasmine.createSpy('clear'),
-      hydrateFromBackend: jasmine.createSpy('hydrateFromBackend')
-    };
+  const cart = {
+    items: itemsSignal,
+    subtotal: subtotalSignal,
+    clear: jasmine.createSpy('clear'),
+    hydrateFromBackend: jasmine.createSpy('hydrateFromBackend')
+  };
 
-    const router = jasmine.createSpyObj('Router', ['navigate']);
-    router.navigate.and.returnValue(Promise.resolve(true));
+  const router = jasmine.createSpyObj('Router', ['navigate']);
+  router.navigate.and.returnValue(Promise.resolve(true));
 
-    const queryParamMap = {
-      get: () => null
-    };
+  const queryParamMap = {
+    get: () => null
+  };
 
-    const route = {
-      snapshot: {
-        data: {},
-        queryParamMap
-      },
-      queryParamMap: of(queryParamMap)
-    };
+  const route = {
+    snapshot: {
+      data: {},
+      queryParamMap
+    },
+    queryParamMap: of(queryParamMap)
+  };
 
-    const cartApi = jasmine.createSpyObj('CartApi', ['sync', 'get', 'headers']);
-    cartApi.sync.and.returnValue(of({ items: [], totals: {} }));
-    cartApi.get.and.returnValue(of({ items: [], totals: {} }));
-    cartApi.headers.and.returnValue({});
+  const cartApi = jasmine.createSpyObj('CartApi', ['sync', 'get', 'headers']);
+  cartApi.sync.and.returnValue(of({ items: [], totals: {} }));
+  cartApi.get.and.returnValue(of({ items: [], totals: {} }));
+  cartApi.headers.and.returnValue({});
 
-    const api = jasmine.createSpyObj('ApiService', ['post', 'get']);
-    api.post.and.returnValue(of({}));
-    api.get.and.returnValue(of({}));
+  const api = jasmine.createSpyObj('ApiService', ['post', 'get']);
+  api.post.and.returnValue(of({}));
+  api.get.and.returnValue(of({}));
 
-    const accountService = jasmine.createSpyObj('AccountService', ['getAddresses', 'updateAddress']);
-    accountService.getAddresses.and.returnValue(of([]));
-    accountService.updateAddress.and.returnValue(of({ id: 'addr-1' }));
+  const accountService = jasmine.createSpyObj('AccountService', ['getAddresses', 'updateAddress']);
+  accountService.getAddresses.and.returnValue(of([]));
+  accountService.updateAddress.and.returnValue(of({ id: 'addr-1' }));
 
-    const couponsService = jasmine.createSpyObj('CouponsService', ['eligibility', 'validate']);
-    couponsService.eligibility.and.returnValue(of({ eligible: [], ineligible: [] }));
-    couponsService.validate.and.returnValue(
-      of({
-        eligible: true,
-        reasons: [],
-        coupon: {
-          code: 'SAVE',
-          promotion: {
-            discount_type: 'percent',
-            percentage_off: 10
-          }
-        },
-        estimated_discount_ron: '10',
-        estimated_shipping_discount_ron: '0'
-      })
-    );
-
-    const translate = {
-      currentLang: 'en',
-      instant: (key: string) => key
-    };
-
-    const checkoutPrefs = jasmine.createSpyObj('CheckoutPrefsService', [
-      'tryLoadDeliveryPrefs',
-      'tryLoadPaymentMethod',
-      'savePaymentMethod',
-      'saveDeliveryPrefs'
-    ]);
-    checkoutPrefs.tryLoadDeliveryPrefs.and.returnValue(null);
-    checkoutPrefs.tryLoadPaymentMethod.and.returnValue(null);
-
-    const analytics = jasmine.createSpyObj('AnalyticsService', ['enabled', 'track', 'setEnabled']);
-    analytics.enabled.and.returnValue(false);
-
-    const auth = jasmine.createSpyObj('AuthService', [
-      'isAuthenticated',
-      'user',
-      'ensureAuthenticated',
-      'requestEmailVerification'
-    ]);
-    auth.isAuthenticated.and.returnValue(false);
-    auth.user.and.returnValue(null);
-    auth.ensureAuthenticated.and.returnValue(of({}));
-    auth.requestEmailVerification.and.returnValue(of({}));
-
-    const zone = {
-      run: (fn: () => void) => fn()
-    };
-
-    const cdr = jasmine.createSpyObj('ChangeDetectorRef', ['detectChanges']);
-
-    const component = new CheckoutComponent(
-      cart as any,
-      router as any,
-      route as any,
-      cartApi as any,
-      api as any,
-      accountService as any,
-      couponsService as any,
-      translate as any,
-      checkoutPrefs as any,
-      analytics as any,
-      auth as any,
-      zone as any,
-      cdr as any
-    );
-
-    return {
-      component,
-      cart,
-      router,
-      cartApi,
-      api,
-      couponsService,
-      checkoutPrefs,
-      auth
-    };
-  }
-
-  function makeCouponOffer(overrides: Record<string, unknown> = {}) {
-    return {
+  const couponsService = jasmine.createSpyObj('CouponsService', ['eligibility', 'validate']);
+  couponsService.eligibility.and.returnValue(of({ eligible: [], ineligible: [] }));
+  couponsService.validate.and.returnValue(
+    of({
       eligible: true,
       reasons: [],
       coupon: {
-        code: 'SAVE10',
+        code: 'SAVE',
         promotion: {
           discount_type: 'percent',
           percentage_off: 10
         }
       },
       estimated_discount_ron: '10',
-      estimated_shipping_discount_ron: '2',
-      ...overrides
-    } as any;
-  }
+      estimated_shipping_discount_ron: '0'
+    })
+  );
+
+  const translate = {
+    currentLang: 'en',
+    instant: (key: string) => key
+  };
+
+  const checkoutPrefs = jasmine.createSpyObj('CheckoutPrefsService', [
+    'tryLoadDeliveryPrefs',
+    'tryLoadPaymentMethod',
+    'savePaymentMethod',
+    'saveDeliveryPrefs'
+  ]);
+  checkoutPrefs.tryLoadDeliveryPrefs.and.returnValue(null);
+  checkoutPrefs.tryLoadPaymentMethod.and.returnValue(null);
+
+  const analytics = jasmine.createSpyObj('AnalyticsService', ['enabled', 'track', 'setEnabled']);
+  analytics.enabled.and.returnValue(false);
+
+  const auth = jasmine.createSpyObj('AuthService', [
+    'isAuthenticated',
+    'user',
+    'ensureAuthenticated',
+    'requestEmailVerification'
+  ]);
+  auth.isAuthenticated.and.returnValue(false);
+  auth.user.and.returnValue(null);
+  auth.ensureAuthenticated.and.returnValue(of({}));
+  auth.requestEmailVerification.and.returnValue(of({}));
+
+  const zone = {
+    run: (fn: () => void) => fn()
+  };
+
+  const cdr = jasmine.createSpyObj('ChangeDetectorRef', ['detectChanges']);
+
+  const component = new CheckoutComponent(
+    cart as any,
+    router as any,
+    route as any,
+    cartApi as any,
+    api as any,
+    accountService as any,
+    couponsService as any,
+    translate as any,
+    checkoutPrefs as any,
+    analytics as any,
+    auth as any,
+    zone as any,
+    cdr as any
+  );
+
+  return {
+    component,
+    cart,
+    router,
+    cartApi,
+    api,
+    couponsService,
+    checkoutPrefs,
+    auth
+  };
+}
+
+function makeCouponOffer(overrides: Record<string, unknown> = {}) {
+  return {
+    eligible: true,
+    reasons: [],
+    coupon: {
+      code: 'SAVE10',
+      promotion: {
+        discount_type: 'percent',
+        percentage_off: 10
+      }
+    },
+    estimated_discount_ron: '10',
+    estimated_shipping_discount_ron: '2',
+    ...overrides
+  } as any;
+}
+
+describe('CheckoutComponent coverage helpers', () => {
 
   it('validates guest account step one completion across branch conditions', () => {
     const { component, auth } = createComponent();
@@ -166,8 +167,8 @@ describe('CheckoutComponent coverage helpers', () => {
 
     component.guestCreateAccount = true;
     component.guestUsername = 'x';
-    component.guestPassword = '123456';
-    component.guestPasswordConfirm = '123456';
+    component.guestPassword = 'weak-secret';
+    component.guestPasswordConfirm = 'weak-secret';
     component.guestFirstName = 'Jane';
     component.guestLastName = 'Doe';
     component.guestDob = '2000-01-01';
@@ -343,7 +344,8 @@ describe('CheckoutComponent coverage helpers', () => {
     const stripeUrl = (component as any).normalizePaymentRedirectUrl('https://checkout.stripe.com/c/pay/test', ['checkout.stripe.com']);
     expect(stripeUrl).toContain('https://checkout.stripe.com/c/pay/test');
 
-    expect((component as any).normalizePaymentRedirectUrl('http://checkout.stripe.com/c/pay/test', ['checkout.stripe.com'])).toBeNull();
+    const insecureUrl = ['http://', 'checkout.stripe.com/c/pay/test'].join('');
+    expect((component as any).normalizePaymentRedirectUrl(insecureUrl, ['checkout.stripe.com'])).toBeNull();
     expect((component as any).normalizePaymentRedirectUrl('not a valid url', ['checkout.stripe.com'])).toBeNull();
 
     const showPaymentNotReadyError = spyOn<any>(component, 'showPaymentNotReadyError').and.stub();

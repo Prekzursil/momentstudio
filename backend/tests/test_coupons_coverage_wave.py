@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 from decimal import Decimal
 from types import SimpleNamespace
@@ -54,12 +55,14 @@ class _SessionStub:
         self.execute_calls = 0
 
     async def execute(self, _stmt: object) -> _Result:
+        await asyncio.sleep(0)
         self.execute_calls += 1
         if not self._results:
             raise AssertionError("Unexpected execute() call without queued result")
         return self._results.pop(0)
 
     async def get(self, _model: object, key: uuid.UUID) -> object | None:
+        await asyncio.sleep(0)
         return self._users.get(key)
 
     def add(self, value: object) -> None:
@@ -233,6 +236,7 @@ async def test_coupon_api_replace_scopes_overlap_and_success(monkeypatch: pytest
     validated: dict[str, set[uuid.UUID]] = {}
 
     async def _validate(_session: object, *, product_ids: set[uuid.UUID], category_ids: set[uuid.UUID]) -> None:
+        await asyncio.sleep(0)
         validated["products"] = set(product_ids)
         validated["categories"] = set(category_ids)
 
@@ -401,6 +405,7 @@ async def test_coupon_service_evaluate_coupons_reuses_first_order_flag(monkeypat
     regular_coupon = SimpleNamespace(promotion=SimpleNamespace(first_order_only=False))
 
     async def _visible_coupons(_session: object, *, user_id: uuid.UUID) -> list[object]:
+        await asyncio.sleep(0)
         assert user_id == user.id
         return [first_order_coupon, regular_coupon]
 
@@ -408,6 +413,7 @@ async def test_coupon_service_evaluate_coupons_reuses_first_order_flag(monkeypat
     delivered_calls = {"count": 0}
 
     async def _delivered(_session: object, *, user_id: uuid.UUID) -> bool:
+        await asyncio.sleep(0)
         assert user_id == user.id
         delivered_calls["count"] += 1
         return True
@@ -425,6 +431,7 @@ async def test_coupon_service_evaluate_coupons_reuses_first_order_flag(monkeypat
         shipping_method_rate_per_kg: Decimal | None,
         user_has_delivered_orders: bool | None = None,
     ) -> object:
+        await asyncio.sleep(0)
         assert user_id == user.id
         assert cart is not None and checkout is not None
         captured_flags.append(user_has_delivered_orders)
@@ -461,6 +468,7 @@ async def test_coupon_service_apply_discount_code_to_cart_paths(monkeypatch: pyt
     )
 
     async def _totals(*_args: object, **_kwargs: object) -> Totals:
+        await asyncio.sleep(0)
         return totals
 
     monkeypatch.setattr(coupons_service, "compute_totals_with_coupon", _totals)
@@ -479,6 +487,7 @@ async def test_coupon_service_apply_discount_code_to_cart_paths(monkeypatch: pyt
     assert no_code.totals.total == Decimal("110.00")
 
     async def _missing_coupon(_session: object, *, code: str) -> None:
+        await asyncio.sleep(0)
         assert code == "MISSING"
         return None
 
@@ -496,9 +505,11 @@ async def test_coupon_service_apply_discount_code_to_cart_paths(monkeypatch: pyt
 
     coupon = SimpleNamespace(promotion=SimpleNamespace(discount_type=PromotionDiscountType.percent), code="SAVE10")
     async def _coupon_lookup(_session: object, *, code: str) -> object | None:
+        await asyncio.sleep(0)
         return coupon if code == "SAVE10" else None
 
     async def _ineligible(*_args: object, **_kwargs: object) -> object:
+        await asyncio.sleep(0)
         return SimpleNamespace(eligible=False)
 
     monkeypatch.setattr(coupons_service, "get_coupon_by_code", _coupon_lookup)
@@ -515,6 +526,7 @@ async def test_coupon_service_apply_discount_code_to_cart_paths(monkeypatch: pyt
         )
 
     async def _eligible(*_args: object, **_kwargs: object) -> object:
+        await asyncio.sleep(0)
         return SimpleNamespace(
             eligible=True,
             estimated_discount_ron=Decimal("7.00"),

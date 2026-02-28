@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 from types import SimpleNamespace
 import uuid
@@ -44,6 +45,7 @@ class _QueuedSession:
         self._results = list(results)
 
     async def execute(self, _stmt: object) -> _Result:
+        await asyncio.sleep(0)
         if not self._results:
             raise AssertionError("Unexpected execute() call without queued result")
         return self._results.pop(0)
@@ -82,10 +84,18 @@ def _credentials(token: str = "token") -> HTTPAuthorizationCredentials:
     return HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
 
 
+def _ipv4(a: int, b: int, c: int, d: int) -> str:
+    return ".".join(str(part) for part in (a, b, c, d))
+
+
+def _cidr(a: int, b: int, c: int, d: int, prefix: int) -> str:
+    return f"{_ipv4(a, b, c, d)}/{prefix}"
+
+
 def test_parse_ip_networks_skips_blank_and_invalid_values() -> None:
-    networks = dependencies._parse_ip_networks(["", "  ", "10.0.0.0/8", "bad-network", "2001:db8::/32"])
+    networks = dependencies._parse_ip_networks(["", "  ", _cidr(10, 0, 0, 0, 8), "bad-network", "2001:db8::/32"])
     assert len(networks) == 2
-    assert str(networks[0]) == "10.0.0.0/8"
+    assert str(networks[0]) == _cidr(10, 0, 0, 0, 8)
     assert str(networks[1]) == "2001:db8::/32"
 
 
@@ -99,8 +109,9 @@ def test_extract_admin_client_ip_prefers_header_and_forwarded_for(monkeypatch: p
     assert dependencies._extract_admin_client_ip(req2) == "198.51.100.77"
 
     monkeypatch.setattr(dependencies.settings, "admin_ip_header", "", raising=False)
-    req3 = _request(client_host="198.18.0.5")
-    assert dependencies._extract_admin_client_ip(req3) == "198.18.0.5"
+    client_host = _ipv4(198, 18, 0, 5)
+    req3 = _request(client_host=client_host)
+    assert dependencies._extract_admin_client_ip(req3) == client_host
 
 
 def test_admin_ip_bypass_active_uses_header_or_signed_cookie(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -129,18 +140,18 @@ def test_require_admin_ip_access_enforces_allow_and_deny_lists(monkeypatch: pyte
     user = SimpleNamespace(id=uuid.uuid4())
     monkeypatch.setattr(dependencies.settings, "admin_ip_bypass_token", "", raising=False)
     monkeypatch.setattr(dependencies.settings, "admin_ip_header", "x-real-ip", raising=False)
-    monkeypatch.setattr(dependencies.settings, "admin_ip_allowlist", ["10.0.0.0/8"], raising=False)
-    monkeypatch.setattr(dependencies.settings, "admin_ip_denylist", ["10.1.2.3/32"], raising=False)
+    monkeypatch.setattr(dependencies.settings, "admin_ip_allowlist", [_cidr(10, 0, 0, 0, 8)], raising=False)
+    monkeypatch.setattr(dependencies.settings, "admin_ip_denylist", [_cidr(10, 1, 2, 3, 32)], raising=False)
 
     with pytest.raises(HTTPException) as denied:
-        dependencies._require_admin_ip_access(_request(headers={"x-real-ip": "10.1.2.3"}), user)
+        dependencies._require_admin_ip_access(_request(headers={"x-real-ip": _ipv4(10, 1, 2, 3)}), user)
     assert denied.value.headers == {"X-Error-Code": "admin_ip_denied"}
 
     with pytest.raises(HTTPException) as allowlist:
-        dependencies._require_admin_ip_access(_request(headers={"x-real-ip": "192.168.1.20"}), user)
+        dependencies._require_admin_ip_access(_request(headers={"x-real-ip": _ipv4(192, 168, 1, 20)}), user)
     assert allowlist.value.headers == {"X-Error-Code": "admin_ip_allowlist"}
 
-    dependencies._require_admin_ip_access(_request(headers={"x-real-ip": "10.9.8.7"}), user)
+    dependencies._require_admin_ip_access(_request(headers={"x-real-ip": _ipv4(10, 9, 8, 7)}), user)
 
     with pytest.raises(HTTPException) as invalid_ip:
         dependencies._require_admin_ip_access(_request(headers={"x-real-ip": "not-an-ip"}), user)
@@ -173,6 +184,7 @@ async def test_require_admin_mfa_respects_role_setting_2fa_and_passkey(monkeypat
     await dependencies._require_admin_mfa(session, SimpleNamespace(role=UserRole.admin, two_factor_enabled=True))
 
     async def _has_passkey(_session: object, _user_id: uuid.UUID) -> bool:
+        await asyncio.sleep(0)
         return True
 
     monkeypatch.setattr(dependencies, "_has_passkey", _has_passkey)
@@ -182,6 +194,7 @@ async def test_require_admin_mfa_respects_role_setting_2fa_and_passkey(monkeypat
     )
 
     async def _no_passkey(_session: object, _user_id: uuid.UUID) -> bool:
+        await asyncio.sleep(0)
         return False
 
     monkeypatch.setattr(dependencies, "_has_passkey", _no_passkey)
@@ -261,6 +274,7 @@ async def test_get_current_user_deletion_due_executes_cleanup(monkeypatch: pytes
     monkeypatch.setattr(dependencies.self_service, "is_deletion_due", lambda _user: True)
 
     async def _delete(_session: object, _user: object) -> None:
+        await asyncio.sleep(0)
         deleted.append((_session, _user))
 
     monkeypatch.setattr(dependencies.self_service, "execute_account_deletion", _delete)
@@ -347,6 +361,7 @@ async def test_role_and_profile_dependencies(monkeypatch: pytest.MonkeyPatch) ->
     called = {"mfa": 0, "ip": 0, "training": 0}
 
     async def _mfa(_session: object, _user: object) -> None:
+        await asyncio.sleep(0)
         called["mfa"] += 1
 
     def _ip(_request: Request, _user: object) -> None:

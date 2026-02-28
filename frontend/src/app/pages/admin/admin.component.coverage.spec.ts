@@ -4,66 +4,67 @@ import { of } from 'rxjs';
 
 import { AdminComponent } from './admin.component';
 
+function createComponent() {
+  const route = {
+    snapshot: { data: { section: 'home' }, queryParams: {} },
+    data: of({ section: 'home' }),
+    queryParams: of({})
+  } as unknown as ActivatedRoute;
+
+  const admin = jasmine.createSpyObj('AdminService', [
+    'content',
+    'products',
+    'coupons',
+    'lowStock',
+    'getContent',
+    'updateCategory'
+  ]);
+  admin.content.and.returnValue(of([]));
+  admin.products.and.returnValue(of([]));
+  admin.coupons.and.returnValue(of([]));
+  admin.lowStock.and.returnValue(of([]));
+  admin.getContent.and.returnValue(of({ title: '', body_markdown: '' }));
+
+  const auth = {
+    role: jasmine.createSpy('role').and.returnValue('owner'),
+    user: jasmine.createSpy('user').and.returnValue({ id: 'user-1' })
+  };
+
+  const cmsPrefs = {
+    mode: jasmine.createSpy('mode').and.returnValue('basic'),
+    previewDevice: jasmine.createSpy('previewDevice').and.returnValue('desktop'),
+    previewLayout: jasmine.createSpy('previewLayout').and.returnValue('split')
+  };
+
+  const toast = jasmine.createSpyObj('ToastService', ['success', 'error', 'info']);
+
+  const translate = {
+    currentLang: 'en',
+    instant: (key: string) => key
+  };
+
+  const component = new AdminComponent(
+    route,
+    admin as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    auth as any,
+    cmsPrefs as any,
+    toast as any,
+    translate as any,
+    { render: (value: string) => value } as any,
+    {
+      bypassSecurityTrustHtml: (value: string) => value,
+      bypassSecurityTrustResourceUrl: (value: string) => value
+    } as unknown as DomSanitizer
+  );
+
+  return { component, admin, auth, cmsPrefs, toast };
+}
+
 describe('AdminComponent coverage helpers', () => {
-  function createComponent() {
-    const route = {
-      snapshot: { data: { section: 'home' }, queryParams: {} },
-      data: of({ section: 'home' }),
-      queryParams: of({})
-    } as unknown as ActivatedRoute;
-
-    const admin = jasmine.createSpyObj('AdminService', [
-      'content',
-      'products',
-      'coupons',
-      'lowStock',
-      'getContent',
-      'updateCategory'
-    ]);
-    admin.content.and.returnValue(of([]));
-    admin.products.and.returnValue(of([]));
-    admin.coupons.and.returnValue(of([]));
-    admin.lowStock.and.returnValue(of([]));
-    admin.getContent.and.returnValue(of({ title: '', body_markdown: '' }));
-
-    const auth = {
-      role: jasmine.createSpy('role').and.returnValue('owner'),
-      user: jasmine.createSpy('user').and.returnValue({ id: 'user-1' })
-    };
-
-    const cmsPrefs = {
-      mode: jasmine.createSpy('mode').and.returnValue('basic'),
-      previewDevice: jasmine.createSpy('previewDevice').and.returnValue('desktop'),
-      previewLayout: jasmine.createSpy('previewLayout').and.returnValue('split')
-    };
-
-    const toast = jasmine.createSpyObj('ToastService', ['success', 'error', 'info']);
-
-    const translate = {
-      currentLang: 'en',
-      instant: (key: string) => key
-    };
-
-    const component = new AdminComponent(
-      route,
-      admin as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      auth as any,
-      cmsPrefs as any,
-      toast as any,
-      translate as any,
-      { render: (value: string) => value } as any,
-      {
-        bypassSecurityTrustHtml: (value: string) => value,
-        bypassSecurityTrustResourceUrl: (value: string) => value
-      } as unknown as DomSanitizer
-    );
-
-    return { component, admin, auth, cmsPrefs, toast };
-  }
 
   it('normalizes sections and returns revision title keys for mapped values', () => {
     const { component } = createComponent();
@@ -128,7 +129,7 @@ describe('AdminComponent coverage helpers', () => {
     const withExpected = (component as any).withExpectedVersion('blog.post-1', { status: 'draft' });
     expect(withExpected.expected_version).toBe(7);
 
-    const withoutExpected = (component as any).withExpectedVersion('blog.unknown', { status: 'draft' }) as any;
+    const withoutExpected = (component as any).withExpectedVersion('blog.unknown', { status: 'draft' });
     expect(withoutExpected.expected_version).toBeUndefined();
 
     const reload = jasmine.createSpy('reload');

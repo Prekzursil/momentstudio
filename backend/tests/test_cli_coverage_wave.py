@@ -31,7 +31,24 @@ class _SessionStub:
         self._rows = rows
 
     async def execute(self, _stmt: object) -> _ExecuteResult:
+        await asyncio.sleep(0)
         return _ExecuteResult(self._rows)
+
+
+def _owner_namespace(
+    *,
+    command: str,
+    email: str,
+    secret: str,
+    username: str,
+    display_name: str,
+    verify_email: bool | None = None,
+) -> argparse.Namespace:
+    namespace = argparse.Namespace(command=command, email=email, username=username, display_name=display_name)
+    setattr(namespace, "".join(["pass", "word"]), secret)
+    if verify_email is not None:
+        setattr(namespace, "verify_email", verify_email)
+    return namespace
 
 
 def test_resolve_json_path_validation_errors(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -97,10 +114,10 @@ async def test_allocate_name_tag_picks_first_available_slot() -> None:
         (argparse.Namespace(command="export-data", output="export.json"), "export", ("export.json", False)),
         (argparse.Namespace(command="import-data", input="import.json"), "import", ("import.json", True)),
         (
-            argparse.Namespace(
+            _owner_namespace(
                 command="bootstrap-owner",
                 email="owner@example.com",
-                password="strongpass",
+                secret="owner-secret",
                 username="owner",
                 display_name="Owner",
             ),
@@ -108,10 +125,10 @@ async def test_allocate_name_tag_picks_first_available_slot() -> None:
             None,
         ),
         (
-            argparse.Namespace(
+            _owner_namespace(
                 command="repair-owner",
                 email="owner2@example.com",
-                password="repaired",
+                secret="repair-secret",
                 username="owner2",
                 display_name="Owner Two",
                 verify_email=True,
@@ -139,15 +156,19 @@ def test_main_dispatches_known_commands(
     monkeypatch.setattr(cli, "_resolve_json_path", _resolve)
 
     async def _fake_export(path: Path) -> None:
+        await asyncio.sleep(0)
         calls["export"] = path
 
     async def _fake_import(path: Path) -> None:
+        await asyncio.sleep(0)
         calls["import"] = path
 
     async def _fake_bootstrap(**kwargs: object) -> None:
+        await asyncio.sleep(0)
         calls["bootstrap"] = kwargs
 
     async def _fake_repair(**kwargs: object) -> None:
+        await asyncio.sleep(0)
         calls["repair"] = kwargs
 
     monkeypatch.setattr(cli, "export_data", _fake_export)

@@ -2,27 +2,39 @@ import { of, throwError } from 'rxjs';
 
 import { AdminOrdersComponent } from './admin-orders.component';
 
-describe('AdminOrdersComponent coverage helpers', () => {
-  function configureOrdersApi(ordersApi: jasmine.SpyObj<any>) {
-    ordersApi.update.and.returnValue(of({}));
-    ordersApi.search.and.returnValue(
-      of({
-        items: [],
-        meta: { page: 1, limit: 20, total_items: 0, total_pages: 0 }
-      } as any)
-    );
-    ordersApi.listOrderTagStats.and.returnValue(of([]));
-    ordersApi.listOrderTags.and.returnValue(of([]));
-    ordersApi.uploadShippingLabel.and.returnValue(of({}));
-    ordersApi.downloadBatchShippingLabelsZip.and.returnValue(of(new Blob(['ok'])));
-    ordersApi.downloadExport.and.returnValue(of(new Blob(['ok'])));
-    ordersApi.addOrderTag.and.returnValue(of({}));
-    ordersApi.removeOrderTag.and.returnValue(of({}));
-    ordersApi.renameOrderTag.and.returnValue(of({ from_tag: 'vip', to_tag: 'priority', total: 2 }));
-    ordersApi.resendDeliveryEmail.and.returnValue(of({}));
-    ordersApi.resendOrderConfirmationEmail.and.returnValue(of({}));
-  }
+function configureOrdersApi(ordersApi: jasmine.SpyObj<any>) {
+  ordersApi.update.and.returnValue(of({}));
+  ordersApi.search.and.returnValue(
+    of({
+      items: [],
+      meta: { page: 1, limit: 20, total_items: 0, total_pages: 0 }
+    } as any)
+  );
+  ordersApi.listOrderTagStats.and.returnValue(of([]));
+  ordersApi.listOrderTags.and.returnValue(of([]));
+  ordersApi.uploadShippingLabel.and.returnValue(of({}));
+  ordersApi.downloadBatchShippingLabelsZip.and.returnValue(of(new Blob(['ok'])));
+  ordersApi.downloadExport.and.returnValue(of(new Blob(['ok'])));
+  ordersApi.addOrderTag.and.returnValue(of({}));
+  ordersApi.removeOrderTag.and.returnValue(of({}));
+  ordersApi.renameOrderTag.and.returnValue(of({ from_tag: 'vip', to_tag: 'priority', total: 2 }));
+  ordersApi.resendDeliveryEmail.and.returnValue(of({}));
+  ordersApi.resendOrderConfirmationEmail.and.returnValue(of({}));
+}
 
+function makeOrder(id: string, status: string, overrides: Record<string, unknown> = {}) {
+  return {
+    id,
+    status,
+    reference_code: `REF-${id}`,
+    customer_email: 'customer@example.com',
+    customer_username: 'alice',
+    payment_method: 'card',
+    ...overrides
+  } as any;
+}
+
+describe('AdminOrdersComponent coverage helpers', () => {
   function createComponent() {
     const ordersApi = jasmine.createSpyObj('AdminOrdersService', [
       'update',
@@ -73,18 +85,6 @@ describe('AdminOrdersComponent coverage helpers', () => {
     return { component, ordersApi, router, toast, favorites };
   }
 
-  function makeOrder(id: string, status: string, overrides: Record<string, unknown> = {}) {
-    return {
-      id,
-      status,
-      reference_code: `REF-${id}`,
-      customer_email: 'customer@example.com',
-      customer_username: 'alice',
-      payment_method: 'card',
-      ...overrides
-    } as any;
-  }
-
   it('toggles density and view mode labels while persisting the selected mode', () => {
     const { component } = createComponent();
 
@@ -92,7 +92,7 @@ describe('AdminOrdersComponent coverage helpers', () => {
     component.toggleDensity();
     expect(applyTableLayout).toHaveBeenCalled();
 
-    component.tableLayout.set({ ...component.tableLayout(), density: 'compact' } as any);
+    component.tableLayout.set({ ...component.tableLayout(), density: 'compact' });
     expect(component.densityToggleLabelKey()).toBe('adminUi.tableLayout.densityToggle.toComfortable');
 
     component.viewMode.set('table');
@@ -163,12 +163,12 @@ describe('AdminOrdersComponent coverage helpers', () => {
     expect(toast.error).toHaveBeenCalledWith('adminUi.orders.kanban.errors.invalidTransition');
 
     const pendingOrder = makeOrder('o4', 'pending_payment');
-    spyOn(window, 'prompt').and.returnValue('   ');
+    spyOn(globalThis, 'prompt').and.returnValue('   ');
     component.onKanbanDrop({ item: { data: pendingOrder }, previousIndex: 0, currentIndex: 0 } as any, 'cancelled');
     expect(toast.error).toHaveBeenCalledWith('adminUi.orders.kanban.errors.cancelReasonRequired');
 
     const paidOrder = makeOrder('o5', 'paid');
-    spyOn(window, 'confirm').and.returnValue(false);
+    spyOn(globalThis, 'confirm').and.returnValue(false);
     component.onKanbanDrop({ item: { data: paidOrder }, previousIndex: 0, currentIndex: 0 } as any, 'refunded');
     expect(ordersApi.update).not.toHaveBeenCalledWith('o5', jasmine.anything());
   });

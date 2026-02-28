@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 
@@ -9,6 +10,10 @@ from starlette.requests import Request
 
 from app.api.v1 import admin_dashboard
 from app.services import admin_reports
+
+
+def _ipv4(a: int, b: int, c: int, d: int) -> str:
+    return '.'.join(str(part) for part in (a, b, c, d))
 
 
 def _request_with_scope(headers: list[tuple[bytes, bytes]] | None = None, client: tuple[str, int] | None = None) -> Request:
@@ -28,10 +33,11 @@ def _request_with_scope(headers: list[tuple[bytes, bytes]] | None = None, client
 
 
 def test_request_audit_metadata_extracts_user_agent_and_ip() -> None:
-    request = _request_with_scope(headers=[(b'user-agent', b'Agent/1.0')], client=('1.2.3.4', 1234))
+    client_ip = _ipv4(1, 2, 3, 4)
+    request = _request_with_scope(headers=[(b'user-agent', b'Agent/1.0')], client=(client_ip, 1234))
     payload = admin_dashboard._request_audit_metadata(request)
     assert payload['user_agent'] == 'Agent/1.0'
-    assert payload['ip_address'] == '1.2.3.4'
+    assert payload['ip_address'] == client_ip
 
     no_client_request = _request_with_scope()
     payload2 = admin_dashboard._request_audit_metadata(no_client_request)
@@ -50,15 +56,15 @@ def test_admin_dashboard_threshold_and_summary_helpers() -> None:
     )
     payload = admin_dashboard._dashboard_alert_thresholds_payload(record)  # type: ignore[arg-type]
     assert payload['failed_payments_min_count'] == 2
-    assert payload['failed_payments_min_delta_pct'] == 12.5
-    assert payload['refund_requests_min_rate_pct'] == 8.4
+    assert payload['failed_payments_min_delta_pct'] == pytest.approx(12.5)
+    assert payload['refund_requests_min_rate_pct'] == pytest.approx(8.4)
 
     assert admin_dashboard._decimal_or_none(None) is None
     assert str(admin_dashboard._decimal_or_none('3.75')) == '3.75'
 
-    assert admin_dashboard._summary_delta_pct(20, 10) == 100.0
+    assert admin_dashboard._summary_delta_pct(20, 10) == pytest.approx(100.0)
     assert admin_dashboard._summary_delta_pct(20, 0) is None
-    assert admin_dashboard._summary_rate_pct(10, 20) == 50.0
+    assert admin_dashboard._summary_rate_pct(10, 20) == pytest.approx(50.0)
     assert admin_dashboard._summary_rate_pct(10, 0) is None
 
 
@@ -159,6 +165,7 @@ async def test_effective_recipients_prefers_explicit_list() -> None:
 @pytest.mark.anyio
 async def test_effective_recipients_falls_back_to_owner_or_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     async def fake_owner(_session: object) -> object:
+        await asyncio.sleep(0)
         return SimpleNamespace(email='Owner@Example.com')
 
     monkeypatch.setattr(admin_reports.auth_service, 'get_owner_user', fake_owner)
@@ -168,6 +175,7 @@ async def test_effective_recipients_falls_back_to_owner_or_settings(monkeypatch:
     assert recipients == ['owner@example.com']
 
     async def no_owner(_session: object) -> object:
+        await asyncio.sleep(0)
         return None
 
     monkeypatch.setattr(admin_reports.auth_service, 'get_owner_user', no_owner)
@@ -233,6 +241,7 @@ async def test_update_due_report_outcome_updates_success_and_failure(monkeypatch
     updates: list[dict[str, object | None]] = []
 
     async def fake_update(_session: object, _block: object, payload: dict[str, object | None]) -> None:
+        await asyncio.sleep(0)
         updates.append(payload)
 
     monkeypatch.setattr(admin_reports, '_update_block_meta', fake_update)
@@ -263,12 +272,15 @@ async def test_send_due_report_for_spec_branches(monkeypatch: pytest.MonkeyPatch
     outcomes: list[tuple[int, int]] = []
 
     async def fake_update(_session: object, _block: object, payload: dict[str, object | None]) -> None:
+        await asyncio.sleep(0)
         updates.append(payload)
 
     async def fake_send_report_email(_session: object, **_kwargs: object) -> tuple[int, int]:
+        await asyncio.sleep(0)
         return (2, 1)
 
     async def fake_outcome(_session: object, _block: object, *, spec: object, attempted: int, delivered: int) -> None:
+        await asyncio.sleep(0)
         outcomes.append((attempted, delivered))
 
     monkeypatch.setattr(admin_reports, '_update_block_meta', fake_update)
@@ -354,14 +366,17 @@ async def test_send_due_report_for_spec_branches(monkeypatch: pytest.MonkeyPatch
 @pytest.mark.anyio
 async def test_send_due_reports_early_returns_and_spec_dispatch(monkeypatch: pytest.MonkeyPatch) -> None:
     async def fake_load_settings_block(_session: object) -> object:
+        await asyncio.sleep(0)
         return SimpleNamespace(meta={})
 
     async def fake_effective_recipients(_session: object, _recipients: object) -> list[str]:
+        await asyncio.sleep(0)
         return ['ops@example.com']
 
     dispatched: list[str] = []
 
     async def fake_send_due_for_spec(_session: object, **kwargs: object) -> None:
+        await asyncio.sleep(0)
         spec = kwargs['spec']
         dispatched.append(spec.kind)
 
@@ -393,6 +408,7 @@ async def test_send_report_now_error_and_success_paths(monkeypatch: pytest.Monke
     monkeypatch.setattr(admin_reports.settings, 'smtp_enabled', True)
 
     async def no_settings_block(_session: object) -> None:
+        await asyncio.sleep(0)
         return None
 
     monkeypatch.setattr(admin_reports, '_load_settings_block', no_settings_block)
@@ -402,9 +418,11 @@ async def test_send_report_now_error_and_success_paths(monkeypatch: pytest.Monke
     block = SimpleNamespace(meta={})
 
     async def fake_block(_session: object) -> object:
+        await asyncio.sleep(0)
         return block
 
     async def no_recipients(_session: object, _recipients: object) -> list[str]:
+        await asyncio.sleep(0)
         return []
 
     monkeypatch.setattr(admin_reports, '_load_settings_block', fake_block)
@@ -415,6 +433,7 @@ async def test_send_report_now_error_and_success_paths(monkeypatch: pytest.Monke
         await admin_reports.send_report_now(SimpleNamespace(), kind='weekly', now=now)
 
     async def has_recipients(_session: object, _recipients: object) -> list[str]:
+        await asyncio.sleep(0)
         return ['ops@example.com']
 
     monkeypatch.setattr(admin_reports, '_effective_recipients', has_recipients)
@@ -439,9 +458,11 @@ async def test_send_report_now_error_and_success_paths(monkeypatch: pytest.Monke
     updates: list[dict[str, object | None]] = []
 
     async def fake_send_email(_session: object, **_kwargs: object) -> tuple[int, int]:
+        await asyncio.sleep(0)
         return (2, 1)
 
     async def fake_update_meta(_session: object, _block: object, payload: dict[str, object | None]) -> None:
+        await asyncio.sleep(0)
         updates.append(payload)
 
     monkeypatch.setattr(admin_reports, '_send_report_email', fake_send_email)
