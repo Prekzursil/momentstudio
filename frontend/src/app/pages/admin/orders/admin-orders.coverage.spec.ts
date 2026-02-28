@@ -3,6 +3,26 @@ import { of, throwError } from 'rxjs';
 import { AdminOrdersComponent } from './admin-orders.component';
 
 describe('AdminOrdersComponent coverage helpers', () => {
+  function configureOrdersApi(ordersApi: jasmine.SpyObj<any>) {
+    ordersApi.update.and.returnValue(of({}));
+    ordersApi.search.and.returnValue(
+      of({
+        items: [],
+        meta: { page: 1, limit: 20, total_items: 0, total_pages: 0 }
+      } as any)
+    );
+    ordersApi.listOrderTagStats.and.returnValue(of([]));
+    ordersApi.listOrderTags.and.returnValue(of([]));
+    ordersApi.uploadShippingLabel.and.returnValue(of({}));
+    ordersApi.downloadBatchShippingLabelsZip.and.returnValue(of(new Blob(['ok'])));
+    ordersApi.downloadExport.and.returnValue(of(new Blob(['ok'])));
+    ordersApi.addOrderTag.and.returnValue(of({}));
+    ordersApi.removeOrderTag.and.returnValue(of({}));
+    ordersApi.renameOrderTag.and.returnValue(of({ from_tag: 'vip', to_tag: 'priority', total: 2 }));
+    ordersApi.resendDeliveryEmail.and.returnValue(of({}));
+    ordersApi.resendOrderConfirmationEmail.and.returnValue(of({}));
+  }
+
   function createComponent() {
     const ordersApi = jasmine.createSpyObj('AdminOrdersService', [
       'update',
@@ -22,23 +42,7 @@ describe('AdminOrdersComponent coverage helpers', () => {
       'resendOrderConfirmationEmail'
     ]);
 
-    ordersApi.update.and.returnValue(of({}));
-    ordersApi.search.and.returnValue(
-      of({
-        items: [],
-        meta: { page: 1, limit: 20, total_items: 0, total_pages: 0 }
-      } as any)
-    );
-    ordersApi.listOrderTagStats.and.returnValue(of([]));
-    ordersApi.listOrderTags.and.returnValue(of([]));
-    ordersApi.uploadShippingLabel.and.returnValue(of({}));
-    ordersApi.downloadBatchShippingLabelsZip.and.returnValue(of(new Blob(['ok'])));
-    ordersApi.downloadExport.and.returnValue(of(new Blob(['ok'])));
-    ordersApi.addOrderTag.and.returnValue(of({}));
-    ordersApi.removeOrderTag.and.returnValue(of({}));
-    ordersApi.renameOrderTag.and.returnValue(of({ from_tag: 'vip', to_tag: 'priority', total: 2 }));
-    ordersApi.resendDeliveryEmail.and.returnValue(of({}));
-    ordersApi.resendOrderConfirmationEmail.and.returnValue(of({}));
+    configureOrdersApi(ordersApi);
 
     const router = jasmine.createSpyObj('Router', ['navigate']);
     router.navigate.and.returnValue(Promise.resolve(true));
@@ -213,7 +217,7 @@ describe('AdminOrdersComponent coverage helpers', () => {
     expect(toast.error).toHaveBeenCalledWith('adminUi.orders.kanban.errors.updateFailed');
   });
 
-  it('applies presets and saved filter views into current filter state', () => {
+  it('applies presets into current filter state', () => {
     const { component, favorites } = createComponent();
 
     component.presets = [
@@ -249,6 +253,11 @@ describe('AdminOrdersComponent coverage helpers', () => {
     expect(component.page).toBe(1);
     expect(clearSelection).toHaveBeenCalled();
     expect(load).toHaveBeenCalled();
+    expect(favorites.items).not.toHaveBeenCalled();
+  });
+
+  it('applies saved filter views into current filter state', () => {
+    const { component, favorites } = createComponent();
 
     favorites.items.and.returnValue([
       {
@@ -337,7 +346,7 @@ describe('AdminOrdersComponent coverage helpers', () => {
     expect(lastErrorCall.args[0]).toBe('adminUi.orders.bulk.partial');
   });
 
-  it('builds detail navigation query params and shipping-label helper assignments', () => {
+  it('builds detail navigation query params', () => {
     const { component, router } = createComponent();
 
     component.page = 3;
@@ -366,6 +375,10 @@ describe('AdminOrdersComponent coverage helpers', () => {
     expect(queryParams['nav_include_test']).toBe(0);
     expect(queryParams['nav_from']).toBe('2026-02-01T00:00:00Z');
     expect(queryParams['nav_to']).toBe('2026-02-10T23:59:59Z');
+  });
+
+  it('assigns shipping labels by reference/short id and maps status classes', () => {
+    const { component } = createComponent();
 
     component.orders.set([
       makeOrder('abcde12345', 'paid', { reference_code: 'REF-ABC' }),
