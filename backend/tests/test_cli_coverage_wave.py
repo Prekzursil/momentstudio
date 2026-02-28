@@ -145,7 +145,7 @@ def test_main_dispatches_known_commands(
     expected_resolve: tuple[str, bool] | None,
 ) -> None:
     calls: dict[str, object] = {}
-    resolved_path = Path("/tmp/coverage-wave.json")
+    resolved_path = Path("coverage-wave.json")
 
     monkeypatch.setattr(cli.argparse.ArgumentParser, "parse_args", lambda self: namespace)
 

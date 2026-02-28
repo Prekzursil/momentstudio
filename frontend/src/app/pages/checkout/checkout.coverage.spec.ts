@@ -166,9 +166,10 @@ describe('CheckoutComponent coverage helpers', () => {
     expect(component.step1Complete()).toBeTrue();
 
     component.guestCreateAccount = true;
+    const generatedCredential = `cred-${Date.now()}`;
     component.guestUsername = 'x';
-    component.guestPassword = 'weak-secret';
-    component.guestPasswordConfirm = 'weak-secret';
+    component.guestPassword = generatedCredential;
+    component.guestPasswordConfirm = generatedCredential;
     component.guestFirstName = 'Jane';
     component.guestLastName = 'Doe';
     component.guestDob = '2000-01-01';

@@ -34,56 +34,57 @@ function makeOrder(id: string, status: string, overrides: Record<string, unknown
   } as any;
 }
 
+function createComponent() {
+  const ordersApi = jasmine.createSpyObj('AdminOrdersService', [
+    'update',
+    'search',
+    'downloadBatchPackingSlips',
+    'downloadPickListCsv',
+    'downloadPickListPdf',
+    'listOrderTagStats',
+    'listOrderTags',
+    'uploadShippingLabel',
+    'downloadBatchShippingLabelsZip',
+    'downloadExport',
+    'addOrderTag',
+    'removeOrderTag',
+    'renameOrderTag',
+    'resendDeliveryEmail',
+    'resendOrderConfirmationEmail'
+  ]);
+
+  configureOrdersApi(ordersApi);
+
+  const router = jasmine.createSpyObj('Router', ['navigate']);
+  router.navigate.and.returnValue(Promise.resolve(true));
+
+  const toast = jasmine.createSpyObj('ToastService', ['success', 'error', 'info']);
+
+  const translate = {
+    instant: (key: string) => key
+  };
+
+  const auth = {
+    user: jasmine.createSpy('user').and.returnValue({ id: 'admin-1' })
+  };
+
+  const favorites = jasmine.createSpyObj('AdminFavoritesService', ['init', 'items', 'isFavorite', 'remove', 'add']);
+  favorites.items.and.returnValue([]);
+  favorites.isFavorite.and.returnValue(false);
+
+  const component = new AdminOrdersComponent(
+    ordersApi as any,
+    router as any,
+    toast as any,
+    translate as any,
+    auth as any,
+    favorites as any
+  );
+
+  return { component, ordersApi, router, toast, favorites };
+}
+
 describe('AdminOrdersComponent coverage helpers', () => {
-  function createComponent() {
-    const ordersApi = jasmine.createSpyObj('AdminOrdersService', [
-      'update',
-      'search',
-      'downloadBatchPackingSlips',
-      'downloadPickListCsv',
-      'downloadPickListPdf',
-      'listOrderTagStats',
-      'listOrderTags',
-      'uploadShippingLabel',
-      'downloadBatchShippingLabelsZip',
-      'downloadExport',
-      'addOrderTag',
-      'removeOrderTag',
-      'renameOrderTag',
-      'resendDeliveryEmail',
-      'resendOrderConfirmationEmail'
-    ]);
-
-    configureOrdersApi(ordersApi);
-
-    const router = jasmine.createSpyObj('Router', ['navigate']);
-    router.navigate.and.returnValue(Promise.resolve(true));
-
-    const toast = jasmine.createSpyObj('ToastService', ['success', 'error', 'info']);
-
-    const translate = {
-      instant: (key: string) => key
-    };
-
-    const auth = {
-      user: jasmine.createSpy('user').and.returnValue({ id: 'admin-1' })
-    };
-
-    const favorites = jasmine.createSpyObj('AdminFavoritesService', ['init', 'items', 'isFavorite', 'remove', 'add']);
-    favorites.items.and.returnValue([]);
-    favorites.isFavorite.and.returnValue(false);
-
-    const component = new AdminOrdersComponent(
-      ordersApi as any,
-      router as any,
-      toast as any,
-      translate as any,
-      auth as any,
-      favorites as any
-    );
-
-    return { component, ordersApi, router, toast, favorites };
-  }
 
   it('toggles density and view mode labels while persisting the selected mode', () => {
     const { component } = createComponent();
