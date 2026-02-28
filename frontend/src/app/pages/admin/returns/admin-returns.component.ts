@@ -4,7 +4,13 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Subscription, forkJoin } from 'rxjs';
-import { AdminReturnsService, ReturnRequestListItem, ReturnRequestRead, ReturnRequestStatus } from '../../../core/admin-returns.service';
+import {
+  AdminReturnsService,
+  ReturnRequestListItem,
+  ReturnRequestListResponse,
+  ReturnRequestRead,
+  ReturnRequestStatus
+} from '../../../core/admin-returns.service';
 import { ToastService } from '../../../core/toast.service';
 import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
@@ -692,15 +698,7 @@ export class AdminReturnsComponent implements OnInit, OnDestroy {
       received: this.api.search({ ...params, status_filter: 'received' }),
       refunded: this.api.search({ ...params, status_filter: 'refunded' })
     }).subscribe({
-      next: (resp) => {
-        this.board.set({
-          requested: { items: resp.requested.items || [], total: resp.requested.meta?.total_items || 0 },
-          approved: { items: resp.approved.items || [], total: resp.approved.meta?.total_items || 0 },
-          received: { items: resp.received.items || [], total: resp.received.meta?.total_items || 0 },
-          refunded: { items: resp.refunded.items || [], total: resp.refunded.meta?.total_items || 0 }
-        });
-        this.boardLoading.set(false);
-      },
+      next: (resp) => this.handleBoardLoaded(resp),
       error: (err) => {
         this.boardError.set(this.translate.instant('adminUi.returns.errors.load'));
         this.boardErrorRequestId.set(extractRequestId(err));
@@ -708,5 +706,26 @@ export class AdminReturnsComponent implements OnInit, OnDestroy {
       }
     });
   }
-}
 
+  private boardColumn(result: { items?: ReturnRequestListItem[]; meta?: { total_items?: number } | null }): {
+    items: ReturnRequestListItem[];
+    total: number;
+  } {
+    return { items: result.items || [], total: result.meta?.total_items || 0 };
+  }
+
+  private handleBoardLoaded(resp: {
+    requested: ReturnRequestListResponse;
+    approved: ReturnRequestListResponse;
+    received: ReturnRequestListResponse;
+    refunded: ReturnRequestListResponse;
+  }): void {
+    this.board.set({
+      requested: this.boardColumn(resp.requested),
+      approved: this.boardColumn(resp.approved),
+      received: this.boardColumn(resp.received),
+      refunded: this.boardColumn(resp.refunded)
+    });
+    this.boardLoading.set(false);
+  }
+}

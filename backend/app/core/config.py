@@ -329,21 +329,32 @@ def _database_url_host(database_url: str) -> str | None:
     return host_str or None
 
 
-def _validate_dev_safety(settings: Settings) -> None:
-    if not bool(getattr(settings, "dev_safety_database_guard_enabled", True)):
-        return
+def _dev_safety_guard_enabled(settings: Settings) -> bool:
+    return bool(getattr(settings, "dev_safety_database_guard_enabled", True))
+
+
+def _is_dev_environment(settings: Settings) -> bool:
     env = str(getattr(settings, "environment", "") or "").strip().lower()
-    if env not in {"local", "development", "dev"}:
+    return env in {"local", "development", "dev"}
+
+
+def _dev_allowed_hosts(settings: Settings) -> set[str]:
+    return {
+        str(host or "").strip().lower()
+        for host in (getattr(settings, "dev_safety_database_allow_hosts", None) or [])
+        if str(host or "").strip()
+    }
+
+
+def _validate_dev_safety(settings: Settings) -> None:
+    if not _dev_safety_guard_enabled(settings):
+        return
+    if not _is_dev_environment(settings):
         return
     host = _database_url_host(str(getattr(settings, "database_url", "") or ""))
     if not host:
         return
-    allow_hosts = {
-        str(h or "").strip().lower()
-        for h in (getattr(settings, "dev_safety_database_allow_hosts", None) or [])
-        if str(h or "").strip()
-    }
-    if host.strip().lower() in allow_hosts:
+    if host.strip().lower() in _dev_allowed_hosts(settings):
         return
     raise RuntimeError(
         "Refusing to start with ENVIRONMENT=local while DATABASE_URL points to a non-local host "

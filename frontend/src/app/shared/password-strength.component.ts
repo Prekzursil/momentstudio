@@ -8,21 +8,14 @@ export function computePasswordStrength(password: string): PasswordStrength {
   const value = (password ?? '').trim();
   if (value.length < 6) return 'weak';
 
-  const hasLower = /[a-z]/.test(value);
-  const hasUpper = /[A-Z]/.test(value);
-  const hasDigit = /\d/.test(value);
-  const hasSymbol = /[^A-Za-z0-9]/.test(value);
-
-  let score = 0;
-  if (value.length >= 8) score += 1;
-  if (value.length >= 12) score += 1;
-  if (value.length >= 16) score += 1;
-
-  const variety = [hasLower, hasUpper, hasDigit, hasSymbol].filter(Boolean).length;
-  score += Math.min(variety, 3);
-
-  if (/^(.)\1+$/.test(value)) score = Math.max(0, score - 3);
-  if (/^(?:1234|2345|3456|4567|5678|6789|0123)/.test(value)) score = Math.max(0, score - 1);
+  const lengthScore = [8, 12, 16].reduce((score, minLength) => score + Number(value.length >= minLength), 0);
+  const varietyScore = Math.min(
+    [/[a-z]/.test(value), /[A-Z]/.test(value), /\d/.test(value), /[^A-Za-z0-9]/.test(value)].filter(Boolean).length,
+    3
+  );
+  const penalties =
+    Number(/^(.)\1+$/.test(value)) * 3 + Number(/^(?:1234|2345|3456|4567|5678|6789|0123)/.test(value));
+  const score = Math.max(0, lengthScore + varietyScore - penalties);
 
   if (score >= 5) return 'strong';
   if (score >= 3) return 'moderate';
@@ -93,4 +86,3 @@ export class PasswordStrengthComponent {
     return 'accent-rose-500';
   }
 }
-

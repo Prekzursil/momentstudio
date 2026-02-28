@@ -29,41 +29,13 @@ describe('CmsPageComponent', () => {
     api = jasmine.createSpyObj<ApiService>('ApiService', ['get']);
     seoHeadLinks = jasmine.createSpyObj<SeoHeadLinksService>('SeoHeadLinksService', ['setLocalizedCanonical']);
     seoHeadLinks.setLocalizedCanonical.and.returnValue('http://localhost:4200/pages/about');
-
-    api.get.and.callFake((path: string, params?: Record<string, unknown>) => {
-      if (path === '/content/pages/about') {
-        if (params?.['lang'] === 'ro') {
-          return of({ key: 'page.about', title: 'Despre', body_markdown: 'Salut', images: [] } as any);
-        }
-        return of({ key: 'page.about', title: 'About page', body_markdown: 'Hello', images: [] } as any);
-      }
-      throw new Error(`Unexpected path: ${path}`);
-    });
+    api.get.and.callFake(cmsPageCallFake);
 
     const markdown = { render: (s: string) => s } as unknown as MarkdownService;
-
-    TestBed.configureTestingModule({
-      imports: [RouterTestingModule, CmsPageComponent, TranslateModule.forRoot()],
-      providers: [
-        { provide: Title, useValue: title },
-        { provide: Meta, useValue: meta },
-        { provide: ApiService, useValue: api },
-        { provide: SeoHeadLinksService, useValue: seoHeadLinks },
-        { provide: StorefrontAdminModeService, useValue: { enabled: () => false } },
-        { provide: MarkdownService, useValue: markdown },
-        {
-          provide: ActivatedRoute,
-          useValue: {
-            paramMap: paramMap$.asObservable(),
-            queryParams: queryParams$.asObservable(),
-          },
-        },
-      ],
-    });
+    configureCmsPageTestingModule(meta, title, api, seoHeadLinks, markdown, paramMap$, queryParams$);
 
     translate = TestBed.inject(TranslateService);
-    translate.setTranslation('en', { about: { metaDescription: 'About desc' }, nav: { home: 'Home', page: 'Page' } }, true);
-    translate.setTranslation('ro', { about: { metaDescription: 'Descriere' }, nav: { home: 'Acasă', page: 'Pagină' } }, true);
+    seedCmsPageTranslations(translate);
     translate.use('en');
   });
 
@@ -92,3 +64,47 @@ describe('CmsPageComponent', () => {
     expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:url', content: 'http://localhost:4200/pages/about?lang=ro' });
   });
 });
+
+function configureCmsPageTestingModule(
+  meta: jasmine.SpyObj<Meta>,
+  title: jasmine.SpyObj<Title>,
+  api: jasmine.SpyObj<ApiService>,
+  seoHeadLinks: jasmine.SpyObj<SeoHeadLinksService>,
+  markdown: MarkdownService,
+  paramMap$: BehaviorSubject<ReturnType<typeof convertToParamMap>>,
+  queryParams$: BehaviorSubject<Record<string, unknown>>
+): void {
+  TestBed.configureTestingModule({
+    imports: [RouterTestingModule, CmsPageComponent, TranslateModule.forRoot()],
+    providers: [
+      { provide: Title, useValue: title },
+      { provide: Meta, useValue: meta },
+      { provide: ApiService, useValue: api },
+      { provide: SeoHeadLinksService, useValue: seoHeadLinks },
+      { provide: StorefrontAdminModeService, useValue: { enabled: () => false } },
+      { provide: MarkdownService, useValue: markdown },
+      {
+        provide: ActivatedRoute,
+        useValue: {
+          paramMap: paramMap$.asObservable(),
+          queryParams: queryParams$.asObservable(),
+        },
+      },
+    ],
+  });
+}
+
+function seedCmsPageTranslations(translate: TranslateService): void {
+  translate.setTranslation('en', { about: { metaDescription: 'About desc' }, nav: { home: 'Home', page: 'Page' } }, true);
+  translate.setTranslation('ro', { about: { metaDescription: 'Descriere' }, nav: { home: 'Acasă', page: 'Pagină' } }, true);
+}
+
+function cmsPageCallFake(path: string, params?: Record<string, unknown>) {
+  if (path === '/content/pages/about') {
+    if (params?.['lang'] === 'ro') {
+      return of({ key: 'page.about', title: 'Despre', body_markdown: 'Salut', images: [] } as any);
+    }
+    return of({ key: 'page.about', title: 'About page', body_markdown: 'Hello', images: [] } as any);
+  }
+  throw new Error(`Unexpected path: ${path}`);
+}

@@ -28,12 +28,14 @@ This document defines the weekly KPI baseline for AI-assisted engineering operat
 Production-sensitive areas require explicit regression tracking when defects escape to production:
 
 ### High-sensitivity areas
+
 1. **Payments**: Stripe integration, checkout flow, order confirmation
 2. **Authentication**: OAuth flows, session management, token handling
 3. **SEO**: Canonical URLs, meta tags, structured data, robots/sitemap
 4. **Security**: Input sanitization, CORS policies, rate limiting
 
 ### Tracking workflow
+
 1. When a regression is discovered in production:
    - Create an issue with labels: `severity:s1`, `area:<relevant>`, `regression:escaped`
    - Include root cause analysis in issue body
@@ -51,6 +53,7 @@ Production-sensitive areas require explicit regression tracking when defects esc
    - Consider adding checks to branch protection audit
 
 ### Regression categories
+
 - `regression:ci-gap` - Would have been caught by better CI coverage
 - `regression:review-miss` - Escaped during human review
 - `regression:spec-drift` - Behavior changed without explicit requirement

@@ -165,6 +165,20 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
   { key: 'why', type: 'why', enabled: true }
 ];
 
+const BOOLEAN_TRUE_TOKENS = new Set(['1', 'true', 'yes', 'on']);
+const BOOLEAN_FALSE_TOKENS = new Set(['0', 'false', 'no', 'off']);
+const SIZE_TOKEN_MAP: Record<string, 'S' | 'M' | 'L'> = {
+  S: 'S',
+  M: 'M',
+  L: 'L',
+  s: 'S',
+  m: 'M',
+  l: 'L',
+  small: 'S',
+  medium: 'M',
+  large: 'L'
+};
+
 @Component({
   selector: 'app-home',
   standalone: true,
@@ -660,15 +674,19 @@ export class HomeComponent implements OnInit, OnDestroy {
       return key;
     };
 
+    const readLocalizedEntry = (record: Record<string, unknown>, locale: 'en' | 'ro'): string | null => {
+      const entry = record[locale];
+      if (typeof entry !== 'string') return null;
+      const trimmed = entry.trim();
+      return trimmed || null;
+    };
+
     const readLocalized = (value: unknown): string | null => {
       if (typeof value === 'string') return value.trim() || null;
       if (!value || typeof value !== 'object') return null;
       const record = value as Record<string, unknown>;
-      const preferred = typeof record[lang] === 'string' ? String(record[lang]).trim() : '';
-      if (preferred) return preferred;
       const otherLang = lang === 'ro' ? 'en' : 'ro';
-      const fallback = typeof record[otherLang] === 'string' ? String(record[otherLang]).trim() : '';
-      return fallback || null;
+      return readLocalizedEntry(record, lang) || readLocalizedEntry(record, otherLang);
     };
 
     const readString = (value: unknown): string | null => {
@@ -680,11 +698,10 @@ export class HomeComponent implements OnInit, OnDestroy {
     const readBoolean = (value: unknown, fallback = false): boolean => {
       if (typeof value === 'boolean') return value;
       if (typeof value === 'number') return value === 1;
-      if (typeof value === 'string') {
-        const normalized = value.trim().toLowerCase();
-        if (normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on') return true;
-        if (normalized === '0' || normalized === 'false' || normalized === 'no' || normalized === 'off') return false;
-      }
+      if (typeof value !== 'string') return fallback;
+      const normalized = value.trim().toLowerCase();
+      if (BOOLEAN_TRUE_TOKENS.has(normalized)) return true;
+      if (BOOLEAN_FALSE_TOKENS.has(normalized)) return false;
       return fallback;
     };
 
@@ -701,12 +718,8 @@ export class HomeComponent implements OnInit, OnDestroy {
 
     const normalizeSize = (value: unknown): 'S' | 'M' | 'L' => {
       const raw = readString(value);
-      if (raw === 'S' || raw === 'M' || raw === 'L') return raw;
       if (!raw) return 'M';
-      const normalized = raw.toLowerCase();
-      if (normalized === 's' || normalized === 'small') return 'S';
-      if (normalized === 'l' || normalized === 'large') return 'L';
-      return 'M';
+      return SIZE_TOKEN_MAP[raw] || SIZE_TOKEN_MAP[raw.toLowerCase()] || 'M';
     };
 
     const normalizeTextStyle = (value: unknown): 'light' | 'dark' => (readString(value) === 'light' ? 'light' : 'dark');
@@ -1208,4 +1221,3 @@ export class HomeComponent implements OnInit, OnDestroy {
     ]);
   }
 }
-

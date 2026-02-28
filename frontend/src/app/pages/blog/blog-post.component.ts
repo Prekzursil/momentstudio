@@ -21,7 +21,16 @@ import { CatalogService, Category, FeaturedCollection, Product } from '../../cor
 import { MarkdownService } from '../../core/markdown.service';
 import { NewsletterService } from '../../core/newsletter.service';
 import { ToastService } from '../../core/toast.service';
-import { BlogComment, BlogCommentSort, BlogPost, BlogPostListItem, BlogService, PaginationMeta } from '../../core/blog.service';
+import {
+  BlogComment,
+  BlogCommentSort,
+  BlogCommentThread,
+  BlogCommentThreadListResponse,
+  BlogPost,
+  BlogPostListItem,
+  BlogService,
+  PaginationMeta
+} from '../../core/blog.service';
 import { StorefrontAdminModeService } from '../../core/storefront-admin-mode.service';
 import { ContainerComponent } from '../../layout/container.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
@@ -845,13 +854,13 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   commentSubscribed = signal<boolean>(false);
   commentSubscriptionLoading = signal<boolean>(false);
   private readonly commentThreadsLimit = 10;
-  commentSkeletons = Array.from({ length: 3 });
+  readonly commentSkeletons = Array.from({ length: 3 });
 
   commentBody = '';
   submitting = signal<boolean>(false);
   replyTo = signal<BlogComment | null>(null);
-  captchaSiteKey = appConfig.captchaSiteKey;
-  captchaEnabled = Boolean(this.captchaSiteKey);
+  readonly captchaSiteKey = appConfig.captchaSiteKey;
+  readonly captchaEnabled = Boolean(this.captchaSiteKey);
   commentCaptchaToken: string | null = null;
   newsletterEmail = '';
   newsletterLoading = signal<boolean>(false);
@@ -890,25 +899,31 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   });
   authorBio = computed(() => {
     const post = this.post();
-    const meta = (post?.meta as any) || {};
-    const author = meta?.author;
-    const bio = author?.bio;
+    const meta = this.toObjectRecord(post?.meta);
+    const author = this.toObjectRecord(meta['author']);
+    const bio = author['bio'];
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     if (typeof bio === 'string') return bio.trim();
-    if (bio && typeof bio === 'object' && typeof bio[lang] === 'string') return String(bio[lang]).trim();
+    if (bio && typeof bio === 'object' && !Array.isArray(bio)) {
+      const localized = this.toObjectRecord(bio)[lang];
+      if (typeof localized === 'string') return localized.trim();
+    }
     return '';
   });
   authorLinks = computed(() => {
     const post = this.post();
-    const meta = (post?.meta as any) || {};
-    const author = meta?.author;
-    const links = author?.links;
-    if (!Array.isArray(links)) return [] as Array<{ label: string; url: string }>;
+    const meta = this.toObjectRecord(post?.meta);
+    const author = this.toObjectRecord(meta['author']);
+    const links = author['links'];
+    if (!Array.isArray(links)) return [];
     return links
-      .map((row: any) => ({
-        label: typeof row?.label === 'string' ? row.label.trim() : '',
-        url: typeof row?.url === 'string' ? row.url.trim() : ''
-      }))
+      .map((row) => {
+        const rec = this.toObjectRecord(row);
+        return {
+          label: typeof rec['label'] === 'string' ? rec['label'].trim() : '',
+          url: typeof rec['url'] === 'string' ? rec['url'].trim() : ''
+        };
+      })
       .filter((row) => row.label && row.url);
   });
 
@@ -961,7 +976,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     private readonly toast: ToastService,
     private readonly markdown: MarkdownService,
     private readonly catalog: CatalogService,
-    public auth: AuthService,
+    public readonly auth: AuthService,
     private readonly seoCopyFallback: SeoCopyFallbackService
   ) {}
 
@@ -1305,7 +1320,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       this.quickEditUnpublishAt = this.toDateTimeLocal(block.published_until);
     }
 
-    const meta = (block?.meta || post?.meta || {}) as Record<string, unknown>;
+    const meta = this.toObjectRecord(block?.meta ?? post?.meta);
     const tags = (post?.tags?.length ? post.tags : this.normalizeTags(meta['tags'])) || [];
     this.quickEditTitle = String(post?.title ?? block?.title ?? '').trim();
     this.quickEditSummary = String(post?.summary ?? this.getMetaSummary(meta, lang) ?? '').trim();
@@ -1379,10 +1394,17 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     if (!raw) return '';
     if (typeof raw === 'string') return raw.trim();
     if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
-      const value = (raw as any)[lang];
+      const value = this.toObjectRecord(raw)[lang];
       if (typeof value === 'string') return value.trim();
     }
     return '';
+  }
+
+  private toObjectRecord(value: unknown): Record<string, unknown> {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return {};
+    }
+    return value as Record<string, unknown>;
   }
 
   private loadNeighbors(lang: string): void {
@@ -1490,9 +1512,10 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   }
 
   handleArticleClick(event: MouseEvent): void {
-    const target = event.target as HTMLElement | null;
-    const link = target?.closest('a[data-router-link]') as HTMLAnchorElement | null;
-    if (link) {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    const link = target.closest('a[data-router-link]');
+    if (link instanceof HTMLAnchorElement) {
       const to = link.getAttribute('data-router-link') || '';
       if (to && !event.defaultPrevented && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
         event.preventDefault();
@@ -1501,14 +1524,14 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         return;
       }
     }
-    const codeButton = target?.closest('button[data-code-action]') as HTMLButtonElement | null;
-    if (codeButton) {
+    const codeButton = target.closest('button[data-code-action]');
+    if (codeButton instanceof HTMLButtonElement) {
       const action = codeButton.getAttribute('data-code-action');
-      const wrapper = codeButton.closest('.blog-codeblock') as HTMLElement | null;
-      if (!action || !wrapper) return;
+      const wrapper = codeButton.closest('.blog-codeblock');
+      if (!action || !(wrapper instanceof HTMLElement)) return;
       if (action === 'copy') {
-        const code = wrapper.querySelector('pre code') as HTMLElement | null;
-        const value = (code?.textContent || '').trimEnd();
+        const code = wrapper.querySelector('pre code');
+        const value = ((code instanceof HTMLElement ? code.textContent : '') || '').trimEnd();
         if (value) this.copyCode(value);
       } else if (action === 'wrap') {
         const wrap = wrapper.classList.toggle('blog-codeblock--wrap');
@@ -1520,8 +1543,8 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       event.stopPropagation();
       return;
     }
-    const img = target?.closest('img') as HTMLImageElement | null;
-    if (!img) return;
+    const img = target.closest('img');
+    if (!(img instanceof HTMLImageElement)) return;
     const images = this.galleryImages();
     if (!images.length) return;
     const src = img.currentSrc || img.src;
@@ -1678,16 +1701,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     this.hasCommentsError.set(false);
     this.blog.listCommentThreads(this.slug, { page, limit: this.commentThreadsLimit, sort }).subscribe({
       next: (resp) => {
-        const flattened: BlogComment[] = [];
-        for (const thread of resp.items || []) {
-          if (thread?.root) flattened.push(thread.root);
-          if (Array.isArray(thread?.replies)) flattened.push(...thread.replies);
-        }
-        this.comments.set(flattened);
-        this.commentsMeta.set(resp.meta ?? null);
-        this.commentsTotal.set(Number(resp.total_comments ?? 0));
-        this.loadingComments.set(false);
-        this.hasCommentsError.set(false);
+        this.applyCommentThreadResponse(resp);
       },
       error: () => {
         this.comments.set([]);
@@ -1697,6 +1711,23 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         this.hasCommentsError.set(true);
       }
     });
+  }
+
+  private applyCommentThreadResponse(resp: BlogCommentThreadListResponse): void {
+    this.comments.set(this.flattenCommentThreads(resp.items));
+    this.commentsMeta.set(resp.meta ?? null);
+    this.commentsTotal.set(Number(resp.total_comments ?? 0));
+    this.loadingComments.set(false);
+    this.hasCommentsError.set(false);
+  }
+
+  private flattenCommentThreads(threads: BlogCommentThread[] | null | undefined): BlogComment[] {
+    const flattened: BlogComment[] = [];
+    for (const thread of threads || []) {
+      if (thread?.root) flattened.push(thread.root);
+      if (Array.isArray(thread?.replies)) flattened.push(...thread.replies);
+    }
+    return flattened;
   }
 
   loadCommentSubscription(): void {
@@ -1724,7 +1755,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   }
 
   toggleCommentSubscription(event: Event): void {
-    const target = event?.target as HTMLInputElement | null;
+    const target = event.target instanceof HTMLInputElement ? event.target : null;
     const desired = Boolean(target?.checked);
     if (!this.slug) return;
     if (!this.auth.isAuthenticated()) return;
@@ -1758,7 +1789,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     if (next !== 'newest' && next !== 'oldest' && next !== 'top') return;
     if (next === this.commentSort()) return;
     this.commentPage.set(1);
-    this.loadComments({ page: 1, sort: next as BlogCommentSort });
+    this.loadComments({ page: 1, sort: next });
   }
 
   goToCommentsPage(page: number): void {
@@ -1842,31 +1873,50 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         this.submitting.set(false);
         this.commentCaptchaToken = null;
         this.commentCaptcha?.reset();
-        const statusCode = typeof (err)?.status === 'number' ? (err).status : 0;
-        const detail = (err)?.error?.detail;
-        if (statusCode === 429) {
-          this.toast.error(this.translate.instant('blog.comments.rateLimitedTitle'), this.translate.instant('blog.comments.rateLimitedCopy'));
-          return;
-        }
-        if (statusCode === 400 && typeof detail === 'string') {
-          if (detail.toLowerCase().includes('link')) {
-            this.toast.error(this.translate.instant('blog.comments.linkLimitTitle'), this.translate.instant('blog.comments.linkLimitCopy'));
-            return;
-          }
-          if (detail.toLowerCase().includes('captcha')) {
-            const copy =
-              detail.toLowerCase().includes('required')
-                ? this.translate.instant('auth.captchaRequired')
-                : this.translate.instant('auth.captchaFailedTryAgain');
-            this.toast.error(this.translate.instant('blog.comments.createErrorTitle'), copy);
-            return;
-          }
-          this.toast.error(this.translate.instant('blog.comments.createErrorTitle'), detail);
-          return;
-        }
-        this.toast.error(this.translate.instant('blog.comments.createErrorTitle'), this.translate.instant('blog.comments.createErrorCopy'));
+        this.toastCommentCreateError(err);
       }
     });
+  }
+
+  private toastCommentCreateError(err: unknown): void {
+    const statusCode = this.commentErrorStatus(err);
+    if (statusCode === 429) {
+      this.toast.error(this.translate.instant('blog.comments.rateLimitedTitle'), this.translate.instant('blog.comments.rateLimitedCopy'));
+      return;
+    }
+    if (statusCode === 400) {
+      const handled = this.toastBadRequestCommentCreateError(err);
+      if (handled) return;
+    }
+    this.toast.error(this.translate.instant('blog.comments.createErrorTitle'), this.translate.instant('blog.comments.createErrorCopy'));
+  }
+
+  private commentErrorStatus(err: unknown): number {
+    const status = (err as { status?: unknown })?.status;
+    return typeof status === 'number' ? status : 0;
+  }
+
+  private toastBadRequestCommentCreateError(err: unknown): boolean {
+    const detail = (err as { error?: { detail?: unknown } })?.error?.detail;
+    if (typeof detail !== 'string') return false;
+    const lowerDetail = detail.toLowerCase();
+    if (lowerDetail.includes('link')) {
+      this.toast.error(this.translate.instant('blog.comments.linkLimitTitle'), this.translate.instant('blog.comments.linkLimitCopy'));
+      return true;
+    }
+    if (lowerDetail.includes('captcha')) {
+      this.toastCaptchaCommentCreateError(lowerDetail);
+      return true;
+    }
+    this.toast.error(this.translate.instant('blog.comments.createErrorTitle'), detail);
+    return true;
+  }
+
+  private toastCaptchaCommentCreateError(detail: string): void {
+    const copy = detail.includes('required')
+      ? this.translate.instant('auth.captchaRequired')
+      : this.translate.instant('auth.captchaFailedTryAgain');
+    this.toast.error(this.translate.instant('blog.comments.createErrorTitle'), copy);
   }
 
   submitNewsletter(event?: Event): void {
@@ -2048,8 +2098,8 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     const end = rect.bottom + scrollTop - w.innerHeight;
     this.scrollStartY = start;
     this.scrollEndY = Math.max(start + 1, end);
-    this.tocHeadingEls = Array.from(el.querySelectorAll('h2[id], h3[id]')) as HTMLElement[];
-    const imgs = Array.from(el.querySelectorAll('img')) as HTMLImageElement[];
+    this.tocHeadingEls = Array.from(el.querySelectorAll<HTMLElement>('h2[id], h3[id]'));
+    const imgs = Array.from(el.querySelectorAll<HTMLImageElement>('img'));
     const gallery: Array<{ src: string; alt: string }> = [];
     const seen = new Set<string>();
     for (const img of imgs) {
@@ -2122,7 +2172,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
 
     const parser = new w.DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
-    const headings = Array.from(doc.body.querySelectorAll('h2, h3')) as HTMLElement[];
+    const headings = Array.from(doc.body.querySelectorAll<HTMLElement>('h2, h3'));
 
     const toc: Array<{ id: string; title: string; level: 2 | 3 }> = [];
     const embeds: Array<{ type: 'product' | 'category' | 'collection'; slug: string }> = [];
@@ -2130,7 +2180,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     const linkLabel = this.translate.instant('blog.post.sectionLinkLabel');
 
     for (const heading of headings) {
-      const level = heading.tagName.toLowerCase() === 'h3' ? 3 : 2;
+      const level: 2 | 3 = heading.tagName.toLowerCase() === 'h3' ? 3 : 2;
       const title = (heading.textContent || '').replace(/\s+/g, ' ').trim();
       if (!title) continue;
       const baseId = this.slugifyHeading(title) || 'section';
@@ -2150,10 +2200,10 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       anchor.textContent = '#';
       heading.appendChild(anchor);
 
-      toc.push({ id, title, level: level as 2 | 3 });
+      toc.push({ id, title, level });
     }
 
-    const images = Array.from(doc.body.querySelectorAll('img')) as HTMLImageElement[];
+    const images = Array.from(doc.body.querySelectorAll<HTMLImageElement>('img'));
     for (const img of images) {
       const title = (img.getAttribute('title') || '').trim().toLowerCase();
       if (!title) continue;
@@ -2210,10 +2260,10 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     }
 
     const embedRe = /^\{\{\s*(product|category|collection)\s*:\s*([a-z0-9_-]+)\s*\}\}$/i;
-    const embedParas = Array.from(doc.body.querySelectorAll('p')) as HTMLElement[];
+    const embedParas = Array.from(doc.body.querySelectorAll<HTMLElement>('p'));
     for (const para of embedParas) {
       const text = (para.textContent || '').trim();
-      const match = text.match(embedRe);
+      const match = embedRe.exec(text);
       if (!match) continue;
       const rawType = (match[1] || '').toLowerCase();
       const type = rawType === 'product' || rawType === 'category' || rawType === 'collection' ? rawType : null;
@@ -2272,12 +2322,12 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       return svg;
     };
 
-    const callouts = Array.from(doc.body.querySelectorAll('blockquote')) as HTMLElement[];
+    const callouts = Array.from(doc.body.querySelectorAll<HTMLElement>('blockquote'));
     for (const blockquote of callouts) {
-      const firstPara = blockquote.querySelector('p') as HTMLElement | null;
+      const firstPara = blockquote.querySelector<HTMLElement>('p');
       if (!firstPara) continue;
       const text = (firstPara.textContent || '').trimStart();
-      const match = text.match(/^\[!(TIP|NOTE|WARNING|CAUTION|IMPORTANT|INFO)\]/i);
+      const match = /^\[!(TIP|NOTE|WARNING|CAUTION|IMPORTANT|INFO)\]/i.exec(text);
       if (!match) continue;
       const marker = match[1].toLowerCase();
       const kind = marker === 'tip' ? 'tip' : marker === 'warning' || marker === 'caution' ? 'warning' : 'note';
@@ -2315,12 +2365,12 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     const codeUnwrapLabel = this.translate.instant('blog.post.code.unwrap');
     const codeFallbackLabel = this.translate.instant('blog.post.code.languageFallback');
 
-    const codeBlocks = Array.from(doc.body.querySelectorAll('pre > code')) as HTMLElement[];
+    const codeBlocks = Array.from(doc.body.querySelectorAll<HTMLElement>('pre > code'));
     for (const codeEl of codeBlocks) {
-      const pre = codeEl.parentElement as HTMLElement | null;
-      if (!pre) continue;
+      const pre = codeEl.parentElement;
+      if (!(pre instanceof HTMLElement)) continue;
       const raw = codeEl.textContent || '';
-      const langMatch = codeEl.className.match(/language-([a-z0-9_-]+)/i);
+      const langMatch = /language-([a-z0-9_-]+)/i.exec(codeEl.className);
       const rawLang = (langMatch?.[1] || '').trim().toLowerCase();
       const lang =
         rawLang === 'js'
@@ -2385,7 +2435,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   private hydrateEmbeds(
     embeds: Array<{ type: 'product' | 'category' | 'collection'; slug: string }>,
     revision: number,
-    lang: string
+    lang: 'en' | 'ro'
   ): void {
     const html = this.bodyHtml();
     if (!html || !embeds.length) return;
@@ -2409,7 +2459,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
 
     const req = forkJoin({
       products: Object.keys(productCalls).length ? forkJoin(productCalls) : of({}),
-      categories: categorySlugs.length ? this.catalog.listCategories(lang as any).pipe(catchError(() => of([]))) : of([]),
+      categories: categorySlugs.length ? this.catalog.listCategories(lang).pipe(catchError(() => of([]))) : of([]),
       collections: collectionSlugs.length ? this.catalog.listFeaturedCollections().pipe(catchError(() => of([]))) : of([])
     });
 
@@ -2432,7 +2482,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     const w = this.document?.defaultView;
     if (!w?.DOMParser) return html;
     const doc = new w.DOMParser().parseFromString(html, 'text/html');
-    const embeds = Array.from(doc.body.querySelectorAll('.blog-embed[data-embed-type][data-embed-slug]')) as HTMLElement[];
+    const embeds = Array.from(doc.body.querySelectorAll<HTMLElement>('.blog-embed[data-embed-type][data-embed-slug]'));
     if (!embeds.length) return html;
 
     const categoryBySlug = new Map<string, Category>();

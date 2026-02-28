@@ -205,7 +205,6 @@ Operational guardrails:
 - Keep sampling rates environment-specific.
 - If noise/cost spikes, set rates to `0` as first-line rollback.
 
-
 ## Agent Issue Watchdog
 
 To avoid long-running stalled agent tasks, `audit-agent-watchdog.yml` runs on a daily schedule and via manual dispatch.
@@ -242,7 +241,7 @@ Workflows may emit summary warnings when metadata is missing, but do not fail bu
 
 ## Roadmap Project
 
-- Project: `AdrianaArt Roadmap` — https://github.com/users/Prekzursil/projects/2
+- Project: `AdrianaArt Roadmap` — <https://github.com/users/Prekzursil/projects/2>
 - Field model: default `Status` + custom `Roadmap Lane` (`Now`, `Next`, `Later`)
 - Item policy: seed as draft items first, then convert to tracked issues when moved to `Now` with owner/date set.
 

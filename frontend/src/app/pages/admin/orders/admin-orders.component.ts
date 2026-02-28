@@ -119,6 +119,9 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
   hidden: ['tags']
 });
 
+const PRESET_SLA_FILTERS = new Set<SlaFilter>(['any_overdue', 'accept_overdue', 'ship_overdue']);
+const PRESET_FRAUD_FILTERS = new Set<FraudFilter>(['queue', 'flagged', 'approved', 'denied']);
+
   @Component({
     selector: 'app-admin-orders',
     standalone: true,
@@ -2429,22 +2432,7 @@ export class AdminOrdersComponent implements OnInit {
     this.tagRenameBusy = true;
     this.tagRenameError = '';
     this.ordersApi.renameOrderTag({ from_tag: fromTag, to_tag: toTag }).subscribe({
-      next: (res) => {
-        const fromKey = normalizeTagKey(res.from_tag || fromTag);
-        const toKey = normalizeTagKey(res.to_tag || toTag);
-        if (fromKey && toKey && this.tagColorOverrides[fromKey] && !this.tagColorOverrides[toKey]) {
-          this.tagColorOverrides[toKey] = this.tagColorOverrides[fromKey];
-        }
-        if (fromKey) delete this.tagColorOverrides[fromKey];
-        persistTagColorOverrides(this.tagColorOverrides);
-
-        if (this.tag === fromKey) this.tag = toKey;
-        this.toast.success(this.translate.instant('adminUi.orders.tags.renamed', { count: res.total }));
-        this.tagRenameFrom = '';
-        this.tagRenameTo = '';
-        this.reloadTagManager();
-        this.load();
-      },
+      next: (res) => this.handleTagRenameSuccess(res, fromTag, toTag),
       error: (err) => {
         this.tagRenameError = err?.error?.detail || this.translate.instant('adminUi.orders.tags.errors.rename');
       },
@@ -2452,6 +2440,31 @@ export class AdminOrdersComponent implements OnInit {
         this.tagRenameBusy = false;
       }
     });
+  }
+
+  private handleTagRenameSuccess(
+    res: { from_tag?: string | null; to_tag?: string | null; total: number },
+    fromTag: string,
+    toTag: string
+  ): void {
+    const fromKey = normalizeTagKey(res.from_tag || fromTag);
+    const toKey = normalizeTagKey(res.to_tag || toTag);
+    this.copyTagColorOverride(fromKey, toKey);
+    if (fromKey) delete this.tagColorOverrides[fromKey];
+    persistTagColorOverrides(this.tagColorOverrides);
+
+    if (this.tag === fromKey) this.tag = toKey;
+    this.toast.success(this.translate.instant('adminUi.orders.tags.renamed', { count: res.total }));
+    this.tagRenameFrom = '';
+    this.tagRenameTo = '';
+    this.reloadTagManager();
+    this.load();
+  }
+
+  private copyTagColorOverride(fromKey: string, toKey: string): void {
+    if (!fromKey || !toKey) return;
+    if (!this.tagColorOverrides[fromKey] || this.tagColorOverrides[toKey]) return;
+    this.tagColorOverrides[toKey] = this.tagColorOverrides[fromKey];
   }
 
   private refreshTagOptions(): void {
@@ -2624,28 +2637,7 @@ export class AdminOrdersComponent implements OnInit {
       )
       .subscribe({
         next: (results) => {
-          const itemsByStatus: Record<string, AdminOrderListItem[]> = {};
-          const totalsByStatus: Record<string, number> = {};
-          let firstError: any = null;
-
-          for (const result of results) {
-            if (result?.res) {
-              itemsByStatus[result.status] = result.res.items ?? [];
-              totalsByStatus[result.status] = result.res.meta?.total_items ?? (result.res.items ?? []).length;
-              continue;
-            }
-            itemsByStatus[result.status] = [];
-            totalsByStatus[result.status] = 0;
-            if (!firstError && 'err' in result) firstError = result.err;
-          }
-
-          this.kanbanItemsByStatus.set(itemsByStatus);
-          this.kanbanTotalsByStatus.set(totalsByStatus);
-          if (firstError) {
-            this.error.set(this.translate.instant('adminUi.orders.errors.load'));
-            this.errorRequestId.set(extractRequestId(firstError));
-          }
-          this.loading.set(false);
+          this.applyKanbanLoadResults(results);
         },
         error: (err) => {
           this.error.set(this.translate.instant('adminUi.orders.errors.load'));
@@ -2653,6 +2645,49 @@ export class AdminOrdersComponent implements OnInit {
           this.loading.set(false);
         }
       });
+  }
+
+  private applyKanbanLoadResults(results: Array<{ status: string; res: AdminOrderListResponse | null; err?: unknown }>): void {
+    const itemsByStatus: Record<string, AdminOrderListItem[]> = {};
+    const totalsByStatus: Record<string, number> = {};
+    const firstError = this.collectKanbanFirstError(results, itemsByStatus, totalsByStatus);
+
+    this.kanbanItemsByStatus.set(itemsByStatus);
+    this.kanbanTotalsByStatus.set(totalsByStatus);
+    if (firstError) {
+      this.error.set(this.translate.instant('adminUi.orders.errors.load'));
+      this.errorRequestId.set(extractRequestId(firstError));
+    }
+    this.loading.set(false);
+  }
+
+  private collectKanbanFirstError(
+    results: Array<{ status: string; res: AdminOrderListResponse | null; err?: unknown }>,
+    itemsByStatus: Record<string, AdminOrderListItem[]>,
+    totalsByStatus: Record<string, number>
+  ): unknown {
+    let firstError: unknown = null;
+    for (const result of results) {
+      this.applyKanbanResult(result, itemsByStatus, totalsByStatus);
+      if (!firstError && !result.res && 'err' in result) firstError = result.err;
+    }
+    return firstError;
+  }
+
+  private applyKanbanResult(
+    result: { status: string; res: AdminOrderListResponse | null; err?: unknown },
+    itemsByStatus: Record<string, AdminOrderListItem[]>,
+    totalsByStatus: Record<string, number>
+  ): void {
+    const status = result.status;
+    const response = result.res;
+    if (response) {
+      itemsByStatus[status] = response.items ?? [];
+      totalsByStatus[status] = response.meta?.total_items ?? (response.items ?? []).length;
+      return;
+    }
+    itemsByStatus[status] = [];
+    totalsByStatus[status] = 0;
   }
 
   retryLoad(): void {
@@ -2750,35 +2785,49 @@ export class AdminOrdersComponent implements OnInit {
       if (!Array.isArray(parsed)) return [];
       return parsed
         .filter((candidate: any) => typeof candidate?.id === 'string' && typeof candidate?.name === 'string')
-        .map((candidate: any) => ({
-          id: String(candidate.id),
-          name: String(candidate.name),
-          createdAt: String(candidate.createdAt ?? ''),
-          filters: {
-            q: String(candidate?.filters?.q ?? ''),
-            status: (candidate?.filters?.status ?? 'all') as OrderStatusFilter,
-            sla: ((): SlaFilter => {
-              const raw = String(candidate?.filters?.sla ?? 'all');
-              return raw === 'any_overdue' || raw === 'accept_overdue' || raw === 'ship_overdue' ? raw : 'all';
-            })(),
-            fraud: ((): FraudFilter => {
-              const raw = String(candidate?.filters?.fraud ?? 'all');
-              return raw === 'queue' || raw === 'flagged' || raw === 'approved' || raw === 'denied' ? raw : 'all';
-            })(),
-            tag: String(candidate?.filters?.tag ?? ''),
-            fromDate: String(candidate?.filters?.fromDate ?? ''),
-            toDate: String(candidate?.filters?.toDate ?? ''),
-            includeTestOrders:
-              typeof candidate?.filters?.includeTestOrders === 'boolean' ? candidate.filters.includeTestOrders : true,
-            limit:
-              typeof candidate?.filters?.limit === 'number' && Number.isFinite(candidate.filters.limit)
-                ? candidate.filters.limit
-                : 20
-          }
-        })) as AdminOrdersFilterPreset[];
+        .map((candidate: any) => this.coercePreset(candidate));
     } catch {
       return [];
     }
+  }
+
+  private coercePreset(candidate: any): AdminOrdersFilterPreset {
+    const source = candidate && typeof candidate === 'object' ? candidate : {};
+    const filters = source.filters && typeof source.filters === 'object' ? source.filters : {};
+    return {
+      id: String(source.id ?? ''),
+      name: String(source.name ?? ''),
+      createdAt: String(source.createdAt ?? ''),
+      filters: {
+        q: String(filters.q ?? ''),
+        status: (filters.status ?? 'all') as OrderStatusFilter,
+        sla: this.coercePresetSlaFilter(filters.sla),
+        fraud: this.coercePresetFraudFilter(filters.fraud),
+        tag: String(filters.tag ?? ''),
+        fromDate: String(filters.fromDate ?? ''),
+        toDate: String(filters.toDate ?? ''),
+        includeTestOrders: this.coercePresetIncludeTestOrders(filters.includeTestOrders),
+        limit: this.coercePresetLimit(filters.limit)
+      }
+    };
+  }
+
+  private coercePresetIncludeTestOrders(value: unknown): boolean {
+    return typeof value === 'boolean' ? value : true;
+  }
+
+  private coercePresetLimit(value: unknown): number {
+    return typeof value === 'number' && Number.isFinite(value) ? value : 20;
+  }
+
+  private coercePresetSlaFilter(value: unknown): SlaFilter {
+    const raw = typeof value === 'string' ? value : 'all';
+    return PRESET_SLA_FILTERS.has(raw as SlaFilter) ? (raw as SlaFilter) : 'all';
+  }
+
+  private coercePresetFraudFilter(value: unknown): FraudFilter {
+    const raw = typeof value === 'string' ? value : 'all';
+    return PRESET_FRAUD_FILTERS.has(raw as FraudFilter) ? (raw as FraudFilter) : 'all';
   }
 
   private persistPresets(): void {

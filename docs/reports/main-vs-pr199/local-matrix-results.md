@@ -36,14 +36,17 @@ Build/config checks:
 ### Backend (pre-fix observation)
 
 `PAYMENTS_PROVIDER=mock`:
+
 - `37 passed, 1 failed`  
 - failure: `test_authenticated_checkout_paypal_flow_requires_auth_to_capture`  
 - reason: assertion assumed providers-mode capture ID (`CAPTURE-1`) while mock mode produced `paypal_mock_capture_*`.
 
 `PAYMENTS_PROVIDER=providers`:
+
 - `38 passed`
 
 Classification:
+
 - environment parity mismatch (not a production behavior regression).
 
 ### Backend (after remediation)
@@ -54,17 +57,21 @@ Matrix rerun after test hardening:
 - `PAYMENTS_PROVIDER=providers`: `38 passed`
 
 Warnings remain (non-blocking):
+
 - intermittent `aiosqlite` thread shutdown warnings in tests using in-memory sqlite event loops.
 
 ### Frontend
 
 Targeted spec run:
+
 - `37 SUCCESS`
 
 Production build:
+
 - success
 
 Compose config:
+
 - success
 
 ## Interpretation
@@ -74,4 +81,3 @@ Compose config:
 3. Two parity traps were addressed:
    - providers-vs-mock test assertion ambiguity.
    - dev locker defaults that could make shipping look broken.
-

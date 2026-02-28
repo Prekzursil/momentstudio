@@ -680,66 +680,106 @@ export function parsePageBlocks(
   return blocks;
 }
 
+const WHITESPACE_PATTERN = /\s+/g;
+
+const stripHtmlTagsLinear = (input: string): string => {
+  const plainChars: string[] = [];
+  let insideTag = false;
+  for (const char of input) {
+    if (char === '<') {
+      insideTag = true;
+      continue;
+    }
+    if (char === '>') {
+      insideTag = false;
+      plainChars.push(' ');
+      continue;
+    }
+    if (!insideTag) {
+      plainChars.push(char);
+    }
+  }
+  return plainChars.join('');
+};
+
+const htmlToPlainText = (html: string): string =>
+  stripHtmlTagsLinear(html || '').replaceAll(WHITESPACE_PATTERN, ' ').trim();
+
+const appendTextLikeParts = (parts: string[], bodyHtml: string, ctaLabel?: string): void => {
+  const text = htmlToPlainText(bodyHtml || '');
+  if (text) parts.push(text);
+  if (ctaLabel) parts.push(ctaLabel);
+};
+
+const appendFaqParts = (parts: string[], block: PageFaqBlock): void => {
+  for (const item of block.items) {
+    parts.push(item.question);
+    appendTextLikeParts(parts, item.answer_html || '');
+  }
+};
+
+const appendTestimonialsParts = (parts: string[], block: PageTestimonialsBlock): void => {
+  for (const item of block.items) {
+    appendTextLikeParts(parts, item.quote_html || '');
+    if (item.author) parts.push(item.author);
+    if (item.role) parts.push(item.role);
+  }
+};
+
+const appendImageParts = (parts: string[], block: PageImageBlock): void => {
+  if (block.caption) parts.push(block.caption);
+};
+
+const appendGalleryParts = (parts: string[], block: PageGalleryBlock): void => {
+  for (const image of block.images) {
+    if (image.caption) parts.push(image.caption);
+  }
+};
+
+const appendSlidesParts = (parts: string[], slides: Slide[]): void => {
+  for (const slide of slides) {
+    if (slide.headline) parts.push(slide.headline);
+    if (slide.subheadline) parts.push(slide.subheadline);
+    if (slide.cta_label) parts.push(slide.cta_label);
+  }
+};
+
+const appendColumnsParts = (parts: string[], block: PageColumnsBlock): void => {
+  for (const column of block.columns) {
+    if (column.title) parts.push(column.title);
+    appendTextLikeParts(parts, column.body_html || '');
+  }
+};
+
+type PageBlockPlainTextAppender = (parts: string[], block: PageBlock) => void;
+
+const pageBlockPlainTextAppenders: Record<PageBlock['type'], PageBlockPlainTextAppender> = {
+  text: (parts, block) => appendTextLikeParts(parts, (block as PageTextBlock).body_html || ''),
+  image: (parts, block) => appendImageParts(parts, block as PageImageBlock),
+  gallery: (parts, block) => appendGalleryParts(parts, block as PageGalleryBlock),
+  banner: (parts, block) => appendSlidesParts(parts, [(block as PageBannerBlock).slide]),
+  carousel: (parts, block) => appendSlidesParts(parts, (block as PageCarouselBlock).slides),
+  columns: (parts, block) => appendColumnsParts(parts, block as PageColumnsBlock),
+  cta: (parts, block) => {
+    const cta = block as PageCtaBlock;
+    appendTextLikeParts(parts, cta.body_html || '', cta.cta_label || undefined);
+  },
+  faq: (parts, block) => appendFaqParts(parts, block as PageFaqBlock),
+  testimonials: (parts, block) => appendTestimonialsParts(parts, block as PageTestimonialsBlock),
+  product_grid: () => {},
+  form: () => {}
+};
+
+function appendBlockParts(parts: string[], block: PageBlock): void {
+  pageBlockPlainTextAppenders[block.type](parts, block);
+}
+
 export function pageBlocksToPlainText(blocks: PageBlock[]): string {
   const parts: string[] = [];
-  const htmlToText = (html: string): string =>
-    (html || '')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
   for (const block of blocks) {
     if (!block.enabled) continue;
     if (block.title) parts.push(block.title);
-    if (block.type === 'text') {
-      const text = htmlToText(block.body_html || '');
-      if (text) parts.push(text);
-    }
-    if (block.type === 'cta') {
-      const text = htmlToText(block.body_html || '');
-      if (text) parts.push(text);
-      if (block.cta_label) parts.push(block.cta_label);
-    }
-    if (block.type === 'faq') {
-      for (const item of block.items) {
-        parts.push(item.question);
-        const answer = htmlToText(item.answer_html || '');
-        if (answer) parts.push(answer);
-      }
-    }
-    if (block.type === 'testimonials') {
-      for (const item of block.items) {
-        const quote = htmlToText(item.quote_html || '');
-        if (quote) parts.push(quote);
-        if (item.author) parts.push(item.author);
-        if (item.role) parts.push(item.role);
-      }
-    }
-    if (block.type === 'image' && block.caption) parts.push(block.caption);
-    if (block.type === 'gallery') {
-      for (const img of block.images) {
-        if (img.caption) parts.push(img.caption);
-      }
-    }
-    if (block.type === 'banner') {
-      const slide = block.slide;
-      if (slide.headline) parts.push(slide.headline);
-      if (slide.subheadline) parts.push(slide.subheadline);
-      if (slide.cta_label) parts.push(slide.cta_label);
-    }
-    if (block.type === 'carousel') {
-      for (const slide of block.slides) {
-        if (slide.headline) parts.push(slide.headline);
-        if (slide.subheadline) parts.push(slide.subheadline);
-        if (slide.cta_label) parts.push(slide.cta_label);
-      }
-    }
-    if (block.type === 'columns') {
-      for (const col of block.columns) {
-        if (col.title) parts.push(col.title);
-        const text = htmlToText(col.body_html || '');
-        if (text) parts.push(text);
-      }
-    }
+    appendBlockParts(parts, block);
   }
-  return parts.join(' ').replace(/\s+/g, ' ').trim();
+  return parts.join(' ').replaceAll(WHITESPACE_PATTERN, ' ').trim();
 }

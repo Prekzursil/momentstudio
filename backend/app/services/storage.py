@@ -2,6 +2,8 @@ import logging
 import uuid
 from io import BytesIO
 from pathlib import Path, PurePosixPath
+from typing import Iterable, Iterator, Protocol, cast
+from urllib.parse import urlsplit
 
 from PIL import Image
 from fastapi import HTTPException, UploadFile, status
@@ -16,10 +18,115 @@ _INVALID_MEDIA_URL = "Invalid media URL"
 _DEFAULT_PERSIST_IMAGE_MIMES = ("image/jpeg", "image/png", "image/webp", "image/gif")
 
 
+class _SvgElement(Protocol):
+    tag: object
+    attrib: dict[object, object]
+    text: object
+
+    def __iter__(self) -> Iterator["_SvgElement"]: ...
+
+    def iter(self) -> Iterable["_SvgElement"]: ...
+
+    def remove(self, element: "_SvgElement") -> None: ...
+
+
 def ensure_media_root(root: str | Path | None = None) -> Path:
     path = Path(root or settings.media_root)
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def _resolve_upload_roots(root: str | Path | None) -> tuple[Path, Path]:
+    base_root = Path(settings.media_root).resolve()
+    dest_root = Path(root or base_root).resolve()
+    dest_root.mkdir(parents=True, exist_ok=True)
+    if not _is_path_within_root(dest_root, base_root):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload destination")
+    return base_root, dest_root
+
+
+def _effective_upload_max_bytes(max_bytes: int | None) -> int:
+    admin_ceiling = int(getattr(settings, "admin_upload_max_bytes", 0) or 0)
+    if max_bytes is None:
+        # Admin-only endpoints may pass max_bytes=None. We still enforce a ceiling to avoid
+        # unbounded uploads that can exhaust disk/memory under abuse.
+        return admin_ceiling if admin_ceiling > 0 else 512 * 1024 * 1024
+    return int(max_bytes)
+
+
+def _initial_upload_name(file: UploadFile, filename: str | None) -> tuple[str, str]:
+    safe_name = Path(filename or "").name if filename else ""
+    original_suffix = Path(file.filename or "").suffix.lower()
+    if safe_name:
+        initial_stem = Path(safe_name).stem
+        initial_suffix = Path(safe_name).suffix or original_suffix or ".bin"
+        return initial_stem, initial_suffix
+    return uuid.uuid4().hex, original_suffix or ".bin"
+
+
+def _upload_destination(dest_root: Path, stem: str, suffix: str) -> Path:
+    destination = (dest_root / f"{stem}{suffix}").resolve()
+    if not _is_path_within_root(destination, dest_root):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload destination")
+    return destination
+
+
+def _cleanup_upload(path: Path) -> None:
+    try:
+        if path.exists():
+            path.unlink()
+    except Exception:  # pragma: no cover
+        logger.warning("upload_cleanup_failed", extra={"path": str(path)})
+
+
+def _stream_upload(file: UploadFile, destination: Path, max_bytes: int) -> int:
+    chunk_size = 1024 * 1024
+    written = 0
+    with destination.open("wb") as out:
+        while True:
+            chunk = file.file.read(chunk_size)
+            if not chunk:
+                break
+            written += len(chunk)
+            if written > max_bytes:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File too large")
+            out.write(chunk)
+    return written
+
+
+def _validated_upload_mime(
+    file: UploadFile,
+    destination: Path,
+    allowed_content_types: tuple[str, ...] | None,
+) -> str | None:
+    if not allowed_content_types:
+        return None
+    if not file.content_type or file.content_type not in allowed_content_types:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
+    sniff_mime = _detect_image_mime_path(destination)
+    if not sniff_mime or sniff_mime not in allowed_content_types:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
+    return sniff_mime
+
+
+def _sanitize_uploaded_svg(destination: Path, written: int, sniff_mime: str | None) -> bool:
+    is_svg = sniff_mime == "image/svg+xml"
+    if not is_svg:
+        return False
+    if written > _SVG_MAX_BYTES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="SVG file too large")
+    raw = destination.read_bytes()
+    destination.write_bytes(_sanitize_svg(raw))
+    return True
+
+
+def _canonical_upload_path(destination: Path, sniff_mime: str | None) -> Path:
+    canonical_suffix = _suffix_for_mime(sniff_mime) if sniff_mime else None
+    if not canonical_suffix or destination.suffix.lower() == canonical_suffix:
+        return destination
+    final_path = destination.with_name(f"{destination.stem}{canonical_suffix}")
+    destination.rename(final_path)
+    return final_path
 
 
 def save_upload(
@@ -30,82 +137,16 @@ def save_upload(
     max_bytes: int | None = 5 * 1024 * 1024,
     generate_thumbnails: bool = False,
 ) -> tuple[str, str]:
-    base_root = Path(settings.media_root).resolve()
-    dest_root = Path(root or base_root).resolve()
-    dest_root.mkdir(parents=True, exist_ok=True)
-    try:
-        dest_root.relative_to(base_root)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload destination")
-
-    admin_ceiling = int(getattr(settings, "admin_upload_max_bytes", 0) or 0)
-    if max_bytes is None:
-        # Admin-only endpoints may pass max_bytes=None. We still enforce a ceiling to avoid
-        # unbounded uploads that can exhaust disk/memory under abuse.
-        effective_max_bytes = admin_ceiling if admin_ceiling > 0 else 512 * 1024 * 1024
-    else:
-        effective_max_bytes = int(max_bytes)
-
-    safe_name = Path(filename or "").name if filename else ""
-    original_suffix = Path(file.filename or "").suffix.lower()
-    if safe_name:
-        initial_stem = Path(safe_name).stem
-        initial_suffix = Path(safe_name).suffix or original_suffix or ".bin"
-    else:
-        initial_stem = uuid.uuid4().hex
-        initial_suffix = original_suffix or ".bin"
-
-    destination = (dest_root / f"{initial_stem}{initial_suffix}").resolve()
-    try:
-        destination.relative_to(dest_root)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload destination")
-
-    def _cleanup(path: Path) -> None:
-        try:
-            if path.exists():
-                path.unlink()
-        except Exception:  # pragma: no cover
-            logger.warning("upload_cleanup_failed", extra={"path": str(path)})
-
-    def _stream_copy(dest: Path) -> int:
-        chunk_size = 1024 * 1024
-        written = 0
-        with dest.open("wb") as out:
-            while True:
-                chunk = file.file.read(chunk_size)
-                if not chunk:
-                    break
-                written += len(chunk)
-                if written > effective_max_bytes:
-                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File too large")
-                out.write(chunk)
-        return written
+    base_root, dest_root = _resolve_upload_roots(root)
+    effective_max_bytes = _effective_upload_max_bytes(max_bytes)
+    initial_stem, initial_suffix = _initial_upload_name(file, filename)
+    destination = _upload_destination(dest_root, initial_stem, initial_suffix)
 
     try:
-        written = _stream_copy(destination)
-
-        sniff_mime: str | None = None
-        if allowed_content_types:
-            if not file.content_type or file.content_type not in allowed_content_types:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
-            sniff_mime = _detect_image_mime_path(destination)
-            if not sniff_mime or sniff_mime not in allowed_content_types:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
-
-        is_svg = sniff_mime == "image/svg+xml"
-        if is_svg:
-            if written > _SVG_MAX_BYTES:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="SVG file too large")
-            raw = destination.read_bytes()
-            sanitized = _sanitize_svg(raw)
-            destination.write_bytes(sanitized)
-
-        canonical_suffix = _suffix_for_mime(sniff_mime) if sniff_mime else None
-        final_path = destination
-        if canonical_suffix and destination.suffix.lower() != canonical_suffix:
-            final_path = destination.with_name(f"{destination.stem}{canonical_suffix}")
-            destination.rename(final_path)
+        written = _stream_upload(file, destination, effective_max_bytes)
+        sniff_mime = _validated_upload_mime(file, destination, allowed_content_types)
+        is_svg = _sanitize_uploaded_svg(destination, written, sniff_mime)
+        final_path = _canonical_upload_path(destination, sniff_mime)
 
         if generate_thumbnails and allowed_content_types and not is_svg:
             _generate_thumbnails(final_path)
@@ -113,11 +154,66 @@ def save_upload(
         rel_path = final_path.relative_to(base_root).as_posix()
         return f"/media/{rel_path}", final_path.name
     except HTTPException:
-        _cleanup(destination)
+        _cleanup_upload(destination)
         raise
     except Exception as exc:
-        _cleanup(destination)
+        _cleanup_upload(destination)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Upload failed") from exc
+
+
+def _validated_image_payload(content: bytes, max_bytes: int) -> bytes:
+    if not isinstance(content, (bytes, bytearray)):
+        raise ValueError("Invalid image payload")
+    payload = bytes(content)
+    if not payload:
+        raise ValueError("Empty image payload")
+    if len(payload) > max_bytes:
+        raise ValueError("Image payload too large")
+    return payload
+
+
+def _validated_image_suffix(payload: bytes, allowed_content_types: tuple[str, ...]) -> str:
+    detected_mime = _detect_image_mime(payload)
+    if not detected_mime or detected_mime not in allowed_content_types:
+        raise ValueError("Unsupported image type")
+
+    suffix = _suffix_for_mime(detected_mime)
+    if not suffix:
+        raise ValueError("Unsupported image type")
+    return suffix
+
+
+def _validated_relative_media_path(relative_path: str) -> PurePosixPath:
+    pure = PurePosixPath((relative_path or "").strip())
+    if not str(pure) or pure.is_absolute() or any(part in {"", ".", ".."} for part in pure.parts):
+        raise ValueError("Invalid relative path")
+    return pure
+
+
+def _resolve_media_destination(base_root: Path, final_rel: PurePosixPath) -> Path:
+    destination = (base_root / final_rel.as_posix()).resolve()
+    if not _is_path_within_root(destination, base_root):
+        raise ValueError("Invalid relative path")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    return destination
+
+
+def _write_payload_atomically(destination: Path, payload: bytes) -> None:
+    temp = destination.with_name(f".{destination.name}.{uuid.uuid4().hex}.tmp")
+    temp.write_bytes(payload)
+    temp.replace(destination)
+
+
+def _cleanup_noncanonical_image_siblings(destination: Path, canonical_suffix: str) -> None:
+    for ext in (".jpg", ".jpeg", ".png", ".webp", ".gif"):
+        if ext == canonical_suffix:
+            continue
+        other = destination.with_suffix(ext)
+        if other.exists():
+            try:
+                other.unlink()
+            except OSError:  # pragma: no cover
+                logger.warning("persisted_image_cleanup_failed", extra={"path": str(other)})
 
 
 def save_image_bytes(
@@ -128,53 +224,18 @@ def save_image_bytes(
     max_bytes: int = 5 * 1024 * 1024,
     allowed_content_types: tuple[str, ...] = _DEFAULT_PERSIST_IMAGE_MIMES,
 ) -> str:
-    if not isinstance(content, (bytes, bytearray)):
-        raise ValueError("Invalid image payload")
-    payload = bytes(content)
-    if not payload:
-        raise ValueError("Empty image payload")
-    if len(payload) > max_bytes:
-        raise ValueError("Image payload too large")
-
-    detected_mime = _detect_image_mime(payload)
-    if not detected_mime or detected_mime not in allowed_content_types:
-        raise ValueError("Unsupported image type")
-
-    suffix = _suffix_for_mime(detected_mime)
-    if not suffix:
-        raise ValueError("Unsupported image type")
-
-    pure = PurePosixPath((relative_path or "").strip())
-    if not str(pure) or pure.is_absolute() or any(part in {"", ".", ".."} for part in pure.parts):
-        raise ValueError("Invalid relative path")
-
+    payload = _validated_image_payload(content, max_bytes)
+    suffix = _validated_image_suffix(payload, allowed_content_types)
+    pure = _validated_relative_media_path(relative_path)
     # Callers provide an extension-less deterministic key (e.g. social/<hash>).
     normalized_rel = pure.with_suffix("")
     final_rel = normalized_rel.with_suffix(suffix)
 
     base_root = ensure_media_root(root or settings.media_root).resolve()
-    destination = (base_root / final_rel.as_posix()).resolve()
-    try:
-        destination.relative_to(base_root)
-    except ValueError as exc:
-        raise ValueError("Invalid relative path") from exc
-    destination.parent.mkdir(parents=True, exist_ok=True)
-
-    temp = destination.with_name(f".{destination.name}.{uuid.uuid4().hex}.tmp")
-    temp.write_bytes(payload)
-    temp.replace(destination)
-
+    destination = _resolve_media_destination(base_root, final_rel)
+    _write_payload_atomically(destination, payload)
     # If mime type changed between refreshes, keep only the canonical extension.
-    for ext in (".jpg", ".jpeg", ".png", ".webp", ".gif"):
-        if ext == suffix:
-            continue
-        other = destination.with_suffix(ext)
-        if other.exists():
-            try:
-                other.unlink()
-            except OSError:  # pragma: no cover
-                logger.warning("persisted_image_cleanup_failed", extra={"path": str(other)})
-
+    _cleanup_noncanonical_image_siblings(destination, suffix)
     return f"{_MEDIA_URL_PREFIX}{final_rel.as_posix()}"
 
 
@@ -263,21 +324,41 @@ def generate_thumbnails(path: str | Path) -> None:
     _generate_thumbnails(Path(path))
 
 
+def _is_invalid_media_relative_path(rel: str) -> bool:
+    if not rel:
+        return True
+    if rel.startswith(("/", "\\")):
+        return True
+    if "\\" in rel:
+        return True
+    if "\x00" in rel:
+        return True
+
+    pure = PurePosixPath(rel)
+    if pure.is_absolute():
+        return True
+    return any(part in {".", ".."} for part in pure.parts)
+
+
+def _is_path_within_root(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True
+
+
 def _media_url_to_path(url: str) -> Path:
     if not url.startswith(_MEDIA_URL_PREFIX):
         raise ValueError(_INVALID_MEDIA_URL)
 
     base_root = Path(settings.media_root).resolve()
     rel = url.removeprefix(_MEDIA_URL_PREFIX)
-    if not rel or rel.startswith(("/", "\\")) or "\\" in rel or "\x00" in rel:
+    if _is_invalid_media_relative_path(rel):
         raise ValueError(_INVALID_MEDIA_URL)
-    pure = PurePosixPath(rel)
-    if pure.is_absolute() or any(part in {".", ".."} for part in pure.parts):
-        raise ValueError(_INVALID_MEDIA_URL)
+
     path = (base_root / rel).resolve()
-    try:
-        path.relative_to(base_root)
-    except ValueError:
+    if not _is_path_within_root(path, base_root):
         raise ValueError(_INVALID_MEDIA_URL)
     return path
 
@@ -344,17 +425,30 @@ def _detect_svg_mime(content: bytes) -> str | None:
     return None
 
 
-def _validate_raster_dimensions(*, width: int, height: int) -> None:
-    max_width = int(getattr(settings, "upload_image_max_width", 0) or 0)
-    max_height = int(getattr(settings, "upload_image_max_height", 0) or 0)
-    max_pixels = int(getattr(settings, "upload_image_max_pixels", 0) or 0)
+def _upload_image_limit(setting_name: str) -> int:
+    return int(getattr(settings, setting_name, 0) or 0)
 
-    if max_width and width > max_width:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image too large")
-    if max_height and height > max_height:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image too large")
-    if max_pixels and (width * height) > max_pixels:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image too large")
+
+def _is_over_limit(value: int, limit: int) -> bool:
+    return bool(limit) and value > limit
+
+
+def _raise_image_too_large() -> None:
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image too large")
+
+
+def _validate_raster_dimensions(*, width: int, height: int) -> None:
+    max_width = _upload_image_limit("upload_image_max_width")
+    max_height = _upload_image_limit("upload_image_max_height")
+    max_pixels = _upload_image_limit("upload_image_max_pixels")
+    pixel_count = width * height
+
+    if _is_over_limit(width, max_width):
+        _raise_image_too_large()
+    if _is_over_limit(height, max_height):
+        _raise_image_too_large()
+    if _is_over_limit(pixel_count, max_pixels):
+        _raise_image_too_large()
 
 
 def _suffix_for_mime(mime: str | None) -> str | None:
@@ -373,7 +467,7 @@ def _suffix_for_mime(mime: str | None) -> str | None:
     return None
 
 
-def _sanitize_svg(content: bytes) -> bytes:
+def _validated_svg_bytes(content: bytes) -> bytes:
     raw = content or b""
     if len(raw) > _SVG_MAX_BYTES:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="SVG file too large")
@@ -381,22 +475,117 @@ def _sanitize_svg(content: bytes) -> bytes:
     lowered = raw.lower()
     if b"<!doctype" in lowered or b"<!entity" in lowered:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported SVG content")
+    return raw
 
+
+def _parse_svg_root(raw: bytes) -> _SvgElement:
     try:
-        from defusedxml.ElementTree import fromstring, tostring
+        from defusedxml.ElementTree import fromstring
 
-        root = fromstring(raw.decode("utf-8", errors="replace"))
+        return cast(_SvgElement, fromstring(raw.decode("utf-8", errors="replace")))
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid SVG") from exc
 
-    def _local(tag: str) -> str:
-        if not isinstance(tag, str):
-            return ""
-        return tag.rsplit("}", 1)[-1].lower()
 
-    if _local(getattr(root, "tag", "")) != "svg":
+def _svg_local_name(tag: object) -> str:
+    if not isinstance(tag, str):
+        return ""
+    return tag.rsplit("}", 1)[-1].lower()
+
+
+def _ensure_svg_root(root: _SvgElement) -> None:
+    if _svg_local_name(getattr(root, "tag", "")) != "svg":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid SVG")
 
+
+def _style_segment_blocked(lowered_segment: str) -> bool:
+    if "@import" in lowered_segment:
+        return True
+    if "url(" not in lowered_segment:
+        return False
+    return _contains_blocked_style_url(lowered_segment)
+
+
+def _contains_blocked_style_url(lowered_segment: str) -> bool:
+    blocked_schemes = {"javascript", "data", "http", "https"}
+    scan_start = 0
+    while True:
+        marker = lowered_segment.find("url(", scan_start)
+        if marker < 0:
+            return False
+        value_start = marker + len("url(")
+        value_end = lowered_segment.find(")", value_start)
+        if value_end < 0:
+            return True
+        raw_value = lowered_segment[value_start:value_end].strip().strip("'\"")
+        if raw_value and not raw_value.startswith("#"):
+            parsed = urlsplit(raw_value)
+            if parsed.scheme in blocked_schemes or bool(parsed.netloc):
+                return True
+        scan_start = value_end + 1
+
+
+def _sanitize_svg_style(value: str) -> str:
+    # Drop obvious external fetches and javascript-like URLs.
+    lowered_style = value.lower()
+    if "url(" not in lowered_style and "@import" not in lowered_style:
+        return value
+
+    cleaned: list[str] = []
+    for part in value.split(";"):
+        segment = part.strip()
+        if not segment:
+            continue
+        if _style_segment_blocked(segment.lower()):
+            continue
+        cleaned.append(segment)
+    return "; ".join(cleaned)
+
+
+def _remove_disallowed_svg_children(parent: _SvgElement, disallowed_tags: set[str]) -> None:
+    for child in list(parent):
+        if _svg_local_name(getattr(child, "tag", "")) in disallowed_tags:
+            parent.remove(child)
+
+
+def _sanitize_svg_href_attribute(attrib: dict[object, object], key: object, href_keys: set[str]) -> bool:
+    key_str = str(key)
+    low_key = key_str.lower()
+    if key_str not in href_keys and low_key not in href_keys:
+        return False
+    value = str(attrib.get(key, "") or "").strip()
+    if not value or value.lower().startswith("#"):
+        return True
+    attrib.pop(key, None)
+    return True
+
+
+def _sanitize_svg_element_attributes(element: _SvgElement, href_keys: set[str]) -> None:
+    attrib = getattr(element, "attrib", None)
+    if not isinstance(attrib, dict):
+        return
+
+    for key in list(attrib.keys()):
+        key_str = str(key)
+        low_key = key_str.lower()
+        if low_key.startswith("on"):
+            attrib.pop(key, None)
+            continue
+        if _sanitize_svg_href_attribute(attrib, key, href_keys):
+            continue
+        if low_key == "style":
+            attrib[key] = _sanitize_svg_style(str(attrib.get(key, "") or ""))
+
+
+def _sanitize_svg_style_elements(root: _SvgElement) -> None:
+    for element in root.iter():
+        if _svg_local_name(getattr(element, "tag", "")) != "style":
+            continue
+        text_value = str(getattr(element, "text", "") or "")
+        element.text = _sanitize_svg_style(text_value)
+
+
+def _sanitize_svg_tree(root: _SvgElement) -> None:
     disallowed_tags = {
         "script",
         "foreignobject",
@@ -410,62 +599,25 @@ def _sanitize_svg(content: bytes) -> bytes:
     }
     href_keys = {"href", "{http://www.w3.org/1999/xlink}href", "xlink:href", "src"}
 
-    def _sanitize_style(value: str) -> str:
-        # Drop obvious external fetches and javascript-like URLs.
-        lowered_style = value.lower()
-        if "url(" not in lowered_style and "@import" not in lowered_style:
-            return value
-        cleaned = []
-        for part in value.split(";"):
-            p = part.strip()
-            if not p:
-                continue
-            low = p.lower()
-            if "@import" in low:
-                continue
-            if "url(" in low and ("javascript:" in low or "data:" in low or "http://" in low or "https://" in low):
-                continue
-            cleaned.append(p)
-        return "; ".join(cleaned)
-
-    # Remove disallowed descendants and dangerous attributes.
     for parent in root.iter():
-        for child in list(parent):
-            if _local(getattr(child, "tag", "")) in disallowed_tags:
-                parent.remove(child)
+        _remove_disallowed_svg_children(parent, disallowed_tags)
+        _sanitize_svg_element_attributes(parent, href_keys)
 
-        attrib = getattr(parent, "attrib", None)
-        if not isinstance(attrib, dict):
-            continue
-        for key in list(attrib.keys()):
-            key_str = str(key)
-            low_key = key_str.lower()
-            if low_key.startswith("on"):
-                attrib.pop(key, None)
-                continue
-            if key_str in href_keys or low_key in href_keys:
-                val = str(attrib.get(key, "") or "").strip()
-                low_val = val.lower()
-                if not val:
-                    continue
-                # Allow only same-document references.
-                if low_val.startswith("#"):
-                    continue
-                attrib.pop(key, None)
-                continue
-            if low_key == "style":
-                attrib[key] = _sanitize_style(str(attrib.get(key, "") or ""))
+    _sanitize_svg_style_elements(root)
 
-    # Sanitize <style> nodes.
-    for el in root.iter():
-        if _local(getattr(el, "tag", "")) != "style":
-            continue
-        text_value = str(getattr(el, "text", "") or "")
-        cleaned = _sanitize_style(text_value)
-        el.text = cleaned
 
+def _serialize_svg(root: _SvgElement) -> bytes:
     try:
-        sanitized = tostring(root, encoding="utf-8", method="xml")
+        from defusedxml.ElementTree import tostring
+
+        return tostring(root, encoding="utf-8", method="xml")
     except Exception as exc:  # pragma: no cover
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid SVG") from exc
-    return sanitized
+
+
+def _sanitize_svg(content: bytes) -> bytes:
+    raw = _validated_svg_bytes(content)
+    root = _parse_svg_root(raw)
+    _ensure_svg_root(root)
+    _sanitize_svg_tree(root)
+    return _serialize_svg(root)

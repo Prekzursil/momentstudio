@@ -24,6 +24,7 @@ This avoids CORS for day-to-day dev.
 If `4200` is already in use, `start.sh` will pick the next free port (`4201`, `4202`, ...).
 
 When that happens:
+
 - `FRONTEND_ORIGIN` should match the actual frontend origin so links/redirects are correct.
 - If the backend is already running and not restarted by `start.sh`, update/restart it with the correct `FRONTEND_ORIGIN`.
 

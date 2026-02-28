@@ -40,38 +40,47 @@ def _order_ref(order: object) -> str:
     return str(getattr(order, "reference_code", None) or getattr(order, "id", "") or "").strip()
 
 
-def build_pick_list_rows(orders: Sequence[object]) -> list[PickListRow]:
-    grouped: dict[tuple[str, str], _PickListAccumulator] = {}
-    for order in orders:
-        ref = _order_ref(order)
-        for item in list(getattr(order, "items", []) or []):
-            item_any: Any = item
-            product: Any = getattr(item_any, "product", None)
-            sku = str(getattr(product, "sku", None) or "").strip() or "—"
-            product_name = (
-                str(getattr(product, "name", None) or getattr(item_any, "product_id", "") or "").strip() or "—"
-            )
-            variant: Any = getattr(item_any, "variant", None)
-            variant_name_raw = str(getattr(variant, "name", None) or "").strip()
-            key = (sku, variant_name_raw)
-            current = grouped.get(key)
-            if current is None:
-                current = _PickListAccumulator(
-                    sku=sku,
-                    product_name=product_name,
-                    variant_name=variant_name_raw or None,
-                )
-                grouped[key] = current
+def _iter_order_items(order: object) -> list[object]:
+    return list(getattr(order, "items", []) or [])
 
-            qty = int(getattr(item_any, "quantity", 0) or 0)
-            current.quantity += qty
-            if ref:
-                current.order_refs.add(ref)
 
+def _pick_list_item_fields(item_any: Any) -> tuple[tuple[str, str], str, str, str | None]:
+    product: Any = getattr(item_any, "product", None)
+    sku = str(getattr(product, "sku", None) or "").strip() or "—"
+    product_name = str(getattr(product, "name", None) or getattr(item_any, "product_id", "") or "").strip() or "—"
+    variant: Any = getattr(item_any, "variant", None)
+    variant_name_raw = str(getattr(variant, "name", None) or "").strip()
+    return (sku, variant_name_raw), sku, product_name, variant_name_raw or None
+
+
+def _get_or_create_group(
+    grouped: dict[tuple[str, str], _PickListAccumulator],
+    *,
+    key: tuple[str, str],
+    sku: str,
+    product_name: str,
+    variant_name: str | None,
+) -> _PickListAccumulator:
+    current = grouped.get(key)
+    if current is None:
+        current = _PickListAccumulator(
+            sku=sku,
+            product_name=product_name,
+            variant_name=variant_name,
+        )
+        grouped[key] = current
+    return current
+
+
+def _item_qty(item_any: Any) -> int:
+    return int(getattr(item_any, "quantity", 0) or 0)
+
+
+def _rows_from_grouped(grouped: dict[tuple[str, str], _PickListAccumulator]) -> list[PickListRow]:
     rows: list[PickListRow] = []
     for key in sorted(grouped.keys(), key=lambda k: (k[0], k[1])):
         entry = grouped[key]
-        order_refs = tuple(sorted([v for v in entry.order_refs if v]))
+        order_refs = tuple(sorted(v for v in entry.order_refs if v))
         rows.append(
             PickListRow(
                 sku=entry.sku,
@@ -82,6 +91,27 @@ def build_pick_list_rows(orders: Sequence[object]) -> list[PickListRow]:
             )
         )
     return rows
+
+
+def build_pick_list_rows(orders: Sequence[object]) -> list[PickListRow]:
+    grouped: dict[tuple[str, str], _PickListAccumulator] = {}
+    for order in orders:
+        ref = _order_ref(order)
+        for item in _iter_order_items(order):
+            item_any: Any = item
+            key, sku, product_name, variant_name = _pick_list_item_fields(item_any)
+            current = _get_or_create_group(
+                grouped,
+                key=key,
+                sku=sku,
+                product_name=product_name,
+                variant_name=variant_name,
+            )
+            current.quantity += _item_qty(item_any)
+            if ref:
+                current.order_refs.add(ref)
+
+    return _rows_from_grouped(grouped)
 
 
 def render_pick_list_csv(rows: Sequence[PickListRow]) -> bytes:
@@ -117,6 +147,15 @@ def render_pick_list_pdf(
     title: str | None = None,
 ) -> bytes:
     font_regular, font_bold = _register_reportlab_fonts()
+    base, muted, h1 = _pick_list_styles(font_regular, font_bold)
+    buf = io.BytesIO()
+    doc = _pick_list_doc_template(buf, title)
+    story = _pick_list_story(rows=rows, base=base, muted=muted, h1=h1, font_bold=font_bold, orders=orders)
+    doc.build(story)
+    return buf.getvalue()
+
+
+def _pick_list_styles(font_regular: str, font_bold: str) -> tuple[ParagraphStyle, ParagraphStyle, ParagraphStyle]:
     styles = getSampleStyleSheet()
     base = ParagraphStyle(
         "base",
@@ -141,9 +180,11 @@ def render_pick_list_pdf(
         leading=20,
         spaceAfter=8,
     )
+    return base, muted, h1
 
-    buf = io.BytesIO()
-    doc = SimpleDocTemplate(
+
+def _pick_list_doc_template(buf: io.BytesIO, title: str | None) -> SimpleDocTemplate:
+    return SimpleDocTemplate(
         buf,
         pagesize=A4,
         leftMargin=18 * mm,
@@ -153,20 +194,42 @@ def render_pick_list_pdf(
         title=title or _DEFAULT_TITLE,
     )
 
-    story: list[object] = []
-    story.append(Paragraph("Picking list / Listă colectare", h1))
 
-    if orders:
-        refs = [(_order_ref(o) or "").strip() for o in orders]
-        refs = [r for r in refs if r]
-        if refs:
-            story.append(Paragraph(f"Orders / Comenzi: {', '.join(refs)}", muted))
-        created_at = _fmt_dt(datetime.now())
-        if created_at:
-            story.append(Paragraph(f"Generated / Generat: {created_at}", muted))
-
+def _pick_list_story(
+    *,
+    rows: Sequence[PickListRow],
+    base: ParagraphStyle,
+    muted: ParagraphStyle,
+    h1: ParagraphStyle,
+    font_bold: str,
+    orders: Sequence[object] | None,
+) -> list[object]:
+    story: list[object] = [Paragraph("Picking list / Listă colectare", h1)]
+    _append_pick_list_order_details(story, muted, orders)
     story.append(Spacer(1, 10))
+    table_rows = _pick_list_table_rows(rows, base)
+    story.append(_pick_list_table(table_rows, font_bold))
+    return story
 
+
+def _append_pick_list_order_details(
+    story: list[object],
+    muted: ParagraphStyle,
+    orders: Sequence[object] | None,
+) -> None:
+    if not orders:
+        return
+
+    refs = [(_order_ref(o) or "").strip() for o in orders]
+    refs = [r for r in refs if r]
+    if refs:
+        story.append(Paragraph(f"Orders / Comenzi: {', '.join(refs)}", muted))
+    created_at = _fmt_dt(datetime.now())
+    if created_at:
+        story.append(Paragraph(f"Generated / Generat: {created_at}", muted))
+
+
+def _pick_list_table_rows(rows: Sequence[PickListRow], base: ParagraphStyle) -> list[list[object]]:
     table_rows: list[list[object]] = [
         [
             Paragraph("SKU", base),
@@ -186,7 +249,10 @@ def render_pick_list_pdf(
                 Paragraph(", ".join(row.order_refs) or "—", base),
             ]
         )
+    return table_rows
 
+
+def _pick_list_table(table_rows: list[list[object]], font_bold: str) -> Table:
     table = Table(
         table_rows,
         colWidths=[28 * mm, 62 * mm, 28 * mm, 15 * mm, 45 * mm],
@@ -208,7 +274,4 @@ def render_pick_list_pdf(
             ]
         )
     )
-    story.append(table)
-
-    doc.build(story)
-    return buf.getvalue()
+    return table

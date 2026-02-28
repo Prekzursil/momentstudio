@@ -16,6 +16,33 @@ import { ToastService } from '../../core/toast.service';
 import { MarkdownService } from '../../core/markdown.service';
 import { AuthService } from '../../core/auth.service';
 
+type BlogRouteStub = {
+  snapshot: { params: Record<string, unknown>; queryParams: Record<string, unknown> };
+  params: Observable<Record<string, unknown>>;
+  queryParams: Observable<Record<string, unknown>>;
+};
+
+type BlogPostSpecDeps = {
+  meta: jasmine.SpyObj<Meta>;
+  title: jasmine.SpyObj<Title>;
+  blog: jasmine.SpyObj<BlogService>;
+  toast: jasmine.SpyObj<ToastService>;
+  markdown: jasmine.SpyObj<MarkdownService>;
+  auth: jasmine.SpyObj<AuthService>;
+  routeStub: BlogRouteStub;
+  doc: Document;
+};
+
+const BLOG_POST_FIXTURE: BlogPost = {
+  slug: 'first-post',
+  title: 'Hello',
+  body_markdown: 'Body',
+  created_at: '2000-01-01T00:00:00+00:00',
+  updated_at: '2000-01-01T00:00:00+00:00',
+  images: [],
+  summary: 'Summary'
+};
+
 describe('BlogPostComponent', () => {
   let meta: jasmine.SpyObj<Meta>;
   let title: jasmine.SpyObj<Title>;
@@ -26,21 +53,7 @@ describe('BlogPostComponent', () => {
   let doc: Document;
   let routeParams$: Subject<Record<string, unknown>>;
   let routeQueryParams$: Subject<Record<string, unknown>>;
-  let routeStub: {
-    snapshot: { params: Record<string, unknown>; queryParams: Record<string, unknown> };
-    params: Observable<Record<string, unknown>>;
-    queryParams: Observable<Record<string, unknown>>;
-  };
-
-  const post: BlogPost = {
-    slug: 'first-post',
-    title: 'Hello',
-    body_markdown: 'Body',
-    created_at: '2000-01-01T00:00:00+00:00',
-    updated_at: '2000-01-01T00:00:00+00:00',
-    images: [],
-    summary: 'Summary'
-  };
+  let routeStub: BlogRouteStub;
 
   beforeEach(() => {
     meta = jasmine.createSpyObj<Meta>('Meta', ['updateTag']);
@@ -58,8 +71,8 @@ describe('BlogPostComponent', () => {
     auth = jasmine.createSpyObj<AuthService>('AuthService', ['isAuthenticated', 'user']);
     doc = document.implementation.createHTMLDocument('blog-post-test');
 
-    blog.getPost.and.returnValue(of(post));
-    blog.getPreviewPost.and.returnValue(of(post));
+    blog.getPost.and.returnValue(of(BLOG_POST_FIXTURE));
+    blog.getPreviewPost.and.returnValue(of(BLOG_POST_FIXTURE));
     blog.getNeighbors.and.returnValue(of({ previous: null, next: null }));
     blog.listPosts.and.returnValue(of({ items: [], meta: { total_items: 0, total_pages: 1, page: 1, limit: 10 } }));
     blog.listCommentThreads.and.returnValue(
@@ -78,32 +91,8 @@ describe('BlogPostComponent', () => {
     };
   });
 
-  function configure(): void {
-    TestBed.configureTestingModule({
-      imports: [BlogPostComponent, TranslateModule.forRoot(), RouterTestingModule.withRoutes([])],
-      providers: [
-        { provide: Title, useValue: title },
-        { provide: Meta, useValue: meta },
-        { provide: BlogService, useValue: blog },
-        { provide: AdminService, useValue: jasmine.createSpyObj<AdminService>('AdminService', ['getContent', 'updateContentBlock']) },
-        { provide: CatalogService, useValue: jasmine.createSpyObj<CatalogService>('CatalogService', ['getProduct', 'listCategories', 'listFeaturedCollections']) },
-        { provide: NewsletterService, useValue: jasmine.createSpyObj<NewsletterService>('NewsletterService', ['subscribe']) },
-        { provide: ToastService, useValue: toast },
-        { provide: MarkdownService, useValue: markdown },
-        { provide: StorefrontAdminModeService, useValue: { enabled: () => false } },
-        { provide: AuthService, useValue: auth },
-        { provide: ActivatedRoute, useValue: routeStub },
-        { provide: DOCUMENT, useValue: doc }
-      ]
-    });
-
-    const translate = TestBed.inject(TranslateService);
-    translate.setTranslation('en', { blog: { post: { metaTitle: 'Blog post', metaDescription: 'Desc' } } }, true);
-    translate.use('en');
-  }
-
   it('loads a post and sets canonical/OG tags', () => {
-    configure();
+    configureBlogPostTestingModule({ meta, title, blog, toast, markdown, auth, routeStub, doc });
     const fixture = TestBed.createComponent(BlogPostComponent);
     const cmp = fixture.componentInstance as any;
     cmp.slug = 'first-post';
@@ -130,7 +119,7 @@ describe('BlogPostComponent', () => {
   });
 
   it('uses preview endpoint when preview token is present', () => {
-    configure();
+    configureBlogPostTestingModule({ meta, title, blog, toast, markdown, auth, routeStub, doc });
     const fixture = TestBed.createComponent(BlogPostComponent);
     const cmp = fixture.componentInstance as any;
     cmp.slug = 'first-post';
@@ -143,9 +132,9 @@ describe('BlogPostComponent', () => {
   it('uses route snapshot slug and preview token on first paint', () => {
     routeStub.snapshot.params = { slug: 'snapshot-post' };
     routeStub.snapshot.queryParams = { preview: 'preview-token' };
-    blog.getPreviewPost.and.returnValue(of({ ...post, slug: 'snapshot-post' }));
+    blog.getPreviewPost.and.returnValue(of({ ...BLOG_POST_FIXTURE, slug: 'snapshot-post' }));
 
-    configure();
+    configureBlogPostTestingModule({ meta, title, blog, toast, markdown, auth, routeStub, doc });
     const fixture = TestBed.createComponent(BlogPostComponent);
     fixture.detectChanges();
 
@@ -153,3 +142,27 @@ describe('BlogPostComponent', () => {
     expect(blog.getPost).not.toHaveBeenCalled();
   });
 });
+
+function configureBlogPostTestingModule(deps: BlogPostSpecDeps): void {
+  TestBed.configureTestingModule({
+    imports: [BlogPostComponent, TranslateModule.forRoot(), RouterTestingModule.withRoutes([])],
+    providers: [
+      { provide: Title, useValue: deps.title },
+      { provide: Meta, useValue: deps.meta },
+      { provide: BlogService, useValue: deps.blog },
+      { provide: AdminService, useValue: jasmine.createSpyObj<AdminService>('AdminService', ['getContent', 'updateContentBlock']) },
+      { provide: CatalogService, useValue: jasmine.createSpyObj<CatalogService>('CatalogService', ['getProduct', 'listCategories', 'listFeaturedCollections']) },
+      { provide: NewsletterService, useValue: jasmine.createSpyObj<NewsletterService>('NewsletterService', ['subscribe']) },
+      { provide: ToastService, useValue: deps.toast },
+      { provide: MarkdownService, useValue: deps.markdown },
+      { provide: StorefrontAdminModeService, useValue: { enabled: () => false } },
+      { provide: AuthService, useValue: deps.auth },
+      { provide: ActivatedRoute, useValue: deps.routeStub },
+      { provide: DOCUMENT, useValue: deps.doc }
+    ]
+  });
+
+  const translate = TestBed.inject(TranslateService);
+  translate.setTranslation('en', { blog: { post: { metaTitle: 'Blog post', metaDescription: 'Desc' } } }, true);
+  translate.use('en');
+}

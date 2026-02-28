@@ -254,37 +254,70 @@ def _find_option_id(options: list[dict[str, Any]], expected_name: str) -> str:
     return ""
 
 
+def _field_options(field: dict[str, Any]) -> list[dict[str, Any]]:
+    options = field.get("options")
+    return options if isinstance(options, list) else []
+
+
+def _resolve_single_select_field_option(
+    fields_nodes: list[dict[str, Any]],
+    *,
+    field_name: str,
+    option_name: str,
+    missing_field_error: str,
+    missing_option_error: str,
+) -> tuple[str, str]:
+    field_id = ""
+    option_id = ""
+    for field in fields_nodes:
+        if str(field.get("name") or "") != field_name:
+            continue
+        field_id = str(field.get("id") or "")
+        option_id = _find_option_id(_field_options(field), option_name)
+
+    if not field_id:
+        raise RuntimeError(missing_field_error)
+    if not option_id:
+        raise RuntimeError(missing_option_error)
+    return field_id, option_id
+
+
 def _resolve_project_fields(
     fields_nodes: list[dict[str, Any]],
     *,
     lane_name: str,
     status_name: str,
 ) -> tuple[str, str, str, str]:
-    lane_field_id = ""
-    lane_option_id = ""
-    status_field_id = ""
-    status_option_id = ""
-
-    for field in fields_nodes:
-        name = str(field.get("name") or "")
-        options = field.get("options") if isinstance(field.get("options"), list) else []
-        if name == "Roadmap Lane":
-            lane_field_id = str(field.get("id") or "")
-            lane_option_id = _find_option_id(options, lane_name)
-        elif name == "Status":
-            status_field_id = str(field.get("id") or "")
-            status_option_id = _find_option_id(options, status_name)
-
-    if not lane_field_id:
-        raise RuntimeError("Project field 'Roadmap Lane' not found.")
-    if not lane_option_id:
-        raise RuntimeError(f"Roadmap Lane option '{lane_name}' not found.")
-    if not status_field_id:
-        raise RuntimeError("Project field 'Status' not found.")
-    if not status_option_id:
-        raise RuntimeError(f"Status option '{status_name}' not found.")
-
+    lane_field_id, lane_option_id = _resolve_single_select_field_option(
+        fields_nodes,
+        field_name="Roadmap Lane",
+        option_name=lane_name,
+        missing_field_error="Project field 'Roadmap Lane' not found.",
+        missing_option_error=f"Roadmap Lane option '{lane_name}' not found.",
+    )
+    status_field_id, status_option_id = _resolve_single_select_field_option(
+        fields_nodes,
+        field_name="Status",
+        option_name=status_name,
+        missing_field_error="Project field 'Status' not found.",
+        missing_option_error=f"Status option '{status_name}' not found.",
+    )
     return lane_field_id, lane_option_id, status_field_id, status_option_id
+
+
+def _require_open_project(data: dict[str, Any], *, project_owner: str, project_number: int) -> dict[str, Any]:
+    project = _extract_project_node(data)
+    if not isinstance(project, dict):
+        raise RuntimeError(f"Project not found for {project_owner} #{project_number}.")
+    if bool(project.get("closed")):
+        raise RuntimeError(f"Project {project_owner} #{project_number} is closed.")
+    return project
+
+
+def _project_field_nodes(project: dict[str, Any]) -> list[dict[str, Any]]:
+    fields = project.get("fields") if isinstance(project.get("fields"), dict) else {}
+    nodes = fields.get("nodes") if isinstance(fields.get("nodes"), list) else []
+    return [field for field in nodes if isinstance(field, dict)]
 
 
 def _resolve_project(
@@ -297,16 +330,9 @@ def _resolve_project(
     request_fn: Callable[[str, str, dict[str, Any]], dict[str, Any]],
 ) -> ProjectRef:
     data = request_fn(token, RESOLVE_PROJECT_QUERY, {"owner": project_owner, "number": project_number})
-    project = _extract_project_node(data)
-    if not isinstance(project, dict):
-        raise RuntimeError(f"Project not found for {project_owner} #{project_number}.")
-    if bool(project.get("closed")):
-        raise RuntimeError(f"Project {project_owner} #{project_number} is closed.")
-
-    fields = project.get("fields") if isinstance(project.get("fields"), dict) else {}
-    fields_nodes = fields.get("nodes") if isinstance(fields.get("nodes"), list) else []
+    project = _require_open_project(data, project_owner=project_owner, project_number=project_number)
     lane_field_id, lane_option_id, status_field_id, status_option_id = _resolve_project_fields(
-        [field for field in fields_nodes if isinstance(field, dict)],
+        _project_field_nodes(project),
         lane_name=lane_name,
         status_name=status_name,
     )
@@ -321,36 +347,75 @@ def _resolve_project(
     )
 
 
-def _parse_project_item(item: dict[str, Any]) -> tuple[str, dict[str, str]] | None:
+def _project_issue_node_id(item: dict[str, Any]) -> str:
     content = item.get("content") if isinstance(item.get("content"), dict) else None
     if not content or str(content.get("__typename") or "") != "Issue":
-        return None
+        return ""
+    return str(content.get("id") or "")
 
-    issue_node_id = str(content.get("id") or "")
-    if not issue_node_id:
-        return None
 
+def _single_select_field_value(value: dict[str, Any]) -> tuple[str, str] | None:
+    if str(value.get("__typename") or "") != "ProjectV2ItemFieldSingleSelectValue":
+        return None
+    field = value.get("field") if isinstance(value.get("field"), dict) else {}
+    return str(field.get("name") or ""), str(value.get("name") or "")
+
+
+def _project_item_status_and_lane(item: dict[str, Any]) -> tuple[str, str]:
     status_name = ""
     lane_name = ""
     field_values = item.get("fieldValues") if isinstance(item.get("fieldValues"), dict) else {}
     values_nodes = field_values.get("nodes") if isinstance(field_values.get("nodes"), list) else []
 
     for value in values_nodes:
-        if str(value.get("__typename") or "") != "ProjectV2ItemFieldSingleSelectValue":
+        parsed_value = _single_select_field_value(value)
+        if not parsed_value:
             continue
-        field = value.get("field") if isinstance(value.get("field"), dict) else {}
-        field_name = str(field.get("name") or "")
-        selected_name = str(value.get("name") or "")
+        field_name, selected_name = parsed_value
         if field_name == "Status":
             status_name = selected_name
         elif field_name == "Roadmap Lane":
             lane_name = selected_name
+    return status_name, lane_name
+
+
+def _as_dict(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
+def _as_list(value: Any) -> list[Any]:
+    return value if isinstance(value, list) else []
+
+
+def _dict_rows(values: list[Any]) -> list[dict[str, Any]]:
+    return [value for value in values if isinstance(value, dict)]
+
+
+def _parse_project_item(item: dict[str, Any]) -> tuple[str, dict[str, str]] | None:
+    issue_node_id = _project_issue_node_id(item)
+    if not issue_node_id:
+        return None
+
+    status_name, lane_name = _project_item_status_and_lane(item)
 
     return issue_node_id, {
         "item_id": str(item.get("id") or ""),
         "status_name": status_name,
         "lane_name": lane_name,
     }
+
+
+def _project_items_page(payload: dict[str, Any]) -> tuple[list[dict[str, Any]], bool, str] | None:
+    node = _as_dict(payload.get("node"))
+    if not node:
+        return None
+
+    items = _as_dict(node.get("items"))
+    page_info = _as_dict(items.get("pageInfo"))
+    nodes = _dict_rows(_as_list(items.get("nodes")))
+    has_next_page = bool(page_info.get("hasNextPage"))
+    end_cursor = str(page_info.get("endCursor") or "")
+    return nodes, has_next_page, end_cursor
 
 
 def _list_project_issue_items(
@@ -364,26 +429,20 @@ def _list_project_issue_items(
 
     while True:
         payload = request_fn(token, PROJECT_ITEMS_QUERY, {"projectId": project_id, "after": after})
-        node = payload.get("node") if isinstance(payload.get("node"), dict) else None
-        if not node:
+        page = _project_items_page(payload)
+        if page is None:
             break
 
-        items = node.get("items") if isinstance(node.get("items"), dict) else {}
-        nodes = items.get("nodes") if isinstance(items.get("nodes"), list) else []
+        nodes, has_next_page, end_cursor = page
         for item in nodes:
-            if not isinstance(item, dict):
-                continue
             parsed = _parse_project_item(item)
             if parsed:
                 issue_node_id, row = parsed
                 mapping[issue_node_id] = row
 
-        page_info = items.get("pageInfo") if isinstance(items.get("pageInfo"), dict) else {}
-        if not bool(page_info.get("hasNextPage")):
+        if not has_next_page or not end_cursor:
             break
-        after = str(page_info.get("endCursor") or "")
-        if not after:
-            break
+        after = end_cursor
 
     return mapping
 
@@ -446,25 +505,34 @@ def _set_single_select_field(
     )
 
 
-def _normalize_issue_row(row: dict[str, Any]) -> dict[str, Any] | None:
-    issue_number_raw = row.get("issue_number")
-    if isinstance(issue_number_raw, bool):
+def _parse_positive_issue_number(raw_value: Any) -> int | None:
+    if isinstance(raw_value, bool):
         return None
     try:
-        issue_number = int(issue_number_raw)
+        issue_number = int(raw_value)
     except (TypeError, ValueError):
         return None
-    if issue_number <= 0:
+    return issue_number if issue_number > 0 else None
+
+
+def _strip_issue_text(value: Any, *, lowercase: bool = False) -> str:
+    normalized = str(value or "").strip()
+    return normalized.lower() if lowercase else normalized
+
+
+def _normalize_issue_row(row: dict[str, Any]) -> dict[str, Any] | None:
+    issue_number = _parse_positive_issue_number(row.get("issue_number"))
+    if issue_number is None:
         return None
 
     return {
         "issue_number": issue_number,
-        "issue_node_id": str(row.get("issue_node_id") or "").strip(),
-        "fingerprint": str(row.get("fingerprint") or "").strip(),
-        "severity": str(row.get("severity") or "").strip().lower(),
-        "route": str(row.get("route") or "").strip(),
-        "surface": str(row.get("surface") or "").strip(),
-        "action": str(row.get("action") or "").strip(),
+        "issue_node_id": _strip_issue_text(row.get("issue_node_id")),
+        "fingerprint": _strip_issue_text(row.get("fingerprint")),
+        "severity": _strip_issue_text(row.get("severity"), lowercase=True),
+        "route": _strip_issue_text(row.get("route")),
+        "surface": _strip_issue_text(row.get("surface")),
+        "action": _strip_issue_text(row.get("action")),
     }
 
 
@@ -531,6 +599,101 @@ def _resolve_issue_node(issue: dict[str, Any], *, token: str, repo: RepoRef, req
     )
 
 
+def _initial_sync_counters() -> dict[str, int]:
+    return {"added": 0, "updated": 0, "lane_updates": 0, "status_updates": 0}
+
+
+def _resolve_item_sync_context(
+    token: str,
+    project: ProjectRef,
+    issue_number: int,
+    issue_node_id: str,
+    existing: dict[str, str] | None,
+    dry_run: bool,
+    request_fn: Callable[[str, str, dict[str, Any]], dict[str, Any]],
+) -> tuple[str, str, str, bool]:
+    if existing:
+        return (
+            str(existing.get("item_id") or ""),
+            str(existing.get("lane_name") or ""),
+            str(existing.get("status_name") or ""),
+            False,
+        )
+    if dry_run:
+        return f"dry-run-{issue_number}", "", "", True
+    return (
+        _add_project_item(
+            token=token,
+            project_id=project.project_id,
+            issue_node_id=issue_node_id,
+            request_fn=request_fn,
+        ),
+        "",
+        "",
+        True,
+    )
+
+
+def _sync_lane_value(
+    token: str,
+    project: ProjectRef,
+    item_id: str,
+    lane_current: str,
+    lane_name: str,
+    dry_run: bool,
+    request_fn: Callable[[str, str, dict[str, Any]], dict[str, Any]],
+) -> bool:
+    lane_changed = lane_current != lane_name
+    if lane_changed and not dry_run:
+        _set_single_select_field(
+            token=token,
+            project_id=project.project_id,
+            item_id=item_id,
+            field_id=project.lane_field_id,
+            option_id=project.lane_option_id,
+            request_fn=request_fn,
+        )
+    return lane_changed
+
+
+def _sync_status_value(
+    token: str,
+    project: ProjectRef,
+    item_id: str,
+    status_current: str,
+    status_name: str,
+    dry_run: bool,
+    request_fn: Callable[[str, str, dict[str, Any]], dict[str, Any]],
+) -> bool:
+    status_changed = _should_set_status_todo(status_current, status_name)
+    if status_changed and not dry_run:
+        _set_single_select_field(
+            token=token,
+            project_id=project.project_id,
+            item_id=item_id,
+            field_id=project.status_field_id,
+            option_id=project.status_option_id,
+            request_fn=request_fn,
+        )
+    return status_changed
+
+
+def _build_sync_result(
+    issue_number: int,
+    issue_node_id: str,
+    added: bool,
+    lane_changed: bool,
+    status_changed: bool,
+) -> dict[str, Any]:
+    return {
+        "issue_number": issue_number,
+        "issue_node_id": issue_node_id,
+        "result": "added" if added else "updated",
+        "lane_changed": lane_changed,
+        "status_changed": status_changed,
+    }
+
+
 def _sync_project_item(
     *,
     token: str,
@@ -544,121 +707,75 @@ def _sync_project_item(
     request_fn: Callable[[str, str, dict[str, Any]], dict[str, Any]],
 ) -> tuple[dict[str, Any], dict[str, int]]:
     issue_number = int(issue["issue_number"])
-    counters = {"added": 0, "updated": 0, "lane_updates": 0, "status_updates": 0}
+    counters = _initial_sync_counters()
+    item_id, lane_current, status_current, added = _resolve_item_sync_context(token, project, issue_number, issue_node_id, existing, dry_run, request_fn)
+    counters["added"] = 1 if added else 0
+    counters["updated"] = 0 if added else 1
 
-    lane_current = ""
-    status_current = ""
-    if existing:
-        item_id = str(existing.get("item_id") or "")
-        lane_current = str(existing.get("lane_name") or "")
-        status_current = str(existing.get("status_name") or "")
-        counters["updated"] = 1
-    else:
-        counters["added"] = 1
-        item_id = (
-            _add_project_item(
-                token=token,
-                project_id=project.project_id,
-                issue_node_id=issue_node_id,
-                request_fn=request_fn,
-            )
-            if not dry_run
-            else f"dry-run-{issue_number}"
-        )
-
-    lane_changed = lane_current != lane_name
+    lane_changed = _sync_lane_value(token, project, item_id, lane_current, lane_name, dry_run, request_fn)
     if lane_changed:
         counters["lane_updates"] = 1
-        if not dry_run:
-            _set_single_select_field(
-                token=token,
-                project_id=project.project_id,
-                item_id=item_id,
-                field_id=project.lane_field_id,
-                option_id=project.lane_option_id,
-                request_fn=request_fn,
-            )
 
-    status_changed = _should_set_status_todo(status_current, status_name)
+    status_changed = _sync_status_value(token, project, item_id, status_current, status_name, dry_run, request_fn)
     if status_changed:
         counters["status_updates"] = 1
-        if not dry_run:
-            _set_single_select_field(
-                token=token,
-                project_id=project.project_id,
-                item_id=item_id,
-                field_id=project.status_field_id,
-                option_id=project.status_option_id,
-                request_fn=request_fn,
-            )
 
-    result = {
-        "issue_number": issue_number,
-        "issue_node_id": issue_node_id,
-        "result": "added" if counters["added"] else "updated",
-        "lane_changed": lane_changed,
-        "status_changed": status_changed,
-    }
+    result = _build_sync_result(issue_number, issue_node_id, bool(counters["added"]), lane_changed, status_changed)
     return result, counters
 
 
-def run_sync(
+def _maybe_skip_sync_run(
     *,
+    summary: dict[str, Any],
+    token: str,
+    allow_skip_missing_token: bool,
+    issue_count: int,
+) -> dict[str, Any] | None:
+    if not token:
+        if allow_skip_missing_token:
+            summary.update({"skipped": issue_count, "skip_reason": "missing_project_write_token", "skipped_run": True})
+            return summary
+        raise RuntimeError("Missing ROADMAP_PROJECT_WRITE_TOKEN.")
+    if issue_count == 0:
+        summary.update({"skip_reason": "no_severe_issues", "skipped_run": True})
+        return summary
+    return None
+
+
+def _append_missing_node_error(summary: dict[str, Any], *, issue_number: int) -> None:
+    summary["errors"] += 1
+    summary["results"].append(
+        {
+            "issue_number": issue_number,
+            "result": "error",
+            "error": "issue_node_id_not_found",
+        }
+    )
+
+
+def _apply_sync_counters(summary: dict[str, Any], counters: dict[str, int]) -> None:
+    for key in ("added", "updated", "lane_updates", "status_updates"):
+        summary[key] += counters[key]
+
+
+def _sync_issues(
+    *,
+    summary: dict[str, Any],
+    issues: list[dict[str, Any]],
     token: str,
     repo: RepoRef,
-    project_owner: str,
-    project_number: int,
-    issues_path: Path,
+    project: ProjectRef,
+    existing_items: dict[str, dict[str, str]],
     lane_name: str,
     status_name: str,
     dry_run: bool,
-    allow_skip_missing_token: bool,
     request_fn: Callable[[str, str, dict[str, Any]], dict[str, Any]],
-) -> dict[str, Any]:
-    issues = _load_severe_issues(issues_path)
-    summary = _initialize_summary(
-        repo=repo,
-        project_owner=project_owner,
-        project_number=project_number,
-        lane_name=lane_name,
-        status_name=status_name,
-        issue_count=len(issues),
-    )
-
-    if not token:
-        if allow_skip_missing_token:
-            summary.update({"skipped": len(issues), "skip_reason": "missing_project_write_token", "skipped_run": True})
-            return summary
-        raise RuntimeError("Missing ROADMAP_PROJECT_WRITE_TOKEN.")
-
-    if not issues:
-        summary.update({"skip_reason": "no_severe_issues", "skipped_run": True})
-        return summary
-
-    project = _resolve_project(
-        token=token,
-        project_owner=project_owner,
-        project_number=project_number,
-        lane_name=lane_name,
-        status_name=status_name,
-        request_fn=request_fn,
-    )
-    summary["project_url"] = project.project_url
-
-    existing_items = _list_project_issue_items(token=token, project_id=project.project_id, request_fn=request_fn)
-
+) -> None:
     for issue in issues:
         issue_node_id = _resolve_issue_node(issue, token=token, repo=repo, request_fn=request_fn)
         issue_number = int(issue["issue_number"])
         if not issue_node_id:
-            summary["errors"] += 1
-            summary["results"].append(
-                {
-                    "issue_number": issue_number,
-                    "result": "error",
-                    "error": "issue_node_id_not_found",
-                }
-            )
+            _append_missing_node_error(summary, issue_number=issue_number)
             continue
 
         result, counters = _sync_project_item(
@@ -673,15 +790,102 @@ def run_sync(
             request_fn=request_fn,
         )
         summary["results"].append(result)
-        for key in ("added", "updated", "lane_updates", "status_updates"):
-            summary[key] += counters[key]
+        _apply_sync_counters(summary, counters)
 
-    if summary["errors"] > 0:
-        raise RuntimeError(
-            "Project sync completed with errors "
-            f"(errors={summary['errors']}, added={summary['added']}, updated={summary['updated']})."
-        )
 
+def _load_sync_inputs(
+    *,
+    repo: RepoRef,
+    project_owner: str,
+    project_number: int,
+    lane_name: str,
+    status_name: str,
+    issues_path: Path,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    issues = _load_severe_issues(issues_path)
+    summary = _initialize_summary(
+        repo=repo,
+        project_owner=project_owner,
+        project_number=project_number,
+        lane_name=lane_name,
+        status_name=status_name,
+        issue_count=len(issues),
+    )
+    return issues, summary
+
+
+def _load_project_sync_context(
+    *,
+    token: str,
+    project_owner: str,
+    project_number: int,
+    lane_name: str,
+    status_name: str,
+    request_fn: Callable[[str, str, dict[str, Any]], dict[str, Any]],
+) -> tuple[ProjectRef, dict[str, dict[str, str]]]:
+    project = _resolve_project(
+        token=token,
+        project_owner=project_owner,
+        project_number=project_number,
+        lane_name=lane_name,
+        status_name=status_name,
+        request_fn=request_fn,
+    )
+    existing_items = _list_project_issue_items(token=token, project_id=project.project_id, request_fn=request_fn)
+    return project, existing_items
+
+
+def _raise_if_sync_errors(summary: dict[str, Any]) -> None:
+    if summary["errors"] <= 0:
+        return
+    raise RuntimeError(
+        "Project sync completed with errors "
+        f"(errors={summary['errors']}, added={summary['added']}, updated={summary['updated']})."
+    )
+
+
+def run_sync(*, token: str, repo: RepoRef, project_owner: str, project_number: int, issues_path: Path, lane_name: str, status_name: str, dry_run: bool, allow_skip_missing_token: bool, request_fn: Callable[[str, str, dict[str, Any]], dict[str, Any]]) -> dict[str, Any]:
+    issues, summary = _load_sync_inputs(
+        repo=repo,
+        project_owner=project_owner,
+        project_number=project_number,
+        lane_name=lane_name,
+        status_name=status_name,
+        issues_path=issues_path,
+    )
+
+    skipped_summary = _maybe_skip_sync_run(
+        summary=summary,
+        token=token,
+        allow_skip_missing_token=allow_skip_missing_token,
+        issue_count=len(issues),
+    )
+    if skipped_summary is not None:
+        return skipped_summary
+
+    project, existing_items = _load_project_sync_context(
+        token=token,
+        project_owner=project_owner,
+        project_number=project_number,
+        lane_name=lane_name,
+        status_name=status_name,
+        request_fn=request_fn,
+    )
+    summary["project_url"] = project.project_url
+
+    _sync_issues(
+        summary=summary,
+        issues=issues,
+        token=token,
+        repo=repo,
+        project=project,
+        existing_items=existing_items,
+        lane_name=lane_name,
+        status_name=status_name,
+        dry_run=dry_run,
+        request_fn=request_fn,
+    )
+    _raise_if_sync_errors(summary)
     return summary
 
 

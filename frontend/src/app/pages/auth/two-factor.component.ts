@@ -65,32 +65,42 @@ export class TwoFactorComponent implements OnInit {
 
   constructor(private readonly auth: AuthService, private toast: ToastService, private router: Router, private translate: TranslateService) {}
 
+  private redirectToLoginWithMissingToken(): void {
+    this.toast.error(this.translate.instant('auth.twoFactorMissing'));
+    void this.router.navigateByUrl('/login');
+  }
+
+  private readRememberFlag(): boolean {
+    const rememberRaw = sessionStorage.getItem('two_factor_remember');
+    try {
+      return JSON.parse(rememberRaw ?? 'false');
+    } catch {
+      return false;
+    }
+  }
+
+  private readTwoFactorUserEmail(): string | null {
+    const rawUser = sessionStorage.getItem('two_factor_user');
+    if (!rawUser) return null;
+    try {
+      const parsed = JSON.parse(rawUser);
+      return parsed?.email ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   ngOnInit(): void {
     if (typeof sessionStorage === 'undefined') {
-      this.toast.error(this.translate.instant('auth.twoFactorMissing'));
-      void this.router.navigateByUrl('/login');
+      this.redirectToLoginWithMissingToken();
       return;
     }
     this.token = sessionStorage.getItem('two_factor_token');
-    const rememberRaw = sessionStorage.getItem('two_factor_remember');
-    try {
-      this.remember = JSON.parse(rememberRaw ?? 'false');
-    } catch {
-      this.remember = false;
-    }
-    const rawUser = sessionStorage.getItem('two_factor_user');
-    if (rawUser) {
-      try {
-        const parsed = JSON.parse(rawUser);
-        this.userEmail = parsed?.email ?? null;
-      } catch {
-        this.userEmail = null;
-      }
-    }
+    this.remember = this.readRememberFlag();
+    this.userEmail = this.readTwoFactorUserEmail();
 
     if (!this.token) {
-      this.toast.error(this.translate.instant('auth.twoFactorMissing'));
-      void this.router.navigateByUrl('/login');
+      this.redirectToLoginWithMissingToken();
     }
   }
 
@@ -135,4 +145,3 @@ export class TwoFactorComponent implements OnInit {
       });
   }
 }
-

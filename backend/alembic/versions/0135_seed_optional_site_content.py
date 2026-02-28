@@ -159,6 +159,33 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     conn = op.get_bind()
+    content_blocks = sa.table(
+        "content_blocks",
+        sa.column("id", sa.UUID(as_uuid=True)),
+        sa.column("key", sa.String()),
+    )
+    content_images = sa.table(
+        "content_images",
+        sa.column("id", sa.UUID(as_uuid=True)),
+        sa.column("content_block_id", sa.UUID(as_uuid=True)),
+    )
+    content_image_tags = sa.table(
+        "content_image_tags",
+        sa.column("content_image_id", sa.UUID(as_uuid=True)),
+    )
+    content_block_translations = sa.table(
+        "content_block_translations",
+        sa.column("content_block_id", sa.UUID(as_uuid=True)),
+    )
+    content_block_versions = sa.table(
+        "content_block_versions",
+        sa.column("content_block_id", sa.UUID(as_uuid=True)),
+    )
+    content_audit_log = sa.table(
+        "content_audit_log",
+        sa.column("content_block_id", sa.UUID(as_uuid=True)),
+    )
+
     for key in (
         "site.navigation",
         "site.header-banners",
@@ -171,21 +198,16 @@ def downgrade() -> None:
         "seo.category",
         "seo.about",
     ):
-        row = conn.execute(sa.text("SELECT id FROM content_blocks WHERE key = :key"), {"key": key}).first()
+        row = conn.execute(sa.select(content_blocks.c.id).where(content_blocks.c.key == key)).first()
         if not row:
             continue
         block_id = row[0]
+        image_ids = sa.select(content_images.c.id).where(content_images.c.content_block_id == block_id)
         conn.execute(
-            sa.text(
-                "DELETE FROM content_image_tags WHERE content_image_id IN (SELECT id FROM content_images WHERE content_block_id = :block_id)"
-            ),
-            {"block_id": block_id},
+            sa.delete(content_image_tags).where(content_image_tags.c.content_image_id.in_(image_ids))
         )
-        conn.execute(sa.text("DELETE FROM content_images WHERE content_block_id = :block_id"), {"block_id": block_id})
-        conn.execute(
-            sa.text("DELETE FROM content_block_translations WHERE content_block_id = :block_id"),
-            {"block_id": block_id},
-        )
-        conn.execute(sa.text("DELETE FROM content_block_versions WHERE content_block_id = :block_id"), {"block_id": block_id})
-        conn.execute(sa.text("DELETE FROM content_audit_log WHERE content_block_id = :block_id"), {"block_id": block_id})
-        conn.execute(sa.text("DELETE FROM content_blocks WHERE id = :block_id"), {"block_id": block_id})
+        conn.execute(sa.delete(content_images).where(content_images.c.content_block_id == block_id))
+        conn.execute(sa.delete(content_block_translations).where(content_block_translations.c.content_block_id == block_id))
+        conn.execute(sa.delete(content_block_versions).where(content_block_versions.c.content_block_id == block_id))
+        conn.execute(sa.delete(content_audit_log).where(content_audit_log.c.content_block_id == block_id))
+        conn.execute(sa.delete(content_blocks).where(content_blocks.c.id == block_id))

@@ -9,9 +9,10 @@ import mimetypes
 import random
 import re
 import shutil
-from collections.abc import Awaitable, Iterable
+from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from functools import partial
 from pathlib import Path
 from typing import Any, Literal, TypeVar, cast
 from uuid import UUID, uuid4
@@ -156,6 +157,15 @@ class RetryPolicyResolved:
     version_ts: str
 
 
+@dataclass(slots=True)
+class MediaEditOptions:
+    rotate_cw: int
+    crop_aspect_w: Any
+    crop_aspect_h: Any
+    resize_max_width: Any
+    resize_max_height: Any
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -167,6 +177,11 @@ def _normalize_tag(value: str) -> str:
 
 def _normalize_job_tag(value: str) -> str:
     return _normalize_tag(value)
+
+
+def _optional_stripped(value: str | None) -> str | None:
+    text = str(value or "").strip()
+    return text or None
 
 
 def _coerce_triage_state(
@@ -224,21 +239,48 @@ def _retry_policy_from_payload(payload: dict[str, Any], *, job_type: MediaJobTyp
     raw = payload.get(RETRY_POLICY_PAYLOAD_KEY)
     if not isinstance(raw, dict):
         return None
+    return _retry_policy_from_raw(raw)
+
+
+def _parse_positive_int(value: Any) -> int | None:
     try:
-        schedule = [max(1, int(v)) for v in list(raw.get("schedule") or [])]
-        attempts = int(raw.get("max_attempts") or 0)
-        jitter = float(raw.get("jitter_ratio") or 0.0)
-        if attempts < 1 or not schedule:
-            return None
-        return RetryPolicyResolved(
-            max_attempts=max(1, min(MAX_RETRY_POLICY_ATTEMPTS, attempts)),
-            schedule=schedule,
-            jitter_ratio=max(0.0, min(1.0, jitter)),
-            enabled=bool(raw.get("enabled", True)),
-            version_ts=str(raw.get("version_ts") or "snapshot"),
-        )
+        parsed = int(value)
     except Exception:
         return None
+    return parsed if parsed > 0 else None
+
+
+def _parse_ratio(value: Any) -> float:
+    try:
+        parsed = float(value)
+    except Exception:
+        parsed = 0.0
+    return max(0.0, min(1.0, parsed))
+
+
+def _parse_retry_schedule(raw: Any) -> list[int]:
+    if not isinstance(raw, list):
+        return []
+    out: list[int] = []
+    for value in raw:
+        parsed = _parse_positive_int(value)
+        if parsed is not None:
+            out.append(parsed)
+    return out
+
+
+def _retry_policy_from_raw(raw: dict[str, Any]) -> RetryPolicyResolved | None:
+    attempts = _parse_positive_int(raw.get("max_attempts") or 0)
+    schedule = _parse_retry_schedule(raw.get("schedule") or [])
+    if attempts is None or not schedule:
+        return None
+    return RetryPolicyResolved(
+        max_attempts=max(1, min(MAX_RETRY_POLICY_ATTEMPTS, attempts)),
+        schedule=schedule,
+        jitter_ratio=_parse_ratio(raw.get("jitter_ratio") or 0.0),
+        enabled=bool(raw.get("enabled", True)),
+        version_ts=str(raw.get("version_ts") or "snapshot"),
+    )
 
 
 def _retry_delay_seconds(
@@ -405,17 +447,8 @@ def verify_preview_signature(asset_id: UUID, *, exp: int, sig: str, variant_prof
     expected = _sign_preview(asset_id, exp=exp_ts, variant_profile=variant_profile)
     return hmac.compare_digest(expected, str(sig or ""))
 
-async def create_asset_from_upload(
-    session: AsyncSession,
-    *,
-    file,
-    created_by_user_id: UUID | None,
-    visibility: MediaVisibility = MediaVisibility.private,
-) -> MediaAssetUploadResponse:
-    asset_id = uuid4()
-    filename = _safe_storage_name(getattr(file, "filename", None))
-    asset_type = _guess_asset_type(getattr(file, "content_type", None), filename)
-    storage_key = f"originals/{_asset_base_folder(asset_id)}/{filename}"
+
+def _persist_uploaded_file(*, file: Any, filename: str, storage_key: str) -> str:
     temp_url, _ = storage.save_upload(
         file,
         root=settings.media_root,
@@ -430,7 +463,21 @@ async def create_asset_from_upload(
     temp_path = storage.media_url_to_path(temp_url)
     if temp_path != target_path:
         _move_file(temp_path, target_path)
-    media_url = _public_url_from_storage_key(storage_key)
+    return _public_url_from_storage_key(storage_key)
+
+
+async def create_asset_from_upload(
+    session: AsyncSession,
+    *,
+    file,
+    created_by_user_id: UUID | None,
+    visibility: MediaVisibility = MediaVisibility.private,
+) -> MediaAssetUploadResponse:
+    asset_id = uuid4()
+    filename = _safe_storage_name(getattr(file, "filename", None))
+    asset_type = _guess_asset_type(getattr(file, "content_type", None), filename)
+    storage_key = f"originals/{_asset_base_folder(asset_id)}/{filename}"
+    media_url = _persist_uploaded_file(file=file, filename=filename, storage_key=storage_key)
     asset = MediaAsset(
         id=asset_id,
         asset_type=asset_type,
@@ -546,19 +593,34 @@ async def _record_job_event(
     await session.flush()
 
 
-def _parse_schedule_json(value: str | None, *, fallback: list[int]) -> list[int]:
+def _parse_json_list(value: str | None) -> list[Any]:
     try:
         raw = json.loads(value or "[]")
     except Exception:
-        raw = []
+        return []
+    if isinstance(raw, list):
+        return raw
+    return []
+
+
+def _schedule_item_to_int(item: Any) -> int | None:
+    if not isinstance(item, (int, float, str)):
+        return None
+    if not str(item).strip():
+        return None
+    try:
+        return max(1, int(item))
+    except Exception:
+        return None
+
+
+def _parse_schedule_json(value: str | None, *, fallback: list[int]) -> list[int]:
+    raw = _parse_json_list(value)
     out: list[int] = []
-    for item in raw if isinstance(raw, list) else []:
-        if not isinstance(item, (int, float, str)) or not str(item).strip():
-            continue
-        try:
-            out.append(max(1, int(item)))
-        except Exception:
-            continue
+    for item in raw:
+        parsed = _schedule_item_to_int(item)
+        if parsed is not None:
+            out.append(parsed)
     return out or list(fallback)
 
 
@@ -937,6 +999,48 @@ def _preset_to_read(
     )
 
 
+async def _latest_retry_policy_event_for_actions(
+    session: AsyncSession,
+    *,
+    job_type: MediaJobType,
+    actions: tuple[str, ...],
+) -> MediaJobRetryPolicyEvent | None:
+    action_clause: ColumnElement[bool]
+    if len(actions) == 1:
+        action_clause = cast(ColumnElement[bool], MediaJobRetryPolicyEvent.action == actions[0])
+    else:
+        action_clause = cast(ColumnElement[bool], MediaJobRetryPolicyEvent.action.in_(actions))
+    return await session.scalar(
+        select(MediaJobRetryPolicyEvent)
+        .where(MediaJobRetryPolicyEvent.job_type == job_type, action_clause)
+        .order_by(MediaJobRetryPolicyEvent.created_at.desc(), MediaJobRetryPolicyEvent.id.desc())
+    )
+
+
+def _preset_from_event_or_default(
+    *,
+    preset_key: str,
+    event: MediaJobRetryPolicyEvent | None,
+    snapshot_json: str | None,
+    job_type: MediaJobType,
+    default_policy: RetryPolicyResolved,
+) -> MediaRetryPolicyPresetRead:
+    if event is None:
+        return _preset_to_read(
+            preset_key=preset_key,
+            policy=default_policy,
+            fallback_used=True,
+        )
+    policy = _deserialize_policy_snapshot_json(snapshot_json, job_type=job_type)
+    return _preset_to_read(
+        preset_key=preset_key,
+        policy=policy,
+        source_event_id=event.id,
+        fallback_used=False,
+        updated_at=event.created_at,
+    )
+
+
 async def get_retry_policy_presets(
     session: AsyncSession,
     *,
@@ -944,62 +1048,31 @@ async def get_retry_policy_presets(
 ) -> MediaRetryPolicyPresetsResponse:
     parsed_job_type = _parse_job_type(job_type)
     default_policy = _default_retry_policy(parsed_job_type)
-
-    # known_good uses the latest explicit marker.
-    known_good_event = await session.scalar(
-        select(MediaJobRetryPolicyEvent)
-        .where(
-            MediaJobRetryPolicyEvent.job_type == parsed_job_type,
-            MediaJobRetryPolicyEvent.action == "mark_known_good",
-        )
-        .order_by(MediaJobRetryPolicyEvent.created_at.desc(), MediaJobRetryPolicyEvent.id.desc())
+    known_good_event = await _latest_retry_policy_event_for_actions(
+        session,
+        job_type=parsed_job_type,
+        actions=("mark_known_good",),
     )
-    if known_good_event is not None:
-        known_good_policy = _deserialize_policy_snapshot_json(
-            known_good_event.after_policy_json,
-            job_type=parsed_job_type,
-        )
-        known_good_preset = _preset_to_read(
-            preset_key="known_good",
-            policy=known_good_policy,
-            source_event_id=known_good_event.id,
-            fallback_used=False,
-            updated_at=known_good_event.created_at,
-        )
-    else:
-        known_good_preset = _preset_to_read(
-            preset_key="known_good",
-            policy=default_policy,
-            fallback_used=True,
-        )
-
-    # last_change reverts to the "before" snapshot of the latest mutating event.
-    last_change_event = await session.scalar(
-        select(MediaJobRetryPolicyEvent)
-        .where(
-            MediaJobRetryPolicyEvent.job_type == parsed_job_type,
-            MediaJobRetryPolicyEvent.action.in_(("update", "reset", "reset_all", "rollback")),
-        )
-        .order_by(MediaJobRetryPolicyEvent.created_at.desc(), MediaJobRetryPolicyEvent.id.desc())
+    known_good_preset = _preset_from_event_or_default(
+        preset_key="known_good",
+        event=known_good_event,
+        snapshot_json=known_good_event.after_policy_json if known_good_event is not None else None,
+        job_type=parsed_job_type,
+        default_policy=default_policy,
     )
-    if last_change_event is not None:
-        last_change_policy = _deserialize_policy_snapshot_json(
-            last_change_event.before_policy_json,
-            job_type=parsed_job_type,
-        )
-        last_change_preset = _preset_to_read(
-            preset_key="last_change",
-            policy=last_change_policy,
-            source_event_id=last_change_event.id,
-            fallback_used=False,
-            updated_at=last_change_event.created_at,
-        )
-    else:
-        last_change_preset = _preset_to_read(
-            preset_key="last_change",
-            policy=default_policy,
-            fallback_used=True,
-        )
+
+    last_change_event = await _latest_retry_policy_event_for_actions(
+        session,
+        job_type=parsed_job_type,
+        actions=("update", "reset", "reset_all", "rollback"),
+    )
+    last_change_preset = _preset_from_event_or_default(
+        preset_key="last_change",
+        event=last_change_event,
+        snapshot_json=last_change_event.before_policy_json if last_change_event is not None else None,
+        job_type=parsed_job_type,
+        default_policy=default_policy,
+    )
 
     return MediaRetryPolicyPresetsResponse(
         job_type=parsed_job_type.value,
@@ -1036,6 +1109,40 @@ async def mark_retry_policy_known_good(
     return retry_policy_event_to_read(event)
 
 
+async def _resolve_rollback_target_policy(
+    session: AsyncSession,
+    *,
+    parsed_job_type: MediaJobType,
+    payload: MediaRetryPolicyRollbackRequest,
+) -> tuple[RetryPolicyResolved, str | None]:
+    if payload.event_id:
+        event = await session.scalar(
+            select(MediaJobRetryPolicyEvent).where(
+                MediaJobRetryPolicyEvent.id == payload.event_id,
+                MediaJobRetryPolicyEvent.job_type == parsed_job_type,
+            )
+        )
+        if event is None:
+            raise ValueError("Retry policy history event not found")
+        return _deserialize_policy_snapshot_json(event.after_policy_json, job_type=parsed_job_type), None
+
+    presets = await get_retry_policy_presets(session, job_type=parsed_job_type)
+    preset = next((item for item in presets.items if item.preset_key == payload.preset_key), None)
+    if preset is None:
+        raise ValueError("Unknown retry policy preset")
+    policy = _policy_snapshot_from_raw(
+        {
+            "max_attempts": preset.policy.max_attempts,
+            "schedule": list(preset.policy.backoff_schedule_seconds),
+            "jitter_ratio": preset.policy.jitter_ratio,
+            "enabled": preset.policy.enabled,
+            "version_ts": preset.policy.version_ts or "preset",
+        },
+        job_type=parsed_job_type,
+    )
+    return policy, payload.preset_key
+
+
 async def rollback_retry_policy(
     session: AsyncSession,
     *,
@@ -1046,35 +1153,11 @@ async def rollback_retry_policy(
     parsed_job_type = _parse_job_type(job_type)
     row = await session.scalar(select(MediaJobRetryPolicy).where(MediaJobRetryPolicy.job_type == parsed_job_type))
     before_policy = _policy_row_to_resolved(row, job_type=parsed_job_type)
-
-    target_policy: RetryPolicyResolved
-    target_preset_key: str | None = payload.preset_key
-    if payload.event_id:
-        event = await session.scalar(
-            select(MediaJobRetryPolicyEvent).where(
-                MediaJobRetryPolicyEvent.id == payload.event_id,
-                MediaJobRetryPolicyEvent.job_type == parsed_job_type,
-            )
-        )
-        if event is None:
-            raise ValueError("Retry policy history event not found")
-        target_policy = _deserialize_policy_snapshot_json(event.after_policy_json, job_type=parsed_job_type)
-        target_preset_key = None
-    else:
-        presets = await get_retry_policy_presets(session, job_type=parsed_job_type)
-        preset = next((item for item in presets.items if item.preset_key == payload.preset_key), None)
-        if preset is None:
-            raise ValueError("Unknown retry policy preset")
-        target_policy = _policy_snapshot_from_raw(
-            {
-                "max_attempts": preset.policy.max_attempts,
-                "schedule": list(preset.policy.backoff_schedule_seconds),
-                "jitter_ratio": preset.policy.jitter_ratio,
-                "enabled": preset.policy.enabled,
-                "version_ts": preset.policy.version_ts or "preset",
-            },
-            job_type=parsed_job_type,
-        )
+    target_policy, target_preset_key = await _resolve_rollback_target_policy(
+        session,
+        parsed_job_type=parsed_job_type,
+        payload=payload,
+    )
 
     if row is None:
         row = MediaJobRetryPolicy(job_type=parsed_job_type)
@@ -1097,6 +1180,53 @@ async def rollback_retry_policy(
     return _retry_policy_to_read(parsed_job_type, _policy_row_to_resolved(row, job_type=parsed_job_type), row)
 
 
+def _existing_job_tag_links(job: MediaJob) -> dict[str, MediaJobTagLink]:
+    return {
+        rel.tag.value: rel for rel in (job.tags or []) if getattr(rel, "tag", None) and getattr(rel.tag, "value", None)
+    }
+
+
+def _normalized_non_empty_job_tags(raw_tags: list[str] | None) -> set[str]:
+    normalized = {_normalize_job_tag(raw) for raw in (raw_tags or [])}
+    return {value for value in normalized if value}
+
+
+async def _delete_job_tag_links(
+    session: AsyncSession,
+    *,
+    existing_links: dict[str, MediaJobTagLink],
+    remove_tags: list[str] | None,
+) -> None:
+    for value in _normalized_non_empty_job_tags(remove_tags):
+        relation = existing_links.get(value)
+        if relation is not None:
+            await session.delete(relation)
+
+
+async def _get_or_create_job_tag(session: AsyncSession, value: str) -> MediaJobTag:
+    tag = await session.scalar(select(MediaJobTag).where(MediaJobTag.value == value))
+    if tag is not None:
+        return tag
+    tag = MediaJobTag(value=value)
+    session.add(tag)
+    await session.flush()
+    return tag
+
+
+async def _add_job_tag_links(
+    session: AsyncSession,
+    *,
+    job_id: UUID,
+    existing_links: dict[str, MediaJobTagLink],
+    add_tags: list[str] | None,
+) -> None:
+    for value in _normalized_non_empty_job_tags(add_tags):
+        if value in existing_links:
+            continue
+        tag = await _get_or_create_job_tag(session, value)
+        session.add(MediaJobTagLink(job_id=job_id, tag_id=tag.id))
+
+
 async def _apply_job_tag_changes(
     session: AsyncSession,
     *,
@@ -1104,101 +1234,84 @@ async def _apply_job_tag_changes(
     add_tags: list[str] | None = None,
     remove_tags: list[str] | None = None,
 ) -> None:
-    existing_by_value = {
-        rel.tag.value: rel for rel in (job.tags or []) if getattr(rel, "tag", None) and getattr(rel.tag, "value", None)
-    }
-
-    remove_values = {_normalize_job_tag(raw) for raw in (remove_tags or [])}
-    remove_values = {value for value in remove_values if value}
-    for value in remove_values:
-        relation = existing_by_value.get(value)
-        if relation is not None:
-            await session.delete(relation)
-
-    add_values = {_normalize_job_tag(raw) for raw in (add_tags or [])}
-    add_values = {value for value in add_values if value}
-    for value in add_values:
-        if value in existing_by_value:
-            continue
-        tag = await session.scalar(select(MediaJobTag).where(MediaJobTag.value == value))
-        if tag is None:
-            tag = MediaJobTag(value=value)
-            session.add(tag)
-            await session.flush()
-        session.add(MediaJobTagLink(job_id=job.id, tag_id=tag.id))
+    existing_links = _existing_job_tag_links(job)
+    await _delete_job_tag_links(session, existing_links=existing_links, remove_tags=remove_tags)
+    await _add_job_tag_links(session, job_id=job.id, existing_links=existing_links, add_tags=add_tags)
     await session.flush()
 
 
-async def list_assets(session: AsyncSession, filters: MediaListFilters) -> tuple[list[MediaAsset], dict[str, int]]:
-    clauses = []
+def _asset_search_clause(query: str) -> ColumnElement[bool]:
+    search = f"%{query.strip().lower()}%"
+    return or_(
+        func.lower(MediaAsset.original_filename).like(search),
+        func.lower(MediaAsset.public_url).like(search),
+        func.lower(MediaAsset.storage_key).like(search),
+        func.lower(MediaAsset.source_ref).like(search),
+        MediaAsset.id.in_(
+            select(MediaAssetI18n.asset_id).where(
+                or_(
+                    func.lower(MediaAssetI18n.title).like(search),
+                    func.lower(MediaAssetI18n.alt_text).like(search),
+                    func.lower(MediaAssetI18n.caption).like(search),
+                    func.lower(MediaAssetI18n.description).like(search),
+                )
+            )
+        ),
+    )
+
+
+def _asset_tag_clause(raw_tag: str) -> ColumnElement[bool] | None:
+    normalized_tag = _normalize_tag(raw_tag)
+    if not normalized_tag:
+        return None
+    return MediaAsset.id.in_(
+        select(MediaAssetTag.asset_id)
+        .join(MediaTag, MediaTag.id == MediaAssetTag.tag_id)
+        .where(MediaTag.value == normalized_tag)
+    )
+
+
+def _asset_enum_filter_clauses(filters: MediaListFilters) -> list[ColumnElement[bool]]:
+    clauses: list[ColumnElement[bool]] = []
+    for raw_value, enum_type, column in (
+        (filters.asset_type, MediaAssetType, cast(ColumnElement[Any], MediaAsset.asset_type)),
+        (filters.status, MediaAssetStatus, cast(ColumnElement[Any], MediaAsset.status)),
+        (filters.visibility, MediaVisibility, cast(ColumnElement[Any], MediaAsset.visibility)),
+    ):
+        if raw_value:
+            clauses.append(cast(ColumnElement[bool], column == enum_type(raw_value)))
+    return clauses
+
+
+def _build_asset_filter_clauses(filters: MediaListFilters) -> list[ColumnElement[bool]]:
+    clauses: list[ColumnElement[bool]] = []
     if not filters.include_trashed:
         clauses.append(MediaAsset.status != MediaAssetStatus.trashed)
     if filters.q:
-        q = f"%{filters.q.strip().lower()}%"
-        clauses.append(
-            or_(
-                func.lower(MediaAsset.original_filename).like(q),
-                func.lower(MediaAsset.public_url).like(q),
-                func.lower(MediaAsset.storage_key).like(q),
-                func.lower(MediaAsset.source_ref).like(q),
-                MediaAsset.id.in_(
-                    select(MediaAssetI18n.asset_id).where(
-                        or_(
-                            func.lower(MediaAssetI18n.title).like(q),
-                            func.lower(MediaAssetI18n.alt_text).like(q),
-                            func.lower(MediaAssetI18n.caption).like(q),
-                            func.lower(MediaAssetI18n.description).like(q),
-                        )
-                    )
-                ),
-            )
-        )
-    if filters.asset_type:
-        clauses.append(MediaAsset.asset_type == MediaAssetType(filters.asset_type))
-    if filters.status:
-        clauses.append(MediaAsset.status == MediaAssetStatus(filters.status))
-    if filters.visibility:
-        clauses.append(MediaAsset.visibility == MediaVisibility(filters.visibility))
+        clauses.append(_asset_search_clause(filters.q))
+    clauses.extend(_asset_enum_filter_clauses(filters))
     if filters.created_from:
         clauses.append(MediaAsset.created_at >= filters.created_from)
     if filters.created_to:
         clauses.append(MediaAsset.created_at <= filters.created_to)
-    if filters.tag:
-        normalized_tag = _normalize_tag(filters.tag)
-        if normalized_tag:
-            clauses.append(
-                MediaAsset.id.in_(
-                    select(MediaAssetTag.asset_id)
-                    .join(MediaTag, MediaTag.id == MediaAssetTag.tag_id)
-                    .where(MediaTag.value == normalized_tag)
-                )
-            )
+    tag_clause = _asset_tag_clause(filters.tag) if filters.tag else None
+    if tag_clause is not None:
+        clauses.append(tag_clause)
+    return clauses
 
-    stmt = select(MediaAsset).options(
-        selectinload(MediaAsset.tags).selectinload(MediaAssetTag.tag),
-        selectinload(MediaAsset.i18n),
-        selectinload(MediaAsset.variants),
+
+def _job_tag_clause(raw_tag: str) -> ColumnElement[bool] | None:
+    normalized_tag = _normalize_job_tag(raw_tag)
+    if not normalized_tag:
+        return None
+    return MediaJob.id.in_(
+        select(MediaJobTagLink.job_id)
+        .join(MediaJobTag, MediaJobTag.id == MediaJobTagLink.tag_id)
+        .where(MediaJobTag.value == normalized_tag)
     )
-    count_stmt = select(func.count()).select_from(MediaAsset)
-    if clauses:
-        stmt = stmt.where(and_(*clauses))
-        count_stmt = count_stmt.where(and_(*clauses))
-
-    order_map: dict[str, list[ColumnElement[Any]]] = {
-        "newest": [MediaAsset.created_at.desc(), MediaAsset.id.desc()],
-        "oldest": [MediaAsset.created_at.asc(), MediaAsset.id.asc()],
-        "name_asc": [MediaAsset.original_filename.asc().nulls_last(), MediaAsset.created_at.desc()],
-        "name_desc": [MediaAsset.original_filename.desc().nulls_last(), MediaAsset.created_at.desc()],
-    }
-    order = order_map.get(filters.sort, order_map["newest"])
-    stmt = stmt.order_by(*order).offset((filters.page - 1) * filters.limit).limit(filters.limit)
-    total_items = int((await session.scalar(count_stmt)) or 0)
-    total_pages = max(1, (total_items + filters.limit - 1) // filters.limit) if total_items else 1
-    rows = (await session.execute(stmt)).scalars().all()
-    return list(rows), {"total_items": total_items, "total_pages": total_pages, "page": filters.page, "limit": filters.limit}
 
 
-async def list_jobs(session: AsyncSession, filters: MediaJobListFilters) -> tuple[list[MediaJob], dict[str, int]]:
+def _job_base_filter_clauses(filters: MediaJobListFilters) -> list[ColumnElement[bool]]:
     clauses: list[ColumnElement[bool]] = []
     if filters.status:
         clauses.append(MediaJob.status == MediaJobStatus(filters.status))
@@ -1210,32 +1323,63 @@ async def list_jobs(session: AsyncSession, filters: MediaJobListFilters) -> tupl
         clauses.append(MediaJob.created_at >= filters.created_from)
     if filters.created_to:
         clauses.append(MediaJob.created_at <= filters.created_to)
-    if filters.triage_state:
-        clauses.append(MediaJob.triage_state == _coerce_triage_state(filters.triage_state, fallback="open"))
     if filters.assigned_to_user_id:
         clauses.append(MediaJob.assigned_to_user_id == filters.assigned_to_user_id)
     if filters.dead_letter_only:
         clauses.append(MediaJob.status == MediaJobStatus.dead_letter)
+    return clauses
+
+
+def _build_job_filter_clauses(filters: MediaJobListFilters, *, now: datetime) -> list[ColumnElement[bool]]:
+    clauses = _job_base_filter_clauses(filters)
+    if filters.triage_state:
+        clauses.append(MediaJob.triage_state == _coerce_triage_state(filters.triage_state, fallback="open"))
     if filters.sla_breached:
-        clauses.append(MediaJob.sla_due_at.is_not(None))
-        clauses.append(MediaJob.sla_due_at < _now())
-        clauses.append(MediaJob.triage_state != "resolved")
-    if filters.tag:
-        normalized_tag = _normalize_job_tag(filters.tag)
-        if normalized_tag:
-            clauses.append(
-                MediaJob.id.in_(
-                    select(MediaJobTagLink.job_id)
-                    .join(MediaJobTag, MediaJobTag.id == MediaJobTagLink.tag_id)
-                    .where(MediaJobTag.value == normalized_tag)
-                )
-            )
+        clauses.extend((MediaJob.sla_due_at.is_not(None), MediaJob.sla_due_at < now, MediaJob.triage_state != "resolved"))
+    tag_clause = _job_tag_clause(filters.tag) if filters.tag else None
+    if tag_clause is not None:
+        clauses.append(tag_clause)
+    return clauses
+
+
+async def list_assets(session: AsyncSession, filters: MediaListFilters) -> tuple[list[MediaAsset], dict[str, int]]:
+    clauses = _build_asset_filter_clauses(filters)
+
+    stmt = select(MediaAsset).options(
+        selectinload(MediaAsset.tags).selectinload(MediaAssetTag.tag),
+        selectinload(MediaAsset.i18n),
+        selectinload(MediaAsset.variants),
+    )
+    count_stmt = select(func.count()).select_from(MediaAsset)
+    if clauses:
+        where_clause = and_(*clauses)
+        stmt = stmt.where(where_clause)
+        count_stmt = count_stmt.where(where_clause)
+
+    order_map: dict[str, list[ColumnElement[Any]]] = {
+        "newest": [MediaAsset.created_at.desc(), MediaAsset.id.desc()],
+        "oldest": [MediaAsset.created_at.asc(), MediaAsset.id.asc()],
+        "name_asc": [MediaAsset.original_filename.asc().nulls_last(), MediaAsset.created_at.desc()],
+        "name_desc": [MediaAsset.original_filename.desc().nulls_last(), MediaAsset.created_at.desc()],
+    }
+    order = order_map.get(filters.sort, order_map["newest"])
+    stmt = stmt.order_by(*order).offset((filters.page - 1) * filters.limit).limit(filters.limit)
+
+    total_items = int((await session.scalar(count_stmt)) or 0)
+    total_pages = max(1, (total_items + filters.limit - 1) // filters.limit) if total_items else 1
+    rows = (await session.execute(stmt)).scalars().all()
+    return list(rows), {"total_items": total_items, "total_pages": total_pages, "page": filters.page, "limit": filters.limit}
+
+
+async def list_jobs(session: AsyncSession, filters: MediaJobListFilters) -> tuple[list[MediaJob], dict[str, int]]:
+    clauses = _build_job_filter_clauses(filters, now=_now())
 
     stmt = select(MediaJob).options(selectinload(MediaJob.tags).selectinload(MediaJobTagLink.tag))
     count_stmt = select(func.count()).select_from(MediaJob)
     if clauses:
-        stmt = stmt.where(and_(*clauses))
-        count_stmt = count_stmt.where(and_(*clauses))
+        where_clause = and_(*clauses)
+        stmt = stmt.where(where_clause)
+        count_stmt = count_stmt.where(where_clause)
 
     stmt = stmt.order_by(MediaJob.created_at.desc(), MediaJob.id.desc()).offset((filters.page - 1) * filters.limit).limit(filters.limit)
     total_items = int((await session.scalar(count_stmt)) or 0)
@@ -1244,115 +1388,113 @@ async def list_jobs(session: AsyncSession, filters: MediaJobListFilters) -> tupl
     return list(rows), {"total_items": total_items, "total_pages": total_pages, "page": filters.page, "limit": filters.limit}
 
 
-async def get_telemetry(session: AsyncSession) -> MediaTelemetryResponse:
-    redis = get_redis()
-    queue_depth = 0
+async def _redis_queue_depth(redis: Any) -> int:
+    try:
+        return int(await _await_if_needed(redis.llen(QUEUE_KEY)) or 0)
+    except Exception:
+        return 0
+
+
+def _heartbeat_scan_limit() -> int:
+    return max(1, int(getattr(settings, "media_dam_telemetry_heartbeat_scan_limit", 500) or 500))
+
+
+def _parse_heartbeat_timestamp(value: Any) -> datetime | None:
+    try:
+        parsed = datetime.fromisoformat(str(value))
+    except Exception:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def _optional_int(value: Any) -> int | None:
+    raw = str(value or "").strip()
+    if not raw.isdigit():
+        return None
+    return int(raw)
+
+
+def _worker_id_from_payload(payload: dict[str, Any], *, key: object) -> str:
+    configured = _optional_stripped(str(payload.get("worker_id") or ""))
+    return configured or str(key).split(":")[-1]
+
+
+def _heartbeat_payload_to_worker(payload: dict[str, Any], *, key: object, now: datetime) -> MediaTelemetryWorkerRead | None:
+    last_seen = _parse_heartbeat_timestamp(payload.get("last_seen_at"))
+    if last_seen is None:
+        return None
+    lag = max(0, int((now - last_seen).total_seconds()))
+    return MediaTelemetryWorkerRead(
+        worker_id=_worker_id_from_payload(payload, key=key),
+        hostname=_optional_stripped(str(payload.get("hostname") or "")),
+        pid=_optional_int(payload.get("pid")),
+        app_version=str(payload.get("app_version") or "") or None,
+        last_seen_at=last_seen,
+        lag_seconds=lag,
+    )
+
+
+async def _consume_heartbeat(redis: Any, *, key: object, now: datetime) -> MediaTelemetryWorkerRead | None:
+    raw = await _await_if_needed(redis.get(str(key)))
+    if not raw:
+        return None
+    payload = json_loads(raw)
+    return _heartbeat_payload_to_worker(payload, key=key, now=now)
+
+
+async def _collect_telemetry_workers(
+    redis: Any,
+    *,
+    prefix: str,
+    now: datetime,
+) -> list[MediaTelemetryWorkerRead]:
     workers: list[MediaTelemetryWorkerRead] = []
-    now = _now()
-    prefix = str(getattr(settings, "media_dam_worker_heartbeat_prefix", HEARTBEAT_PREFIX) or HEARTBEAT_PREFIX)
+    scan_limit = _heartbeat_scan_limit()
+    scanned = 0
+    key_iter = redis.scan_iter(match=f"{prefix}:*")
+    if hasattr(key_iter, "__aiter__"):
+        async for key in key_iter:
+            if scanned >= scan_limit:
+                break
+            scanned += 1
+            worker = await _consume_heartbeat(redis, key=key, now=now)
+            if worker is not None:
+                workers.append(worker)
+        return workers
+    for key in cast(Iterable[object], key_iter):
+        if scanned >= scan_limit:
+            break
+        scanned += 1
+        worker = await _consume_heartbeat(redis, key=key, now=now)
+        if worker is not None:
+            workers.append(worker)
+    return workers
 
-    if redis is not None:
-        try:
-            queue_depth = int(await _await_if_needed(redis.llen(QUEUE_KEY)) or 0)
-        except Exception:
-            queue_depth = 0
 
-        try:
-            scan_limit = max(1, int(getattr(settings, "media_dam_telemetry_heartbeat_scan_limit", 500) or 500))
+async def _count_jobs(session: AsyncSession, *conditions: ColumnElement[bool]) -> int:
+    stmt = select(func.count()).select_from(MediaJob)
+    if conditions:
+        stmt = stmt.where(*conditions)
+    return int((await session.scalar(stmt)) or 0)
 
-            async def _consume_heartbeat(key: object) -> bool:
-                raw = await _await_if_needed(redis.get(str(key)))
-                if not raw:
-                    return False
-                payload = json_loads(raw)
-                last_seen_raw = payload.get("last_seen_at")
-                try:
-                    last_seen = datetime.fromisoformat(str(last_seen_raw))
-                    if last_seen.tzinfo is None:
-                        last_seen = last_seen.replace(tzinfo=timezone.utc)
-                except Exception:
-                    return False
-                lag = max(0, int((now - last_seen).total_seconds()))
-                workers.append(
-                    MediaTelemetryWorkerRead(
-                        worker_id=str(payload.get("worker_id") or str(key).split(":")[-1]),
-                        hostname=str(payload.get("hostname") or "") or None,
-                        pid=int(payload["pid"]) if str(payload.get("pid") or "").isdigit() else None,
-                        app_version=str(payload.get("app_version") or "") or None,
-                        last_seen_at=last_seen,
-                        lag_seconds=lag,
-                    )
-                )
-                return True
 
-            scanned = 0
-            key_iter = redis.scan_iter(match=f"{prefix}:*")
-            if hasattr(key_iter, "__aiter__"):
-                async for key in key_iter:
-                    if scanned >= scan_limit:
-                        break
-                    scanned += 1
-                    await _consume_heartbeat(key)
-            else:
-                for key in cast(Iterable[object], key_iter):
-                    if scanned >= scan_limit:
-                        break
-                    scanned += 1
-                    await _consume_heartbeat(key)
-        except Exception:
-            workers = []
-
-    stale_seconds = max(60, int(getattr(settings, "media_dam_processing_stale_seconds", 600) or 600))
-    stale_cutoff = now - timedelta(seconds=stale_seconds)
-    stale_processing_count = int(
-        (await session.scalar(select(func.count()).select_from(MediaJob).where(MediaJob.status == MediaJobStatus.processing, MediaJob.started_at < stale_cutoff)))
-        or 0
-    )
-    dead_letter_count = int(
-        (await session.scalar(select(func.count()).select_from(MediaJob).where(MediaJob.status == MediaJobStatus.dead_letter)))
-        or 0
-    )
-    retry_scheduled_count = int(
-        (
-            await session.scalar(
-                select(func.count()).select_from(MediaJob).where(
-                    MediaJob.status == MediaJobStatus.failed,
-                    MediaJob.next_retry_at.is_not(None),
-                )
-            )
-        )
-        or 0
-    )
-    sla_breached_count = int(
-        (
-            await session.scalar(
-                select(func.count()).select_from(MediaJob).where(
-                    MediaJob.sla_due_at.is_not(None),
-                    MediaJob.sla_due_at < now,
-                    MediaJob.triage_state != "resolved",
-                )
-            )
-        )
-        or 0
-    )
-
+async def _oldest_queued_age_seconds(session: AsyncSession, *, now: datetime) -> int | None:
     oldest_queued_at = await session.scalar(
         select(func.min(MediaJob.created_at)).where(MediaJob.status == MediaJobStatus.queued)
     )
-    oldest_queued_age_seconds: int | None = None
-    if oldest_queued_at:
-        oldest_queued_age_seconds = max(0, int((now - oldest_queued_at).total_seconds()))
+    if not oldest_queued_at:
+        return None
+    return max(0, int((now - oldest_queued_at).total_seconds()))
 
-    status_counts_rows = (
-        await session.execute(select(MediaJob.status, func.count()).group_by(MediaJob.status))
-    ).all()
-    status_counts = {row[0].value if hasattr(row[0], "value") else str(row[0]): int(row[1] or 0) for row in status_counts_rows}
 
-    type_counts_rows = (
-        await session.execute(select(MediaJob.job_type, func.count()).group_by(MediaJob.job_type))
-    ).all()
-    type_counts = {row[0].value if hasattr(row[0], "value") else str(row[0]): int(row[1] or 0) for row in type_counts_rows}
+async def _grouped_job_counts(session: AsyncSession, column: ColumnElement[Any]) -> dict[str, int]:
+    rows = (await session.execute(select(column, func.count()).group_by(column))).all()
+    return {row[0].value if hasattr(row[0], "value") else str(row[0]): int(row[1] or 0) for row in rows}
 
+
+async def _avg_processing_seconds_last_day(session: AsyncSession, *, now: datetime) -> int | None:
     completed_rows = (
         await session.execute(
             select(MediaJob.started_at, MediaJob.completed_at)
@@ -1371,7 +1513,66 @@ async def get_telemetry(session: AsyncSession) -> MediaTelemetryResponse:
         if not started_at or not completed_at:
             continue
         processing_seconds.append(max(0, int((completed_at - started_at).total_seconds())))
-    avg_processing_seconds = int(sum(processing_seconds) / len(processing_seconds)) if processing_seconds else None
+    if not processing_seconds:
+        return None
+    return int(sum(processing_seconds) / len(processing_seconds))
+
+
+async def _telemetry_job_counters(
+    session: AsyncSession,
+    *,
+    now: datetime,
+) -> tuple[int, int, int, int, int | None, dict[str, int], dict[str, int], int | None]:
+    stale_seconds = max(60, int(getattr(settings, "media_dam_processing_stale_seconds", 600) or 600))
+    stale_cutoff = now - timedelta(seconds=stale_seconds)
+    stale_processing = await _count_jobs(
+        session,
+        MediaJob.status == MediaJobStatus.processing,
+        MediaJob.started_at < stale_cutoff,
+    )
+    dead_letter = await _count_jobs(session, MediaJob.status == MediaJobStatus.dead_letter)
+    retry_scheduled = await _count_jobs(
+        session,
+        MediaJob.status == MediaJobStatus.failed,
+        MediaJob.next_retry_at.is_not(None),
+    )
+    sla_breached = await _count_jobs(
+        session,
+        MediaJob.sla_due_at.is_not(None),
+        MediaJob.sla_due_at < now,
+        MediaJob.triage_state != "resolved",
+    )
+    oldest_age = await _oldest_queued_age_seconds(session, now=now)
+    status_counts = await _grouped_job_counts(session, cast(ColumnElement[Any], MediaJob.status))
+    type_counts = await _grouped_job_counts(session, cast(ColumnElement[Any], MediaJob.job_type))
+    avg_processing = await _avg_processing_seconds_last_day(session, now=now)
+    return stale_processing, dead_letter, retry_scheduled, sla_breached, oldest_age, status_counts, type_counts, avg_processing
+
+
+async def get_telemetry(session: AsyncSession) -> MediaTelemetryResponse:
+    redis = get_redis()
+    queue_depth = 0
+    workers: list[MediaTelemetryWorkerRead] = []
+    now = _now()
+    prefix = str(getattr(settings, "media_dam_worker_heartbeat_prefix", HEARTBEAT_PREFIX) or HEARTBEAT_PREFIX)
+
+    if redis is not None:
+        queue_depth = await _redis_queue_depth(redis)
+        try:
+            workers = await _collect_telemetry_workers(redis, prefix=prefix, now=now)
+        except Exception:
+            workers = []
+
+    (
+        stale_processing_count,
+        dead_letter_count,
+        retry_scheduled_count,
+        sla_breached_count,
+        oldest_queued_age_seconds,
+        status_counts,
+        type_counts,
+        avg_processing_seconds,
+    ) = await _telemetry_job_counters(session, now=now)
 
     workers.sort(key=lambda row: row.last_seen_at, reverse=True)
     return MediaTelemetryResponse(
@@ -1388,13 +1589,11 @@ async def get_telemetry(session: AsyncSession) -> MediaTelemetryResponse:
         type_counts=type_counts,
     )
 
-def asset_to_read(asset: MediaAsset) -> MediaAssetRead:
-    _ensure_asset_storage_placement(asset)
-    tags = sorted({tag_rel.tag.value for tag_rel in (asset.tags or []) if getattr(tag_rel, "tag", None)})
-    i18n: list[MediaAssetI18nRead] = []
-    for i18n_row in sorted(asset.i18n or [], key=lambda x: x.lang):
+def _asset_i18n_to_read(asset: MediaAsset) -> list[MediaAssetI18nRead]:
+    rows: list[MediaAssetI18nRead] = []
+    for i18n_row in sorted(asset.i18n or [], key=lambda row: row.lang):
         lang = cast(Literal["en", "ro"], i18n_row.lang if i18n_row.lang in {"en", "ro"} else "en")
-        i18n.append(
+        rows.append(
             MediaAssetI18nRead(
                 lang=lang,
                 title=i18n_row.title,
@@ -1403,9 +1602,13 @@ def asset_to_read(asset: MediaAsset) -> MediaAssetRead:
                 description=i18n_row.description,
             )
         )
-    variants: list[MediaVariantRead] = []
-    for variant_row in sorted(asset.variants or [], key=lambda x: x.profile):
-        variants.append(
+    return rows
+
+
+def _asset_variants_to_read(asset: MediaAsset) -> list[MediaVariantRead]:
+    rows: list[MediaVariantRead] = []
+    for variant_row in sorted(asset.variants or [], key=lambda row: row.profile):
+        rows.append(
             MediaVariantRead(
                 id=variant_row.id,
                 profile=variant_row.profile,
@@ -1417,6 +1620,15 @@ def asset_to_read(asset: MediaAsset) -> MediaAssetRead:
                 created_at=variant_row.created_at,
             )
         )
+    return rows
+
+
+def asset_to_read(asset: MediaAsset) -> MediaAssetRead:
+
+    _ensure_asset_storage_placement(asset)
+    tags = sorted({tag_rel.tag.value for tag_rel in (asset.tags or []) if getattr(tag_rel, "tag", None)})
+    i18n = _asset_i18n_to_read(asset)
+    variants = _asset_variants_to_read(asset)
     preview_url = asset.public_url if _is_publicly_servable(asset) else build_preview_url(asset.id)
     return MediaAssetRead(
         id=asset.id,
@@ -1467,17 +1679,19 @@ async def get_asset_or_404(session: AsyncSession, asset_id: UUID) -> MediaAsset:
 
 
 async def apply_asset_update(session: AsyncSession, asset: MediaAsset, payload: MediaAssetUpdateRequest) -> None:
+    def _set_optional_text(attr: str, value: str | None) -> None:
+        if value is None:
+            return
+        setattr(asset, attr, (value or "").strip() or None)
+
     before_public = _is_publicly_servable(asset)
     if payload.status:
         asset.status = MediaAssetStatus(payload.status)
     if payload.visibility:
         asset.visibility = MediaVisibility(payload.visibility)
-    if payload.rights_license is not None:
-        asset.rights_license = (payload.rights_license or "").strip() or None
-    if payload.rights_owner is not None:
-        asset.rights_owner = (payload.rights_owner or "").strip() or None
-    if payload.rights_notes is not None:
-        asset.rights_notes = (payload.rights_notes or "").strip() or None
+    _set_optional_text("rights_license", payload.rights_license)
+    _set_optional_text("rights_owner", payload.rights_owner)
+    _set_optional_text("rights_notes", payload.rights_notes)
     session.add(asset)
 
     if payload.tags is not None:
@@ -1492,6 +1706,12 @@ async def apply_asset_update(session: AsyncSession, asset: MediaAsset, payload: 
 
 
 async def _replace_asset_i18n(session: AsyncSession, asset: MediaAsset, entries: list[MediaAssetUpdateI18nItem]) -> None:
+    def _apply_i18n_values(row: MediaAssetI18n, data: MediaAssetUpdateI18nItem) -> None:
+        row.title = _optional_stripped(data.title)
+        row.alt_text = _optional_stripped(data.alt_text)
+        row.caption = _optional_stripped(data.caption)
+        row.description = _optional_stripped(data.description)
+
     by_lang = {row.lang: row for row in (asset.i18n or [])}
     seen_langs: set[str] = set()
     for row in entries:
@@ -1503,38 +1723,57 @@ async def _replace_asset_i18n(session: AsyncSession, asset: MediaAsset, entries:
         if current is None:
             current = MediaAssetI18n(asset_id=asset.id, lang=lang)
             session.add(current)
-        current.title = (row.title or "").strip() or None
-        current.alt_text = (row.alt_text or "").strip() or None
-        current.caption = (row.caption or "").strip() or None
-        current.description = (row.description or "").strip() or None
+        _apply_i18n_values(current, row)
 
 
-async def _replace_asset_tags(session: AsyncSession, asset: MediaAsset, tags: list[str]) -> None:
-    normalized = []
-    seen = set()
+def _normalized_asset_tags(tags: list[str] | None, *, limit: int = 30) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
     for raw in tags or []:
         value = _normalize_tag(raw)
         if not value or value in seen:
             continue
         seen.add(value)
         normalized.append(value)
-        if len(normalized) >= 30:
+        if len(normalized) >= limit:
             break
+    return normalized
 
-    existing = {rel.tag.value: rel for rel in (asset.tags or []) if getattr(rel, "tag", None)}
-    keep = set(normalized)
-    for value, relation in existing.items():
-        if value not in keep:
+
+def _existing_asset_tag_links(asset: MediaAsset) -> dict[str, MediaAssetTag]:
+    return {rel.tag.value: rel for rel in (asset.tags or []) if getattr(rel, "tag", None)}
+
+
+async def _delete_asset_tag_links_not_in(
+    session: AsyncSession,
+    *,
+    existing_links: dict[str, MediaAssetTag],
+    keep_values: set[str],
+) -> None:
+    for value, relation in existing_links.items():
+        if value not in keep_values:
             await session.delete(relation)
+
+
+async def _get_or_create_asset_tag(session: AsyncSession, value: str) -> MediaTag:
+    tag = await session.scalar(select(MediaTag).where(MediaTag.value == value))
+    if tag is not None:
+        return tag
+    tag = MediaTag(value=value)
+    session.add(tag)
+    await session.flush()
+    return tag
+
+
+async def _replace_asset_tags(session: AsyncSession, asset: MediaAsset, tags: list[str]) -> None:
+    normalized = _normalized_asset_tags(tags)
+    existing = _existing_asset_tag_links(asset)
+    await _delete_asset_tag_links_not_in(session, existing_links=existing, keep_values=set(normalized))
 
     for value in normalized:
         if value in existing:
             continue
-        tag = await session.scalar(select(MediaTag).where(MediaTag.value == value))
-        if tag is None:
-            tag = MediaTag(value=value)
-            session.add(tag)
-            await session.flush()
+        tag = await _get_or_create_asset_tag(session, value)
         session.add(MediaAssetTag(asset_id=asset.id, tag_id=tag.id))
 
 
@@ -1647,35 +1886,51 @@ async def restore_asset(session: AsyncSession, asset: MediaAsset, actor_id: UUID
     return asset
 
 
-async def purge_asset(session: AsyncSession, asset: MediaAsset) -> None:
-    paths: list[Path] = []
+def _append_existing_storage_path(paths: list[Path], *, storage_key: str, context: dict[str, str], event_name: str) -> None:
     try:
-        path = _find_existing_storage_path(asset.storage_key)
-        if path is not None:
-            paths.append(path)
+        path = _find_existing_storage_path(storage_key)
     except Exception as exc:
-        logger.debug(
-            "media_asset_purge_primary_path_resolve_failed",
-            extra={"asset_id": str(asset.id), "storage_key": str(asset.storage_key)},
-            exc_info=exc,
-        )
+        logger.debug(event_name, extra=context, exc_info=exc)
+        return
+    if path is not None:
+        paths.append(path)
+
+
+def _purge_candidate_paths(asset: MediaAsset) -> list[Path]:
+    context = {"asset_id": str(asset.id), "storage_key": str(asset.storage_key)}
+    paths: list[Path] = []
+    _append_existing_storage_path(
+        paths,
+        storage_key=asset.storage_key,
+        context=context,
+        event_name="media_asset_purge_primary_path_resolve_failed",
+    )
     for variant in asset.variants or []:
+        _append_existing_storage_path(
+            paths,
+            storage_key=variant.storage_key,
+            context=context,
+            event_name="media_asset_purge_variant_path_resolve_failed",
+        )
+    return paths
+
+
+def _unlink_purge_paths(paths: list[Path], *, asset_id: UUID) -> None:
+    for path in paths:
         try:
-            path = _find_existing_storage_path(variant.storage_key)
-            if path is not None:
-                paths.append(path)
-        except Exception:
-            continue
-    for p in paths:
-        try:
-            if p.exists():
-                p.unlink()
+            if path.exists():
+                path.unlink()
         except Exception as exc:
             logger.debug(
                 "media_asset_purge_unlink_failed",
-                extra={"asset_id": str(asset.id), "path": str(p)},
+                extra={"asset_id": str(asset_id), "path": str(path)},
                 exc_info=exc,
             )
+
+
+async def purge_asset(session: AsyncSession, asset: MediaAsset) -> None:
+    paths = _purge_candidate_paths(asset)
+    _unlink_purge_paths(paths, asset_id=asset.id)
     await session.delete(asset)
     await session.commit()
 
@@ -1744,6 +1999,97 @@ async def rebuild_usage_edges(
     )
 
 
+async def _collect_usage_refs_for_url(
+    session: AsyncSession,
+    *,
+    url: str,
+) -> list[tuple[str, str, str | None, str, str | None]]:
+    refs: list[tuple[str, str, str | None, str, str | None]] = []
+    refs.extend(await _usage_refs_from_content_blocks(session, url=url))
+    refs.extend(await _usage_refs_from_content_images(session, url=url))
+    refs.extend(await _usage_refs_from_product_images(session, url=url))
+    refs.extend(await _usage_refs_from_content_translations(session, url=url))
+    refs.extend(await _usage_refs_from_site_social(session, url=url))
+    return refs
+
+
+async def _usage_refs_from_content_blocks(
+    session: AsyncSession,
+    *,
+    url: str,
+) -> list[tuple[str, str, str | None, str, str | None]]:
+    keys = await content_service.get_asset_usage_keys(session, url=url)
+    return [("content_block", key, None, "auto_scan", None) for key in keys]
+
+
+async def _usage_refs_from_content_images(
+    session: AsyncSession,
+    *,
+    url: str,
+) -> list[tuple[str, str, str | None, str, str | None]]:
+    rows = (
+        await session.execute(
+            select(ContentImage.id, ContentBlock.key)
+            .join(ContentBlock, ContentBlock.id == ContentImage.content_block_id)
+            .where(ContentImage.url == url)
+        )
+    ).all()
+    return [("content_image", block_key, str(image_id), "content_images.url", None) for image_id, block_key in rows]
+
+
+async def _usage_refs_from_product_images(
+    session: AsyncSession,
+    *,
+    url: str,
+) -> list[tuple[str, str, str | None, str, str | None]]:
+    rows = (
+        await session.execute(
+            select(ProductImage.id, Product.slug)
+            .join(Product, Product.id == ProductImage.product_id)
+            .where(ProductImage.url == url, ProductImage.is_deleted.is_(False))
+        )
+    ).all()
+    return [("product_image", slug, str(image_id), "product_images.url", None) for image_id, slug in rows]
+
+
+async def _usage_refs_from_content_translations(
+    session: AsyncSession,
+    *,
+    url: str,
+) -> list[tuple[str, str, str | None, str, str | None]]:
+    rows = (
+        await session.execute(
+            select(ContentBlock.key, ContentBlockTranslation.lang)
+            .join(ContentBlock, ContentBlock.id == ContentBlockTranslation.content_block_id)
+            .where(ContentBlockTranslation.body_markdown.ilike(f"%{url}%"))
+        )
+    ).all()
+    return [
+        ("content_translation", block_key, None, "translations.body_markdown", str(lang or ""))
+        for block_key, lang in rows
+    ]
+
+
+async def _usage_refs_from_site_social(
+    session: AsyncSession,
+    *,
+    url: str,
+) -> list[tuple[str, str, str | None, str, str | None]]:
+    like = f"%{url}%"
+    rows = (
+        await session.execute(
+            select(ContentBlock.key).where(
+                ContentBlock.key == "site.social",
+                or_(
+                    ContentBlock.body_markdown.ilike(like),
+                    func.cast(ContentBlock.meta, String).ilike(like),
+                ),
+            )
+        )
+    ).all()
+    return [("site_social", block_key, None, "site.social", None) for (block_key,) in rows]
+
+
 async def _collect_usage_refs(
     session: AsyncSession,
     asset: MediaAsset,
@@ -1751,54 +2097,7 @@ async def _collect_usage_refs(
     refs: list[tuple[str, str, str | None, str, str | None]] = []
     urls = [asset.public_url]
     for url in urls:
-        keys = await content_service.get_asset_usage_keys(session, url=url)
-        refs.extend([("content_block", key, None, "auto_scan", None) for key in keys])
-
-        content_rows = (
-            await session.execute(
-                select(ContentImage.id, ContentBlock.key)
-                .join(ContentBlock, ContentBlock.id == ContentImage.content_block_id)
-                .where(ContentImage.url == url)
-            )
-        ).all()
-        for image_id, block_key in content_rows:
-            refs.append(("content_image", block_key, str(image_id), "content_images.url", None))
-
-        product_rows = (
-            await session.execute(
-                select(ProductImage.id, Product.slug)
-                .join(Product, Product.id == ProductImage.product_id)
-                .where(ProductImage.url == url, ProductImage.is_deleted.is_(False))
-            )
-        ).all()
-        for image_id, slug in product_rows:
-            refs.append(("product_image", slug, str(image_id), "product_images.url", None))
-
-        like = f"%{url}%"
-        tr_rows = (
-            await session.execute(
-                select(ContentBlock.key, ContentBlockTranslation.lang)
-                .join(ContentBlock, ContentBlock.id == ContentBlockTranslation.content_block_id)
-                .where(ContentBlockTranslation.body_markdown.ilike(like))
-            )
-        ).all()
-        for block_key, lang in tr_rows:
-            refs.append(("content_translation", block_key, None, "translations.body_markdown", str(lang or "")))
-
-        social_rows = (
-            await session.execute(
-                select(ContentBlock.key)
-                .where(
-                    ContentBlock.key == "site.social",
-                    or_(
-                        ContentBlock.body_markdown.ilike(like),
-                        func.cast(ContentBlock.meta, String).ilike(like),
-                    ),
-                )
-            )
-        ).all()
-        for (block_key,) in social_rows:
-            refs.append(("site_social", block_key, None, "site.social", None))
+        refs.extend(await _collect_usage_refs_for_url(session, url=url))
 
     return refs
 
@@ -1823,8 +2122,12 @@ def _detect_image_dimensions(path: Path) -> tuple[int | None, int | None]:
         return None, None
 
 
-async def process_job_inline(session: AsyncSession, job: MediaJob) -> MediaJob:
-    payload = _job_payload(job)
+async def _prepare_job_retry_policy(
+    session: AsyncSession,
+    *,
+    job: MediaJob,
+    payload: dict[str, Any],
+) -> RetryPolicyResolved:
     retry_policy = _retry_policy_from_payload(payload, job_type=job.job_type)
     if retry_policy is None:
         retry_policy = await get_retry_policy_for_job_type(session, job.job_type)
@@ -1833,7 +2136,10 @@ async def process_job_inline(session: AsyncSession, job: MediaJob) -> MediaJob:
         job.payload_json = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
     if not int(job.max_attempts or 0):
         job.max_attempts = int(retry_policy.max_attempts)
+    return retry_policy
 
+
+async def _mark_job_processing_started(session: AsyncSession, *, job: MediaJob) -> None:
     job.status = MediaJobStatus.processing
     job.triage_state = "retrying" if job.attempt > 0 else _coerce_triage_state(job.triage_state, fallback="open")
     job.started_at = _now()
@@ -1842,86 +2148,134 @@ async def process_job_inline(session: AsyncSession, job: MediaJob) -> MediaJob:
     session.add(job)
     await session.flush()
     await _record_job_event(session, job=job, action="processing_started", meta={"attempt": int(job.attempt or 0)})
-    try:
-        if job.job_type == MediaJobType.ingest:
-            await _process_ingest_job(session, job)
-        elif job.job_type == MediaJobType.variant:
-            await _process_variant_job(session, job)
-        elif job.job_type == MediaJobType.edit:
-            await _process_edit_job(session, job)
-        elif job.job_type == MediaJobType.ai_tag:
-            await _process_ai_tag_job(session, job)
-        elif job.job_type == MediaJobType.duplicate_scan:
-            await _process_duplicate_scan_job(session, job)
-        elif job.job_type == MediaJobType.usage_reconcile:
-            await _process_usage_reconcile_job(session, job)
-        job.status = MediaJobStatus.completed
-        job.progress_pct = 100
-        job.completed_at = _now()
-        job.next_retry_at = None
-        job.dead_lettered_at = None
-        job.last_error_at = None
-        job.triage_state = "resolved"
-        job.error_code = None
-        job.error_message = None
+
+
+def _resolve_job_processor(job_type: MediaJobType) -> Callable[[AsyncSession, MediaJob], Awaitable[None]] | None:
+    processors: dict[MediaJobType, Callable[[AsyncSession, MediaJob], Awaitable[None]]] = {
+        MediaJobType.ingest: _process_ingest_job,
+        MediaJobType.variant: _process_variant_job,
+        MediaJobType.edit: _process_edit_job,
+        MediaJobType.ai_tag: _process_ai_tag_job,
+        MediaJobType.duplicate_scan: _process_duplicate_scan_job,
+        MediaJobType.usage_reconcile: _process_usage_reconcile_job,
+    }
+    return processors.get(job_type)
+
+
+async def _mark_job_completed(session: AsyncSession, *, job: MediaJob) -> None:
+    job.status = MediaJobStatus.completed
+    job.progress_pct = 100
+    job.completed_at = _now()
+    job.next_retry_at = None
+    job.dead_lettered_at = None
+    job.last_error_at = None
+    job.triage_state = "resolved"
+    job.error_code = None
+    job.error_message = None
+    await _record_job_event(
+        session,
+        job=job,
+        action="completed",
+        meta={"attempt": int(job.attempt or 0), "job_type": job.job_type.value},
+    )
+
+
+def _retry_policy_event_meta(
+    *,
+    job: MediaJob,
+    retry_policy: RetryPolicyResolved,
+    effective_max_attempts: int,
+    delay: int | None = None,
+) -> dict[str, Any]:
+    meta: dict[str, Any] = {
+        "attempt": int(job.attempt or 0),
+        "max_attempts": effective_max_attempts,
+        "schedule": retry_policy.schedule,
+        "jitter_ratio": retry_policy.jitter_ratio,
+    }
+    if delay is not None:
+        meta["retry_in_seconds"] = int(delay)
+    else:
+        meta["policy_enabled"] = retry_policy.enabled
+    return meta
+
+
+def _set_dead_letter_state(job: MediaJob, *, now: datetime) -> None:
+    job.status = MediaJobStatus.dead_letter
+    job.dead_lettered_at = now
+    job.next_retry_at = None
+    job.triage_state = "open"
+
+
+def _set_retry_scheduled_state(job: MediaJob, *, now: datetime, delay: int) -> None:
+    job.status = MediaJobStatus.failed
+    job.next_retry_at = now + timedelta(seconds=delay)
+    job.triage_state = "retrying"
+
+
+async def _mark_job_failed_or_retrying(
+    session: AsyncSession,
+    *,
+    job: MediaJob,
+    exc: Exception,
+    retry_policy: RetryPolicyResolved,
+) -> None:
+    now = _now()
+    effective_max_attempts = max(1, int(job.max_attempts or retry_policy.max_attempts or DEFAULT_MAX_ATTEMPTS))
+    delay = (
+        None
+        if not retry_policy.enabled
+        else _retry_delay_seconds(
+            attempt=int(job.attempt or 0),
+            max_attempts=effective_max_attempts,
+            schedule=list(retry_policy.schedule),
+            jitter_ratio=float(retry_policy.jitter_ratio),
+        )
+    )
+    job.last_error_at = now
+    job.error_code = "processing_failed"
+    job.error_message = str(exc)
+    job.completed_at = now
+    if delay is None:
+        _set_dead_letter_state(job, now=now)
         await _record_job_event(
             session,
             job=job,
-            action="completed",
-            meta={"attempt": int(job.attempt or 0), "job_type": job.job_type.value},
+            action="dead_lettered",
+            note=str(exc),
+            meta=_retry_policy_event_meta(
+                job=job,
+                retry_policy=retry_policy,
+                effective_max_attempts=effective_max_attempts,
+            ),
         )
+        return
+    _set_retry_scheduled_state(job, now=now, delay=delay)
+    await _record_job_event(
+        session,
+        job=job,
+        action="retry_scheduled",
+        note=str(exc),
+        meta=_retry_policy_event_meta(
+            job=job,
+            retry_policy=retry_policy,
+            effective_max_attempts=effective_max_attempts,
+            delay=delay,
+        ),
+    )
+
+
+async def process_job_inline(session: AsyncSession, job: MediaJob) -> MediaJob:
+    payload = _job_payload(job)
+    retry_policy = await _prepare_job_retry_policy(session, job=job, payload=payload)
+    await _mark_job_processing_started(session, job=job)
+    try:
+        processor = _resolve_job_processor(job.job_type)
+        if processor is not None:
+            await processor(session, job)
+        await _mark_job_completed(session, job=job)
     except Exception as exc:
-        now = _now()
-        effective_max_attempts = max(1, int(job.max_attempts or retry_policy.max_attempts or DEFAULT_MAX_ATTEMPTS))
-        delay = (
-            None
-            if not retry_policy.enabled
-            else _retry_delay_seconds(
-                attempt=int(job.attempt or 0),
-                max_attempts=effective_max_attempts,
-                schedule=list(retry_policy.schedule),
-                jitter_ratio=float(retry_policy.jitter_ratio),
-            )
-        )
-        job.last_error_at = now
-        job.error_code = "processing_failed"
-        job.error_message = str(exc)
-        job.completed_at = now
-        if delay is None:
-            job.status = MediaJobStatus.dead_letter
-            job.dead_lettered_at = now
-            job.next_retry_at = None
-            job.triage_state = "open"
-            await _record_job_event(
-                session,
-                job=job,
-                action="dead_lettered",
-                note=str(exc),
-                meta={
-                    "attempt": int(job.attempt or 0),
-                    "max_attempts": effective_max_attempts,
-                    "schedule": retry_policy.schedule,
-                    "jitter_ratio": retry_policy.jitter_ratio,
-                    "policy_enabled": retry_policy.enabled,
-                },
-            )
-        else:
-            job.status = MediaJobStatus.failed
-            job.next_retry_at = now + timedelta(seconds=delay)
-            job.triage_state = "retrying"
-            await _record_job_event(
-                session,
-                job=job,
-                action="retry_scheduled",
-                note=str(exc),
-                meta={
-                    "attempt": int(job.attempt or 0),
-                    "max_attempts": effective_max_attempts,
-                    "retry_in_seconds": int(delay),
-                    "schedule": retry_policy.schedule,
-                    "jitter_ratio": retry_policy.jitter_ratio,
-                },
-            )
+        await _mark_job_failed_or_retrying(session, job=job, exc=exc, retry_policy=retry_policy)
     session.add(job)
     await session.commit()
     await session.refresh(job)
@@ -1999,6 +2353,60 @@ async def _process_variant_job(session: AsyncSession, job: MediaJob) -> None:
     session.add(row)
 
 
+def _edit_options_from_payload(payload: dict[str, Any]) -> MediaEditOptions:
+    return MediaEditOptions(
+        rotate_cw=int(payload.get("rotate_cw") or 0),
+        crop_aspect_w=payload.get("crop_aspect_w"),
+        crop_aspect_h=payload.get("crop_aspect_h"),
+        resize_max_width=payload.get("resize_max_width"),
+        resize_max_height=payload.get("resize_max_height"),
+    )
+
+
+def _apply_edit_rotation(img: Image.Image, *, rotate_cw: int) -> Image.Image:
+    if rotate_cw in (90, 180, 270):
+        return img.rotate(-rotate_cw, expand=True)
+    return img
+
+
+def _crop_to_aspect(img: Image.Image, *, crop_w: Any, crop_h: Any) -> Image.Image:
+    if not crop_w or not crop_h:
+        return img
+    iw, ih = img.size
+    target_ratio = float(crop_w) / float(crop_h)
+    current_ratio = float(iw) / float(ih) if ih else target_ratio
+    if current_ratio > target_ratio:
+        new_w = int(ih * target_ratio)
+        left = max(0, (iw - new_w) // 2)
+        return img.crop((left, 0, left + new_w, ih))
+    if current_ratio < target_ratio:
+        new_h = int(iw / target_ratio)
+        top = max(0, (ih - new_h) // 2)
+        return img.crop((0, top, iw, top + new_h))
+    return img
+
+
+def _apply_edit_resize(img: Image.Image, *, max_w: Any, max_h: Any) -> Image.Image:
+    if max_w or max_h:
+        img.thumbnail((int(max_w or 12000), int(max_h or 12000)))
+    return img
+
+
+def _render_edited_image(
+    *,
+    src_path: Path,
+    edited_path: Path,
+    options: MediaEditOptions,
+) -> tuple[int, int]:
+    with Image.open(src_path) as img:
+        out = img.convert("RGB")
+        out = _apply_edit_rotation(out, rotate_cw=options.rotate_cw)
+        out = _crop_to_aspect(out, crop_w=options.crop_aspect_w, crop_h=options.crop_aspect_h)
+        out = _apply_edit_resize(out, max_w=options.resize_max_width, max_h=options.resize_max_height)
+        out.save(edited_path, format="JPEG", optimize=True, quality=88)
+        return out.size
+
+
 async def _process_edit_job(session: AsyncSession, job: MediaJob) -> None:
     payload = _job_payload(job)
     if not job.asset_id:
@@ -2010,38 +2418,14 @@ async def _process_edit_job(session: AsyncSession, job: MediaJob) -> None:
     if not src_path.exists():
         raise FileNotFoundError(f"Missing media file for {asset.public_url}")
 
-    rotate_cw = int(payload.get("rotate_cw") or 0)
-    crop_w = payload.get("crop_aspect_w")
-    crop_h = payload.get("crop_aspect_h")
-    max_w = payload.get("resize_max_width")
-    max_h = payload.get("resize_max_height")
+    edit_options = _edit_options_from_payload(payload)
     edited_key = f"variants/{asset.id}/edit-{job.id}.jpg"
     edited_path = _storage_path_for_key(edited_key, public_root=_is_publicly_servable(asset))
     edited_path.parent.mkdir(parents=True, exist_ok=True)
 
-    def _render_edit() -> tuple[int, int]:
-        with Image.open(src_path) as img:
-            out = img.convert("RGB")
-            if rotate_cw in (90, 180, 270):
-                out = out.rotate(-rotate_cw, expand=True)
-            if crop_w and crop_h:
-                iw, ih = out.size
-                target_ratio = float(crop_w) / float(crop_h)
-                current_ratio = float(iw) / float(ih) if ih else target_ratio
-                if current_ratio > target_ratio:
-                    new_w = int(ih * target_ratio)
-                    left = max(0, (iw - new_w) // 2)
-                    out = out.crop((left, 0, left + new_w, ih))
-                elif current_ratio < target_ratio:
-                    new_h = int(iw / target_ratio)
-                    top = max(0, (ih - new_h) // 2)
-                    out = out.crop((0, top, iw, top + new_h))
-            if max_w or max_h:
-                out.thumbnail((int(max_w or 12000), int(max_h or 12000)))
-            out.save(edited_path, format="JPEG", optimize=True, quality=88)
-            return out.size
-
-    width, height = await anyio.to_thread.run_sync(_render_edit)
+    width, height = await anyio.to_thread.run_sync(
+        partial(_render_edited_image, src_path=src_path, edited_path=edited_path, options=edit_options)
+    )
     row = MediaVariant(
         asset_id=asset.id,
         profile=f"edit-{job.id}",
@@ -2055,6 +2439,18 @@ async def _process_edit_job(session: AsyncSession, job: MediaJob) -> None:
     session.add(row)
 
 
+def _auto_tags_from_filename(filename: str) -> set[str]:
+    tags: set[str] = set()
+    for token in re.split(r"[^a-z0-9]+", filename.lower()):
+        if len(token) >= 3:
+            tags.add(token[:32])
+    return tags
+
+
+def _existing_asset_tag_values(asset: MediaAsset) -> set[str]:
+    return {tag.tag.value for tag in (asset.tags or []) if tag.tag}
+
+
 async def _process_ai_tag_job(session: AsyncSession, job: MediaJob) -> None:
     if not job.asset_id:
         return
@@ -2063,14 +2459,10 @@ async def _process_ai_tag_job(session: AsyncSession, job: MediaJob) -> None:
     )
     if asset is None:
         return
-    auto_tags = set()
-    filename = str(asset.original_filename or "").lower()
-    for token in re.split(r"[^a-z0-9]+", filename):
-        if len(token) >= 3:
-            auto_tags.add(token[:32])
+    auto_tags = _auto_tags_from_filename(str(asset.original_filename or ""))
     if asset.width and asset.height:
         auto_tags.add("landscape" if asset.width >= asset.height else "portrait")
-    await _replace_asset_tags(session, asset, sorted({*(tag.tag.value for tag in (asset.tags or []) if tag.tag), *auto_tags}))
+    await _replace_asset_tags(session, asset, sorted({*_existing_asset_tag_values(asset), *auto_tags}))
 
 
 async def _process_duplicate_scan_job(session: AsyncSession, job: MediaJob) -> None:
@@ -2163,16 +2555,7 @@ async def manual_retry_job(
     job: MediaJob,
     actor_user_id: UUID | None = None,
 ) -> MediaJob:
-    job.status = MediaJobStatus.queued
-    job.progress_pct = 0
-    job.error_code = None
-    job.error_message = None
-    job.next_retry_at = None
-    job.started_at = None
-    job.completed_at = None
-    job.dead_lettered_at = None
-    if job.triage_state in {"open", "ignored", "resolved"}:
-        job.triage_state = "retrying"
+    _reset_job_for_retry(job)
     session.add(job)
     await _record_job_event(
         session,
@@ -2185,6 +2568,28 @@ async def manual_retry_job(
     await _maybe_queue_job(job.id)
     await session.refresh(job)
     return job
+
+
+def _is_retryable_job(job: MediaJob) -> bool:
+    if job.status == MediaJobStatus.processing:
+        return False
+    max_attempts = int(job.max_attempts or DEFAULT_MAX_ATTEMPTS)
+    if int(job.attempt or 0) < max_attempts:
+        return True
+    return job.status == MediaJobStatus.dead_letter
+
+
+def _reset_job_for_retry(job: MediaJob) -> None:
+    job.status = MediaJobStatus.queued
+    job.progress_pct = 0
+    job.error_code = None
+    job.error_message = None
+    job.next_retry_at = None
+    job.started_at = None
+    job.completed_at = None
+    job.dead_lettered_at = None
+    if job.triage_state in {"open", "ignored", "resolved"}:
+        job.triage_state = "retrying"
 
 
 async def bulk_retry_jobs(
@@ -2202,20 +2607,9 @@ async def bulk_retry_jobs(
     ).scalars().all()
     retried: list[MediaJob] = []
     for job in rows:
-        if job.status == MediaJobStatus.processing:
+        if not _is_retryable_job(job):
             continue
-        if int(job.attempt or 0) >= int(job.max_attempts or DEFAULT_MAX_ATTEMPTS) and job.status != MediaJobStatus.dead_letter:
-            continue
-        job.status = MediaJobStatus.queued
-        job.progress_pct = 0
-        job.error_code = None
-        job.error_message = None
-        job.next_retry_at = None
-        job.started_at = None
-        job.completed_at = None
-        job.dead_lettered_at = None
-        if job.triage_state in {"open", "ignored", "resolved"}:
-            job.triage_state = "retrying"
+        _reset_job_for_retry(job)
         session.add(job)
         await _record_job_event(
             session,
@@ -2231,6 +2625,66 @@ async def bulk_retry_jobs(
     for row in retried:
         await session.refresh(row)
     return retried
+
+
+def _apply_triage_state_update(job: MediaJob, *, triage_state: str | None, meta: dict[str, Any]) -> None:
+    if not triage_state:
+        return
+    current_triage = _coerce_triage_state(job.triage_state, fallback="open")
+    job.triage_state = _coerce_triage_state(triage_state, fallback=current_triage)
+    meta["triage_state"] = job.triage_state
+
+
+def _apply_assignee_update(
+    job: MediaJob,
+    *,
+    clear_assignee: bool,
+    assigned_to_user_id: UUID | None,
+    meta: dict[str, Any],
+) -> None:
+    if clear_assignee:
+        job.assigned_to_user_id = None
+        meta["assigned_to_user_id"] = None
+        return
+    if assigned_to_user_id is None:
+        return
+    job.assigned_to_user_id = assigned_to_user_id
+    meta["assigned_to_user_id"] = str(assigned_to_user_id)
+
+
+def _apply_sla_update(
+    job: MediaJob,
+    *,
+    clear_sla_due_at: bool,
+    sla_due_at: datetime | None,
+    meta: dict[str, Any],
+) -> None:
+    if clear_sla_due_at:
+        job.sla_due_at = None
+        meta["sla_due_at"] = None
+        return
+    if sla_due_at is None:
+        return
+    job.sla_due_at = sla_due_at
+    meta["sla_due_at"] = sla_due_at.isoformat()
+
+
+def _apply_incident_update(
+    job: MediaJob,
+    *,
+    clear_incident_url: bool,
+    incident_url: str | None,
+    meta: dict[str, Any],
+) -> None:
+    if clear_incident_url:
+        job.incident_url = None
+        meta["incident_url"] = None
+        return
+    if incident_url is None:
+        return
+    cleaned = (incident_url or "").strip()
+    job.incident_url = cleaned or None
+    meta["incident_url"] = job.incident_url
 
 
 async def update_job_triage(
@@ -2250,29 +2704,25 @@ async def update_job_triage(
     note: str | None = None,
 ) -> MediaJob:
     meta: dict[str, Any] = {}
-    if triage_state:
-        current_triage = _coerce_triage_state(job.triage_state, fallback="open")
-        job.triage_state = _coerce_triage_state(triage_state, fallback=current_triage)
-        meta["triage_state"] = job.triage_state
-    if clear_assignee:
-        job.assigned_to_user_id = None
-        meta["assigned_to_user_id"] = None
-    elif assigned_to_user_id is not None:
-        job.assigned_to_user_id = assigned_to_user_id
-        meta["assigned_to_user_id"] = str(assigned_to_user_id)
-    if clear_sla_due_at:
-        job.sla_due_at = None
-        meta["sla_due_at"] = None
-    elif sla_due_at is not None:
-        job.sla_due_at = sla_due_at
-        meta["sla_due_at"] = sla_due_at.isoformat()
-    if clear_incident_url:
-        job.incident_url = None
-        meta["incident_url"] = None
-    elif incident_url is not None:
-        cleaned = (incident_url or "").strip()
-        job.incident_url = cleaned or None
-        meta["incident_url"] = job.incident_url
+    _apply_triage_state_update(job, triage_state=triage_state, meta=meta)
+    _apply_assignee_update(
+        job,
+        clear_assignee=clear_assignee,
+        assigned_to_user_id=assigned_to_user_id,
+        meta=meta,
+    )
+    _apply_sla_update(
+        job,
+        clear_sla_due_at=clear_sla_due_at,
+        sla_due_at=sla_due_at,
+        meta=meta,
+    )
+    _apply_incident_update(
+        job,
+        clear_incident_url=clear_incident_url,
+        incident_url=incident_url,
+        meta=meta,
+    )
 
     await _apply_job_tag_changes(session, job=job, add_tags=add_tags or [], remove_tags=remove_tags or [])
     session.add(job)

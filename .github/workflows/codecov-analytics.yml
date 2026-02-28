@@ -90,6 +90,19 @@ jobs:
           echo "test_exit_code=$test_exit" >> "$GITHUB_OUTPUT"
           exit 0
 
+      - name: Enforce absolute backend/frontend/project coverage >= 90
+        id: absolute_coverage
+        continue-on-error: true
+        run: |
+          set +e
+          python3 scripts/quality/assert_coverage_thresholds.py \
+            --backend backend/coverage.xml \
+            --frontend frontend/coverage/lcov.info \
+            --threshold 90
+          coverage_exit=$?
+          echo "coverage_exit_code=$coverage_exit" >> "$GITHUB_OUTPUT"
+          exit 0
+
       - name: Build frontend browser bundle
         id: frontend_build
         continue-on-error: true
@@ -109,7 +122,7 @@ jobs:
         uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: backend/coverage.xml,frontend/coverage/**/lcov.info
+          files: backend/coverage.xml,frontend/coverage/lcov.info,frontend/coverage/**/lcov.info
           flags: backend,frontend
           fail_ci_if_error: false
           verbose: true
@@ -167,45 +180,86 @@ jobs:
       - name: Enforce test/build and bundle results
         if: ${{ !cancelled() }}
         run: |
+          set -euo pipefail
+
+          normalize_int() {
+            local raw="$1"
+            raw="$(printf '%s' "$raw" | tr -d '\r\n[:space:]')"
+            if [[ -z "$raw" ]]; then
+              echo "1"
+              return
+            fi
+            if [[ ! "$raw" =~ ^-?[0-9]+$ ]]; then
+              echo "1"
+              return
+            fi
+            echo "$raw"
+          }
+
+          normalize_outcome() {
+            local raw="$1"
+            raw="$(printf '%s' "$raw" | tr -d '\r\n[:space:]')"
+            if [[ -z "$raw" ]]; then
+              echo "failure"
+              return
+            fi
+            echo "$raw"
+          }
+
+          backend_test_exit="$(normalize_int "${{ steps.backend_tests.outputs.test_exit_code }}")"
+          backend_coverage_exit="$(normalize_int "${{ steps.backend_tests.outputs.coverage_exit_code }}")"
+          frontend_test_exit="$(normalize_int "${{ steps.frontend_tests.outputs.test_exit_code }}")"
+          absolute_coverage_exit="$(normalize_int "${{ steps.absolute_coverage.outputs.coverage_exit_code }}")"
+          frontend_build_exit="$(normalize_int "${{ steps.frontend_build.outputs.build_exit_code }}")"
+          browser_bundle_exit="$(normalize_int "${{ steps.browser_bundle.outputs.bundle_exit_code }}")"
+          ssr_bundle_exit="$(normalize_int "${{ steps.ssr_bundle.outputs.bundle_exit_code }}")"
+          upload_coverage_outcome="$(normalize_outcome "${{ steps.upload_coverage.outcome }}")"
+          upload_test_results_outcome="$(normalize_outcome "${{ steps.upload_test_results.outcome }}")"
+
           fail=0
 
-          if [ "${{ steps.backend_tests.outputs.test_exit_code }}" != "0" ]; then
-            echo "::error::Backend tests failed (exit ${{ steps.backend_tests.outputs.test_exit_code }})."
+          if [ "$backend_test_exit" -ne 0 ]; then
+            echo "::error::Backend tests failed (exit $backend_test_exit)."
             fail=1
           fi
 
-          if [ "${{ steps.backend_tests.outputs.coverage_exit_code }}" != "0" ]; then
-            echo "::error::Backend coverage export failed (exit ${{ steps.backend_tests.outputs.coverage_exit_code }})."
+          if [ "$backend_coverage_exit" -ne 0 ]; then
+            echo "::error::Backend coverage export failed (exit $backend_coverage_exit)."
             fail=1
           fi
 
-          if [ "${{ steps.frontend_tests.outputs.test_exit_code }}" != "0" ]; then
-            echo "::error::Frontend tests failed (exit ${{ steps.frontend_tests.outputs.test_exit_code }})."
+          if [ "$frontend_test_exit" -ne 0 ]; then
+            echo "::error::Frontend tests failed (exit $frontend_test_exit)."
             fail=1
           fi
 
-          if [ "${{ steps.frontend_build.outputs.build_exit_code }}" != "0" ]; then
-            echo "::error::Frontend browser build failed (exit ${{ steps.frontend_build.outputs.build_exit_code }})."
+          if [ "$absolute_coverage_exit" -ne 0 ]; then
+            echo "::error::Absolute coverage threshold check failed (exit $absolute_coverage_exit)."
             fail=1
           fi
 
-          if [ "${{ steps.browser_bundle.outputs.bundle_exit_code }}" != "0" ]; then
-            echo "::error::Browser bundle upload failed (exit ${{ steps.browser_bundle.outputs.bundle_exit_code }})."
+          if [ "$frontend_build_exit" -ne 0 ]; then
+            echo "::error::Frontend browser build failed (exit $frontend_build_exit)."
             fail=1
           fi
 
-          if [ "${{ steps.ssr_bundle.outputs.bundle_exit_code }}" != "0" ]; then
-            echo "::error::SSR bundle upload failed (exit ${{ steps.ssr_bundle.outputs.bundle_exit_code }})."
+          if [ "$browser_bundle_exit" -ne 0 ]; then
+            echo "::error::Browser bundle upload failed (exit $browser_bundle_exit)."
             fail=1
           fi
 
-          if [ "${{ steps.upload_coverage.outcome }}" != "success" ]; then
-            echo "::error::Codecov coverage upload step did not succeed (outcome=${{ steps.upload_coverage.outcome }})."
+          if [ "$ssr_bundle_exit" -ne 0 ]; then
+            echo "::error::SSR bundle upload failed (exit $ssr_bundle_exit)."
             fail=1
           fi
 
-          if [ "${{ steps.upload_test_results.outcome }}" != "success" ]; then
-            echo "::error::Codecov test-results upload step did not succeed (outcome=${{ steps.upload_test_results.outcome }})."
+          if [ "$upload_coverage_outcome" != "success" ]; then
+            echo "::error::Codecov coverage upload step did not succeed (outcome=$upload_coverage_outcome)."
+            fail=1
+          fi
+
+          if [ "$upload_test_results_outcome" != "success" ]; then
+            echo "::error::Codecov test-results upload step did not succeed (outcome=$upload_test_results_outcome)."
             fail=1
           fi
 

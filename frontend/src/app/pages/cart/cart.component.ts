@@ -454,11 +454,20 @@ export class CartComponent implements OnInit {
     private readonly route: ActivatedRoute,
     private readonly analytics: AnalyticsService
   ) {
+    this.initializeDeliveryPrefs();
+    this.savedForLater = this.loadSavedForLater();
+    this.setupPromoRefreshEffect();
+    this.setupRecommendationsEffect();
+    this.setupCartViewTrackingEffect();
+  }
+
+  private initializeDeliveryPrefs(): void {
     const prefs = this.checkoutPrefs.loadDeliveryPrefs();
     this.courier = prefs.courier;
     this.deliveryType = prefs.deliveryType;
-    this.savedForLater = this.loadSavedForLater();
+  }
 
+  private setupPromoRefreshEffect(): void {
     effect(() => {
       if (this.cart.syncing()) return;
       if (!this.pendingPromoRefresh) return;
@@ -468,7 +477,9 @@ export class CartComponent implements OnInit {
       this.pendingPromoRefresh = false;
       this.refreshPromoQuote(code);
     });
+  }
 
+  private setupRecommendationsEffect(): void {
     effect(() => {
       const productIds = this.items()
         .map((i) => i.product_id)
@@ -486,7 +497,9 @@ export class CartComponent implements OnInit {
       this.recommendationsKey = productIds;
       this.loadRecommendations(new Set(productIds.split(',')));
     });
+  }
 
+  private setupCartViewTrackingEffect(): void {
     effect(() => {
       if (this.cartViewTracked) return;
       if (this.syncing()) return;
@@ -754,6 +767,33 @@ export class CartComponent implements OnInit {
     this.persistSavedForLater();
   }
 
+  private asStringOr(value: any, fallback: string): string {
+    return String(value || fallback);
+  }
+
+  private asNumberOr(value: any, fallback: number): number {
+    return Number(value || fallback);
+  }
+
+  private asOptionalString(value: any): string {
+    return value ? String(value) : '';
+  }
+
+  private parseSavedForLaterEntry(entry: any): SavedForLaterItem {
+    const variantId = entry?.variant_id;
+    return {
+      product_id: this.asStringOr(entry?.product_id, ''),
+      variant_id: variantId == null ? null : String(variantId),
+      quantity: Math.max(1, this.asNumberOr(entry?.quantity, 1)),
+      name: this.asStringOr(entry?.name, ''),
+      slug: this.asStringOr(entry?.slug, ''),
+      price: this.asNumberOr(entry?.price, 0),
+      currency: this.asStringOr(entry?.currency, 'RON'),
+      image: this.asOptionalString(entry?.image),
+      saved_at: this.asStringOr(entry?.saved_at, '')
+    };
+  }
+
   private loadSavedForLater(): SavedForLaterItem[] {
     if (typeof localStorage === 'undefined') return [];
     try {
@@ -762,17 +802,7 @@ export class CartComponent implements OnInit {
       const parsed = JSON.parse(raw);
       if (!Array.isArray(parsed)) return [];
       return parsed
-        .map((entry) => ({
-          product_id: String(entry?.product_id || ''),
-          variant_id: entry?.variant_id == null ? null : String(entry.variant_id),
-          quantity: Math.max(1, Number(entry?.quantity || 1)),
-          name: String(entry?.name || ''),
-          slug: String(entry?.slug || ''),
-          price: Number(entry?.price || 0),
-          currency: String(entry?.currency || 'RON'),
-          image: entry?.image ? String(entry.image) : '',
-          saved_at: String(entry?.saved_at || '')
-        }))
+        .map((entry) => this.parseSavedForLaterEntry(entry))
         .filter((entry) => entry.product_id && entry.slug && entry.name && Number.isFinite(entry.price));
     } catch {
       return [];

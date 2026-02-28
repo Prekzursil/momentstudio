@@ -3,6 +3,50 @@ import { HttpClientTestingModule, HttpTestingController } from '@angular/common/
 import { ApiService } from './api.service';
 import { AccountService } from './account.service';
 
+function expectDownloadExportFetchesJsonBlob(service: AccountService, httpMock: HttpTestingController): void {
+  service.downloadExport().subscribe((blob) => {
+    expect(blob).toBeTruthy();
+  });
+
+  const req = httpMock.expectOne('/api/v1/auth/me/export');
+  expect(req.request.method).toBe('GET');
+  expect(req.request.responseType).toBe('blob');
+  req.flush(new Blob(['{}'], { type: 'application/json' }));
+}
+
+function expectRequestDeletionPostsConfirmText(service: AccountService, httpMock: HttpTestingController): void {
+  service.requestAccountDeletion('DELETE', 'supersecret').subscribe((resp) => {
+    expect(resp.cooldown_hours).toBe(24);
+  });
+
+  const req = httpMock.expectOne('/api/v1/auth/me/delete');
+  expect(req.request.method).toBe('POST');
+  expect(req.request.body).toEqual({ confirm: 'DELETE', password: 'supersecret' });
+  req.flush({ requested_at: null, scheduled_for: '2030-01-01T00:00:00+00:00', deleted_at: null, cooldown_hours: 24 });
+}
+
+function expectGetDeletionStatusFetchesCurrentStatus(service: AccountService, httpMock: HttpTestingController): void {
+  service.getDeletionStatus().subscribe((resp) => {
+    expect(resp.cooldown_hours).toBe(24);
+    expect(resp.scheduled_for).toBeNull();
+  });
+
+  const req = httpMock.expectOne('/api/v1/auth/me/delete/status');
+  expect(req.request.method).toBe('GET');
+  req.flush({ requested_at: null, scheduled_for: null, deleted_at: null, cooldown_hours: 24 });
+}
+
+function expectCancelAccountDeletionPostsToCancelEndpoint(service: AccountService, httpMock: HttpTestingController): void {
+  service.cancelAccountDeletion().subscribe((resp) => {
+    expect(resp.scheduled_for).toBeNull();
+  });
+
+  const req = httpMock.expectOne('/api/v1/auth/me/delete/cancel');
+  expect(req.request.method).toBe('POST');
+  expect(req.request.body).toEqual({});
+  req.flush({ requested_at: null, scheduled_for: null, deleted_at: null, cooldown_hours: 24 });
+}
+
 describe('AccountService', () => {
   let service: AccountService;
   let httpMock: HttpTestingController;
@@ -21,46 +65,18 @@ describe('AccountService', () => {
   });
 
   it('downloadExport fetches a JSON blob', () => {
-    service.downloadExport().subscribe((blob) => {
-      expect(blob).toBeTruthy();
-    });
-
-    const req = httpMock.expectOne('/api/v1/auth/me/export');
-    expect(req.request.method).toBe('GET');
-    expect(req.request.responseType).toBe('blob');
-    req.flush(new Blob(['{}'], { type: 'application/json' }));
+    expectDownloadExportFetchesJsonBlob(service, httpMock);
   });
 
   it('requestAccountDeletion posts confirm text', () => {
-    service.requestAccountDeletion('DELETE', 'supersecret').subscribe((resp) => {
-      expect(resp.cooldown_hours).toBe(24);
-    });
-
-    const req = httpMock.expectOne('/api/v1/auth/me/delete');
-    expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ confirm: 'DELETE', password: 'supersecret' });
-    req.flush({ requested_at: null, scheduled_for: '2030-01-01T00:00:00+00:00', deleted_at: null, cooldown_hours: 24 });
+    expectRequestDeletionPostsConfirmText(service, httpMock);
   });
 
   it('getDeletionStatus fetches current deletion status', () => {
-    service.getDeletionStatus().subscribe((resp) => {
-      expect(resp.cooldown_hours).toBe(24);
-      expect(resp.scheduled_for).toBeNull();
-    });
-
-    const req = httpMock.expectOne('/api/v1/auth/me/delete/status');
-    expect(req.request.method).toBe('GET');
-    req.flush({ requested_at: null, scheduled_for: null, deleted_at: null, cooldown_hours: 24 });
+    expectGetDeletionStatusFetchesCurrentStatus(service, httpMock);
   });
 
   it('cancelAccountDeletion posts to cancel endpoint', () => {
-    service.cancelAccountDeletion().subscribe((resp) => {
-      expect(resp.scheduled_for).toBeNull();
-    });
-
-    const req = httpMock.expectOne('/api/v1/auth/me/delete/cancel');
-    expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({});
-    req.flush({ requested_at: null, scheduled_for: null, deleted_at: null, cooldown_hours: 24 });
+    expectCancelAccountDeletionPostsToCancelEndpoint(service, httpMock);
   });
 });

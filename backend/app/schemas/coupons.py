@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.coupons_v2 import CouponBulkJobAction, CouponBulkJobStatus, CouponVisibility, PromotionDiscountType
+from app.models.coupons import CouponBulkJobAction, CouponBulkJobStatus, CouponVisibility, PromotionDiscountType
 
 
 class PromotionRead(BaseModel):

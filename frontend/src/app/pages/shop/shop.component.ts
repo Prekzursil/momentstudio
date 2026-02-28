@@ -2,13 +2,13 @@ import { CommonModule } from '@angular/common';
 import { Component, EffectRef, OnDestroy, OnInit, computed, effect, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Params, Router } from '@angular/router';
-import { CatalogService, Category, PaginationMeta, Product, SortOption } from '../../core/catalog.service';
+import { CatalogService, Category, PaginationMeta, Product, ProductListResponse, SortOption } from '../../core/catalog.service';
 import { ContainerComponent } from '../../layout/container.component';
 import { ButtonComponent } from '../../shared/button.component';
 import { InputComponent } from '../../shared/input.component';
 import { ProductCardComponent } from '../../shared/product-card.component';
 import { ProductQuickViewModalComponent } from '../../shared/product-quick-view-modal.component';
-import { AdminCategoryDeletePreview, AdminCategoryMergePreview, AdminService } from '../../core/admin.service';
+import { AdminCategoryDeletePreview, AdminCategoryMergePreview, AdminCategoryTranslation, AdminService } from '../../core/admin.service';
 import { StorefrontAdminModeService } from '../../core/storefront-admin-mode.service';
 import { ToastService } from '../../core/toast.service';
 import { PageHeaderComponent } from '../../shared/page-header.component';
@@ -930,7 +930,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   productReorderSaving = signal<boolean>(false);
   private productsLoadSeq = 0;
 
-  sortOptions: { label: string; value: SortOption }[] = [
+  readonly sortOptions: { label: string; value: SortOption }[] = [
     { label: 'shop.sortRecommended', value: 'recommended' },
     { label: 'shop.sortNew', value: 'newest' },
     { label: 'shop.sortPriceAsc', value: 'price_asc' },
@@ -986,7 +986,7 @@ export class ShopComponent implements OnInit, OnDestroy {
 	      this.loadProducts(false);
 	    });
 	    this.initScrollRestoreFromSession();
-	    const dataCategories = (this.route.snapshot.data['categories'] as Category[]) ?? [];
+	    const dataCategories: Category[] = this.route.snapshot.data['categories'] ?? [];
     if (dataCategories.length) {
       this.categories = dataCategories;
       this.rebuildCategoryTree();
@@ -1337,7 +1337,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   }
 
   private getDescendants(root: Category): Category[] {
-    const parentId = root?.id || '';
+    const parentId = root.id;
     const children = parentId ? this.childrenByParentId.get(parentId) ?? [] : [];
     const out: Category[] = [];
     for (const child of children) {
@@ -1461,25 +1461,39 @@ export class ShopComponent implements OnInit, OnDestroy {
     this.renameNameEn = '';
 
     this.admin.getCategoryTranslations(slug).subscribe({
-      next: (rows) => {
-        const ro = rows.find((r) => r.lang === 'ro')?.name?.trim() ?? '';
-        const en = rows.find((r) => r.lang === 'en')?.name?.trim() ?? '';
-        const currentLang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
-        this.renameNameRo = ro || (currentLang === 'ro' ? (category.name || '').trim() : '');
-        this.renameNameEn = en || (currentLang === 'en' ? (category.name || '').trim() : '');
-        if (!this.renameNameRo && !this.renameNameEn) {
-          this.renameNameRo = (category.name || '').trim();
-        }
-        this.renameLoading = false;
-      },
-      error: () => {
-        const currentLang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
-        this.renameNameRo = currentLang === 'ro' ? (category.name || '').trim() : '';
-        this.renameNameEn = currentLang === 'en' ? (category.name || '').trim() : '';
-        this.renameLoading = false;
-        this.renameError = this.translate.instant('adminUi.storefront.categories.loadError');
-      }
+      next: (rows) => this.applyRenameTranslations(rows, category),
+      error: () => this.applyRenameTranslationLoadError(category)
     });
+  }
+
+  private currentShopLang(): 'en' | 'ro' {
+    return this.translate.currentLang === 'ro' ? 'ro' : 'en';
+  }
+
+  private categoryDisplayName(category: Category): string {
+    return (category.name || '').trim();
+  }
+
+  private applyRenameTranslations(rows: AdminCategoryTranslation[], category: Category): void {
+    const ro = rows.find((row) => row.lang === 'ro')?.name?.trim() ?? '';
+    const en = rows.find((row) => row.lang === 'en')?.name?.trim() ?? '';
+    const currentLang = this.currentShopLang();
+    const fallbackName = this.categoryDisplayName(category);
+    this.renameNameRo = ro || (currentLang === 'ro' ? fallbackName : '');
+    this.renameNameEn = en || (currentLang === 'en' ? fallbackName : '');
+    if (!this.renameNameRo && !this.renameNameEn) {
+      this.renameNameRo = fallbackName;
+    }
+    this.renameLoading = false;
+  }
+
+  private applyRenameTranslationLoadError(category: Category): void {
+    const currentLang = this.currentShopLang();
+    const fallbackName = this.categoryDisplayName(category);
+    this.renameNameRo = currentLang === 'ro' ? fallbackName : '';
+    this.renameNameEn = currentLang === 'en' ? fallbackName : '';
+    this.renameLoading = false;
+    this.renameError = this.translate.instant('adminUi.storefront.categories.loadError');
   }
 
   cancelRenameCategory(): void {
@@ -1613,7 +1627,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   mergeCategory(category: Category): void {
     if (!this.canEditCategories()) return;
     if (this.mergeSaving) return;
-    const sourceSlug = (category?.slug || '').trim();
+    const sourceSlug = category.slug.trim();
     const targetSlug = (this.mergeTargetSlug || '').trim();
     if (!sourceSlug || !targetSlug) return;
     if (!this.mergePreview || !this.mergePreview.can_merge) {
@@ -1622,7 +1636,7 @@ export class ShopComponent implements OnInit, OnDestroy {
     }
 
     const targetName = this.rootCategories.find((c) => c.slug === targetSlug)?.name ?? targetSlug;
-    const sourceName = category?.name ?? sourceSlug;
+    const sourceName = category.name || sourceSlug;
     const count = Number(this.mergePreview.product_count || 0);
     if (typeof window !== 'undefined') {
       const ok = window.confirm(
@@ -1685,10 +1699,10 @@ export class ShopComponent implements OnInit, OnDestroy {
       this.deleteError = this.translate.instant('adminUi.storefront.categories.deletePreviewRequired');
       return;
     }
-    const slug = (category?.slug || '').trim();
+    const slug = category.slug.trim();
     if (!slug) return;
 
-    const name = category?.name ?? slug;
+    const name = category.name || slug;
     if (typeof window !== 'undefined') {
       const ok = window.confirm(this.translate.instant('adminUi.storefront.categories.confirmDelete', { name }));
       if (!ok) return;
@@ -1731,8 +1745,10 @@ export class ShopComponent implements OnInit, OnDestroy {
     if (!el) return;
     el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     setTimeout(() => {
-      const select = document.getElementById('shop-sort-select') as HTMLSelectElement | null;
-      select?.focus();
+      const select = document.getElementById('shop-sort-select');
+      if (select instanceof HTMLSelectElement) {
+        select.focus();
+      }
     }, 350);
   }
 
@@ -2035,98 +2051,122 @@ export class ShopComponent implements OnInit, OnDestroy {
   }
 
   private fetchProducts(append = false): void {
-	    const loadSeq = ++this.productsLoadSeq;
-	    const isSale = this.activeCategorySlug === 'sale';
-	    const categorySlug = isSale ? undefined : (this.activeSubcategorySlug || this.activeCategorySlug || undefined);
-	    const includeUnpublished = this.canEditProducts();
-      const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
-	    this.catalog
-	      .listProducts({
-	        search: this.filters.search || undefined,
-	        category_slug: categorySlug,
-	        on_sale: isSale ? true : undefined,
-	        include_unpublished: includeUnpublished ? true : undefined,
-          lang,
-	        min_price: this.filters.min_price > this.priceMinBound ? this.filters.min_price : undefined,
-	        max_price: this.filters.max_price < this.priceMaxBound ? this.filters.max_price : undefined,
-	        tags: Array.from(this.filters.tags),
-	        sort: this.filters.sort,
+    const loadSeq = ++this.productsLoadSeq;
+    const isSale = this.activeCategorySlug === 'sale';
+    const categorySlug = this.resolveCatalogCategorySlug(isSale);
+    const includeUnpublished = this.canEditProducts();
+    const lang = this.currentShopLang();
+    this.catalog
+      .listProducts({
+        search: this.filters.search || undefined,
+        category_slug: categorySlug,
+        on_sale: isSale ? true : undefined,
+        include_unpublished: includeUnpublished ? true : undefined,
+        lang,
+        min_price: this.filters.min_price > this.priceMinBound ? this.filters.min_price : undefined,
+        max_price: this.filters.max_price < this.priceMaxBound ? this.filters.max_price : undefined,
+        tags: Array.from(this.filters.tags),
+        sort: this.filters.sort,
         page: this.filters.page,
         limit: this.filters.limit
       })
       .subscribe({
-        next: (response) => {
-	        if (loadSeq !== this.productsLoadSeq) return;
-          const incoming = response.items ?? [];
-          this.products = append && this.products.length ? [...this.products, ...incoming] : incoming;
-          if (!append) {
-            this.clearBulkSelection();
-            this.bulkEditError = '';
-          }
-          this.pageMeta = response.meta;
-          const previousMaxBound = this.priceMaxBound;
-          const max = response.bounds?.max_price;
-          if (typeof max === 'number' && Number.isFinite(max)) {
-            const rounded = Math.ceil(max / this.priceStep) * this.priceStep;
-            this.priceMaxBound = Math.max(this.priceMinBound, rounded);
-            if (this.filters.max_price === previousMaxBound) {
-              this.filters.max_price = this.priceMaxBound;
-            }
-	          }
-	          this.normalizePriceRange();
-	          if (isSale) {
-	            this.crumbs = [
-	              { label: 'nav.home', url: '/' },
-	              { label: 'nav.shop', url: '/shop' },
-	              { label: 'shop.sale' }
-	            ];
-	          } else if (this.activeCategorySlug) {
-	            const cat = this.categories.find((c) => c.slug === this.activeCategorySlug);
-	            const sub = this.activeSubcategorySlug
-	              ? this.categories.find((c) => c.slug === this.activeSubcategorySlug)
-	              : undefined;
-	            this.crumbs = [
-	              { label: 'nav.home', url: '/' },
-	              { label: 'nav.shop', url: '/shop' },
-              { label: cat?.name ?? this.activeCategorySlug, url: `/shop/${this.activeCategorySlug}` },
-              ...(sub ? [{ label: sub.name ?? sub.slug }] : [])
-            ];
-          } else {
-            this.crumbs = [
-              { label: 'nav.home', url: '/' },
-              { label: 'nav.shop' }
-            ];
-          }
-          const tagMap = new Map<string, string>();
-          this.products.forEach((p) => {
-            (p.tags ?? []).forEach((tag) => tagMap.set(tag.slug, tag.name));
-          });
-          this.allTags = Array.from(tagMap.entries())
-            .map(([slug, name]) => ({ slug, name }))
-            .sort((a, b) => a.name.localeCompare(b.name));
-          this.setMetaTags();
-          this.loading.set(false);
-          this.loadingMore.set(false);
-          this.hasError.set(false);
-          if (!append) this.restoreScrollIfNeeded();
-        },
-        error: () => {
-	        if (loadSeq !== this.productsLoadSeq) return;
-          this.loading.set(false);
-          this.loadingMore.set(false);
-          if (append) {
-            this.filters.page = Math.max(1, this.filters.page - 1);
-            this.toast.error(this.translate.instant('shop.errorTitle'), this.translate.instant('shop.errorCopy'));
-            return;
-          }
-          this.products = [];
-          this.pageMeta = null;
-          this.clearBulkSelection();
-          this.bulkEditError = '';
-          this.hasError.set(true);
-          this.toast.error(this.translate.instant('shop.errorTitle'), this.translate.instant('shop.errorCopy'));
-        }
+        next: (response) => this.handleProductsLoaded(loadSeq, append, isSale, response),
+        error: () => this.handleProductsLoadError(loadSeq, append)
       });
+  }
+
+  private resolveCatalogCategorySlug(isSale: boolean): string | undefined {
+    if (isSale) return undefined;
+    return this.activeSubcategorySlug || this.activeCategorySlug || undefined;
+  }
+
+  private handleProductsLoaded(loadSeq: number, append: boolean, isSale: boolean, response: ProductListResponse): void {
+    if (loadSeq !== this.productsLoadSeq) return;
+    const incoming = response.items ?? [];
+    this.products = append && this.products.length ? [...this.products, ...incoming] : incoming;
+    if (!append) {
+      this.clearBulkSelection();
+      this.bulkEditError = '';
+    }
+    this.pageMeta = response.meta;
+    this.syncPriceBoundsFromResponse(response);
+    this.normalizePriceRange();
+    this.updateCrumbsForLoadedProducts(isSale);
+    this.rebuildTagOptions();
+    this.setMetaTags();
+    this.loading.set(false);
+    this.loadingMore.set(false);
+    this.hasError.set(false);
+    if (!append) this.restoreScrollIfNeeded();
+  }
+
+  private syncPriceBoundsFromResponse(response: ProductListResponse): void {
+    const previousMaxBound = this.priceMaxBound;
+    const max = response.bounds?.max_price;
+    if (typeof max !== 'number' || !Number.isFinite(max)) return;
+    const rounded = Math.ceil(max / this.priceStep) * this.priceStep;
+    this.priceMaxBound = Math.max(this.priceMinBound, rounded);
+    if (this.filters.max_price === previousMaxBound) {
+      this.filters.max_price = this.priceMaxBound;
+    }
+  }
+
+  private updateCrumbsForLoadedProducts(isSale: boolean): void {
+    if (isSale) {
+      this.crumbs = [
+        { label: 'nav.home', url: '/' },
+        { label: 'nav.shop', url: '/shop' },
+        { label: 'shop.sale' }
+      ];
+      return;
+    }
+    if (!this.activeCategorySlug) {
+      this.crumbs = [
+        { label: 'nav.home', url: '/' },
+        { label: 'nav.shop' }
+      ];
+      return;
+    }
+    const cat = this.categories.find((category) => category.slug === this.activeCategorySlug);
+    const sub = this.activeSubcategorySlug
+      ? this.categories.find((category) => category.slug === this.activeSubcategorySlug)
+      : undefined;
+    this.crumbs = [
+      { label: 'nav.home', url: '/' },
+      { label: 'nav.shop', url: '/shop' },
+      { label: cat?.name ?? this.activeCategorySlug, url: `/shop/${this.activeCategorySlug}` },
+      ...(sub ? [{ label: sub.name ?? sub.slug }] : [])
+    ];
+  }
+
+  private rebuildTagOptions(): void {
+    const tagMap = new Map<string, string>();
+    for (const product of this.products) {
+      for (const tag of product.tags ?? []) {
+        tagMap.set(tag.slug, tag.name);
+      }
+    }
+    this.allTags = Array.from(tagMap.entries())
+      .map(([slug, name]) => ({ slug, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  private handleProductsLoadError(loadSeq: number, append: boolean): void {
+    if (loadSeq !== this.productsLoadSeq) return;
+    this.loading.set(false);
+    this.loadingMore.set(false);
+    if (append) {
+      this.filters.page = Math.max(1, this.filters.page - 1);
+      this.toast.error(this.translate.instant('shop.errorTitle'), this.translate.instant('shop.errorCopy'));
+      return;
+    }
+    this.products = [];
+    this.pageMeta = null;
+    this.clearBulkSelection();
+    this.bulkEditError = '';
+    this.hasError.set(true);
+    this.toast.error(this.translate.instant('shop.errorTitle'), this.translate.instant('shop.errorCopy'));
   }
 
   private rememberShopReturnContext(): void {
@@ -2331,22 +2371,25 @@ export class ShopComponent implements OnInit, OnDestroy {
       }
     }
 
-    const sortByOrderThenName = (a: Category, b: Category) => {
-      const sortA = a.sort_order;
-      const sortB = b.sort_order;
-      const orderA = typeof sortA === 'number' && Number.isFinite(sortA) ? sortA : 0;
-      const orderB = typeof sortB === 'number' && Number.isFinite(sortB) ? sortB : 0;
-      if (orderA !== orderB) return orderA - orderB;
-      return (a.name ?? '').localeCompare(b.name ?? '');
-    };
-
     for (const [key, list] of this.childrenByParentId.entries()) {
-      this.childrenByParentId.set(key, [...list].sort(sortByOrderThenName));
+      this.childrenByParentId.set(key, [...list].sort((a, b) => this.compareCategoriesByOrderThenName(a, b)));
     }
 
     this.rootCategories = this.categories
       .filter((c) => !c.parent_id)
-      .sort(sortByOrderThenName);
+      .sort((a, b) => this.compareCategoriesByOrderThenName(a, b));
+  }
+
+  private compareCategoriesByOrderThenName(a: Category, b: Category): number {
+    const orderDiff = this.normalizedCategorySortOrder(a.sort_order) - this.normalizedCategorySortOrder(b.sort_order);
+    if (orderDiff !== 0) return orderDiff;
+    return (a.name ?? '').localeCompare(b.name ?? '');
+  }
+
+  private normalizedCategorySortOrder(order: number | null | undefined): number {
+    if (typeof order !== 'number') return 0;
+    if (!Number.isFinite(order)) return 0;
+    return order;
   }
 
   private syncStateFromUrl(routeCategory: string | null, params: Params): boolean {
@@ -2429,7 +2472,7 @@ export class ShopComponent implements OnInit, OnDestroy {
     this.filters.max_price = max ?? this.priceMaxBound;
     const rawSort = typeof params['sort'] === 'string' ? params['sort'].trim() : '';
     const allowedSorts: SortOption[] = ['recommended', 'newest', 'price_asc', 'price_desc', 'name_asc', 'name_desc'];
-    this.filters.sort = allowedSorts.includes(rawSort as SortOption) ? (rawSort as SortOption) : 'recommended';
+    this.filters.sort = allowedSorts.find((option) => option === rawSort) ?? 'recommended';
     this.filters.page = params['page'] ? Number(params['page']) : 1;
     const tagParam = params['tags'];
     this.filters.tags = new Set<string>(
@@ -2652,4 +2695,3 @@ export class ShopComponent implements OnInit, OnDestroy {
     requestAnimationFrame(() => window.scrollTo({ top: y, behavior: 'auto' }));
   }
 }
-

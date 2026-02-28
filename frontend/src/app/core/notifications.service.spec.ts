@@ -2,37 +2,46 @@ import { HttpClientTestingModule, HttpTestingController } from '@angular/common/
 import { TestBed } from '@angular/core/testing';
 import { NotificationsService } from './notifications.service';
 
-describe('NotificationsService', () => {
-  let service: NotificationsService;
-  let httpMock: HttpTestingController;
+let notificationsService: NotificationsService;
+let notificationsHttpMock: HttpTestingController;
 
+describe('NotificationsService', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [HttpClientTestingModule],
       providers: [NotificationsService]
     });
-    service = TestBed.inject(NotificationsService);
-    httpMock = TestBed.inject(HttpTestingController);
+    notificationsService = TestBed.inject(NotificationsService);
+    notificationsHttpMock = TestBed.inject(HttpTestingController);
   });
 
   afterEach(() => {
-    httpMock.verify();
+    notificationsHttpMock.verify();
   });
 
-  it('refreshes unread count', () => {
-    service.refreshUnreadCount();
+  defineRefreshUnreadCountSpec();
+  defineLoadNotificationsSpec();
+  defineMarkReadSpec();
+  defineDismissSpec();
+});
 
-    const req = httpMock.expectOne('/api/v1/notifications/unread-count');
+function defineRefreshUnreadCountSpec(): void {
+  it('refreshes unread count', () => {
+    notificationsService.refreshUnreadCount();
+
+    const req = notificationsHttpMock.expectOne('/api/v1/notifications/unread-count');
     expect(req.request.method).toBe('GET');
     req.flush({ count: 3 });
 
-    expect(service.unreadCount()).toBe(3);
+    expect(notificationsService.unreadCount()).toBe(3);
   });
+};
 
+function defineLoadNotificationsSpec(): void {
   it('loads notifications and derives unread count', () => {
-    service.load(25);
+    notificationsService.load(25);
 
-    const req = httpMock.expectOne((r) => r.url === '/api/v1/notifications');
+    const req = notificationsHttpMock.expectOne((r) => r.url === '/api/v1/notifications');
     expect(req.request.method).toBe('GET');
     expect(req.request.params.get('limit')).toBe('25');
     req.flush({
@@ -42,21 +51,23 @@ describe('NotificationsService', () => {
       ]
     });
 
-    expect(service.items().map((n) => n.id)).toEqual(['n1', 'n2']);
-    expect(service.unreadCount()).toBe(1);
+    expect(notificationsService.items().map((n) => n.id)).toEqual(['n1', 'n2']);
+    expect(notificationsService.unreadCount()).toBe(1);
   });
+};
 
+function defineMarkReadSpec(): void {
   it('marks a notification as read', () => {
-    service.load(20);
-    const loadReq = httpMock.expectOne((r) => r.url === '/api/v1/notifications');
+    notificationsService.load(20);
+    const loadReq = notificationsHttpMock.expectOne((r) => r.url === '/api/v1/notifications');
     expect(loadReq.request.method).toBe('GET');
     expect(loadReq.request.params.get('limit')).toBe('20');
     loadReq.flush({
       items: [{ id: 'n1', type: 'order', title: 'Order', created_at: '2000-01-01T00:00:00+00:00', read_at: null }]
     });
 
-    service.markRead('n1');
-    const req = httpMock.expectOne('/api/v1/notifications/n1/read');
+    notificationsService.markRead('n1');
+    const req = notificationsHttpMock.expectOne('/api/v1/notifications/n1/read');
     expect(req.request.method).toBe('POST');
     req.flush({
       id: 'n1',
@@ -66,21 +77,23 @@ describe('NotificationsService', () => {
       read_at: '2000-01-01T00:00:00+00:00'
     });
 
-    expect(service.items()[0].read_at).toBeTruthy();
-    expect(service.unreadCount()).toBe(0);
+    expect(notificationsService.items()[0].read_at).toBeTruthy();
+    expect(notificationsService.unreadCount()).toBe(0);
   });
+};
 
+function defineDismissSpec(): void {
   it('dismisses a notification', () => {
-    service.load(20);
-    const loadReq = httpMock.expectOne((r) => r.url === '/api/v1/notifications');
+    notificationsService.load(20);
+    const loadReq = notificationsHttpMock.expectOne((r) => r.url === '/api/v1/notifications');
     expect(loadReq.request.method).toBe('GET');
     expect(loadReq.request.params.get('limit')).toBe('20');
     loadReq.flush({
       items: [{ id: 'n1', type: 'order', title: 'Order', created_at: '2000-01-01T00:00:00+00:00', read_at: null }]
     });
 
-    service.dismiss('n1');
-    const req = httpMock.expectOne('/api/v1/notifications/n1/dismiss');
+    notificationsService.dismiss('n1');
+    const req = notificationsHttpMock.expectOne('/api/v1/notifications/n1/dismiss');
     expect(req.request.method).toBe('POST');
     req.flush({
       id: 'n1',
@@ -90,6 +103,6 @@ describe('NotificationsService', () => {
       dismissed_at: '2000-01-01T00:00:00+00:00'
     });
 
-    expect(service.items().length).toBe(0);
+    expect(notificationsService.items().length).toBe(0);
   });
-});
+};

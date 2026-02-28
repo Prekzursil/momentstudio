@@ -1,3 +1,5 @@
+const path = require('node:path');
+
 module.exports = function (config) {
   if (!process.env.CHROME_BIN) {
     try {
@@ -10,9 +12,14 @@ module.exports = function (config) {
   }
 
   const enableJUnitReporter = process.env.KARMA_JUNIT === '1' || process.env.CI === 'true';
-  const reporters = enableJUnitReporter
-    ? ['progress', 'kjhtml', 'junit']
-    : ['progress', 'kjhtml'];
+  const enableCoverageReporter = process.argv.includes('--code-coverage') || process.env.CI === 'true';
+  const reporters = ['progress', 'kjhtml'];
+  if (enableJUnitReporter) {
+    reporters.push('junit');
+  }
+  if (enableCoverageReporter) {
+    reporters.push('coverage');
+  }
 
   config.set({
     basePath: '',
@@ -33,6 +40,12 @@ module.exports = function (config) {
       outputDir: 'test-results',
       outputFile: 'karma.junit.xml',
       useBrowserName: false
+    },
+    coverageReporter: {
+      dir: path.join(__dirname, 'coverage'),
+      subdir: '.',
+      reporters: [{ type: 'lcovonly', file: 'lcov.info' }, { type: 'text-summary' }],
+      fixWebpackSourcePaths: true
     },
     port: 9876,
     listenAddress: '127.0.0.1',

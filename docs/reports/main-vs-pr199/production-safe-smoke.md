@@ -41,5 +41,5 @@ Access level: public + safe auth probes only (no destructive/admin mutations)
 4. Full authenticated production flow was intentionally not executed because no production credentials were used in this audit.
 
 Coverage gap recorded:
-- Authenticated session and checkout pre-payment stages were validated locally, but only anonymous-safe probes were run on production.
 
+- Authenticated session and checkout pre-payment stages were validated locally, but only anonymous-safe probes were run on production.

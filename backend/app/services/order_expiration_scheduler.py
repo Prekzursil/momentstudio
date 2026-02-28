@@ -16,52 +16,58 @@ from app.services import leader_lock
 logger = logging.getLogger(__name__)
 
 
-async def _run_once() -> int:
+def _expiration_config() -> tuple[int, int] | None:
     if not bool(getattr(settings, "order_pending_payment_expiry_enabled", True)):
-        return 0
-
+        return None
     ttl_minutes = int(getattr(settings, "order_pending_payment_expiry_minutes", 0) or 0)
     if ttl_minutes <= 0:
-        return 0
-
+        return None
     limit = max(1, int(getattr(settings, "order_pending_payment_expiry_batch_limit", 200) or 200))
-    cutoff = datetime.now(timezone.utc) - timedelta(minutes=ttl_minutes)
+    return ttl_minutes, limit
 
-    async with SessionLocal() as session:
-        rows = (
-            (
-                await session.execute(
-                    select(Order)
-                    .where(Order.status == OrderStatus.pending_payment, Order.created_at < cutoff)
-                    .order_by(Order.created_at.asc())
-                    .limit(limit)
-                )
-            )
-            .scalars()
-            .all()
+
+async def _expired_pending_payment_orders(session, *, cutoff: datetime, limit: int) -> list[Order]:
+    result = await session.execute(
+        select(Order)
+        .where(Order.status == OrderStatus.pending_payment, Order.created_at < cutoff)
+        .order_by(Order.created_at.asc())
+        .limit(limit)
+    )
+    return result.scalars().all()
+
+
+def _expire_order(session, order: Order) -> None:
+    order.status = OrderStatus.cancelled
+    if not (getattr(order, "cancel_reason", None) or "").strip():
+        order.cancel_reason = "Payment expired"
+    session.add(order)
+    session.add(
+        OrderEvent(
+            order_id=order.id,
+            event="status_change",
+            note="pending_payment -> cancelled (expired)",
+            data={
+                "changes": {
+                    "status": {"from": OrderStatus.pending_payment.value, "to": OrderStatus.cancelled.value},
+                    "cancel_reason": order.cancel_reason,
+                }
+            },
         )
+    )
+
+
+async def _run_once() -> int:
+    config = _expiration_config()
+    if config is None:
+        return 0
+    ttl_minutes, limit = config
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=ttl_minutes)
+    async with SessionLocal() as session:
+        rows = await _expired_pending_payment_orders(session, cutoff=cutoff, limit=limit)
         if not rows:
             return 0
-
         for order in rows:
-            order.status = OrderStatus.cancelled
-            if not (getattr(order, "cancel_reason", None) or "").strip():
-                order.cancel_reason = "Payment expired"
-            session.add(order)
-            session.add(
-                OrderEvent(
-                    order_id=order.id,
-                    event="status_change",
-                    note="pending_payment -> cancelled (expired)",
-                    data={
-                        "changes": {
-                            "status": {"from": OrderStatus.pending_payment.value, "to": OrderStatus.cancelled.value},
-                            "cancel_reason": order.cancel_reason,
-                        }
-                    },
-                )
-            )
-
+            _expire_order(session, order)
         await session.commit()
         return len(rows)
 
@@ -112,4 +118,3 @@ async def stop(app: FastAPI) -> None:
         delattr(app.state, "order_expiration_scheduler_stop")
     if getattr(app.state, "order_expiration_scheduler_task", None) is not None:
         delattr(app.state, "order_expiration_scheduler_task")
-

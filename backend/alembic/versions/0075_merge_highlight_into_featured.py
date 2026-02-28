@@ -20,38 +20,39 @@ depends_on: Sequence[str] | None = None
 
 def upgrade() -> None:
     op.execute(
-        sa.text(
-            """
-            UPDATE products
-            SET is_featured = TRUE
-            WHERE id IN (
-                SELECT pt.product_id
-                FROM product_tags pt
-                JOIN tags t ON t.id = pt.tag_id
-                WHERE t.slug = 'highlight'
-            )
-            """
+        """
+        UPDATE products
+        SET is_featured = TRUE
+        WHERE id IN (
+            SELECT pt.product_id
+            FROM product_tags pt
+            JOIN tags t ON t.id = pt.tag_id
+            WHERE t.slug = 'highlight'
         )
+        """
     )
     op.execute(
-        sa.text(
-            """
-            DELETE FROM product_tags
-            WHERE tag_id IN (
-                SELECT id FROM tags WHERE slug = 'highlight'
-            )
-            """
+        """
+        DELETE FROM product_tags
+        WHERE tag_id IN (
+            SELECT id FROM tags WHERE slug = 'highlight'
         )
+        """
     )
-    op.execute(sa.text("DELETE FROM tags WHERE slug = 'highlight'"))
+    op.execute("DELETE FROM tags WHERE slug = 'highlight'")
 
 
 def downgrade() -> None:
+    tags_table = sa.table(
+        "tags",
+        sa.column("id", sa.String(length=36)),
+        sa.column("name", sa.String(length=255)),
+        sa.column("slug", sa.String(length=255)),
+    )
     conn = op.get_bind()
-    exists = conn.execute(sa.text("SELECT 1 FROM tags WHERE slug = 'highlight'")).first()
+    exists = conn.execute(
+        sa.select(sa.literal(1)).select_from(tags_table).where(tags_table.c.slug == "highlight")
+    ).first()
     if exists:
         return
-    op.execute(
-        sa.text("INSERT INTO tags (id, name, slug) VALUES (:id, :name, :slug)")
-        .bindparams(id=uuid.uuid4(), name="Highlight", slug="highlight")
-    )
+    op.bulk_insert(tags_table, [{"id": str(uuid.uuid4()), "name": "Highlight", "slug": "highlight"}])

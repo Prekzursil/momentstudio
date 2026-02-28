@@ -53,6 +53,11 @@ type CheckoutBillingAddress = {
 
 type CheckoutPaymentMethod = 'cod' | 'netopia' | 'paypal' | 'stripe';
 type PaymentMethodCapability = { enabled?: boolean; reason?: string | null; reason_code?: string | null };
+type PaymentCapabilitiesResponse = {
+  stripe?: PaymentMethodCapability;
+  paypal?: PaymentMethodCapability;
+  netopia?: PaymentMethodCapability;
+};
 
 type CheckoutStartResponse = {
   order_id: string;
@@ -303,7 +308,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
 	    @ViewChild('checkoutFormEl') checkoutFormEl?: ElementRef<HTMLFormElement>;
       readonly vm = this;
 
-		  crumbs = [
+	  readonly crumbs = [
 		    { label: 'nav.home', url: '/' },
 		    { label: 'nav.cart', url: '/cart' },
 	    { label: 'checkout.title' }
@@ -443,7 +448,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     private readonly translate: TranslateService,
     private readonly checkoutPrefs: CheckoutPrefsService,
     private readonly analytics: AnalyticsService,
-    public auth: AuthService,
+    public readonly auth: AuthService,
     private readonly zone: NgZone,
     private readonly cdr: ChangeDetectorRef
   ) {
@@ -473,7 +478,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
 	  scrollToStep(id: string): void {
       if (typeof document === 'undefined') return;
       try {
-        const step = document.getElementById(id) as HTMLElement | null;
+        const step = document.getElementById(id);
         if (!step) return;
         step.scrollIntoView({ behavior: 'smooth', block: 'start' });
         setTimeout(() => {
@@ -495,7 +500,14 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       const candidates = Array.from(container.querySelectorAll<HTMLElement>(selector));
       for (const candidate of candidates) {
         if (candidate instanceof HTMLInputElement && candidate.type === 'hidden') continue;
-        if ('disabled' in candidate && Boolean((candidate as any).disabled)) continue;
+        if (
+          candidate instanceof HTMLButtonElement ||
+          candidate instanceof HTMLInputElement ||
+          candidate instanceof HTMLSelectElement ||
+          candidate instanceof HTMLTextAreaElement
+        ) {
+          if (candidate.disabled) continue;
+        }
         if (!this.isElementVisible(candidate)) continue;
         return candidate;
       }
@@ -541,7 +553,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     private focusElementById(id: string): void {
       if (typeof document === 'undefined') return;
       setTimeout(() => {
-        const el = document.getElementById(id) as HTMLElement | null;
+        const el = document.getElementById(id);
         if (!el) return;
         this.scrollAndFocus(el);
       });
@@ -561,7 +573,14 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       const candidates = Array.from(container.querySelectorAll<HTMLElement>(selector));
       for (const candidate of candidates) {
         if (candidate instanceof HTMLInputElement && candidate.type === 'hidden') continue;
-        if ('disabled' in candidate && Boolean((candidate as any).disabled)) continue;
+        if (
+          candidate instanceof HTMLButtonElement ||
+          candidate instanceof HTMLInputElement ||
+          candidate instanceof HTMLSelectElement ||
+          candidate instanceof HTMLTextAreaElement
+        ) {
+          if (candidate.disabled) continue;
+        }
         if (!this.isElementVisible(candidate)) continue;
         return candidate;
       }
@@ -941,7 +960,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     const trimmed = (raw || '').trim();
     if (!trimmed) return null;
 
-    const codeMatch = trimmed.match(/^([A-Za-z]{2})\b/);
+    const codeMatch = /^([A-Za-z]{2})\b/.exec(trimmed);
     if (codeMatch) {
       const code = codeMatch[1].toUpperCase();
       if (this.countries.some((c) => c.code === code)) return code;
@@ -980,31 +999,63 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     this.savedAddressesLoading = true;
     this.savedAddressesError = '';
     this.accountService.getAddresses().subscribe({
-      next: (addresses) => {
-        this.savedAddresses = Array.isArray(addresses) ? addresses : [];
-        if (this.savedAddresses.length) {
-          const defaultShipping = this.savedAddresses.find((a) => a.is_default_shipping) ?? this.savedAddresses[0];
-          const defaultBilling = this.savedAddresses.find((a) => a.is_default_billing) ?? defaultShipping;
-          if (!this.selectedBillingAddressId && defaultBilling) {
-            this.selectedBillingAddressId = defaultBilling.id;
-          }
-          if (!this.billingSameAsShipping && !this.billing.line1.trim() && !this.billing.city.trim() && !this.billing.postal.trim() && defaultBilling) {
-            this.applySavedAddressToBilling(defaultBilling);
-          }
-
-          if (!this.address.line1.trim() && !this.address.city.trim() && !this.address.postal.trim()) {
-          this.selectedShippingAddressId = defaultShipping.id;
-          this.applySavedAddressToShipping(defaultShipping);
-          }
-        }
-        this.savedAddressesLoading = false;
-      },
+      next: (addresses) => this.handleSavedAddressesLoaded(addresses),
       error: () => {
         this.savedAddresses = [];
         this.savedAddressesError = this.translate.instant('checkout.savedAddressesLoadError');
         this.savedAddressesLoading = false;
       }
     });
+  }
+
+  private handleSavedAddressesLoaded(addresses: Address[] | null | undefined): void {
+    this.savedAddresses = Array.isArray(addresses) ? addresses : [];
+    const defaults = this.getDefaultSavedAddresses();
+    if (!defaults) {
+      this.savedAddressesLoading = false;
+      return;
+    }
+
+    this.ensureDefaultBillingSelection(defaults.billing);
+    this.prefillBillingFromSavedAddress(defaults.billing);
+    this.prefillShippingFromSavedAddress(defaults.shipping);
+    this.savedAddressesLoading = false;
+  }
+
+  private getDefaultSavedAddresses(): { shipping: Address; billing: Address } | null {
+    if (!this.savedAddresses.length) return null;
+    const shipping = this.savedAddresses.find((a) => a.is_default_shipping) ?? this.savedAddresses[0];
+    const billing = this.savedAddresses.find((a) => a.is_default_billing) ?? shipping;
+    return { shipping, billing };
+  }
+
+  private ensureDefaultBillingSelection(defaultBilling: Address): void {
+    if (this.selectedBillingAddressId) return;
+    this.selectedBillingAddressId = defaultBilling.id;
+  }
+
+  private prefillBillingFromSavedAddress(defaultBilling: Address): void {
+    if (!this.shouldPrefillBillingFromSavedAddress()) return;
+    this.applySavedAddressToBilling(defaultBilling);
+  }
+
+  private shouldPrefillBillingFromSavedAddress(): boolean {
+    if (this.billingSameAsShipping) return false;
+    if (this.billing.line1.trim()) return false;
+    if (this.billing.city.trim()) return false;
+    return !this.billing.postal.trim();
+  }
+
+  private prefillShippingFromSavedAddress(defaultShipping: Address): void {
+    if (!this.shouldPrefillShippingFromSavedAddress()) return;
+    this.selectedShippingAddressId = defaultShipping.id;
+    this.applySavedAddressToShipping(defaultShipping);
+  }
+
+  private shouldPrefillShippingFromSavedAddress(): boolean {
+    if (this.address.line1.trim()) return false;
+    if (this.address.city.trim()) return false;
+    return !this.address.postal.trim();
   }
 
   onEmailChanged(): void {
@@ -1117,7 +1168,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     try {
       const raw = localStorage.getItem(CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY);
       if (!raw) return false;
-      const parsed = JSON.parse(raw) as unknown;
+      const parsed = JSON.parse(raw);
       return parsed === true;
     } catch {
       return false;
@@ -1401,7 +1452,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     if (!items.length) return;
     this.checkoutStartTracked = true;
     const units = items.reduce((sum, item) => sum + (item.quantity || 0), 0);
-    const currency = (this.currency || items[0]?.currency || 'RON') as string;
+    const currency = this.currency || items[0]?.currency || 'RON';
     this.analytics.track('checkout_start', {
       line_items: items.length,
       units,
@@ -1416,7 +1467,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     if (this.checkoutFlowCompleted) return;
     const items = this.items();
     const units = items.reduce((sum, item) => sum + (item.quantity || 0), 0);
-    const currency = (this.currency || items[0]?.currency || 'RON') as string;
+    const currency = this.currency || items[0]?.currency || 'RON';
     this.analytics.track('checkout_abandon', {
       line_items: items.length,
       units,
@@ -1486,28 +1537,46 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     this.couponEligibilityLoading = true;
     this.couponEligibilityError = '';
     this.couponsService.eligibility().subscribe({
-      next: (res) => {
-        this.couponEligibility = res ?? { eligible: [], ineligible: [] };
-        this.couponEligibilityLoading = false;
-        this.suggestedCouponOffer = this.pickBestCouponOffer(this.couponEligibility.eligible ?? []);
-
-        const current = (this.promo || '').trim().toUpperCase();
-        if (!current) {
-          this.appliedCouponOffer = null;
-        } else {
-          const offers = [...(this.couponEligibility.eligible ?? []), ...(this.couponEligibility.ineligible ?? [])];
-          const match = offers.find((offer) => offer.coupon?.code?.toUpperCase() === current) ?? null;
-          this.appliedCouponOffer = match;
-        }
-
-        this.maybeAutoApplyBestCoupon();
-      },
+      next: (res) => this.handleCouponEligibilityLoaded(res),
       error: (err) => {
         this.couponEligibilityLoading = false;
         this.couponEligibilityError =
           err?.error?.detail || this.translate.instant('checkout.couponsLoadError');
       }
     });
+  }
+
+  private handleCouponEligibilityLoaded(res: CouponEligibilityResponse | null | undefined): void {
+    const eligibility = this.normalizeCouponEligibility(res);
+    this.couponEligibility = eligibility;
+    this.couponEligibilityLoading = false;
+    this.suggestedCouponOffer = this.pickBestCouponOffer(eligibility.eligible ?? []);
+    this.appliedCouponOffer = this.findAppliedCouponOffer(eligibility);
+    this.maybeAutoApplyBestCoupon();
+  }
+
+  private normalizeCouponEligibility(
+    res: CouponEligibilityResponse | null | undefined
+  ): CouponEligibilityResponse {
+    return res ?? { eligible: [], ineligible: [] };
+  }
+
+  private findAppliedCouponOffer(eligibility: CouponEligibilityResponse): CouponOffer | null {
+    const current = this.currentPromoCode();
+    if (!current) return null;
+    return this.findCouponOfferByCode(eligibility, current);
+  }
+
+  private currentPromoCode(): string {
+    return (this.promo || '').trim().toUpperCase();
+  }
+
+  private findCouponOfferByCode(
+    eligibility: CouponEligibilityResponse,
+    code: string
+  ): CouponOffer | null {
+    const offers = [...(eligibility.eligible ?? []), ...(eligibility.ineligible ?? [])];
+    return offers.find((offer) => offer.coupon?.code?.toUpperCase() === code) ?? null;
   }
 
   private applyPendingPromoCode(): void {
@@ -1818,33 +1887,40 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
 	  }
 
     private loadPaymentCapabilities(): void {
-      this.api.get<{
-        stripe?: PaymentMethodCapability;
-        paypal?: PaymentMethodCapability;
-        netopia?: PaymentMethodCapability;
-      }>('/payments/capabilities')
+      this.api.get<PaymentCapabilitiesResponse>('/payments/capabilities')
       .subscribe({
-        next: (cap) => {
-          this.stripeEnabled = Boolean(appConfig.stripeEnabled) && Boolean(cap?.stripe?.enabled);
-          this.paypalEnabled = Boolean(cap?.paypal?.enabled);
-          const netopiaUiEnabled = Boolean(appConfig.netopiaEnabled);
-          const netopiaBackendEnabled = Boolean(cap?.netopia?.enabled);
-          this.netopiaEnabled = netopiaUiEnabled && netopiaBackendEnabled;
-          if (netopiaUiEnabled && !netopiaBackendEnabled) {
-            const reasonCode = String(cap?.netopia?.reason_code || '').trim();
-            const reasonKey = reasonCode ? `checkout.paymentDisabledReasons.${reasonCode}` : '';
-            const translated = reasonKey ? this.translate.instant(reasonKey) : '';
-            const fallback = String(cap?.netopia?.reason || '').trim();
-            this.netopiaDisabledReason = translated && translated !== reasonKey ? translated : fallback;
-          } else {
-            this.netopiaDisabledReason = '';
-          }
-          this.ensurePaymentMethodAvailable();
-        },
+        next: (cap) => this.applyPaymentCapabilities(cap),
         error: () => {
           // Keep app-config defaults when the backend cannot be reached.
         }
       });
+    }
+
+    private applyPaymentCapabilities(cap: PaymentCapabilitiesResponse | null | undefined): void {
+      this.stripeEnabled = Boolean(appConfig.stripeEnabled) && Boolean(cap?.stripe?.enabled);
+      this.paypalEnabled = Boolean(cap?.paypal?.enabled);
+      const netopiaUiEnabled = Boolean(appConfig.netopiaEnabled);
+      const netopiaBackendEnabled = Boolean(cap?.netopia?.enabled);
+      this.netopiaEnabled = netopiaUiEnabled && netopiaBackendEnabled;
+      this.netopiaDisabledReason = this.resolveNetopiaDisabledReason(
+        cap?.netopia,
+        netopiaUiEnabled,
+        netopiaBackendEnabled
+      );
+      this.ensurePaymentMethodAvailable();
+    }
+
+    private resolveNetopiaDisabledReason(
+      netopia: PaymentMethodCapability | undefined,
+      netopiaUiEnabled: boolean,
+      netopiaBackendEnabled: boolean
+    ): string {
+      if (!netopiaUiEnabled || netopiaBackendEnabled) return '';
+      const reasonCode = String(netopia?.reason_code || '').trim();
+      const reasonKey = reasonCode ? `checkout.paymentDisabledReasons.${reasonCode}` : '';
+      const translated = reasonKey ? this.translate.instant(reasonKey) : '';
+      if (translated && translated !== reasonKey) return translated;
+      return String(netopia?.reason || '').trim();
     }
 
 	  ngOnDestroy(): void {

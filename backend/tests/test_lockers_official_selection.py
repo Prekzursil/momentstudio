@@ -117,3 +117,14 @@ async def test_fan_auth_token_parses_nested_response(monkeypatch) -> None:
 
     token = await lockers_service._fan_get_token()
     assert token == "tok"
+
+
+def test_parse_fan_locker_core_fields_rejects_missing_coordinates() -> None:
+    payload = {"id": "123", "name": "Locker", "latitude": None, "longitude": "26.1"}
+    assert lockers_service._parse_fan_locker_core_fields(payload) is None
+
+
+def test_parse_fan_locker_core_fields_accepts_numeric_coordinates() -> None:
+    payload = {"id": "123", "name": "Locker", "latitude": "44.4", "longitude": 26.1}
+    parsed = lockers_service._parse_fan_locker_core_fields(payload)
+    assert parsed == ("123", 44.4, 26.1, "Locker")

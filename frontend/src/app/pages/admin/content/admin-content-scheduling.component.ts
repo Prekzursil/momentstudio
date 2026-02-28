@@ -305,14 +305,11 @@ export class AdminContentSchedulingComponent implements OnInit {
     }
 
     const sortTs = (row: ScheduleRow): number => {
-      const publishMs = row.publishAt?.getTime() ?? null;
-      const unpublishMs = row.unpublishAt?.getTime() ?? null;
-      const publishUpcoming = publishMs !== null && publishMs >= nowMs;
-      const unpublishUpcoming = unpublishMs !== null && unpublishMs >= nowMs;
-      return Math.min(
-        publishUpcoming && publishMs !== null ? publishMs : Number.POSITIVE_INFINITY,
-        unpublishUpcoming && unpublishMs !== null ? unpublishMs : Number.POSITIVE_INFINITY
-      );
+      const asUpcomingTs = (timestamp: number | null): number => {
+        if (timestamp === null || timestamp < nowMs) return Number.POSITIVE_INFINITY;
+        return timestamp;
+      };
+      return Math.min(asUpcomingTs(row.publishAt?.getTime() ?? null), asUpcomingTs(row.unpublishAt?.getTime() ?? null));
     };
 
     return out.sort((a, b) => sortTs(a) - sortTs(b));
@@ -332,4 +329,3 @@ export class AdminContentSchedulingComponent implements OnInit {
     return row.key;
   }
 }
-

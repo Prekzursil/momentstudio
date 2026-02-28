@@ -20,9 +20,9 @@ docker compose up --build
 
 Then open:
 
-- Frontend: http://localhost:4201
-- Backend health: http://localhost:8001/api/v1/health
-- Backend docs: http://localhost:8001/docs
+- Frontend: <http://localhost:4201>
+- Backend health: <http://localhost:8001/api/v1/health>
+- Backend docs: <http://localhost:8001/docs>
 
 ## Frontend ↔ backend routing / CORS
 

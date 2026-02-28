@@ -131,12 +131,12 @@ async def test_postgres_coupon_global_cap_reservation_race() -> None:
 
     from fastapi import HTTPException
 
-    from app.models.coupons_v2 import Coupon, CouponReservation, CouponVisibility, Promotion, PromotionDiscountType
+    from app.models.coupons import Coupon, CouponReservation, CouponVisibility, Promotion, PromotionDiscountType
     from app.models.order import Order, OrderStatus
     from app.models.user import User
     from app.schemas.user import UserCreate
     from app.services.auth import create_user
-    from app.services.coupons_v2 import reserve_coupon_for_order
+    from app.services.coupons import reserve_coupon_for_order
 
     async with SessionLocal() as session:
         u1 = await create_user(

@@ -6,6 +6,7 @@ This project adds RFC 2369 + RFC 8058 headers to marketing emails:
 - `List-Unsubscribe-Post: List-Unsubscribe=One-Click`
 
 The backend accepts both:
+
 - `GET /api/v1/newsletter/unsubscribe?token=…`
 - `POST /api/v1/newsletter/unsubscribe?token=…` (supports form bodies like `List-Unsubscribe=One-Click`)
 
@@ -36,6 +37,7 @@ Confirm the UI appears for the message.
 Click the client’s “Unsubscribe” action.
 
 Expected result:
+
 - The client performs a POST to the URL in `List-Unsubscribe`.
 - The backend marks the newsletter subscriber as unsubscribed.
 - If a matching `User` exists, `notify_marketing` becomes `False`.

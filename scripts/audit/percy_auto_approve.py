@@ -70,43 +70,41 @@ def select_build_for_approval(builds: Iterable[dict[str, Any]]) -> dict[str, Any
     return candidates[0]
 
 
-def _request_json(
+def _request_url(path: str, query: dict[str, str] | None) -> str:
+    if not query:
+        return f"{API_BASE}{path}"
+    return f"{API_BASE}{path}?" + urllib.parse.urlencode(query)
+
+
+def _authorization_header(
     *,
     token: str | None,
-    method: str,
-    path: str,
-    query: dict[str, str] | None = None,
-    payload: dict[str, Any] | None = None,
-    basic_auth: tuple[str, str] | None = None,
-) -> dict[str, Any]:
-    query_suffix = ""
-    if query:
-        query_suffix = "?" + urllib.parse.urlencode(query)
-    url = f"{API_BASE}{path}{query_suffix}"
-    data = None
-    if payload is not None:
-        data = json.dumps(payload).encode("utf-8")
-
-    headers: dict[str, str] = {
-        "Accept": "application/json",
-        "User-Agent": "adrianaart-percy-auto-approve",
-    }
-    if data is not None:
-        headers["Content-Type"] = "application/json"
+    basic_auth: tuple[str, str] | None,
+) -> str:
     if basic_auth is not None:
         username, access_key = basic_auth
         auth_pair = f"{username}:{access_key}".encode("utf-8")
-        headers["Authorization"] = "Basic " + base64.b64encode(auth_pair).decode("ascii")
-    elif token:
-        headers["Authorization"] = f"Token token={token}"
-    else:
-        raise ValueError("Token or basic_auth credentials are required")
+        return "Basic " + base64.b64encode(auth_pair).decode("ascii")
+    if token:
+        return f"Token token={token}"
+    raise ValueError("Token or basic_auth credentials are required")
 
-    req = urllib.request.Request(url=url, method=method, data=data, headers=headers)
 
+def _request_body(payload: dict[str, Any] | None) -> bytes | None:
+    if payload is None:
+        return None
+    return json.dumps(payload).encode("utf-8")
+
+
+def _read_response_text(
+    request: urllib.request.Request,
+    *,
+    method: str,
+    path: str,
+) -> str:
     try:
-        with urllib.request.urlopen(req, timeout=20) as resp:
-            raw = resp.read().decode("utf-8")
+        with urllib.request.urlopen(request, timeout=20) as resp:
+            return resp.read().decode("utf-8")
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
         msg = f"Percy API {method} {path} failed (HTTP {exc.code})"
@@ -116,6 +114,8 @@ def _request_json(
     except urllib.error.URLError as exc:
         raise PercyApiError(f"Percy API {method} {path} failed: {exc}") from exc
 
+
+def _parse_response_dict(raw: str, *, method: str, path: str) -> dict[str, Any]:
     if not raw:
         return {}
     try:
@@ -127,6 +127,31 @@ def _request_json(
     return data_json
 
 
+def _request_json(
+    *,
+    token: str | None,
+    method: str,
+    path: str,
+    query: dict[str, str] | None = None,
+    payload: dict[str, Any] | None = None,
+    basic_auth: tuple[str, str] | None = None,
+) -> dict[str, Any]:
+    url = _request_url(path, query)
+    data = _request_body(payload)
+
+    headers: dict[str, str] = {
+        "Accept": "application/json",
+        "User-Agent": "adrianaart-percy-auto-approve",
+    }
+    if data is not None:
+        headers["Content-Type"] = "application/json"
+    headers["Authorization"] = _authorization_header(token=token, basic_auth=basic_auth)
+
+    req = urllib.request.Request(url=url, method=method, data=data, headers=headers)
+    raw = _read_response_text(req, method=method, path=path)
+    return _parse_response_dict(raw, method=method, path=path)
+
+
 def _validate_sha(sha: str) -> str:
     value = sha.strip()
     if not value:
@@ -134,6 +159,66 @@ def _validate_sha(sha: str) -> str:
     if not SHA_RE.fullmatch(value):
         raise ValueError(f"Invalid commit SHA: {value}")
     return value
+
+
+def _print_non_approvable(*, reason: str, builds_scanned: int) -> int:
+    print("approved=false")
+    print(f"reason={reason}")
+    print(f"builds_scanned={builds_scanned}")
+    return 0
+
+
+def _approve_selected_build(
+    build_id: str,
+    *,
+    token: str,
+    browserstack_username: str | None,
+    browserstack_access_key: str | None,
+) -> None:
+    approval_basic_auth: tuple[str, str] | None = None
+    if browserstack_username and browserstack_access_key:
+        approval_basic_auth = (browserstack_username, browserstack_access_key)
+    _request_json(
+        token=token if approval_basic_auth is None else None,
+        method="POST",
+        path="/reviews",
+        payload={
+            "data": {
+                "type": "reviews",
+                "attributes": {"state": "approved"},
+                "relationships": {
+                    "build": {
+                        "data": {
+                            "type": "builds",
+                            "id": build_id,
+                        }
+                    }
+                },
+            }
+        },
+        basic_auth=approval_basic_auth,
+    )
+
+
+def _approve_selected_build_with_error_details(
+    *,
+    build_id: str,
+    token: str,
+    browserstack_username: str | None,
+    browserstack_access_key: str | None,
+) -> None:
+    try:
+        _approve_selected_build(
+            build_id,
+            token=token,
+            browserstack_username=browserstack_username,
+            browserstack_access_key=browserstack_access_key,
+        )
+    except PercyApiError as exc:
+        print("approved=false")
+        print(f"reason=approval-error:{exc}")
+        print(f"selected_build_id={build_id}")
+        raise
 
 
 def run(
@@ -160,17 +245,11 @@ def run(
 
     selected = select_build_for_approval(builds)
     if selected is None:
-        print("approved=false")
-        print("reason=no-approvable-build")
-        print(f"builds_scanned={len(builds)}")
-        return 0
+        return _print_non_approvable(reason="no-approvable-build", builds_scanned=len(builds))
 
     build_id = str(selected.get("id") or "")
     if not build_id:
-        print("approved=false")
-        print("reason=missing-build-id")
-        print(f"builds_scanned={len(builds)}")
-        return 0
+        return _print_non_approvable(reason="missing-build-id", builds_scanned=len(builds))
 
     print(f"selected_build_id={build_id}")
     print(f"builds_scanned={len(builds)}")
@@ -180,36 +259,12 @@ def run(
         print("reason=dry-run")
         return 0
 
-    approval_basic_auth: tuple[str, str] | None = None
-    if browserstack_username and browserstack_access_key:
-        approval_basic_auth = (browserstack_username, browserstack_access_key)
-
-    try:
-        _request_json(
-            token=token if approval_basic_auth is None else None,
-            method="POST",
-            path="/reviews",
-            payload={
-                "data": {
-                    "type": "reviews",
-                    "attributes": {"state": "approved"},
-                    "relationships": {
-                        "build": {
-                            "data": {
-                                "type": "builds",
-                                "id": build_id,
-                            }
-                        }
-                    },
-                }
-            },
-            basic_auth=approval_basic_auth,
-        )
-    except PercyApiError as exc:
-        print("approved=false")
-        print(f"reason=approval-error:{exc}")
-        print(f"selected_build_id={build_id}")
-        raise
+    _approve_selected_build_with_error_details(
+        build_id=build_id,
+        token=token,
+        browserstack_username=browserstack_username,
+        browserstack_access_key=browserstack_access_key,
+    )
 
     print("approved=true")
     print("reason=build-approved")
@@ -231,13 +286,20 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv or sys.argv[1:])
 
-    token = str(args.token or os.environ.get("PERCY_TOKEN", "")).strip()
+    def _resolve_token() -> str:
+        return str(args.token or os.environ.get("PERCY_TOKEN", "")).strip()
+
+    def _resolve_browserstack_pair() -> tuple[str | None, str | None]:
+        username = str(args.browserstack_username or os.environ.get("BROWSERSTACK_USERNAME", "")).strip() or None
+        access_key = str(args.browserstack_access_key or os.environ.get("BROWSERSTACK_ACCESS_KEY", "")).strip() or None
+        return username, access_key
+
+    token = _resolve_token()
     if not token:
         print("approved=false")
         print("reason=missing-token")
         return 0
-    browserstack_username = str(args.browserstack_username or os.environ.get("BROWSERSTACK_USERNAME", "")).strip() or None
-    browserstack_access_key = str(args.browserstack_access_key or os.environ.get("BROWSERSTACK_ACCESS_KEY", "")).strip() or None
+    browserstack_username, browserstack_access_key = _resolve_browserstack_pair()
 
     try:
         return run(

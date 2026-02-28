@@ -1,17 +1,2 @@
-exclude_paths:
-  # Hybrid backlog closeout:
-  # Keep core application code in scanner scope while suppressing legacy
-  # low-signal hotspots that dominate historical backlog noise.
-
-  # Alembic migration history is append-only legacy/change-log code and
-  # generates recurring style churn with low product-risk signal.
-  - "backend/alembic/**"
-
-  # Audit helper scripts are operational orchestration glue covered by
-  # dedicated audit workflows/tests; exclude to avoid duplicate scanner noise.
-  - "scripts/audit/**"
-
-  # Known giant legacy API modules: temporarily excluded from Codacy backlog
-  # closeout until modularization lands, while the rest of backend/app remains scanned.
-  - "backend/app/api/v1/admin_dashboard.py"
-  - "backend/app/api/v1/orders.py"
+# Strict-zero mode: no path suppressions.
+exclude_paths: []

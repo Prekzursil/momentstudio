@@ -132,52 +132,60 @@ def test_run_sync_adds_missing_issue_and_sets_lane_and_status(tmp_path) -> None:
     assert [name for name, _ in calls].count("set") == 2
 
 
-def test_run_sync_updates_existing_and_preserves_done_status(tmp_path) -> None:
-    module = _load_module()
-    issues_path = tmp_path / "artifacts" / "audit-evidence" / "severe.json"
-    _write_issues(issues_path, [{"issue_number": 221, "issue_node_id": "ISSUE_221"}])
+def _existing_item_project_items_payload() -> dict[str, object]:
+    return {
+        "node": {
+            "items": {
+                "nodes": [
+                    {
+                        "id": "ITEM_221",
+                        "content": {"__typename": "Issue", "id": "ISSUE_221", "number": 221},
+                        "fieldValues": {
+                            "nodes": [
+                                {
+                                    "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                                    "name": "Next",
+                                    "optionId": "OPT_NEXT",
+                                    "field": {"name": "Roadmap Lane"},
+                                },
+                                {
+                                    "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                                    "name": "Done",
+                                    "optionId": "OPT_DONE",
+                                    "field": {"name": "Status"},
+                                },
+                            ]
+                        },
+                    }
+                ],
+                "pageInfo": {"hasNextPage": False, "endCursor": None},
+            }
+        }
+    }
 
-    set_calls: list[dict[str, object]] = []
 
+def _existing_item_request(set_calls: list[dict[str, object]]):
     def fake_request(_token: str, query: str, variables: dict[str, object]) -> dict[str, object]:
         if "query ResolveProject" in query:
             return _project_payload()
         if "query ProjectItems" in query:
-            return {
-                "node": {
-                    "items": {
-                        "nodes": [
-                            {
-                                "id": "ITEM_221",
-                                "content": {"__typename": "Issue", "id": "ISSUE_221", "number": 221},
-                                "fieldValues": {
-                                    "nodes": [
-                                        {
-                                            "__typename": "ProjectV2ItemFieldSingleSelectValue",
-                                            "name": "Next",
-                                            "optionId": "OPT_NEXT",
-                                            "field": {"name": "Roadmap Lane"},
-                                        },
-                                        {
-                                            "__typename": "ProjectV2ItemFieldSingleSelectValue",
-                                            "name": "Done",
-                                            "optionId": "OPT_DONE",
-                                            "field": {"name": "Status"},
-                                        },
-                                    ]
-                                },
-                            }
-                        ],
-                        "pageInfo": {"hasNextPage": False, "endCursor": None},
-                    }
-                }
-            }
+            return _existing_item_project_items_payload()
         if "mutation AddProjectItem" in query:
             raise AssertionError("Should not add an existing issue")
         if "mutation SetSingleSelect" in query:
             set_calls.append(variables)
             return {"updateProjectV2ItemFieldValue": {"projectV2Item": {"id": "ITEM_221"}}}
         raise AssertionError(f"Unexpected query: {query[:80]}")
+
+    return fake_request
+
+
+def test_run_sync_updates_existing_and_preserves_done_status(tmp_path) -> None:
+    module = _load_module()
+    issues_path = tmp_path / "artifacts" / "audit-evidence" / "severe.json"
+    _write_issues(issues_path, [{"issue_number": 221, "issue_node_id": "ISSUE_221"}])
+
+    set_calls: list[dict[str, object]] = []
 
     summary = module.run_sync(
         token="token",
@@ -189,7 +197,7 @@ def test_run_sync_updates_existing_and_preserves_done_status(tmp_path) -> None:
         status_name="Todo",
         dry_run=False,
         allow_skip_missing_token=False,
-        request_fn=fake_request,
+        request_fn=_existing_item_request(set_calls),
     )
 
     assert summary["added"] == 0

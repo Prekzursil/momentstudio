@@ -11,6 +11,10 @@ from app.db.base import Base
 from app.models.order import Order
 from app.models.user import User
 
+CASCADE_ALL_DELETE_ORPHAN = "all, delete-orphan"
+FK_COUPONS_ID = "coupons.id"
+FK_USERS_ID = "users.id"
+
 
 class PromotionDiscountType(str, enum.Enum):
     percent = "percent"
@@ -74,10 +78,10 @@ class Promotion(Base):
     )
 
     coupons: Mapped[list["Coupon"]] = relationship(
-        "Coupon", back_populates="promotion", cascade="all, delete-orphan", lazy="selectin"
+        "Coupon", back_populates="promotion", cascade=CASCADE_ALL_DELETE_ORPHAN, lazy="selectin"
     )
     scopes: Mapped[list["PromotionScope"]] = relationship(
-        "PromotionScope", back_populates="promotion", cascade="all, delete-orphan", lazy="selectin"
+        "PromotionScope", back_populates="promotion", cascade=CASCADE_ALL_DELETE_ORPHAN, lazy="selectin"
     )
 
 
@@ -101,7 +105,7 @@ class Coupon(Base):
 
     promotion: Mapped[Promotion] = relationship("Promotion", back_populates="coupons")
     assignments: Mapped[list["CouponAssignment"]] = relationship(
-        "CouponAssignment", back_populates="coupon", cascade="all, delete-orphan", lazy="selectin"
+        "CouponAssignment", back_populates="coupon", cascade=CASCADE_ALL_DELETE_ORPHAN, lazy="selectin"
     )
 
 
@@ -133,8 +137,8 @@ class CouponAssignment(Base):
     __table_args__ = (UniqueConstraint("coupon_id", "user_id", name="uq_coupon_assignments_coupon_user"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    coupon_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("coupons.id"), nullable=False)
-    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    coupon_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey(FK_COUPONS_ID), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey(FK_USERS_ID), nullable=False)
     issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     revoked_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -148,8 +152,8 @@ class CouponReservation(Base):
     __table_args__ = (UniqueConstraint("order_id", name="uq_coupon_reservations_order"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    coupon_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("coupons.id"), nullable=False)
-    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    coupon_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey(FK_COUPONS_ID), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey(FK_USERS_ID), nullable=False)
     order_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("orders.id"), nullable=False)
     reserved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
@@ -166,8 +170,8 @@ class CouponRedemption(Base):
     __table_args__ = (UniqueConstraint("order_id", name="uq_coupon_redemptions_order"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    coupon_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("coupons.id"), nullable=False)
-    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    coupon_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey(FK_COUPONS_ID), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey(FK_USERS_ID), nullable=False)
     order_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("orders.id"), nullable=False)
     redeemed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     discount_ron: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False, default=0)
@@ -185,9 +189,9 @@ class CouponBulkJob(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     coupon_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("coupons.id", ondelete="CASCADE"), nullable=False, index=True
+        UUID(as_uuid=True), ForeignKey(FK_COUPONS_ID, ondelete="CASCADE"), nullable=False, index=True
     )
-    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey(FK_USERS_ID), nullable=True)
     action: Mapped[CouponBulkJobAction] = mapped_column(
         Enum(CouponBulkJobAction, native_enum=False),
         nullable=False,

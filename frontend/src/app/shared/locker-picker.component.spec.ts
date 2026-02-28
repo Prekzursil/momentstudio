@@ -7,15 +7,15 @@ import { ShippingService } from '../core/shipping.service';
 import { LockerPickerComponent } from './locker-picker.component';
 
 
-describe('LockerPickerComponent', () => {
-  let fixture: ComponentFixture<LockerPickerComponent>;
-  let component: LockerPickerComponent;
-  let shipping: jasmine.SpyObj<ShippingService>;
+let lockerPickerFixture: ComponentFixture<LockerPickerComponent>;
+let lockerPickerComponent: LockerPickerComponent;
+let lockerPickerShipping: jasmine.SpyObj<ShippingService>;
 
+describe('LockerPickerComponent', () => {
   beforeEach(async () => {
-    shipping = jasmine.createSpyObj<ShippingService>('ShippingService', ['listLockers', 'listLockerCities']);
-    shipping.listLockers.and.returnValue(of([]));
-    shipping.listLockerCities.and.returnValue(
+    lockerPickerShipping = jasmine.createSpyObj<ShippingService>('ShippingService', ['listLockers', 'listLockerCities']);
+    lockerPickerShipping.listLockers.and.returnValue(of([]));
+    lockerPickerShipping.listLockerCities.and.returnValue(
       of({
         items: [
           {
@@ -46,39 +46,47 @@ describe('LockerPickerComponent', () => {
     await TestBed.configureTestingModule({
       imports: [TranslateModule.forRoot(), LockerPickerComponent],
       providers: [
-        { provide: ShippingService, useValue: shipping },
+        { provide: ShippingService, useValue: lockerPickerShipping },
         { provide: LazyStylesService, useValue: { ensure: () => Promise.resolve() } }
       ]
     }).compileComponents();
 
-    fixture = TestBed.createComponent(LockerPickerComponent);
-    component = fixture.componentInstance;
-    spyOn(component as any, 'initMap').and.returnValue(Promise.resolve());
-    fixture.detectChanges();
+    lockerPickerFixture = TestBed.createComponent(LockerPickerComponent);
+    lockerPickerComponent = lockerPickerFixture.componentInstance;
+    spyOn(lockerPickerComponent as any, 'initMap').and.returnValue(Promise.resolve());
+    lockerPickerFixture.detectChanges();
   });
 
+  defineCitySuggestionSpec();
+  defineMirrorUnavailableSpec();
+});
+
+function defineCitySuggestionSpec(): void {
   it('loads city suggestions from backend for sameday and stores stale snapshot metadata', async () => {
-    component.provider = 'sameday';
-    await (component as any).fetchLocations('Bucu');
-    fixture.detectChanges();
+    lockerPickerComponent.provider = 'sameday';
+    await (lockerPickerComponent as any).fetchLocations('Bucu');
+    lockerPickerFixture.detectChanges();
 
-    expect(shipping.listLockerCities).toHaveBeenCalled();
-    expect(component.searchResults.length).toBe(1);
-    expect(component.searchResults[0].display_name).toContain('Bucuresti');
-    expect(component.mirrorSnapshot?.stale).toBeTrue();
-    expect(component.mirrorSnapshot?.canary_alert_messages?.length).toBeGreaterThan(0);
-    expect(component.staleDays()).toBeGreaterThanOrEqual(30);
-    expect((fixture.nativeElement.textContent || '').replace(/\s+/g, ' ')).toContain('checkout.lockers.snapshotCanaryTitle');
+    expect(lockerPickerShipping.listLockerCities).toHaveBeenCalled();
+    expect(lockerPickerComponent.searchResults.length).toBe(1);
+    expect(lockerPickerComponent.searchResults[0].display_name).toContain('Bucuresti');
+    expect(lockerPickerComponent.mirrorSnapshot?.stale).toBeTrue();
+    expect(lockerPickerComponent.mirrorSnapshot?.canary_alert_messages?.length).toBeGreaterThan(0);
+    expect(lockerPickerComponent.staleDays()).toBeGreaterThanOrEqual(30);
+    expect((lockerPickerFixture.nativeElement.textContent || '').replaceAll(/\s+/g, ' ')).toContain(
+      'checkout.lockers.snapshotCanaryTitle'
+    );
   });
+};
 
+function defineMirrorUnavailableSpec(): void {
   it('shows mirror unavailable message when backend returns 503 locker mirror error', async () => {
-    shipping.listLockers.and.returnValue(
+    lockerPickerShipping.listLockers.and.returnValue(
       throwError(() => ({ error: { detail: 'Sameday locker mirror is not initialized' } }))
     );
-    component.provider = 'sameday';
+    lockerPickerComponent.provider = 'sameday';
 
-    await (component as any).loadLockers(44.4, 26.1);
-
-    expect(component.error).toContain('checkout.lockers.mirrorUnavailable');
+    await (lockerPickerComponent as any).loadLockers(44.4, 26.1);
+    expect(lockerPickerComponent.error).toContain('checkout.lockers.mirrorUnavailable');
   });
-});
+};

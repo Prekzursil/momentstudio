@@ -5088,7 +5088,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
     this.editorDirty.set(false);
   }
 
-		  edit(slug: string): void {
+  edit(slug: string): void {
         this.exitWizard();
 		    this.editorOpen.set(true);
 		    this.editorError.set(null);
@@ -5109,109 +5109,196 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
 			    this.resetTranslations();
 			    this.resetDeletedImages();
 			    this.resetImageMeta();
-	        this.resetImageUploads();
-			    this.resetVariants();
-		    this.resetStockLedger();
-	    this.admin.getProduct(slug).subscribe({
-      next: (prod: any) => {
-        const name = (prod?.name || '').toString().trim();
-        this.recent.add({
-          key: `product:${slug}`,
-          type: 'product',
-          label: name || slug,
-          subtitle: slug,
-          url: '/admin/products',
-          state: { editProductSlug: slug }
-        });
-        this.editingProductId.set(prod?.id ? String(prod.id) : null);
-        this.editingCurrency.set((prod?.currency || 'RON').toString() || 'RON');
-        const basePrice = typeof prod.base_price === 'number' ? prod.base_price : Number(prod.base_price || 0);
-        const weightGramsRaw = typeof prod.weight_grams === 'number' ? prod.weight_grams : Number(prod.weight_grams ?? NaN);
-        const widthRaw = typeof prod.width_cm === 'number' ? prod.width_cm : Number(prod.width_cm ?? NaN);
-        const heightRaw = typeof prod.height_cm === 'number' ? prod.height_cm : Number(prod.height_cm ?? NaN);
-        const depthRaw = typeof prod.depth_cm === 'number' ? prod.depth_cm : Number(prod.depth_cm ?? NaN);
-        const shippingClassRaw = (prod.shipping_class || '').toString();
-        const shippingClass: 'standard' | 'bulky' | 'oversize' =
-          shippingClassRaw === 'bulky' || shippingClassRaw === 'oversize' ? shippingClassRaw : 'standard';
-        const disallowedCouriers = Array.isArray(prod.shipping_disallowed_couriers)
-          ? prod.shipping_disallowed_couriers.map((c: any) => (c ?? '').toString().trim().toLowerCase()).filter(Boolean)
-          : [];
-        const disallowedSet = new Set(disallowedCouriers);
-        const rawSaleType = (prod.sale_type || '').toString();
-        const saleType: 'percent' | 'amount' = rawSaleType === 'amount' ? 'amount' : 'percent';
-        const saleValueNum =
-          typeof prod.sale_value === 'number' ? prod.sale_value : Number(prod.sale_value ?? 0);
-        const saleEnabled =
-          (typeof prod.sale_price === 'number' && Number.isFinite(prod.sale_price)) ||
-          (rawSaleType && Number.isFinite(saleValueNum) && saleValueNum > 0);
-        const tagSlugs = this.parseTagSlugs(prod.tags);
-        this.loadedTagSlugs = tagSlugs;
-        const badgesState: Record<ProductBadgeKey, BadgeForm> = {
-          new: { enabled: false, start_at: '', end_at: '' },
-          limited: { enabled: false, start_at: '', end_at: '' },
-          handmade: { enabled: false, start_at: '', end_at: '' }
-        };
-        const rawBadges = Array.isArray(prod.badges) ? prod.badges : [];
-        for (const raw of rawBadges) {
-          const badgeKey = String(raw?.badge ?? '').trim();
-          if (badgeKey !== 'new' && badgeKey !== 'limited' && badgeKey !== 'handmade') continue;
-          const key = badgeKey as ProductBadgeKey;
-          badgesState[key].enabled = true;
-          badgesState[key].start_at = raw?.start_at ? this.toLocalDateTime(raw.start_at) : '';
-          badgesState[key].end_at = raw?.end_at ? this.toLocalDateTime(raw.end_at) : '';
-        }
-        this.form = {
-          name: prod.name || '',
-          category_id: prod.category_id || '',
-          base_price: this.formatMoneyInput(Number.isFinite(basePrice) ? basePrice : 0),
-          weight_grams: Number.isFinite(weightGramsRaw) && weightGramsRaw >= 0 ? String(Math.round(weightGramsRaw)) : '',
-          width_cm: Number.isFinite(widthRaw) && widthRaw >= 0 ? String(widthRaw) : '',
-          height_cm: Number.isFinite(heightRaw) && heightRaw >= 0 ? String(heightRaw) : '',
-          depth_cm: Number.isFinite(depthRaw) && depthRaw >= 0 ? String(depthRaw) : '',
-          shipping_class: shippingClass,
-          shipping_allow_locker: prod.shipping_allow_locker !== false,
-          shipping_disallowed_couriers: {
-            sameday: disallowedSet.has('sameday'),
-            fan_courier: disallowedSet.has('fan_courier')
-          },
-          sale_enabled: saleEnabled,
-          sale_type: saleType,
-          sale_value: saleEnabled
-            ? saleType === 'amount'
-              ? this.formatMoneyInput(Number.isFinite(saleValueNum) ? saleValueNum : 0)
-              : String(Math.round(saleValueNum * 100) / 100)
-            : '',
-          sale_start_at: prod.sale_start_at ? this.toLocalDateTime(prod.sale_start_at) : '',
-          sale_end_at: prod.sale_end_at ? this.toLocalDateTime(prod.sale_end_at) : '',
-          sale_auto_publish: !!prod.sale_auto_publish,
-          stock_quantity: Number(prod.stock_quantity || 0),
-          low_stock_threshold:
-            prod.low_stock_threshold === null || prod.low_stock_threshold === undefined ? '' : String(prod.low_stock_threshold),
-          status: (prod.status) || 'draft',
-          is_active: prod.is_active !== false,
-          is_featured: !!prod.is_featured,
-          sku: (prod.sku || '').toString(),
-          short_description: (prod.short_description || '').toString(),
-          long_description: (prod.long_description || '').toString(),
-          publish_at: prod.publish_at ? this.toLocalDateTime(prod.publish_at) : '',
-          is_bestseller: tagSlugs.includes('bestseller'),
-          badges: badgesState
-        };
-        this.lastSavedState.set({ status: this.form.status, isActive: this.form.is_active });
-        const nextImages = Array.isArray(prod.images) ? [...prod.images] : [];
-        nextImages.sort((a: any, b: any) => Number(a?.sort_order ?? 0) - Number(b?.sort_order ?? 0));
-        this.images.set(nextImages);
-        this.setVariantsFromProduct(prod);
-        const productId = this.editingProductId();
-        if (productId) this.loadStockAdjustments(productId);
-        this.loadTranslations((prod.slug || slug).toString());
-		        this.loadRelationships((prod.slug || slug).toString());
-		        this.loadAudit((prod.slug || slug).toString());
-		        this.scheduleDuplicateCheck();
-		      },
-	      error: () => this.editorError.set(this.t('adminUi.products.errors.load'))
-		    });
-		  }
+    this.resetImageUploads();
+    this.resetVariants();
+    this.resetStockLedger();
+    this.admin.getProduct(slug).subscribe({
+      next: (prod: any) => this.handleLoadedProduct(prod, slug),
+      error: () => this.editorError.set(this.t('adminUi.products.errors.load'))
+    });
+  }
+
+  private handleLoadedProduct(prod: any, requestedSlug: string): void {
+    this.addRecentProductEntry(prod, requestedSlug);
+    this.editingProductId.set(prod?.id ? String(prod.id) : null);
+    this.editingCurrency.set(this.normalizeLoadedCurrency(prod?.currency));
+    const tagSlugs = this.parseTagSlugs(prod?.tags);
+    this.loadedTagSlugs = tagSlugs;
+    this.form = this.buildLoadedProductForm(prod, tagSlugs);
+    this.lastSavedState.set({ status: this.form.status, isActive: this.form.is_active });
+    this.setSortedEditorImages(prod?.images);
+    this.setVariantsFromProduct(prod);
+    this.loadStockAdjustmentsForCurrentProduct();
+    this.loadLoadedProductPanels(prod, requestedSlug);
+    this.scheduleDuplicateCheck();
+  }
+
+  private addRecentProductEntry(prod: any, slug: string): void {
+    const name = this.toStringValue(prod?.name).trim();
+    this.recent.add({
+      key: `product:${slug}`,
+      type: 'product',
+      label: name || slug,
+      subtitle: slug,
+      url: '/admin/products',
+      state: { editProductSlug: slug }
+    });
+  }
+
+  private normalizeLoadedCurrency(currency: unknown): string {
+    const value = this.toStringValue(currency).trim();
+    return value || 'RON';
+  }
+
+  private buildLoadedProductForm(prod: any, tagSlugs: string[]): ProductForm {
+    const form = this.blankForm();
+    const saleState = this.buildLoadedSaleState(prod);
+
+    form.name = this.toStringValue(prod?.name);
+    form.category_id = this.toStringValue(prod?.category_id);
+    form.base_price = this.formatMoneyInput(this.toNumberOrDefault(prod?.base_price, 0));
+    form.weight_grams = this.formatLoadedWeight(prod?.weight_grams);
+    form.width_cm = this.formatLoadedDimension(prod?.width_cm);
+    form.height_cm = this.formatLoadedDimension(prod?.height_cm);
+    form.depth_cm = this.formatLoadedDimension(prod?.depth_cm);
+    form.shipping_class = this.normalizeLoadedShippingClass(prod?.shipping_class);
+    form.shipping_allow_locker = prod?.shipping_allow_locker !== false;
+    form.shipping_disallowed_couriers = this.buildLoadedDisallowedCouriers(prod?.shipping_disallowed_couriers);
+    form.sale_enabled = saleState.enabled;
+    form.sale_type = saleState.type;
+    form.sale_value = saleState.value;
+    form.sale_start_at = this.toLocalDateTimeOrEmpty(prod?.sale_start_at);
+    form.sale_end_at = this.toLocalDateTimeOrEmpty(prod?.sale_end_at);
+    form.sale_auto_publish = Boolean(prod?.sale_auto_publish);
+    form.stock_quantity = Number(prod?.stock_quantity || 0);
+    form.low_stock_threshold = this.toOptionalTextValue(prod?.low_stock_threshold);
+    form.status = this.normalizeLoadedStatus(prod?.status);
+    form.is_active = prod?.is_active !== false;
+    form.is_featured = Boolean(prod?.is_featured);
+    form.sku = this.toStringValue(prod?.sku);
+    form.short_description = this.toStringValue(prod?.short_description);
+    form.long_description = this.toStringValue(prod?.long_description);
+    form.publish_at = this.toLocalDateTimeOrEmpty(prod?.publish_at);
+    form.is_bestseller = tagSlugs.includes('bestseller');
+    form.badges = this.buildLoadedBadgeState(prod?.badges);
+
+    return form;
+  }
+
+  private toStringValue(value: unknown): string {
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+      return String(value);
+    }
+    return '';
+  }
+
+  private toOptionalTextValue(value: unknown): string {
+    return this.toStringValue(value);
+  }
+
+  private toNumberOrDefault(value: unknown, fallback: number): number {
+    if (typeof value === 'number') return value;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  private formatLoadedWeight(value: unknown): string {
+    const parsed = this.toNumberOrDefault(value, Number.NaN);
+    if (!Number.isFinite(parsed) || parsed < 0) return '';
+    return String(Math.round(parsed));
+  }
+
+  private formatLoadedDimension(value: unknown): string {
+    const parsed = this.toNumberOrDefault(value, Number.NaN);
+    if (!Number.isFinite(parsed) || parsed < 0) return '';
+    return String(parsed);
+  }
+
+  private normalizeLoadedShippingClass(value: unknown): 'standard' | 'bulky' | 'oversize' {
+    const parsed = this.toStringValue(value);
+    if (parsed === 'bulky' || parsed === 'oversize') return parsed;
+    return 'standard';
+  }
+
+  private buildLoadedDisallowedCouriers(
+    value: unknown
+  ): { sameday: boolean; fan_courier: boolean } {
+    const couriers = Array.isArray(value)
+      ? value.map((courier: any) => this.toStringValue(courier).trim().toLowerCase()).filter(Boolean)
+      : [];
+    const disallowed = new Set(couriers);
+    return {
+      sameday: disallowed.has('sameday'),
+      fan_courier: disallowed.has('fan_courier')
+    };
+  }
+
+  private buildLoadedSaleState(
+    prod: any
+  ): { enabled: boolean; type: 'percent' | 'amount'; value: string } {
+    const rawType = this.toStringValue(prod?.sale_type);
+    const type: 'percent' | 'amount' = rawType === 'amount' ? 'amount' : 'percent';
+    const saleValue = this.toNumberOrDefault(prod?.sale_value, 0);
+    const hasSalePrice = typeof prod?.sale_price === 'number' && Number.isFinite(prod.sale_price);
+    const enabled = hasSalePrice || Boolean(rawType && Number.isFinite(saleValue) && saleValue > 0);
+
+    if (!enabled) return { enabled: false, type, value: '' };
+    if (type === 'amount') {
+      const normalized = Number.isFinite(saleValue) ? saleValue : 0;
+      return { enabled: true, type, value: this.formatMoneyInput(normalized) };
+    }
+    return { enabled: true, type, value: String(Math.round(saleValue * 100) / 100) };
+  }
+
+  private buildLoadedBadgeState(rawBadges: unknown): Record<ProductBadgeKey, BadgeForm> {
+    const badges: Record<ProductBadgeKey, BadgeForm> = {
+      new: { enabled: false, start_at: '', end_at: '' },
+      limited: { enabled: false, start_at: '', end_at: '' },
+      handmade: { enabled: false, start_at: '', end_at: '' }
+    };
+    if (!Array.isArray(rawBadges)) return badges;
+
+    for (const raw of rawBadges) {
+      const badge = this.toStringValue(raw?.badge).trim();
+      if (badge !== 'new' && badge !== 'limited' && badge !== 'handmade') continue;
+      badges[badge].enabled = true;
+      badges[badge].start_at = this.toLocalDateTimeOrEmpty(raw?.start_at);
+      badges[badge].end_at = this.toLocalDateTimeOrEmpty(raw?.end_at);
+    }
+    return badges;
+  }
+
+  private toLocalDateTimeOrEmpty(value: unknown): string {
+    const raw = this.toStringValue(value).trim();
+    if (!raw) return '';
+    return this.toLocalDateTime(raw);
+  }
+
+  private normalizeLoadedStatus(value: unknown): 'draft' | 'published' | 'archived' {
+    if (value === 'published' || value === 'archived') return value;
+    return 'draft';
+  }
+
+  private setSortedEditorImages(value: unknown): void {
+    const nextImages = Array.isArray(value) ? [...value] : [];
+    nextImages.sort((a: any, b: any) => Number(a?.sort_order ?? 0) - Number(b?.sort_order ?? 0));
+    this.images.set(nextImages);
+  }
+
+  private loadStockAdjustmentsForCurrentProduct(): void {
+    const productId = this.editingProductId();
+    if (!productId) return;
+    this.loadStockAdjustments(productId);
+  }
+
+  private loadLoadedProductPanels(prod: any, fallbackSlug: string): void {
+    const loadedSlug = this.toStringValue(prod?.slug);
+    const targetSlug = loadedSlug || fallbackSlug;
+    this.loadTranslations(targetSlug);
+    this.loadRelationships(targetSlug);
+    this.loadAudit(targetSlug);
+  }
 
 	  restoreProduct(product: AdminProductListItem): void {
 	    const id = (product?.id || '').toString();
@@ -5650,50 +5737,82 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
     const op = slug ? this.admin.updateProduct(slug, payload) : this.admin.createProduct(payload);
     this.editorSaving.set(true);
     op.subscribe({
-      next: (prod: any) => {
-        this.editorSaving.set(false);
-        this.editorDirty.set(false);
-        this.editorLastSavedAt.set(new Date().toISOString());
-        this.toast.success(this.t('adminUi.products.success.save'));
-        this.editorMessage.set(this.t('adminUi.products.success.save'));
-        const newSlug = (prod?.slug as string | undefined) || slug || null;
-        this.editingSlug.set(newSlug);
-        this.loadedTagSlugs = this.parseTagSlugs(prod?.tags);
-        if (!this.editingProductId() && prod?.id) {
-          this.editingProductId.set(String(prod.id));
-          this.loadStockAdjustments(String(prod.id));
-        }
-        if (Array.isArray(prod?.images)) {
-          const nextImages = [...prod.images];
-          nextImages.sort((a: any, b: any) => Number(a?.sort_order ?? 0) - Number(b?.sort_order ?? 0));
-          this.images.set(nextImages);
-        }
-	        if (prod?.status) this.form.status = prod.status;
-          if (typeof prod?.is_active === 'boolean') this.form.is_active = prod.is_active;
-          this.lastSavedState.set({ status: this.form.status, isActive: this.form.is_active });
-	        if (newSlug) this.loadTranslations(newSlug);
-	        if (newSlug) this.loadRelationships(newSlug);
-          if (newSlug) this.loadAudit(newSlug);
-	        this.load();
-          opts?.done?.(true);
-          if (this.wizardExitAfterPublish) {
-            this.wizardExitAfterPublish = false;
-            this.wizardAdvanceAfterSave = false;
-            this.exitWizard();
-          } else if (this.wizardAdvanceAfterSave && this.wizardCurrentStepId() === 'save') {
-            this.wizardAdvanceAfterSave = false;
-            this.wizardNext();
-          } else {
-            this.wizardAdvanceAfterSave = false;
-          }
-	      },
-	      error: () => {
+      next: (prod: any) => this.handleSaveProductSuccess(prod, slug, opts),
+      error: () => {
           this.editorSaving.set(false);
           this.editorError.set(this.t('adminUi.products.errors.save'));
           opts?.done?.(false);
         }
 	    });
 	  }
+
+  private handleSaveProductSuccess(
+    prod: any,
+    fallbackSlug: string | null,
+    opts?: { done?: (saved: boolean) => void }
+  ): void {
+    this.editorSaving.set(false);
+    this.editorDirty.set(false);
+    this.editorLastSavedAt.set(new Date().toISOString());
+    this.toast.success(this.t('adminUi.products.success.save'));
+    this.editorMessage.set(this.t('adminUi.products.success.save'));
+
+    const newSlug = this.resolveSavedProductSlug(prod, fallbackSlug);
+    this.editingSlug.set(newSlug);
+    this.loadedTagSlugs = this.parseTagSlugs(prod?.tags);
+    this.syncSavedProductId(prod);
+    this.syncSavedProductImages(prod);
+    this.syncSavedProductState(prod);
+    this.loadSavedProductPanels(newSlug);
+    this.load();
+    opts?.done?.(true);
+    this.applyWizardSaveNavigation();
+  }
+
+  private resolveSavedProductSlug(prod: any, fallbackSlug: string | null): string | null {
+    const savedSlug = this.toStringValue(prod?.slug).trim();
+    return savedSlug || fallbackSlug || null;
+  }
+
+  private syncSavedProductId(prod: any): void {
+    if (this.editingProductId() || !prod?.id) return;
+    const productId = String(prod.id);
+    this.editingProductId.set(productId);
+    this.loadStockAdjustments(productId);
+  }
+
+  private syncSavedProductImages(prod: any): void {
+    if (!Array.isArray(prod?.images)) return;
+    this.setSortedEditorImages(prod.images);
+  }
+
+  private syncSavedProductState(prod: any): void {
+    if (prod?.status) this.form.status = prod.status;
+    if (typeof prod?.is_active === 'boolean') this.form.is_active = prod.is_active;
+    this.lastSavedState.set({ status: this.form.status, isActive: this.form.is_active });
+  }
+
+  private loadSavedProductPanels(slug: string | null): void {
+    if (!slug) return;
+    this.loadTranslations(slug);
+    this.loadRelationships(slug);
+    this.loadAudit(slug);
+  }
+
+  private applyWizardSaveNavigation(): void {
+    if (this.wizardExitAfterPublish) {
+      this.wizardExitAfterPublish = false;
+      this.wizardAdvanceAfterSave = false;
+      this.exitWizard();
+      return;
+    }
+    if (this.wizardAdvanceAfterSave && this.wizardCurrentStepId() === 'save') {
+      this.wizardAdvanceAfterSave = false;
+      this.wizardNext();
+      return;
+    }
+    this.wizardAdvanceAfterSave = false;
+  }
 
   variantsWithIds(): VariantRow[] {
     return this.variants().filter((v) => Boolean(v.id));
@@ -6159,46 +6278,55 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       { field: 'long_description', labelKey: 'adminUi.products.form.description' }
     ];
 
-    return fields.map(({ field, labelKey }) => {
-      const roRaw = (this.translations.ro?.[field] ?? '').toString();
-      const enRaw = (this.translations.en?.[field] ?? '').toString();
-      const ro = roRaw.trim();
-      const en = enRaw.trim();
-      const roMissing = !ro;
-      const enMissing = !en;
-
-      let statusKey = 'adminUi.products.translations.diffStatus.different';
-      let tone: TranslationDiffRow['tone'] = 'neutral';
-
-      if (roMissing && enMissing) {
-        statusKey = 'adminUi.products.translations.diffStatus.missingBoth';
-        tone = 'error';
-      } else if (roMissing) {
-        statusKey = 'adminUi.products.translations.diffStatus.missingRo';
-        tone = 'error';
-      } else if (enMissing) {
-        statusKey = 'adminUi.products.translations.diffStatus.missingEn';
-        tone = 'error';
-      } else if (this.normalizeTranslationDiff(ro) === this.normalizeTranslationDiff(en)) {
-        statusKey = 'adminUi.products.translations.diffStatus.same';
-        tone = 'warn';
-      }
-
-      return {
-        field,
-        labelKey,
-        roSnippet: this.translationDiffSnippet(ro),
-        enSnippet: this.translationDiffSnippet(en),
-        roMissing,
-        enMissing,
-        statusKey,
-        tone
-      };
-    });
+    return fields.map(({ field, labelKey }) => this.buildTranslationDiffRow(field, labelKey));
   }
 
   trackByTranslationDiffRow(_index: number, row: TranslationDiffRow): string {
     return row.field;
+  }
+
+  private buildTranslationDiffRow(field: TranslationDiffField, labelKey: string): TranslationDiffRow {
+    const ro = this.translationDiffValue('ro', field);
+    const en = this.translationDiffValue('en', field);
+    const roMissing = !ro;
+    const enMissing = !en;
+    const status = this.translationDiffStatus(ro, en, roMissing, enMissing);
+
+    return {
+      field,
+      labelKey,
+      roSnippet: this.translationDiffSnippet(ro),
+      enSnippet: this.translationDiffSnippet(en),
+      roMissing,
+      enMissing,
+      statusKey: status.statusKey,
+      tone: status.tone
+    };
+  }
+
+  private translationDiffValue(lang: 'en' | 'ro', field: TranslationDiffField): string {
+    return (this.translations[lang]?.[field] ?? '').toString().trim();
+  }
+
+  private translationDiffStatus(
+    ro: string,
+    en: string,
+    roMissing: boolean,
+    enMissing: boolean
+  ): { statusKey: string; tone: TranslationDiffRow['tone'] } {
+    if (roMissing && enMissing) {
+      return { statusKey: 'adminUi.products.translations.diffStatus.missingBoth', tone: 'error' };
+    }
+    if (roMissing) {
+      return { statusKey: 'adminUi.products.translations.diffStatus.missingRo', tone: 'error' };
+    }
+    if (enMissing) {
+      return { statusKey: 'adminUi.products.translations.diffStatus.missingEn', tone: 'error' };
+    }
+    if (this.normalizeTranslationDiff(ro) === this.normalizeTranslationDiff(en)) {
+      return { statusKey: 'adminUi.products.translations.diffStatus.same', tone: 'warn' };
+    }
+    return { statusKey: 'adminUi.products.translations.diffStatus.different', tone: 'neutral' };
   }
 
   private normalizeTranslationDiff(value: string): string {

@@ -12,7 +12,7 @@ The Website is operated by:
 - **Trade Register No.:** F40/91/17012018
 - **VAT / Fiscal code (CUI):** 38708340
 - **Registered office:** Soldat Marin Nicolae 44, Bucharest
-- **Email:** momentstudio.ro@gmail.com
+- **Email:** <momentstudio.ro@gmail.com>
 - **Phone:** +40723204204
 
 (Collectively, “Seller”, “we”, “us”, “our”.)
@@ -116,7 +116,7 @@ If the payment fails or is reversed, the Order may remain unpaid and can be canc
 4. **Transfer of risk.** The risk of loss/damage transfers to you when you (or a person designated by you) take physical possession of the Products.
 5. **Damaged parcels.** If the package appears damaged on arrival, please:
    - take photos, and
-   - notify us within 14 days of parcel delivery at momentstudio.ro@gmail.com.
+   - notify us within 14 days of parcel delivery at <momentstudio.ro@gmail.com>.
 
 ---
 
@@ -130,7 +130,7 @@ If you are a **Consumer**, you generally have the right to withdraw from the Con
 
 To withdraw, please send an unequivocal statement to:
 
-- Email: momentstudio.ro@gmail.com
+- Email: <momentstudio.ro@gmail.com>
 
 Include: order number, name, the Products you want to return, and the date.
 
@@ -172,7 +172,7 @@ If you sell any such Products, ensure they are clearly labelled on the product p
 
 ## 11) Defective Products, legal conformity warranty, and complaints
 
-1. **Defects on arrival / incorrect products.** If you receive a defective Product or the wrong Product, contact us at momentstudio.ro@gmail.com within 14 days of parcel receival with photos and your order number.
+1. **Defects on arrival / incorrect products.** If you receive a defective Product or the wrong Product, contact us at <momentstudio.ro@gmail.com> within 14 days of parcel receival with photos and your order number.
 2. **Legal conformity rights.** Consumers benefit from statutory conformity rights. We will provide repair/replacement/refund/reduction as required by applicable law, depending on the case.
 
 ---
@@ -199,11 +199,11 @@ We are not liable for indirect damages (loss of profit, loss of opportunity) exc
 
 These Terms are governed by the laws of Romania.
 
-If you have a complaint, please contact us first at momentstudio.ro@gmail.com and we will try to resolve it amicably.
+If you have a complaint, please contact us first at <momentstudio.ro@gmail.com> and we will try to resolve it amicably.
 
 Consumers may also use:
 
-- **ANPC SAL (Alternative Dispute Resolution)** information: https://anpc.ro/
+- **ANPC SAL (Alternative Dispute Resolution)** information: <https://anpc.ro/>
 
 ---
 
@@ -217,5 +217,5 @@ We may update these Terms from time to time. The updated version will be publish
 
 For any questions about these Terms:
 
-- Email: momentstudio.ro@gmail.com
+- Email: <momentstudio.ro@gmail.com>
 - Phone: +40723204204

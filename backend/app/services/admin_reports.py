@@ -5,6 +5,7 @@ import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -80,30 +81,29 @@ def _parse_bool(value: object | None, *, fallback: bool) -> bool:
     return fallback
 
 
-def _parse_int(value: object | None, *, fallback: int, min_value: int | None = None, max_value: int | None = None) -> int:
-    raw: int | None = None
-    if value is None:
-        raw = None
-    elif isinstance(value, bool):
-        raw = None
-    elif isinstance(value, int):
-        raw = value
-    elif isinstance(value, float):
-        try:
-            raw = int(value)
-        except Exception:
-            raw = None
-    elif isinstance(value, str):
-        candidate = value.strip()
-        if not candidate:
-            raw = None
-        else:
-            try:
-                raw = int(candidate)
-            except Exception:
-                raw = None
+def _try_int(value: str | float | int) -> int | None:
+    try:
+        return int(value)
+    except Exception:
+        return None
 
-    result = fallback if raw is None else raw
+
+def _coerce_int(value: object | None) -> int | None:
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return _try_int(value)
+    if isinstance(value, str):
+        candidate = value.strip()
+        return _try_int(candidate) if candidate else None
+    return None
+
+
+def _parse_int(value: object | None, *, fallback: int, min_value: int | None = None, max_value: int | None = None) -> int:
+    result = _coerce_int(value)
+    result = fallback if result is None else result
     if min_value is not None:
         result = max(min_value, result)
     if max_value is not None:
@@ -128,29 +128,32 @@ def _parse_iso_dt(value: object | None) -> datetime | None:
         return None
 
 
-def _parse_recipients(value: object | None) -> list[str]:
-    emails: list[str] = []
+def _recipient_candidates(value: object | None) -> list[str]:
     if value is None:
-        return emails
+        return []
     if isinstance(value, list):
-        candidates = [str(v or "").strip() for v in value]
-    else:
-        candidates = re.split(r"[,;\n]+", str(value))
+        return [str(v or "").strip() for v in value]
+    return re.split(r"[,;\n]+", str(value))
 
-    for raw in candidates:
-        email = (raw or "").strip()
-        if not email:
-            continue
-        if _EMAIL_RE.match(email) is None:
-            continue
-        emails.append(email.lower())
+
+def _normalize_recipient_email(value: str) -> str | None:
+    email = (value or "").strip()
+    if not email:
+        return None
+    if _EMAIL_RE.match(email) is None:
+        return None
+    return email.lower()
+
+
+def _parse_recipients(value: object | None) -> list[str]:
     unique: list[str] = []
-    seen = set()
-    for e in emails:
-        if e in seen:
+    seen: set[str] = set()
+    for raw in _recipient_candidates(value):
+        email = _normalize_recipient_email(raw)
+        if email is None or email in seen:
             continue
-        unique.append(e)
-        seen.add(e)
+        unique.append(email)
+        seen.add(email)
     return unique
 
 
@@ -271,6 +274,66 @@ async def _update_block_meta(session: AsyncSession, block: ContentBlock, updates
     await session.commit()
 
 
+def _order_period_filters(period_start: datetime, period_end: datetime, exclude_test_orders: Any) -> tuple[Any, Any, Any]:
+    return (
+        Order.created_at >= period_start,
+        Order.created_at < period_end,
+        exclude_test_orders,
+    )
+
+
+async def _sum_gross_sales(
+    session: AsyncSession,
+    *,
+    filters: tuple[Any, ...],
+    sales_statuses: tuple[OrderStatus, ...],
+) -> Any:
+    return await session.scalar(select(func.coalesce(func.sum(Order.total_amount), 0)).where(*filters, Order.status.in_(sales_statuses)))
+
+
+async def _sum_refunds(
+    session: AsyncSession,
+    *,
+    filters: tuple[Any, ...],
+    sales_statuses: tuple[OrderStatus, ...],
+) -> Any:
+    return await session.scalar(
+        select(func.coalesce(func.sum(OrderRefund.amount), 0))
+        .select_from(OrderRefund)
+        .join(Order, OrderRefund.order_id == Order.id)
+        .where(*filters, Order.status.in_(sales_statuses))
+    )
+
+
+async def _sum_missing_refunds(
+    session: AsyncSession,
+    *,
+    filters: tuple[Any, ...],
+) -> Any:
+    return await session.scalar(
+        select(func.coalesce(func.sum(Order.total_amount), 0))
+        .select_from(Order)
+        .outerjoin(OrderRefund, OrderRefund.order_id == Order.id)
+        .where(*filters, Order.status == OrderStatus.refunded, OrderRefund.id.is_(None))
+    )
+
+
+async def _count_orders(
+    session: AsyncSession,
+    *,
+    filters: tuple[Any, ...],
+    status: OrderStatus | None = None,
+    statuses: tuple[OrderStatus, ...] | None = None,
+) -> int:
+    stmt = select(func.count()).select_from(Order).where(*filters)
+    if statuses is not None:
+        stmt = stmt.where(Order.status.in_(statuses))
+    elif status is not None:
+        stmt = stmt.where(Order.status == status)
+    count = await session.scalar(stmt)
+    return int(count or 0)
+
+
 async def _compute_summary(
     session: AsyncSession,
     *,
@@ -281,74 +344,24 @@ async def _compute_summary(
     sales_statuses = (*successful_statuses, OrderStatus.refunded)
     test_order_ids = select(OrderTag.order_id).where(OrderTag.tag == "test")
     exclude_test_orders = Order.id.notin_(test_order_ids)
+    filters = _order_period_filters(period_start, period_end, exclude_test_orders)
 
-    gross_sales = await session.scalar(
-        select(func.coalesce(func.sum(Order.total_amount), 0)).where(
-            Order.created_at >= period_start,
-            Order.created_at < period_end,
-            Order.status.in_(sales_statuses),
-            exclude_test_orders,
-        )
-    )
-    refunds = await session.scalar(
-        select(func.coalesce(func.sum(OrderRefund.amount), 0))
-        .select_from(OrderRefund)
-        .join(Order, OrderRefund.order_id == Order.id)
-        .where(
-            Order.created_at >= period_start,
-            Order.created_at < period_end,
-            Order.status.in_(sales_statuses),
-            exclude_test_orders,
-        )
-    )
-    missing_refunds = await session.scalar(
-        select(func.coalesce(func.sum(Order.total_amount), 0))
-        .select_from(Order)
-        .outerjoin(OrderRefund, OrderRefund.order_id == Order.id)
-        .where(
-            Order.created_at >= period_start,
-            Order.created_at < period_end,
-            Order.status == OrderStatus.refunded,
-            OrderRefund.id.is_(None),
-            exclude_test_orders,
-        )
-    )
+    gross_sales = await _sum_gross_sales(session, filters=filters, sales_statuses=sales_statuses)
+    refunds = await _sum_refunds(session, filters=filters, sales_statuses=sales_statuses)
+    missing_refunds = await _sum_missing_refunds(session, filters=filters)
     net_sales = (gross_sales or 0) - (refunds or 0) - (missing_refunds or 0)
-
-    orders_total = await session.scalar(
-        select(func.count())
-        .select_from(Order)
-        .where(Order.created_at >= period_start, Order.created_at < period_end, exclude_test_orders)
-    )
-    orders_success = await session.scalar(
-        select(func.count())
-        .select_from(Order)
-        .where(
-            Order.created_at >= period_start,
-            Order.created_at < period_end,
-            Order.status.in_(successful_statuses),
-            exclude_test_orders,
-        )
-    )
-    orders_refunded = await session.scalar(
-        select(func.count())
-        .select_from(Order)
-        .where(
-            Order.created_at >= period_start,
-            Order.created_at < period_end,
-            Order.status == OrderStatus.refunded,
-            exclude_test_orders,
-        )
-    )
+    orders_total = await _count_orders(session, filters=filters)
+    orders_success = await _count_orders(session, filters=filters, statuses=successful_statuses)
+    orders_refunded = await _count_orders(session, filters=filters, status=OrderStatus.refunded)
 
     return {
         "gross_sales": Decimal(str(gross_sales or 0)),
         "net_sales": Decimal(str(net_sales or 0)),
         "refunds": Decimal(str(refunds or 0)),
         "missing_refunds": Decimal(str(missing_refunds or 0)),
-        "orders_total": int(orders_total or 0),
-        "orders_success": int(orders_success or 0),
-        "orders_refunded": int(orders_refunded or 0),
+        "orders_total": orders_total,
+        "orders_success": orders_success,
+        "orders_refunded": orders_refunded,
     }
 
 
@@ -487,6 +500,111 @@ async def _effective_recipients(session: AsyncSession, recipients: list[str] | N
     return []
 
 
+@dataclass(frozen=True)
+class _ScheduledReportSpec:
+    kind: str
+    period_start: datetime
+    period_end: datetime
+    last_sent_period_end: datetime | None
+    last_attempt_at: datetime | None
+    last_attempt_period_end: datetime | None
+    attempt_at_key: str
+    attempt_period_end_key: str
+    sent_period_end_key: str
+    error_key: str
+
+
+def _weekly_due_spec(now: datetime, settings_obj: ReportSettings, state_obj: ReportState) -> _ScheduledReportSpec:
+    period_end = _weekly_period_end(now, weekday=settings_obj.weekly_weekday, hour_utc=settings_obj.weekly_hour_utc)
+    return _ScheduledReportSpec(
+        kind="weekly",
+        period_start=period_end - timedelta(days=7),
+        period_end=period_end,
+        last_sent_period_end=state_obj.weekly_last_sent_period_end,
+        last_attempt_at=state_obj.weekly_last_attempt_at,
+        last_attempt_period_end=state_obj.weekly_last_attempt_period_end,
+        attempt_at_key="reports_weekly_last_attempt_at",
+        attempt_period_end_key="reports_weekly_last_attempt_period_end",
+        sent_period_end_key="reports_weekly_last_sent_period_end",
+        error_key="reports_weekly_last_error",
+    )
+
+
+def _monthly_due_spec(now: datetime, settings_obj: ReportSettings, state_obj: ReportState) -> _ScheduledReportSpec:
+    period_end = _monthly_period_end(now, day=settings_obj.monthly_day, hour_utc=settings_obj.monthly_hour_utc)
+    return _ScheduledReportSpec(
+        kind="monthly",
+        period_start=_subtract_one_month(period_end),
+        period_end=period_end,
+        last_sent_period_end=state_obj.monthly_last_sent_period_end,
+        last_attempt_at=state_obj.monthly_last_attempt_at,
+        last_attempt_period_end=state_obj.monthly_last_attempt_period_end,
+        attempt_at_key="reports_monthly_last_attempt_at",
+        attempt_period_end_key="reports_monthly_last_attempt_period_end",
+        sent_period_end_key="reports_monthly_last_sent_period_end",
+        error_key="reports_monthly_last_error",
+    )
+
+
+async def _update_due_report_outcome(
+    session: AsyncSession,
+    block: ContentBlock,
+    *,
+    spec: _ScheduledReportSpec,
+    attempted: int,
+    delivered: int,
+) -> None:
+    if delivered > 0:
+        await _update_block_meta(
+            session,
+            block,
+            {spec.sent_period_end_key: spec.period_end.isoformat(), spec.error_key: None},
+        )
+        return
+    await _update_block_meta(session, block, {spec.error_key: f"Delivery failed (attempted={attempted})."})
+
+
+async def _send_due_report_for_spec(
+    session: AsyncSession,
+    *,
+    now: datetime,
+    block: ContentBlock,
+    settings_obj: ReportSettings,
+    recipients: list[str],
+    spec: _ScheduledReportSpec,
+) -> None:
+    if spec.last_sent_period_end == spec.period_end:
+        return
+    if _cooldown_active(
+        now=now,
+        period_end=spec.period_end,
+        last_attempt_at=spec.last_attempt_at,
+        last_attempt_period_end=spec.last_attempt_period_end,
+        cooldown_minutes=settings_obj.retry_cooldown_minutes,
+    ):
+        return
+
+    await _update_block_meta(
+        session,
+        block,
+        {
+            spec.attempt_at_key: now.isoformat(),
+            spec.attempt_period_end_key: spec.period_end.isoformat(),
+            spec.error_key: None,
+        },
+    )
+    attempted, delivered = await _send_report_email(
+        session,
+        kind=spec.kind,
+        period_start=spec.period_start,
+        period_end=spec.period_end,
+        recipients=recipients,
+        top_products_limit=settings_obj.top_products_limit,
+        low_stock_limit=settings_obj.low_stock_limit,
+    )
+    await _update_due_report_outcome(session, block, spec=spec, attempted=attempted, delivered=delivered)
+
+
 async def send_due_reports(session: AsyncSession, *, now: datetime | None = None) -> None:
     if not settings.smtp_enabled:
         return
@@ -502,104 +620,70 @@ async def send_due_reports(session: AsyncSession, *, now: datetime | None = None
         return
 
     if settings_obj.weekly_enabled:
-        period_end = _weekly_period_end(now, weekday=settings_obj.weekly_weekday, hour_utc=settings_obj.weekly_hour_utc)
-        if state_obj.weekly_last_sent_period_end == period_end:
-            pass
-        elif _cooldown_active(
+        await _send_due_report_for_spec(
+            session,
             now=now,
-            period_end=period_end,
-            last_attempt_at=state_obj.weekly_last_attempt_at,
-            last_attempt_period_end=state_obj.weekly_last_attempt_period_end,
-            cooldown_minutes=settings_obj.retry_cooldown_minutes,
-        ):
-            pass
-        else:
-            await _update_block_meta(
-                session,
-                block,
-                {
-                    "reports_weekly_last_attempt_at": now.isoformat(),
-                    "reports_weekly_last_attempt_period_end": period_end.isoformat(),
-                    "reports_weekly_last_error": None,
-                },
-            )
-            period_start = period_end - timedelta(days=7)
-            attempted, delivered = await _send_report_email(
-                session,
-                kind="weekly",
-                period_start=period_start,
-                period_end=period_end,
-                recipients=recipients,
-                top_products_limit=settings_obj.top_products_limit,
-                low_stock_limit=settings_obj.low_stock_limit,
-            )
-            if delivered > 0:
-                await _update_block_meta(
-                    session,
-                    block,
-                    {
-                        "reports_weekly_last_sent_period_end": period_end.isoformat(),
-                        "reports_weekly_last_error": None,
-                    },
-                )
-            else:
-                await _update_block_meta(
-                    session,
-                    block,
-                    {
-                        "reports_weekly_last_error": f"Delivery failed (attempted={attempted}).",
-                    },
-                )
+            block=block,
+            settings_obj=settings_obj,
+            recipients=recipients,
+            spec=_weekly_due_spec(now, settings_obj, state_obj),
+        )
 
     if settings_obj.monthly_enabled:
-        period_end = _monthly_period_end(now, day=settings_obj.monthly_day, hour_utc=settings_obj.monthly_hour_utc)
-        if state_obj.monthly_last_sent_period_end == period_end:
-            pass
-        elif _cooldown_active(
+        await _send_due_report_for_spec(
+            session,
             now=now,
-            period_end=period_end,
-            last_attempt_at=state_obj.monthly_last_attempt_at,
-            last_attempt_period_end=state_obj.monthly_last_attempt_period_end,
-            cooldown_minutes=settings_obj.retry_cooldown_minutes,
-        ):
-            pass
-        else:
-            await _update_block_meta(
-                session,
-                block,
-                {
-                    "reports_monthly_last_attempt_at": now.isoformat(),
-                    "reports_monthly_last_attempt_period_end": period_end.isoformat(),
-                    "reports_monthly_last_error": None,
-                },
-            )
-            period_start = _subtract_one_month(period_end)
-            attempted, delivered = await _send_report_email(
-                session,
-                kind="monthly",
-                period_start=period_start,
-                period_end=period_end,
-                recipients=recipients,
-                top_products_limit=settings_obj.top_products_limit,
-                low_stock_limit=settings_obj.low_stock_limit,
-            )
-            if delivered > 0:
-                await _update_block_meta(
-                    session,
-                    block,
-                    {
-                        "reports_monthly_last_sent_period_end": period_end.isoformat(),
-                        "reports_monthly_last_error": None,
-                    },
-                )
-            else:
-                await _update_block_meta(
-                    session,
-                    block,
-                    {
-                        "reports_monthly_last_error": f"Delivery failed (attempted={attempted}).",
-                    },
-                )
+            block=block,
+            settings_obj=settings_obj,
+            recipients=recipients,
+            spec=_monthly_due_spec(now, settings_obj, state_obj),
+        )
+
+
+def _clean_report_kind(kind: str) -> str:
+    kind_clean = (kind or "").strip().lower()
+    if kind_clean not in {"weekly", "monthly"}:
+        raise ValueError("Invalid report kind")
+    return kind_clean
+
+
+def _report_period(kind: str, now: datetime, settings_obj: ReportSettings) -> tuple[datetime, datetime]:
+    if kind == "weekly":
+        period_end = _weekly_period_end(now, weekday=settings_obj.weekly_weekday, hour_utc=settings_obj.weekly_hour_utc)
+        return period_end - timedelta(days=7), period_end
+    period_end = _monthly_period_end(now, day=settings_obj.monthly_day, hour_utc=settings_obj.monthly_hour_utc)
+    return _subtract_one_month(period_end), period_end
+
+
+def _last_sent_period_end(kind: str, state_obj: ReportState) -> datetime | None:
+    if kind == "weekly":
+        return state_obj.weekly_last_sent_period_end
+    return state_obj.monthly_last_sent_period_end
+
+
+def _last_sent_meta_key(kind: str) -> str:
+    if kind == "weekly":
+        return "reports_weekly_last_sent_period_end"
+    return "reports_monthly_last_sent_period_end"
+
+
+def _report_result(
+    *,
+    kind: str,
+    period_start: datetime,
+    period_end: datetime,
+    attempted: int,
+    delivered: int,
+    skipped: bool,
+) -> dict[str, object]:
+    return {
+        "kind": kind,
+        "period_start": period_start.isoformat(),
+        "period_end": period_end.isoformat(),
+        "attempted": attempted,
+        "delivered": delivered,
+        "skipped": skipped,
+    }
 
 
 async def send_report_now(
@@ -611,69 +695,28 @@ async def send_report_now(
 ) -> dict:
     if not settings.smtp_enabled:
         raise ValueError("SMTP is disabled")
-
     now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     block = await _load_settings_block(session)
     if not block:
         raise ValueError("Reports settings not configured")
-
     settings_obj, state_obj = _parse_settings(getattr(block, "meta", None))
     recipients = await _effective_recipients(session, settings_obj.recipients)
     if not recipients:
         raise ValueError("No report recipients configured")
-
-    kind_clean = (kind or "").strip().lower()
-    if kind_clean not in {"weekly", "monthly"}:
-        raise ValueError("Invalid report kind")
-
-    if kind_clean == "weekly":
-        period_end = _weekly_period_end(now, weekday=settings_obj.weekly_weekday, hour_utc=settings_obj.weekly_hour_utc)
-        period_start = period_end - timedelta(days=7)
-        last_sent = state_obj.weekly_last_sent_period_end
-        if not force and last_sent == period_end:
-            return {
-                "kind": "weekly",
-                "period_start": period_start.isoformat(),
-                "period_end": period_end.isoformat(),
-                "attempted": 0,
-                "delivered": 0,
-                "skipped": True,
-            }
-        attempted, delivered = await _send_report_email(
-            session,
-            kind="weekly",
+    kind_clean = _clean_report_kind(kind)
+    period_start, period_end = _report_period(kind_clean, now, settings_obj)
+    if not force and _last_sent_period_end(kind_clean, state_obj) == period_end:
+        return _report_result(
+            kind=kind_clean,
             period_start=period_start,
             period_end=period_end,
-            recipients=recipients,
-            top_products_limit=settings_obj.top_products_limit,
-            low_stock_limit=settings_obj.low_stock_limit,
+            attempted=0,
+            delivered=0,
+            skipped=True,
         )
-        if delivered > 0:
-            await _update_block_meta(session, block, {"reports_weekly_last_sent_period_end": period_end.isoformat()})
-        return {
-            "kind": "weekly",
-            "period_start": period_start.isoformat(),
-            "period_end": period_end.isoformat(),
-            "attempted": attempted,
-            "delivered": delivered,
-            "skipped": False,
-        }
-
-    period_end = _monthly_period_end(now, day=settings_obj.monthly_day, hour_utc=settings_obj.monthly_hour_utc)
-    period_start = _subtract_one_month(period_end)
-    last_sent = state_obj.monthly_last_sent_period_end
-    if not force and last_sent == period_end:
-        return {
-            "kind": "monthly",
-            "period_start": period_start.isoformat(),
-            "period_end": period_end.isoformat(),
-            "attempted": 0,
-            "delivered": 0,
-            "skipped": True,
-        }
     attempted, delivered = await _send_report_email(
         session,
-        kind="monthly",
+        kind=kind_clean,
         period_start=period_start,
         period_end=period_end,
         recipients=recipients,
@@ -681,13 +724,12 @@ async def send_report_now(
         low_stock_limit=settings_obj.low_stock_limit,
     )
     if delivered > 0:
-        await _update_block_meta(session, block, {"reports_monthly_last_sent_period_end": period_end.isoformat()})
-    return {
-        "kind": "monthly",
-        "period_start": period_start.isoformat(),
-        "period_end": period_end.isoformat(),
-        "attempted": attempted,
-        "delivered": delivered,
-        "skipped": False,
-    }
-
+        await _update_block_meta(session, block, {_last_sent_meta_key(kind_clean): period_end.isoformat()})
+    return _report_result(
+        kind=kind_clean,
+        period_start=period_start,
+        period_end=period_end,
+        attempted=attempted,
+        delivered=delivered,
+        skipped=False,
+    )

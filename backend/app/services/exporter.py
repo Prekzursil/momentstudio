@@ -9,100 +9,116 @@ from app.models.order import Order
 from app.models.user import User
 
 
+def _serialize_user(user: User) -> dict[str, Any]:
+    return {
+        "id": str(user.id),
+        "email": user.email,
+        "name": user.name,
+        "avatar_url": user.avatar_url,
+        "preferred_language": user.preferred_language,
+        "email_verified": user.email_verified,
+        "role": user.role.value,
+        "created_at": user.created_at.isoformat(),
+    }
+
+
+def _serialize_category(category: Category) -> dict[str, Any]:
+    return {
+        "id": str(category.id),
+        "slug": category.slug,
+        "name": category.name,
+        "description": category.description,
+        "sort_order": category.sort_order,
+        "created_at": category.created_at.isoformat(),
+    }
+
+
+def _serialize_product(product: Product) -> dict[str, Any]:
+    images = [
+        {"id": str(image.id), "url": image.url, "alt_text": image.alt_text, "sort_order": image.sort_order}
+        for image in product.images
+    ]
+    options = [{"id": str(option.id), "name": option.option_name, "value": option.option_value} for option in product.options]
+    variants = [
+        {
+            "id": str(variant.id),
+            "name": variant.name,
+            "price_delta": float(variant.additional_price_delta),
+            "stock_quantity": variant.stock_quantity,
+        }
+        for variant in product.variants
+    ]
+    return {
+        "id": str(product.id),
+        "category_id": str(product.category_id),
+        "sku": product.sku,
+        "slug": product.slug,
+        "name": product.name,
+        "short_description": product.short_description,
+        "long_description": product.long_description,
+        "base_price": float(product.base_price),
+        "currency": product.currency,
+        "is_featured": product.is_featured,
+        "stock_quantity": product.stock_quantity,
+        "status": product.status.value,
+        "publish_at": product.publish_at.isoformat() if product.publish_at else None,
+        "meta_title": product.meta_title,
+        "meta_description": product.meta_description,
+        "tags": [tag.slug for tag in product.tags],
+        "images": images,
+        "options": options,
+        "variants": variants,
+    }
+
+
+def _serialize_address(address: Address) -> dict[str, Any]:
+    return {
+        "id": str(address.id),
+        "user_id": str(address.user_id) if address.user_id else None,
+        "line1": address.line1,
+        "line2": address.line2,
+        "city": address.city,
+        "region": address.region,
+        "postal_code": address.postal_code,
+        "country": address.country,
+    }
+
+
+def _serialize_order(order: Order) -> dict[str, Any]:
+    items = [
+        {
+            "id": str(item.id),
+            "product_id": str(item.product_id) if item.product_id else None,
+            "quantity": item.quantity,
+            "unit_price": float(item.unit_price),
+            "subtotal": float(item.subtotal),
+        }
+        for item in order.items
+    ]
+    return {
+        "id": str(order.id),
+        "user_id": str(order.user_id) if order.user_id else None,
+        "status": order.status.value,
+        "total_amount": float(order.total_amount),
+        "currency": order.currency,
+        "reference_code": order.reference_code,
+        "shipping_address_id": str(order.shipping_address_id) if order.shipping_address_id else None,
+        "billing_address_id": str(order.billing_address_id) if order.billing_address_id else None,
+        "items": items,
+    }
+
+
 async def export_json(session: AsyncSession) -> Dict[str, Any]:
-    data: Dict[str, Any] = {}
     users = (await session.execute(select(User))).scalars().all()
-    data["users"] = [
-        {
-            "id": str(u.id),
-            "email": u.email,
-            "name": u.name,
-            "avatar_url": u.avatar_url,
-            "preferred_language": u.preferred_language,
-            "email_verified": u.email_verified,
-            "role": u.role.value,
-            "created_at": u.created_at.isoformat(),
-        }
-        for u in users
-    ]
     categories = (await session.execute(select(Category))).scalars().all()
-    data["categories"] = [
-        {
-            "id": str(c.id),
-            "slug": c.slug,
-            "name": c.name,
-            "description": c.description,
-            "sort_order": c.sort_order,
-            "created_at": c.created_at.isoformat(),
-        }
-        for c in categories
-    ]
     products = (await session.execute(select(Product))).scalars().all()
-    data["products"] = []
-    for p in products:
-        data["products"].append(
-            {
-                "id": str(p.id),
-                "category_id": str(p.category_id),
-                "sku": p.sku,
-                "slug": p.slug,
-                "name": p.name,
-                "short_description": p.short_description,
-                "long_description": p.long_description,
-                "base_price": float(p.base_price),
-                "currency": p.currency,
-                "is_featured": p.is_featured,
-                "stock_quantity": p.stock_quantity,
-                "status": p.status.value,
-                "publish_at": p.publish_at.isoformat() if p.publish_at else None,
-                "meta_title": p.meta_title,
-                "meta_description": p.meta_description,
-                "tags": [t.slug for t in p.tags],
-                "images": [
-                    {"id": str(img.id), "url": img.url, "alt_text": img.alt_text, "sort_order": img.sort_order}
-                    for img in p.images
-                ],
-                "options": [{"id": str(opt.id), "name": opt.option_name, "value": opt.option_value} for opt in p.options],
-                "variants": [{"id": str(v.id), "name": v.name, "price_delta": float(v.additional_price_delta), "stock_quantity": v.stock_quantity} for v in p.variants],
-            }
-        )
     addresses = (await session.execute(select(Address))).scalars().all()
-    data["addresses"] = [
-        {
-            "id": str(a.id),
-            "user_id": str(a.user_id) if a.user_id else None,
-            "line1": a.line1,
-            "line2": a.line2,
-            "city": a.city,
-            "region": a.region,
-            "postal_code": a.postal_code,
-            "country": a.country,
-        }
-        for a in addresses
-    ]
     orders = (await session.execute(select(Order))).scalars().all()
-    data["orders"] = []
-    for o in orders:
-        data["orders"].append(
-            {
-                "id": str(o.id),
-                "user_id": str(o.user_id) if o.user_id else None,
-                "status": o.status.value,
-                "total_amount": float(o.total_amount),
-                "currency": o.currency,
-                "reference_code": o.reference_code,
-                "shipping_address_id": str(o.shipping_address_id) if o.shipping_address_id else None,
-                "billing_address_id": str(o.billing_address_id) if o.billing_address_id else None,
-                "items": [
-                    {
-                        "id": str(oi.id),
-                        "product_id": str(oi.product_id) if oi.product_id else None,
-                        "quantity": oi.quantity,
-                        "unit_price": float(oi.unit_price),
-                        "subtotal": float(oi.subtotal),
-                    }
-                    for oi in o.items
-                ],
-            }
-        )
-    return data
+
+    return {
+        "users": [_serialize_user(user) for user in users],
+        "categories": [_serialize_category(category) for category in categories],
+        "products": [_serialize_product(product) for product in products],
+        "addresses": [_serialize_address(address) for address in addresses],
+        "orders": [_serialize_order(order) for order in orders],
+    }

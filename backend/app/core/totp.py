@@ -51,6 +51,31 @@ def normalize_code(raw: str) -> str:
     return digits
 
 
+def _resolved_totp_digits(digits: int | None) -> int:
+    return int(settings.two_factor_totp_digits if digits is None else digits)
+
+
+def _resolved_totp_window(window: int | None) -> int:
+    return int(settings.two_factor_totp_window if window is None else window)
+
+
+def _resolved_totp_period(period: int | None) -> int:
+    return int(settings.two_factor_totp_period_seconds if period is None else period)
+
+
+def _totp_counter(now: datetime | None, period: int) -> int:
+    now_dt = now or datetime.now(timezone.utc)
+    return int(now_dt.timestamp()) // period
+
+
+def _matches_totp_window(*, key: bytes, counter: int, digits: int, window: int, normalized: str) -> bool:
+    for offset in range(-window, window + 1):
+        expected = _totp(key, counter + offset, digits=digits)
+        if hmac.compare_digest(expected, normalized):
+            return True
+    return False
+
+
 def verify_totp_code(
     *,
     secret: str,
@@ -63,24 +88,23 @@ def verify_totp_code(
     normalized = normalize_code(code)
     if not normalized:
         return False
-    digits = int(settings.two_factor_totp_digits if digits is None else digits)
-    if len(normalized) != digits:
+    resolved_digits = _resolved_totp_digits(digits)
+    if len(normalized) != resolved_digits:
         return False
-
-    window = int(settings.two_factor_totp_window if window is None else window)
-    period = int(settings.two_factor_totp_period_seconds if period is None else period)
-    now_dt = now or datetime.now(timezone.utc)
-    counter = int(now_dt.timestamp()) // period
 
     key = _base32_decode(secret)
     if key is None:
         return False
-
-    for offset in range(-window, window + 1):
-        expected = _totp(key, counter + offset, digits=digits)
-        if hmac.compare_digest(expected, normalized):
-            return True
-    return False
+    resolved_period = _resolved_totp_period(period)
+    counter = _totp_counter(now, resolved_period)
+    resolved_window = _resolved_totp_window(window)
+    return _matches_totp_window(
+        key=key,
+        counter=counter,
+        digits=resolved_digits,
+        window=resolved_window,
+        normalized=normalized,
+    )
 
 
 def _fernet() -> Fernet:

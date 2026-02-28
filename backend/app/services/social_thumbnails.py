@@ -59,27 +59,36 @@ class _MetaImageParser(HTMLParser):
         self.twitter_image: str | None = None
         self.icon: str | None = None
 
+    def _handle_meta_tag(self, attrs: list[tuple[str, str | None]]) -> None:
+        data = {k.lower(): (v or "") for k, v in attrs}
+        prop = (data.get("property") or data.get("name") or "").strip().lower()
+        content = (data.get("content") or "").strip()
+        if not content:
+            return
+        self._assign_og_image(prop, content)
+        self._assign_twitter_image(prop, content)
+
+    def _assign_og_image(self, prop: str, content: str) -> None:
+        if prop in {"og:image", "og:image:url"} and not self.og_image:
+            self.og_image = content
+
+    def _assign_twitter_image(self, prop: str, content: str) -> None:
+        if prop == "twitter:image" and not self.twitter_image:
+            self.twitter_image = content
+
+    def _handle_link_tag(self, attrs: list[tuple[str, str | None]]) -> None:
+        data = {k.lower(): (v or "") for k, v in attrs}
+        rel = (data.get("rel") or "").strip().lower()
+        href = (data.get("href") or "").strip()
+        if href and "icon" in rel and not self.icon:
+            self.icon = href
+
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if tag == "meta":
-            data = {k.lower(): (v or "") for k, v in attrs}
-            prop = (data.get("property") or data.get("name") or "").strip().lower()
-            content = (data.get("content") or "").strip()
-            if not content:
-                return
-            if prop in {"og:image", "og:image:url"} and not self.og_image:
-                self.og_image = content
-            if prop == "twitter:image" and not self.twitter_image:
-                self.twitter_image = content
+            self._handle_meta_tag(attrs)
             return
-
         if tag == "link":
-            data = {k.lower(): (v or "") for k, v in attrs}
-            rel = (data.get("rel") or "").strip().lower()
-            href = (data.get("href") or "").strip()
-            if not href:
-                return
-            if "icon" in rel and not self.icon:
-                self.icon = href
+            self._handle_link_tag(attrs)
 
 
 def _is_allowed_host(host: str) -> bool:
@@ -128,14 +137,25 @@ def _normalize_source_url(raw_url: str) -> str:
     if not host:
         return parsed.geturl()
 
-    normalized_path = re.sub(r"/{2,}", "/", parsed.path or "/")
+    normalized_path = _normalized_source_path(parsed.path)
+    normalized_query = urlencode(_filtered_source_query_items(parsed.query), doseq=True)
+    netloc = _normalized_netloc(host=host, scheme=scheme, port=parsed.port)
+
+    return urlunparse((scheme, netloc, normalized_path, "", normalized_query, ""))
+
+
+def _normalized_source_path(path: str) -> str:
+    normalized_path = re.sub(r"/{2,}", "/", path or "/")
     if not normalized_path.startswith("/"):
         normalized_path = f"/{normalized_path}"
     if normalized_path != "/":
-        normalized_path = normalized_path.rstrip("/") + "/"
+        return normalized_path.rstrip("/") + "/"
+    return normalized_path
 
+
+def _filtered_source_query_items(query: str) -> list[tuple[str, str]]:
     kept_query: list[tuple[str, str]] = []
-    for key, value in parse_qsl(parsed.query, keep_blank_values=True):
+    for key, value in parse_qsl(query, keep_blank_values=True):
         normalized_key = (key or "").strip()
         if not normalized_key:
             continue
@@ -145,30 +165,43 @@ def _normalize_source_url(raw_url: str) -> str:
         if any(lowered.startswith(prefix) for prefix in _TRACKING_QUERY_PREFIXES):
             continue
         kept_query.append((normalized_key, value))
+    return kept_query
 
-    normalized_query = urlencode(kept_query, doseq=True)
-    netloc = host
-    if parsed.port and not ((scheme == "https" and parsed.port == 443) or (scheme == "http" and parsed.port == 80)):
-        netloc = f"{host}:{parsed.port}"
 
-    return urlunparse((scheme, netloc, normalized_path, "", normalized_query, ""))
+def _normalized_netloc(*, host: str, scheme: str, port: int | None) -> str:
+    if port and not ((scheme == "https" and port == 443) or (scheme == "http" and port == 80)):
+        return f"{host}:{port}"
+    return host
+
+
+def _uses_supported_http_scheme(url: str) -> bool:
+    return urlparse(url).scheme in {"http", "https"}
+
+
+def _is_rejected_image_url_candidate(candidate: str) -> bool:
+    lowered = candidate.lower()
+    return lowered.startswith("data:") or lowered.startswith("javascript:")
+
+
+def _resolve_image_url_candidate(candidate: str, *, base_url: str) -> str:
+    if candidate.startswith("//"):
+        parsed = urlparse(base_url)
+        return f"{parsed.scheme}:{candidate}"
+    if candidate.startswith("/"):
+        return urljoin(base_url, candidate)
+    return candidate
 
 
 def _normalize_image_url(raw: str, *, base_url: str) -> str | None:
     candidate = (raw or "").strip().strip('"')
     if not candidate:
         return None
-    lowered = candidate.lower()
-    if lowered.startswith("data:") or lowered.startswith("javascript:"):
+    if _is_rejected_image_url_candidate(candidate):
         return None
-    if candidate.startswith("//"):
-        parsed = urlparse(base_url)
-        normalized = f"{parsed.scheme}:{candidate}"
-        return normalized if urlparse(normalized).scheme in {"http", "https"} else None
-    if candidate.startswith("/"):
-        normalized = urljoin(base_url, candidate)
-        return normalized if urlparse(normalized).scheme in {"http", "https"} else None
-    return candidate if urlparse(candidate).scheme in {"http", "https"} else None
+    normalized = _resolve_image_url_candidate(candidate, base_url=base_url)
+    if not _uses_supported_http_scheme(normalized):
+        return None
+    return normalized
 
 
 def _extract_first_image(html: str, *, base_url: str) -> str | None:
@@ -283,29 +316,40 @@ async def _fetch_page_thumbnail_candidate(source_url: str) -> str | None:
 
 
 async def _download_thumbnail_bytes(url: str) -> bytes:
-    parsed = urlparse((url or "").strip())
-    if parsed.scheme not in {"http", "https"}:
-        raise ValueError("Thumbnail URL must use http(s)")
-    if not _is_allowed_thumbnail_host(parsed.hostname or ""):
-        raise ValueError("Thumbnail host is not allowed")
+    parsed = _validated_thumbnail_request_url(url)
 
     timeout = httpx.Timeout(8.0, connect=5.0)
     headers = {"User-Agent": _UA, "Accept": "image/*"}
     async with httpx.AsyncClient(follow_redirects=True, timeout=timeout, headers=headers) as client:
         resp = await client.get(parsed.geturl())
         resp.raise_for_status()
+    _assert_thumbnail_response_host(resp)
+    return _validated_thumbnail_body(resp)
 
-    final = urlparse(str(resp.url))
+
+def _validated_thumbnail_request_url(url: str) -> Any:
+    parsed = urlparse((url or "").strip())
+    if parsed.scheme not in {"http", "https"}:
+        raise ValueError("Thumbnail URL must use http(s)")
+    if not _is_allowed_thumbnail_host(parsed.hostname or ""):
+        raise ValueError("Thumbnail host is not allowed")
+    return parsed
+
+
+def _assert_thumbnail_response_host(response: httpx.Response) -> None:
+    final = urlparse(str(response.url))
     if not _is_allowed_thumbnail_host(final.hostname or ""):
         raise ValueError("Thumbnail redirect host is not allowed")
 
-    body = bytes(resp.content or b"")
+
+def _validated_thumbnail_body(response: httpx.Response) -> bytes:
+    body = bytes(response.content or b"")
     if not body:
         raise ValueError("Thumbnail image is empty")
     if len(body) > _MAX_IMAGE_BYTES:
         raise ValueError("Thumbnail image too large")
 
-    content_type = (resp.headers.get("content-type") or "").split(";", 1)[0].strip().lower()
+    content_type = (response.headers.get("content-type") or "").split(";", 1)[0].strip().lower()
     if content_type and content_type not in _PERSISTABLE_IMAGE_MIMES:
         raise ValueError("Unsupported thumbnail content type")
     return body
@@ -336,6 +380,26 @@ async def fetch_social_thumbnail_url(
     force_refresh: bool = False,
     allow_remote_fallback: bool = True,
 ) -> str | None:
+    normalized_source_url = _validated_social_source_url(url)
+    cached = _cached_thumbnail_if_fresh(normalized_source_url, force_refresh=force_refresh)
+    if cached is not None:
+        return cached
+
+    thumb = await _fetch_page_thumbnail_candidate(normalized_source_url)
+    resolved = await _resolved_thumbnail_url(
+        source_url=normalized_source_url,
+        thumbnail_url=thumb,
+        persist_local=persist_local,
+        allow_remote_fallback=allow_remote_fallback,
+    )
+    _cache[normalized_source_url] = _CacheEntry(
+        expires_at=datetime.now(timezone.utc) + _CACHE_TTL,
+        thumbnail_url=resolved,
+    )
+    return resolved
+
+
+def _validated_social_source_url(url: str) -> str:
     parsed = urlparse((url or "").strip())
     if parsed.scheme not in {"http", "https"}:
         raise ValueError("URL must start with http:// or https://")
@@ -343,24 +407,34 @@ async def fetch_social_thumbnail_url(
         raise ValueError("URL host is required")
     if not _is_allowed_host(parsed.hostname or ""):
         raise ValueError("Only Facebook/Instagram URLs are allowed")
+    return _normalize_source_url(parsed.geturl())
 
-    normalized_source_url = _normalize_source_url(parsed.geturl())
+
+def _cached_thumbnail_if_fresh(source_url: str, *, force_refresh: bool) -> str | None:
+    if force_refresh:
+        return None
     now = datetime.now(timezone.utc)
-    cached = _cache.get(normalized_source_url)
-    if cached and cached.expires_at > now and not force_refresh:
-        return cached.thumbnail_url
+    cached = _cache.get(source_url)
+    if not cached or cached.expires_at <= now:
+        return None
+    return cached.thumbnail_url
 
-    thumb = await _fetch_page_thumbnail_candidate(normalized_source_url)
-    resolved: str | None = thumb
-    if persist_local:
-        local = await _persist_thumbnail(normalized_source_url, thumb or "") if thumb else None
-        if local:
-            resolved = local
-        elif not allow_remote_fallback:
-            resolved = None
 
-    _cache[normalized_source_url] = _CacheEntry(expires_at=now + _CACHE_TTL, thumbnail_url=resolved)
-    return resolved
+async def _resolved_thumbnail_url(
+    *,
+    source_url: str,
+    thumbnail_url: str | None,
+    persist_local: bool,
+    allow_remote_fallback: bool,
+) -> str | None:
+    if not persist_local:
+        return thumbnail_url
+    local = await _persist_thumbnail(source_url, thumbnail_url or "") if thumbnail_url else None
+    if local:
+        return local
+    if allow_remote_fallback:
+        return thumbnail_url
+    return None
 
 
 async def hydrate_site_social_meta(meta: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -372,27 +446,46 @@ async def hydrate_site_social_meta(meta: dict[str, Any] | None) -> dict[str, Any
         pages = hydrated.get(list_key)
         if not isinstance(pages, list):
             continue
-        for page in pages:
-            if not isinstance(page, dict):
-                continue
-            source_url = str(page.get("url") or "").strip()
-            if not source_url:
-                continue
-            current_thumb = str(page.get("thumbnail_url") or "").strip() or None
-            if not thumbnail_requires_local_persist(current_thumb):
-                continue
-            try:
-                refreshed = await fetch_social_thumbnail_url(
-                    source_url,
-                    persist_local=True,
-                    force_refresh=False,
-                    allow_remote_fallback=False,
-                )
-            except (ValueError, httpx.HTTPError):
-                refreshed = None
-            if refreshed:
-                page["thumbnail_url"] = refreshed
+        await _hydrate_social_pages(pages)
     return hydrated
+
+
+async def _hydrate_social_pages(pages: list[Any]) -> None:
+    for page in pages:
+        source_url = _page_source_url(page)
+        if source_url is None:
+            continue
+        if not _needs_thumbnail_refresh(page):
+            continue
+        refreshed = await _refreshed_social_thumbnail(source_url)
+        if refreshed:
+            page["thumbnail_url"] = refreshed
+
+
+def _page_source_url(page: Any) -> str | None:
+    if not isinstance(page, dict):
+        return None
+    source_url = str(page.get("url") or "").strip()
+    if not source_url:
+        return None
+    return source_url
+
+
+def _needs_thumbnail_refresh(page: Any) -> bool:
+    current_thumb = str(page.get("thumbnail_url") or "").strip() or None
+    return thumbnail_requires_local_persist(current_thumb)
+
+
+async def _refreshed_social_thumbnail(source_url: str) -> str | None:
+    try:
+        return await fetch_social_thumbnail_url(
+            source_url,
+            persist_local=True,
+            force_refresh=False,
+            allow_remote_fallback=False,
+        )
+    except (ValueError, httpx.HTTPError):
+        return None
 
 
 def looks_like_social_url(url: str) -> bool:
@@ -402,16 +495,30 @@ def looks_like_social_url(url: str) -> bool:
     return _is_allowed_host(parsed.hostname or "")
 
 
+def _is_instagram_profile_host(host: str | None) -> bool:
+    normalized = (host or "").strip().lower()
+    return normalized in {"instagram.com", "www.instagram.com"}
+
+
+def _first_path_segment(path: str) -> str | None:
+    for segment in path.split("/"):
+        if segment:
+            return segment.strip()
+    return None
+
+
+def _is_reserved_instagram_segment(segment: str) -> bool:
+    return segment.lower() in {"p", "reel", "stories", "explore", "accounts", "direct"}
+
+
 def try_extract_instagram_handle(url: str) -> str | None:
     parsed = urlparse((url or "").strip())
-    host = (parsed.hostname or "").strip().lower()
-    if host not in {"instagram.com", "www.instagram.com"}:
+    if not _is_instagram_profile_host(parsed.hostname):
         return None
-    segments = [segment for segment in parsed.path.split("/") if segment]
-    if not segments:
+    head = _first_path_segment(parsed.path)
+    if not head:
         return None
-    head = segments[0].strip()
-    if head.lower() in {"p", "reel", "stories", "explore", "accounts", "direct"}:
+    if _is_reserved_instagram_segment(head):
         return None
     if not re.fullmatch(r"[A-Za-z0-9._-]{2,30}", head):
         return None

@@ -26,6 +26,11 @@ def upgrade() -> None:
     promo_codes = sa.table("promo_codes", sa.column("currency", sa.String()), sa.column("amount_off", sa.Numeric()))
     table_map = {"products": products, "orders": orders, "promo_codes": promo_codes}
 
+    def normalize_ron_case(table: str) -> None:
+        table_ref = table_map[table]
+        condition = sa.and_(table_ref.c.currency.is_not(None), sa.func.upper(table_ref.c.currency) == "RON")
+        conn.execute(sa.update(table_ref).where(condition).values(currency="RON"))
+
     def count_non_ron(table: str) -> int:
         table_ref = table_map[table]
         condition = sa.and_(table_ref.c.currency.is_not(None), table_ref.c.currency != "RON")
@@ -34,10 +39,24 @@ def upgrade() -> None:
         stmt = sa.select(sa.func.count()).select_from(table_ref).where(condition)
         return int(conn.execute(stmt).scalar_one())
 
+    def normalize_non_ron(table: str) -> None:
+        table_ref = table_map[table]
+        condition = sa.and_(table_ref.c.currency.is_not(None), table_ref.c.currency != "RON")
+        if table == "promo_codes":
+            condition = sa.and_(table_ref.c.amount_off.is_not(None), condition)
+        conn.execute(sa.update(table_ref).where(condition).values(currency="RON"))
+
+    def normalize_null_currency(table: str) -> None:
+        table_ref = table_map[table]
+        condition = table_ref.c.currency.is_(None)
+        if table == "promo_codes":
+            condition = sa.and_(table_ref.c.amount_off.is_not(None), condition)
+        conn.execute(sa.update(table_ref).where(condition).values(currency="RON"))
+
     # Normalize casing to avoid treating "ron" as a foreign currency.
-    op.execute("UPDATE products SET currency='RON' WHERE currency IS NOT NULL AND UPPER(currency)='RON'")
-    op.execute("UPDATE orders SET currency='RON' WHERE currency IS NOT NULL AND UPPER(currency)='RON'")
-    op.execute("UPDATE promo_codes SET currency='RON' WHERE currency IS NOT NULL AND UPPER(currency)='RON'")
+    normalize_ron_case("products")
+    normalize_ron_case("orders")
+    normalize_ron_case("promo_codes")
 
     offenders = {table: count_non_ron(table) for table in ("products", "orders", "promo_codes")}
     offenders = {table: count for table, count in offenders.items() if count > 0}
@@ -48,19 +67,17 @@ def upgrade() -> None:
             f"({detail}). Ensure amounts are already stored in RON before continuing.",
             file=sys.stderr,
         )
-        op.execute("UPDATE products SET currency='RON' WHERE currency IS NOT NULL AND currency <> 'RON'")
-        op.execute("UPDATE orders SET currency='RON' WHERE currency IS NOT NULL AND currency <> 'RON'")
-        op.execute(
-            "UPDATE promo_codes SET currency='RON' WHERE amount_off IS NOT NULL AND currency IS NOT NULL AND currency <> 'RON'"
-        )
+        normalize_non_ron("products")
+        normalize_non_ron("orders")
+        normalize_non_ron("promo_codes")
 
-    op.execute("UPDATE products SET currency='RON' WHERE currency IS NULL")
+    normalize_null_currency("products")
     op.alter_column("products", "currency", existing_type=sa.String(length=3), server_default="RON", nullable=False)
 
-    op.execute("UPDATE orders SET currency='RON' WHERE currency IS NULL")
+    normalize_null_currency("orders")
     op.alter_column("orders", "currency", existing_type=sa.String(length=3), server_default="RON", nullable=False)
 
-    op.execute("UPDATE promo_codes SET currency='RON' WHERE amount_off IS NOT NULL AND currency IS NULL")
+    normalize_null_currency("promo_codes")
 
 
 def downgrade() -> None:

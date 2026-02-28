@@ -8,6 +8,7 @@ import secrets
 import string
 import unicodedata
 import uuid
+from typing import Any, cast
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, delete, func, select, update, or_, case, false
@@ -146,31 +147,47 @@ def apply_category_translation(category: Category, lang: str | None) -> None:
         category.description = match.description
 
 
+def _find_translation_for_lang(translations, lang: str):
+    if not translations:
+        return None
+    return next((translation for translation in translations if translation.lang == lang), None)
+
+
+def _apply_product_text_translation(product: Product, lang: str) -> None:
+    match = _find_translation_for_lang(getattr(product, "translations", None), lang)
+    if not match:
+        return
+    product.name = match.name
+    product.short_description = match.short_description
+    product.long_description = match.long_description
+    product.meta_title = match.meta_title or product.meta_title
+    product.meta_description = match.meta_description or product.meta_description
+
+
+def _apply_product_image_translation(image: ProductImage, lang: str) -> None:
+    match = _find_translation_for_lang(getattr(image, "translations", None), lang)
+    if not match:
+        return
+    if match.alt_text is not None:
+        image.alt_text = match.alt_text
+    if match.caption is not None:
+        image.caption = match.caption
+
+
+def _apply_product_image_translations(product: Product, lang: str) -> None:
+    if not getattr(product, "images", None):
+        return
+    for image in product.images:
+        _apply_product_image_translation(image, lang)
+
+
 def apply_product_translation(product: Product, lang: str | None) -> None:
     if not product or not lang:
         return
-    if getattr(product, "translations", None):
-        match = next((t for t in product.translations if t.lang == lang), None)
-        if match:
-            product.name = match.name
-            product.short_description = match.short_description
-            product.long_description = match.long_description
-            product.meta_title = match.meta_title or product.meta_title
-            product.meta_description = match.meta_description or product.meta_description
+    _apply_product_text_translation(product, lang)
     if product.category:
         apply_category_translation(product.category, lang)
-    if getattr(product, "images", None):
-        for image in product.images:
-            translations = getattr(image, "translations", None)
-            if not translations:
-                continue
-            match = next((t for t in translations if t.lang == lang), None)
-            if not match:
-                continue
-            if match.alt_text is not None:
-                image.alt_text = match.alt_text
-            if match.caption is not None:
-                image.caption = match.caption
+    _apply_product_image_translations(product, lang)
 
 
 async def list_category_translations(session: AsyncSession, category: Category) -> list[CategoryTranslation]:
@@ -390,37 +407,51 @@ def reprocess_product_image_thumbnails(image: ProductImage) -> dict[str, int | N
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to reprocess thumbnails")
 
 
-async def get_product_by_slug(
-    session: AsyncSession, slug: str, options: list | None = None, follow_history: bool = True, lang: str | None = None
-) -> Product | None:
-    query = select(Product).execution_options(populate_existing=True).options(
+def _base_product_lookup_query():
+    return select(Product).execution_options(populate_existing=True).options(
         with_loader_criteria(ProductImage, ProductImage.is_deleted.is_(False), include_aliases=True)
     )
-    final_options = options[:] if options else []
+
+
+def _build_product_lookup_options(options: list | None, lang: str | None) -> list:
+    final_options = list(options or [])
     if lang:
         final_options.append(selectinload(Product.translations))
         final_options.append(selectinload(Product.category).selectinload(Category.translations))
-    if final_options:
-        for opt in final_options:
-            query = query.options(opt)
+    return final_options
+
+
+def _apply_lookup_options(query, options: list):
+    for option in options:
+        query = query.options(option)
+    return query
+
+
+async def _get_product_by_exact_slug(session: AsyncSession, slug: str, options: list) -> Product | None:
+    query = _apply_lookup_options(_base_product_lookup_query(), options)
     result = await session.execute(query.where(Product.slug == slug))
-    product = result.scalar_one_or_none()
-    if product or not follow_history:
-        if product:
-            apply_product_translation(product, lang)
-        return product
+    return result.scalar_one_or_none()
+
+
+async def _get_product_by_slug_history(session: AsyncSession, slug: str, options: list) -> Product | None:
     hist_result = await session.execute(select(ProductSlugHistory).where(ProductSlugHistory.slug == slug))
     history = hist_result.scalar_one_or_none()
-    if history:
-        hist_query = select(Product).execution_options(populate_existing=True).where(Product.id == history.product_id).options(
-            with_loader_criteria(ProductImage, ProductImage.is_deleted.is_(False), include_aliases=True)
-        )
-        if final_options:
-            for opt in final_options:
-                hist_query = hist_query.options(opt)
-        product = (await session.execute(hist_query)).scalar_one_or_none()
-        if product:
-            apply_product_translation(product, lang)
+    if not history:
+        return None
+    query = _apply_lookup_options(_base_product_lookup_query(), options)
+    result = await session.execute(query.where(Product.id == history.product_id))
+    return result.scalar_one_or_none()
+
+
+async def get_product_by_slug(
+    session: AsyncSession, slug: str, options: list | None = None, follow_history: bool = True, lang: str | None = None
+) -> Product | None:
+    lookup_options = _build_product_lookup_options(options, lang)
+    product = await _get_product_by_exact_slug(session, slug, lookup_options)
+    if not product and follow_history:
+        product = await _get_product_by_slug_history(session, slug, lookup_options)
+    if product:
+        apply_product_translation(product, lang)
     return product
 
 
@@ -495,22 +526,32 @@ def _validate_sale_schedule(*, sale_start_at: datetime | None, sale_end_at: date
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Sale start is required for auto-publish")
 
 
+def _extract_badge_value(item: dict[str, object]) -> object:
+    badge = item.get("badge")
+    if not badge:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Badge is required")
+    return badge
+
+
+def _parse_badge_schedule(item: dict[str, object]) -> tuple[datetime | None, datetime | None]:
+    start_at_raw = item.get("start_at")
+    end_at_raw = item.get("end_at")
+    start_at = _tz_aware(start_at_raw) if isinstance(start_at_raw, datetime) else None
+    end_at = _tz_aware(end_at_raw) if isinstance(end_at_raw, datetime) else None
+    if start_at and end_at and end_at < start_at:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Badge end must be after badge start")
+    return start_at, end_at
+
+
 def _build_product_badges(payload: list[dict[str, object]]) -> list[ProductBadge]:
     seen: set[object] = set()
     badges: list[ProductBadge] = []
     for item in payload:
-        badge = item.get("badge")
-        if not badge:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Badge is required")
+        badge = _extract_badge_value(item)
         if badge in seen:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Duplicate badge")
         seen.add(badge)
-        start_at_raw = item.get("start_at")
-        end_at_raw = item.get("end_at")
-        start_at = _tz_aware(start_at_raw) if isinstance(start_at_raw, datetime) else None
-        end_at = _tz_aware(end_at_raw) if isinstance(end_at_raw, datetime) else None
-        if start_at and end_at and end_at < start_at:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Badge end must be after badge start")
+        start_at, end_at = _parse_badge_schedule(item)
         badges.append(ProductBadge(badge=badge, start_at=start_at, end_at=end_at))
     return badges
 
@@ -613,24 +654,31 @@ def _compute_sale_price(
     if value <= 0:
         return None
 
-    discount = Decimal("0.00")
-    if sale_type == "percent":
-        if value >= 100:
-            discount = base
-        else:
-            discount = pricing.quantize_money(base * value / Decimal("100"))
-    elif sale_type == "amount":
-        discount = value
-    else:
+    discount = _resolve_sale_discount(base, sale_type, value)
+    if discount is None:
         return None
 
+    return _finalize_sale_price(base, discount)
+
+
+def _resolve_sale_discount(base: Decimal, sale_type: str, value: Decimal) -> Decimal | None:
+    if sale_type == "percent":
+        if value >= 100:
+            return base
+        return pricing.quantize_money(base * value / Decimal("100"))
+    if sale_type == "amount":
+        return value
+    return None
+
+
+def _finalize_sale_price(base: Decimal, discount: Decimal) -> Decimal | None:
     price = base - discount
     if price <= 0:
         return Decimal("0.00")
-    price = pricing.quantize_money(price)
-    if price >= base:
+    quantized_price = pricing.quantize_money(price)
+    if quantized_price >= base:
         return None
-    return price
+    return quantized_price
 
 
 def _sync_sale_fields(product: Product) -> None:
@@ -714,44 +762,77 @@ async def create_category(session: AsyncSession, payload: CategoryCreate) -> Cat
     return category
 
 
-async def update_category(session: AsyncSession, category: Category, payload: CategoryUpdate) -> Category:
-    data = payload.model_dump(exclude_unset=True)
-    if "slug" in data:
-        requested_slug = (data.get("slug") or "").strip()
-        if requested_slug and requested_slug != category.slug:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Category slug cannot be changed")
-        data.pop("slug", None)
+def _sanitize_category_update_data(category: Category, data: dict[str, object]) -> dict[str, object]:
+    sanitized = dict(data)
+    if "slug" not in sanitized:
+        return sanitized
+    requested_slug = str(sanitized.get("slug") or "").strip()
+    if requested_slug and requested_slug != category.slug:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Category slug cannot be changed")
+    sanitized.pop("slug", None)
+    return sanitized
+
+
+async def _validate_category_tax_group(session: AsyncSession, tax_group_id: object) -> None:
+    if tax_group_id is None:
+        return
+    tax_group = await session.get(TaxGroup, tax_group_id)
+    if not tax_group:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tax group not found")
+
+
+async def _validate_category_update_relations(
+    session: AsyncSession, category_id: uuid.UUID, data: dict[str, object]
+) -> None:
     if "parent_id" in data:
-        await _validate_category_parent_assignment(session, category_id=category.id, parent_id=data.get("parent_id"))
+        parent_id = cast(uuid.UUID | None, data.get("parent_id"))
+        await _validate_category_parent_assignment(session, category_id=category_id, parent_id=parent_id)
     if "tax_group_id" in data:
-        tax_group_id = data.get("tax_group_id")
-        if tax_group_id is not None:
-            tax_group = await session.get(TaxGroup, tax_group_id)
-            if not tax_group:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tax group not found")
+        await _validate_category_tax_group(session, data.get("tax_group_id"))
+
+
+def _apply_field_updates(entity: object, data: dict[str, object]) -> None:
     for field, value in data.items():
-        setattr(category, field, value)
+        setattr(entity, field, value)
+
+
+async def update_category(session: AsyncSession, category: Category, payload: CategoryUpdate) -> Category:
+    data = _sanitize_category_update_data(category, payload.model_dump(exclude_unset=True))
+    await _validate_category_update_relations(session, category.id, data)
+    _apply_field_updates(category, data)
     session.add(category)
     await session.commit()
     await session.refresh(category)
     return category
 
 
+async def _load_categories_by_slug(session: AsyncSession, slugs: list[str]) -> dict[str, Category]:
+    result = await session.execute(select(Category).where(Category.slug.in_(slugs)))
+    return {category.slug: category for category in result.scalars()}
+
+
+def _collect_category_reorder_updates(
+    payload: list[CategoryReorderItem], categories_by_slug: dict[str, Category]
+) -> list[Category]:
+    updated: list[Category] = []
+    for item in payload:
+        if not item.slug or item.slug not in categories_by_slug:
+            continue
+        category = categories_by_slug[item.slug]
+        if item.sort_order is None:
+            continue
+        category.sort_order = item.sort_order
+        category.updated_at = datetime.now(timezone.utc)
+        updated.append(category)
+    return updated
+
+
 async def reorder_categories(session: AsyncSession, payload: list[CategoryReorderItem]) -> list[CategoryRead]:
     slugs = [item.slug for item in payload]
     if not slugs:
         return []
-    result = await session.execute(select(Category).where(Category.slug.in_(slugs)))
-    categories = {c.slug: c for c in result.scalars()}
-    updated: list[Category] = []
-    for item in payload:
-        if not item.slug or item.slug not in categories:
-            continue
-        cat = categories[item.slug]
-        if item.sort_order is not None:
-            cat.sort_order = item.sort_order
-            cat.updated_at = datetime.now(timezone.utc)
-            updated.append(cat)
+    categories = await _load_categories_by_slug(session, slugs)
+    updated = _collect_category_reorder_updates(payload, categories)
     if not updated:
         return []
     session.add_all(updated)
@@ -759,9 +840,7 @@ async def reorder_categories(session: AsyncSession, payload: list[CategoryReorde
     return [CategoryRead.model_validate(cat) for cat in updated]
 
 
-async def create_product(
-    session: AsyncSession, payload: ProductCreate, commit: bool = True, user_id: uuid.UUID | None = None
-) -> Product:
+async def _resolve_create_product_slug(session: AsyncSession, payload: ProductCreate) -> str:
     requested_slug = (payload.slug or "").strip()
     base_slug = (requested_slug or slugify(payload.name or "") or "product")[:160]
     candidate_slug = base_slug
@@ -769,22 +848,20 @@ async def create_product(
     while True:
         try:
             await _ensure_slug_unique(session, candidate_slug)
-            break
+            return candidate_slug
         except HTTPException:
             suffix = f"-{counter}"
             candidate_slug = f"{base_slug[: 160 - len(suffix)]}{suffix}"
             counter += 1
 
+
+async def _resolve_create_product_sku(session: AsyncSession, payload: ProductCreate, candidate_slug: str) -> str:
     sku = payload.sku or await _generate_unique_sku(session, candidate_slug)
     await _ensure_sku_unique(session, sku)
-    _validate_price_currency(payload.base_price, payload.currency)
+    return sku
 
-    images_payload = payload.images or []
-    variants_payload: list[ProductVariantCreate] = getattr(payload, "variants", []) or []
-    product_data = payload.model_dump(exclude={"images", "variants", "tags", "badges", "options"})
-    product_data["slug"] = candidate_slug
-    product_data["sku"] = sku
-    product_data["currency"] = payload.currency.upper()
+
+async def _resolve_create_product_sort_order(session: AsyncSession, payload: ProductCreate) -> int:
     custom_count = await session.scalar(
         select(func.count(Product.id)).where(
             Product.is_deleted.is_(False),
@@ -792,35 +869,295 @@ async def create_product(
             Product.sort_order != 0,
         )
     )
-    if int(custom_count or 0) > 0:
-        max_sort = await session.scalar(
-            select(func.max(Product.sort_order)).where(
-                Product.is_deleted.is_(False),
-                Product.category_id == payload.category_id,
-            )
+    if int(custom_count or 0) <= 0:
+        return 0
+    max_sort = await session.scalar(
+        select(func.max(Product.sort_order)).where(
+            Product.is_deleted.is_(False),
+            Product.category_id == payload.category_id,
         )
-        product_data["sort_order"] = int(max_sort or 0) + 1
-    else:
-        product_data["sort_order"] = 0
-    product = Product(**product_data)
-    _sync_sale_fields(product)
-    _set_publish_timestamp(product, payload.status)
-    product.images = [ProductImage(**img.model_dump()) for img in images_payload]
-    product.variants = [ProductVariant(**variant.model_dump()) for variant in variants_payload]
+    )
+    return int(max_sort or 0) + 1
+
+
+def _build_create_product_images(payload: ProductCreate) -> list[ProductImage]:
+    return [ProductImage(**image.model_dump()) for image in (payload.images or [])]
+
+
+def _build_create_product_variants(payload: ProductCreate) -> list[ProductVariant]:
+    variants_payload: list[ProductVariantCreate] = getattr(payload, "variants", []) or []
+    return [ProductVariant(**variant.model_dump()) for variant in variants_payload]
+
+
+def _build_create_product_options(payload: ProductCreate) -> list[ProductOption]:
+    return [ProductOption(**option.model_dump()) for option in (payload.options or [])]
+
+
+async def _assign_create_product_relations(session: AsyncSession, product: Product, payload: ProductCreate) -> None:
+    product.images = _build_create_product_images(payload)
+    product.variants = _build_create_product_variants(payload)
     if payload.tags:
         product.tags = await _get_or_create_tags(session, payload.tags)
     if payload.badges:
-        product.badges = _build_product_badges([b.model_dump() for b in payload.badges])
+        product.badges = _build_product_badges([badge.model_dump() for badge in payload.badges])
     if payload.options:
-        product.options = [ProductOption(**opt.model_dump()) for opt in payload.options]
-    session.add(product)
-    if commit:
-        await session.commit()
-        await session.refresh(product)
-        await _log_product_action(session, product.id, "create", user_id, {"slug": product.slug})
-    else:
-        await session.flush()
+        product.options = _build_create_product_options(payload)
+
+
+async def _build_product_from_create_payload(
+    session: AsyncSession, payload: ProductCreate, candidate_slug: str, sku: str
+) -> Product:
+    product_data = payload.model_dump(exclude={"images", "variants", "tags", "badges", "options"})
+    product_data["slug"] = candidate_slug
+    product_data["sku"] = sku
+    product_data["currency"] = payload.currency.upper()
+    product_data["sort_order"] = await _resolve_create_product_sort_order(session, payload)
+    product = Product(**product_data)
+    _sync_sale_fields(product)
+    _set_publish_timestamp(product, payload.status)
+    await _assign_create_product_relations(session, product, payload)
     return product
+
+
+async def _persist_created_product(
+    session: AsyncSession, product: Product, *, commit: bool, user_id: uuid.UUID | None
+) -> None:
+    session.add(product)
+    if not commit:
+        await session.flush()
+        return
+    await session.commit()
+    await session.refresh(product)
+    await _log_product_action(session, product.id, "create", user_id, {"slug": product.slug})
+
+
+async def create_product(
+    session: AsyncSession, payload: ProductCreate, commit: bool = True, user_id: uuid.UUID | None = None
+) -> Product:
+    candidate_slug = await _resolve_create_product_slug(session, payload)
+    sku = await _resolve_create_product_sku(session, payload, candidate_slug)
+    _validate_price_currency(payload.base_price, payload.currency)
+    product = await _build_product_from_create_payload(session, payload, candidate_slug, sku)
+    await _persist_created_product(session, product, commit=commit, user_id=user_id)
+    return product
+
+
+_PRODUCT_UPDATE_TRACKED_FIELDS = (
+    "name",
+    "category_id",
+    "sku",
+    "base_price",
+    "currency",
+    "sale_type",
+    "sale_value",
+    "sale_start_at",
+    "sale_end_at",
+    "sale_auto_publish",
+    "stock_quantity",
+    "low_stock_threshold",
+    "allow_backorder",
+    "restock_at",
+    "weight_grams",
+    "width_cm",
+    "height_cm",
+    "depth_cm",
+    "shipping_class",
+    "shipping_allow_locker",
+    "shipping_disallowed_couriers",
+    "meta_title",
+    "meta_description",
+    "short_description",
+    "long_description",
+    "status",
+    "publish_at",
+    "is_active",
+    "is_featured",
+    "publish_scheduled_for",
+    "unpublish_scheduled_for",
+)
+_SALE_MUTATION_FIELDS = ("sale_type", "sale_value", "sale_start_at", "sale_end_at", "sale_auto_publish")
+
+
+def _normalize_product_update_payload_or_400(product: Product, payload: ProductUpdate) -> dict[str, object]:
+    data = payload.model_dump(exclude_unset=True)
+    if "slug" not in data:
+        return data
+    if data["slug"] and data["slug"] != product.slug:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Slug cannot be changed")
+    data.pop("slug", None)
+    return data
+
+
+def _snapshot_product_tracked_fields(product: Product) -> dict[str, object | None]:
+    return {field: getattr(product, field, None) for field in _PRODUCT_UPDATE_TRACKED_FIELDS}
+
+
+def _snapshot_product_tags(product: Product) -> list[str | None]:
+    return [getattr(tag, "slug", None) for tag in getattr(product, "tags", []) or []]
+
+
+def _snapshot_product_badges(product: Product) -> list[tuple[object | None, datetime | None, datetime | None]]:
+    return [
+        (
+            getattr(badge, "badge", None),
+            _tz_aware(getattr(badge, "start_at", None)),
+            _tz_aware(getattr(badge, "end_at", None)),
+        )
+        for badge in getattr(product, "badges", []) or []
+    ]
+
+
+def _snapshot_product_options(product: Product) -> list[tuple[object | None, object | None]]:
+    return [
+        (getattr(opt, "option_name", None), getattr(opt, "option_value", None))
+        for opt in getattr(product, "options", []) or []
+    ]
+
+
+def _snapshot_product_relations(product: Product) -> dict[str, list[object]]:
+    return {
+        "tags": list(_snapshot_product_tags(product)),
+        "badges": list(_snapshot_product_badges(product)),
+        "options": list(_snapshot_product_options(product)),
+    }
+
+
+async def _validate_update_product_payload(
+    session: AsyncSession, product: Product, data: dict[str, object]
+) -> None:
+    if "base_price" in data or "currency" in data:
+        base_price_value = cast(Decimal | None, data.get("base_price", product.base_price))
+        currency_value = cast(str, data.get("currency", product.currency))
+        _validate_price_currency(base_price_value, currency_value)
+    if "sku" in data and data["sku"]:
+        await _ensure_sku_unique(session, cast(str, data["sku"]), exclude_id=product.id)
+
+
+async def _apply_update_product_relations(
+    session: AsyncSession, product: Product, data: dict[str, object]
+) -> None:
+    if "tags" in data:
+        tags_payload = data.pop("tags")
+        product.tags = [] if tags_payload is None else await _get_or_create_tags(session, cast(list[str], tags_payload))
+    if "badges" in data:
+        badges_payload = data.pop("badges")
+        product.badges = [] if badges_payload is None else _build_product_badges(cast(list[dict[str, object]], badges_payload))
+    if "options" in data:
+        options_payload = data.pop("options")
+        product.options = [] if options_payload is None else [ProductOption(**opt) for opt in cast(list[dict], options_payload)]
+
+
+def _normalize_product_schedule_fields(data: dict[str, object]) -> None:
+    if "publish_scheduled_for" in data:
+        data["publish_scheduled_for"] = _tz_aware(cast(datetime | None, data.get("publish_scheduled_for")))
+    if "unpublish_scheduled_for" in data:
+        data["unpublish_scheduled_for"] = _tz_aware(cast(datetime | None, data.get("unpublish_scheduled_for")))
+
+
+def _apply_product_scalar_updates(product: Product, data: dict[str, object]) -> None:
+    for field, value in data.items():
+        if field == "currency" and value:
+            setattr(product, field, str(value).upper())
+            continue
+        setattr(product, field, value)
+
+
+def _validate_product_publish_windows_or_400(product: Product) -> None:
+    publish_scheduled_for = _tz_aware(getattr(product, "publish_scheduled_for", None))
+    unpublish_scheduled_for = _tz_aware(getattr(product, "unpublish_scheduled_for", None))
+    if publish_scheduled_for and unpublish_scheduled_for and unpublish_scheduled_for <= publish_scheduled_for:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unpublish schedule must be after publish schedule",
+        )
+
+
+def _queue_product_stock_adjustment_if_changed(
+    session: AsyncSession,
+    *,
+    product: Product,
+    data: dict[str, object],
+    before_stock_quantity: int,
+    user_id: uuid.UUID | None,
+) -> None:
+    after_stock_quantity = int(getattr(product, "stock_quantity", 0) or 0)
+    if "stock_quantity" in data and after_stock_quantity != before_stock_quantity:
+        _queue_stock_adjustment(
+            session,
+            product_id=product.id,
+            variant_id=None,
+            before_quantity=before_stock_quantity,
+            after_quantity=after_stock_quantity,
+            reason=StockAdjustmentReason.manual_correction,
+            note=None,
+            user_id=user_id,
+        )
+
+
+def _apply_sale_field_transitions(
+    product: Product,
+    *,
+    data: dict[str, object],
+    before_sale_type: object | None,
+    before_sale_value: object | None,
+) -> None:
+    sale_fields_touched = any(key in data for key in _SALE_MUTATION_FIELDS)
+    if sale_fields_touched or "base_price" in data:
+        _sync_sale_fields(product)
+    if not sale_fields_touched:
+        return
+    sale_changed = (getattr(product, "sale_type", None) != before_sale_type) or (
+        getattr(product, "sale_value", None) != before_sale_value
+    )
+    if sale_changed and product.status == ProductStatus.published:
+        product.status = ProductStatus.draft
+
+
+def _build_product_update_changes(
+    product: Product,
+    *,
+    before_snapshot: dict[str, object | None],
+    before_relations: dict[str, list[object]],
+) -> dict[str, dict[str, object | None]]:
+    changes: dict[str, dict[str, object | None]] = {}
+    for field in _PRODUCT_UPDATE_TRACKED_FIELDS:
+        before_value = before_snapshot.get(field)
+        after_value = getattr(product, field, None)
+        if before_value != after_value:
+            changes[field] = {"before": before_value, "after": after_value}
+    after_relations = _snapshot_product_relations(product)
+    for relation_key in ("tags", "badges", "options"):
+        if before_relations[relation_key] != after_relations[relation_key]:
+            changes[relation_key] = {"before": before_relations[relation_key], "after": after_relations[relation_key]}
+    return changes
+
+
+async def _persist_updated_product(
+    session: AsyncSession,
+    *,
+    product: Product,
+    commit: bool,
+    was_out_of_stock: bool,
+    is_now_out_of_stock: bool,
+    changes: dict[str, dict[str, object | None]],
+    patch_snapshot: dict[str, object],
+    user_id: uuid.UUID | None,
+    source: str | None,
+) -> None:
+    session.add(product)
+    if not commit:
+        await session.flush()
+        return
+    await session.commit()
+    await session.refresh(product)
+    if was_out_of_stock and not is_now_out_of_stock:
+        await fulfill_back_in_stock_requests(session, product=product)
+    if changes:
+        audit_payload: dict[str, object] = {"changes": changes, "patch": patch_snapshot}
+        if source:
+            audit_payload["source"] = source
+        await _log_product_action(session, product.id, "update", user_id, audit_payload)
+    await _maybe_alert_low_stock(session, product)
 
 
 async def update_product(
@@ -835,162 +1172,35 @@ async def update_product(
     before_stock_quantity = int(getattr(product, "stock_quantity", 0) or 0)
     before_sale_type = getattr(product, "sale_type", None)
     before_sale_value = getattr(product, "sale_value", None)
-    data = payload.model_dump(exclude_unset=True)
-    if "slug" in data:
-        if data["slug"] and data["slug"] != product.slug:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Slug cannot be changed")
-        data.pop("slug", None)
+    data = _normalize_product_update_payload_or_400(product, payload)
     patch_snapshot = dict(data)
-    tracked_fields = (
-        "name",
-        "category_id",
-        "sku",
-        "base_price",
-        "currency",
-        "sale_type",
-        "sale_value",
-        "sale_start_at",
-        "sale_end_at",
-        "sale_auto_publish",
-        "stock_quantity",
-        "low_stock_threshold",
-        "allow_backorder",
-        "restock_at",
-        "weight_grams",
-        "width_cm",
-        "height_cm",
-        "depth_cm",
-        "shipping_class",
-        "shipping_allow_locker",
-        "shipping_disallowed_couriers",
-        "meta_title",
-        "meta_description",
-        "short_description",
-        "long_description",
-        "status",
-        "publish_at",
-        "is_active",
-        "is_featured",
-        "publish_scheduled_for",
-        "unpublish_scheduled_for",
+    before_snapshot = _snapshot_product_tracked_fields(product)
+    before_relations = _snapshot_product_relations(product)
+    await _validate_update_product_payload(session, product, data)
+    await _apply_update_product_relations(session, product, data)
+    _normalize_product_schedule_fields(data)
+    _apply_product_scalar_updates(product, data)
+    _validate_product_publish_windows_or_400(product)
+    _queue_product_stock_adjustment_if_changed(
+        session, product=product, data=data, before_stock_quantity=before_stock_quantity, user_id=user_id
     )
-    before_snapshot = {field: getattr(product, field, None) for field in tracked_fields}
-    before_tags = [getattr(tag, "slug", None) for tag in getattr(product, "tags", []) or []]
-    before_badges = [
-        (
-            getattr(badge, "badge", None),
-            _tz_aware(getattr(badge, "start_at", None)),
-            _tz_aware(getattr(badge, "end_at", None)),
-        )
-        for badge in getattr(product, "badges", []) or []
-    ]
-    before_options = [
-        (getattr(opt, "option_name", None), getattr(opt, "option_value", None))
-        for opt in getattr(product, "options", []) or []
-    ]
-    if "base_price" in data or "currency" in data:
-        _validate_price_currency(data.get("base_price", product.base_price), data.get("currency", product.currency))
-    if "sku" in data and data["sku"]:
-        await _ensure_sku_unique(session, data["sku"], exclude_id=product.id)
-    if "tags" in data:
-        tags_payload = data.pop("tags")
-        if tags_payload is None:
-            product.tags = []
-        else:
-            product.tags = await _get_or_create_tags(session, tags_payload)
-    if "badges" in data:
-        badges_payload = data.pop("badges")
-        if badges_payload is None:
-            product.badges = []
-        else:
-            product.badges = _build_product_badges(badges_payload)
-    if "options" in data:
-        options_payload = data.pop("options")
-        if options_payload is None:
-            product.options = []
-        else:
-            product.options = [ProductOption(**opt) for opt in options_payload]
-    if "publish_scheduled_for" in data:
-        data["publish_scheduled_for"] = _tz_aware(data.get("publish_scheduled_for"))
-    if "unpublish_scheduled_for" in data:
-        data["unpublish_scheduled_for"] = _tz_aware(data.get("unpublish_scheduled_for"))
-    for field, value in data.items():
-        if field == "currency" and value:
-            setattr(product, field, value.upper())
-        else:
-            setattr(product, field, value)
-    publish_scheduled_for = _tz_aware(getattr(product, "publish_scheduled_for", None))
-    unpublish_scheduled_for = _tz_aware(getattr(product, "unpublish_scheduled_for", None))
-    if publish_scheduled_for and unpublish_scheduled_for and unpublish_scheduled_for <= publish_scheduled_for:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Unpublish schedule must be after publish schedule",
-        )
-    if "stock_quantity" in data and int(getattr(product, "stock_quantity", 0) or 0) != before_stock_quantity:
-        _queue_stock_adjustment(
-            session,
-            product_id=product.id,
-            variant_id=None,
-            before_quantity=before_stock_quantity,
-            after_quantity=int(getattr(product, "stock_quantity", 0) or 0),
-            reason=StockAdjustmentReason.manual_correction,
-            note=None,
-            user_id=user_id,
-        )
     is_now_out_of_stock = is_out_of_stock(product)
-    sale_fields_touched = any(
-        key in data for key in ("sale_type", "sale_value", "sale_start_at", "sale_end_at", "sale_auto_publish")
+    _apply_sale_field_transitions(
+        product, data=data, before_sale_type=before_sale_type, before_sale_value=before_sale_value
     )
-    if sale_fields_touched or "base_price" in data:
-        _sync_sale_fields(product)
-    if sale_fields_touched:
-        sale_changed = (getattr(product, "sale_type", None) != before_sale_type) or (
-            getattr(product, "sale_value", None) != before_sale_value
-        )
-        if sale_changed and product.status == ProductStatus.published:
-            product.status = ProductStatus.draft
     _set_publish_timestamp(product, product.status)
-
-    after_tags = [getattr(tag, "slug", None) for tag in getattr(product, "tags", []) or []]
-    after_badges = [
-        (
-            getattr(badge, "badge", None),
-            _tz_aware(getattr(badge, "start_at", None)),
-            _tz_aware(getattr(badge, "end_at", None)),
-        )
-        for badge in getattr(product, "badges", []) or []
-    ]
-    after_options = [
-        (getattr(opt, "option_name", None), getattr(opt, "option_value", None))
-        for opt in getattr(product, "options", []) or []
-    ]
-    changes: dict[str, dict[str, object | None]] = {}
-    for field in tracked_fields:
-        before_value = before_snapshot.get(field)
-        after_value = getattr(product, field, None)
-        if before_value != after_value:
-            changes[field] = {"before": before_value, "after": after_value}
-    if before_tags != after_tags:
-        changes["tags"] = {"before": before_tags, "after": after_tags}
-    if before_badges != after_badges:
-        changes["badges"] = {"before": before_badges, "after": after_badges}
-    if before_options != after_options:
-        changes["options"] = {"before": before_options, "after": after_options}
-
-    session.add(product)
-    if commit:
-        await session.commit()
-        await session.refresh(product)
-        if was_out_of_stock and not is_now_out_of_stock:
-            await fulfill_back_in_stock_requests(session, product=product)
-        if changes:
-            audit_payload: dict[str, object] = {"changes": changes, "patch": patch_snapshot}
-            if source:
-                audit_payload["source"] = source
-            await _log_product_action(session, product.id, "update", user_id, audit_payload)
-        await _maybe_alert_low_stock(session, product)
-    else:
-        await session.flush()
+    changes = _build_product_update_changes(product, before_snapshot=before_snapshot, before_relations=before_relations)
+    await _persist_updated_product(
+        session,
+        product=product,
+        commit=commit,
+        was_out_of_stock=was_out_of_stock,
+        is_now_out_of_stock=is_now_out_of_stock,
+        changes=changes,
+        patch_snapshot=patch_snapshot,
+        user_id=user_id,
+        source=source,
+    )
     return product
 
 
@@ -1028,7 +1238,23 @@ async def update_product_variants(
     user_id: uuid.UUID | None = None,
 ) -> list[ProductVariant]:
     existing_by_id: dict[uuid.UUID, ProductVariant] = {v.id: v for v in product.variants}
+    _validate_variant_payload_names_or_400(payload)
+    delete_ids = _collect_variant_delete_ids_or_400(payload)
+    updated_rows, created_with_stock = _upsert_variant_rows(
+        session=session, product=product, payload=payload, existing_by_id=existing_by_id, user_id=user_id
+    )
+    await _delete_variant_rows(
+        session=session, product=product, delete_ids=delete_ids, existing_by_id=existing_by_id, user_id=user_id
+    )
+    await _queue_created_variant_stock_adjustments(
+        session=session, product=product, created_with_stock=created_with_stock, user_id=user_id
+    )
+    return await _finalize_variant_matrix_update(
+        session=session, product=product, updated_rows=updated_rows, delete_ids=delete_ids, user_id=user_id
+    )
 
+
+def _validate_variant_payload_names_or_400(payload: ProductVariantMatrixUpdate) -> None:
     normalized_names: list[str] = []
     for variant_item in payload.variants:
         name = (variant_item.name or "").strip()
@@ -1038,13 +1264,47 @@ async def update_product_variants(
     if len(set(normalized_names)) != len(normalized_names):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Variant names must be unique")
 
-    delete_ids = set(payload.delete_variant_ids or [])
-    for variant_id in delete_ids:
-        if any(v.id == variant_id for v in payload.variants if v.id is not None):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot delete a variant that is also being updated"
-            )
 
+def _collect_variant_delete_ids_or_400(payload: ProductVariantMatrixUpdate) -> set[uuid.UUID]:
+    delete_ids = set(payload.delete_variant_ids or [])
+    upsert_ids = {item.id for item in payload.variants if item.id is not None}
+    if delete_ids & upsert_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot delete a variant that is also being updated"
+        )
+    return delete_ids
+
+
+def _queue_variant_stock_adjustment(
+    session: AsyncSession,
+    *,
+    product_id: uuid.UUID,
+    variant_id: uuid.UUID,
+    before_quantity: int,
+    after_quantity: int,
+    note: str | None,
+    user_id: uuid.UUID | None,
+) -> None:
+    _queue_stock_adjustment(
+        session,
+        product_id=product_id,
+        variant_id=variant_id,
+        before_quantity=before_quantity,
+        after_quantity=after_quantity,
+        reason=StockAdjustmentReason.manual_correction,
+        note=note,
+        user_id=user_id,
+    )
+
+
+def _upsert_variant_rows(
+    session: AsyncSession,
+    *,
+    product: Product,
+    payload: ProductVariantMatrixUpdate,
+    existing_by_id: dict[uuid.UUID, ProductVariant],
+    user_id: uuid.UUID | None,
+) -> tuple[list[ProductVariant], list[ProductVariant]]:
     updated_rows: list[ProductVariant] = []
     created_with_stock: list[ProductVariant] = []
     for item in payload.variants:
@@ -1057,21 +1317,18 @@ async def update_product_variants(
             existing_variant.name = name
             existing_variant.additional_price_delta = item.additional_price_delta
             existing_variant.stock_quantity = item.stock_quantity
-            if int(existing_variant.stock_quantity) != before_qty:
-                _queue_stock_adjustment(
-                    session,
-                    product_id=product.id,
-                    variant_id=existing_variant.id,
-                    before_quantity=before_qty,
-                    after_quantity=int(existing_variant.stock_quantity),
-                    reason=StockAdjustmentReason.manual_correction,
-                    note=None,
-                    user_id=user_id,
-                )
+            _queue_variant_stock_adjustment(
+                session,
+                product_id=product.id,
+                variant_id=existing_variant.id,
+                before_quantity=before_qty,
+                after_quantity=int(existing_variant.stock_quantity),
+                note=None,
+                user_id=user_id,
+            )
             session.add(existing_variant)
             updated_rows.append(existing_variant)
             continue
-
         created = ProductVariant(
             product_id=product.id,
             name=name,
@@ -1082,45 +1339,75 @@ async def update_product_variants(
         if int(created.stock_quantity) != 0:
             created_with_stock.append(created)
         updated_rows.append(created)
+    return updated_rows, created_with_stock
 
+
+async def _ensure_variant_not_in_use_or_400(session: AsyncSession, variant_id: uuid.UUID) -> None:
+    in_cart = await session.scalar(select(CartItem.id).where(CartItem.variant_id == variant_id).limit(1))
+    if in_cart is not None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Variant is used in a cart")
+    in_order = await session.scalar(select(OrderItem.id).where(OrderItem.variant_id == variant_id).limit(1))
+    if in_order is not None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Variant is used in an order")
+
+
+async def _delete_variant_rows(
+    session: AsyncSession,
+    *,
+    product: Product,
+    delete_ids: set[uuid.UUID],
+    existing_by_id: dict[uuid.UUID, ProductVariant],
+    user_id: uuid.UUID | None,
+) -> None:
     for variant_id in delete_ids:
         variant_model = existing_by_id.get(variant_id)
         if not variant_model:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Variant not found")
-
-        in_cart = await session.scalar(select(CartItem.id).where(CartItem.variant_id == variant_id).limit(1))
-        if in_cart is not None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Variant is used in a cart")
-        in_order = await session.scalar(select(OrderItem.id).where(OrderItem.variant_id == variant_id).limit(1))
-        if in_order is not None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Variant is used in an order")
-        if int(getattr(variant_model, "stock_quantity", 0) or 0) != 0:
-            _queue_stock_adjustment(
+        await _ensure_variant_not_in_use_or_400(session, variant_id)
+        stock_quantity = int(getattr(variant_model, "stock_quantity", 0) or 0)
+        if stock_quantity != 0:
+            _queue_variant_stock_adjustment(
                 session,
                 product_id=product.id,
                 variant_id=variant_model.id,
-                before_quantity=int(getattr(variant_model, "stock_quantity", 0) or 0),
+                before_quantity=stock_quantity,
                 after_quantity=0,
-                reason=StockAdjustmentReason.manual_correction,
                 note="Variant deleted",
                 user_id=user_id,
             )
         await session.delete(variant_model)
 
-    if created_with_stock:
-        await session.flush()
-        for created_variant in created_with_stock:
-            _queue_stock_adjustment(
-                session,
-                product_id=product.id,
-                variant_id=created_variant.id,
-                before_quantity=0,
-                after_quantity=int(created_variant.stock_quantity),
-                reason=StockAdjustmentReason.manual_correction,
-                note="Variant created",
-                user_id=user_id,
-            )
 
+async def _queue_created_variant_stock_adjustments(
+    session: AsyncSession,
+    *,
+    product: Product,
+    created_with_stock: list[ProductVariant],
+    user_id: uuid.UUID | None,
+) -> None:
+    if not created_with_stock:
+        return
+    await session.flush()
+    for created_variant in created_with_stock:
+        _queue_variant_stock_adjustment(
+            session,
+            product_id=product.id,
+            variant_id=created_variant.id,
+            before_quantity=0,
+            after_quantity=int(created_variant.stock_quantity),
+            note="Variant created",
+            user_id=user_id,
+        )
+
+
+async def _finalize_variant_matrix_update(
+    session: AsyncSession,
+    *,
+    product: Product,
+    updated_rows: list[ProductVariant],
+    delete_ids: set[uuid.UUID],
+    user_id: uuid.UUID | None,
+) -> list[ProductVariant]:
     await session.commit()
     await session.refresh(product, attribute_names=["variants"])
     await _log_product_action(
@@ -1278,160 +1565,259 @@ async def bulk_update_products(
     source: str | None = None,
 ) -> list[Product]:
     product_ids = [item.product_id for item in updates]
-    category_ids = {
+    category_ids = _bulk_update_target_category_ids(updates)
+    await _ensure_bulk_categories_exist_or_400(session, category_ids)
+    products = await _load_products_for_bulk_update(session, product_ids)
+    category_sort_meta = await _build_bulk_category_sort_meta(session, category_ids)
+
+    restocked: set[uuid.UUID] = set()
+    updated = [
+        _apply_bulk_update_item(
+            session=session,
+            item=item,
+            products=products,
+            category_sort_meta=category_sort_meta,
+            restocked=restocked,
+            user_id=user_id,
+        )
+        for item in updates
+    ]
+    await _finalize_bulk_product_updates(
+        session=session, updated=updated, restocked=restocked, user_id=user_id, source=source
+    )
+    return updated
+
+
+_BULK_PRODUCT_MUTATION_FIELDS = (
+    "base_price",
+    "sale_type",
+    "sale_value",
+    "sale_start_at",
+    "sale_end_at",
+    "sale_auto_publish",
+    "stock_quantity",
+    "is_featured",
+    "sort_order",
+    "category_id",
+    "publish_scheduled_for",
+    "unpublish_scheduled_for",
+    "status",
+)
+
+
+def _bulk_update_target_category_ids(updates: list[BulkProductUpdateItem]) -> set[uuid.UUID]:
+    return {
         item.category_id
         for item in updates
         if "category_id" in item.model_fields_set and item.category_id is not None  # type: ignore[attr-defined]
     }
-    if category_ids:
-        category_result = await session.execute(select(Category.id).where(Category.id.in_(category_ids)))
-        found_categories = set(category_result.scalars())
-        missing = category_ids - found_categories
-        if missing:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="One or more categories not found")
+
+
+async def _ensure_bulk_categories_exist_or_400(session: AsyncSession, category_ids: set[uuid.UUID]) -> None:
+    if not category_ids:
+        return
+    category_result = await session.execute(select(Category.id).where(Category.id.in_(category_ids)))
+    found_categories = set(category_result.scalars())
+    if category_ids - found_categories:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="One or more categories not found")
+
+
+async def _load_products_for_bulk_update(
+    session: AsyncSession, product_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, Product]:
     product_result = await session.execute(select(Product).where(Product.id.in_(product_ids)))
-    products = {p.id: p for p in product_result.scalars()}
+    return {product.id: product for product in product_result.scalars()}
+
+
+async def _build_bulk_category_sort_meta(
+    session: AsyncSession, category_ids: set[uuid.UUID]
+) -> dict[uuid.UUID, dict[str, int | bool]]:
     category_sort_meta: dict[uuid.UUID, dict[str, int | bool]] = {}
-    if category_ids:
-        stats_rows = (
-            await session.execute(
-                select(
-                    Product.category_id,
-                    func.coalesce(func.max(Product.sort_order), 0),
-                    func.count(Product.id).filter(Product.sort_order != 0),
-                )
-                .where(Product.is_deleted.is_(False), Product.category_id.in_(category_ids))
-                .group_by(Product.category_id)
+    if not category_ids:
+        return category_sort_meta
+    stats_rows = (
+        await session.execute(
+            select(
+                Product.category_id,
+                func.coalesce(func.max(Product.sort_order), 0),
+                func.count(Product.id).filter(Product.sort_order != 0),
             )
-        ).all()
-        for cat_id, max_sort, custom_count in stats_rows:
-            if not cat_id:
-                continue
-            category_sort_meta[cat_id] = {
-                "max": int(max_sort or 0),
-                "has_custom": int(custom_count or 0) > 0,
-            }
-        for cat_id in category_ids:
-            category_sort_meta.setdefault(cat_id, {"max": 0, "has_custom": False})
-
-    updated: list[Product] = []
-    restocked: set[uuid.UUID] = set()
-    for item in updates:
-        product = products.get(item.product_id)
-        if not product:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Product {item.product_id} not found")
-        before_category_id = product.category_id
-        was_out_of_stock = is_out_of_stock(product)
-        before_stock_quantity = int(getattr(product, "stock_quantity", 0) or 0)
-        before_sale_type = getattr(product, "sale_type", None)
-        before_sale_value = getattr(product, "sale_value", None)
-        data = item.model_dump(exclude_unset=True)
-        for field in (
-            "base_price",
-            "sale_type",
-            "sale_value",
-            "sale_start_at",
-            "sale_end_at",
-            "sale_auto_publish",
-            "stock_quantity",
-            "is_featured",
-            "sort_order",
-            "category_id",
-            "publish_scheduled_for",
-            "unpublish_scheduled_for",
-            "status",
-        ):
-            if field not in data:
-                continue
-            if field == "sale_auto_publish":
-                if data[field] is None:
-                    setattr(product, field, False)
-                else:
-                    setattr(product, field, bool(data[field]))
-                continue
-            if field == "category_id":
-                if data[field] is None:
-                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="category_id cannot be null")
-                setattr(product, field, data[field])
-                continue
-            if field in {"publish_scheduled_for", "unpublish_scheduled_for"}:
-                setattr(product, field, _tz_aware(data[field]) if data[field] is not None else None)
-                continue
-            if field in {"sale_type", "sale_value", "sale_start_at", "sale_end_at"}:
-                setattr(product, field, data[field] if data[field] is not None else None)
-                continue
-            if data[field] is not None:
-                setattr(product, field, data[field])
-
-        if "category_id" in data and product.category_id != before_category_id and "sort_order" not in data:
-            meta = category_sort_meta.get(product.category_id)
-            if meta and bool(meta.get("has_custom")):
-                next_sort = int(meta.get("max") or 0) + 1
-                product.sort_order = next_sort
-                meta["max"] = next_sort
-            else:
-                product.sort_order = 0
-
-        publish_scheduled_for = _tz_aware(getattr(product, "publish_scheduled_for", None))
-        unpublish_scheduled_for = _tz_aware(getattr(product, "unpublish_scheduled_for", None))
-        if publish_scheduled_for and unpublish_scheduled_for and unpublish_scheduled_for <= publish_scheduled_for:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Unpublish schedule must be after publish schedule",
-            )
-
-        sale_fields_touched = any(
-            key in data for key in ("sale_type", "sale_value", "sale_start_at", "sale_end_at", "sale_auto_publish")
+            .where(Product.is_deleted.is_(False), Product.category_id.in_(category_ids))
+            .group_by(Product.category_id)
         )
-        if sale_fields_touched or "base_price" in data:
-            _sync_sale_fields(product)
-        if sale_fields_touched:
-            sale_changed = (getattr(product, "sale_type", None) != before_sale_type) or (
-                getattr(product, "sale_value", None) != before_sale_value
-            )
-            if sale_changed and product.status == ProductStatus.published:
-                product.status = ProductStatus.draft
+    ).all()
+    for cat_id, max_sort, custom_count in stats_rows:
+        if not cat_id:
+            continue
+        category_sort_meta[cat_id] = {
+            "max": int(max_sort or 0),
+            "has_custom": int(custom_count or 0) > 0,
+        }
+    for cat_id in category_ids:
+        category_sort_meta.setdefault(cat_id, {"max": 0, "has_custom": False})
+    return category_sort_meta
 
-        _set_publish_timestamp(product, product.status)
-        if "stock_quantity" in data and data.get("stock_quantity") is not None:
-            after_stock_quantity = int(getattr(product, "stock_quantity", 0) or 0)
-            if after_stock_quantity != before_stock_quantity:
-                _queue_stock_adjustment(
-                    session,
-                    product_id=product.id,
-                    variant_id=None,
-                    before_quantity=before_stock_quantity,
-                    after_quantity=after_stock_quantity,
-                    reason=StockAdjustmentReason.manual_correction,
-                    note=None,
-                    user_id=user_id,
-                )
-        if was_out_of_stock and not is_out_of_stock(product):
-            restocked.add(product.id)
-        session.add(product)
-        updated.append(product)
+
+def _set_bulk_sale_auto_publish(product: Product, field: str, value: object) -> None:
+    setattr(product, field, False if value is None else bool(value))
+
+
+def _set_bulk_category_id_or_400(product: Product, field: str, value: object) -> None:
+    if value is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="category_id cannot be null")
+    setattr(product, field, value)
+
+
+def _set_bulk_datetime_or_none(product: Product, field: str, value: object) -> None:
+    typed_value = cast(datetime | None, value) if value is not None else None
+    setattr(product, field, _tz_aware(typed_value) if typed_value is not None else None)
+
+
+def _set_bulk_nullable_field(product: Product, field: str, value: object) -> None:
+    setattr(product, field, value if value is not None else None)
+
+
+_BULK_MUTATION_FIELD_HANDLERS = {
+    "sale_auto_publish": _set_bulk_sale_auto_publish,
+    "category_id": _set_bulk_category_id_or_400,
+    "publish_scheduled_for": _set_bulk_datetime_or_none,
+    "unpublish_scheduled_for": _set_bulk_datetime_or_none,
+    "sale_type": _set_bulk_nullable_field,
+    "sale_value": _set_bulk_nullable_field,
+    "sale_start_at": _set_bulk_nullable_field,
+    "sale_end_at": _set_bulk_nullable_field,
+}
+
+
+def _apply_bulk_mutation_field_or_400(product: Product, field: str, value: object) -> None:
+    handler = _BULK_MUTATION_FIELD_HANDLERS.get(field)
+    if handler:
+        handler(product, field, value)
+    elif value is not None:
+        setattr(product, field, value)
+
+
+def _apply_bulk_mutation_fields_or_400(product: Product, data: dict[str, object]) -> None:
+    for field in _BULK_PRODUCT_MUTATION_FIELDS:
+        if field not in data:
+            continue
+        _apply_bulk_mutation_field_or_400(product, field, data[field])
+
+
+def _apply_bulk_sort_order_on_category_change(
+    product: Product,
+    *,
+    data: dict[str, object],
+    before_category_id: uuid.UUID | None,
+    category_sort_meta: dict[uuid.UUID, dict[str, int | bool]],
+) -> None:
+    if "category_id" not in data or product.category_id == before_category_id or "sort_order" in data:
+        return
+    meta = category_sort_meta.get(product.category_id)
+    if meta and bool(meta.get("has_custom")):
+        next_sort = int(meta.get("max") or 0) + 1
+        product.sort_order = next_sort
+        meta["max"] = next_sort
+    else:
+        product.sort_order = 0
+
+
+def _queue_bulk_stock_adjustment_if_changed(
+    session: AsyncSession,
+    *,
+    product: Product,
+    data: dict[str, object],
+    before_stock_quantity: int,
+    user_id: uuid.UUID | None,
+) -> None:
+    if "stock_quantity" not in data or data.get("stock_quantity") is None:
+        return
+    after_stock_quantity = int(getattr(product, "stock_quantity", 0) or 0)
+    if after_stock_quantity == before_stock_quantity:
+        return
+    _queue_stock_adjustment(
+        session,
+        product_id=product.id,
+        variant_id=None,
+        before_quantity=before_stock_quantity,
+        after_quantity=after_stock_quantity,
+        reason=StockAdjustmentReason.manual_correction,
+        note=None,
+        user_id=user_id,
+    )
+
+
+def _apply_bulk_update_item(
+    session: AsyncSession,
+    *,
+    item: BulkProductUpdateItem,
+    products: dict[uuid.UUID, Product],
+    category_sort_meta: dict[uuid.UUID, dict[str, int | bool]],
+    restocked: set[uuid.UUID],
+    user_id: uuid.UUID | None,
+) -> Product:
+    product = products.get(item.product_id)
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Product {item.product_id} not found")
+    before_category_id = product.category_id
+    before_sale_type = getattr(product, "sale_type", None)
+    before_sale_value = getattr(product, "sale_value", None)
+    before_stock_quantity = int(getattr(product, "stock_quantity", 0) or 0)
+    was_out_of_stock = is_out_of_stock(product)
+    data = item.model_dump(exclude_unset=True)
+    _apply_bulk_mutation_fields_or_400(product, data)
+    _apply_bulk_sort_order_on_category_change(
+        product, data=data, before_category_id=before_category_id, category_sort_meta=category_sort_meta
+    )
+    _validate_product_publish_windows_or_400(product)
+    _apply_sale_field_transitions(
+        product, data=data, before_sale_type=before_sale_type, before_sale_value=before_sale_value
+    )
+    _set_publish_timestamp(product, product.status)
+    _queue_bulk_stock_adjustment_if_changed(
+        session, product=product, data=data, before_stock_quantity=before_stock_quantity, user_id=user_id
+    )
+    if was_out_of_stock and not is_out_of_stock(product):
+        restocked.add(product.id)
+    session.add(product)
+    return product
+
+
+def _bulk_update_audit_payload(product: Product, source: str | None) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "base_price": product.base_price,
+        "sale_type": product.sale_type,
+        "sale_value": product.sale_value,
+        "sale_price": product.sale_price,
+        "stock_quantity": product.stock_quantity,
+        "is_featured": product.is_featured,
+        "sort_order": getattr(product, "sort_order", 0),
+        "category_id": str(product.category_id) if product.category_id else None,
+        "publish_scheduled_for": getattr(product, "publish_scheduled_for", None),
+        "unpublish_scheduled_for": getattr(product, "unpublish_scheduled_for", None),
+        "status": str(product.status),
+    }
+    if source:
+        payload["source"] = source
+    return payload
+
+
+async def _finalize_bulk_product_updates(
+    session: AsyncSession,
+    *,
+    updated: list[Product],
+    restocked: set[uuid.UUID],
+    user_id: uuid.UUID | None,
+    source: str | None,
+) -> None:
     await session.commit()
     for product in updated:
         await session.refresh(product)
         if product.id in restocked:
             await fulfill_back_in_stock_requests(session, product=product)
-        payload = {
-            "base_price": product.base_price,
-            "sale_type": product.sale_type,
-            "sale_value": product.sale_value,
-            "sale_price": product.sale_price,
-            "stock_quantity": product.stock_quantity,
-            "is_featured": product.is_featured,
-            "sort_order": getattr(product, "sort_order", 0),
-            "category_id": str(product.category_id) if product.category_id else None,
-            "publish_scheduled_for": getattr(product, "publish_scheduled_for", None),
-            "unpublish_scheduled_for": getattr(product, "unpublish_scheduled_for", None),
-            "status": str(product.status),
-        }
-        if source:
-            payload["source"] = source
-        await _log_product_action(session, product.id, "bulk_update", user_id, payload)
-    return updated
+        await _log_product_action(
+            session, product.id, "bulk_update", user_id, _bulk_update_audit_payload(product, source)
+        )
 
 
 async def list_stock_adjustments(
@@ -1452,6 +1838,178 @@ async def list_stock_adjustments(
     return list(rows)
 
 
+def _adjusted_quantity_or_400(*, before_quantity: int, delta: int) -> int:
+    after_quantity = before_quantity + int(delta)
+    if after_quantity < 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Stock cannot be negative")
+    return after_quantity
+
+
+async def _load_adjustment_product_or_404(session: AsyncSession, product_id: uuid.UUID) -> Product:
+    product = await session.get(Product, product_id)
+    if not product or getattr(product, "is_deleted", False):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    return product
+
+
+async def _apply_variant_stock_adjustment(
+    session: AsyncSession,
+    *,
+    product: Product,
+    variant_id: uuid.UUID,
+    delta: int,
+) -> tuple[uuid.UUID, int, int]:
+    variant = await session.get(ProductVariant, variant_id)
+    if not variant or variant.product_id != product.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid variant")
+    before_quantity = int(getattr(variant, "stock_quantity", 0) or 0)
+    after_quantity = _adjusted_quantity_or_400(before_quantity=before_quantity, delta=delta)
+    variant.stock_quantity = after_quantity
+    session.add(variant)
+    return variant.id, before_quantity, after_quantity
+
+
+def _apply_product_stock_adjustment(*, product: Product, delta: int) -> tuple[int, int, bool]:
+    was_out_of_stock = is_out_of_stock(product)
+    before_quantity = int(getattr(product, "stock_quantity", 0) or 0)
+    after_quantity = _adjusted_quantity_or_400(before_quantity=before_quantity, delta=delta)
+    product.stock_quantity = after_quantity
+    return before_quantity, after_quantity, was_out_of_stock
+
+
+async def _finalize_product_level_stock_adjustment(
+    session: AsyncSession,
+    *,
+    payload: StockAdjustmentCreate,
+    product: Product,
+    was_out_of_stock: bool,
+) -> None:
+    if payload.variant_id is not None:
+        return
+    await session.refresh(product)
+    if was_out_of_stock and not is_out_of_stock(product):
+        await fulfill_back_in_stock_requests(session, product=product)
+    await _maybe_alert_low_stock(session, product)
+
+
+def _build_stock_adjustment(
+    *,
+    product_id: uuid.UUID,
+    variant_id: uuid.UUID | None,
+    user_id: uuid.UUID | None,
+    payload: StockAdjustmentCreate,
+    delta: int,
+    before_quantity: int,
+    after_quantity: int,
+    note: str | None,
+) -> StockAdjustment:
+    return StockAdjustment(
+        product_id=product_id,
+        variant_id=variant_id,
+        actor_user_id=user_id,
+        reason=payload.reason,
+        delta=delta,
+        before_quantity=before_quantity,
+        after_quantity=after_quantity,
+        note=note,
+    )
+
+
+def _stock_adjustment_audit_payload(
+    *,
+    variant_id: uuid.UUID | None,
+    payload: StockAdjustmentCreate,
+    delta: int,
+    before_quantity: int,
+    after_quantity: int,
+    note: str | None,
+) -> dict[str, Any]:
+    return {
+        "variant_id": str(variant_id) if variant_id else None,
+        "reason": str(payload.reason),
+        "delta": delta,
+        "before": before_quantity,
+        "after": after_quantity,
+        "note": note,
+    }
+
+
+async def _resolve_stock_adjustment_target(
+    session: AsyncSession,
+    *,
+    product: Product,
+    payload: StockAdjustmentCreate,
+    delta: int,
+) -> tuple[uuid.UUID | None, int, int, bool]:
+    if payload.variant_id is not None:
+        variant_id, before_quantity, after_quantity = await _apply_variant_stock_adjustment(
+            session,
+            product=product,
+            variant_id=payload.variant_id,
+            delta=delta,
+        )
+        return variant_id, before_quantity, after_quantity, False
+    before_quantity, after_quantity, was_out_of_stock = _apply_product_stock_adjustment(product=product, delta=delta)
+    session.add(product)
+    return None, before_quantity, after_quantity, was_out_of_stock
+
+
+async def _persist_stock_adjustment(
+    session: AsyncSession,
+    *,
+    product: Product,
+    payload: StockAdjustmentCreate,
+    user_id: uuid.UUID | None,
+    variant_id: uuid.UUID | None,
+    delta: int,
+    before_quantity: int,
+    after_quantity: int,
+    note: str | None,
+) -> StockAdjustment:
+    adjustment = _build_stock_adjustment(
+        product_id=product.id,
+        variant_id=variant_id,
+        user_id=user_id,
+        payload=payload,
+        delta=delta,
+        before_quantity=before_quantity,
+        after_quantity=after_quantity,
+        note=note,
+    )
+    session.add(adjustment)
+    await session.commit()
+    await session.refresh(adjustment)
+    return adjustment
+
+
+async def _log_stock_adjustment(
+    session: AsyncSession,
+    *,
+    product: Product,
+    user_id: uuid.UUID | None,
+    variant_id: uuid.UUID | None,
+    payload: StockAdjustmentCreate,
+    delta: int,
+    before_quantity: int,
+    after_quantity: int,
+    note: str | None,
+) -> None:
+    await _log_product_action(
+        session,
+        product.id,
+        "stock_adjustment",
+        user_id,
+        _stock_adjustment_audit_payload(
+            variant_id=variant_id,
+            payload=payload,
+            delta=delta,
+            before_quantity=before_quantity,
+            after_quantity=after_quantity,
+            note=note,
+        ),
+    )
+
+
 async def apply_stock_adjustment(
     session: AsyncSession,
     *,
@@ -1460,71 +2018,39 @@ async def apply_stock_adjustment(
 ) -> StockAdjustment:
     if payload.delta == 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Delta cannot be zero")
-
-    product = await session.get(Product, payload.product_id)
-    if not product or getattr(product, "is_deleted", False):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-
+    product = await _load_adjustment_product_or_404(session, payload.product_id)
     note = (payload.note or "").strip() or None
-    variant_id: uuid.UUID | None = None
-    before_quantity = 0
-    after_quantity = 0
-    was_out_of_stock = False
-    affected_variant: ProductVariant | None = None
-
-    if payload.variant_id is not None:
-        affected_variant = await session.get(ProductVariant, payload.variant_id)
-        if not affected_variant or affected_variant.product_id != product.id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid variant")
-        variant_id = affected_variant.id
-        before_quantity = int(getattr(affected_variant, "stock_quantity", 0) or 0)
-        after_quantity = before_quantity + int(payload.delta)
-        if after_quantity < 0:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Stock cannot be negative")
-        affected_variant.stock_quantity = after_quantity
-        session.add(affected_variant)
-    else:
-        was_out_of_stock = is_out_of_stock(product)
-        before_quantity = int(getattr(product, "stock_quantity", 0) or 0)
-        after_quantity = before_quantity + int(payload.delta)
-        if after_quantity < 0:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Stock cannot be negative")
-        product.stock_quantity = after_quantity
-        session.add(product)
-
-    adjustment = StockAdjustment(
-        product_id=product.id,
+    delta = int(payload.delta)
+    variant_id, before_quantity, after_quantity, was_out_of_stock = await _resolve_stock_adjustment_target(
+        session, product=product, payload=payload, delta=delta
+    )
+    adjustment = await _persist_stock_adjustment(
+        session,
+        product=product,
+        payload=payload,
+        user_id=user_id,
         variant_id=variant_id,
-        actor_user_id=user_id,
-        reason=payload.reason,
-        delta=int(payload.delta),
+        delta=delta,
         before_quantity=before_quantity,
         after_quantity=after_quantity,
         note=note,
     )
-    session.add(adjustment)
-    await session.commit()
-    await session.refresh(adjustment)
-
-    if payload.variant_id is None:
-        await session.refresh(product)
-        if was_out_of_stock and not is_out_of_stock(product):
-            await fulfill_back_in_stock_requests(session, product=product)
-        await _maybe_alert_low_stock(session, product)
-
-    await _log_product_action(
+    await _finalize_product_level_stock_adjustment(
         session,
-        product.id,
-        "stock_adjustment",
-        user_id,
-        {
-            "variant_id": str(variant_id) if variant_id else None,
-            "reason": str(payload.reason),
-            "delta": int(payload.delta),
-            "before": before_quantity,
-            "after": after_quantity,
-            "note": note,
-        },
+        payload=payload,
+        product=product,
+        was_out_of_stock=was_out_of_stock,
+    )
+    await _log_stock_adjustment(
+        session,
+        product=product,
+        user_id=user_id,
+        variant_id=variant_id,
+        payload=payload,
+        delta=delta,
+        before_quantity=before_quantity,
+        after_quantity=after_quantity,
+        note=note,
     )
     return adjustment
 
@@ -1599,14 +2125,43 @@ async def update_featured_collection(
     return collection
 
 
+def _product_feed_options(lang: str | None) -> tuple:
+    if lang:
+        return (
+            selectinload(Product.tags),
+            selectinload(Product.translations),
+            selectinload(Product.category).selectinload(Category.translations),
+        )
+    return (
+        selectinload(Product.tags),
+        selectinload(Product.category),
+        selectinload(Product.category),
+    )
+
+
+def _effective_feed_price(product: Product) -> Decimal:
+    if is_sale_active(product) and product.sale_price is not None:
+        return product.sale_price
+    return product.base_price
+
+
+def _build_product_feed_item(product: Product, lang: str | None) -> ProductFeedItem:
+    apply_product_translation(product, lang)
+    return ProductFeedItem(
+        slug=product.slug,
+        name=product.name,
+        price=float(_effective_feed_price(product)),
+        currency=product.currency,
+        description=product.short_description or product.long_description,
+        category_slug=product.category.slug if product.category else None,
+        tags=[tag.slug for tag in product.tags],
+    )
+
+
 async def get_product_feed(session: AsyncSession, lang: str | None = None) -> list[ProductFeedItem]:
     result = await session.execute(
         select(Product)
-        .options(
-            selectinload(Product.tags),
-            selectinload(Product.translations) if lang else selectinload(Product.category),
-            selectinload(Product.category).selectinload(Category.translations) if lang else selectinload(Product.category),
-        )
+        .options(*_product_feed_options(lang))
         .where(
             Product.is_deleted.is_(False),
             Product.is_active.is_(True),
@@ -1615,22 +2170,7 @@ async def get_product_feed(session: AsyncSession, lang: str | None = None) -> li
         .order_by(Product.created_at.desc())
     )
     products = result.scalars().unique().all()
-    feed: list[ProductFeedItem] = []
-    for p in products:
-        apply_product_translation(p, lang)
-        effective_price = p.sale_price if is_sale_active(p) and p.sale_price is not None else p.base_price
-        feed.append(
-            ProductFeedItem(
-                slug=p.slug,
-                name=p.name,
-                price=float(effective_price),
-                currency=p.currency,
-                description=p.short_description or p.long_description,
-                category_slug=p.category.slug if p.category else None,
-                tags=[tag.slug for tag in p.tags],
-            )
-        )
-    return feed
+    return [_build_product_feed_item(product, lang) for product in products]
 
 
 async def get_product_feed_csv(session: AsyncSession, lang: str | None = None) -> str:
@@ -1675,6 +2215,63 @@ def _normalized_search_expr(column):
     return expr
 
 
+def _build_product_price_bounds_query(effective_price, *, include_unpublished: bool):
+    query = select(
+        func.min(effective_price),
+        func.max(effective_price),
+        func.count(func.distinct(Product.currency)),
+        func.min(Product.currency),
+    ).where(Product.is_deleted.is_(False))
+    if include_unpublished:
+        return query
+    return query.where(Product.is_active.is_(True), Product.status == ProductStatus.published)
+
+
+async def _apply_price_bounds_category_filter(
+    session: AsyncSession, query, category_slug: str | None, *, include_unpublished: bool
+):
+    if not category_slug:
+        return query
+    category_ids = await _get_category_and_descendant_ids_by_slug(session, category_slug)
+    if category_ids and not include_unpublished:
+        visible_ids = (
+            await session.execute(select(Category.id).where(Category.id.in_(category_ids), Category.is_visible.is_(True)))
+        ).scalars().all()
+        category_ids = list(visible_ids)
+    if category_ids:
+        return query.where(Product.category_id.in_(category_ids))
+    return query.where(false())
+
+
+def _apply_price_bounds_search_filter(query, search: str | None):
+    normalized_search = _normalize_search_text(search)
+    if not normalized_search:
+        return query
+    like = f"%{normalized_search}%"
+    return query.where(
+        _normalized_search_expr(Product.name).like(like)
+        | _normalized_search_expr(Product.short_description).like(like)
+        | _normalized_search_expr(Product.long_description).like(like)
+    )
+
+
+def _apply_price_bounds_state_filters(
+    query,
+    *,
+    sale_active,
+    on_sale: bool | None,
+    is_featured: bool | None,
+    tags: list[str] | None,
+):
+    if on_sale is not None:
+        query = query.where(sale_active if on_sale else ~sale_active)
+    if is_featured is not None:
+        query = query.where(Product.is_featured == is_featured)
+    if tags:
+        query = query.join(Product.tags).where(Tag.slug.in_(tags))
+    return query
+
+
 async def get_product_price_bounds(
     session: AsyncSession,
     category_slug: str | None,
@@ -1687,42 +2284,14 @@ async def get_product_price_bounds(
     now_dt = datetime.now(timezone.utc)
     sale_active = _sale_active_clause(now_dt)
     effective_price = case((sale_active, Product.sale_price), else_=Product.base_price)
-    query = select(
-        func.min(effective_price),
-        func.max(effective_price),
-        func.count(func.distinct(Product.currency)),
-        func.min(Product.currency),
-    ).where(Product.is_deleted.is_(False))
-    if not include_unpublished:
-        query = query.where(Product.is_active.is_(True), Product.status == ProductStatus.published)
-
-    if category_slug:
-        category_ids = await _get_category_and_descendant_ids_by_slug(session, category_slug)
-        if category_ids and not include_unpublished:
-            visible_ids = (
-                await session.execute(
-                    select(Category.id).where(Category.id.in_(category_ids), Category.is_visible.is_(True))
-                )
-            ).scalars().all()
-            category_ids = list(visible_ids)
-        if category_ids:
-            query = query.where(Product.category_id.in_(category_ids))
-        else:
-            query = query.where(false())
-    if on_sale is not None:
-        query = query.where(sale_active if on_sale else ~sale_active)
-    if is_featured is not None:
-        query = query.where(Product.is_featured == is_featured)
-    normalized_search = _normalize_search_text(search)
-    if normalized_search:
-        like = f"%{normalized_search}%"
-        query = query.where(
-            _normalized_search_expr(Product.name).like(like)
-            | _normalized_search_expr(Product.short_description).like(like)
-            | _normalized_search_expr(Product.long_description).like(like)
-        )
-    if tags:
-        query = query.join(Product.tags).where(Tag.slug.in_(tags))
+    query = _build_product_price_bounds_query(effective_price, include_unpublished=include_unpublished)
+    query = await _apply_price_bounds_category_filter(
+        session, query, category_slug, include_unpublished=include_unpublished
+    )
+    query = _apply_price_bounds_search_filter(query, search)
+    query = _apply_price_bounds_state_filters(
+        query, sale_active=sale_active, on_sale=on_sale, is_featured=is_featured, tags=tags
+    )
 
     row = (await session.execute(query)).one()
     min_price, max_price, currency_count, currency = row
@@ -1750,6 +2319,29 @@ async def list_products_with_filters(
     now_dt = datetime.now(timezone.utc)
     sale_active = _sale_active_clause(now_dt)
     effective_price = case((sale_active, Product.sale_price), else_=Product.base_price)
+    base_query = _build_products_listing_base_query(lang=lang, include_unpublished=include_unpublished)
+    base_query = await _apply_price_bounds_category_filter(
+        session, base_query, category_slug, include_unpublished=include_unpublished
+    )
+    base_query = _apply_products_listing_filters(
+        base_query,
+        sale_active=sale_active,
+        on_sale=on_sale,
+        is_featured=is_featured,
+        search=search,
+        min_price=min_price,
+        max_price=max_price,
+        tags=tags,
+        effective_price=effective_price,
+    )
+    total_items = await _count_products_for_listing(session, base_query)
+    sorted_query = _apply_products_listing_sort(base_query, sort=sort, effective_price=effective_price)
+    items = await _load_products_page(session, sorted_query, limit=limit, offset=offset)
+    _apply_listing_translations(items, lang)
+    return items, total_items
+
+
+def _build_products_listing_base_query(*, lang: str | None, include_unpublished: bool):
     image_loader = selectinload(Product.images)
     if lang:
         image_loader = image_loader.selectinload(ProductImage.translations)
@@ -1763,68 +2355,65 @@ async def list_products_with_filters(
         options.append(selectinload(Product.category).selectinload(Category.translations))
     else:
         options.append(selectinload(Product.category))
-    base_query = (
-        select(Product)
-        .options(*options)
-        .where(Product.is_deleted.is_(False))
-    )
-    if not include_unpublished:
-        base_query = base_query.where(Product.is_active.is_(True), Product.status == ProductStatus.published)
-    if category_slug:
-        category_ids = await _get_category_and_descendant_ids_by_slug(session, category_slug)
-        if category_ids and not include_unpublished:
-            visible_ids = (
-                await session.execute(
-                    select(Category.id).where(Category.id.in_(category_ids), Category.is_visible.is_(True))
-                )
-            ).scalars().all()
-            category_ids = list(visible_ids)
-        if category_ids:
-            base_query = base_query.where(Product.category_id.in_(category_ids))
-        else:
-            base_query = base_query.where(false())
-    if on_sale is not None:
-        base_query = base_query.where(sale_active if on_sale else ~sale_active)
-    if is_featured is not None:
-        base_query = base_query.where(Product.is_featured == is_featured)
-    normalized_search = _normalize_search_text(search)
-    if normalized_search:
-        like = f"%{normalized_search}%"
-        base_query = base_query.where(
-            _normalized_search_expr(Product.name).like(like)
-            | _normalized_search_expr(Product.short_description).like(like)
-            | _normalized_search_expr(Product.long_description).like(like)
-        )
-    if min_price is not None:
-        base_query = base_query.where(effective_price >= min_price)
-    if max_price is not None:
-        base_query = base_query.where(effective_price <= max_price)
-    if tags:
-        base_query = base_query.join(Product.tags).where(Tag.slug.in_(tags))
+    query = select(Product).options(*options).where(Product.is_deleted.is_(False))
+    if include_unpublished:
+        return query
+    return query.where(Product.is_active.is_(True), Product.status == ProductStatus.published)
 
+
+def _apply_products_listing_filters(
+    query,
+    *,
+    sale_active,
+    on_sale: bool | None,
+    is_featured: bool | None,
+    search: str | None,
+    min_price: float | None,
+    max_price: float | None,
+    tags: list[str] | None,
+    effective_price,
+):
+    query = _apply_price_bounds_state_filters(
+        query, sale_active=sale_active, on_sale=on_sale, is_featured=is_featured, tags=tags
+    )
+    query = _apply_price_bounds_search_filter(query, search)
+    if min_price is not None:
+        query = query.where(effective_price >= min_price)
+    if max_price is not None:
+        query = query.where(effective_price <= max_price)
+    return query
+
+
+async def _count_products_for_listing(session: AsyncSession, base_query) -> int:
     total_query = base_query.with_only_columns(func.count(func.distinct(Product.id))).order_by(None)
     total_result = await session.execute(total_query)
-    total_items = total_result.scalar_one()
+    return int(total_result.scalar_one())
 
+
+def _apply_products_listing_sort(base_query, *, sort: str | None, effective_price):
     if sort == "recommended":
-        base_query = base_query.order_by(Product.sort_order.asc(), Product.created_at.desc())
-    elif sort == "price_asc":
-        base_query = base_query.order_by(effective_price.asc())
-    elif sort == "price_desc":
-        base_query = base_query.order_by(effective_price.desc())
-    elif sort == "name_asc":
-        base_query = base_query.order_by(Product.name.asc())
-    elif sort == "name_desc":
-        base_query = base_query.order_by(Product.name.desc())
-    else:
-        base_query = base_query.order_by(Product.created_at.desc())
+        return base_query.order_by(Product.sort_order.asc(), Product.created_at.desc())
+    if sort == "price_asc":
+        return base_query.order_by(effective_price.asc())
+    if sort == "price_desc":
+        return base_query.order_by(effective_price.desc())
+    if sort == "name_asc":
+        return base_query.order_by(Product.name.asc())
+    if sort == "name_desc":
+        return base_query.order_by(Product.name.desc())
+    return base_query.order_by(Product.created_at.desc())
 
-    result = await session.execute(base_query.limit(limit).offset(offset))
-    items = list(result.scalars().unique())
-    if lang:
-        for item in items:
-            apply_product_translation(item, lang)
-    return items, total_items
+
+async def _load_products_page(session: AsyncSession, query, *, limit: int, offset: int) -> list[Product]:
+    result = await session.execute(query.limit(limit).offset(offset))
+    return list(result.scalars().unique())
+
+
+def _apply_listing_translations(items: list[Product], lang: str | None) -> None:
+    if not lang:
+        return
+    for item in items:
+        apply_product_translation(item, lang)
 
 
 async def _get_or_create_tags(session: AsyncSession, names: list[str]) -> list[Tag]:
@@ -1849,34 +2438,50 @@ async def duplicate_product(
     user_id: uuid.UUID | None = None,
     source: str | None = None,
 ) -> Product:
-    base_slug = f"{product.slug}-copy"
+    new_slug = await _generate_duplicate_slug(session, product.slug)
+    new_sku = await _generate_unique_sku(session, new_slug)
+    sort_order = await _resolve_duplicate_sort_order(session, product.category_id)
+    clone = _build_duplicate_product_clone(product, new_slug=new_slug, new_sku=new_sku, sort_order=sort_order)
+    session.add(clone)
+    await session.commit()
+    await session.refresh(clone)
+    await _log_product_action(session, clone.id, "duplicate", user_id, _duplicate_product_audit_payload(product, source))
+    return clone
+
+
+async def _generate_duplicate_slug(session: AsyncSession, product_slug: str) -> str:
+    base_slug = f"{product_slug}-copy"
     new_slug = base_slug
     counter = 1
     while True:
         try:
             await _ensure_slug_unique(session, new_slug)
-            break
+            return new_slug
         except HTTPException:
             counter += 1
             new_slug = f"{base_slug}-{counter}"
-    new_sku = await _generate_unique_sku(session, new_slug)
+
+
+async def _resolve_duplicate_sort_order(session: AsyncSession, category_id: uuid.UUID | None) -> int:
     custom_count = await session.scalar(
         select(func.count(Product.id)).where(
             Product.is_deleted.is_(False),
-            Product.category_id == product.category_id,
+            Product.category_id == category_id,
             Product.sort_order != 0,
         )
     )
-    sort_order = 0
-    if int(custom_count or 0) > 0:
-        max_sort = await session.scalar(
-            select(func.max(Product.sort_order)).where(
-                Product.is_deleted.is_(False),
-                Product.category_id == product.category_id,
-            )
+    if int(custom_count or 0) <= 0:
+        return 0
+    max_sort = await session.scalar(
+        select(func.max(Product.sort_order)).where(
+            Product.is_deleted.is_(False),
+            Product.category_id == category_id,
         )
-        sort_order = int(max_sort or 0) + 1
+    )
+    return int(max_sort or 0) + 1
 
+
+def _build_duplicate_product_clone(product: Product, *, new_slug: str, new_sku: str, sort_order: int) -> Product:
     clone = Product(
         category_id=product.category_id,
         sku=new_sku,
@@ -1906,6 +2511,11 @@ async def duplicate_product(
         meta_title=product.meta_title,
         meta_description=product.meta_description,
     )
+    _copy_duplicate_clone_relations(clone, product)
+    return clone
+
+
+def _copy_duplicate_clone_relations(clone: Product, source: Product) -> None:
     clone.images = [
         ProductImage(
             url=img.url,
@@ -1913,23 +2523,26 @@ async def duplicate_product(
             caption=getattr(img, "caption", None),
             sort_order=img.sort_order,
         )
-        for img in product.images
+        for img in source.images
     ]
     clone.variants = [
-        ProductVariant(name=variant.name, additional_price_delta=variant.additional_price_delta, stock_quantity=variant.stock_quantity)
-        for variant in product.variants
+        ProductVariant(
+            name=variant.name,
+            additional_price_delta=variant.additional_price_delta,
+            stock_quantity=variant.stock_quantity,
+        )
+        for variant in source.variants
     ]
-    clone.options = [ProductOption(option_name=opt.option_name, option_value=opt.option_value) for opt in product.options]
-    clone.tags = product.tags.copy()
-    clone.badges = [ProductBadge(badge=badge.badge, start_at=badge.start_at, end_at=badge.end_at) for badge in product.badges]
-    session.add(clone)
-    await session.commit()
-    await session.refresh(clone)
+    clone.options = [ProductOption(option_name=opt.option_name, option_value=opt.option_value) for opt in source.options]
+    clone.tags = source.tags.copy()
+    clone.badges = [ProductBadge(badge=badge.badge, start_at=badge.start_at, end_at=badge.end_at) for badge in source.badges]
+
+
+def _duplicate_product_audit_payload(product: Product, source: str | None) -> dict[str, str]:
     payload = {"from_product_id": str(product.id), "from_slug": product.slug}
     if source:
         payload["source"] = source
-    await _log_product_action(session, clone.id, "duplicate", user_id, payload)
-    return clone
+    return payload
 
 
 def _set_publish_timestamp(product: Product, status_value: ProductStatus | str | None) -> None:
@@ -2069,6 +2682,61 @@ async def get_product_relationships(session: AsyncSession, product_id: uuid.UUID
     )
 
 
+def _normalized_relationship_ids(
+    *,
+    product_id: uuid.UUID,
+    payload: ProductRelationshipsUpdate,
+) -> tuple[list[uuid.UUID], list[uuid.UUID]]:
+    related_ids = _dedupe_uuid_list(list(payload.related_product_ids or []))
+    upsell_ids = _dedupe_uuid_list(list(payload.upsell_product_ids or []))
+    if product_id in related_ids or product_id in upsell_ids:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Product cannot reference itself")
+    related_set = set(related_ids)
+    filtered_upsells = [pid for pid in upsell_ids if pid not in related_set]
+    return related_ids, filtered_upsells
+
+
+async def _ensure_relationship_candidates_exist(session: AsyncSession, candidate_ids: list[uuid.UUID]) -> None:
+    if not candidate_ids:
+        return
+    found = set(
+        await session.scalars(
+            select(Product.id).where(Product.id.in_(candidate_ids), Product.is_deleted.is_(False))
+        )
+    )
+    missing = set(candidate_ids) - found
+    if missing:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="One or more related products not found")
+
+
+def _build_relationship_rows(
+    *,
+    product_id: uuid.UUID,
+    related_ids: list[uuid.UUID],
+    upsell_ids: list[uuid.UUID],
+) -> list[ProductRelationship]:
+    rows: list[ProductRelationship] = []
+    rows.extend(
+        ProductRelationship(
+            product_id=product_id,
+            related_product_id=pid,
+            relationship_type=ProductRelationshipType.related,
+            sort_order=idx,
+        )
+        for idx, pid in enumerate(related_ids)
+    )
+    rows.extend(
+        ProductRelationship(
+            product_id=product_id,
+            related_product_id=pid,
+            relationship_type=ProductRelationshipType.upsell,
+            sort_order=idx,
+        )
+        for idx, pid in enumerate(upsell_ids)
+    )
+    return rows
+
+
 async def update_product_relationships(
     session: AsyncSession,
     *,
@@ -2076,48 +2744,12 @@ async def update_product_relationships(
     payload: ProductRelationshipsUpdate,
     user_id: uuid.UUID | None = None,
 ) -> ProductRelationshipsUpdate:
-    related_ids = _dedupe_uuid_list(list(payload.related_product_ids or []))
-    upsell_ids = _dedupe_uuid_list(list(payload.upsell_product_ids or []))
-
-    if product.id in related_ids or product.id in upsell_ids:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Product cannot reference itself")
-
-    # Prevent overlap: if an id appears in related, drop it from upsells.
-    related_set = set(related_ids)
-    upsell_ids = [pid for pid in upsell_ids if pid not in related_set]
-
+    related_ids, upsell_ids = _normalized_relationship_ids(product_id=product.id, payload=payload)
     candidate_ids = _dedupe_uuid_list([*related_ids, *upsell_ids])
-    if candidate_ids:
-        found = set(
-            await session.scalars(
-                select(Product.id).where(Product.id.in_(candidate_ids), Product.is_deleted.is_(False))
-            )
-        )
-        missing = set(candidate_ids) - found
-        if missing:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="One or more related products not found")
+    await _ensure_relationship_candidates_exist(session, candidate_ids)
 
     await session.execute(delete(ProductRelationship).where(ProductRelationship.product_id == product.id))
-
-    rows: list[ProductRelationship] = []
-    for idx, pid in enumerate(related_ids):
-        rows.append(
-            ProductRelationship(
-                product_id=product.id,
-                related_product_id=pid,
-                relationship_type=ProductRelationshipType.related,
-                sort_order=idx,
-            )
-        )
-    for idx, pid in enumerate(upsell_ids):
-        rows.append(
-            ProductRelationship(
-                product_id=product.id,
-                related_product_id=pid,
-                relationship_type=ProductRelationshipType.upsell,
-                sort_order=idx,
-            )
-        )
+    rows = _build_relationship_rows(product_id=product.id, related_ids=related_ids, upsell_ids=upsell_ids)
     if rows:
         session.add_all(rows)
 
@@ -2247,9 +2879,8 @@ async def export_products_csv(session: AsyncSession) -> str:
     return buf.getvalue()
 
 
-async def export_categories_csv(session: AsyncSession, template: bool = False) -> str:
-    buf = io.StringIO()
-    fieldnames = [
+def _category_export_fieldnames() -> list[str]:
+    return [
         "slug",
         "name",
         "parent_slug",
@@ -2261,38 +2892,219 @@ async def export_categories_csv(session: AsyncSession, template: bool = False) -
         "name_en",
         "description_en",
     ]
-    writer = csv.DictWriter(buf, fieldnames=fieldnames)
-    writer.writeheader()
-    if template:
-        return buf.getvalue()
 
+
+async def _load_categories_for_csv_export(session: AsyncSession) -> list[Category]:
     result = await session.execute(
         select(Category)
         .options(selectinload(Category.translations))
         .order_by(Category.sort_order.asc(), Category.slug.asc())
     )
-    categories = result.scalars().unique().all()
+    return list(result.scalars().unique().all())
+
+
+def _category_parent_slug(category: Category, id_to_slug: dict[uuid.UUID, str]) -> str:
+    if category.parent_id is None:
+        return ""
+    return id_to_slug.get(category.parent_id, "")
+
+
+def _translation_name(translation: CategoryTranslation | None) -> str:
+    if translation is None:
+        return ""
+    return translation.name
+
+
+def _translation_description(translation: CategoryTranslation | None) -> str:
+    if translation is None or translation.description is None:
+        return ""
+    return translation.description or ""
+
+
+def _build_category_export_row(category: Category, id_to_slug: dict[uuid.UUID, str]) -> dict[str, object]:
+    translations = {translation.lang: translation for translation in (category.translations or [])}
+    ro = translations.get("ro")
+    en = translations.get("en")
+    return {
+        "slug": category.slug,
+        "name": category.name,
+        "parent_slug": _category_parent_slug(category, id_to_slug),
+        "sort_order": category.sort_order,
+        "is_visible": "true" if category.is_visible else "false",
+        "description": category.description or "",
+        "name_ro": _translation_name(ro),
+        "description_ro": _translation_description(ro),
+        "name_en": _translation_name(en),
+        "description_en": _translation_description(en),
+    }
+
+
+async def export_categories_csv(session: AsyncSession, template: bool = False) -> str:
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=_category_export_fieldnames())
+    writer.writeheader()
+    if template:
+        return buf.getvalue()
+
+    categories = await _load_categories_for_csv_export(session)
     id_to_slug = {c.id: c.slug for c in categories}
 
-    for c in categories:
-        translations = {t.lang: t for t in (c.translations or [])}
-        ro = translations.get("ro")
-        en = translations.get("en")
-        writer.writerow(
-            {
-                "slug": c.slug,
-                "name": c.name,
-                "parent_slug": id_to_slug.get(c.parent_id, "") if c.parent_id else "",
-                "sort_order": c.sort_order,
-                "is_visible": "true" if c.is_visible else "false",
-                "description": c.description or "",
-                "name_ro": ro.name if ro else "",
-                "description_ro": ro.description or "" if ro and ro.description else "",
-                "name_en": en.name if en else "",
-                "description_en": en.description or "" if en and en.description else "",
-            }
-        )
+    for category in categories:
+        writer.writerow(_build_category_export_row(category, id_to_slug))
     return buf.getvalue()
+
+
+def _import_product_required_fields(row: dict[str, str]) -> tuple[str, str, str]:
+    return (
+        (row.get("slug") or "").strip(),
+        (row.get("name") or "").strip(),
+        (row.get("category_slug") or "").strip(),
+    )
+
+
+def _parse_import_product_pricing_or_error(
+    row: dict[str, str], idx: int
+) -> tuple[tuple[Decimal, int] | None, str | None]:
+    try:
+        base_price = Decimal(str(row.get("base_price") or "0")).quantize(Decimal("0.01"))
+        stock_quantity = int(row.get("stock_quantity") or 0)
+    except Exception:
+        return None, f"Row {idx}: invalid base_price or stock_quantity"
+    return (base_price, stock_quantity), None
+
+
+def _parse_import_product_currency_or_error(row: dict[str, str], idx: int) -> tuple[str | None, str | None]:
+    currency = (row.get("currency") or "RON").strip().upper()
+    if currency == "RON":
+        return currency, None
+    return None, f"Row {idx}: currency must be RON"
+
+
+def _parse_import_product_status_or_error(
+    row: dict[str, str], idx: int
+) -> tuple[ProductStatus | None, str | None]:
+    status_value = (row.get("status") or ProductStatus.draft.value).strip()
+    try:
+        return ProductStatus(status_value), None
+    except ValueError:
+        return None, f"Row {idx}: invalid status {status_value}"
+
+
+def _import_product_text_or_none(row: dict[str, str], key: str) -> str | None:
+    return (row.get(key) or "").strip() or None
+
+
+def _import_product_tags(row: dict[str, str]) -> list[str]:
+    return [tag.strip() for tag in (row.get("tags") or "").split(",") if tag.strip()]
+
+
+def _parse_import_product_row(row: dict[str, str], idx: int) -> tuple[dict[str, Any] | None, str | None]:
+    slug, name, category_slug = _import_product_required_fields(row)
+    if any(not value for value in (slug, name, category_slug)):
+        return None, f"Row {idx}: missing slug, name, or category_slug"
+    pricing, pricing_error = _parse_import_product_pricing_or_error(row, idx)
+    if pricing_error:
+        return None, pricing_error
+    currency, currency_error = _parse_import_product_currency_or_error(row, idx)
+    if currency_error:
+        return None, currency_error
+    status_enum, status_error = _parse_import_product_status_or_error(row, idx)
+    if status_error:
+        return None, status_error
+    base_price, stock_quantity = cast(tuple[Decimal, int], pricing)
+    return {
+        "slug": slug,
+        "name": name,
+        "category_slug": category_slug,
+        "base_price": base_price,
+        "stock_quantity": stock_quantity,
+        "currency": currency,
+        "status_enum": status_enum,
+        "is_featured": str(row.get("is_featured") or "").lower() in {"true", "1", "yes"},
+        "is_active": str(row.get("is_active") or "true").lower() not in {"false", "0", "no"},
+        "short_description": _import_product_text_or_none(row, "short_description"),
+        "long_description": _import_product_text_or_none(row, "long_description"),
+        "tag_slugs": _import_product_tags(row),
+    }, None
+
+
+async def _resolve_import_product_category(
+    session: AsyncSession, *, category_slug: str, idx: int, dry_run: bool
+) -> tuple[Category | None, str | None]:
+    category = await get_category_by_slug(session, category_slug)
+    if category:
+        return category, None
+    if dry_run:
+        return None, f"Row {idx}: category {category_slug} not found"
+    category = Category(slug=category_slug, name=category_slug.replace("-", " ").title())
+    session.add(category)
+    await session.flush()
+    return category, None
+
+
+def _build_import_product_update_payload(row_data: dict[str, Any], category_id: uuid.UUID) -> ProductUpdate:
+    tag_slugs = cast(list[str], row_data["tag_slugs"])
+    return ProductUpdate(
+        name=cast(str, row_data["name"]),
+        base_price=cast(Decimal, row_data["base_price"]),
+        currency=cast(str, row_data["currency"]),
+        stock_quantity=cast(int, row_data["stock_quantity"]),
+        status=cast(ProductStatus, row_data["status_enum"]),
+        is_featured=cast(bool, row_data["is_featured"]),
+        is_active=cast(bool, row_data["is_active"]),
+        short_description=cast(str | None, row_data["short_description"]),
+        long_description=cast(str | None, row_data["long_description"]),
+        category_id=category_id,
+        tags=tag_slugs if tag_slugs else [],
+    )
+
+
+def _build_import_product_create_payload(row_data: dict[str, Any], category_id: uuid.UUID) -> ProductCreate:
+    return ProductCreate(
+        category_id=category_id,
+        slug=cast(str, row_data["slug"]),
+        name=cast(str, row_data["name"]),
+        base_price=cast(Decimal, row_data["base_price"]),
+        currency=cast(str, row_data["currency"]),
+        stock_quantity=cast(int, row_data["stock_quantity"]),
+        status=cast(ProductStatus, row_data["status_enum"]),
+        is_featured=cast(bool, row_data["is_featured"]),
+        is_active=cast(bool, row_data["is_active"]),
+        short_description=cast(str | None, row_data["short_description"]),
+        long_description=cast(str | None, row_data["long_description"]),
+        tags=cast(list[str], row_data["tag_slugs"]),
+    )
+
+
+async def _apply_import_product_row(
+    session: AsyncSession,
+    *,
+    row_data: dict[str, Any],
+    category: Category,
+    dry_run: bool,
+) -> tuple[int, int]:
+    slug = cast(str, row_data["slug"])
+    existing = await get_product_by_slug(session, slug, follow_history=False)
+    if existing:
+        if not dry_run:
+            update_payload = _build_import_product_update_payload(row_data, category.id)
+            await update_product(session, existing, update_payload, commit=False)
+        return 0, 1
+    if not dry_run:
+        create_payload = _build_import_product_create_payload(row_data, category.id)
+        await create_product(session, create_payload, commit=False)
+    return 1, 0
+
+
+async def _finalize_import_products_transaction(
+    session: AsyncSession, *, dry_run: bool, errors: list[str]
+) -> None:
+    if dry_run:
+        return
+    if errors:
+        await session.rollback()
+        return
+    await session.commit()
 
 
 async def import_products_csv(session: AsyncSession, content: str, dry_run: bool = True):
@@ -2300,219 +3112,274 @@ async def import_products_csv(session: AsyncSession, content: str, dry_run: bool
     created = 0
     updated = 0
     errors: list[str] = []
-
     for idx, row in enumerate(reader, start=2):
-        slug = (row.get("slug") or "").strip()
-        name = (row.get("name") or "").strip()
-        category_slug = (row.get("category_slug") or "").strip()
-        if not slug or not name or not category_slug:
-            errors.append(f"Row {idx}: missing slug, name, or category_slug")
+        row_data, error = _parse_import_product_row(cast(dict[str, str], row), idx)
+        if error:
+            errors.append(error)
             continue
-        try:
-            base_price = Decimal(str(row.get("base_price") or "0")).quantize(Decimal("0.01"))
-            stock_quantity = int(row.get("stock_quantity") or 0)
-        except Exception:
-            errors.append(f"Row {idx}: invalid base_price or stock_quantity")
+        if row_data is None:
+            errors.append(f"Row {idx}: invalid row")
             continue
-        currency = (row.get("currency") or "RON").strip().upper()
-        if currency != "RON":
-            errors.append(f"Row {idx}: currency must be RON")
+        category, category_error = await _resolve_import_product_category(
+            session,
+            category_slug=cast(str, row_data["category_slug"]),
+            idx=idx,
+            dry_run=dry_run,
+        )
+        if category_error:
+            errors.append(category_error)
             continue
-        status_value = (row.get("status") or ProductStatus.draft.value).strip()
-        try:
-            status_enum = ProductStatus(status_value)
-        except ValueError:
-            errors.append(f"Row {idx}: invalid status {status_value}")
-            continue
-        is_featured = str(row.get("is_featured") or "").lower() in {"true", "1", "yes"}
-        is_active = str(row.get("is_active") or "true").lower() not in {"false", "0", "no"}
-        short_description = (row.get("short_description") or "").strip() or None
-        long_description = (row.get("long_description") or "").strip() or None
-        tag_slugs = [t.strip() for t in (row.get("tags") or "").split(",") if t.strip()]
-
-        category = await get_category_by_slug(session, category_slug)
-        if not category:
-            if dry_run:
-                errors.append(f"Row {idx}: category {category_slug} not found")
-                continue
-            category = Category(slug=category_slug, name=category_slug.replace("-", " ").title())
-            session.add(category)
-            await session.flush()
-
-        existing = await get_product_by_slug(session, slug, follow_history=False)
-        if existing:
-            updated += 1
-            if dry_run:
-                continue
-            payload = ProductUpdate(
-                name=name,
-                base_price=base_price,
-                currency=currency,
-                stock_quantity=stock_quantity,
-                status=status_enum,
-                is_featured=is_featured,
-                is_active=is_active,
-                short_description=short_description,
-                long_description=long_description,
-                category_id=category.id,
-                tags=tag_slugs if tag_slugs else [],
-            )
-            await update_product(session, existing, payload, commit=False)
-        else:
-            created += 1
-            if dry_run:
-                continue
-            create_payload = ProductCreate(
-                category_id=category.id,
-                slug=slug,
-                name=name,
-                base_price=base_price,
-                currency=currency,
-                stock_quantity=stock_quantity,
-                status=status_enum,
-                is_featured=is_featured,
-                is_active=is_active,
-                short_description=short_description,
-                long_description=long_description,
-                tags=tag_slugs,
-            )
-            await create_product(session, create_payload, commit=False)
-    if errors:
-        if not dry_run:
-            await session.rollback()
-    else:
-        if not dry_run:
-            await session.commit()
+        created_delta, updated_delta = await _apply_import_product_row(
+            session, row_data=cast(dict[str, Any], row_data), category=cast(Category, category), dry_run=dry_run
+        )
+        created += created_delta
+        updated += updated_delta
+    await _finalize_import_products_transaction(session, dry_run=dry_run, errors=errors)
     return {"created": created, "updated": updated, "errors": errors}
 
 
-async def import_categories_csv(session: AsyncSession, content: str, dry_run: bool = True):
-    reader = csv.DictReader(io.StringIO(content))
-    created = 0
-    updated = 0
+def _parse_category_sort_order_or_error(idx: int, sort_order_raw: str) -> tuple[int | None, str | None]:
+    if not sort_order_raw:
+        return 0, None
+    try:
+        return int(sort_order_raw), None
+    except Exception:
+        return None, f"Row {idx}: invalid sort_order {sort_order_raw}"
+
+
+def _validate_category_slug_fields_or_error(
+    idx: int, *, slug: str, name: str, seen: set[str]
+) -> str | None:
+    if not slug or not name:
+        return f"Row {idx}: missing slug or name"
+    if slug != slugify(slug):
+        return f"Row {idx}: invalid slug {slug}"
+    if slug in seen:
+        return f"Row {idx}: duplicate slug {slug}"
+    seen.add(slug)
+    return None
+
+
+def _parse_category_parent_slug_or_error(idx: int, *, slug: str, raw_parent_slug: str) -> tuple[str | None, str | None]:
+    parent_slug = raw_parent_slug.strip() or None
+    if parent_slug and parent_slug == slug:
+        return None, f"Row {idx}: parent_slug cannot match slug"
+    return parent_slug, None
+
+
+def _parse_category_is_visible(value: str) -> bool | None:
+    raw = value.strip()
+    if not raw:
+        return None
+    return raw.lower() not in {"false", "0", "no"}
+
+
+def _category_translation_fields(row: dict[str, str]) -> tuple[str, str, str | None, str | None]:
+    name_ro = (row.get("name_ro") or "").strip()
+    name_en = (row.get("name_en") or "").strip()
+    description_ro = (row.get("description_ro") or "").strip() or None
+    description_en = (row.get("description_en") or "").strip() or None
+    return name_ro, name_en, description_ro, description_en
+
+
+def _validate_category_translation_fields_or_error(
+    idx: int,
+    *,
+    name_ro: str,
+    name_en: str,
+    description_ro: str | None,
+    description_en: str | None,
+) -> str | None:
+    if description_ro and not name_ro:
+        return f"Row {idx}: description_ro provided without name_ro"
+    if description_en and not name_en:
+        return f"Row {idx}: description_en provided without name_en"
+    return None
+
+
+def _csv_trimmed_value(row: dict[str, str], key: str) -> str:
+    raw_value = row.get(key)
+    if raw_value is None:
+        return ""
+    return raw_value.strip()
+
+
+def _build_parsed_category_import_row(
+    *,
+    idx: int,
+    slug: str,
+    name: str,
+    description: str | None,
+    parent_slug: str | None,
+    sort_order: int | None,
+    is_visible: bool | None,
+    name_ro: str,
+    name_en: str,
+    description_ro: str | None,
+    description_en: str | None,
+) -> dict[str, Any]:
+    return {
+        "idx": idx,
+        "slug": slug,
+        "name": name,
+        "description": description,
+        "parent_slug": parent_slug,
+        "sort_order": sort_order,
+        "is_visible": is_visible,
+        "name_ro": name_ro,
+        "name_en": name_en,
+        "description_ro": description_ro,
+        "description_en": description_en,
+    }
+
+
+def _parse_category_import_row_or_error(
+    idx: int, row: dict[str, str], seen: set[str]
+) -> tuple[dict[str, Any] | None, str | None]:
+    slug = _csv_trimmed_value(row, "slug")
+    name = _csv_trimmed_value(row, "name")
+    slug_error = _validate_category_slug_fields_or_error(idx, slug=slug, name=name, seen=seen)
+    if slug_error:
+        return None, slug_error
+    parent_slug, parent_error = _parse_category_parent_slug_or_error(
+        idx, slug=slug, raw_parent_slug=_csv_trimmed_value(row, "parent_slug")
+    )
+    if parent_error:
+        return None, parent_error
+    sort_order, sort_error = _parse_category_sort_order_or_error(idx, _csv_trimmed_value(row, "sort_order"))
+    if sort_error:
+        return None, sort_error
+    is_visible = _parse_category_is_visible(_csv_trimmed_value(row, "is_visible"))
+    description = _csv_trimmed_value(row, "description") or None
+    name_ro, name_en, description_ro, description_en = _category_translation_fields(row)
+    translation_error = _validate_category_translation_fields_or_error(
+        idx,
+        name_ro=name_ro,
+        name_en=name_en,
+        description_ro=description_ro,
+        description_en=description_en,
+    )
+    if translation_error:
+        return None, translation_error
+    return _build_parsed_category_import_row(
+        idx=idx,
+        slug=slug,
+        name=name,
+        description=description,
+        parent_slug=parent_slug,
+        sort_order=sort_order,
+        is_visible=is_visible,
+        name_ro=name_ro,
+        name_en=name_en,
+        description_ro=description_ro,
+        description_en=description_en,
+    ), None
+
+
+def _parse_category_import_rows(reader: csv.DictReader) -> tuple[list[dict[str, Any]], list[str]]:
+    rows: list[dict[str, Any]] = []
     errors: list[str] = []
-    rows: list[dict] = []
     seen: set[str] = set()
-
     for idx, row in enumerate(reader, start=2):
-        slug = (row.get("slug") or "").strip()
-        name = (row.get("name") or "").strip()
-        if not slug or not name:
-            errors.append(f"Row {idx}: missing slug or name")
+        parsed_row, error = _parse_category_import_row_or_error(idx, cast(dict[str, str], row), seen)
+        if error:
+            errors.append(error)
             continue
-        if slug != slugify(slug):
-            errors.append(f"Row {idx}: invalid slug {slug}")
-            continue
-        if slug in seen:
-            errors.append(f"Row {idx}: duplicate slug {slug}")
-            continue
-        seen.add(slug)
+        rows.append(cast(dict[str, Any], parsed_row))
+    return rows, errors
 
-        parent_slug = (row.get("parent_slug") or "").strip() or None
-        if parent_slug and parent_slug == slug:
-            errors.append(f"Row {idx}: parent_slug cannot match slug")
-            continue
 
-        sort_order_raw = str(row.get("sort_order") or "").strip()
-        sort_order = 0
-        if sort_order_raw:
-            try:
-                sort_order = int(sort_order_raw)
-            except Exception:
-                errors.append(f"Row {idx}: invalid sort_order {sort_order_raw}")
-                continue
+async def _count_category_import_changes(
+    session: AsyncSession, file_slugs: set[str]
+) -> tuple[int, int]:
+    if not file_slugs:
+        return 0, 0
+    existing_slug_result = await session.execute(select(Category.slug).where(Category.slug.in_(file_slugs)))
+    existing_slugs = set(existing_slug_result.scalars().all())
+    return len(file_slugs - existing_slugs), len(file_slugs & existing_slugs)
 
-        is_visible_raw = str(row.get("is_visible") or "").strip()
-        is_visible: bool | None = None
-        if is_visible_raw:
-            is_visible = is_visible_raw.lower() not in {"false", "0", "no"}
 
-        description = (row.get("description") or "").strip() or None
-        name_ro = (row.get("name_ro") or "").strip()
-        name_en = (row.get("name_en") or "").strip()
-        description_ro = (row.get("description_ro") or "").strip() or None
-        description_en = (row.get("description_en") or "").strip() or None
-        if description_ro and not name_ro:
-            errors.append(f"Row {idx}: description_ro provided without name_ro")
-            continue
-        if description_en and not name_en:
-            errors.append(f"Row {idx}: description_en provided without name_en")
-            continue
+def _parent_candidates_for_import(rows: list[dict[str, Any]], file_slugs: set[str]) -> set[str]:
+    return {
+        row["parent_slug"]
+        for row in rows
+        if row["parent_slug"] and row["parent_slug"] not in file_slugs
+    }
 
-        rows.append(
-            {
-                "idx": idx,
-                "slug": slug,
-                "name": name,
-                "description": description,
-                "parent_slug": parent_slug,
-                "sort_order": sort_order,
-                "is_visible": is_visible,
-                "name_ro": name_ro,
-                "name_en": name_en,
-                "description_ro": description_ro,
-                "description_en": description_en,
-            }
+
+def _missing_parent_row_errors(rows: list[dict[str, Any]], missing: set[str]) -> list[str]:
+    return [
+        f"Row {row['idx']}: parent category {row['parent_slug']} not found"
+        for row in rows
+        if row["parent_slug"] and row["parent_slug"] in missing
+    ]
+
+
+async def _collect_missing_parent_errors(
+    session: AsyncSession, rows: list[dict[str, Any]], file_slugs: set[str]
+) -> list[str]:
+    parent_candidates = _parent_candidates_for_import(rows, file_slugs)
+    if not parent_candidates:
+        return []
+    parent_slug_result = await session.execute(select(Category.slug).where(Category.slug.in_(parent_candidates)))
+    found = set(parent_slug_result.scalars().all())
+    missing = parent_candidates - found
+    if not missing:
+        return []
+    return _missing_parent_row_errors(rows, missing)
+
+
+def _category_hierarchy_error_for_row(
+    row: dict[str, Any],
+    *,
+    proposed_parent_by_slug: dict[str, str | None],
+    parent_slug_by_slug: dict[str, str | None],
+) -> str | None:
+    slug = row["slug"]
+    current = row["parent_slug"]
+    seen_slugs: set[str] = set()
+    while current is not None:
+        if current == slug:
+            return f"Row {row['idx']}: Category parent would create a cycle"
+        if current in seen_slugs:
+            return f"Row {row['idx']}: Invalid category hierarchy"
+        seen_slugs.add(current)
+        current = proposed_parent_by_slug[current] if current in proposed_parent_by_slug else parent_slug_by_slug.get(current)
+    return None
+
+
+async def _collect_category_hierarchy_errors(
+    session: AsyncSession, rows: list[dict[str, Any]]
+) -> list[str]:
+    if not rows:
+        return []
+    hierarchy_result = await session.execute(select(Category.id, Category.slug, Category.parent_id))
+    category_rows = hierarchy_result.all()
+    id_to_slug = {cat_id: slug for cat_id, slug, _parent_id in category_rows}
+    parent_slug_by_slug = {slug: id_to_slug.get(parent_id) if parent_id else None for _id, slug, parent_id in category_rows}
+    proposed_parent_by_slug = {row["slug"]: row["parent_slug"] for row in rows}
+    errors: list[str] = []
+    for row in rows:
+        row_error = _category_hierarchy_error_for_row(
+            row, proposed_parent_by_slug=proposed_parent_by_slug, parent_slug_by_slug=parent_slug_by_slug
         )
+        if row_error:
+            errors.append(row_error)
+    return errors
 
-    file_slugs = {r["slug"] for r in rows}
-    if file_slugs:
-        existing_slug_result = await session.execute(select(Category.slug).where(Category.slug.in_(file_slugs)))
-        existing_slugs = set(existing_slug_result.scalars().all())
-        created = len(file_slugs - existing_slugs)
-        updated = len(file_slugs & existing_slugs)
-    else:
-        existing_slugs = set()
 
-    if rows:
-        parent_candidates = {r["parent_slug"] for r in rows if r["parent_slug"] and r["parent_slug"] not in file_slugs}
-        if parent_candidates:
-            parent_slug_result = await session.execute(select(Category.slug).where(Category.slug.in_(parent_candidates)))
-            found = set(parent_slug_result.scalars().all())
-            missing = parent_candidates - found
-            if missing:
-                missing_set = set(missing)
-                for row in rows:
-                    parent_slug = row["parent_slug"]
-                    if parent_slug and parent_slug in missing_set:
-                        errors.append(f"Row {row['idx']}: parent category {parent_slug} not found")
-
-    if dry_run and rows:
-        hierarchy_result = await session.execute(select(Category.id, Category.slug, Category.parent_id))
-        category_rows = hierarchy_result.all()
-        id_to_slug = {cat_id: slug for cat_id, slug, _parent_id in category_rows}
-        parent_slug_by_slug = {slug: id_to_slug.get(parent_id) if parent_id else None for _id, slug, parent_id in category_rows}
-        proposed_parent_by_slug = {r["slug"]: r["parent_slug"] for r in rows}
-
-        for row in rows:
-            slug = row["slug"]
-            current = row["parent_slug"]
-            seen_slugs: set[str] = set()
-            while current is not None:
-                if current == slug:
-                    errors.append(f"Row {row['idx']}: Category parent would create a cycle")
-                    break
-                if current in seen_slugs:
-                    errors.append(f"Row {row['idx']}: Invalid category hierarchy")
-                    break
-                seen_slugs.add(current)
-                if current in proposed_parent_by_slug:
-                    current = proposed_parent_by_slug[current]
-                else:
-                    current = parent_slug_by_slug.get(current)
-
-    if dry_run:
-        return {"created": created, "updated": updated, "errors": errors}
-
-    if errors:
-        await session.rollback()
-        return {"created": created, "updated": updated, "errors": errors}
-
-    all_slugs = set(file_slugs)
-    all_slugs.update(r["parent_slug"] for r in rows if r["parent_slug"])
+async def _load_categories_for_import(
+    session: AsyncSession, rows: list[dict[str, Any]]
+) -> dict[str, Category]:
+    all_slugs = {row["slug"] for row in rows}
+    all_slugs.update(row["parent_slug"] for row in rows if row["parent_slug"])
     category_result = await session.execute(select(Category).where(Category.slug.in_(all_slugs)))
-    by_slug: dict[str, Category] = {c.slug: c for c in category_result.scalars().all()}
+    return {category.slug: category for category in category_result.scalars().all()}
 
+
+def _upsert_categories_from_import_rows(
+    session: AsyncSession, rows: list[dict[str, Any]], by_slug: dict[str, Category]
+) -> None:
     for row in rows:
         slug = row["slug"]
         category = by_slug.get(slug)
@@ -2524,7 +3391,6 @@ async def import_categories_csv(session: AsyncSession, content: str, dry_run: bo
                 category.is_visible = row["is_visible"]
             session.add(category)
             continue
-
         category = Category(
             slug=slug,
             name=row["name"],
@@ -2536,17 +3402,17 @@ async def import_categories_csv(session: AsyncSession, content: str, dry_run: bo
         session.add(category)
         by_slug[slug] = category
 
-    await session.flush()
 
+async def _assign_import_category_parents(
+    session: AsyncSession, rows: list[dict[str, Any]], by_slug: dict[str, Category]
+) -> list[str]:
+    errors: list[str] = []
     for row in rows:
-        slug = row["slug"]
-        category = by_slug.get(slug)
+        category = by_slug.get(row["slug"])
         if not category:
-            errors.append(f"Row {row['idx']}: category {slug} not found after upsert")
+            errors.append(f"Row {row['idx']}: category {row['slug']} not found after upsert")
             continue
-
-        parent_slug = row["parent_slug"]
-        parent = by_slug.get(parent_slug) if parent_slug else None
+        parent = by_slug.get(row["parent_slug"]) if row["parent_slug"] else None
         parent_id = parent.id if parent is not None else None
         try:
             await _validate_category_parent_assignment(session, category_id=category.id, parent_id=parent_id)
@@ -2555,45 +3421,76 @@ async def import_categories_csv(session: AsyncSession, content: str, dry_run: bo
             continue
         category.parent_id = parent_id
         session.add(category)
+    return errors
 
-    if errors:
-        await session.rollback()
-        return {"created": created, "updated": updated, "errors": errors}
 
+async def _upsert_import_category_translations(
+    session: AsyncSession, rows: list[dict[str, Any]], by_slug: dict[str, Category]
+) -> None:
     for row in rows:
         category = by_slug.get(row["slug"])
         if not category:
             continue
-
         for lang in ("ro", "en"):
-            name_key = f"name_{lang}"
-            desc_key = f"description_{lang}"
-            raw_name = (row.get(name_key) or "").strip()
-            raw_desc = row.get(desc_key)
+            raw_name = (row.get(f"name_{lang}") or "").strip()
             if not raw_name:
                 continue
-            description_value = (raw_desc or "").strip() or None
-
-            existing = await session.scalar(
-                select(CategoryTranslation).where(
-                    CategoryTranslation.category_id == category.id,
-                    CategoryTranslation.lang == lang,
-                )
+            await _upsert_import_category_translation_for_lang(
+                session, category=category, lang=lang, raw_name=raw_name, raw_desc=row.get(f"description_{lang}")
             )
-            if existing:
-                existing.name = raw_name
-                existing.description = description_value
-                session.add(existing)
-            else:
-                session.add(
-                    CategoryTranslation(
-                        category_id=category.id,
-                        lang=lang,
-                        name=raw_name,
-                        description=description_value,
-                    )
-                )
 
+
+async def _upsert_import_category_translation_for_lang(
+    session: AsyncSession,
+    *,
+    category: Category,
+    lang: str,
+    raw_name: str,
+    raw_desc: object,
+) -> None:
+    description_value = str(raw_desc or "").strip() or None
+    existing = await session.scalar(
+        select(CategoryTranslation).where(
+            CategoryTranslation.category_id == category.id,
+            CategoryTranslation.lang == lang,
+        )
+    )
+    if existing:
+        existing.name = raw_name
+        existing.description = description_value
+        session.add(existing)
+        return
+    session.add(
+        CategoryTranslation(
+            category_id=category.id,
+            lang=lang,
+            name=raw_name,
+            description=description_value,
+        )
+    )
+
+
+async def import_categories_csv(session: AsyncSession, content: str, dry_run: bool = True):
+    reader = csv.DictReader(io.StringIO(content))
+    rows, errors = _parse_category_import_rows(reader)
+    file_slugs = {r["slug"] for r in rows}
+    created, updated = await _count_category_import_changes(session, file_slugs)
+    errors.extend(await _collect_missing_parent_errors(session, rows, file_slugs))
+    if dry_run:
+        errors.extend(await _collect_category_hierarchy_errors(session, rows))
+        return {"created": created, "updated": updated, "errors": errors}
+
+    if errors and not dry_run:
+        await session.rollback()
+        return {"created": created, "updated": updated, "errors": errors}
+    by_slug = await _load_categories_for_import(session, rows)
+    _upsert_categories_from_import_rows(session, rows, by_slug)
+    await session.flush()
+    errors.extend(await _assign_import_category_parents(session, rows, by_slug))
+    if errors:
+        await session.rollback()
+        return {"created": created, "updated": updated, "errors": errors}
+    await _upsert_import_category_translations(session, rows, by_slug)
     await session.commit()
     return {"created": created, "updated": updated, "errors": errors}
 

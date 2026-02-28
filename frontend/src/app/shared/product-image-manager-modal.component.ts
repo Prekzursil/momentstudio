@@ -329,15 +329,7 @@ export class ProductImageManagerModalComponent implements OnChanges {
 
   private seedDraftImages(): void {
     const incoming = Array.isArray(this.images) ? this.images : [];
-    const normalized = incoming
-      .map((img) => ({
-        id: typeof img?.id === 'string' ? img.id : undefined,
-        url: String(img?.url || '').trim(),
-        alt_text: typeof img?.alt_text === 'string' ? img.alt_text : img?.alt_text ?? null,
-        caption: typeof img?.caption === 'string' ? img.caption : img?.caption ?? null,
-        sort_order: typeof img?.sort_order === 'number' && Number.isFinite(img.sort_order) ? img.sort_order : 0
-      }))
-      .filter((img) => Boolean(img.url));
+    const normalized = incoming.map((img) => this.normalizeDraftImage(img)).filter((img) => Boolean(img.url));
     normalized.sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0));
     this.draftImages = normalized;
   }
@@ -362,6 +354,16 @@ export class ProductImageManagerModalComponent implements OnChanges {
       return aIdx - bIdx;
     });
     this.draftImages = sorted;
+  }
+
+  private normalizeDraftImage(img: StorefrontProductImage): StorefrontProductImage {
+    return {
+      id: typeof img?.id === 'string' ? img.id : undefined,
+      url: String(img?.url || '').trim(),
+      alt_text: typeof img?.alt_text === 'string' ? img.alt_text : img?.alt_text ?? null,
+      caption: typeof img?.caption === 'string' ? img.caption : img?.caption ?? null,
+      sort_order: typeof img?.sort_order === 'number' && Number.isFinite(img.sort_order) ? img.sort_order : 0
+    };
   }
 
   private persistOrder(previousIds: string[]): void {
@@ -496,4 +498,3 @@ export class ProductImageManagerModalComponent implements OnChanges {
     this.clearMeta();
   }
 }
-
