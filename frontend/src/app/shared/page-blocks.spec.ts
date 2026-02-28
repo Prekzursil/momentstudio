@@ -4,6 +4,7 @@ import {
   pageBlocksToPlainText,
   parsePageBlocks,
 } from './page-blocks';
+import type { PageBannerBlock, PageCarouselBlock, PageImageBlock, PageProductGridBlock } from './page-blocks';
 
 const renderMarkdown = (value: string): string => `<p>${String(value || '').trim()}</p>`;
 
@@ -111,24 +112,30 @@ describe('page-blocks helpers', () => {
   it('keeps enabled unique blocks across supported types', () => {
     const blocks = parseRichBlocks();
     expect(blocks.length).toBe(11);
-    expect(blocks.filter((block) => (block as any).key === 'intro').length).toBe(1);
-    expect(blocks.some((block) => (block as any).key === 'disabled')).toBeFalse();
+    expect(blocks.filter((block) => block.key === 'intro').length).toBe(1);
+    expect(blocks.some((block) => block.key === 'disabled')).toBeFalse();
   });
 
   it('normalizes product-grid data from loose metadata payloads', () => {
     const blocks = parseRichBlocks();
-    const productGrid = blocks.find((block) => block.type === 'product_grid');
-    expect(productGrid).toBeTruthy();
-    expect((productGrid as any).source).toBe('category');
-    expect((productGrid as any).limit).toBe(24);
-    expect((productGrid as any).product_slugs).toEqual(['chair-a', 'chair-b']);
+    const productGrid = blocks.find((block): block is PageProductGridBlock => block.type === 'product_grid');
+    expect(productGrid).toBeDefined();
+    if (!productGrid) return;
+    expect(productGrid.source).toBe('category');
+    expect(productGrid.limit).toBe(24);
+    expect(productGrid.product_slugs).toEqual(['chair-a', 'chair-b']);
   });
 
   it('normalizes media focal points plus banner and carousel settings', () => {
     const blocks = parseRichBlocks();
-    const banner = blocks.find((block) => block.type === 'banner') as any;
-    const carousel = blocks.find((block) => block.type === 'carousel') as any;
-    const image = blocks.find((block) => block.type === 'image') as any;
+    const banner = blocks.find((block): block is PageBannerBlock => block.type === 'banner');
+    const carousel = blocks.find((block): block is PageCarouselBlock => block.type === 'carousel');
+    const image = blocks.find((block): block is PageImageBlock => block.type === 'image');
+
+    expect(banner).toBeDefined();
+    expect(carousel).toBeDefined();
+    expect(image).toBeDefined();
+    if (!banner || !carousel || !image) return;
 
     expect(banner.slide.size).toBe('L');
     expect(banner.slide.text_style).toBe('light');
@@ -168,6 +175,6 @@ describe('page-blocks helpers', () => {
 
   it('falls back to empty lists for invalid metadata', () => {
     expect(parsePageBlocks(null, 'en', renderMarkdown)).toEqual([]);
-    expect(parsePageBlocks({ blocks: 'bad' } as any, 'en', renderMarkdown)).toEqual([]);
+    expect(parsePageBlocks({ blocks: 'bad' }, 'en', renderMarkdown)).toEqual([]);
   });
 });

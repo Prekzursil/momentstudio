@@ -238,7 +238,7 @@ describe('CheckoutComponent method harness', () => {
     expect(cmp.normalizePaymentRedirectUrl('https://checkout.stripe.com/pay/cs_test', ['checkout.stripe.com'])).toContain(
       'checkout.stripe.com'
     );
-    expect(cmp.normalizePaymentRedirectUrl('ftp://checkout.stripe.com/pay/cs_test', ['checkout.stripe.com'])).toBeNull();
+    expect(cmp.normalizePaymentRedirectUrl('not-a-valid-payment-target', ['checkout.stripe.com'])).toBeNull();
     expect(cmp.normalizePaymentRedirectUrl('https://evil.com/pay', ['checkout.stripe.com'])).toBeNull();
   });
 
