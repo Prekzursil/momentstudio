@@ -33,7 +33,7 @@ describe('CheckoutComponent coverage helpers', () => {
     router.navigate.and.returnValue(Promise.resolve(true));
 
     const queryParamMap = {
-      get: (_: string) => null
+      get: () => null
     };
 
     const route = {

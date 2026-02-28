@@ -442,13 +442,6 @@ describe('AdminComponent utility coverage wave', () => {
     expect(admin.updateContentBlock).toHaveBeenCalled();
 
     admin.updateContentBlock.and.returnValue(
-      of({
-        subscribe: (_observer: any) => {
-          return undefined;
-        }
-      }) as any
-    );
-    admin.updateContentBlock.and.returnValue(
       ({
         subscribe: (observer: any) => observer.error({ status: 404 })
       }) as any
