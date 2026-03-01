@@ -9,20 +9,17 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
-def _resolve_repo_file(raw_path: str, *, label: str, allowed_suffixes: tuple[str, ...]) -> Path:
-    """Resolve a user-provided path inside the repository root only."""
-    repo_root = Path.cwd().resolve()
-    candidate = Path(raw_path)
-    if candidate.is_absolute():
-        raise ValueError(f"{label} path must be relative to repository root: {raw_path}")
+BACKEND_COVERAGE_PATH = Path("backend/coverage.xml")
+FRONTEND_COVERAGE_PATH = Path("frontend/coverage/lcov.info")
 
-    resolved = (repo_root / candidate).resolve(strict=False)
-    if resolved != repo_root and repo_root not in resolved.parents:
-        raise ValueError(f"{label} path escapes repository root: {raw_path}")
-    if resolved.suffix.lower() not in allowed_suffixes:
-        raise ValueError(f"{label} path must end with one of {allowed_suffixes}: {raw_path}")
 
-    return resolved
+def _assert_expected_input_paths(backend_arg: str, frontend_arg: str) -> None:
+    backend_path = Path(backend_arg)
+    frontend_path = Path(frontend_arg)
+    if backend_path != BACKEND_COVERAGE_PATH:
+        raise ValueError(f"Unsupported backend coverage path: {backend_arg}")
+    if frontend_path != FRONTEND_COVERAGE_PATH:
+        raise ValueError(f"Unsupported frontend coverage path: {frontend_arg}")
 
 
 def _load_backend_coverage(path: Path) -> tuple[float, int, int]:
@@ -63,10 +60,9 @@ def main() -> int:
     parser.add_argument("--threshold", type=float, default=90.0, help="Coverage percentage threshold")
     args = parser.parse_args()
 
-    backend_path = _resolve_repo_file(args.backend, label="Backend coverage", allowed_suffixes=(".xml",))
-    frontend_path = _resolve_repo_file(args.frontend, label="Frontend coverage", allowed_suffixes=(".info", ".lcov"))
-    backend_pct, backend_hit, backend_total = _load_backend_coverage(backend_path)
-    frontend_pct, frontend_hit, frontend_total = _load_frontend_coverage(frontend_path)
+    _assert_expected_input_paths(args.backend, args.frontend)
+    backend_pct, backend_hit, backend_total = _load_backend_coverage(BACKEND_COVERAGE_PATH)
+    frontend_pct, frontend_hit, frontend_total = _load_frontend_coverage(FRONTEND_COVERAGE_PATH)
 
     project_hit = backend_hit + frontend_hit
     project_total = backend_total + frontend_total
