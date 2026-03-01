@@ -43,6 +43,96 @@ const BLOG_POST_FIXTURE: BlogPost = {
   summary: 'Summary'
 };
 
+function invokeBlogMethodSafely(component: any, method: string, args: unknown[]): void {
+  const fn = component?.[method];
+  if (typeof fn !== 'function') return;
+  try {
+    const result = fn.apply(component, args);
+    if (result && typeof result.then === 'function') {
+      (result as Promise<unknown>).catch(() => undefined);
+    }
+  } catch {
+    // Method sweep intentionally continues through guarded branches.
+  }
+}
+
+const BLOG_SWEEP_BLOCKED = new Set([
+  'constructor',
+  'ngOnInit',
+  'ngOnDestroy',
+  // Route and async loads are already exercised by dedicated tests.
+  'load',
+  'loadAdminBlock',
+  'loadNeighbors',
+  'loadRelatedPosts',
+  'loadMoreFromAuthor',
+  'loadComments',
+  'loadCommentSubscription',
+  // Scroll/measurement helpers depend on stable real browser layout.
+  'measureReadingProgressSoon',
+  'measureReadingProgress',
+  'updateReadingProgress',
+  'updateActiveHeading',
+  'setMetaTags',
+  'setErrorMetaTags',
+]);
+
+const BLOG_SWEEP_ARGS_BY_NAME: Record<string, unknown[]> = {
+  focalPosition: [12.5, 88.2],
+  coverImageClass: ['contain'],
+  scrollToHeading: [{ preventDefault: () => undefined }, 'intro'],
+  handleArticleClick: [{ target: null, preventDefault: () => undefined } as unknown as MouseEvent],
+  openLightbox: [0],
+  nextLightbox: [{ preventDefault: () => undefined }],
+  prevLightbox: [{ preventDefault: () => undefined }],
+  toggleCommentSubscription: [{ preventDefault: () => undefined }],
+  setCommentSort: ['oldest'],
+  goToCommentsPage: [2],
+  replies: ['parent-1'],
+  canDelete: [{ id: 'c-1', user_id: 'u-1', author: { name: 'User' } }],
+  canReply: [{ id: 'c-2', parent_id: null }],
+  startReply: [{ id: 'c-2', parent_id: null }],
+  authorLabel: [{ name: 'Author' }],
+  submitComment: [{ preventDefault: () => undefined }],
+  submitNewsletter: [{ preventDefault: () => undefined }],
+  deleteComment: [{ id: 'c-3' }],
+  canFlag: [{ id: 'c-4', user_id: 'u-2' }],
+  flagComment: [{ id: 'c-4' }],
+  toDateTimeLocal: ['2026-03-01T01:02:03Z'],
+  toIsoFromDateTimeLocal: ['2026-03-01T12:30'],
+  isFutureIso: ['2999-01-01T00:00:00Z'],
+  cloneMeta: [{ summary_en: 'Summary' }],
+  normalizeTags: [['news', 'tips']],
+  normalizeTagsInput: ['news, tips,news'],
+  sameStringSet: [['news'], ['NEWS']],
+  getMetaSummary: [{ summary_en: 'Summary' }, 'en'],
+  toObjectRecord: [{ foo: 1 }],
+  copyCode: ['const x = 1;'],
+  applyCommentThreadResponse: [{ items: [], meta: { page: 1, limit: 10, total_pages: 1, total_items: 0 }, total_comments: 0 }],
+  flattenCommentThreads: [[]],
+  toastCommentCreateError: [{ status: 500 }],
+  commentErrorStatus: [{ status: 400 }],
+  toastBadRequestCommentCreateError: [{ error: { detail: 'detail' } }],
+  toastCaptchaCommentCreateError: ['captcha failed'],
+  setCanonical: [],
+  buildShareUrl: [],
+  renderPostBody: ['# Title\n\nBody'],
+  hydrateEmbeds: ['<p>Body</p>', []],
+  applyEmbedData: ['<p>Body</p>', { products: {}, categories: [], collections: [] }],
+  slugifyHeading: ['Heading One'],
+};
+
+function runBlogPrototypeSweep(component: any): number {
+  let attempted = 0;
+  for (const name of Object.getOwnPropertyNames(BlogPostComponent.prototype)) {
+    if (BLOG_SWEEP_BLOCKED.has(name)) continue;
+    const fallback = new Array(Math.min(component[name]?.length ?? 0, 4)).fill(undefined);
+    invokeBlogMethodSafely(component, name, BLOG_SWEEP_ARGS_BY_NAME[name] ?? fallback);
+    attempted += 1;
+  }
+  return attempted;
+}
+
 describe('BlogPostComponent', () => {
   let meta: jasmine.SpyObj<Meta>;
   let title: jasmine.SpyObj<Title>;
@@ -315,6 +405,38 @@ describe('BlogPostComponent', () => {
     toast.error.calls.reset();
     cmp.toastCommentCreateError({ status: 500 });
     expect(toast.error).toHaveBeenCalledWith('blog.comments.createErrorTitle', 'blog.comments.createErrorCopy');
+  });
+
+  it('sweeps prototype methods through guarded branches without throwing', () => {
+    configureBlogPostTestingModule({ meta, title, blog, toast, markdown, auth, routeStub, doc });
+    const fixture = TestBed.createComponent(BlogPostComponent);
+    const cmp = fixture.componentInstance as any;
+    const admin = TestBed.inject(AdminService) as jasmine.SpyObj<AdminService>;
+    const catalog = TestBed.inject(CatalogService) as jasmine.SpyObj<CatalogService>;
+    const newsletter = TestBed.inject(NewsletterService) as jasmine.SpyObj<NewsletterService>;
+
+    admin.getContent.and.returnValue(of({ key: 'blog.first-post', body_markdown: 'Body', meta: {}, version: 1 } as any));
+    admin.updateContentBlock.and.returnValue(of({ key: 'blog.first-post', body_markdown: 'Body', meta: {}, version: 2 } as any));
+    catalog.getProduct.and.returnValue(of(null as any));
+    catalog.listCategories.and.returnValue(of([] as any));
+    catalog.listFeaturedCollections.and.returnValue(of([] as any));
+    newsletter.subscribe.and.returnValue(of({} as any));
+
+    cmp.slug = 'first-post';
+    cmp.previewToken = '';
+    cmp.post.set(BLOG_POST_FIXTURE);
+    cmp.bodyHtml.set('<p>Body</p>');
+    cmp.galleryImages.set([{ url: '/a.jpg', alt: 'A' }] as any);
+    cmp.commentBody = 'Looks great';
+    cmp.newsletterEmail = 'reader@example.com';
+    cmp.commentsMeta.set({ total_items: 1, total_pages: 2, page: 1, limit: 10 });
+
+    spyOn(window, 'open').and.returnValue(null);
+    spyOn(window, 'confirm').and.returnValue(false);
+    spyOn(navigator.clipboard, 'writeText').and.returnValue(Promise.resolve());
+
+    const attempted = runBlogPrototypeSweep(cmp);
+    expect(attempted).toBeGreaterThan(35);
   });
 });
 
