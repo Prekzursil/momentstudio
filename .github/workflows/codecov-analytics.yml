@@ -188,26 +188,26 @@ jobs:
           ssr_build_exit=$?
           cd ..
           if [ "$ssr_build_exit" -eq 0 ] && [ -d frontend/dist/app/server ]; then
-            cat > /tmp/codecov-bundle-ssr.json <<EOF
-            {
-              "gitService": "github",
-              "oidc": {
-                "useGitHubOIDC": true,
-                "gitHubOIDCTokenAudience": "https://codecov.io"
-              },
-              "uploadOverrides": {
-                "slug": "${CODECOV_SLUG}",
-                "sha": "${GITHUB_SHA}",
-                "pr": "${CODECOV_PR}",
-                "branch": "${CODECOV_BRANCH}",
-                "build": "${CODECOV_BUILD}"
-              }
+          cat > /tmp/codecov-bundle-ssr.json <<EOF
+          {
+            "gitService": "github",
+            "oidc": {
+              "useGitHubOIDC": true,
+              "gitHubOIDCTokenAudience": "https://codecov.io"
+            },
+            "uploadOverrides": {
+              "slug": "${CODECOV_SLUG}",
+              "sha": "${GITHUB_SHA}",
+              "pr": "${CODECOV_PR}",
+              "branch": "${CODECOV_BRANCH}",
+              "build": "${CODECOV_BUILD}"
             }
-            EOF
-            npx --yes --package @codecov/bundle-analyzer bundle-analyzer ./frontend/dist/app/server \
-              --bundle-name=adrianaart-frontend-server \
-              --config-file=/tmp/codecov-bundle-ssr.json
-            ssr_bundle_exit=$?
+          }
+EOF
+          npx --yes --package @codecov/bundle-analyzer bundle-analyzer ./frontend/dist/app/server \
+            --bundle-name=adrianaart-frontend-server \
+            --config-file=/tmp/codecov-bundle-ssr.json
+          ssr_bundle_exit=$?
           else
             ssr_bundle_exit=$ssr_build_exit
           fi
