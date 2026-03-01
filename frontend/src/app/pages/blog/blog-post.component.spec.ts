@@ -141,6 +141,181 @@ describe('BlogPostComponent', () => {
     expect(blog.getPreviewPost).toHaveBeenCalledWith('snapshot-post', 'preview-token', 'en');
     expect(blog.getPost).not.toHaveBeenCalled();
   });
+
+  it('transforms markdown into toc, gallery, embeds, callouts and code blocks', () => {
+    configureBlogPostTestingModule({ meta, title, blog, toast, markdown, auth, routeStub, doc });
+    const fixture = TestBed.createComponent(BlogPostComponent);
+    const cmp = fixture.componentInstance as any;
+    cmp.slug = 'first-post';
+    cmp.document = document;
+    markdown.render.and.returnValue(
+      [
+        '<h2>Intro</h2>',
+        '<h2>Intro</h2>',
+        '<h3>Details</h3>',
+        '<p><img src="/a.jpg" alt="A" title="gallery"></p>',
+        '<p><img src="/b.jpg" alt="B" title="gallery"></p>',
+        '<p>{{ product: camera-1 }}</p>',
+        '<blockquote><p>[!TIP] Keep this safe.</p><p>Second line.</p></blockquote>',
+        '<pre><code class="language-js">const x = 1;</code></pre>'
+      ].join('')
+    );
+
+    const rendered = cmp.renderPostBody('ignored');
+
+    expect(rendered.toc).toEqual([
+      { id: 'intro', title: 'Intro', level: 2 },
+      { id: 'intro-2', title: 'Intro', level: 2 },
+      { id: 'details', title: 'Details', level: 3 }
+    ]);
+    expect(rendered.embeds).toEqual([{ type: 'product', slug: 'camera-1' }]);
+    expect(rendered.html).toContain('blog-heading-anchor');
+    expect(rendered.html).toContain('class="blog-gallery"');
+    expect(rendered.html).toContain('data-embed-type="product"');
+    expect(rendered.html).toContain('blog-callout--tip');
+    expect(rendered.html).toContain('blog-codeblock');
+  });
+
+  it('hydrates embeds for product/category/collection and keeps fallback copy for missing entries', () => {
+    configureBlogPostTestingModule({ meta, title, blog, toast, markdown, auth, routeStub, doc });
+    const fixture = TestBed.createComponent(BlogPostComponent);
+    const cmp = fixture.componentInstance as any;
+    cmp.document = document;
+
+    const html = [
+      '<div class="blog-embed" data-embed-type="product" data-embed-slug="camera-1"></div>',
+      '<div class="blog-embed" data-embed-type="category" data-embed-slug="prints"></div>',
+      '<div class="blog-embed" data-embed-type="collection" data-embed-slug="summer"></div>',
+      '<div class="blog-embed" data-embed-type="product" data-embed-slug="missing"></div>'
+    ].join('');
+
+    const hydrated = cmp.applyEmbedData(html, {
+      products: {
+        'camera-1': {
+          id: 'p1',
+          slug: 'camera-1',
+          name: 'Camera',
+          base_price: 200,
+          sale_price: 150,
+          currency: 'RON',
+          images: [{ url: '/cam.jpg' }],
+          short_description: 'Compact'
+        },
+        missing: null
+      },
+      categories: [{ id: 'c1', slug: 'prints', name: 'Prints', thumbnail_url: '/prints.jpg' }],
+      collections: [
+        {
+          slug: 'summer',
+          name: 'Summer',
+          description: 'Hot picks',
+          products: [{ slug: 'camera-1', name: 'Camera', images: [{ url: '/cam.jpg' }] }]
+        }
+      ]
+    });
+
+    expect(hydrated).toContain('/products/camera-1');
+    expect(hydrated).toContain('/shop/prints');
+    expect(hydrated).toContain('150.00 RON');
+    expect(hydrated).toContain('200.00 RON');
+    expect(hydrated).toContain('Summer');
+    expect(hydrated).toContain('blog.post.embed.notFoundProduct');
+  });
+
+  it('handles comment sorting and pagination guards deterministically', () => {
+    configureBlogPostTestingModule({ meta, title, blog, toast, markdown, auth, routeStub, doc });
+    const fixture = TestBed.createComponent(BlogPostComponent);
+    const cmp = fixture.componentInstance as any;
+    const loadComments = spyOn(cmp, 'loadComments').and.stub();
+
+    cmp.commentSort.set('newest');
+    cmp.commentPage.set(2);
+    cmp.setCommentSort('invalid');
+    cmp.setCommentSort('newest');
+    expect(loadComments).not.toHaveBeenCalled();
+
+    cmp.setCommentSort('oldest');
+    expect(cmp.commentPage()).toBe(1);
+    expect(loadComments).toHaveBeenCalledWith({ page: 1, sort: 'oldest' });
+
+    loadComments.calls.reset();
+    cmp.commentsMeta.set({ total_pages: 3, total_items: 24, page: 1, limit: 10 });
+    cmp.commentPage.set(1);
+    cmp.goToCommentsPage(99);
+    expect(loadComments).toHaveBeenCalledWith({ page: 3 });
+
+    loadComments.calls.reset();
+    cmp.commentPage.set(3);
+    cmp.goToCommentsPage(3);
+    expect(loadComments).not.toHaveBeenCalled();
+  });
+
+  it('applies article text threshold and focal positioning clamps', () => {
+    configureBlogPostTestingModule({ meta, title, blog, toast, markdown, auth, routeStub, doc });
+    const fixture = TestBed.createComponent(BlogPostComponent);
+    const cmp = fixture.componentInstance as any;
+
+    cmp.bodyHtml.set('<p>short</p>');
+    expect(cmp.hasMeaningfulArticleText()).toBeFalse();
+
+    cmp.bodyHtml.set(`<p>${'lorem ipsum '.repeat(12)}</p>`);
+    expect(cmp.hasMeaningfulArticleText()).toBeTrue();
+
+    expect(cmp.focalPosition()).toBe('50% 50%');
+    expect(cmp.focalPosition(-12.4, 120.2)).toBe('0% 100%');
+    expect(cmp.focalPosition(40.6, 39.4)).toBe('41% 39%');
+  });
+
+  it('normalizes quick-edit datetime and tag helper conversions', () => {
+    configureBlogPostTestingModule({ meta, title, blog, toast, markdown, auth, routeStub, doc });
+    const fixture = TestBed.createComponent(BlogPostComponent);
+    const cmp = fixture.componentInstance as any;
+
+    expect(cmp.toDateTimeLocal('bad-date')).toBe('');
+    expect(cmp.toDateTimeLocal('2026-02-28T12:34:56Z')).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+
+    expect(cmp.toIsoFromDateTimeLocal('')).toBeNull();
+    const iso = cmp.toIsoFromDateTimeLocal('2026-02-28T14:15');
+    expect(iso).toContain('2026-02');
+    expect(iso?.endsWith('Z')).toBeTrue();
+
+    expect(cmp.normalizeTagsInput(' News,news , tips,  ')).toEqual(['News', 'tips']);
+    expect(cmp.sameStringSet([' News ', 'tips'], ['TIPS', 'news'])).toBeTrue();
+    expect(cmp.sameStringSet(['news'], ['news', 'tips'])).toBeFalse();
+  });
+
+  it('routes comment-create errors through rate-limit/captcha/detail fallbacks', () => {
+    configureBlogPostTestingModule({ meta, title, blog, toast, markdown, auth, routeStub, doc });
+    const fixture = TestBed.createComponent(BlogPostComponent);
+    const cmp = fixture.componentInstance as any;
+
+    expect(cmp.commentErrorStatus({ status: 400 })).toBe(400);
+    expect(cmp.commentErrorStatus({ status: '400' })).toBe(0);
+
+    toast.error.calls.reset();
+    cmp.toastCommentCreateError({ status: 429 });
+    expect(toast.error).toHaveBeenCalledWith('blog.comments.rateLimitedTitle', 'blog.comments.rateLimitedCopy');
+
+    toast.error.calls.reset();
+    cmp.toastCommentCreateError({ status: 400, error: { detail: 'Too many links in comment' } });
+    expect(toast.error).toHaveBeenCalledWith('blog.comments.linkLimitTitle', 'blog.comments.linkLimitCopy');
+
+    toast.error.calls.reset();
+    cmp.toastCommentCreateError({ status: 400, error: { detail: 'captcha required' } });
+    expect(toast.error).toHaveBeenCalledWith('blog.comments.createErrorTitle', 'auth.captchaRequired');
+
+    toast.error.calls.reset();
+    cmp.toastCommentCreateError({ status: 400, error: { detail: 'captcha invalid token' } });
+    expect(toast.error).toHaveBeenCalledWith('blog.comments.createErrorTitle', 'auth.captchaFailedTryAgain');
+
+    toast.error.calls.reset();
+    cmp.toastCommentCreateError({ status: 400, error: { detail: 'backend detail text' } });
+    expect(toast.error).toHaveBeenCalledWith('blog.comments.createErrorTitle', 'backend detail text');
+
+    toast.error.calls.reset();
+    cmp.toastCommentCreateError({ status: 500 });
+    expect(toast.error).toHaveBeenCalledWith('blog.comments.createErrorTitle', 'blog.comments.createErrorCopy');
+  });
 });
 
 function configureBlogPostTestingModule(deps: BlogPostSpecDeps): void {

@@ -975,6 +975,7 @@ describe('AdminComponent sweep coverage', () => {
     component.saveContent();
     expect(toast.error).toHaveBeenCalledWith('adminUi.content.errors.update');
 
+    component.products = [{ id: 'p-1', slug: 'seed-product-wave', stock_quantity: 2 }] as any;
     component.selectedIds = new Set(['p-1']);
     component.bulkStock = 11;
     admin.updateProduct.and.returnValue(of({}));

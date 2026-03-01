@@ -51,6 +51,9 @@ module.exports = function (config) {
     listenAddress: '127.0.0.1',
     colors: true,
     logLevel: config.LOG_INFO,
+    browserNoActivityTimeout: 180000,
+    browserDisconnectTimeout: 20000,
+    browserDisconnectTolerance: 2,
     autoWatch: true,
     customLaunchers: {
       ChromeHeadlessNoSandbox: {

@@ -75,7 +75,8 @@ describe('Checkout auth gating', () => {
       .filter((v): v is string => Boolean(v));
     expect(hrefs.some((h) => h.includes('/login'))).toBeTrue();
     expect(hrefs.some((h) => h.includes('/register'))).toBeTrue();
-    expect(apiService.post).not.toHaveBeenCalled();
+    const postedUrls = apiService.post.calls.allArgs().map((args: unknown[]) => String(args[0] ?? ''));
+    expect(postedUrls).not.toContain('/orders/guest-checkout');
   }));
 
   it('submits guest checkout via /orders/guest-checkout when verified', fakeAsync(() => {

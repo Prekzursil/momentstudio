@@ -449,4 +449,149 @@ describe('AdminOrdersComponent coverage helpers', () => {
     getItemSpy.and.throwError('storage unavailable');
     expect((component as any).loadViewMode()).toBe('table');
   });
+
+  it('pins and unpins current filter views with prompt validation', () => {
+    const { component, favorites, toast } = createComponent();
+    const key = (component as any).currentViewFavoriteKey();
+
+    component.selectedSavedViewKey = key;
+    favorites.isFavorite.and.returnValue(true);
+    component.toggleCurrentViewPin();
+    expect(favorites.remove).toHaveBeenCalledWith(key);
+    expect(component.selectedSavedViewKey).toBe('');
+
+    favorites.isFavorite.and.returnValue(false);
+    spyOn(globalThis, 'prompt').and.returnValues('   ', 'Operations');
+    component.toggleCurrentViewPin();
+    expect(toast.error).toHaveBeenCalledWith('adminUi.favorites.savedViews.errors.nameRequired');
+
+    component.toggleCurrentViewPin();
+    expect(favorites.add).toHaveBeenCalledWith(
+      jasmine.objectContaining({
+        key,
+        type: 'filter',
+        label: 'Operations',
+        url: '/admin/orders'
+      })
+    );
+    expect(component.selectedSavedViewKey).toBe(key);
+  });
+
+  it('saves and deletes presets with guard branches and persistence side effects', () => {
+    const { component, toast } = createComponent();
+    const setItemSpy = spyOn(localStorage, 'setItem').and.stub();
+
+    spyOn(globalThis, 'prompt').and.returnValues('   ', 'High priority');
+    component.savePreset();
+    expect(component.presets.length).toBe(0);
+    expect(toast.error).toHaveBeenCalledWith('adminUi.orders.presets.errors.nameRequired');
+
+    component.q = 'vip';
+    component.status = 'paid';
+    component.savePreset();
+    expect(component.presets.length).toBe(1);
+    expect(component.selectedPresetId).toBe(component.presets[0].id);
+    expect(setItemSpy).toHaveBeenCalledWith('admin.orders.filters.v1:admin-1', jasmine.any(String));
+
+    const confirmSpy = spyOn(globalThis, 'confirm').and.returnValues(false, true);
+    component.deletePreset();
+    expect(component.presets.length).toBe(1);
+
+    component.deletePreset();
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(component.presets.length).toBe(0);
+    expect(component.selectedPresetId).toBe('');
+  });
+
+  it('allows COD-specific kanban transitions from pending acceptance', () => {
+    const { component } = createComponent();
+
+    const codTransitions = (component as any).allowedKanbanTransitions(
+      makeOrder('cod', 'pending_acceptance', { payment_method: 'cod' })
+    );
+    expect(codTransitions).toContain('shipped');
+    expect(codTransitions).toContain('delivered');
+    expect(codTransitions).toContain('paid');
+    expect(codTransitions).toContain('cancelled');
+
+    const cardTransitions = (component as any).allowedKanbanTransitions(
+      makeOrder('card', 'pending_acceptance', { payment_method: 'card' })
+    );
+    expect(cardTransitions).toEqual(['paid', 'cancelled']);
+  });
+
+  it('exposes filter/status utility helpers', () => {
+    const { component } = createComponent();
+
+    component.q = 'john';
+    component.status = 'paid';
+    component.sla = 'ship_overdue';
+    component.fraud = 'queue';
+    component.tag = 'vip';
+    component.fromDate = '2026-02-01';
+    component.toDate = '2026-02-05';
+    component.includeTestOrders = false;
+    component.limit = 50;
+
+    expect((component as any).currentViewFilters()).toEqual({
+      q: 'john',
+      status: 'paid',
+      sla: 'ship_overdue',
+      fraud: 'queue',
+      tag: 'vip',
+      fromDate: '2026-02-01',
+      toDate: '2026-02-05',
+      includeTestOrders: false,
+      limit: 50,
+    });
+
+    expect(component.shippingLabelStatusLabelKey('uploading')).toBe('adminUi.orders.shippingLabelsModal.status.uploading');
+    expect(component.shippingLabelStatusLabelKey('success')).toBe('adminUi.orders.shippingLabelsModal.status.success');
+    expect(component.tagLabel('vip')).toBe('vip');
+    expect(component.statusPillClass('paid').length).toBeGreaterThan(0);
+
+    const defaultPadding = component.cellPaddingClass();
+    component.tableLayout.set({ ...component.tableLayout(), density: 'compact' });
+    const compactPadding = component.cellPaddingClass();
+    expect(compactPadding).not.toBe(defaultPadding);
+    expect(component.visibleColumnIds()).toContain('reference');
+
+    expect((component as any).formatDurationShort(30 * 60 * 1000)).toBe('30m');
+    expect((component as any).formatDurationShort(2 * 60 * 60 * 1000)).toBe('2h');
+    expect((component as any).formatDurationShort(72 * 60 * 60 * 1000)).toBe('3d');
+  });
+
+  it('coerces preset helper payload values', () => {
+    const { component } = createComponent();
+
+    const coerced = (component as any).coercePreset({
+      id: 123,
+      name: null,
+      createdAt: null,
+      filters: {
+        q: 5,
+        status: 'paid',
+        sla: 'invalid',
+        fraud: 'approved',
+        tag: 99,
+        fromDate: 123,
+        toDate: undefined,
+        includeTestOrders: 'no',
+        limit: Number.NaN,
+      },
+    });
+
+    expect(coerced.id).toBe('123');
+    expect(coerced.name).toBe('');
+    expect(coerced.filters.q).toBe('5');
+    expect(coerced.filters.sla).toBe('all');
+    expect(coerced.filters.fraud).toBe('approved');
+    expect(coerced.filters.includeTestOrders).toBeTrue();
+    expect(coerced.filters.limit).toBe(20);
+
+    expect((component as any).coercePresetIncludeTestOrders(false)).toBeFalse();
+    expect((component as any).coercePresetLimit(25)).toBe(25);
+    expect((component as any).coercePresetSlaFilter('ship_overdue')).toBe('ship_overdue');
+    expect((component as any).coercePresetFraudFilter('queue')).toBe('queue');
+  });
 });

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from types import SimpleNamespace
 import uuid
@@ -11,6 +11,8 @@ import pytest
 
 from app.api.v1 import coupons as coupons_api
 from app.models.coupons import (
+    CouponBulkJobAction,
+    CouponBulkJobStatus,
     CouponVisibility,
     PromotionDiscountType,
     PromotionScope,
@@ -126,6 +128,107 @@ def _coupon_for_promotion(promotion: SimpleNamespace) -> SimpleNamespace:
         created_at=promotion.created_at,
         promotion=promotion,
     )
+
+
+@pytest.mark.anyio
+async def test_coupon_api_shipping_method_and_key_validation_helpers() -> None:
+    shipping_method_id = uuid.uuid4()
+    shipping_method = SimpleNamespace(id=shipping_method_id)
+    assert await coupons_api._get_shipping_method(_SessionStub(users={shipping_method_id: shipping_method}), None) is None
+    assert (
+        await coupons_api._get_shipping_method(
+            _SessionStub(users={shipping_method_id: shipping_method}),
+            shipping_method_id,
+        )
+        is shipping_method
+    )
+    with pytest.raises(HTTPException, match="Shipping method not found"):
+        await coupons_api._get_shipping_method(_SessionStub(users={}), shipping_method_id)
+
+    assert await coupons_api._clean_and_validate_promotion_key(_SessionStub(_Result(scalars=[])), raw_key="  ") is None
+    cleaned = await coupons_api._clean_and_validate_promotion_key(
+        _SessionStub(_Result(scalars=[])),
+        raw_key="x" * 120,
+    )
+    assert cleaned == "x" * 80
+
+    existing = SimpleNamespace(id=uuid.uuid4(), key="PROMO")
+    with pytest.raises(HTTPException, match="Promotion key already exists"):
+        await coupons_api._clean_and_validate_promotion_key(
+            _SessionStub(_Result(scalars=[existing])),
+            raw_key="PROMO",
+        )
+    assert (
+        await coupons_api._clean_and_validate_promotion_key(
+            _SessionStub(_Result(scalars=[])),
+            raw_key="PROMO",
+            promotion_id=existing.id,
+        )
+        == "PROMO"
+    )
+
+
+def test_coupon_api_scalar_update_rate_and_partition_helpers() -> None:
+    promo = SimpleNamespace(
+        name="Old name",
+        description="Old description",
+        discount_type=PromotionDiscountType.percent,
+        percentage_off=Decimal("5.00"),
+        amount_off=None,
+        max_discount_amount=None,
+        min_subtotal=None,
+        allow_on_sale_items=False,
+        first_order_only=False,
+        is_active=True,
+        starts_at=None,
+        ends_at=None,
+        is_automatic=False,
+    )
+    coupons_api._apply_promotion_scalar_updates(
+        promo,
+        {
+            "name": "New name",
+            "description": "New description",
+            "percentage_off": Decimal("12.50"),
+            "is_active": False,
+        },
+    )
+    assert promo.name == "New name"
+    assert promo.description == "New description"
+    assert promo.percentage_off == Decimal("12.50")
+    assert promo.is_active is False
+
+    assert coupons_api._shipping_method_rates(None) == (None, None)
+    assert coupons_api._shipping_method_rates(SimpleNamespace(rate_flat="7.50", rate_per_kg="1.25")) == (
+        Decimal("7.50"),
+        Decimal("1.25"),
+    )
+
+    promotion = _promotion_with_scopes([])
+    coupon = _coupon_for_promotion(promotion)
+    eligible_result = SimpleNamespace(
+        coupon=coupon,
+        estimated_discount_ron=Decimal("3.00"),
+        estimated_shipping_discount_ron=Decimal("0.00"),
+        eligible=True,
+        reasons=["ok"],
+        global_remaining=5,
+        customer_remaining=1,
+    )
+    ineligible_result = SimpleNamespace(
+        coupon=coupon,
+        estimated_discount_ron=Decimal("0.00"),
+        estimated_shipping_discount_ron=Decimal("0.00"),
+        eligible=False,
+        reasons=["inactive"],
+        global_remaining=5,
+        customer_remaining=1,
+    )
+    eligible, ineligible = coupons_api._partition_coupon_offers([eligible_result, ineligible_result])
+    assert len(eligible) == 1
+    assert len(ineligible) == 1
+    assert eligible[0].eligible is True
+    assert ineligible[0].eligible is False
 
 
 def test_coupon_api_helper_normalization_and_bucket_parsing() -> None:
@@ -546,3 +649,303 @@ async def test_coupon_service_apply_discount_code_to_cart_paths(monkeypatch: pyt
     assert applied.coupon is coupon
     assert applied.discount_ron == Decimal("7.00")
     assert applied.shipping_discount_ron == Decimal("0.00")
+
+
+def test_coupon_api_discount_issue_and_context_helpers() -> None:
+    coupons_api._validate_promotion_discount_values(
+        discount_type=PromotionDiscountType.percent,
+        percentage_off=Decimal("10"),
+        amount_off=None,
+    )
+    coupons_api._validate_promotion_discount_values(
+        discount_type=PromotionDiscountType.amount,
+        percentage_off=None,
+        amount_off=Decimal("15"),
+    )
+    coupons_api._validate_promotion_discount_values(
+        discount_type=PromotionDiscountType.free_shipping,
+        percentage_off=None,
+        amount_off=None,
+    )
+
+    with pytest.raises(HTTPException, match="percentage_off is required"):
+        coupons_api._validate_promotion_discount_values(
+            discount_type=PromotionDiscountType.percent,
+            percentage_off=None,
+            amount_off=None,
+        )
+    with pytest.raises(HTTPException, match="amount_off is required"):
+        coupons_api._validate_promotion_discount_values(
+            discount_type=PromotionDiscountType.amount,
+            percentage_off=None,
+            amount_off=None,
+        )
+    with pytest.raises(HTTPException, match="cannot set percentage_off/amount_off"):
+        coupons_api._validate_promotion_discount_values(
+            discount_type=PromotionDiscountType.free_shipping,
+            percentage_off=Decimal("5"),
+            amount_off=None,
+        )
+    with pytest.raises(HTTPException, match="Choose percentage_off or amount_off"):
+        coupons_api._validate_promotion_discount_values(
+            discount_type=PromotionDiscountType.percent,
+            percentage_off=Decimal("5"),
+            amount_off=Decimal("2"),
+        )
+
+    existing_product = uuid.uuid4()
+    existing_category = uuid.uuid4()
+    promo = _promotion_with_scopes(
+        [
+            SimpleNamespace(entity_type=PromotionScopeEntityType.product, mode=PromotionScopeMode.include, entity_id=existing_product),
+            SimpleNamespace(entity_type=PromotionScopeEntityType.category, mode=PromotionScopeMode.exclude, entity_id=existing_category),
+        ]
+    )
+    assert coupons_api._resolve_scope_updates(promo=promo, data={"name": "ignored"}) is None
+    replacement_product = uuid.uuid4()
+    scope_updates = coupons_api._resolve_scope_updates(
+        promo=promo,
+        data={"included_product_ids": [replacement_product]},
+    )
+    assert scope_updates is not None
+    include_products, exclude_products, include_categories, exclude_categories = scope_updates
+    assert include_products == {replacement_product}
+    assert exclude_products == set()
+    assert include_categories == set()
+    assert exclude_categories == {existing_category}
+
+    starts_at = datetime(2026, 2, 20, 12, 0, tzinfo=timezone.utc)
+    normalized = coupons_api._normalize_issue_coupon_ends_at(
+        ends_at=datetime(2026, 2, 21, 12, 0),
+        validity_days=None,
+        starts_at=starts_at,
+    )
+    assert normalized == datetime(2026, 2, 21, 12, 0, tzinfo=timezone.utc)
+    assert coupons_api._normalize_issue_coupon_ends_at(ends_at=None, validity_days=5, starts_at=starts_at) == starts_at + timedelta(days=5)
+
+    assert coupons_api._resolve_issue_coupon_should_email(send_email=False, user=SimpleNamespace(email="u@example.com")) is False
+    assert (
+        coupons_api._resolve_issue_coupon_should_email(
+            send_email=True,
+            user=SimpleNamespace(email="u@example.com", notify_marketing=True),
+        )
+        is True
+    )
+    with pytest.raises(HTTPException, match="marketing"):
+        coupons_api._resolve_issue_coupon_should_email(
+            send_email=True,
+            user=SimpleNamespace(email="u@example.com", notify_marketing=False),
+        )
+
+    request_with_validity = coupons_api.CouponIssueToUserRequest(
+        user_id=uuid.uuid4(),
+        promotion_id=uuid.uuid4(),
+        validity_days=2,
+    )
+    assert coupons_api._resolve_issue_coupon_ends_at_or_400(payload=request_with_validity, starts_at=starts_at) == starts_at + timedelta(days=2)
+
+    request_with_past_end = coupons_api.CouponIssueToUserRequest(
+        user_id=uuid.uuid4(),
+        promotion_id=uuid.uuid4(),
+        ends_at=starts_at - timedelta(days=1),
+    )
+    with pytest.raises(HTTPException, match="must be in the future"):
+        coupons_api._resolve_issue_coupon_ends_at_or_400(payload=request_with_past_end, starts_at=starts_at)
+
+    fallback_ctx = coupons_api._coupon_email_context(None)
+    assert fallback_ctx.promotion_name
+    assert fallback_ctx.coupon_code == ""
+    coupon_ctx = coupons_api._coupon_email_context(
+        SimpleNamespace(
+            code="SAVE20",
+            ends_at=starts_at,
+            promotion=SimpleNamespace(name="Promo", description="Promo desc"),
+        )
+    )
+    assert coupon_ctx.coupon_code == "SAVE20"
+    assert coupon_ctx.promotion_name == "Promo"
+    assert coupons_api._trimmed_revoke_reason("  " + ("x" * 400)) == "x" * 255
+    assert coupons_api._notification_revoke_reason("  reason  ") == "reason"
+
+
+def test_coupon_api_bulk_email_bucket_and_preview_helpers(monkeypatch: pytest.MonkeyPatch) -> None:
+    requested, normalized, invalid = coupons_api._normalize_bulk_email_request(
+        ["USER@example.com", "user@example.com", "bad", "ok@test.ro"]
+    )
+    assert requested == 4
+    assert normalized == ["user@example.com", "ok@test.ro"]
+    assert invalid == ["bad"]
+
+    too_many = [f"user{i}@example.com" for i in range(501)]
+    with pytest.raises(HTTPException, match="Too many emails"):
+        coupons_api._normalize_bulk_email_request(too_many)
+
+    users_by_email = {
+        "user@example.com": SimpleNamespace(email="user@example.com"),
+    }
+    assert coupons_api._not_found_emails(["user@example.com", "missing@example.com"], users_by_email) == ["missing@example.com"]
+
+    assert coupons_api._bucket_total_in_range(2) is True
+    assert coupons_api._bucket_total_in_range(101) is False
+    assert coupons_api._bucket_index_in_range(index=0, total=2) is True
+    assert coupons_api._bucket_index_in_range(index=2, total=2) is False
+
+    user_a = uuid.uuid4()
+    user_b = uuid.uuid4()
+    rows = [(user_a, "a@example.com"), (user_b, "b@example.com")]
+    job_rows = [(user_a, "a@example.com", "en"), (user_b, "b@example.com", "ro")]
+    bucket = coupons_api._BucketConfig(total=2, index=1, seed="segment")
+
+    monkeypatch.setattr(
+        coupons_api,
+        "_bucket_index_for_user",
+        lambda *, user_id, seed, total: 1 if user_id == user_b else 0,
+    )
+    assert coupons_api._bucket_preview_rows(rows, bucket=bucket) == [(user_b, "b@example.com")]
+    assert coupons_api._bucket_job_rows(job_rows, bucket=bucket) == [(user_b, "b@example.com", "ro")]
+
+    sample: list[str] = []
+    total, already_active, restored = coupons_api._preview_bucket_assignment_counts(
+        bucketed=[(user_a, "a@example.com"), (user_b, "b@example.com"), (uuid.uuid4(), None)],
+        status_by_user_id={user_a: None, user_b: datetime(2026, 2, 20, tzinfo=timezone.utc)},
+        sample=sample,
+    )
+    assert total == 3
+    assert already_active == 1
+    assert restored == 1
+    assert sample == ["a@example.com", "b@example.com"]
+
+
+def test_coupon_api_bulk_job_row_helpers() -> None:
+    session = _SessionStub()
+    coupon_id = uuid.uuid4()
+    user_id = uuid.uuid4()
+    now = datetime(2026, 2, 20, tzinfo=timezone.utc)
+
+    assign_job = SimpleNamespace(
+        action=CouponBulkJobAction.assign,
+        coupon_id=coupon_id,
+        send_email=True,
+        processed=0,
+        created=0,
+        restored=0,
+        already_active=0,
+        revoked=0,
+        already_revoked=0,
+        not_assigned=0,
+    )
+    notify: list[tuple[str, str | None]] = []
+    coupons_api._apply_bulk_job_assign_row(
+        session=session,
+        job=assign_job,
+        assignment=SimpleNamespace(revoked_at=None),
+        user_id=user_id,
+        email="user@example.com",
+        preferred_language="en",
+        notify=notify,
+    )
+    assert assign_job.already_active == 1
+    assert notify == []
+
+    revoked_assignment = SimpleNamespace(revoked_at=now - timedelta(days=1), revoked_reason="old")
+    coupons_api._apply_bulk_job_assign_row(
+        session=session,
+        job=assign_job,
+        assignment=revoked_assignment,
+        user_id=user_id,
+        email="user@example.com",
+        preferred_language="en",
+        notify=notify,
+    )
+    assert assign_job.restored == 1
+    assert revoked_assignment.revoked_at is None
+    assert notify == [("user@example.com", "en")]
+
+    coupons_api._apply_bulk_job_assign_row(
+        session=session,
+        job=assign_job,
+        assignment=None,
+        user_id=uuid.uuid4(),
+        email="new@example.com",
+        preferred_language="ro",
+        notify=notify,
+    )
+    assert assign_job.created == 1
+    assert any(getattr(item, "user_id", None) is not None for item in session.added)
+
+    revoke_job = SimpleNamespace(
+        action=CouponBulkJobAction.revoke,
+        coupon_id=coupon_id,
+        send_email=True,
+        processed=0,
+        created=0,
+        restored=0,
+        already_active=0,
+        revoked=0,
+        already_revoked=0,
+        not_assigned=0,
+    )
+    revoke_notify: list[tuple[str, str | None]] = []
+    coupons_api._apply_bulk_job_revoke_row(
+        session=session,
+        job=revoke_job,
+        assignment=None,
+        email="none@example.com",
+        preferred_language="en",
+        notify=revoke_notify,
+        now=now,
+        revoke_reason="cleanup",
+    )
+    assert revoke_job.not_assigned == 1
+
+    already_revoked = SimpleNamespace(revoked_at=now - timedelta(days=1), revoked_reason="old")
+    coupons_api._apply_bulk_job_revoke_row(
+        session=session,
+        job=revoke_job,
+        assignment=already_revoked,
+        email="revoked@example.com",
+        preferred_language="en",
+        notify=revoke_notify,
+        now=now,
+        revoke_reason="cleanup",
+    )
+    assert revoke_job.already_revoked == 1
+
+    active_assignment = SimpleNamespace(revoked_at=None, revoked_reason=None)
+    coupons_api._apply_bulk_job_revoke_row(
+        session=session,
+        job=revoke_job,
+        assignment=active_assignment,
+        email="active@example.com",
+        preferred_language="ro",
+        notify=revoke_notify,
+        now=now,
+        revoke_reason="cleanup",
+    )
+    assert revoke_job.revoked == 1
+    assert active_assignment.revoked_reason == "cleanup"
+    assert ("active@example.com", "ro") in revoke_notify
+
+    assign_rows_notify = coupons_api._apply_bulk_job_rows(
+        session=session,
+        job=SimpleNamespace(**assign_job.__dict__),
+        rows=[(user_id, "user@example.com", "en")],
+        assignments_by_user_id={user_id: SimpleNamespace(revoked_at=None)},
+        now=now,
+        revoke_reason=None,
+    )
+    assert assign_rows_notify == []
+
+    revoke_rows_notify = coupons_api._apply_bulk_job_rows(
+        session=session,
+        job=SimpleNamespace(**revoke_job.__dict__),
+        rows=[(user_id, "user@example.com", "en")],
+        assignments_by_user_id={user_id: SimpleNamespace(revoked_at=None, revoked_reason=None)},
+        now=now,
+        revoke_reason="cleanup",
+    )
+    assert revoke_rows_notify == [("user@example.com", "en")]
+
+    assert coupons_api._is_bulk_job_runnable(SimpleNamespace(status=CouponBulkJobStatus.pending)) is True
+    assert coupons_api._is_bulk_job_runnable(SimpleNamespace(status=CouponBulkJobStatus.running)) is True
+    assert coupons_api._is_bulk_job_runnable(SimpleNamespace(status=CouponBulkJobStatus.succeeded)) is False

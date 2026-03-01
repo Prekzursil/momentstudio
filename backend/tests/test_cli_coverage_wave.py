@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from datetime import date, datetime, timezone
+import json
 from pathlib import Path
+from types import SimpleNamespace
 import uuid
 
 import pytest
@@ -212,3 +215,273 @@ def test_main_prints_help_when_command_missing(monkeypatch: pytest.MonkeyPatch) 
     cli.main()
 
     assert help_called["value"] is True
+
+
+def test_cli_wave_serializers_and_payload_helpers(tmp_path: Path) -> None:
+    now = datetime(2026, 2, 28, 10, 30, tzinfo=timezone.utc)
+
+    serialized_user = cli._serialize_user(
+        SimpleNamespace(
+            id=uuid.uuid4(),
+            email="user@example.com",
+            username="user1",
+            name="User One",
+            name_tag=3,
+            first_name="User",
+            middle_name=None,
+            last_name="One",
+            date_of_birth=date(1999, 1, 2),
+            phone="+40123456789",
+            avatar_url="/a.png",
+            preferred_language="en",
+            email_verified=True,
+            role=SimpleNamespace(value="customer"),
+            created_at=now,
+        )
+    )
+    assert serialized_user["role"] == "customer"
+    assert serialized_user["date_of_birth"] == "1999-01-02"
+    assert serialized_user["created_at"] == now.isoformat()
+
+    category = cli._serialize_category(
+        SimpleNamespace(
+            id=uuid.uuid4(),
+            slug="rings",
+            name="Rings",
+            description="Fine rings",
+            sort_order=2,
+            created_at=now,
+        )
+    )
+    assert category["slug"] == "rings"
+
+    serialized_product = cli._serialize_product(
+        SimpleNamespace(
+            id=uuid.uuid4(),
+            category_id=uuid.uuid4(),
+            sku="SKU-1",
+            slug="ring-1",
+            name="Ring 1",
+            short_description="Short",
+            long_description="Long",
+            base_price=12.5,
+            currency="RON",
+            is_featured=True,
+            stock_quantity=3,
+            status=SimpleNamespace(value="published"),
+            publish_at=now,
+            meta_title="Meta",
+            meta_description="Desc",
+            tags=[SimpleNamespace(slug="new"), SimpleNamespace(slug="sale")],
+            images=[SimpleNamespace(id=uuid.uuid4(), url="/i1.jpg", alt_text="alt", sort_order=1)],
+            options=[SimpleNamespace(id=uuid.uuid4(), option_name="size", option_value="M")],
+            variants=[SimpleNamespace(id=uuid.uuid4(), name="Blue", additional_price_delta=2.0, stock_quantity=1)],
+        )
+    )
+    assert serialized_product["status"] == "published"
+    assert serialized_product["tags"] == ["new", "sale"]
+    assert serialized_product["images"][0]["url"] == "/i1.jpg"
+
+    serialized_order = cli._serialize_order(
+        SimpleNamespace(
+            id=uuid.uuid4(),
+            user_id=uuid.uuid4(),
+            status=SimpleNamespace(value="pending"),
+            total_amount=99.9,
+            currency="RON",
+            reference_code="REF-1",
+            customer_email="buyer@example.com",
+            customer_name="Buyer",
+            shipping_address_id=uuid.uuid4(),
+            billing_address_id=None,
+            items=[SimpleNamespace(id=uuid.uuid4(), product_id=uuid.uuid4(), quantity=2, unit_price=10, subtotal=20)],
+        )
+    )
+    assert serialized_order["status"] == "pending"
+    assert serialized_order["items"][0]["quantity"] == 2
+
+    payload_path = tmp_path / "payload.json"
+    payload_path.write_text(json.dumps({"users": [{"id": "1"}]}), encoding="utf-8")
+    assert cli._load_import_payload(payload_path) == {"users": [{"id": "1"}]}
+
+    tags: dict[str, int] = {}
+    assert cli._next_name_tag(tags, "Alice") == 0
+    assert cli._next_name_tag(tags, "Alice") == 1
+    assert cli._preferred_username({"username": "  shop-user "}, "a@example.com") == "shop-user"
+    assert cli._preferred_username({}, "fallback@example.com") == "fallback"
+    assert cli._parse_optional_date("2026-02-28") == date(2026, 2, 28)
+    assert cli._parse_optional_date("") is None
+    assert cli._payload_optional_text({"name": "  Value  "}, "name") == "Value"
+    assert cli._payload_optional_text({"name": "   "}, "name") is None
+
+
+def test_cli_wave_import_mutation_helpers(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _Session:
+        def __init__(self) -> None:
+            self.added: list[object] = []
+
+        def add(self, value: object) -> None:
+            self.added.append(value)
+
+    session = _Session()
+    monkeypatch.setattr(cli.security, "hash_password", lambda value: f"hashed::{value}")
+
+    user_id = uuid.uuid4()
+    user_obj = cli._create_import_user(
+        session,
+        user_payload={
+            "id": str(user_id),
+            "email": "user@example.com",
+            "username": " user ",
+            "name": "Display",
+            "date_of_birth": "2000-01-01",
+            "first_name": "First",
+            "last_name": "Last",
+        },
+        user_id=user_id,
+        email="user@example.com",
+        used_usernames=set(),
+        next_tag_by_name={},
+    )
+    assert user_obj.username == "user"
+    assert user_obj.name == "Display"
+    assert user_obj.date_of_birth == date(2000, 1, 1)
+    assert len(session.added) == 3
+
+    existing = SimpleNamespace(id=uuid.uuid4(), username=None, name="Old", name_tag=0)
+    cli._ensure_import_user_username(
+        session,
+        user_obj=existing,
+        user_payload={},
+        email="new@example.com",
+        used_usernames=set(),
+    )
+    assert existing.username == "new"
+
+    cli._sync_import_user_display_name(
+        session,
+        user_obj=existing,
+        user_payload={"name": "Updated"},
+        next_tag_by_name={},
+    )
+    assert existing.name == "Updated"
+
+    cli._apply_import_user_fields(
+        existing,
+        {"avatar_url": "/avatar.png", "preferred_language": "ro", "email_verified": True, "role": "admin"},
+    )
+    assert existing.avatar_url == "/avatar.png"
+    assert existing.preferred_language == "ro"
+    assert existing.email_verified is True
+
+    tag_cache = {"new": SimpleNamespace(slug="new"), "sale": SimpleNamespace(slug="sale")}
+    product = SimpleNamespace(images=[], options=[], variants=[], tags=[], status="draft")
+    cli._update_product_basics(
+        product,
+        {
+            "category_id": uuid.uuid4(),
+            "sku": "SKU-7",
+            "slug": "s-7",
+            "name": "Sample",
+            "short_description": "short",
+            "long_description": "long",
+            "base_price": 50,
+            "currency": "RON",
+            "is_featured": True,
+            "stock_quantity": 9,
+            "status": "published",
+            "publish_at": "2026-02-28T10:00:00+00:00",
+            "meta_title": "Meta",
+            "meta_description": "Desc",
+            "tags": ["new", "sale"],
+        },
+        tag_cache,
+    )
+    assert product.status == "published"
+    assert len(product.tags) == 2
+
+    cli._replace_product_images(product, [{"id": uuid.uuid4(), "url": "/img.jpg", "alt_text": "Alt"}])
+    cli._replace_product_options(product, [{"id": uuid.uuid4(), "option_name": "size", "values": ["M"]}])
+    cli._replace_product_variants(product, [{"id": uuid.uuid4(), "sku": "v-1", "price": 3.5, "stock_quantity": 2}])
+    assert len(product.images) == 1
+    assert len(product.options) == 1
+    assert len(product.variants) == 1
+
+    assert cli._parse_optional_uuid(str(uuid.uuid4())) is not None
+    assert cli._parse_optional_uuid(None) is None
+    assert cli._missing_customer_info(None, "Name") is True
+    assert cli._missing_customer_info("a@example.com", "Name") is False
+
+    order = SimpleNamespace(items=[])
+    cli._replace_order_items(order, [{"id": uuid.uuid4(), "quantity": 3, "unit_price": 5, "subtotal": 15}])
+    assert len(order.items) == 1
+
+    cli._update_order_fields(
+        order,
+        order_payload={
+            "status": "paid",
+            "total_amount": 120,
+            "currency": "EUR",
+            "reference_code": "R-1",
+            "shipping_address_id": uuid.uuid4(),
+            "billing_address_id": uuid.uuid4(),
+            "shipping_method_id": uuid.uuid4(),
+        },
+        order_user_id=uuid.uuid4(),
+        customer_email="buyer@example.com",
+        customer_name="Buyer",
+    )
+    assert order.status == "paid"
+    assert order.currency == "EUR"
+
+
+@pytest.mark.anyio
+async def test_cli_wave_customer_resolution_helpers() -> None:
+    class _Session:
+        def __init__(self, user: object | None) -> None:
+            self._user = user
+
+        async def get(self, model: object, value: object):  # noqa: ARG002
+            return self._user
+
+    user_id = uuid.uuid4()
+    email, name = await cli._fill_customer_from_order_user(
+        _Session(SimpleNamespace(email="owner@example.com", name="Owner Name")),
+        order_user_id=user_id,
+        customer_email=None,
+        customer_name=None,
+    )
+    assert (email, name) == ("owner@example.com", "Owner Name")
+
+    email, name = await cli._resolve_order_customer(
+        _Session(SimpleNamespace(email="owner@example.com", name="Owner Name")),
+        order_payload={"id": "ord-1"},
+        order_user_id=user_id,
+        customer_email=None,
+        customer_name=None,
+    )
+    assert (email, name) == ("owner@example.com", "Owner Name")
+
+    with pytest.raises(SystemExit, match="missing customer_email/customer_name"):
+        await cli._resolve_order_customer(
+            _Session(None),
+            order_payload={"id": "ord-2"},
+            order_user_id=None,
+            customer_email=None,
+            customer_name=None,
+        )
+
+
+def test_cli_wave_run_cli_command_seed_and_unknown(monkeypatch: pytest.MonkeyPatch) -> None:
+    ran: dict[str, object] = {}
+
+    async def _fake_seed(profile: str) -> None:
+        await asyncio.sleep(0)
+        ran["seed"] = profile
+
+    monkeypatch.setattr(cli, "_seed_data", _fake_seed)
+    original_asyncio_run = asyncio.run
+    monkeypatch.setattr(cli.asyncio, "run", lambda coro: original_asyncio_run(coro))
+    assert cli._run_cli_command(argparse.Namespace(command="seed-data", profile="adriana")) is True
+    assert ran["seed"] == "adriana"
+    assert cli._run_cli_command(argparse.Namespace(command="unknown")) is False

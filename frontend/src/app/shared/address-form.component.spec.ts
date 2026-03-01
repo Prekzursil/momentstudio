@@ -8,6 +8,9 @@ describe('AddressFormComponent', () => {
   defineInvalidSubmitSpec();
   defineValidSubmitSpec();
   defineUseAsBillingSpec();
+  definePhoneValidationSpec();
+  defineLabelSyncSpec();
+  defineAutocompleteApplySpec();
 });
 
 function registerAddressFormSetup(): void {
@@ -91,5 +94,63 @@ function defineUseAsBillingSpec(): void {
     useAsBilling?.click();
     fixture.detectChanges();
     expect(component.model.is_default_billing).toBeTrue();
+  });
+};
+
+function definePhoneValidationSpec(): void {
+  it('builds valid E164 numbers and blocks save when number is invalid', () => {
+    const fixture = TestBed.createComponent(AddressFormComponent);
+    const component = fixture.componentInstance;
+    component.model = { line1: '123 Main', city: 'Bucharest', postal_code: '010203', country: 'RO' };
+    component.phoneCountry = 'RO';
+    component.phoneNational = '712345678';
+    component.onPhoneChanged();
+    expect(component.model.phone).toBe('+40712345678');
+
+    spyOn(component.save, 'emit');
+    component.phoneNational = '123';
+    component.onPhoneChanged();
+    component.submit({ valid: true } as any);
+    expect(component.model.phone).toBeNull();
+    expect(component.save.emit).not.toHaveBeenCalled();
+  });
+};
+
+function defineLabelSyncSpec(): void {
+  it('synchronizes known and custom labels from incoming model changes', () => {
+    const fixture = TestBed.createComponent(AddressFormComponent);
+    const component = fixture.componentInstance;
+    component.model = { line1: 'L1', city: 'C', postal_code: '1', country: 'RO', label: 'work' };
+    component.ngOnChanges({ model: {} as any });
+    expect(component.labelPreset).toBe('work');
+    expect(component.model.label).toBe('work');
+
+    component.model = { ...component.model, label: 'Studio label' };
+    component.ngOnChanges({ model: {} as any });
+    expect(component.labelPreset).toBe('custom');
+    expect(component.labelCustom).toBe('Studio label');
+  });
+};
+
+function defineAutocompleteApplySpec(): void {
+  it('applies autocomplete values and normalizes Romanian county names', () => {
+    const fixture = TestBed.createComponent(AddressFormComponent);
+    const component = fixture.componentInstance;
+    component.model = { line1: '', city: '', postal_code: '', country: 'RO' };
+    component.autocompleteQuery = 'bucu';
+    component.autocompleteResults = [{ display_name: 'Bucuresti', address: {} }];
+
+    component.applyAutocomplete({
+      display_name: 'Bucuresti',
+      address: { country_code: 'ro', house_number: '10', road: 'Strada Lunga', city: 'Bucuresti', state: 'ilfov', postcode: '010203' }
+    });
+
+    expect(component.model.country).toBe('RO');
+    expect(component.model.line1).toBe('10 Strada Lunga');
+    expect(component.model.city).toBe('Bucuresti');
+    expect(component.model.region).toBe('Ilfov');
+    expect(component.model.postal_code).toBe('010203');
+    expect(component.autocompleteQuery).toBe('');
+    expect(component.autocompleteResults).toEqual([]);
   });
 };

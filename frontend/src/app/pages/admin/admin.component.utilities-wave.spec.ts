@@ -456,3 +456,85 @@ describe('AdminComponent utility coverage wave', () => {
     expect(admin.createContent).toHaveBeenCalled();
   });
 });
+
+describe('AdminComponent draft manager coverage', () => {
+  const homeAutosaveKey = 'adrianaart.cms.autosave.home.sections';
+
+  beforeEach(() => {
+    window.localStorage.removeItem(homeAutosaveKey);
+  });
+
+  it('supports home draft undo and redo transitions', () => {
+    const { component } = createComponent();
+    const initialBlocks = [
+      (component as any).makeHomeBlockDraft('a', 'text', true)
+    ];
+    const updatedBlocks = [
+      ...initialBlocks,
+      (component as any).makeHomeBlockDraft('b', 'cta', true)
+    ];
+    const manager = (component as any).cmsHomeDraft;
+
+    manager.initFromServer(initialBlocks);
+    component.homeBlocks = updatedBlocks as any;
+
+    expect(component.homeDraftReady()).toBeTrue();
+    expect(component.homeDraftCanUndo()).toBeTrue();
+
+    component.undoHomeDraft();
+    expect(component.homeBlocks.map((block) => block.key)).toEqual(['a']);
+    expect(component.homeDraftCanRedo()).toBeTrue();
+
+    component.redoHomeDraft();
+    expect(component.homeBlocks.map((block) => block.key)).toEqual(['a', 'b']);
+    expect(component.homeDraftAutosaving()).toBeFalse();
+    expect(component.homeDraftLastAutosavedAt()).not.toBeNull();
+  });
+
+  it('restores autosaved home draft payloads and clears restore state', () => {
+    const { component } = createComponent();
+    const manager = (component as any).cmsHomeDraft;
+    const initialBlocks = [
+      (component as any).makeHomeBlockDraft('base', 'text', true)
+    ];
+    const restoredBlocks = [
+      ...initialBlocks,
+      (component as any).makeHomeBlockDraft('restored', 'faq', true)
+    ];
+    const autosaveAt = '2026-02-28T01:02:03.000Z';
+    window.localStorage.setItem(
+      homeAutosaveKey,
+      JSON.stringify({ v: 1, ts: autosaveAt, state_json: JSON.stringify(restoredBlocks) })
+    );
+
+    manager.initFromServer(initialBlocks);
+    component.homeBlocks = initialBlocks as any;
+
+    expect(component.homeDraftHasRestore()).toBeTrue();
+    expect(component.homeDraftRestoreAt()).toBe(autosaveAt);
+
+    component.restoreHomeDraftAutosave();
+    expect(component.homeBlocks.map((block) => block.key)).toEqual(['base', 'restored']);
+    expect(component.homeDraftHasRestore()).toBeFalse();
+
+    component.dismissHomeDraftAutosave();
+    expect(window.localStorage.getItem(homeAutosaveKey)).toBeNull();
+  });
+
+  it('drops autosave payloads that match server state', () => {
+    const { component } = createComponent();
+    const manager = (component as any).cmsHomeDraft;
+    const initialBlocks = [
+      (component as any).makeHomeBlockDraft('same', 'text', true)
+    ];
+    window.localStorage.setItem(
+      homeAutosaveKey,
+      JSON.stringify({ v: 1, ts: '2026-02-28T02:00:00.000Z', state_json: JSON.stringify(initialBlocks) })
+    );
+
+    manager.initFromServer(initialBlocks);
+
+    expect(component.homeDraftHasRestore()).toBeFalse();
+    expect(window.localStorage.getItem(homeAutosaveKey)).toBeNull();
+  });
+});

@@ -531,3 +531,279 @@ describe('AccountState comments and pagination helpers', () => {
     expect(state.returnCreateError).toContain('alreadyExists');
   });
 });
+
+describe('AccountState section navigation and section-loading branches', () => {
+  it('normalizes route sections and remembers the last valid section', () => {
+    const state = createStateHarness();
+    state.lastSectionStorageKey = 'account.lastSection';
+    state.route = { route: 'account' };
+    state.router = {
+      url: '/account/password?next=1',
+      navigate: jasmine.createSpy('navigate').and.returnValue(Promise.resolve(true)),
+      navigateByUrl: jasmine.createSpy('navigateByUrl').and.returnValue(Promise.resolve(true)),
+    };
+
+    expect(state.navigationSection()).toBe('security');
+    expect(state.activeSectionFromUrl('/account/orders#recent')).toBe('orders');
+    expect(state.activeSectionFromUrl('/shop')).toBe('overview');
+    expect(state.isAccountRootUrl('/account?tab=overview')).toBeTrue();
+    expect(state.isAccountRootUrl('/account/addresses')).toBeFalse();
+
+    state.navigateToSection(' password ');
+    expect(state.router.navigate).not.toHaveBeenCalled();
+
+    state.navigateToSection(' orders ');
+    expect(state.router.navigate).toHaveBeenCalledWith(['orders'], { relativeTo: state.route });
+
+    localStorage.setItem('account.lastSection', 'wishlist');
+    expect(state.lastVisitedSection()).toBe('wishlist');
+
+    state.rememberLastVisitedSection('password');
+    expect(localStorage.getItem('account.lastSection')).toBe('wishlist');
+
+    state.rememberLastVisitedSection('security');
+    expect(localStorage.getItem('account.lastSection')).toBe('security');
+
+    localStorage.setItem('account.lastSection', 'invalid');
+    expect(state.lastVisitedSection()).toBe('overview');
+  });
+
+  it('loads section-specific resources only for required sections', () => {
+    const state = createStateHarness();
+    state.stopExportJobPolling = jasmine.createSpy('stopExportJobPolling');
+    state.loadCooldowns = jasmine.createSpy('loadCooldowns');
+    state.loadAliases = jasmine.createSpy('loadAliases');
+    state.loadOrders = jasmine.createSpy('loadOrders');
+    state.loadAddresses = jasmine.createSpy('loadAddresses');
+    state.loadTickets = jasmine.createSpy('loadTickets');
+    state.loadSecondaryEmails = jasmine.createSpy('loadSecondaryEmails');
+    state.loadSessions = jasmine.createSpy('loadSessions');
+    state.loadSecurityEvents = jasmine.createSpy('loadSecurityEvents');
+    state.loadTwoFactorStatus = jasmine.createSpy('loadTwoFactorStatus');
+    state.loadPasskeys = jasmine.createSpy('loadPasskeys');
+    state.myCommentsMeta = mockSignal<any>(null);
+    state.loadMyComments = jasmine.createSpy('loadMyComments');
+    state.loadDeletionStatus = jasmine.createSpy('loadDeletionStatus');
+    state.loadLatestExportJob = jasmine.createSpy('loadLatestExportJob');
+    state.deletionStatus = mockSignal<any>(null);
+    const ensureLoaded = jasmine.createSpy('ensureLoaded');
+    state.wishlist = { ensureLoaded, isLoaded: () => true, items: () => [] };
+
+    state.ensureLoadedForSection('privacy');
+    expect(state.stopExportJobPolling).not.toHaveBeenCalled();
+    expect(state.loadDeletionStatus).toHaveBeenCalledTimes(1);
+    expect(state.loadLatestExportJob).toHaveBeenCalledTimes(1);
+
+    state.deletionStatus.set({ requested_at: '2026-02-27T00:00:00Z' });
+    state.ensureLoadedForSection('privacy');
+    expect(state.loadDeletionStatus).toHaveBeenCalledTimes(1);
+    expect(state.loadLatestExportJob).toHaveBeenCalledTimes(2);
+
+    state.ensureLoadedForSection('profile');
+    expect(state.loadCooldowns).toHaveBeenCalledTimes(1);
+    expect(state.loadAliases).toHaveBeenCalledTimes(1);
+
+    state.ensureLoadedForSection('security');
+    expect(state.loadSecondaryEmails).toHaveBeenCalledTimes(1);
+    expect(state.loadSessions).toHaveBeenCalledTimes(1);
+    expect(state.loadSecurityEvents).toHaveBeenCalledTimes(1);
+    expect(state.loadTwoFactorStatus).toHaveBeenCalledTimes(1);
+    expect(state.loadPasskeys).toHaveBeenCalledTimes(1);
+
+    state.ensureLoadedForSection('comments');
+    expect(state.loadMyComments).toHaveBeenCalledTimes(1);
+    state.myCommentsMeta.set({ page: 1, total_pages: 1 });
+    state.ensureLoadedForSection('comments');
+    expect(state.loadMyComments).toHaveBeenCalledTimes(1);
+
+    state.ensureLoadedForSection('overview');
+    expect(state.loadOrders).toHaveBeenCalled();
+    expect(state.loadAddresses).toHaveBeenCalled();
+    expect(state.loadTickets).toHaveBeenCalled();
+    expect(ensureLoaded).toHaveBeenCalled();
+  });
+});
+
+describe('AccountState filtering, address defaults and profile helper branches', () => {
+  it('validates order filters and paging boundaries', () => {
+    const state = createStateHarness();
+    state.loadOrders = jasmine.createSpy('loadOrders');
+    state.ordersError = mockSignal<string | null>(null);
+
+    state.ordersFrom = '2026-02-20';
+    state.ordersTo = '2026-02-01';
+    state.applyOrderFilters();
+    expect(state.ordersError()).toBe('account.orders.invalidDateRange');
+    expect(state.loadOrders).not.toHaveBeenCalled();
+
+    state.ordersError.set(null);
+    state.ordersFrom = '2026-02-01';
+    state.ordersTo = '2026-02-20';
+    state.page = 3;
+    state.applyOrderFilters();
+    expect(state.page).toBe(1);
+    expect(state.loadOrders).toHaveBeenCalledWith(true);
+
+    state.orderFilter = 'paid';
+    state.ordersQuery = 'REF';
+    expect(state.ordersFiltersActive()).toBeTrue();
+    state.clearOrderFilters();
+    expect(state.orderFilter).toBe('');
+    expect(state.ordersQuery).toBe('');
+
+    state.page = 1;
+    state.totalPages = 2;
+    state.nextPage();
+    expect(state.page).toBe(2);
+    state.nextPage();
+    expect(state.page).toBe(2);
+    state.prevPage();
+    expect(state.page).toBe(1);
+    state.prevPage();
+    expect(state.page).toBe(1);
+  });
+
+  it('updates default address flags and surfaces billing errors', () => {
+    const state = createStateHarness();
+    state.addresses.set([
+      { id: 'a1', label: 'home', is_default_shipping: true, is_default_billing: true },
+      { id: 'a2', label: 'work', is_default_shipping: false, is_default_billing: false },
+    ] as any);
+
+    state.account.updateAddress.and.returnValues(
+      of({ id: 'a2', label: 'work', is_default_shipping: true, is_default_billing: false }),
+      throwError(() => ({ error: { detail: 'No billing permission' } }))
+    );
+
+    state.setDefaultShipping({ id: 'a2' } as any);
+    const shippingAddresses = state.addresses();
+    expect(shippingAddresses.find((a: any) => a.id === 'a2')?.is_default_shipping).toBeTrue();
+    expect(shippingAddresses.find((a: any) => a.id === 'a1')?.is_default_shipping).toBeFalse();
+
+    state.setDefaultBilling({ id: 'a2' } as any);
+    expect(state.toast.error).toHaveBeenCalledWith('No billing permission');
+  });
+
+  it('computes profile completion requirements and required labels', () => {
+    const state = createStateHarness();
+
+    state.profile.set({
+      id: 'u1',
+      email: 'ana@example.com',
+      username: 'ana',
+      role: 'customer',
+      avatar_url: '/avatar.png'
+    });
+    state.profileName = 'Ana';
+    state.profileFirstName = 'Ana';
+    state.profileLastName = 'Pop';
+    state.profileDateOfBirth = '1990-01-01';
+    state.profilePhoneCountry = 'RO';
+    state.profilePhoneNational = '712345678';
+    state.profileLanguage = 'en';
+    state.emailVerified.set(true);
+
+    expect(state.profileCompleteness()).toEqual({ completed: 8, total: 8, percent: 100 });
+
+    state.profile.set({
+      id: 'u2',
+      email: 'missing@example.com',
+      username: 'missing',
+      role: 'customer',
+      google_sub: null
+    });
+    state.forceProfileCompletion = false;
+    expect(state.profileCompletionRequired()).toBeFalse();
+
+    state.profile.set({
+      id: 'u3',
+      email: 'missing@example.com',
+      username: 'missing',
+      role: 'customer',
+      google_sub: 'google-sub'
+    });
+    expect(state.profileCompletionRequired()).toBeTrue();
+
+    state.forceProfileCompletion = true;
+    state.profile.set({
+      id: 'u4',
+      email: 'missing@example.com',
+      username: 'missing',
+      role: 'customer',
+      google_sub: null
+    });
+    expect(state.profileCompletionRequired()).toBeTrue();
+
+    expect(state.requiredFieldLabelKey('phone')).toBe('auth.phone');
+    expect(state.requiredFieldLabelKey('username')).toBe('auth.username');
+    expect(state.requiredFieldLabelKey('unknown' as any)).toBeUndefined();
+  });
+});
+
+describe('AccountState coupon and phone helper branches', () => {
+  it('parses coupon boundaries and counts only currently available coupons', () => {
+    const state = createStateHarness();
+    const now = Date.parse('2026-02-27T12:00:00Z');
+    spyOn(Date, 'now').and.returnValue(now);
+
+    const coupons = [
+      {
+        is_active: true,
+        promotion: { is_active: true },
+        starts_at: '2026-02-01T00:00:00Z',
+        ends_at: '2026-03-01T00:00:00Z',
+      },
+      {
+        is_active: true,
+        promotion: { is_active: true },
+        starts_at: '2026-03-01T00:00:00Z',
+        ends_at: '2026-03-31T00:00:00Z',
+      },
+      {
+        is_active: true,
+        promotion: { is_active: false },
+        starts_at: '2026-02-01T00:00:00Z',
+        ends_at: '2026-03-01T00:00:00Z',
+      },
+      {
+        is_active: true,
+        promotion: { is_active: true },
+        starts_at: 'not-a-date',
+        ends_at: null,
+      },
+      {
+        is_active: false,
+        promotion: { is_active: true },
+        starts_at: null,
+        ends_at: null,
+      },
+    ];
+
+    expect((state as any).parseCouponDateBoundary('2026-02-28T00:00:00Z')).toBe(Date.parse('2026-02-28T00:00:00Z'));
+    expect((state as any).parseCouponDateBoundary('bad-date')).toBeNull();
+    expect((state as any).isCouponAvailableAt(coupons[0], now)).toBeTrue();
+    expect((state as any).isCouponAvailableAt(coupons[1], now)).toBeFalse();
+    expect((state as any).countAvailableCoupons(coupons as any)).toBe(2);
+  });
+
+  it('computes resend cooldown seconds and phone previews', () => {
+    const state = createStateHarness();
+    const now = Date.parse('2026-02-27T00:00:00Z');
+    state.now.set(now);
+    state.primaryVerificationResendUntil = mockSignal<number | null>(null);
+
+    state.primaryVerificationResendUntil.set(now + 2_500);
+    expect(state.primaryVerificationResendRemainingSeconds()).toBe(3);
+
+    state.primaryVerificationResendUntil.set(now - 1_000);
+    expect(state.primaryVerificationResendRemainingSeconds()).toBe(0);
+
+    state.profilePhoneCountry = 'RO';
+    state.profilePhoneNational = '712345678';
+    expect(state.phoneNationalPreview()).toContain('712');
+    expect(state.phoneE164Preview()).toContain('+40');
+
+    expect((state as any).parseTimestampMs('bad-date')).toBeNull();
+    expect((state as any).parseTimestampMs('2026-02-27T00:00:00Z')).toBe(Date.parse('2026-02-27T00:00:00Z'));
+  });
+});

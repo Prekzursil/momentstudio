@@ -3,9 +3,11 @@ from __future__ import annotations
 import asyncio
 from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException
+from sqlalchemy.exc import IntegrityError
 from starlette.requests import Request
 
 from app.api.v1 import admin_dashboard
@@ -88,6 +90,164 @@ def test_summary_resolve_range_defaults_and_validations() -> None:
 
     with pytest.raises(HTTPException):
         admin_dashboard._summary_resolve_range(now, 7, date(2026, 2, 5), date(2026, 2, 1))
+
+
+@pytest.mark.anyio
+async def test_admin_dashboard_get_alert_thresholds_create_and_retry_paths() -> None:
+    class _ThresholdSession:
+        def __init__(self, scalar_values: list[object | None], *, commit_error: Exception | None = None) -> None:
+            self._scalar_values = list(scalar_values)
+            self.commit_error = commit_error
+            self.added: list[object] = []
+            self.commits = 0
+            self.rollbacks = 0
+
+        async def scalar(self, _stmt: object) -> object | None:
+            if not self._scalar_values:
+                return None
+            return self._scalar_values.pop(0)
+
+        def add(self, value: object) -> None:
+            self.added.append(value)
+
+        async def commit(self) -> None:
+            self.commits += 1
+            if self.commits == 1 and self.commit_error is not None:
+                raise self.commit_error
+
+        async def rollback(self) -> None:
+            self.rollbacks += 1
+
+    existing = SimpleNamespace(key='default')
+    session_existing = _ThresholdSession([existing])
+    assert await admin_dashboard._get_dashboard_alert_thresholds(session_existing) is existing
+    assert session_existing.added == []
+    assert session_existing.commits == 0
+
+    session_created = _ThresholdSession([None])
+    created = await admin_dashboard._get_dashboard_alert_thresholds(session_created)
+    assert created.key == 'default'
+    assert len(session_created.added) == 1
+    assert session_created.commits == 1
+
+    recovered = SimpleNamespace(key='default')
+    session_retry = _ThresholdSession(
+        [None, recovered],
+        commit_error=IntegrityError('insert', {'key': 'default'}, Exception('duplicate')),
+    )
+    assert await admin_dashboard._get_dashboard_alert_thresholds(session_retry) is recovered
+    assert session_retry.rollbacks == 1
+    assert session_retry.commits == 1
+
+
+def test_admin_dashboard_summary_and_audit_payload_helpers() -> None:
+    assert admin_dashboard._summary_failed_payments_is_alert(1, 200.0, threshold_min_count=2, threshold_min_delta_pct=10.0) is False
+    assert admin_dashboard._summary_failed_payments_is_alert(3, None, threshold_min_count=2, threshold_min_delta_pct=10.0) is True
+    assert admin_dashboard._summary_failed_payments_is_alert(3, 5.0, threshold_min_count=2, threshold_min_delta_pct=10.0) is False
+    assert admin_dashboard._summary_failed_payments_is_alert(3, 15.0, threshold_min_count=2, threshold_min_delta_pct=10.0) is True
+
+    assert admin_dashboard._summary_refund_requests_is_alert(1, 30.0, threshold_min_count=2, threshold_min_rate_pct=10.0) is False
+    assert admin_dashboard._summary_refund_requests_is_alert(3, None, threshold_min_count=2, threshold_min_rate_pct=10.0) is True
+    assert admin_dashboard._summary_refund_requests_is_alert(3, 8.0, threshold_min_count=2, threshold_min_rate_pct=10.0) is False
+    assert admin_dashboard._summary_refund_requests_is_alert(3, 12.0, threshold_min_count=2, threshold_min_rate_pct=10.0) is True
+
+    failed_payload = admin_dashboard._summary_failed_payments_payload(
+        failed_payments=4,
+        failed_payments_prev=2,
+        threshold_min_count=2,
+        threshold_min_delta_pct=50.0,
+    )
+    assert failed_payload['delta_pct'] == pytest.approx(100.0)
+    assert failed_payload['is_alert'] is True
+
+    refund_payload = admin_dashboard._summary_refund_requests_payload(
+        refund_requests=4,
+        refund_requests_prev=2,
+        refund_window_orders=20,
+        refund_window_orders_prev=10,
+        threshold_min_count=2,
+        threshold_min_rate_pct=15.0,
+    )
+    assert refund_payload['current_rate_pct'] == pytest.approx(20.0)
+    assert refund_payload['rate_delta_pct'] == pytest.approx(0.0)
+    assert refund_payload['is_alert'] is True
+
+    anomalies = admin_dashboard._summary_anomalies_payload(
+        anomaly_inputs={
+            'failed_payments': 4,
+            'failed_payments_prev': 2,
+            'refund_requests': 3,
+            'refund_requests_prev': 1,
+            'refund_window_orders': 15,
+            'refund_window_orders_prev': 10,
+            'stockouts': 5,
+        },
+        thresholds_payload={
+            'failed_payments_min_count': 2,
+            'failed_payments_min_delta_pct': 20.0,
+            'refund_requests_min_count': 2,
+            'refund_requests_min_rate_pct': 10.0,
+            'stockouts_min_count': 4,
+        },
+    )
+    assert anomalies['failed_payments']['is_alert'] is True
+    assert anomalies['refund_requests']['is_alert'] is True
+    assert anomalies['stockouts']['is_alert'] is True
+
+    start = datetime(2026, 2, 1, tzinfo=timezone.utc)
+    end = datetime(2026, 2, 8, tzinfo=timezone.utc)
+    overview = admin_dashboard._summary_overview_payload(
+        totals={'products': 1, 'orders': 2, 'users': 3, 'low_stock': 4},
+        sales_30d_metrics={'sales': 100.0, 'gross_sales': 120.0, 'net_sales': 90.0, 'orders': 5},
+        range_metrics={'sales': 40.0, 'gross_sales': 50.0, 'net_sales': 35.0, 'orders': 2},
+        effective_range_days=7,
+        start=start,
+        end=end,
+    )
+    assert overview['range_from'] == '2026-02-01'
+    assert overview['range_to'] == '2026-02-07'
+
+    day_payload = admin_dashboard._summary_day_payload(
+        {
+            'today_orders': 3,
+            'yesterday_orders': 2,
+            'orders_delta_pct': 50.0,
+            'today_sales': 60.0,
+            'yesterday_sales': 40.0,
+            'sales_delta_pct': 50.0,
+            'gross_today_sales': 70.0,
+            'gross_yesterday_sales': 50.0,
+            'gross_sales_delta_pct': 40.0,
+            'net_today_sales': 55.0,
+            'net_yesterday_sales': 35.0,
+            'net_sales_delta_pct': 57.0,
+            'today_refunds': 1,
+            'yesterday_refunds': 0,
+            'refunds_delta_pct': None,
+        }
+    )
+    assert day_payload['today_orders'] == 3
+    assert day_payload['today_refunds'] == 1
+
+    long_agent = 'A' * 300
+    request = _request_with_scope(headers=[(b'user-agent', long_agent.encode('ascii'))], client=('203.0.113.11', 443))
+    admin_meta = admin_dashboard._admin_request_metadata(request)
+    assert admin_meta['ip_address'] == '203.0.113.11'
+    assert admin_meta['user_agent'] == 'A' * 255
+
+    audit_data = admin_dashboard._admin_send_report_audit_data(
+        kind='weekly',
+        force=True,
+        request_meta={'user_agent': 'Agent/1.0', 'ip_address': '203.0.113.11'},
+        result={'attempted': 2},
+        error=RuntimeError('x' * 600),
+    )
+    assert audit_data['kind'] == 'weekly'
+    assert audit_data['result'] == {'attempted': 2}
+    assert len(str(audit_data['error'])) == 500
+
+    assert admin_dashboard._funnel_rate(1, 0) is None
+    assert admin_dashboard._funnel_rate(2, 4) == pytest.approx(0.5)
 
 
 def test_admin_reports_parse_helpers() -> None:
@@ -473,3 +633,172 @@ async def test_send_report_now_error_and_success_paths(monkeypatch: pytest.Monke
     assert sent['delivered'] == 1
     assert sent['skipped'] is False
     assert any('reports_weekly_last_sent_period_end' in item for item in updates)
+
+
+def test_admin_dashboard_channel_shipping_and_refund_helper_branches() -> None:
+    assert admin_dashboard._channel_normalize_value(123) == ''
+    assert admin_dashboard._channel_extract(None) == ('direct', None, None)
+    assert admin_dashboard._channel_extract({'utm_source': ' Google ', 'utm_medium': ' CPC ', 'utm_campaign': ' Spring '}) == (
+        'google',
+        'cpc',
+        'Spring',
+    )
+
+    order_a = uuid4()
+    order_b = uuid4()
+    channel_rows, tracked_orders, tracked_sales = admin_dashboard._channel_aggregate(
+        order_to_session={order_a: 'session-a', order_b: 'session-b'},
+        order_amounts={order_a: 120.0, order_b: 30.0},
+        session_payload={
+            'session-a': {'utm_source': 'newsletter', 'utm_medium': 'email', 'utm_campaign': 'launch'},
+            'session-b': None,
+        },
+    )
+    assert tracked_orders == 2
+    assert tracked_sales == pytest.approx(150.0)
+    assert channel_rows[0]['source'] == 'newsletter'
+    assert channel_rows[0]['orders'] == 1
+    assert admin_dashboard._channel_coverage_pct(0, 0) is None
+    assert admin_dashboard._channel_coverage_pct(1, 4) == pytest.approx(0.25)
+
+    start = datetime(2026, 2, 1, tzinfo=timezone.utc)
+    end = datetime(2026, 2, 8, tzinfo=timezone.utc)
+    empty_payload = admin_dashboard._channel_empty_response(
+        effective_range_days=7,
+        start=start,
+        end=end,
+        total_orders=2,
+        total_gross_sales=99.0,
+    )
+    assert empty_payload['coverage_pct'] == 0.0
+    limited_payload = admin_dashboard._channel_limited_response(
+        effective_range_days=7,
+        start=start,
+        end=end,
+        total_orders=4,
+        total_gross_sales=100.0,
+        tracked_orders=2,
+        tracked_gross_sales=50.0,
+        channels=channel_rows,
+        limit=1,
+    )
+    assert len(limited_payload['channels']) == 1
+    assert limited_payload['coverage_pct'] == pytest.approx(0.5)
+
+    duration_rows = [
+        ('sameday', start, start + timedelta(hours=5)),
+        ('fan', None, start + timedelta(hours=2)),
+        ('fan', start + timedelta(hours=2), start),
+        ('fan', start, start + timedelta(days=400)),
+    ]
+    durations = admin_dashboard._shipping_duration_map(duration_rows, courier_idx=0, start_idx=1, end_idx=2)
+    assert durations == {'sameday': [5.0]}
+
+    shipping_rows = admin_dashboard._shipping_rows(
+        current_durations={'sameday': [4.0, 6.0], 'fan': [3.0]},
+        previous_durations={'sameday': [5.0]},
+    )
+    sameday = next(item for item in shipping_rows if item['courier'] == 'sameday')
+    assert sameday['current']['count'] == 2
+    assert sameday['delta_pct']['avg_hours'] == pytest.approx(0.0)
+    shipping_payload = admin_dashboard._shipping_response_payload(
+        7,
+        start,
+        end,
+        {'sameday': [4.0]},
+        {'sameday': [5.0]},
+        {'sameday': [24.0]},
+        {'sameday': [30.0]},
+    )
+    assert shipping_payload['window_days'] == 7
+    assert len(shipping_payload['time_to_ship']) == 1
+
+    assert 'stricat' in admin_dashboard._normalize_refund_reason_text('  Ștricat ')
+    assert admin_dashboard._refund_reason_category('Wrong product received') == 'wrong_item'
+    assert admin_dashboard._refund_reason_category('') == 'other'
+
+    providers = admin_dashboard._refund_provider_payload(
+        current_provider=[('stripe', 2, 30.0), ('paypal', 1, 10.0)],
+        previous_provider=[('stripe', 1, 15.0)],
+    )
+    assert providers[0]['provider'] == 'stripe'
+    assert providers[1]['delta_pct']['count'] is None
+
+    reasons = admin_dashboard._refund_reasons_payload(
+        current_reasons={'damaged': 2, 'other': 1},
+        previous_reasons={'damaged': 1},
+    )
+    assert reasons[0]['category'] == 'damaged'
+    assert any(item['category'] == 'other' for item in reasons)
+
+
+def test_admin_dashboard_audit_duplicate_and_gdpr_helpers(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert admin_dashboard._duplicate_value('  SKU-1  ') == 'SKU-1'
+    assert admin_dashboard._duplicate_slug_base('Fancy Ring') == 'fancy-ring'
+    assert admin_dashboard._duplicate_slug_base('') is None
+    assert admin_dashboard._duplicate_suggested_slug('ring', {'ring', 'ring-2'}) == 'ring-3'
+
+    assert admin_dashboard._audit_mask_email('john@example.com') == 'j***@example.com'
+    assert admin_dashboard._audit_mask_email('x@example.com') == '*@example.com'
+    redacted = admin_dashboard._audit_redact_text(
+        'User john@example.com from 192.168.1.5 and 2001:db8::1'
+    )
+    assert 'j***@example.com' in redacted
+    assert '***.***.***.***' in redacted
+    assert '****:****:****:****' in redacted
+    assert admin_dashboard._audit_csv_cell('=2+2').startswith("'=")
+    assert admin_dashboard._audit_csv_cell('hello\nworld') == 'hello world'
+    assert admin_dashboard._audit_total_pages(0, 25) == 1
+    assert admin_dashboard._audit_total_pages(51, 25) == 3
+
+    row = {
+        'created_at': datetime(2026, 2, 20, tzinfo=timezone.utc),
+        'entity': 'security',
+        'action': 'login',
+        'actor_email': 'admin@example.com',
+        'subject_email': 'user@example.com',
+        'ref_key': 'auth',
+        'ref_id': '1',
+        'actor_user_id': 'admin-id',
+        'subject_user_id': 'user-id',
+        'data': 'ip=127.0.0.1 email=user@example.com',
+    }
+    csv_content = admin_dashboard._audit_export_csv_content([row], redact=True)
+    assert 'created_at,entity,action' in csv_content
+    assert 'a****@example.com' in csv_content
+    assert '***.***.***.***' in csv_content
+
+    now = datetime(2026, 2, 20, tzinfo=timezone.utc)
+    assert admin_dashboard._gdpr_deletion_status(None, now) == 'scheduled'
+    assert admin_dashboard._gdpr_deletion_status(now - timedelta(seconds=1), now) == 'due'
+    assert admin_dashboard._gdpr_deletion_status(now + timedelta(seconds=1), now) == 'cooldown'
+    assert admin_dashboard._gdpr_export_sla_days() >= 1
+
+    session_row = SimpleNamespace(
+        id=uuid4(),
+        created_at=datetime(2026, 2, 20, 8, 0),
+        expires_at=datetime(2026, 2, 20, 9, 0),
+        persistent=True,
+        user_agent='Agent',
+        ip_address='198.51.100.1',
+        country_code='RO',
+    )
+    session_payload = admin_dashboard._refresh_session_to_response(session_row, now=datetime(2026, 2, 20, 8, 30, tzinfo=timezone.utc))
+    assert session_payload is not None
+    assert session_payload.created_at.tzinfo == timezone.utc
+    assert session_payload.is_current is False
+    assert (
+        admin_dashboard._refresh_session_to_response(
+            SimpleNamespace(
+                id=uuid4(),
+                created_at=datetime(2026, 2, 20, 8, 0, tzinfo=timezone.utc),
+                expires_at=datetime(2026, 2, 20, 8, 15, tzinfo=timezone.utc),
+                persistent=True,
+                user_agent=None,
+                ip_address=None,
+                country_code=None,
+            ),
+            now=datetime(2026, 2, 20, 8, 30, tzinfo=timezone.utc),
+        )
+        is None
+    )

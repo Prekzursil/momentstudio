@@ -29,6 +29,10 @@ describe('AdminService', () => {
   defineMaintenanceStateSpec();
   defineListCouponsSpec();
   defineSocialThumbnailSpec();
+  defineGlobalSearchSpec();
+  defineReorderProductImageSpec();
+  definePreviewTokenSpec();
+  defineDeleteContentSpec();
 });
 
 function defineSummarySpec(): void {
@@ -173,5 +177,69 @@ function defineSocialThumbnailSpec(): void {
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({ url: 'https://www.instagram.com/example/' });
     req.flush({ thumbnail_url: 'https://cdn.example/thumb.png' });
+  });
+};
+
+function defineGlobalSearchSpec(): void {
+  it('should set include_pii by default and allow explicit false', () => {
+    adminService.globalSearch('invoice-1').subscribe();
+    const defaultReq = adminServiceHttpMock.expectOne((r) => r.url === '/api/v1/admin/dashboard/search');
+    expect(defaultReq.request.method).toBe('GET');
+    expect(defaultReq.request.params.get('q')).toBe('invoice-1');
+    expect(defaultReq.request.params.get('include_pii')).toBe('true');
+    defaultReq.flush({ results: [] });
+
+    adminService.globalSearch('invoice-2', { include_pii: false }).subscribe();
+    const hiddenReq = adminServiceHttpMock.expectOne((r) => r.url === '/api/v1/admin/dashboard/search');
+    expect(hiddenReq.request.params.get('q')).toBe('invoice-2');
+    expect(hiddenReq.request.params.get('include_pii')).toBe('false');
+    hiddenReq.flush({ results: [] });
+  });
+};
+
+function defineReorderProductImageSpec(): void {
+  it('should send sort order and optional source when reordering product images', () => {
+    adminService.reorderProductImage('slug-a', 'img-a', 4, { source: 'storefront' }).subscribe();
+    const sourcedReq = adminServiceHttpMock.expectOne((r) => r.url.startsWith('/api/v1/catalog/products/slug-a/images/img-a/sort'));
+    expect(sourcedReq.request.method).toBe('PATCH');
+    expect(sourcedReq.request.body).toEqual({});
+    expect(sourcedReq.request.params.get('sort_order')).toBe('4');
+    expect(sourcedReq.request.params.get('source')).toBe('storefront');
+    sourcedReq.flush({ id: 'p-1' });
+
+    adminService.reorderProductImage('slug-b', 'img-b', 9).subscribe();
+    const plainReq = adminServiceHttpMock.expectOne((r) => r.url.startsWith('/api/v1/catalog/products/slug-b/images/img-b/sort'));
+    expect(plainReq.request.params.get('sort_order')).toBe('9');
+    expect(plainReq.request.params.has('source')).toBeFalse();
+    plainReq.flush({ id: 'p-2' });
+  });
+};
+
+function definePreviewTokenSpec(): void {
+  it('should build preview token URLs with encoded slug and optional query params', () => {
+    adminService.createPagePreviewToken('home/main', { lang: 'ro', expires_minutes: 30 }).subscribe();
+    const pageReq = adminServiceHttpMock.expectOne(
+      '/api/v1/content/pages/home%2Fmain/preview-token?lang=ro&expires_minutes=30'
+    );
+    expect(pageReq.request.method).toBe('POST');
+    expect(pageReq.request.body).toEqual({});
+    pageReq.flush({ token: 'page' });
+
+    adminService.createHomePreviewToken().subscribe();
+    const homeReq = adminServiceHttpMock.expectOne('/api/v1/content/home/preview-token');
+    expect(homeReq.request.method).toBe('POST');
+    expect(homeReq.request.body).toEqual({});
+    homeReq.flush({ token: 'home' });
+  });
+};
+
+function defineDeleteContentSpec(): void {
+  it('should URL-encode content keys when deleting content', () => {
+    adminService.deleteContent('about/us').subscribe((res) => {
+      expect(res).toBeNull();
+    });
+    const req = adminServiceHttpMock.expectOne('/api/v1/content/admin/about%2Fus');
+    expect(req.request.method).toBe('DELETE');
+    req.flush(null);
   });
 };

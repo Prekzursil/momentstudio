@@ -59,6 +59,11 @@ describe('LockerPickerComponent', () => {
 
   defineCitySuggestionSpec();
   defineMirrorUnavailableSpec();
+  defineNoGeolocationSpec();
+  defineShortSearchSpec();
+  defineSearchFirstResultSpec();
+  defineGenericLoadErrorSpec();
+  defineStaleDaysSpec();
 });
 
 function defineCitySuggestionSpec(): void {
@@ -88,5 +93,64 @@ function defineMirrorUnavailableSpec(): void {
 
     await (lockerPickerComponent as any).loadLockers(44.4, 26.1);
     expect(lockerPickerComponent.error).toContain('checkout.lockers.mirrorUnavailable');
+  });
+};
+
+function defineNoGeolocationSpec(): void {
+  it('surfaces a no-geolocation error when geolocation API is unavailable', () => {
+    spyOnProperty(window.navigator, 'geolocation', 'get').and.returnValue(undefined as any);
+
+    lockerPickerComponent.useMyLocation();
+
+    expect(lockerPickerComponent.error).toContain('checkout.lockers.noGeolocation');
+  });
+};
+
+function defineShortSearchSpec(): void {
+  it('clears search results and aborts in-flight lookup for short search strings', () => {
+    const controller = new AbortController();
+    const abortSpy = spyOn(controller, 'abort').and.callThrough();
+    lockerPickerComponent.searchResults = [{ display_name: 'Old', lat: 1, lng: 2 }];
+    (lockerPickerComponent as any).searchAbort = controller;
+
+    lockerPickerComponent.onSearchQueryChange('ab');
+
+    expect(lockerPickerComponent.searchResults).toEqual([]);
+    expect(abortSpy).toHaveBeenCalled();
+  });
+};
+
+function defineSearchFirstResultSpec(): void {
+  it('applies the first in-memory search result before performing remote lookup', () => {
+    lockerPickerShipping.listLockerCities.calls.reset();
+    const applySpy = spyOn(lockerPickerComponent, 'applyLocation');
+    lockerPickerComponent.searchQuery = 'bucu';
+    lockerPickerComponent.searchResults = [{ display_name: 'Bucuresti', lat: 44.43, lng: 26.1 }];
+
+    lockerPickerComponent.searchFirstResult();
+
+    expect(applySpy).toHaveBeenCalledWith(lockerPickerComponent.searchResults[0]);
+    expect(lockerPickerShipping.listLockerCities).not.toHaveBeenCalled();
+  });
+};
+
+function defineGenericLoadErrorSpec(): void {
+  it('uses the generic locker error for non-sameday providers', async () => {
+    lockerPickerShipping.listLockers.and.returnValue(throwError(() => ({ error: { detail: 'service unavailable' } })));
+    lockerPickerComponent.provider = 'fan_courier';
+
+    await (lockerPickerComponent as any).loadLockers(44.4, 26.1);
+
+    expect(lockerPickerComponent.error).toContain('checkout.lockers.error');
+  });
+};
+
+function defineStaleDaysSpec(): void {
+  it('returns fallback and computed stale day values from mirror snapshots', () => {
+    lockerPickerComponent.mirrorSnapshot = { stale_age_seconds: null } as any;
+    expect(lockerPickerComponent.staleDays()).toBe(30);
+
+    lockerPickerComponent.mirrorSnapshot = { stale_age_seconds: 86400 * 7.9 } as any;
+    expect(lockerPickerComponent.staleDays()).toBe(7);
   });
 };

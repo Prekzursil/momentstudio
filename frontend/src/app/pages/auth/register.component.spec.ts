@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { ActivatedRoute } from '@angular/router';
 import { RouterTestingModule } from '@angular/router/testing';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { AuthResponse, AuthService } from '../../core/auth.service';
 import { ToastService } from '../../core/toast.service';
 import { RegisterComponent } from './register.component';
@@ -60,7 +60,7 @@ const expectRegistrationPayload = (auth: jasmine.SpyObj<AuthService>): void => {
 
 describe('RegisterComponent', () => {
   it('submits registration payload with derived E.164 phone', () => {
-    const auth = jasmine.createSpyObj<AuthService>('AuthService', ['register', 'startGoogleLogin']);
+    const auth = jasmine.createSpyObj<AuthService>('AuthService', ['register', 'startGoogleLogin', 'completeGoogleRegistration']);
     const toast = jasmine.createSpyObj<ToastService>('ToastService', ['success', 'error']);
     const router = jasmine.createSpyObj<Router>('Router', ['navigateByUrl']);
     router.navigateByUrl.and.returnValue(Promise.resolve(true));
@@ -87,5 +87,80 @@ describe('RegisterComponent', () => {
     expectRegistrationPayload(auth);
     expect(router.navigateByUrl).toHaveBeenCalledWith('/account');
     expect(toast.success).toHaveBeenCalled();
+  });
+
+  it('covers goNext, captcha guard, and registration error reset branches', () => {
+    const auth = jasmine.createSpyObj<AuthService>('AuthService', ['register', 'startGoogleLogin', 'completeGoogleRegistration']);
+    const toast = jasmine.createSpyObj<ToastService>('ToastService', ['success', 'error']);
+    const router = jasmine.createSpyObj<Router>('Router', ['navigateByUrl']);
+    router.navigateByUrl.and.returnValue(Promise.resolve(true));
+    auth.register.and.returnValue(throwError(() => ({ error: { detail: 'duplicate email' } })));
+
+    configureRegisterTestingModule(auth, toast, router);
+    const fixture = TestBed.createComponent(RegisterComponent);
+    const cmp = fixture.componentInstance;
+
+    cmp.step = 1;
+    cmp.displayName = 'Ana';
+    cmp.username = 'ana2005l';
+    cmp.email = 'ana@example.com';
+    cmp.password = 'secret-1';
+    cmp.confirmPassword = 'secret-2';
+    cmp.goNext({ valid: true, form: { markAllAsTouched: () => undefined } } as any);
+    expect(cmp.error).toBeTruthy();
+    expect(cmp.step).toBe(1);
+
+    fillValidRegisterForm(cmp);
+    cmp.captchaEnabled = true;
+    cmp.captchaToken = null;
+    cmp.onSubmit({ valid: true, form: { markAllAsTouched: () => undefined } } as any);
+    expect(cmp.error).toBe('auth.captchaRequired');
+
+    cmp.captchaToken = 'captcha-token';
+    cmp.captcha = { reset: jasmine.createSpy('reset') } as any;
+    cmp.onSubmit({ valid: true, form: { markAllAsTouched: () => undefined } } as any);
+    expect(auth.register).toHaveBeenCalled();
+    expect(cmp.captcha?.reset).toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith('duplicate email');
+  });
+
+  it('covers google start and completion-mode branches', () => {
+    const auth = jasmine.createSpyObj<AuthService>('AuthService', ['register', 'startGoogleLogin', 'completeGoogleRegistration']);
+    const toast = jasmine.createSpyObj<ToastService>('ToastService', ['success', 'error']);
+    const router = jasmine.createSpyObj<Router>('Router', ['navigateByUrl']);
+    router.navigateByUrl.and.returnValue(Promise.resolve(true));
+    auth.startGoogleLogin.and.returnValue(throwError(() => ({ error: { detail: 'google failed' } })));
+    auth.completeGoogleRegistration.and.returnValue(of({} as any));
+
+    configureRegisterTestingModule(auth, toast, router);
+
+    const fixture = TestBed.createComponent(RegisterComponent);
+    const cmp = fixture.componentInstance;
+
+    cmp.startGoogle();
+    expect(toast.error).toHaveBeenCalledWith('google failed');
+
+    const event = {
+      preventDefault: jasmine.createSpy('preventDefault'),
+      stopPropagation: jasmine.createSpy('stopPropagation')
+    } as unknown as Event;
+    cmp.onConsentAttempt(event, 'terms');
+    expect(cmp.consentModalOpen).toBeTrue();
+    cmp.confirmConsentModal();
+    expect(cmp.acceptTerms).toBeTrue();
+    cmp.closeConsentModal();
+    expect(cmp.consentModalOpen).toBeFalse();
+
+    cmp.completionMode = true;
+    (cmp as any).googleCompletionToken = null;
+    fillValidRegisterForm(cmp);
+    cmp.captchaEnabled = false;
+    cmp.onSubmit({ valid: true, form: { markAllAsTouched: () => undefined } } as any);
+    expect(toast.error).toHaveBeenCalled();
+
+    (cmp as any).googleCompletionToken = 'completion-token';
+    cmp.onSubmit({ valid: true, form: { markAllAsTouched: () => undefined } } as any);
+    expect(auth.completeGoogleRegistration).toHaveBeenCalled();
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/account');
   });
 });

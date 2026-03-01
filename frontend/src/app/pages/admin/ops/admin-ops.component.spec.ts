@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 
 import { AdminService } from '../../../core/admin.service';
 import { HealthService } from '../../../core/health.service';
@@ -197,5 +197,136 @@ describe('AdminOpsComponent', () => {
     expect(ops.getSamedaySyncStatus).toHaveBeenCalled();
     expect(text).toContain('adminUi.ops.samedaySync.title');
     expect(text).toContain('adminUi.ops.samedaySync.canaryTitle');
+  });
+
+  it('covers health and diagnostics error branches', () => {
+    health.ready.and.returnValue(throwError(() => new Error('health down')));
+    ops.getWebhookFailureStats.and.returnValue(throwError(() => new Error('webhooks failed')));
+    ops.getWebhookBacklogStats.and.returnValue(throwError(() => new Error('webhooks backlog failed')));
+    ops.getEmailFailureStats.and.returnValue(throwError(() => new Error('emails failed')));
+    ops.getDiagnostics.and.returnValue(throwError(() => new Error('diag failed')));
+    adminService.getMediaTelemetry.and.returnValue(throwError(() => new Error('dam failed')));
+
+    const fixture = TestBed.createComponent(AdminOpsComponent);
+    fixture.detectChanges();
+    const cmp = fixture.componentInstance;
+
+    expect(cmp.healthError()).toBeTruthy();
+    expect(cmp.diagnosticsError()).toBeTruthy();
+    expect(cmp.damTelemetryError()).toBe('Failed to load DAM telemetry.');
+    expect(cmp.backendReady()).toBeFalse();
+    expect(cmp.formatDamAge(null)).toBe('n/a');
+    expect(cmp.formatDamAge(30)).toBe('30s');
+    expect(cmp.formatDamAge(120)).toBe('2m');
+    expect(cmp.formatDamAge(7200)).toBe('2h');
+    expect(cmp.diagnosticsBadgeClass('ok')).toContain('emerald');
+    expect(cmp.diagnosticsBadgeClass('warning')).toContain('amber');
+    expect(cmp.diagnosticsBadgeClass('error')).toContain('rose');
+    expect(cmp.diagnosticsBadgeClass('unknown')).toContain('slate');
+  });
+
+  it('covers banner save/delete flows and simulation branches', () => {
+    const fixture = TestBed.createComponent(AdminOpsComponent);
+    fixture.detectChanges();
+    const cmp = fixture.componentInstance;
+    spyOn(window, 'confirm').and.returnValue(true);
+
+    cmp.bannerStartsAtLocal = '';
+    cmp.bannerMessageEn = '';
+    cmp.bannerMessageRo = '';
+    cmp.saveBanner();
+    expect(toast.error).toHaveBeenCalled();
+
+    cmp.bannerStartsAtLocal = '2026-02-18T12:00';
+    cmp.bannerMessageEn = 'Maintenance';
+    cmp.bannerMessageRo = 'Mentenanta';
+    cmp.saveBanner();
+    expect(ops.createBanner).toHaveBeenCalled();
+
+    cmp.editingBannerId = 'banner-1';
+    cmp.bannerStartsAtLocal = '2026-02-19T09:00';
+    cmp.bannerMessageEn = 'Maintenance 2';
+    cmp.bannerMessageRo = 'Mentenanta 2';
+    cmp.saveBanner();
+    expect(ops.updateBanner).toHaveBeenCalled();
+
+    ops.deleteBanner.and.returnValue(throwError(() => ({ error: { detail: 'delete denied' } })));
+    cmp.deleteBanner('banner-1');
+    expect(toast.error).toHaveBeenCalledWith('delete denied');
+
+    cmp.simSubtotal = '';
+    cmp.runSimulation();
+    expect(toast.error).toHaveBeenCalled();
+
+    cmp.simSubtotal = '120.50';
+    cmp.simDiscount = '5';
+    cmp.simShippingMethodId = 'ship-1';
+    cmp.simPostalCode = '010101';
+    cmp.runSimulation();
+    expect(ops.simulateShipping).toHaveBeenCalled();
+  });
+
+  it('covers webhook detail/retry and email failure list branches', () => {
+    const fixture = TestBed.createComponent(AdminOpsComponent);
+    fixture.detectChanges();
+    const cmp = fixture.componentInstance;
+
+    ops.getWebhookDetail.and.returnValue(of({ provider: 'stripe', event_id: 'evt-1' } as any));
+    cmp.viewWebhook({ provider: 'stripe', event_id: 'evt-1', status: 'failed' } as any);
+    expect(cmp.selectedWebhook()?.event_id).toBe('evt-1');
+    cmp.closeWebhookDetail();
+    expect(cmp.selectedWebhook()).toBeNull();
+
+    ops.retryWebhook.and.returnValue(of({} as any));
+    cmp.retryWebhook({ provider: 'stripe', event_id: 'evt-1', status: 'failed' } as any);
+    expect(ops.retryWebhook).toHaveBeenCalledWith('stripe', 'evt-1');
+    expect(ops.listWebhooks).toHaveBeenCalled();
+
+    ops.retryWebhook.and.returnValue(throwError(() => ({ error: { detail: 'retry denied' } })));
+    cmp.retryWebhook({ provider: 'stripe', event_id: 'evt-2', status: 'failed' } as any);
+    expect(toast.error).toHaveBeenCalledWith('retry denied');
+
+    ops.listEmailFailures.and.returnValue(throwError(() => new Error('email load failed')));
+    cmp.loadEmailFailures();
+    expect(cmp.emailFailuresError()).toBeTruthy();
+    cmp.resetEmailFailureFilters();
+    expect(cmp.emailFailuresTo).toBe('');
+    expect(cmp.emailFailuresSinceHours).toBe(24);
+    expect(cmp.webhookStatusClasses('failed')).toContain('rose');
+    expect(cmp.webhookStatusClasses('processed')).toContain('emerald');
+    expect(cmp.webhookStatusClasses('queued')).toContain('slate');
+  });
+
+  it('covers sync-run errors, export branches, and timestamp helpers', () => {
+    const fixture = TestBed.createComponent(AdminOpsComponent);
+    fixture.detectChanges();
+    const cmp = fixture.componentInstance;
+
+    ops.runSamedaySyncNow.and.returnValue(throwError(() => ({ error: { detail: 'sync blocked' } })));
+    cmp.runSamedaySyncNow();
+    expect(cmp.samedaySyncError()).toBe('sync blocked');
+
+    const createUrl = spyOn(URL, 'createObjectURL').and.returnValue('blob:test');
+    const revokeUrl = spyOn(URL, 'revokeObjectURL');
+    const append = spyOn(document.body, 'appendChild').and.callThrough();
+    const anchorClick = spyOn(HTMLAnchorElement.prototype, 'click').and.stub();
+    const anchorRemove = spyOn(HTMLAnchorElement.prototype, 'remove').and.callThrough();
+
+    cmp.downloadNewsletterExport();
+    expect(ops.downloadNewsletterConfirmedSubscribersExport).toHaveBeenCalled();
+    expect(createUrl).toHaveBeenCalled();
+    expect(revokeUrl).toHaveBeenCalledWith('blob:test');
+    expect(append).toHaveBeenCalled();
+    expect(anchorClick).toHaveBeenCalled();
+    expect(anchorRemove).toHaveBeenCalled();
+
+    ops.downloadNewsletterConfirmedSubscribersExport.and.returnValue(throwError(() => new Error('export fail')));
+    cmp.downloadNewsletterExport();
+    expect(toast.error).toHaveBeenCalled();
+
+    expect((cmp as any).toLocalInput('invalid')).toBe('');
+    expect((cmp as any).fromLocalInput('')).toBeNull();
+    expect((cmp as any).fromLocalInput('2026-02-18T12:00')).toContain('2026-02-18T');
+    expect((cmp as any).nowLocalInput()).toContain('T');
   });
 });
