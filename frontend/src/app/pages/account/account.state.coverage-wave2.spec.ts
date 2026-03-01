@@ -575,7 +575,7 @@ describe('AccountState coverage wave 2', () => {
       if (typeof handler === 'function') handler();
       return 123 as any;
     }) as any);
-    const clearIntervalSpy = spyOn(window, 'clearInterval');
+    spyOn(window, 'clearInterval');
     const localStorageGet = spyOn(localStorage, 'getItem').and.returnValue('orders');
     spyOn(localStorage, 'setItem');
 
@@ -587,7 +587,12 @@ describe('AccountState coverage wave 2', () => {
     };
     state.route = {
       snapshot: {
-        queryParamMap: { get: (_key: string) => null }
+        queryParamMap: {
+          get: (key: string) => {
+            void key;
+            return null;
+          }
+        }
       }
     };
 

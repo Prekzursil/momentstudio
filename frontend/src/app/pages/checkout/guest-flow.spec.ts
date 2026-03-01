@@ -75,7 +75,7 @@ describe('Checkout auth gating', () => {
       .filter((v): v is string => Boolean(v));
     expect(hrefs.some((h) => h.includes('/login'))).toBeTrue();
     expect(hrefs.some((h) => h.includes('/register'))).toBeTrue();
-    const postedUrls = apiService.post.calls.allArgs().map((args: unknown[]) => String(args[0] ?? ''));
+    const postedUrls = apiService.post.calls.allArgs().map((args: unknown[]) => (typeof args[0] === 'string' ? args[0] : ''));
     expect(postedUrls).not.toContain('/orders/guest-checkout');
   }));
 

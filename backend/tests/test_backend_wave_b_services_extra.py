@@ -12,7 +12,6 @@ import pytest
 from app.models.content import ContentStatus
 from app.models.media import MediaJobType, MediaVisibility
 from app.models.order import OrderStatus
-from app.models.catalog import ProductStatus
 from app.services import auth as auth_service
 from app.services import content as content_service
 from app.services import media_dam

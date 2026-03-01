@@ -61,7 +61,8 @@ describe('AnalyticsService', () => {
     window.removeEventListener('app:analytics', handler);
 
     const record = window.dataLayer?.[0] as Record<string, unknown>;
-    const sessionId = String(record['session_id'] || '');
+    const sessionIdValue = record['session_id'];
+    const sessionId = typeof sessionIdValue === 'string' ? sessionIdValue : '';
     expect(record['event']).toBe('product_view');
     expect(record['sku']).toBe('sku-1');
     expect(sessionId.length).toBeGreaterThan(0);
