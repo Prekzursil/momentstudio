@@ -98,7 +98,7 @@ function defineMirrorUnavailableSpec(): void {
 
 function defineNoGeolocationSpec(): void {
   it('surfaces a no-geolocation error when geolocation API is unavailable', () => {
-    spyOnProperty(window.navigator, 'geolocation', 'get').and.returnValue(undefined as any);
+    spyOnProperty(globalThis.navigator, 'geolocation', 'get').and.returnValue(undefined as any);
 
     lockerPickerComponent.useMyLocation();
 

@@ -5,6 +5,7 @@ import { ApiService } from './api.service';
 
 type AnalyticsApiSpy = jasmine.SpyObj<Pick<ApiService, 'post'>>;
 type AnalyticsPostImpl = (path: string, body: unknown, headers?: Record<string, string>) => Observable<any>;
+type GlobalWithDataLayer = typeof globalThis & { dataLayer?: Array<Record<string, unknown>> };
 
 function createService(postImpl?: AnalyticsPostImpl): { service: AnalyticsService; api: AnalyticsApiSpy } {
   const api = jasmine.createSpyObj<AnalyticsApiSpy>('ApiService', ['post']);
@@ -21,11 +22,13 @@ function createService(postImpl?: AnalyticsPostImpl): { service: AnalyticsServic
 }
 
 describe('AnalyticsService', () => {
+  const globalScope = globalThis as GlobalWithDataLayer;
+
   beforeEach(() => {
-    window.localStorage.clear();
-    window.sessionStorage.clear();
-    window.history.replaceState({}, document.title, '/');
-    delete window.dataLayer;
+    globalThis.localStorage.clear();
+    globalThis.sessionStorage.clear();
+    globalThis.history.replaceState({}, document.title, '/');
+    delete globalScope.dataLayer;
   });
 
   it('emits an analytics opt-in event whenever consent is toggled', () => {
@@ -36,9 +39,9 @@ describe('AnalyticsService', () => {
       received = Boolean(custom.detail?.enabled);
     };
 
-    window.addEventListener('app:analytics-opt-in', handler);
+    globalThis.addEventListener('app:analytics-opt-in', handler);
     service.setEnabled(false);
-    window.removeEventListener('app:analytics-opt-in', handler);
+    globalThis.removeEventListener('app:analytics-opt-in', handler);
 
     expect(received).toBeFalse();
   });
@@ -47,20 +50,20 @@ describe('AnalyticsService', () => {
     const { service, api } = createService();
     service.setEnabled(true);
     api.post.calls.reset();
-    window.sessionStorage.removeItem('analytics.token.v1');
-    window.sessionStorage.removeItem('analytics.token_expires_at.v1');
-    window.dataLayer = [];
+    globalThis.sessionStorage.removeItem('analytics.token.v1');
+    globalThis.sessionStorage.removeItem('analytics.token_expires_at.v1');
+    globalScope.dataLayer = [];
     let receivedEvent: string | null = null;
     const handler = (event: Event) => {
       const custom = event as CustomEvent<{ event?: string }>;
       receivedEvent = String(custom.detail?.event || '');
     };
 
-    window.addEventListener('app:analytics', handler);
+    globalThis.addEventListener('app:analytics', handler);
     service.track('product_view', { sku: 'sku-1' });
-    window.removeEventListener('app:analytics', handler);
+    globalThis.removeEventListener('app:analytics', handler);
 
-    const record = window.dataLayer?.[0] as Record<string, unknown>;
+    const record = globalScope.dataLayer?.[0] as Record<string, unknown>;
     const sessionIdValue = record['session_id'];
     const sessionId = typeof sessionIdValue === 'string' ? sessionIdValue : '';
     expect(record['event']).toBe('product_view');
@@ -79,8 +82,8 @@ describe('AnalyticsService', () => {
     const { service, api } = createService();
     service.setEnabled(true);
     api.post.calls.reset();
-    window.sessionStorage.removeItem('analytics.token.v1');
-    window.sessionStorage.removeItem('analytics.token_expires_at.v1');
+    globalThis.sessionStorage.removeItem('analytics.token.v1');
+    globalThis.sessionStorage.removeItem('analytics.token_expires_at.v1');
 
     service.track('view_one');
     service.track('view_two');
@@ -99,12 +102,12 @@ describe('AnalyticsService', () => {
     });
     service.setEnabled(true);
     api.post.calls.reset();
-    window.sessionStorage.setItem('analytics.token.v1', 'stale-token');
-    window.sessionStorage.setItem('analytics.token_expires_at.v1', String(Date.now() - 1_000));
+    globalThis.sessionStorage.setItem('analytics.token.v1', 'stale-token');
+    globalThis.sessionStorage.setItem('analytics.token_expires_at.v1', String(Date.now() - 1_000));
 
     service.track('checkout_start');
 
-    expect(window.sessionStorage.getItem('analytics.token.v1')).toBeNull();
+    expect(globalThis.sessionStorage.getItem('analytics.token.v1')).toBeNull();
     const eventCall = api.post.calls.allArgs().find((args) => args[0] === '/analytics/events');
     expect(eventCall).toBeDefined();
     expect(eventCall?.[1]).toEqual(jasmine.objectContaining({ event: 'checkout_start', path: '/', payload: null }));

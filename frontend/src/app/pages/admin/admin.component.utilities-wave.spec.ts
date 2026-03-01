@@ -461,7 +461,7 @@ describe('AdminComponent draft manager coverage', () => {
   const homeAutosaveKey = 'adrianaart.cms.autosave.home.sections';
 
   beforeEach(() => {
-    window.localStorage.removeItem(homeAutosaveKey);
+    globalThis.localStorage.removeItem(homeAutosaveKey);
   });
 
   it('supports home draft undo and redo transitions', () => {
@@ -502,7 +502,7 @@ describe('AdminComponent draft manager coverage', () => {
       (component as any).makeHomeBlockDraft('restored', 'faq', true)
     ];
     const autosaveAt = '2026-02-28T01:02:03.000Z';
-    window.localStorage.setItem(
+    globalThis.localStorage.setItem(
       homeAutosaveKey,
       JSON.stringify({ v: 1, ts: autosaveAt, state_json: JSON.stringify(restoredBlocks) })
     );
@@ -518,7 +518,7 @@ describe('AdminComponent draft manager coverage', () => {
     expect(component.homeDraftHasRestore()).toBeFalse();
 
     component.dismissHomeDraftAutosave();
-    expect(window.localStorage.getItem(homeAutosaveKey)).toBeNull();
+    expect(globalThis.localStorage.getItem(homeAutosaveKey)).toBeNull();
   });
 
   it('drops autosave payloads that match server state', () => {
@@ -527,7 +527,7 @@ describe('AdminComponent draft manager coverage', () => {
     const initialBlocks = [
       (component as any).makeHomeBlockDraft('same', 'text', true)
     ];
-    window.localStorage.setItem(
+    globalThis.localStorage.setItem(
       homeAutosaveKey,
       JSON.stringify({ v: 1, ts: '2026-02-28T02:00:00.000Z', state_json: JSON.stringify(initialBlocks) })
     );
@@ -535,6 +535,6 @@ describe('AdminComponent draft manager coverage', () => {
     manager.initFromServer(initialBlocks);
 
     expect(component.homeDraftHasRestore()).toBeFalse();
-    expect(window.localStorage.getItem(homeAutosaveKey)).toBeNull();
+    expect(globalThis.localStorage.getItem(homeAutosaveKey)).toBeNull();
   });
 });

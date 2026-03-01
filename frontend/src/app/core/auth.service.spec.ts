@@ -94,9 +94,9 @@ function readSync<T>(obs$: Observable<T>): T {
 
 describe('AuthService', () => {
   beforeEach(() => {
-    window.localStorage.clear();
-    window.sessionStorage.clear();
-    window.history.replaceState({}, document.title, '/');
+    globalThis.localStorage.clear();
+    globalThis.sessionStorage.clear();
+    globalThis.history.replaceState({}, document.title, '/');
   });
 
   it('evaluates role-based permissions for admin sections', () => {
@@ -435,7 +435,7 @@ describe('AuthService', () => {
 
   it('drops fully expired persisted tokens during bootstrap', () => {
     const expired = createTokens({ accessExpOffsetSec: -7_200, refreshExpOffsetSec: -7_200 });
-    window.sessionStorage.setItem('auth_tokens', JSON.stringify(expired));
+    globalThis.sessionStorage.setItem('auth_tokens', JSON.stringify(expired));
 
     const { service } = createService();
 
@@ -445,7 +445,7 @@ describe('AuthService', () => {
 
   it('keeps persisted tokens when at least one token is still valid', () => {
     const partial = createTokens({ accessExpOffsetSec: -7_200, refreshExpOffsetSec: 7_200 });
-    window.sessionStorage.setItem('auth_tokens', JSON.stringify(partial));
+    globalThis.sessionStorage.setItem('auth_tokens', JSON.stringify(partial));
 
     const { service } = createService();
 

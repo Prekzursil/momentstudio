@@ -517,8 +517,8 @@ describe('AccountState coverage wave 2', () => {
       if (tag.toLowerCase() === 'a') return anchor;
       return originalCreateElement(tag);
     });
-    const objectUrlSpy = spyOn(window.URL, 'createObjectURL').and.returnValue('blob://receipt-1');
-    const revokeSpy = spyOn(window.URL, 'revokeObjectURL').and.stub();
+    const objectUrlSpy = spyOn(globalThis.URL, 'createObjectURL').and.returnValue('blob://receipt-1');
+    const revokeSpy = spyOn(globalThis.URL, 'revokeObjectURL').and.stub();
 
     state.downloadingReceiptId = 'existing';
     state.downloadReceipt(order);

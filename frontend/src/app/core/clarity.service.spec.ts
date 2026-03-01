@@ -91,7 +91,7 @@ describe('ClarityService', () => {
     expect(getClarityScript()).toBeNull();
 
     analytics.enabledValue = true;
-    window.dispatchEvent(new CustomEvent('app:analytics-opt-in', { detail: { enabled: true } }));
+    globalThis.dispatchEvent(new CustomEvent('app:analytics-opt-in', { detail: { enabled: true } }));
     tick();
 
     const script = getClarityScript();

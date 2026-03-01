@@ -253,14 +253,16 @@ describe('Service coverage wave - AdminOrdersService branches', () => {
 });
 
 describe('Service coverage wave - AnalyticsService branches', () => {
+  const globalScope = globalThis as typeof globalThis & { dataLayer?: unknown[] };
+
   beforeEach(() => {
-    window.localStorage.clear();
-    window.sessionStorage.clear();
-    window.dataLayer = [];
+    globalThis.localStorage.clear();
+    globalThis.sessionStorage.clear();
+    globalScope.dataLayer = [];
   });
 
   it('starts a session once and sends attribution payload when query has UTM params', () => {
-    window.history.replaceState({}, document.title, '/shop?utm_source=ig&utm_medium=social&utm_campaign=launch');
+    globalThis.history.replaceState({}, document.title, '/shop?utm_source=ig&utm_medium=social&utm_campaign=launch');
 
     const api = jasmine.createSpyObj<ApiService>('ApiService', ['post']);
     api.post.and.callFake(((path: string) => {
@@ -290,8 +292,8 @@ describe('Service coverage wave - AnalyticsService branches', () => {
       return of({ received: true });
     }) as any);
 
-    window.sessionStorage.setItem('analytics.token.v1', 'stale');
-    window.sessionStorage.setItem('analytics.token_expires_at.v1', String(Date.now() - 1000));
+    globalThis.sessionStorage.setItem('analytics.token.v1', 'stale');
+    globalThis.sessionStorage.setItem('analytics.token_expires_at.v1', String(Date.now() - 1000));
 
     const service = new AnalyticsService(api);
     service.setEnabled(true);
@@ -304,8 +306,8 @@ describe('Service coverage wave - AnalyticsService branches', () => {
 
 describe('Service coverage wave - AuthService branches', () => {
   beforeEach(() => {
-    window.localStorage.clear();
-    window.sessionStorage.clear();
+    globalThis.localStorage.clear();
+    globalThis.sessionStorage.clear();
   });
 
   it('covers register/change-password/google start/two-factor completion', () => {
