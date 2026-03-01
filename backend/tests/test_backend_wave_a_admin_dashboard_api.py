@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 
 from datetime import datetime, timezone
 from types import SimpleNamespace
@@ -23,12 +24,15 @@ class _DashboardSession:
         self.added.append(value)
 
     async def commit(self) -> None:
+        await asyncio.sleep(0)
         self.commits += 1
 
     async def rollback(self) -> None:
+        await asyncio.sleep(0)
         self.rollbacks += 1
 
     async def refresh(self, value: object) -> None:
+        await asyncio.sleep(0)
         self.refresh_calls.append(value)
 
 
@@ -62,6 +66,7 @@ async def test_admin_dashboard_alert_threshold_endpoint_wrappers(monkeypatch: py
     )
 
     async def _get_thresholds(_session: object):
+        await asyncio.sleep(0)
         return record
 
     monkeypatch.setattr(admin_dashboard, "_get_dashboard_alert_thresholds", _get_thresholds)
@@ -73,6 +78,7 @@ async def test_admin_dashboard_alert_threshold_endpoint_wrappers(monkeypatch: py
     audit_calls: list[dict[str, object]] = []
 
     async def _audit(_session: object, **kwargs):
+        await asyncio.sleep(0)
         audit_calls.append(kwargs)
 
     monkeypatch.setattr(admin_dashboard.audit_chain_service, "add_admin_audit_log", _audit)
@@ -107,12 +113,15 @@ async def test_admin_dashboard_summary_and_report_wrappers(monkeypatch: pytest.M
     monkeypatch.setattr(admin_dashboard, "_summary_resolve_range", lambda now, days, range_from, range_to: (start, end, 9))
 
     async def _summary_totals(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return {"products": 2, "orders": 3, "users": 4, "low_stock": 1}
 
     async def _sales_metrics(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return {"sales": 100.0, "gross_sales": 120.0, "net_sales": 90.0, "orders": 5}
 
     async def _day_metrics(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return {
             "today_orders": 2,
             "yesterday_orders": 1,
@@ -132,9 +141,11 @@ async def test_admin_dashboard_summary_and_report_wrappers(monkeypatch: pytest.M
         }
 
     async def _threshold_record(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return SimpleNamespace()
 
     async def _anomaly_inputs(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return {
             "failed_payments": 1,
             "failed_payments_prev": 1,
@@ -180,11 +191,13 @@ async def test_admin_dashboard_summary_and_report_wrappers(monkeypatch: pytest.M
     audit_actions: list[str] = []
 
     async def _audit_log(_session: object, *, action: str, **_kwargs) -> None:
+        await asyncio.sleep(0)
         audit_actions.append(action)
 
     monkeypatch.setattr(admin_dashboard, "_admin_send_report_audit_log", _audit_log)
 
     async def _send_ok(_session: object, *, kind: str, force: bool):
+        await asyncio.sleep(0)
         assert kind == "weekly"
         assert force is True
         return {"queued": True}
@@ -201,6 +214,7 @@ async def test_admin_dashboard_summary_and_report_wrappers(monkeypatch: pytest.M
     assert "admin_reports.send_now" in audit_actions
 
     async def _send_bad(_session: object, *, kind: str, force: bool):
+        await asyncio.sleep(0)
         raise ValueError("invalid kind")
 
     monkeypatch.setattr(admin_dashboard.admin_reports_service, "send_report_now", _send_bad)
@@ -215,6 +229,7 @@ async def test_admin_dashboard_summary_and_report_wrappers(monkeypatch: pytest.M
     assert "admin_reports.send_now_failed" in audit_actions
 
     async def _send_crash(_session: object, *, kind: str, force: bool):
+        await asyncio.sleep(0)
         raise RuntimeError("boom")
 
     monkeypatch.setattr(admin_dashboard.admin_reports_service, "send_report_now", _send_crash)
@@ -235,6 +250,7 @@ async def test_admin_dashboard_channel_and_payments_wrappers(monkeypatch: pytest
     monkeypatch.setattr(admin_dashboard, "_summary_resolve_range", lambda now, days, range_from, range_to: (start, end, 4))
 
     async def _channel_items(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return [{"key": "stripe", "orders": 2, "gross_sales": 100.0, "net_sales": 95.0}]
 
     monkeypatch.setattr(admin_dashboard, "_channel_breakdown_items", _channel_items)
@@ -252,12 +268,15 @@ async def test_admin_dashboard_channel_and_payments_wrappers(monkeypatch: pytest
     assert len(channel["delivery_types"]) == 1
 
     async def _method_counts(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return {"stripe": 4, "paypal": 1}
 
     async def _webhook_counts(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return {"stripe": {"errors": 1, "backlog": 2}, "paypal": {"errors": 0, "backlog": 1}}
 
     async def _recent_rows(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return []
 
     monkeypatch.setattr(admin_dashboard, "_payments_method_counts", _method_counts)

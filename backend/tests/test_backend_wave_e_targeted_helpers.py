@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -66,11 +67,13 @@ class _Session:
         self.refreshed: list[object] = []
 
     async def execute(self, _stmt: object) -> _ExecResult:
+        await asyncio.sleep(0)
         if not self.execute_results:
             raise AssertionError("Unexpected execute()")
         return self.execute_results.pop(0)
 
     async def get(self, _model: object, key: object):
+        await asyncio.sleep(0)
         return self.get_map.get(key)
 
     def add(self, value: object) -> None:
@@ -80,12 +83,15 @@ class _Session:
         self.added.extend(values)
 
     async def commit(self) -> None:
+        await asyncio.sleep(0)
         self.commits += 1
 
     async def flush(self) -> None:
+        await asyncio.sleep(0)
         self.flushes += 1
 
     async def refresh(self, value: object) -> None:
+        await asyncio.sleep(0)
         self.refreshed.append(value)
 
 
@@ -180,6 +186,7 @@ async def test_orders_document_export_shipping_label_and_receipt_paths(
     monkeypatch.setattr(orders_api.step_up_service, "require_step_up", lambda _request, _admin: None)
 
     async def _missing_export(_session: object, _export_id: object):
+        await asyncio.sleep(0)
         return None, None
 
     monkeypatch.setattr(orders_api.order_exports_service, "get_export", _missing_export)
@@ -202,6 +209,7 @@ async def test_orders_document_export_shipping_label_and_receipt_paths(
     )
 
     async def _get_export(_session: object, _export_id: object):
+        await asyncio.sleep(0)
         return export, "R-1"
 
     monkeypatch.setattr(orders_api.order_exports_service, "get_export", _get_export)
@@ -228,6 +236,7 @@ async def test_orders_document_export_shipping_label_and_receipt_paths(
     session = _Session()
 
     async def _get_order_by_id(_session: object, oid):
+        await asyncio.sleep(0)
         return order if oid == order_id else None
 
     monkeypatch.setattr(orders_api.order_service, "get_order_by_id", _get_order_by_id)
@@ -250,6 +259,7 @@ async def test_orders_document_export_shipping_label_and_receipt_paths(
     assert deleted_paths == ["private/label.pdf"]
 
     async def _get_order_for_user(_session: object, _user_id: object, requested_order_id):
+        await asyncio.sleep(0)
         return order if requested_order_id == order_id else None
 
     monkeypatch.setattr(orders_api.order_service, "get_order", _get_order_for_user)
@@ -279,11 +289,13 @@ async def test_orders_revoke_receipt_share_token(monkeypatch: pytest.MonkeyPatch
     session = _Session()
 
     async def _get_order_by_id(_session: object, oid: object):
+        await asyncio.sleep(0)
         return order if oid == order_id else None
 
     monkeypatch.setattr(orders_api.order_service, "get_order_by_id", _get_order_by_id)
     monkeypatch.setattr(orders_api, "_require_receipt_share_access", lambda _order, _user: None)
     async def _build_share(_session: object, _order: object):
+        await asyncio.sleep(0)
         return SimpleNamespace(token="tok", version=_order.receipt_token_version)
 
     monkeypatch.setattr(orders_api, "_build_receipt_share_token_read", _build_share)
@@ -302,6 +314,7 @@ async def test_orders_revoke_receipt_share_token(monkeypatch: pytest.MonkeyPatch
 async def test_admin_dashboard_channel_search_inventory_and_owner_helpers(monkeypatch: pytest.MonkeyPatch) -> None:
     class _ChannelSession(_Session):
         async def execute(self, _stmt: object) -> _ExecResult:
+            await asyncio.sleep(0)
             return _rows_result(
                 [
                     ("s-1", uuid4()),
@@ -350,6 +363,7 @@ async def test_admin_dashboard_channel_search_inventory_and_owner_helpers(monkey
             self._user = user
 
         async def get(self, model: object, _key: object):
+            await asyncio.sleep(0)
             model_name = getattr(model, "__name__", "")
             if model_name == "Order":
                 return fake_order
@@ -389,6 +403,7 @@ async def test_admin_dashboard_channel_search_inventory_and_owner_helpers(monkey
         )
 
     async def _by_any_email(_session: object, _identifier: str):
+        await asyncio.sleep(0)
         return SimpleNamespace(id=uuid4())
 
     monkeypatch.setattr(admin_dashboard.auth_service, "get_user_by_any_email", _by_any_email)
@@ -396,6 +411,7 @@ async def test_admin_dashboard_channel_search_inventory_and_owner_helpers(monkey
     assert owner_target.id is not None
 
     async def _none_lookup(_session: object, _identifier: str):
+        await asyncio.sleep(0)
         return None
 
     monkeypatch.setattr(admin_dashboard.auth_service, "get_user_by_any_email", _none_lookup)
@@ -507,6 +523,7 @@ async def test_auth_rotation_and_logout_helper_branches(monkeypatch: pytest.Monk
     user = SimpleNamespace(id=user_id, locked_until=None, password_reset_required=False, deleted_at=None, deletion_scheduled_for=None)
     session = _Session(get_map={user_id: user})
     async def _ensure_active(_session: object, _user: object) -> None:
+        await asyncio.sleep(0)
         return None
 
     monkeypatch.setattr(auth_api, "_ensure_user_account_active", _ensure_active)
@@ -547,6 +564,7 @@ async def test_auth_rotation_and_logout_helper_branches(monkeypatch: pytest.Monk
 
     revoked: list[str] = []
     async def _revoke(_session: object, jti: str, reason: str):
+        await asyncio.sleep(0)
         revoked.append(f"{jti}:{reason}")
 
     monkeypatch.setattr(auth_api.auth_service, "revoke_refresh_token", _revoke)
@@ -604,6 +622,7 @@ async def test_auth_start_export_job_reuse_branches(monkeypatch: pytest.MonkeyPa
     current_user = SimpleNamespace(id=uuid4())
 
     async def _latest_pending(_session: object, _uid: object):
+        await asyncio.sleep(0)
         return pending_job
 
     monkeypatch.setattr(auth_api, "_latest_export_job_for_user", _latest_pending)
@@ -614,6 +633,7 @@ async def test_auth_start_export_job_reuse_branches(monkeypatch: pytest.MonkeyPa
     assert scheduled[-1] == pending_job.id
 
     async def _latest_succeeded(_session: object, _uid: object):
+        await asyncio.sleep(0)
         return succeeded_job
 
     monkeypatch.setattr(auth_api, "_latest_export_job_for_user", _latest_succeeded)
@@ -622,9 +642,11 @@ async def test_auth_start_export_job_reuse_branches(monkeypatch: pytest.MonkeyPa
     assert result_reused.id == succeeded_job.id
 
     async def _latest_none(_session: object, _uid: object):
+        await asyncio.sleep(0)
         return None
 
     async def _create_pending(_session: object, _uid: object):
+        await asyncio.sleep(0)
         return created_job
 
     monkeypatch.setattr(auth_api, "_latest_export_job_for_user", _latest_none)

@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -127,6 +128,7 @@ class _JsonRequestStub:
         self.headers: dict[str, str] = {}
 
     async def json(self) -> object:
+        await asyncio.sleep(0)
         if self._error is not None:
             raise self._error
         return self._payload
@@ -139,12 +141,14 @@ class _WebhookSessionStub:
         self.commits = 0
 
     async def get(self, _model, record_id):
+        await asyncio.sleep(0)
         return self.by_id.get(record_id)
 
     def add(self, obj: object) -> None:
         self.added.append(obj)
 
     async def commit(self) -> None:
+        await asyncio.sleep(0)
         self.commits += 1
 
 
@@ -159,6 +163,7 @@ async def test_payments_paypal_webhook_helpers(monkeypatch: pytest.MonkeyPatch) 
         await payments_api._parse_paypal_webhook_event(_JsonRequestStub(error=RuntimeError("boom")))
 
     async def _verify_ok(*, headers, event):
+        await asyncio.sleep(0)
         assert headers == {"paypal-auth-algo": "SHA256"}
         assert event == {"id": "evt_1"}
         return True
@@ -170,6 +175,7 @@ async def test_payments_paypal_webhook_helpers(monkeypatch: pytest.MonkeyPatch) 
     )
 
     async def _verify_bad(*, headers, event):
+        await asyncio.sleep(0)
         return False
 
     monkeypatch.setattr(payments_api.paypal_service, "verify_webhook_signature", _verify_bad)

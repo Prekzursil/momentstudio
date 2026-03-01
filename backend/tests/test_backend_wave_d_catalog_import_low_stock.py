@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 
 import csv
 import io
@@ -61,25 +62,31 @@ class _FakeSession:
         self.added_batches.append(list(values))
 
     async def execute(self, _statement):
+        await asyncio.sleep(0)
         if self.execute_results:
             return self.execute_results.pop(0)
         return _ExecuteResult()
 
     async def scalar(self, _statement):
+        await asyncio.sleep(0)
         if self.scalar_results:
             return self.scalar_results.pop(0)
         return None
 
     async def commit(self) -> None:
+        await asyncio.sleep(0)
         self.commit_calls += 1
 
     async def rollback(self) -> None:
+        await asyncio.sleep(0)
         self.rollback_calls += 1
 
     async def flush(self) -> None:
+        await asyncio.sleep(0)
         self.flush_calls += 1
 
     async def refresh(self, _value: object) -> None:
+        await asyncio.sleep(0)
         self.refresh_calls += 1
 
 
@@ -192,11 +199,13 @@ async def test_catalog_wave_d_product_import_parsers_and_apply_paths(monkeypatch
     product = SimpleNamespace(id=uuid4())
 
     async def _get_existing(_session, _slug, follow_history=False):  # noqa: ARG001
+        await asyncio.sleep(0)
         return product
 
     update_calls: list[object] = []
 
     async def _update(_session, _existing, payload, commit=False):  # noqa: ARG001
+        await asyncio.sleep(0)
         update_calls.append(payload)
 
     monkeypatch.setattr(catalog_service, "get_product_by_slug", _get_existing)
@@ -224,11 +233,13 @@ async def test_catalog_wave_d_product_import_parsers_and_apply_paths(monkeypatch
     assert len(update_calls) == 1
 
     async def _get_missing(_session, _slug, follow_history=False):  # noqa: ARG001
+        await asyncio.sleep(0)
         return None
 
     create_calls: list[object] = []
 
     async def _create(_session, payload, commit=False):  # noqa: ARG001
+        await asyncio.sleep(0)
         create_calls.append(payload)
 
     monkeypatch.setattr(catalog_service, "get_product_by_slug", _get_missing)
@@ -268,6 +279,7 @@ async def test_catalog_wave_d_resolve_import_category_and_csv_export_helpers(mon
     existing = SimpleNamespace(id=uuid4(), slug="rings", name="Rings")
 
     async def _get_found(_session, _slug):  # noqa: ARG001
+        await asyncio.sleep(0)
         return existing
 
     monkeypatch.setattr(catalog_service, "get_category_by_slug", _get_found)
@@ -276,6 +288,7 @@ async def test_catalog_wave_d_resolve_import_category_and_csv_export_helpers(mon
     assert err is None
 
     async def _get_missing(_session, _slug):  # noqa: ARG001
+        await asyncio.sleep(0)
         return None
 
     monkeypatch.setattr(catalog_service, "get_category_by_slug", _get_missing)
@@ -342,6 +355,7 @@ async def test_catalog_wave_d_resolve_import_category_and_csv_export_helpers(mon
     ]
 
     async def _load_categories(_session):
+        await asyncio.sleep(0)
         return fake_categories
 
     monkeypatch.setattr(catalog_service, "_load_categories_for_csv_export", _load_categories)
@@ -522,6 +536,7 @@ async def test_catalog_wave_d_category_import_mutation_and_translation_helpers(m
     ]
 
     async def _validate_parent(_session, *, category_id, parent_id):  # noqa: ARG001
+        await asyncio.sleep(0)
         if parent_id == existing_category.id:
             raise HTTPException(status_code=400, detail="Category parent would create a cycle")
 
@@ -556,6 +571,7 @@ async def test_catalog_wave_d_category_import_mutation_and_translation_helpers(m
     upsert_calls: list[tuple[str, str]] = []
 
     async def _upsert_lang(_session, *, category, lang, raw_name, raw_desc):  # noqa: ARG001
+        await asyncio.sleep(0)
         upsert_calls.append((lang, raw_name))
 
     monkeypatch.setattr(catalog_service, "_upsert_import_category_translation_for_lang", _upsert_lang)
@@ -578,12 +594,15 @@ async def test_catalog_wave_d_import_categories_csv_control_flow(monkeypatch: py
     monkeypatch.setattr(catalog_service, "_parse_category_import_rows", lambda _reader: (rows, []))
 
     async def _count_changes(_session, _slugs):
+        await asyncio.sleep(0)
         return 1, 2
 
     async def _missing_parent_errors(_session, _rows, _slugs):
+        await asyncio.sleep(0)
         return []
 
     async def _hierarchy_errors(_session, _rows):
+        await asyncio.sleep(0)
         return ["Row 2: Category parent would create a cycle"]
 
     monkeypatch.setattr(catalog_service, "_count_category_import_changes", _count_changes)
@@ -602,15 +621,18 @@ async def test_catalog_wave_d_import_categories_csv_control_flow(monkeypatch: py
     }
 
     async def _load_import_categories(_session, _rows):
+        await asyncio.sleep(0)
         return {"rings": SimpleNamespace(id=uuid4(), slug="rings")}
 
     def _upsert_categories(_session, _rows, _by_slug):
         return None
 
     async def _assign_parents(_session, _rows, _by_slug):
+        await asyncio.sleep(0)
         return []
 
     async def _upsert_translations(_session, _rows, _by_slug):
+        await asyncio.sleep(0)
         return None
 
     monkeypatch.setattr(catalog_service, "_collect_category_hierarchy_errors", lambda _session, _rows: [])
@@ -628,6 +650,7 @@ async def test_catalog_wave_d_import_categories_csv_control_flow(monkeypatch: py
     assert session.commit_calls == 1
 
     async def _assign_with_error(_session, _rows, _by_slug):
+        await asyncio.sleep(0)
         return ["Row 2: invalid hierarchy"]
 
     monkeypatch.setattr(catalog_service, "_assign_import_category_parents", _assign_with_error)
@@ -659,9 +682,11 @@ async def test_catalog_wave_d_low_stock_and_back_in_stock_flows(monkeypatch: pyt
     sent_alerts: list[tuple[str, str, int]] = []
 
     async def _owner_email(_session):
+        await asyncio.sleep(0)
         return None
 
     async def _send_low_stock(email: str, name: str, quantity: int):
+        await asyncio.sleep(0)
         sent_alerts.append((email, name, quantity))
 
     monkeypatch.setattr(catalog_service.auth_service, "get_owner_email", _owner_email)
@@ -683,6 +708,7 @@ async def test_catalog_wave_d_low_stock_and_back_in_stock_flows(monkeypatch: pyt
     owner = SimpleNamespace(id=uuid4())
 
     async def _existing_request(_session, *, user_id, product_id):  # noqa: ARG001
+        await asyncio.sleep(0)
         return SimpleNamespace(id=uuid4(), user_id=user_id, product_id=product_id)
 
     monkeypatch.setattr(catalog_service, "get_active_back_in_stock_request", _existing_request)
@@ -694,12 +720,15 @@ async def test_catalog_wave_d_low_stock_and_back_in_stock_flows(monkeypatch: pyt
     assert existing is not None
 
     async def _no_existing(_session, *, user_id, product_id):  # noqa: ARG001
+        await asyncio.sleep(0)
         return None
 
     async def _owner_user(_session):
+        await asyncio.sleep(0)
         return owner
 
     async def _notify_fail(*args, **kwargs):
+        await asyncio.sleep(0)
         raise RuntimeError("notify failed")
 
     monkeypatch.setattr(catalog_service, "get_active_back_in_stock_request", _no_existing)
@@ -724,6 +753,7 @@ async def test_catalog_wave_d_low_stock_and_back_in_stock_flows(monkeypatch: pyt
     cancelled_record = SimpleNamespace(canceled_at=None)
 
     async def _get_for_cancel(_session, *, user_id, product_id):  # noqa: ARG001
+        await asyncio.sleep(0)
         return cancelled_record
 
     monkeypatch.setattr(catalog_service, "get_active_back_in_stock_request", _get_for_cancel)
@@ -739,6 +769,7 @@ async def test_catalog_wave_d_low_stock_and_back_in_stock_flows(monkeypatch: pyt
     session.execute_results = [_ExecuteResult(rows=rows)]
 
     async def _send_back_in_stock(email: str, _product_name: str) -> bool:
+        await asyncio.sleep(0)
         return email == "a@example.com"
 
     monkeypatch.setattr(catalog_service.email_service, "send_back_in_stock", _send_back_in_stock)
@@ -769,11 +800,13 @@ async def test_catalog_wave_d_import_products_csv_control_flow(monkeypatch: pyte
         return {"slug": "second", "category_slug": "rings"}, None
 
     async def _resolve_category(_session, *, category_slug: str, idx: int, dry_run: bool):  # noqa: ARG001
+        await asyncio.sleep(0)
         if idx == 4:
             return None, "Row 4: category missing"
         return SimpleNamespace(id=uuid4()), None
 
     async def _apply_row(_session, *, row_data, category, dry_run: bool):  # noqa: ARG001
+        await asyncio.sleep(0)
         if row_data["slug"] == "ok":
             return 1, 0
         return 0, 1
@@ -781,6 +814,7 @@ async def test_catalog_wave_d_import_products_csv_control_flow(monkeypatch: pyte
     finalize_calls: list[tuple[bool, list[str]]] = []
 
     async def _finalize(_session, *, dry_run: bool, errors: list[str]):
+        await asyncio.sleep(0)
         finalize_calls.append((dry_run, list(errors)))
 
     monkeypatch.setattr(catalog_service, "_parse_import_product_row", _parse_row)

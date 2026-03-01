@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -44,17 +45,20 @@ class _CouponsSession:
         self.commits = 0
 
     async def execute(self, _stmt: object) -> _ExecResult:
+        await asyncio.sleep(0)
         if not self.execute_results:
             raise AssertionError("Unexpected execute() call")
         return self.execute_results.pop(0)
 
     async def get(self, _model: object, key: UUID) -> object | None:
+        await asyncio.sleep(0)
         return self.get_map.get(key)
 
     def add(self, value: object) -> None:
         self.added.append(value)
 
     async def commit(self) -> None:
+        await asyncio.sleep(0)
         self.commits += 1
 
 
@@ -105,6 +109,7 @@ async def test_coupons_scope_validation_and_replace_paths(monkeypatch: pytest.Mo
     added_batches: list[tuple[object, object, set[UUID]]] = []
 
     async def _validate_stub(_session: object, *, product_ids: set[UUID], category_ids: set[UUID]) -> None:
+        await asyncio.sleep(0)
         validate_calls.append((set(product_ids), set(category_ids)))
 
     def _add_scopes_stub(
@@ -169,15 +174,19 @@ async def test_coupons_eligibility_and_validation_wrappers(monkeypatch: pytest.M
     )
 
     async def _get_cart(_session: object, _user_id: UUID, _session_id: str | None):
+        await asyncio.sleep(0)
         return SimpleNamespace(items=[SimpleNamespace()])
 
     async def _get_settings(_session: object):
+        await asyncio.sleep(0)
         return SimpleNamespace()
 
     async def _get_shipping(_session: object, _shipping_id: UUID | None):
+        await asyncio.sleep(0)
         return SimpleNamespace(rate_flat=Decimal("8.00"), rate_per_kg=Decimal("1.50"))
 
     async def _evaluate_for_cart(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return [eligibility]
 
     monkeypatch.setattr(coupons_api.cart_service, "get_cart", _get_cart)
@@ -196,6 +205,7 @@ async def test_coupons_eligibility_and_validation_wrappers(monkeypatch: pytest.M
     assert eligibility_response.eligible[0].coupon.code == "SAVE10"
 
     async def _coupon_not_found(_session: object, *, code: str):
+        await asyncio.sleep(0)
         assert code == "BAD"
         return None
 
@@ -210,10 +220,12 @@ async def test_coupons_eligibility_and_validation_wrappers(monkeypatch: pytest.M
         )
 
     async def _coupon_found(_session: object, *, code: str):
+        await asyncio.sleep(0)
         assert code == "SAVE10"
         return coupon
 
     async def _evaluate_single(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return eligibility
 
     monkeypatch.setattr(coupons_api.coupons_service, "get_coupon_by_code", _coupon_found)

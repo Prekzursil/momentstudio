@@ -103,6 +103,7 @@ async def test_admin_dashboard_get_alert_thresholds_create_and_retry_paths() -> 
             self.rollbacks = 0
 
         async def scalar(self, _stmt: object) -> object | None:
+            await asyncio.sleep(0)
             if not self._scalar_values:
                 return None
             return self._scalar_values.pop(0)
@@ -111,11 +112,13 @@ async def test_admin_dashboard_get_alert_thresholds_create_and_retry_paths() -> 
             self.added.append(value)
 
         async def commit(self) -> None:
+            await asyncio.sleep(0)
             self.commits += 1
             if self.commits == 1 and self.commit_error is not None:
                 raise self.commit_error
 
         async def rollback(self) -> None:
+            await asyncio.sleep(0)
             self.rollbacks += 1
 
     existing = SimpleNamespace(key='default')
@@ -347,6 +350,7 @@ async def test_effective_recipients_falls_back_to_owner_or_settings(monkeypatch:
 
 @pytest.mark.anyio
 async def test_parse_settings_and_result_helpers() -> None:
+    await asyncio.sleep(0)
     settings_obj, state_obj = admin_reports._parse_settings(
         {
             'reports_weekly_enabled': 'true',

@@ -45,24 +45,31 @@ class _DummySession:
         self.deleted: list[object] = []
 
     async def execute(self, *_args, **_kwargs):
+        await asyncio.sleep(0)
         return _DummyScalarResult()
 
     async def scalar(self, *_args, **_kwargs):
+        await asyncio.sleep(0)
         return None
 
     async def get(self, *_args, **_kwargs):
+        await asyncio.sleep(0)
         return SimpleNamespace(id='id-1', user_id='u-test')
 
     async def commit(self):
+        await asyncio.sleep(0)
         return None
 
     async def rollback(self):
+        await asyncio.sleep(0)
         return None
 
     async def refresh(self, *_args, **_kwargs):
+        await asyncio.sleep(0)
         return None
 
     async def delete(self, value):
+        await asyncio.sleep(0)
         self.deleted.append(value)
         return None
 
@@ -86,6 +93,7 @@ class _DummyUpload:
         self.file = BytesIO(b'fixture')
 
     async def read(self):
+        await asyncio.sleep(0)
         return b'fixture'
 
 

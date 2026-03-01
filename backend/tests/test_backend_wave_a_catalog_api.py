@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 
 from decimal import Decimal
 from io import BytesIO
@@ -43,6 +44,7 @@ class _CatalogSession:
         self.refresh_calls: list[object] = []
 
     async def execute(self, _stmt: object) -> _ExecResult:
+        await asyncio.sleep(0)
         if not self.execute_results:
             raise AssertionError("Unexpected execute() call")
         return self.execute_results.pop(0)
@@ -51,12 +53,15 @@ class _CatalogSession:
         self.added.append(value)
 
     async def delete(self, value: object) -> None:
+        await asyncio.sleep(0)
         self.deleted.append(value)
 
     async def commit(self) -> None:
+        await asyncio.sleep(0)
         self.commits += 1
 
     async def refresh(self, value: object) -> None:
+        await asyncio.sleep(0)
         self.refresh_calls.append(value)
 
 
@@ -94,12 +99,15 @@ async def test_catalog_csv_and_listing_wrappers(monkeypatch: pytest.MonkeyPatch)
     assert translated == [(categories[0], "ro")]
 
     async def _auto_publish(_session: object) -> None:
+        await asyncio.sleep(0)
         return None
 
     async def _apply_due(_session: object) -> None:
+        await asyncio.sleep(0)
         return None
 
     async def _fetch_listing(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return [SimpleNamespace(id=uuid4())], 7, ProductPriceBounds(min_price=10.0, max_price=20.0, currency="RON")
 
     monkeypatch.setattr(catalog_api.catalog_service, "auto_publish_due_sales", _auto_publish)
@@ -131,6 +139,7 @@ async def test_catalog_csv_and_listing_wrappers(monkeypatch: pytest.MonkeyPatch)
     bounds_calls: list[dict[str, object]] = []
 
     async def _bounds(*_args, **kwargs):
+        await asyncio.sleep(0)
         bounds_calls.append(kwargs)
         return (1.0, 9.0, "RON")
 
@@ -160,10 +169,12 @@ async def test_catalog_category_routes_and_merge_wrappers(monkeypatch: pytest.Mo
     updated = SimpleNamespace(id=uuid4(), slug="rings")
 
     async def _create_category(_session: object, payload: CategoryCreate):
+        await asyncio.sleep(0)
         assert payload.name == "Rings"
         return created
 
     async def _update_category(_session: object, category: object, payload: CategoryUpdate):
+        await asyncio.sleep(0)
         assert category is created
         return updated
 
@@ -173,6 +184,7 @@ async def test_catalog_category_routes_and_merge_wrappers(monkeypatch: pytest.Mo
     audit_actions: list[str] = []
 
     async def _audit_log(_session: object, *, action: str, **_kwargs):
+        await asyncio.sleep(0)
         audit_actions.append(action)
 
     monkeypatch.setattr(catalog_api.audit_chain_service, "add_admin_audit_log", _audit_log)
@@ -196,6 +208,7 @@ async def test_catalog_category_routes_and_merge_wrappers(monkeypatch: pytest.Mo
     assert session.commits == 1
 
     async def _get_category_none(_session: object, _slug: str):
+        await asyncio.sleep(0)
         return None
 
     monkeypatch.setattr(catalog_api.catalog_service, "get_category_by_slug", _get_category_none)
@@ -209,6 +222,7 @@ async def test_catalog_category_routes_and_merge_wrappers(monkeypatch: pytest.Mo
         )
 
     async def _get_category_found(_session: object, _slug: str):
+        await asyncio.sleep(0)
         return created
 
     monkeypatch.setattr(catalog_api.catalog_service, "get_category_by_slug", _get_category_found)
@@ -246,6 +260,7 @@ async def test_catalog_category_routes_and_merge_wrappers(monkeypatch: pytest.Mo
     reorder_payload = [CategoryReorderItem(slug="rings", sort_order=1)]
 
     async def _reorder(_session: object, payload: list[CategoryReorderItem]):
+        await asyncio.sleep(0)
         assert len(payload) == 1
         return [created]
 
@@ -275,6 +290,7 @@ async def test_catalog_category_routes_and_merge_wrappers(monkeypatch: pytest.Mo
     good_target = SimpleNamespace(id=uuid4(), slug="target", parent_id=source.parent_id)
 
     async def _get_merge_category(_session: object, slug: str):
+        await asyncio.sleep(0)
         mapping = {
             "source": source,
             "same": same_target,
@@ -318,12 +334,15 @@ async def test_catalog_category_routes_and_merge_wrappers(monkeypatch: pytest.Mo
     merge_session = _CatalogSession(execute_results=[_ExecResult(rowcount=4)])
 
     async def _merge_pair(_session: object, _source_slug: str, _target_slug: str):
+        await asyncio.sleep(0)
         return source, good_target
 
     async def _ensure_no_children(_session: object, _category: object) -> None:
+        await asyncio.sleep(0)
         return None
 
     async def _audit_merge(*_args, **_kwargs) -> None:
+        await asyncio.sleep(0)
         return None
 
     monkeypatch.setattr(catalog_api, "_get_merge_source_and_target_categories", _merge_pair)
@@ -345,15 +364,18 @@ async def test_catalog_category_routes_and_merge_wrappers(monkeypatch: pytest.Mo
 @pytest.mark.anyio
 async def test_catalog_product_visibility_and_import_wrappers(monkeypatch: pytest.MonkeyPatch) -> None:
     async def _auto_publish(_session: object) -> None:
+        await asyncio.sleep(0)
         return None
 
     async def _apply_due(_session: object) -> None:
+        await asyncio.sleep(0)
         return None
 
     monkeypatch.setattr(catalog_api.catalog_service, "auto_publish_due_sales", _auto_publish)
     monkeypatch.setattr(catalog_api.catalog_service, "apply_due_product_schedules", _apply_due)
 
     async def _missing_product(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return None
 
     monkeypatch.setattr(catalog_api.catalog_service, "get_product_by_slug", _missing_product)
@@ -375,11 +397,13 @@ async def test_catalog_product_visibility_and_import_wrappers(monkeypatch: pytes
     )
 
     async def _found_product(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return product
 
     viewed_calls: list[tuple[object, object, object, object]] = []
 
     async def _record_recently_viewed(*args):
+        await asyncio.sleep(0)
         viewed_calls.append(args)
 
     monkeypatch.setattr(catalog_api.catalog_service, "get_product_by_slug", _found_product)
@@ -408,6 +432,7 @@ async def test_catalog_product_visibility_and_import_wrappers(monkeypatch: pytes
     assert model_admin.sale_price == Decimal("10.00")
 
     async def _get_active_request(_session: object, *, user_id: object, product_id: object):
+        await asyncio.sleep(0)
         assert user_id is not None
         assert product_id == product.id
         return None
@@ -425,6 +450,7 @@ async def test_catalog_product_visibility_and_import_wrappers(monkeypatch: pytes
     monkeypatch.setattr(catalog_api.BackInStockRequestRead, "model_validate", staticmethod(lambda _record: {"id": "req-1"}))
 
     async def _create_back_in_stock(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return SimpleNamespace(id=uuid4())
 
     monkeypatch.setattr(catalog_api.catalog_service, "create_back_in_stock_request", _create_back_in_stock)
@@ -438,6 +464,7 @@ async def test_catalog_product_visibility_and_import_wrappers(monkeypatch: pytes
     cancelled: list[tuple[object, object]] = []
 
     async def _cancel_back_in_stock(_session: object, *, user_id: object, product_id: object) -> None:
+        await asyncio.sleep(0)
         cancelled.append((user_id, product_id))
 
     monkeypatch.setattr(catalog_api.catalog_service, "cancel_back_in_stock_request", _cancel_back_in_stock)
@@ -466,6 +493,7 @@ async def test_catalog_product_visibility_and_import_wrappers(monkeypatch: pytes
         )
 
     async def _import_categories(_session: object, content: str, *, dry_run: bool):
+        await asyncio.sleep(0)
         assert dry_run is False
         assert "name" in content
         return {"created": 1, "updated": 0, "errors": []}
@@ -496,6 +524,7 @@ async def test_catalog_product_visibility_and_import_wrappers(monkeypatch: pytes
         )
 
     async def _import_products(_session: object, content: str, *, dry_run: bool):
+        await asyncio.sleep(0)
         assert dry_run is True
         assert "slug" in content
         return {"created": 0, "updated": 2, "errors": ["row 3"]}
