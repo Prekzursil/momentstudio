@@ -1,8 +1,8 @@
-fastapi==0.129.2
+fastapi==0.134.0
 jinja2==3.1.6
 uvicorn[standard]==0.41.0
 pydantic-settings==2.13.1
-sqlalchemy[asyncio]==2.0.46
+sqlalchemy[asyncio]==2.0.47
 alembic==1.18.4
 asyncpg==0.31.0
 aiosqlite==0.22.1
@@ -12,9 +12,9 @@ email-validator==2.3.0
 python-multipart==0.0.22
 httpx==0.28.1
 simplejson==3.20.2
-redis==7.2.0
+redis==7.2.1
 pytest==9.0.2
-stripe==14.3.0
+stripe==14.4.0
 Pillow==12.1.1
 defusedxml==0.7.1
 reportlab==4.4.10
