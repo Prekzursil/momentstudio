@@ -87,7 +87,7 @@ jobs:
           echo "test_exit_code=$test_exit" >> "$GITHUB_OUTPUT"
           exit 0
 
-      - name: Enforce absolute backend/frontend/project coverage >= 90
+      - name: Enforce absolute backend/frontend/project coverage >= 100
         id: absolute_coverage
         continue-on-error: true
         run: |
@@ -95,7 +95,7 @@ jobs:
           python3 scripts/quality/assert_coverage_thresholds.py \
             --backend backend/coverage.xml \
             --frontend frontend/coverage/lcov.info \
-            --threshold 90
+            --threshold 100
           coverage_exit=$?
           echo "coverage_exit_code=$coverage_exit" >> "$GITHUB_OUTPUT"
           exit 0

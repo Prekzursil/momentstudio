@@ -57,7 +57,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Assert absolute coverage thresholds.")
     parser.add_argument("--backend", default="backend/coverage.xml", help="Path to backend coverage XML")
     parser.add_argument("--frontend", default="frontend/coverage/lcov.info", help="Path to frontend lcov file")
-    parser.add_argument("--threshold", type=float, default=90.0, help="Coverage percentage threshold")
+    parser.add_argument("--threshold", type=float, default=100.0, help="Coverage percentage threshold")
     args = parser.parse_args()
 
     _assert_expected_input_paths(args.backend, args.frontend)
