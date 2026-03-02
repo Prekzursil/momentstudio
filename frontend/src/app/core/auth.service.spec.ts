@@ -25,7 +25,7 @@ type AuthInternals = {
 function base64UrlEncode(input: string): string {
   const encoded = btoa(input).replaceAll('+', '-').replaceAll('/', '_');
   let trimIndex = encoded.length;
-  while (trimIndex > 0 && encoded.charCodeAt(trimIndex - 1) === 61) {
+  while (trimIndex > 0 && encoded.codePointAt(trimIndex - 1) === 61) {
     trimIndex -= 1;
   }
   return encoded.slice(0, trimIndex);
