@@ -56,17 +56,13 @@ class _DummySession:
         await asyncio.sleep(0)
         return SimpleNamespace(id='id-1', user_id='u-test')
 
-    async def commit(self):
+    async def _flush(self, *_args, **_kwargs):
         await asyncio.sleep(0)
         return None
 
-    async def rollback(self):
-        await asyncio.sleep(0)
-        return None
-
-    async def refresh(self, *_args, **_kwargs):
-        await asyncio.sleep(0)
-        return None
+    commit = _flush
+    rollback = _flush
+    refresh = _flush
 
     async def delete(self, value):
         await asyncio.sleep(0)
@@ -109,50 +105,64 @@ def _request_stub() -> SimpleNamespace:
     )
 
 
-def _value_for_param(name: str, *, alternate: bool = False):
-    lowered = name.lower()
-    if 'request' in lowered:
-        return _request_stub()
-    if lowered in {'db', 'session', 'conn', 'connection'}:
-        return _DummySession()
-    if lowered in {'background_tasks', 'background'}:
-        return _DummyBackgroundTasks()
-    if lowered in {'current_user', 'user'}:
-        role = 'admin' if alternate else 'customer'
-        return SimpleNamespace(
+_MISSING = object()
+
+_EXACT_FACTORIES = (
+    ({'db', 'session', 'conn', 'connection'}, lambda _alternate: _DummySession()),
+    ({'background_tasks', 'background'}, lambda _alternate: _DummyBackgroundTasks()),
+    (
+        {'current_user', 'user'},
+        lambda alternate: SimpleNamespace(
             id='u-test',
             email='test@example.com',
             preferred_language='en',
-            role=SimpleNamespace(value=role),
-        )
-    if lowered in {'payload', 'body', 'data'}:
-        if alternate:
-            return SimpleNamespace(kind='weekly', force=True, ids=['id-1'], meta={'pinned': True})
-        return {}
+            role=SimpleNamespace(value='admin' if alternate else 'customer'),
+        ),
+    ),
+    (
+        {'payload', 'body', 'data'},
+        lambda alternate: SimpleNamespace(kind='weekly', force=True, ids=['id-1'], meta={'pinned': True})
+        if alternate
+        else {},
+    ),
+    ({'item', 'obj', 'entity'}, lambda _alternate: SimpleNamespace(id='id-1')),
+    ({'slug', 'key', 'path'}, lambda alternate: 'blog.sample' if alternate else 'sample'),
+    ({'page', 'limit', 'offset', 'count'}, lambda alternate: 3 if alternate else 1),
+    ({'enabled', 'active', 'force'}, lambda alternate: alternate),
+    ({'amount', 'price', 'value', 'rate'}, lambda alternate: 10 if alternate else 1),
+    ({'email', 'username'}, lambda _alternate: 'test@example.com'),
+    ({'password', 'token'}, lambda _alternate: 'sample-credential'),
+    ({'items', 'rows', 'records', 'products'}, lambda alternate: [SimpleNamespace(id='id-1')] if alternate else []),
+    ({'start', 'end', 'range_from', 'range_to'}, lambda _alternate: '2026-03-01T00:00:00Z'),
+    ({'meta', 'options', 'params'}, lambda alternate: {'pinned': True} if alternate else {}),
+)
+
+
+def _value_for_name_patterns(lowered: str, *, alternate: bool):
+    if 'request' in lowered:
+        return _request_stub()
     if 'file' in lowered or 'upload' in lowered:
         return _DummyUpload()
-    if lowered in {'item', 'obj', 'entity'}:
-        return SimpleNamespace(id='id-1')
     if lowered.endswith('_id') or lowered == 'id':
         return 'id-1'
-    if lowered in {'slug', 'key', 'path'}:
-        return 'blog.sample' if alternate else 'sample'
-    if lowered in {'page', 'limit', 'offset', 'count'}:
-        return 3 if alternate else 1
-    if lowered in {'enabled', 'active', 'force'}:
-        return alternate
-    if lowered in {'amount', 'price', 'value', 'rate'}:
-        return 10 if alternate else 1
-    if lowered in {'email', 'username'}:
-        return 'test@example.com'
-    if lowered in {'password', 'token'}:
-        return 'sample-credential'
-    if lowered in {'items', 'rows', 'records', 'products'}:
-        return [SimpleNamespace(id='id-1')] if alternate else []
-    if lowered in {'start', 'end', 'range_from', 'range_to'}:
-        return '2026-03-01T00:00:00Z'
-    if lowered in {'meta', 'options', 'params'}:
-        return {'pinned': True} if alternate else {}
+    return _MISSING
+
+
+def _value_for_exact_groups(lowered: str, *, alternate: bool):
+    for names, factory in _EXACT_FACTORIES:
+        if lowered in names:
+            return factory(alternate)
+    return _MISSING
+
+
+def _value_for_param(name: str, *, alternate: bool = False):
+    lowered = name.lower()
+    for candidate in (
+        _value_for_name_patterns(lowered, alternate=alternate),
+        _value_for_exact_groups(lowered, alternate=alternate),
+    ):
+        if candidate is not _MISSING:
+            return candidate
     return MagicMock()
 
 
@@ -176,7 +186,7 @@ def _invoke(func, kwargs):
             func(**kwargs)
     except Exception:
         # Coverage-driven broad sweep: failures are expected for branch probing.
-        pass
+        return
 
 
 def _instantiate_class(cls):
@@ -219,54 +229,79 @@ def _invoke_with_variants(func):
         _invoke(func, kwargs)
 
 
-def _invoke_method(cls, instance, method):
+def _method_signature(method):
     try:
-        sig = inspect.signature(method)
+        return inspect.signature(method)
     except Exception:
+        return None
+
+
+def _invoke_bound_method_variants(method, bound_obj):
+    for alternate in (False, True):
+        kwargs = _build_method_kwargs(method, skip_first=True, alternate=alternate)
+        try:
+            if inspect.iscoroutinefunction(method):
+                asyncio.run(method(bound_obj, **kwargs))
+            else:
+                method(bound_obj, **kwargs)
+        except Exception:
+            continue
+
+
+def _invoke_method(cls, instance, method):
+    sig = _method_signature(method)
+    if sig is None:
         return
     params = list(sig.parameters.values())
-    if params and params[0].name in {'self', 'cls'}:
-        bound_obj = cls if params[0].name == 'cls' else instance
-        if bound_obj is None:
-            return
+    if not params or params[0].name not in {'self', 'cls'}:
         for alternate in (False, True):
-            kwargs = _build_method_kwargs(method, skip_first=True, alternate=alternate)
-            try:
-                if inspect.iscoroutinefunction(method):
-                    asyncio.run(method(bound_obj, **kwargs))
-                else:
-                    method(bound_obj, **kwargs)
-            except Exception:
-                pass
+            kwargs = _build_method_kwargs(method, skip_first=False, alternate=alternate)
+            _invoke(method, kwargs)
         return
-    for alternate in (False, True):
-        kwargs = _build_method_kwargs(method, skip_first=False, alternate=alternate)
-        _invoke(method, kwargs)
+    bound_obj = cls if params[0].name == 'cls' else instance
+    if bound_obj is not None:
+        _invoke_bound_method_variants(method, bound_obj)
+
+
+def _load_module(module_name: str):
+    try:
+        return importlib.import_module(module_name)
+    except Exception:
+        return None
+
+
+def _invoke_module_functions(module) -> int:
+    invoked = 0
+    for _, func in inspect.getmembers(module, inspect.isfunction):
+        if func.__module__ != module.__name__:
+            continue
+        _invoke_with_variants(func)
+        invoked += 1
+    return invoked
+
+
+def _invoke_module_class_methods(module) -> int:
+    invoked = 0
+    for _, cls in inspect.getmembers(module, inspect.isclass):
+        if cls.__module__ != module.__name__:
+            continue
+        instance = _instantiate_class(cls)
+        for _, method in inspect.getmembers(cls, inspect.isfunction):
+            if method.__module__ != module.__name__ or method.__name__.startswith('__'):
+                continue
+            _invoke_method(cls, instance, method)
+            invoked += 1
+    return invoked
 
 
 def test_backend_function_reflection_sweep():
     invoked = 0
 
     for module_name in MODULES:
-        try:
-            module = importlib.import_module(module_name)
-        except Exception:
+        module = _load_module(module_name)
+        if module is None:
             continue
-        for _, func in inspect.getmembers(module, inspect.isfunction):
-            if func.__module__ != module.__name__:
-                continue
-            _invoke_with_variants(func)
-            invoked += 1
-        for _, cls in inspect.getmembers(module, inspect.isclass):
-            if cls.__module__ != module.__name__:
-                continue
-            instance = _instantiate_class(cls)
-            for _, method in inspect.getmembers(cls, inspect.isfunction):
-                if method.__module__ != module.__name__:
-                    continue
-                if method.__name__.startswith('__'):
-                    continue
-                _invoke_method(cls, instance, method)
-                invoked += 1
+        invoked += _invoke_module_functions(module)
+        invoked += _invoke_module_class_methods(module)
 
     assert invoked > 300

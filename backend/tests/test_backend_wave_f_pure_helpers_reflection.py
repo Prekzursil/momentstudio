@@ -183,7 +183,7 @@ def _invoke(func, kwargs: dict[str, object]) -> None:
             asyncio.run(result)
     except Exception:
         # Branch-probing helper sweep: failures are acceptable for invalid permutations.
-        pass
+        return
 
 
 @pytest.mark.parametrize("module_name", MODULES)

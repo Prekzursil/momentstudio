@@ -779,11 +779,11 @@ describe('AccountState coupon and phone helper branches', () => {
       },
     ];
 
-    expect((state as any).parseCouponDateBoundary('2026-02-28T00:00:00Z')).toBe(Date.parse('2026-02-28T00:00:00Z'));
-    expect((state as any).parseCouponDateBoundary('bad-date')).toBeNull();
-    expect((state as any).isCouponAvailableAt(coupons[0], now)).toBeTrue();
-    expect((state as any).isCouponAvailableAt(coupons[1], now)).toBeFalse();
-    expect((state as any).countAvailableCoupons(coupons as any)).toBe(2);
+    expect(state.parseCouponDateBoundary('2026-02-28T00:00:00Z')).toBe(Date.parse('2026-02-28T00:00:00Z'));
+    expect(state.parseCouponDateBoundary('bad-date')).toBeNull();
+    expect(state.isCouponAvailableAt(coupons[0], now)).toBeTrue();
+    expect(state.isCouponAvailableAt(coupons[1], now)).toBeFalse();
+    expect(state.countAvailableCoupons(coupons as any)).toBe(2);
   });
 
   it('computes resend cooldown seconds and phone previews', () => {
@@ -803,7 +803,7 @@ describe('AccountState coupon and phone helper branches', () => {
     expect(state.phoneNationalPreview()).toContain('712');
     expect(state.phoneE164Preview()).toContain('+40');
 
-    expect((state as any).parseTimestampMs('bad-date')).toBeNull();
-    expect((state as any).parseTimestampMs('2026-02-27T00:00:00Z')).toBe(Date.parse('2026-02-27T00:00:00Z'));
+    expect(state.parseTimestampMs('bad-date')).toBeNull();
+    expect(state.parseTimestampMs('2026-02-27T00:00:00Z')).toBe(Date.parse('2026-02-27T00:00:00Z'));
   });
 });

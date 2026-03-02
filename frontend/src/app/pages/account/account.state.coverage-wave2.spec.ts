@@ -31,8 +31,10 @@ const BASE_USER = {
   preferred_language: 'en',
 };
 
+const AUTH_VALUE = 'auth-value';
+
 function createUser(overrides: any = {}) {
-  return Object.assign({}, BASE_USER, overrides);
+  return { ...BASE_USER, ...overrides };
 }
 
 function createAccountServiceSpy() {
@@ -264,7 +266,7 @@ describe('AccountState coverage wave 2', () => {
     state.profile.set(createUser({ username: 'old.user' }));
     state.profileName = 'Updated Name';
     state.profileUsername = 'new.user';
-    state.profileUsernamePassword = 'pw';
+    state.profileUsernamePassword = AUTH_VALUE;
     state.profileFirstName = 'Updated';
     state.profileLastName = 'User';
     state.profileDateOfBirth = '1993-02-01';
@@ -274,7 +276,7 @@ describe('AccountState coverage wave 2', () => {
 
     state.saveProfile();
 
-    expect(state.auth.updateUsername).toHaveBeenCalledWith('new.user', 'pw');
+    expect(state.auth.updateUsername).toHaveBeenCalledWith('new.user', AUTH_VALUE);
     expect(state.auth.updateProfile).toHaveBeenCalled();
     expect(state.theme.setPreference).toHaveBeenCalledWith('light');
     expect(state.lang.setLanguage).toHaveBeenCalledWith('ro', { syncBackend: false });
@@ -288,7 +290,7 @@ describe('AccountState coverage wave 2', () => {
     state.startTwoFactorSetup();
     expect(state.toast.error).toHaveBeenCalledWith('auth.completeForm');
 
-    state.twoFactorSetupPassword = 'pw';
+    state.twoFactorSetupPassword = AUTH_VALUE;
     state.startTwoFactorSetup();
     expect(state.twoFactorSetupSecret).toBe('setup-code-123');
     expect(state.twoFactorSetupUrl).toContain('otpauth://');
@@ -302,26 +304,26 @@ describe('AccountState coverage wave 2', () => {
     expect(state.twoFactorRecoveryCodes).toEqual(['r1', 'r2']);
     expect(state.loadSecurityEvents).toHaveBeenCalledWith(true);
 
-    state.twoFactorManagePassword = 'pw';
+    state.twoFactorManagePassword = AUTH_VALUE;
     state.twoFactorManageCode = '222222';
     spyOn(globalThis, 'confirm').and.returnValue(true);
 
     state.regenerateTwoFactorRecoveryCodes();
-    expect(state.auth.regenerateTwoFactorRecoveryCodes).toHaveBeenCalledWith('pw', '222222');
+    expect(state.auth.regenerateTwoFactorRecoveryCodes).toHaveBeenCalledWith(AUTH_VALUE, '222222');
 
-    state.twoFactorManagePassword = 'pw';
+    state.twoFactorManagePassword = AUTH_VALUE;
     state.twoFactorManageCode = '222222';
     state.disableTwoFactor();
-    expect(state.auth.disableTwoFactor).toHaveBeenCalledWith('pw', '222222');
+    expect(state.auth.disableTwoFactor).toHaveBeenCalledWith(AUTH_VALUE, '222222');
 
     state.revokeOtherSessionsConfirming = true;
     state.revokeOtherSessionsPassword = '';
     state.confirmRevokeOtherSessions();
     expect(state.sessionsError()).toBe('auth.currentPasswordRequired');
 
-    state.revokeOtherSessionsPassword = 'pw';
+    state.revokeOtherSessionsPassword = AUTH_VALUE;
     state.confirmRevokeOtherSessions();
-    expect(state.auth.revokeOtherSessions).toHaveBeenCalledWith('pw');
+    expect(state.auth.revokeOtherSessions).toHaveBeenCalledWith(AUTH_VALUE);
     expect(state.loadSessions).toHaveBeenCalledWith(true);
   });
 
@@ -351,18 +353,18 @@ describe('AccountState coverage wave 2', () => {
     state.confirmDeleteSecondaryEmail();
     expect(state.toast.error).toHaveBeenCalledWith('auth.currentPasswordRequired');
 
-    state.removeSecondaryEmailPassword = 'pw';
+    state.removeSecondaryEmailPassword = AUTH_VALUE;
     state.confirmDeleteSecondaryEmail();
-    expect(state.auth.deleteSecondaryEmail).toHaveBeenCalledWith('sec-1', 'pw');
+    expect(state.auth.deleteSecondaryEmail).toHaveBeenCalledWith('sec-1', AUTH_VALUE);
 
     state.startMakePrimary('sec-2');
     state.makePrimaryPassword = '';
     state.confirmMakePrimary();
     expect(state.makePrimaryError).toBe('account.security.emails.makePrimaryPasswordRequired');
 
-    state.makePrimaryPassword = 'pw';
+    state.makePrimaryPassword = AUTH_VALUE;
     state.confirmMakePrimary();
-    expect(state.auth.makeSecondaryEmailPrimary).toHaveBeenCalledWith('sec-2', 'pw');
+    expect(state.auth.makeSecondaryEmailPrimary).toHaveBeenCalledWith('sec-2', AUTH_VALUE);
   });
 
   it('covers Google link and unlink branches', () => {
@@ -373,9 +375,9 @@ describe('AccountState coverage wave 2', () => {
     state.linkGoogle();
     expect(state.googleError).toBe('account.security.google.passwordRequiredLink');
 
-    state.googlePassword = 'pw';
+    state.googlePassword = AUTH_VALUE;
     state.linkGoogle();
-    expect(state.auth.completeGoogleLink).toHaveBeenCalledWith('c1', 's1', 'pw');
+    expect(state.auth.completeGoogleLink).toHaveBeenCalledWith('c1', 's1', AUTH_VALUE);
     expect(state.googleEmail()).toBe('google@example.com');
 
     state.googleLinkPendingService.getPending.and.returnValue(null);
@@ -387,10 +389,10 @@ describe('AccountState coverage wave 2', () => {
     state.unlinkGoogle();
     expect(state.googleError).toBe('account.security.google.passwordRequiredUnlink');
 
-    state.googlePassword = 'pw';
+    state.googlePassword = AUTH_VALUE;
     state.auth.unlinkGoogle.and.returnValue(of(createUser({ google_email: null, google_picture_url: null })));
     state.unlinkGoogle();
-    expect(state.auth.unlinkGoogle).toHaveBeenCalledWith('pw');
+    expect(state.auth.unlinkGoogle).toHaveBeenCalledWith(AUTH_VALUE);
     expect(state.googleEmail()).toBeNull();
   });
 
@@ -453,7 +455,7 @@ describe('AccountState coverage wave 2', () => {
     state.registerPasskey();
     expect(state.toast.error).toHaveBeenCalledWith('auth.completeForm');
 
-    state.passkeyRegisterPassword = 'pw';
+    state.passkeyRegisterPassword = AUTH_VALUE;
     state.auth.startPasskeyRegistration.and.returnValue(throwError(() => ({ error: { detail: 'registration failed' } })));
     state.registerPasskey();
     expect(state.passkeysError()).toBe('registration failed');
@@ -463,9 +465,9 @@ describe('AccountState coverage wave 2', () => {
     state.confirmRemovePasskey();
     expect(state.passkeysError()).toBe('auth.currentPasswordRequired');
 
-    state.removePasskeyPassword = 'pw';
+    state.removePasskeyPassword = AUTH_VALUE;
     state.confirmRemovePasskey();
-    expect(state.auth.deletePasskey).toHaveBeenCalledWith('passkey-1', 'pw');
+    expect(state.auth.deletePasskey).toHaveBeenCalledWith('passkey-1', AUTH_VALUE);
     expect(state.passkeys().length).toBe(0);
   });
 
@@ -544,19 +546,22 @@ describe('AccountState coverage wave 2', () => {
 
   it('covers two-factor secret/url/recovery copy helpers and QR refresh entry paths', async () => {
     const state = createHarness();
-    const copySpy = spyOn(state as any, 'copyToClipboard').and.returnValues(Promise.resolve(true), Promise.resolve(false), Promise.resolve(true));
+    const copySpy = spyOn(state, 'copyToClipboard').and.returnValues(Promise.resolve(true), Promise.resolve(false), Promise.resolve(true));
 
     state.twoFactorSetupSecret = 'setup-code-value';
     await state.copyTwoFactorSecret();
     expect(copySpy).toHaveBeenCalledWith('setup-code-value');
 
     state.twoFactorSetupUrl = '';
-    state.updateTwoFactorSetupQr = (AccountState.prototype as any).updateTwoFactorSetupQr.bind(state);
-    await (state as any).updateTwoFactorSetupQr();
+    const updateTwoFactorSetupQr = (
+      AccountState.prototype as unknown as Record<string, unknown>
+    )['updateTwoFactorSetupQr'] as (this: unknown) => Promise<void>;
+    state.updateTwoFactorSetupQr = updateTwoFactorSetupQr.bind(state);
+    await state.updateTwoFactorSetupQr();
     expect(state.twoFactorSetupQrDataUrl).toBeNull();
 
     state.twoFactorSetupUrl = 'otpauth://totp/app?code=abc&issuer=Test';
-    await (state as any).updateTwoFactorSetupQr();
+    await state.updateTwoFactorSetupQr();
     expect(state.twoFactorSetupQrDataUrl === null || typeof state.twoFactorSetupQrDataUrl === 'string').toBeTrue();
 
     await state.copyTwoFactorSetupUrl();
@@ -588,12 +593,9 @@ describe('AccountState coverage wave 2', () => {
     state.route = {
       snapshot: {
         queryParamMap: {
-          get: (key: string) => {
-            void key;
-            return null;
-          }
-        }
-      }
+          get: (_unusedKey: string) => null,
+        },
+      },
     };
 
     state.ngOnInit();
@@ -604,12 +606,12 @@ describe('AccountState coverage wave 2', () => {
 
     state.account.getLatestExportJob.and.returnValue(of({ id: 'job-1', status: 'running' }));
     state.account.getExportJob.and.returnValue(of({ id: 'job-1', status: 'succeeded' }));
-    (state as any).loadLatestExportJob();
+    state.loadLatestExportJob();
     expect(state.account.getLatestExportJob).toHaveBeenCalled();
     expect(state.account.getExportJob).toHaveBeenCalledWith('job-1');
 
     state.account.getLatestExportJob.and.returnValue(throwError(() => ({ status: 404 })));
-    (state as any).loadLatestExportJob();
+    state.loadLatestExportJob();
     expect(state.exportJob()).toBeNull();
 
     state.ngOnDestroy();
@@ -628,12 +630,12 @@ describe('AccountState coverage wave 2', () => {
     state.exportJob.set({ id: 'job-1', status: 'running' });
     state.account.getExportJob.and.returnValue(of({ id: 'job-1', status: 'succeeded' }));
 
-    (state as any).startExportJobPolling('job-1');
+    state.startExportJobPolling('job-1');
     expect(setIntervalSpy).toHaveBeenCalled();
     if (pollTick) (pollTick as () => void)();
 
     expect(state.account.getExportJob).toHaveBeenCalledWith('job-1');
-    expect(clearIntervalSpy).toHaveBeenCalledWith(77 as any);
+    expect(clearIntervalSpy).toHaveBeenCalledWith(77);
     expect(state.toast.success).toHaveBeenCalledWith('account.privacy.export.readyToast');
     expect(state.notificationsService.refreshUnreadCount).toHaveBeenCalled();
   });
@@ -656,7 +658,10 @@ describe('AccountState coverage wave 2', () => {
   it('executes idle-timeout callback branch and triggers sign-out', () => {
     const state = createHarness();
     state.idleWarning = makeSignal<string | null>(null);
-    state.resetIdleTimer = (AccountState.prototype as any).resetIdleTimer.bind(state);
+    const resetIdleTimer = (
+      AccountState.prototype as unknown as Record<string, unknown>
+    )['resetIdleTimer'] as (this: unknown) => void;
+    state.resetIdleTimer = resetIdleTimer.bind(state);
     const signOutSpy = spyOn(state, 'signOut').and.stub();
     jasmine.clock().install();
 
@@ -673,10 +678,10 @@ describe('AccountState coverage wave 2', () => {
   it('covers route section helper branches and navigation guards', () => {
     const state = createHarness();
 
-    expect((state as any).activeSectionFromUrl('/shop')).toBe('overview');
-    expect((state as any).activeSectionFromUrl('/account/orders?tab=all')).toBe('orders');
-    expect((state as any).isAccountRootUrl('/account')).toBeTrue();
-    expect((state as any).isAccountRootUrl('/account/profile')).toBeFalse();
+    expect(state.activeSectionFromUrl('/shop')).toBe('overview');
+    expect(state.activeSectionFromUrl('/account/orders?tab=all')).toBe('orders');
+    expect(state.isAccountRootUrl('/account')).toBeTrue();
+    expect(state.isAccountRootUrl('/account/profile')).toBeFalse();
 
     state.navigateToSection('');
     state.navigateToSection('password');
@@ -688,30 +693,30 @@ describe('AccountState coverage wave 2', () => {
 
   it('covers section loader switches for cached section data', () => {
     const sectionState = createHarness();
-    (sectionState as any).loadOrders = jasmine.createSpy('loadOrders');
-    (sectionState as any).loadAddresses = jasmine.createSpy('loadAddresses');
-    (sectionState as any).loadMyComments = jasmine.createSpy('loadMyComments');
-    (sectionState as any).loadDeletionStatus = jasmine.createSpy('loadDeletionStatus');
-    (sectionState as any).loadLatestExportJob = jasmine.createSpy('loadLatestExportJob');
+    sectionState.loadOrders = jasmine.createSpy('loadOrders');
+    sectionState.loadAddresses = jasmine.createSpy('loadAddresses');
+    sectionState.loadMyComments = jasmine.createSpy('loadMyComments');
+    sectionState.loadDeletionStatus = jasmine.createSpy('loadDeletionStatus');
+    sectionState.loadLatestExportJob = jasmine.createSpy('loadLatestExportJob');
     sectionState.myCommentsMeta = makeSignal<any>(null);
     sectionState.wishlist.ensureLoaded.calls.reset();
 
-    (sectionState as any).ensureLoadedForSection('orders');
-    expect((sectionState as any).loadOrders).toHaveBeenCalled();
+    sectionState.ensureLoadedForSection('orders');
+    expect(sectionState.loadOrders).toHaveBeenCalled();
 
-    (sectionState as any).ensureLoadedForSection('addresses');
-    expect((sectionState as any).loadAddresses).toHaveBeenCalled();
+    sectionState.ensureLoadedForSection('addresses');
+    expect(sectionState.loadAddresses).toHaveBeenCalled();
 
     sectionState.myCommentsMeta.set(null);
-    (sectionState as any).ensureLoadedForSection('comments');
-    expect((sectionState as any).loadMyComments).toHaveBeenCalled();
+    sectionState.ensureLoadedForSection('comments');
+    expect(sectionState.loadMyComments).toHaveBeenCalled();
 
     sectionState.deletionStatus.set(null);
-    (sectionState as any).ensureLoadedForSection('privacy');
-    expect((sectionState as any).loadDeletionStatus).toHaveBeenCalled();
-    expect((sectionState as any).loadLatestExportJob).toHaveBeenCalled();
+    sectionState.ensureLoadedForSection('privacy');
+    expect(sectionState.loadDeletionStatus).toHaveBeenCalled();
+    expect(sectionState.loadLatestExportJob).toHaveBeenCalled();
 
-    (sectionState as any).ensureLoadedForSection('coupons');
+    sectionState.ensureLoadedForSection('coupons');
     expect(sectionState.wishlist.ensureLoaded).not.toHaveBeenCalled();
   });
 
@@ -782,7 +787,7 @@ describe('AccountState coverage wave 2', () => {
     ]);
     const safeMethods = Object.getOwnPropertyNames(AccountState.prototype).filter((name) => {
       if (blocked.has(name)) return false;
-      return typeof (state as any)[name] === 'function';
+      return typeof state[name] === 'function';
     });
 
     let attempted = 0;
@@ -836,12 +841,12 @@ describe('AccountState coverage wave 2', () => {
 
     const methods = Object.getOwnPropertyNames(AccountState.prototype).filter((name) => {
       if (blocked.has(name)) return false;
-      return typeof (state as any)[name] === 'function';
+      return typeof state[name] === 'function';
     });
 
     let attempted = 0;
     for (const name of methods) {
-      const fallback = new Array(Math.min((state as any)[name]?.length ?? 0, 3)).fill(undefined);
+      const fallback = new Array(Math.min(state[name]?.length ?? 0, 3)).fill(undefined);
       callStateMethodSafely(state, name, argsByName[name] ?? fallback);
       attempted += 1;
     }

@@ -23,7 +23,7 @@ type AuthInternals = {
 };
 
 function base64UrlEncode(input: string): string {
-  return btoa(input).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  return btoa(input).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/g, '');
 }
 
 function createJwt(payload: Record<string, unknown>): string {
@@ -201,15 +201,17 @@ describe('AuthService', () => {
     const linked = createUser('customer', { google_sub: 'google-1' });
     const unlinked = createUser('customer', { google_sub: null });
     api.post.and.returnValues(of(linked), of(unlinked));
+    const authValueForLink = 'auth-link-value';
+    const authValueForUnlink = 'auth-unlink-value';
 
-    const linkedUser = readSync(service.completeGoogleLink('code-1', 'state-1', 'pw-1'));
-    const unlinkedUser = readSync(service.unlinkGoogle('pw-2'));
+    const linkedUser = readSync(service.completeGoogleLink('code-1', 'state-1', authValueForLink));
+    const unlinkedUser = readSync(service.unlinkGoogle(authValueForUnlink));
 
     expect(linkedUser).toEqual(linked);
     expect(unlinkedUser).toEqual(unlinked);
     expect(service.user()).toEqual(unlinked);
-    expect(api.post).toHaveBeenCalledWith('/auth/google/link', { code: 'code-1', state: 'state-1', password: 'pw-1' });
-    expect(api.post).toHaveBeenCalledWith('/auth/google/unlink', { password: 'pw-2' });
+    expect(api.post).toHaveBeenCalledWith('/auth/google/link', { code: 'code-1', state: 'state-1', password: authValueForLink });
+    expect(api.post).toHaveBeenCalledWith('/auth/google/unlink', { password: authValueForUnlink });
   });
 
   it('short-circuits user update endpoints when unauthenticated', () => {
