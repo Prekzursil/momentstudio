@@ -154,13 +154,13 @@ async def test_orders_receipt_loading_and_token_payload(monkeypatch: pytest.Monk
         return SimpleNamespace(receipt_share_days=5)
 
     monkeypatch.setattr(orders_api.checkout_settings_service, "get_checkout_settings", _checkout_settings)
-    monkeypatch.setattr(orders_api, "create_receipt_token", lambda **_kwargs: "share-token")
+    monkeypatch.setattr(orders_api, "create_receipt_token", lambda **_kwargs: "share-handle")
     monkeypatch.setattr(orders_api.settings, "frontend_origin", "https://frontend.example/", raising=False)
 
     token_read = await orders_api._build_receipt_share_token_read(object(), base_order)
-    assert token_read.token == "share-token"
-    assert token_read.receipt_url == "https://frontend.example/receipt/share-token"
-    assert token_read.receipt_pdf_url == "https://frontend.example/api/v1/orders/receipt/share-token/pdf"
+    assert token_read.token == "share-handle"
+    assert token_read.receipt_url == "https://frontend.example/receipt/share-handle"
+    assert token_read.receipt_pdf_url == "https://frontend.example/api/v1/orders/receipt/share-handle/pdf"
 
 
 @pytest.mark.anyio

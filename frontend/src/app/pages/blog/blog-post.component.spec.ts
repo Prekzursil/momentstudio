@@ -431,8 +431,8 @@ describe('BlogPostComponent', () => {
     cmp.newsletterEmail = 'reader@example.com';
     cmp.commentsMeta.set({ total_items: 1, total_pages: 2, page: 1, limit: 10 });
 
-    spyOn(window, 'open').and.returnValue(null);
-    spyOn(window, 'confirm').and.returnValue(false);
+    spyOn(globalThis, 'open').and.returnValue(null);
+    spyOn(globalThis, 'confirm').and.returnValue(false);
     spyOn(navigator.clipboard, 'writeText').and.returnValue(Promise.resolve());
 
     const attempted = runBlogPrototypeSweep(cmp);

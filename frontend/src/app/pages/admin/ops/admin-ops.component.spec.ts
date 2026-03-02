@@ -229,7 +229,7 @@ describe('AdminOpsComponent', () => {
     const fixture = TestBed.createComponent(AdminOpsComponent);
     fixture.detectChanges();
     const cmp = fixture.componentInstance;
-    spyOn(window, 'confirm').and.returnValue(true);
+    spyOn(globalThis, 'confirm').and.returnValue(true);
 
     cmp.bannerStartsAtLocal = '';
     cmp.bannerMessageEn = '';

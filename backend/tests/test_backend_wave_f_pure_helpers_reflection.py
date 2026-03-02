@@ -181,7 +181,7 @@ def _invoke(func, kwargs: dict[str, object]) -> None:
         result = func(**kwargs)
         if inspect.iscoroutine(result):
             asyncio.run(result)
-    except BaseException:
+    except Exception:
         # Branch-probing helper sweep: failures are acceptable for invalid permutations.
         pass
 

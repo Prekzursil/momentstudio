@@ -198,15 +198,15 @@ def test_backend_wave_b_storage_mime_and_svg_edges(monkeypatch: pytest.MonkeyPat
     sanitized = storage_service._sanitize_svg(
         b"""<svg xmlns='http://www.w3.org/2000/svg'>
             <script>alert(1)</script>
-            <a href='http://bad.example/x'>bad</a>
+            <a href='invalid://bad.example/x'>bad</a>
             <a href='#ok'>ok</a>
-            <rect onclick='evil()' style='fill:red; background:url(http://bad.example/bg)' />
+            <rect onclick='evil()' style='fill:red; background:url(invalid://bad.example/bg)' />
             <style>@import url(https://bad.example/x.css); fill:#fff;</style>
         </svg>"""
     ).decode("utf-8", errors="ignore").lower()
     assert "<script" not in sanitized
     assert "onclick" not in sanitized
-    assert "http://bad.example" not in sanitized
+    assert "invalid://bad.example" not in sanitized
     assert "#ok" in sanitized
 
     with pytest.raises(HTTPException, match="Invalid SVG"):

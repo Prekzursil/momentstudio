@@ -400,11 +400,11 @@ describe('AdminComponent sweep coverage', () => {
     const { component } = createComponent();
     let pollTick: (() => void) | null = null;
     const observeCmsDrafts = spyOn<any>(component, 'observeCmsDrafts').and.stub();
-    const setIntervalSpy = spyOn(window, 'setInterval').and.callFake(((handler: TimerHandler) => {
+    const setIntervalSpy = spyOn(globalThis, 'setInterval').and.callFake(((handler: TimerHandler) => {
       pollTick = handler as () => void;
       return 91 as any;
     }) as any);
-    const clearIntervalSpy = spyOn(window, 'clearInterval');
+    const clearIntervalSpy = spyOn(globalThis, 'clearInterval');
     const visibilitySpy = spyOnProperty(document, 'visibilityState', 'get').and.returnValue('visible');
 
     (component as any).syncCmsDraftPoller('home');
@@ -425,8 +425,8 @@ describe('AdminComponent sweep coverage', () => {
 
   it('covers owner transfer and FX branches including confirmations', () => {
     const { component, admin, fxAdmin, toast } = createComponent();
-    const confirmSpy = spyOn(window, 'confirm');
-    const promptSpy = spyOn(window, 'prompt');
+    const confirmSpy = spyOn(globalThis, 'confirm');
+    const promptSpy = spyOn(globalThis, 'prompt');
 
     component.ownerTransferIdentifier = '';
     component.submitOwnerTransfer();
@@ -470,7 +470,7 @@ describe('AdminComponent sweep coverage', () => {
 
   it('covers FX save/clear and product create/update/delete branches', () => {
     const { component, admin, fxAdmin, toast } = createComponent();
-    const confirmSpy = spyOn(window, 'confirm').and.returnValue(false);
+    const confirmSpy = spyOn(globalThis, 'confirm').and.returnValue(false);
 
     component.fxOverrideForm = { eur_per_ron: 0, usd_per_ron: 0, as_of: '' };
     component.saveFxOverride();
@@ -519,11 +519,11 @@ describe('AdminComponent sweep coverage', () => {
 
   it('covers draft observers, revision switch branches, and split-scroll sync', () => {
     const { component, cmsPrefs } = createComponent();
-    spyOn(window, 'setTimeout').and.callFake(((handler: TimerHandler) => {
+    spyOn(globalThis, 'setTimeout').and.callFake(((handler: TimerHandler) => {
       if (typeof handler === 'function') handler();
       return 1;
     }) as any);
-    const rafSpy = spyOn(window as any, 'requestAnimationFrame').and.callFake(((cb: FrameRequestCallback) => {
+    const rafSpy = spyOn(globalThis as any, 'requestAnimationFrame').and.callFake(((cb: FrameRequestCallback) => {
       cb(0);
       return 1;
     }) as any);
@@ -804,8 +804,8 @@ describe('AdminComponent sweep coverage', () => {
 
   it('covers seo validation, page rename, and page-block parsing branches', () => {
     const { component, admin, toast } = createComponent();
-    const confirmSpy = spyOn(window, 'confirm').and.returnValue(true);
-    const promptSpy = spyOn(window, 'prompt');
+    const confirmSpy = spyOn(globalThis, 'confirm').and.returnValue(true);
+    const promptSpy = spyOn(globalThis, 'prompt');
 
     component.runStructuredDataValidation();
     expect(admin.validateStructuredData).toHaveBeenCalled();
@@ -952,7 +952,7 @@ describe('AdminComponent sweep coverage', () => {
 
     component.selectedUserId = 'user-1';
     component.selectedUserRole = 'admin';
-    spyOn(window, 'prompt').and.returnValue('secret');
+    spyOn(globalThis, 'prompt').and.returnValue('secret');
     admin.updateUserRole.and.returnValue(throwError(() => ({ status: 500 })));
     component.updateRole();
     expect(toast.error).toHaveBeenCalledWith('adminUi.users.errors.role');
@@ -994,8 +994,8 @@ describe('AdminComponent sweep coverage', () => {
   it('sweeps admin component prototype methods through guarded branches', () => {
     const { component } = createComponent();
     const dynamic = component as any;
-    spyOn(window, 'confirm').and.returnValue(false);
-    spyOn(window, 'prompt').and.returnValue('');
+    spyOn(globalThis, 'confirm').and.returnValue(false);
+    spyOn(globalThis, 'prompt').and.returnValue('');
     mockClipboardWriteText();
 
     const attempted = runAdminPrototypeSweep(dynamic);
@@ -1005,8 +1005,8 @@ describe('AdminComponent sweep coverage', () => {
   it('re-sweeps admin prototype with alternate role and section state', () => {
     const { component, auth, cmsPrefs } = createComponent();
     const dynamic = component as any;
-    spyOn(window, 'confirm').and.returnValue(true);
-    spyOn(window, 'prompt').and.returnValue('alternate-value');
+    spyOn(globalThis, 'confirm').and.returnValue(true);
+    spyOn(globalThis, 'prompt').and.returnValue('alternate-value');
     mockClipboardWriteText();
 
     (auth.role as jasmine.Spy).and.returnValue('admin');

@@ -220,8 +220,8 @@ describe('HeaderComponent coverage wave', () => {
 
   it('covers polling lifecycle, sign out, refresh banner, and destroy cleanup', () => {
     const { cmp, auth, notificationsService, ops } = createHarness();
-    const setIntervalSpy = spyOn(window, 'setInterval').and.returnValue(99 as any);
-    const clearIntervalSpy = spyOn(window, 'clearInterval');
+    const setIntervalSpy = spyOn(globalThis, 'setInterval').and.returnValue(99 as any);
+    const clearIntervalSpy = spyOn(globalThis, 'clearInterval');
 
     (cmp as any).startUnreadPolling();
     expect(setIntervalSpy).toHaveBeenCalled();

@@ -237,8 +237,8 @@ describe('BlogPostComponent coverage wave', () => {
     cmp.submitNewsletter();
     expect(toast.error).toHaveBeenCalledWith('blog.newsletter.errorTitle', 'blog.newsletter.errorCopy');
 
-    spyOn(window, 'confirm').and.returnValue(true);
-    spyOn(window, 'prompt').and.returnValue('spam link');
+    spyOn(globalThis, 'confirm').and.returnValue(true);
+    spyOn(globalThis, 'prompt').and.returnValue('spam link');
 
     const myComment = { id: 'c1', is_deleted: false, is_hidden: false, author: { id: 'u1' } } as any;
     const otherComment = { id: 'c2', is_deleted: false, is_hidden: false, author: { id: 'u2' } } as any;
@@ -257,8 +257,8 @@ describe('BlogPostComponent coverage wave', () => {
   it('sweeps prototype methods through guarded blog-post branches', () => {
     const { component } = createHarness();
     const cmp = component as any;
-    spyOn(window, 'confirm').and.returnValue(true);
-    spyOn(window, 'prompt').and.returnValue('spam');
+    spyOn(globalThis, 'confirm').and.returnValue(true);
+    spyOn(globalThis, 'prompt').and.returnValue('spam');
     const argsByName: Record<string, unknown[]> = {
       toggleCommentSubscription: [{ target: { checked: true } }],
       deleteComment: [{ id: 'c1', is_deleted: false, is_hidden: false, author: { id: 'u1' } }],
@@ -301,8 +301,8 @@ describe('BlogPostComponent coverage wave', () => {
   it('expands blog-post sweep across prototype methods with alternate state toggles', () => {
     const { component, auth, blog, newsletter } = createHarness();
     const cmp = component as any;
-    spyOn(window, 'confirm').and.returnValue(false);
-    spyOn(window, 'prompt').and.returnValue('');
+    spyOn(globalThis, 'confirm').and.returnValue(false);
+    spyOn(globalThis, 'prompt').and.returnValue('');
 
     auth.isAuthenticated.and.returnValue(false);
     auth.user.and.returnValue(null as any);

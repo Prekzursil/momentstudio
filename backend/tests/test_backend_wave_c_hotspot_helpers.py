@@ -177,9 +177,9 @@ def test_backend_wave_c_admin_dashboard_helper_branches() -> None:
     assert admin_dashboard._decimal_or_none("2.5") == Decimal("2.5")
 
     assert admin_dashboard._summary_delta_pct(10, 0) is None
-    assert admin_dashboard._summary_delta_pct(15, 10) == 50.0
+    assert admin_dashboard._summary_delta_pct(15, 10) == pytest.approx(50.0)
     assert admin_dashboard._summary_rate_pct(1, 0) is None
-    assert admin_dashboard._summary_rate_pct(2, 4) == 50.0
+    assert admin_dashboard._summary_rate_pct(2, 4) == pytest.approx(50.0)
 
     now = datetime(2026, 2, 28, tzinfo=timezone.utc)
     with pytest.raises(HTTPException, match="must be provided together"):
@@ -231,10 +231,10 @@ def test_backend_wave_c_admin_dashboard_helper_branches() -> None:
         "unknown",
     )
     assert channel_items[0]["key"] == "stripe"
-    assert channel_items[0]["net_sales"] == 15.0
+    assert channel_items[0]["net_sales"] == pytest.approx(15.0)
     assert channel_items[1]["key"] == "unknown"
     assert admin_dashboard._channel_coverage_pct(0, 0) is None
-    assert admin_dashboard._channel_coverage_pct(2, 4) == 0.5
+    assert admin_dashboard._channel_coverage_pct(2, 4) == pytest.approx(0.5)
 
     assert admin_dashboard._normalize_refund_reason_text("  Întârziere LIVRARE  ") == "intarziere livrare"
     assert admin_dashboard._refund_reason_category("Package arrived broken") == "damaged"
@@ -260,8 +260,8 @@ def test_backend_wave_c_admin_dashboard_helper_branches() -> None:
 
     rows = admin_dashboard._shipping_rows({"fast": [4.0, 6.0]}, {"fast": [2.0], "slow": [10.0]})
     assert rows[0]["courier"] == "fast"
-    assert rows[0]["current"]["avg_hours"] == 5.0
-    assert rows[0]["delta_pct"]["count"] == 100.0
+    assert rows[0]["current"]["avg_hours"] == pytest.approx(5.0)
+    assert rows[0]["delta_pct"]["count"] == pytest.approx(100.0)
     assert any(row["courier"] == "slow" for row in rows)
 
     payload = admin_dashboard._shipping_response_payload(

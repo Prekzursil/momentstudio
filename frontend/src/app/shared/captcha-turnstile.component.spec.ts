@@ -12,7 +12,7 @@ describe('CaptchaTurnstileComponent', () => {
   }
 
   afterEach(() => {
-    delete (window as any).turnstile;
+    delete (globalThis as any).turnstile;
   });
 
   it('returns early when site key is missing', async () => {
@@ -30,7 +30,7 @@ describe('CaptchaTurnstileComponent', () => {
     const resetSpy = jasmine.createSpy('reset');
     const removeSpy = jasmine.createSpy('remove');
 
-    (window as any).turnstile = {
+    (globalThis as any).turnstile = {
       render: (_el: HTMLElement, options: Record<string, unknown>) => {
         renderOptions = options as any;
         return 'widget-1';
@@ -66,7 +66,7 @@ describe('CaptchaTurnstileComponent', () => {
 
   it('sets load error when render throws', async () => {
     const component = createComponent();
-    (window as any).turnstile = {
+    (globalThis as any).turnstile = {
       render: () => {
         throw new Error('boom');
       },
@@ -82,7 +82,7 @@ describe('CaptchaTurnstileComponent', () => {
   it('ignores reset when no widget id exists', () => {
     const component = createComponent();
     const resetSpy = jasmine.createSpy('reset');
-    (window as any).turnstile = { reset: resetSpy, render: () => 'id', remove: () => undefined };
+    (globalThis as any).turnstile = { reset: resetSpy, render: () => 'id', remove: () => undefined };
 
     component.reset();
 

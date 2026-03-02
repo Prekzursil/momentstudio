@@ -55,7 +55,7 @@ function createAccountServiceSpy() {
   account.createReturnRequest.and.returnValue(of({}));
   account.requestOrderCancellation.and.returnValue(of({ id: 'order-1' }));
   account.downloadReceipt.and.returnValue(of(new Blob(['receipt'])));
-  account.shareReceipt.and.returnValue(of({ token: 'share-token', receipt_url: 'https://example.test/receipt', expires_at: '2099-01-01T00:00:00Z' }));
+  account.shareReceipt.and.returnValue(of({ token: 'share-handle', receipt_url: 'https://example.test/receipt', expires_at: '2099-01-01T00:00:00Z' }));
   account.revokeReceiptShare.and.returnValue(of({}));
   return account;
 }
@@ -75,7 +75,7 @@ function createAuthServiceSpy() {
     loadCurrentUser: jasmine.createSpy('loadCurrentUser').and.returnValue(of(createUser())),
     getAliases: jasmine.createSpy('getAliases').and.returnValue(of({ aliases: [] })),
     getCooldowns: jasmine.createSpy('getCooldowns').and.returnValue(of(null)),
-    startTwoFactorSetup: jasmine.createSpy('startTwoFactorSetup').and.returnValue(of({ secret: 'secret-123', otpauth_url: 'otpauth://totp/test' })),
+    startTwoFactorSetup: jasmine.createSpy('startTwoFactorSetup').and.returnValue(of({ secret: 'setup-code-123', otpauth_url: 'otpauth://totp/test' })),
     enableTwoFactor: jasmine.createSpy('enableTwoFactor').and.returnValue(of({ recovery_codes: ['r1', 'r2'] })),
     disableTwoFactor: jasmine.createSpy('disableTwoFactor').and.returnValue(of({ enabled: false })),
     regenerateTwoFactorRecoveryCodes: jasmine.createSpy('regenerateTwoFactorRecoveryCodes').and.returnValue(of({ recovery_codes: ['r3'] })),
@@ -89,7 +89,7 @@ function createAuthServiceSpy() {
     completeGoogleLink: jasmine.createSpy('completeGoogleLink').and.returnValue(of(createUser({ google_email: 'google@example.com' }))),
     unlinkGoogle: jasmine.createSpy('unlinkGoogle').and.returnValue(of(createUser({ google_email: null })),
     ),
-    startPasskeyRegistration: jasmine.createSpy('startPasskeyRegistration').and.returnValue(of({ options: {}, registration_token: 'reg-token' })),
+    startPasskeyRegistration: jasmine.createSpy('startPasskeyRegistration').and.returnValue(of({ options: {}, registration_token: 'registration-handle' })),
     completePasskeyRegistration: jasmine.createSpy('completePasskeyRegistration').and.returnValue(of({})),
     deletePasskey: jasmine.createSpy('deletePasskey').and.returnValue(of({})),
     updateNotificationPreferences: jasmine.createSpy('updateNotificationPreferences').and.returnValue(of(createUser())),
@@ -290,7 +290,7 @@ describe('AccountState coverage wave 2', () => {
 
     state.twoFactorSetupPassword = 'pw';
     state.startTwoFactorSetup();
-    expect(state.twoFactorSetupSecret).toBe('secret-123');
+    expect(state.twoFactorSetupSecret).toBe('setup-code-123');
     expect(state.twoFactorSetupUrl).toContain('otpauth://');
 
     state.twoFactorEnableCode = '';
@@ -304,7 +304,7 @@ describe('AccountState coverage wave 2', () => {
 
     state.twoFactorManagePassword = 'pw';
     state.twoFactorManageCode = '222222';
-    spyOn(window, 'confirm').and.returnValue(true);
+    spyOn(globalThis, 'confirm').and.returnValue(true);
 
     state.regenerateTwoFactorRecoveryCodes();
     expect(state.auth.regenerateTwoFactorRecoveryCodes).toHaveBeenCalledWith('pw', '222222');
@@ -345,7 +345,7 @@ describe('AccountState coverage wave 2', () => {
     state.confirmSecondaryEmailVerification();
     expect(state.secondaryEmailMessage).toBe('account.security.emails.verified');
 
-    spyOn(window, 'confirm').and.returnValue(true);
+    spyOn(globalThis, 'confirm').and.returnValue(true);
     state.startDeleteSecondaryEmail('sec-1');
     state.removeSecondaryEmailPassword = '';
     state.confirmDeleteSecondaryEmail();
@@ -396,7 +396,7 @@ describe('AccountState coverage wave 2', () => {
 
   it('covers avatar/session/logout helpers and profile completeness summary', () => {
     const state = createHarness();
-    spyOn(window, 'confirm').and.returnValue(true);
+    spyOn(globalThis, 'confirm').and.returnValue(true);
 
     state.refreshSession();
     expect(state.auth.refresh).toHaveBeenCalled();
@@ -442,7 +442,7 @@ describe('AccountState coverage wave 2', () => {
 
   it('covers passkey registration and removal branches', () => {
     const state = createHarness();
-    spyOn(window, 'confirm').and.returnValue(true);
+    spyOn(globalThis, 'confirm').and.returnValue(true);
 
     state.passkeysSupported.and.returnValue(false);
     state.registerPasskey();
@@ -546,21 +546,21 @@ describe('AccountState coverage wave 2', () => {
     const state = createHarness();
     const copySpy = spyOn(state as any, 'copyToClipboard').and.returnValues(Promise.resolve(true), Promise.resolve(false), Promise.resolve(true));
 
-    state.twoFactorSetupSecret = 'secret-value';
+    state.twoFactorSetupSecret = 'setup-code-value';
     await state.copyTwoFactorSecret();
-    expect(copySpy).toHaveBeenCalledWith('secret-value');
+    expect(copySpy).toHaveBeenCalledWith('setup-code-value');
 
     state.twoFactorSetupUrl = '';
     state.updateTwoFactorSetupQr = (AccountState.prototype as any).updateTwoFactorSetupQr.bind(state);
     await (state as any).updateTwoFactorSetupQr();
     expect(state.twoFactorSetupQrDataUrl).toBeNull();
 
-    state.twoFactorSetupUrl = 'otpauth://totp/app?secret=abc&issuer=Test';
+    state.twoFactorSetupUrl = 'otpauth://totp/app?code=abc&issuer=Test';
     await (state as any).updateTwoFactorSetupQr();
     expect(state.twoFactorSetupQrDataUrl === null || typeof state.twoFactorSetupQrDataUrl === 'string').toBeTrue();
 
     await state.copyTwoFactorSetupUrl();
-    expect(copySpy).toHaveBeenCalledWith('otpauth://totp/app?secret=abc&issuer=Test');
+    expect(copySpy).toHaveBeenCalledWith('otpauth://totp/app?code=abc&issuer=Test');
 
     state.twoFactorRecoveryCodes = ['r1', 'r2'];
     await state.copyTwoFactorRecoveryCodes();
@@ -569,13 +569,13 @@ describe('AccountState coverage wave 2', () => {
 
   it('covers lifecycle and export polling branches', () => {
     const state = createHarness();
-    const addEventListener = spyOn(window, 'addEventListener');
-    const removeEventListener = spyOn(window, 'removeEventListener');
-    const setIntervalSpy = spyOn(window, 'setInterval').and.callFake(((handler: TimerHandler) => {
+    const addEventListener = spyOn(globalThis, 'addEventListener');
+    const removeEventListener = spyOn(globalThis, 'removeEventListener');
+    const setIntervalSpy = spyOn(globalThis, 'setInterval').and.callFake(((handler: TimerHandler) => {
       if (typeof handler === 'function') handler();
       return 123 as any;
     }) as any);
-    spyOn(window, 'clearInterval');
+    spyOn(globalThis, 'clearInterval');
     const localStorageGet = spyOn(localStorage, 'getItem').and.returnValue('orders');
     spyOn(localStorage, 'setItem');
 
@@ -619,11 +619,11 @@ describe('AccountState coverage wave 2', () => {
   it('runs export polling timer callback to completion and stops the poller', () => {
     const state = createHarness();
     let pollTick: (() => void) | null = null;
-    const setIntervalSpy = spyOn(window, 'setInterval').and.callFake(((handler: TimerHandler) => {
+    const setIntervalSpy = spyOn(globalThis, 'setInterval').and.callFake(((handler: TimerHandler) => {
       pollTick = handler as () => void;
       return 77 as any;
     }) as any);
-    const clearIntervalSpy = spyOn(window, 'clearInterval');
+    const clearIntervalSpy = spyOn(globalThis, 'clearInterval');
 
     state.exportJob.set({ id: 'job-1', status: 'running' });
     state.account.getExportJob.and.returnValue(of({ id: 'job-1', status: 'succeeded' }));
@@ -752,11 +752,11 @@ describe('AccountState coverage wave 2', () => {
 
   it('sweeps account state prototype methods through guarded flows', () => {
     const state = createHarness();
-    spyOn(window, 'confirm').and.returnValue(true);
-    spyOn(window, 'setInterval').and.returnValue(1 as any);
-    spyOn(window, 'clearInterval');
-    spyOn(window, 'addEventListener');
-    spyOn(window, 'removeEventListener');
+    spyOn(globalThis, 'confirm').and.returnValue(true);
+    spyOn(globalThis, 'setInterval').and.returnValue(1 as any);
+    spyOn(globalThis, 'clearInterval');
+    spyOn(globalThis, 'addEventListener');
+    spyOn(globalThis, 'removeEventListener');
     const argsByName: Record<string, unknown[]> = {
       refreshSecurityEvents: [true],
       loadAliases: [true],
@@ -797,11 +797,11 @@ describe('AccountState coverage wave 2', () => {
 
   it('re-sweeps account state prototype methods with alternate state toggles', () => {
     const state = createHarness();
-    spyOn(window, 'confirm').and.returnValue(false);
-    spyOn(window, 'setInterval').and.returnValue(1 as any);
-    spyOn(window, 'clearInterval');
-    spyOn(window, 'addEventListener');
-    spyOn(window, 'removeEventListener');
+    spyOn(globalThis, 'confirm').and.returnValue(false);
+    spyOn(globalThis, 'setInterval').and.returnValue(1 as any);
+    spyOn(globalThis, 'clearInterval');
+    spyOn(globalThis, 'addEventListener');
+    spyOn(globalThis, 'removeEventListener');
 
     state.auth.isAuthenticated.and.returnValue(false);
     state.auth.isAdmin.and.returnValue(false);

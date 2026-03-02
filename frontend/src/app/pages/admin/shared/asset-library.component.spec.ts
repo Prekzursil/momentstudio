@@ -114,7 +114,7 @@ describe('AssetLibraryComponent alt text edits', () => {
   it('renames image alt text through the admin endpoint', () => {
     const { component, admin, toast } = createAssetLibraryContext();
     component.images.set([{ ...BASE_IMAGE }]);
-    spyOn(window, 'prompt').and.returnValue('Renamed image');
+    spyOn(globalThis, 'prompt').and.returnValue('Renamed image');
 
     component.editAltText(BASE_IMAGE);
 

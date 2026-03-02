@@ -206,7 +206,7 @@ describe('ShopComponent coverage wave 2', () => {
     cmp.mergeCategory({ slug: 'rings', name: 'Rings' } as any);
     expect(cmp.mergeError).toBe('adminUi.storefront.categories.mergePreviewRequired');
 
-    spyOn(window, 'confirm').and.returnValue(true);
+    spyOn(globalThis, 'confirm').and.returnValue(true);
     cmp.mergePreview = { can_merge: true, product_count: 2 };
     cmp.mergeCategory({ slug: 'rings', name: 'Rings' } as any);
     expect(cmp.admin.mergeCategory).toHaveBeenCalledWith('rings', 'silver', { source: 'storefront' });
@@ -273,7 +273,7 @@ describe('ShopComponent coverage wave 2', () => {
 
   it('sweeps prototype methods through guarded storefront branches', () => {
     const cmp = createHarness();
-    spyOn(window, 'confirm').and.returnValue(true);
+    spyOn(globalThis, 'confirm').and.returnValue(true);
     const skip = new Set(['constructor', 'ngOnInit', 'ngOnDestroy']);
     const argsByName: Record<string, unknown[]> = {
       startRenameCategory: [eventStub(), { slug: 'rings', name: 'Rings' }],
@@ -309,7 +309,7 @@ describe('ShopComponent coverage wave 2', () => {
 
   it('re-sweeps storefront prototype methods with alternate branch toggles', () => {
     const cmp = createHarness();
-    spyOn(window, 'confirm').and.returnValue(false);
+    spyOn(globalThis, 'confirm').and.returnValue(false);
 
     cmp.canEditCategories.and.returnValue(false);
     cmp.canEditProducts.and.returnValue(false);

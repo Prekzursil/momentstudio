@@ -36,7 +36,7 @@ function getClarityScript(): HTMLScriptElement | null {
 
 function resetClarityScript(): void {
   getClarityScript()?.remove();
-  const clarityWindow = window as Window & { clarity?: unknown };
+  const clarityWindow = globalThis as Window & { clarity?: unknown };
   if ('clarity' in clarityWindow) {
     delete clarityWindow.clarity;
   }

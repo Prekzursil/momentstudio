@@ -409,7 +409,7 @@ describe('DamAssetLibraryComponent coverage wave 1', () => {
     expect(toast.error).toHaveBeenCalledWith('Current policy could not be loaded.');
 
     component.selectedQueueJobIds.set(new Set(['job-1']));
-    spyOn(window, 'prompt').and.returnValue('owner-42');
+    spyOn(globalThis, 'prompt').and.returnValue('owner-42');
     admin.updateMediaJobTriage.and.returnValue(throwError(() => ({ error: { detail: 'assign failed' } })));
     await component.bulkAssignSelectedJobs();
     expect(toast.error).toHaveBeenCalledWith('assign failed');
@@ -442,8 +442,8 @@ describe('DamAssetLibraryComponent coverage wave 1', () => {
     component.editTitleEn = 'Edited title';
     component.editAltEn = 'Edited alt';
 
-    spyOn(window, 'prompt').and.returnValue('owner-1');
-    spyOn(window, 'confirm').and.returnValue(false);
+    spyOn(globalThis, 'prompt').and.returnValue('owner-1');
+    spyOn(globalThis, 'confirm').and.returnValue(false);
 
     const attempted = runDamPrototypeSweep(component);
     expect(attempted).toBeGreaterThan(65);

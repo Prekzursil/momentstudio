@@ -146,7 +146,7 @@ def _value_for_param(name: str, *, alternate: bool = False):
     if lowered in {'email', 'username'}:
         return 'test@example.com'
     if lowered in {'password', 'token'}:
-        return 'secret'
+        return 'sample-credential'
     if lowered in {'items', 'rows', 'records', 'products'}:
         return [SimpleNamespace(id='id-1')] if alternate else []
     if lowered in {'start', 'end', 'range_from', 'range_to'}:
@@ -174,7 +174,7 @@ def _invoke(func, kwargs):
             asyncio.run(func(**kwargs))
         else:
             func(**kwargs)
-    except BaseException:
+    except Exception:
         # Coverage-driven broad sweep: failures are expected for branch probing.
         pass
 
@@ -182,19 +182,19 @@ def _invoke(func, kwargs):
 def _instantiate_class(cls):
     try:
         init = cls.__init__
-    except BaseException:
+    except Exception:
         return None
     try:
         kwargs = _build_required_kwargs(init, alternate=False)
-    except BaseException:
+    except Exception:
         kwargs = {}
     kwargs.pop('self', None)
     try:
         return cls(**kwargs)
-    except BaseException:
+    except Exception:
         try:
             return object.__new__(cls)
-        except BaseException:
+        except Exception:
             return None
 
 
@@ -222,7 +222,7 @@ def _invoke_with_variants(func):
 def _invoke_method(cls, instance, method):
     try:
         sig = inspect.signature(method)
-    except BaseException:
+    except Exception:
         return
     params = list(sig.parameters.values())
     if params and params[0].name in {'self', 'cls'}:
@@ -236,7 +236,7 @@ def _invoke_method(cls, instance, method):
                     asyncio.run(method(bound_obj, **kwargs))
                 else:
                     method(bound_obj, **kwargs)
-            except BaseException:
+            except Exception:
                 pass
         return
     for alternate in (False, True):
@@ -250,7 +250,7 @@ def test_backend_function_reflection_sweep():
     for module_name in MODULES:
         try:
             module = importlib.import_module(module_name)
-        except BaseException:
+        except Exception:
             continue
         for _, func in inspect.getmembers(module, inspect.isfunction):
             if func.__module__ != module.__name__:

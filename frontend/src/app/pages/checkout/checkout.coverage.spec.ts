@@ -661,7 +661,7 @@ describe('CheckoutComponent coverage helpers', () => {
 
     component.guestCreateAccount = true;
     component.guestUsername = 'guest.user';
-    component.guestPassword = 'secret-123';
+    component.guestPassword = 'setup-code-123';
     component.guestFirstName = 'Guest';
     component.guestMiddleName = 'Middle';
     component.guestLastName = 'User';
@@ -993,21 +993,21 @@ describe('CheckoutComponent coverage helpers', () => {
 
     expect(
       (component as any).resolveNetopiaDisabledReason(
-        { reason_code: 'maintenance', reason: 'Maintenance window' },
+        { reason_code: 'maintenance', reason: 'Maintenance globalThis' },
         true,
         false
       )
-    ).toBe('Maintenance window');
+    ).toBe('Maintenance globalThis');
     expect(
       (component as any).resolveNetopiaDisabledReason(
-        { reason_code: 'maintenance', reason: 'Maintenance window' },
+        { reason_code: 'maintenance', reason: 'Maintenance globalThis' },
         false,
         false
       )
     ).toBe('');
     expect(
       (component as any).resolveNetopiaDisabledReason(
-        { reason_code: 'maintenance', reason: 'Maintenance window' },
+        { reason_code: 'maintenance', reason: 'Maintenance globalThis' },
         true,
         true
       )
@@ -1108,8 +1108,8 @@ describe('CheckoutComponent coverage helpers', () => {
 
     component.guestCreateAccount = true;
     component.guestUsername = 'valid.user';
-    component.guestPassword = 'secret-123';
-    component.guestPasswordConfirm = 'secret-123';
+    component.guestPassword = 'setup-code-123';
+    component.guestPasswordConfirm = 'setup-code-123';
     component.guestFirstName = 'Jane';
     component.guestLastName = 'Doe';
     component.guestDob = '2000-01-01';
@@ -1216,8 +1216,8 @@ describe('CheckoutComponent coverage helpers', () => {
     component['syncDebounceHandle'] = 1 as any;
     component['guestResendTimer'] = 2 as any;
     component['paymentNotReadyTimer'] = 3 as any;
-    const clearTimeoutSpy = spyOn(window, 'clearTimeout');
-    const clearIntervalSpy = spyOn(window, 'clearInterval');
+    const clearTimeoutSpy = spyOn(globalThis, 'clearTimeout');
+    const clearIntervalSpy = spyOn(globalThis, 'clearInterval');
     const abandonSpy = spyOn(dynamic, 'trackCheckoutAbandon').and.stub();
     component.ngOnDestroy();
     expect(clearTimeoutSpy).toHaveBeenCalled();
@@ -1253,10 +1253,10 @@ describe('CheckoutComponent coverage helpers', () => {
     dynamic.applyPaymentCapabilities({
       stripe: { enabled: true },
       paypal: { enabled: true },
-      netopia: { enabled: false, reason_code: 'maintenance', reason: 'Maintenance window' }
+      netopia: { enabled: false, reason_code: 'maintenance', reason: 'Maintenance globalThis' }
     });
     expect(component.netopiaEnabled).toBeFalse();
-    expect(['', 'Maintenance window']).toContain(component.netopiaDisabledReason);
+    expect(['', 'Maintenance globalThis']).toContain(component.netopiaDisabledReason);
   });
 
   it('covers cart sync debounce/queue and quote fallback branches', () => {

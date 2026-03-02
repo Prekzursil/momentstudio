@@ -91,7 +91,7 @@ describe('ContentRevisionsComponent', () => {
     component.contentKey = 'site.block';
     const reloadSpy = spyOn(component, 'reload');
 
-    const confirmSpy = spyOn(window, 'confirm');
+    const confirmSpy = spyOn(globalThis, 'confirm');
     confirmSpy.and.returnValue(false);
     component.rollbackSelected();
     expect(admin.rollbackContentVersion).not.toHaveBeenCalled();

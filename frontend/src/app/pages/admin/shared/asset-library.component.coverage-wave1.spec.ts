@@ -156,7 +156,7 @@ describe('AssetLibraryComponent coverage wave 1', () => {
   it('edits tags and opens/closes details panel', () => {
     const { component, admin, toast } = createComponent();
     component.images.set([createImage('img-a')]);
-    spyOn(window, 'prompt').and.returnValue(' one, two ');
+    spyOn(globalThis, 'prompt').and.returnValue(' one, two ');
     component.editTags(createImage('img-a'));
     expect(admin.updateContentImageTags).toHaveBeenCalledWith('img-a', ['one', 'two']);
     expect(toast.success).toHaveBeenCalledWith('adminUi.site.assets.library.tagsSaved');
@@ -185,7 +185,7 @@ describe('AssetLibraryComponent coverage wave 1', () => {
     expect(openUsage).toHaveBeenCalled();
 
     admin.getContentImageUsage.and.returnValue(of({ keys: [], stored_in_key: null } as any));
-    spyOn(window, 'confirm').and.returnValue(true);
+    spyOn(globalThis, 'confirm').and.returnValue(true);
     await component.deleteAssetGroup({ primary: original, original, edits: [edited], latestAt: Date.now() } as any);
     expect(admin.deleteContentImage).toHaveBeenCalledWith('img-1', { delete_versions: true });
     expect(component.page).toBe(1);

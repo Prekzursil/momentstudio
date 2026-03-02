@@ -238,7 +238,7 @@ describe('AdminOrdersComponent coverage wave 5', () => {
     ordersApi.resendDeliveryEmail.and.callFake((id: string) =>
       id === 'o-2' ? throwError(() => new Error('boom')) : of({})
     );
-    spyOn(window, 'prompt').and.returnValue(' wave-note ');
+    spyOn(globalThis, 'prompt').and.returnValue(' wave-note ');
 
     component.resendBulkEmails();
 
@@ -348,8 +348,8 @@ describe('AdminOrdersComponent coverage wave 5', () => {
   it('sweeps prototype methods through guarded admin-orders branches', () => {
     const { component } = createComponent();
     const dynamic = component as any;
-    spyOn(window, 'confirm').and.returnValue(true);
-    spyOn(window, 'prompt').and.returnValue('wave-note');
+    spyOn(globalThis, 'confirm').and.returnValue(true);
+    spyOn(globalThis, 'prompt').and.returnValue('wave-note');
 
     component.orders.set([
       { id: 'o-1', reference_code: 'REF-1', status: 'pending_payment', payment_method: 'stripe', tag_ids: [] },
@@ -370,8 +370,8 @@ describe('AdminOrdersComponent coverage wave 5', () => {
   it('re-sweeps admin-orders methods with alternate filters and empty states', () => {
     const { component, ordersApi } = createComponent();
     const dynamic = component as any;
-    spyOn(window, 'confirm').and.returnValue(false);
-    spyOn(window, 'prompt').and.returnValue('');
+    spyOn(globalThis, 'confirm').and.returnValue(false);
+    spyOn(globalThis, 'prompt').and.returnValue('');
 
     component.orders.set([] as any);
     component.selectedIds = new Set();
