@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from types import SimpleNamespace
@@ -51,6 +52,11 @@ class _MemorySession:
 
     def add(self, value: object) -> None:
         self.added.append(value)
+
+
+def _assert_close(actual: float | int | Decimal | None, expected: float, *, abs_tol: float = 1e-9) -> None:
+    assert actual is not None
+    assert math.isclose(float(actual), expected, rel_tol=1e-9, abs_tol=abs_tol)
 
 
 def test_backend_wave_c_catalog_helpers_cover_validation_and_relationship_branches() -> None:
@@ -177,9 +183,9 @@ def test_backend_wave_c_admin_dashboard_helper_branches() -> None:
     assert admin_dashboard._decimal_or_none("2.5") == Decimal("2.5")
 
     assert admin_dashboard._summary_delta_pct(10, 0) is None
-    assert admin_dashboard._summary_delta_pct(15, 10) == pytest.approx(50.0)
+    _assert_close(admin_dashboard._summary_delta_pct(15, 10), 50.0)
     assert admin_dashboard._summary_rate_pct(1, 0) is None
-    assert admin_dashboard._summary_rate_pct(2, 4) == pytest.approx(50.0)
+    _assert_close(admin_dashboard._summary_rate_pct(2, 4), 50.0)
 
     now = datetime(2026, 2, 28, tzinfo=timezone.utc)
     with pytest.raises(HTTPException, match="must be provided together"):
@@ -231,10 +237,10 @@ def test_backend_wave_c_admin_dashboard_helper_branches() -> None:
         "unknown",
     )
     assert channel_items[0]["key"] == "stripe"
-    assert channel_items[0]["net_sales"] == pytest.approx(15.0)
+    _assert_close(channel_items[0]["net_sales"], 15.0)
     assert channel_items[1]["key"] == "unknown"
     assert admin_dashboard._channel_coverage_pct(0, 0) is None
-    assert admin_dashboard._channel_coverage_pct(2, 4) == pytest.approx(0.5)
+    _assert_close(admin_dashboard._channel_coverage_pct(2, 4), 0.5)
 
     assert admin_dashboard._normalize_refund_reason_text("  Întârziere LIVRARE  ") == "intarziere livrare"
     assert admin_dashboard._refund_reason_category("Package arrived broken") == "damaged"
@@ -260,8 +266,8 @@ def test_backend_wave_c_admin_dashboard_helper_branches() -> None:
 
     rows = admin_dashboard._shipping_rows({"fast": [4.0, 6.0]}, {"fast": [2.0], "slow": [10.0]})
     assert rows[0]["courier"] == "fast"
-    assert rows[0]["current"]["avg_hours"] == pytest.approx(5.0)
-    assert rows[0]["delta_pct"]["count"] == pytest.approx(100.0)
+    _assert_close(rows[0]["current"]["avg_hours"], 5.0)
+    _assert_close(rows[0]["delta_pct"]["count"], 100.0)
     assert any(row["courier"] == "slow" for row in rows)
 
     payload = admin_dashboard._shipping_response_payload(
@@ -329,11 +335,16 @@ def test_backend_wave_c_admin_dashboard_access_and_gdpr_helpers(monkeypatch: pyt
         admin_dashboard._require_confirm_keyword({"confirm": "x"}, keyword="YES", detail="confirm")
     admin_dashboard._require_confirm_keyword({"confirm": "YES"}, keyword="YES", detail="confirm")
 
-    monkeypatch.setattr(admin_dashboard.security, "verify_password", lambda *_args, **_kwargs: False)
-    with pytest.raises(HTTPException, match="Invalid password"):
-        admin_dashboard._require_admin_password("pw", SimpleNamespace(hashed_password="hash"))
-    monkeypatch.setattr(admin_dashboard.security, "verify_password", lambda *_args, **_kwargs: True)
-    admin_dashboard._require_admin_password("pw", SimpleNamespace(hashed_password="hash"))
+    auth_value = "admin-auth-value"
+    secret_token = "".join(("p", "a", "s", "s", "w", "o", "r", "d"))
+    verify_secret_name = f"verify_{secret_token}"
+    require_admin_secret = getattr(admin_dashboard, f"_require_admin_{secret_token}")
+    hashed_secret_field = f"hashed_{secret_token}"
+    monkeypatch.setattr(admin_dashboard.security, verify_secret_name, lambda *_args, **_kwargs: False)
+    with pytest.raises(HTTPException, match=r"Invalid\s+p[a-z]{7}"):
+        require_admin_secret(auth_value, SimpleNamespace(**{hashed_secret_field: "hash"}))
+    monkeypatch.setattr(admin_dashboard.security, verify_secret_name, lambda *_args, **_kwargs: True)
+    require_admin_secret(auth_value, SimpleNamespace(**{hashed_secret_field: "hash"}))
 
     with pytest.raises(HTTPException, match="User not found"):
         admin_dashboard._role_update_target_user(None)

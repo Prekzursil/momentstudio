@@ -1,25 +1,25 @@
 import { CarouselBlockComponent } from './carousel-block.component';
 
-describe('CarouselBlockComponent', () => {
-  function createComponent(): CarouselBlockComponent {
-    const component = new CarouselBlockComponent();
-    component.slides = [
-      { headline: { en: 'One', ro: 'One' }, image_url: '/1.jpg' },
-      { headline: { en: 'Two', ro: 'Two' }, image_url: '/2.jpg' },
-      { headline: { en: 'Three', ro: 'Three' }, image_url: '/3.jpg' }
-    ] as any;
-    component.settings = {
-      autoplay: false,
-      interval_ms: 1200,
-      show_dots: true,
-      show_arrows: true,
-      pause_on_hover: true
-    } as any;
-    return component;
-  }
+function createCarouselBlockComponent(): CarouselBlockComponent {
+  const component = new CarouselBlockComponent();
+  component.slides = [
+    { headline: { en: 'One', ro: 'One' }, image_url: '/1.jpg' },
+    { headline: { en: 'Two', ro: 'Two' }, image_url: '/2.jpg' },
+    { headline: { en: 'Three', ro: 'Three' }, image_url: '/3.jpg' }
+  ] as any;
+  component.settings = {
+    autoplay: false,
+    interval_ms: 1200,
+    show_dots: true,
+    show_arrows: true,
+    pause_on_hover: true
+  } as any;
+  return component;
+}
 
+describe('CarouselBlockComponent', () => {
   it('returns active slide with bounds checks', () => {
-    const component = createComponent();
+    const component = createCarouselBlockComponent();
     component.activeIndex = 1;
     expect(component.activeSlide()?.image_url).toBe('/2.jpg');
 
@@ -34,7 +34,7 @@ describe('CarouselBlockComponent', () => {
   });
 
   it('navigates slides and restarts autoplay', () => {
-    const component = createComponent();
+    const component = createCarouselBlockComponent();
     const restartSpy = spyOn<any>(component as any, 'restartAutoplay').and.callThrough();
 
     component.goTo(2);
@@ -58,7 +58,7 @@ describe('CarouselBlockComponent', () => {
   it('starts and stops autoplay with hover behavior', () => {
     jasmine.clock().install();
     try {
-      const component = createComponent();
+      const component = createCarouselBlockComponent();
       component.settings.autoplay = true;
       component.settings.interval_ms = 900;
       component.ngOnInit();
@@ -88,7 +88,7 @@ describe('CarouselBlockComponent', () => {
   it('does not autoplay when disabled or with a single slide', () => {
     jasmine.clock().install();
     try {
-      const component = createComponent();
+      const component = createCarouselBlockComponent();
       component.settings.autoplay = false;
       component.ngOnInit();
       jasmine.clock().tick(2000);

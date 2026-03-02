@@ -63,11 +63,11 @@ describe('AnalyticsService', () => {
     service.track('product_view', { sku: 'sku-1' });
     globalThis.removeEventListener('app:analytics', handler);
 
-    const record = globalScope.dataLayer?.[0] as Record<string, unknown>;
-    const sessionIdValue = record['session_id'];
+    const record = globalScope.dataLayer?.[0];
+    const sessionIdValue = record?.['session_id'];
     const sessionId = typeof sessionIdValue === 'string' ? sessionIdValue : '';
-    expect(record['event']).toBe('product_view');
-    expect(record['sku']).toBe('sku-1');
+    expect(record?.['event']).toBe('product_view');
+    expect(record?.['sku']).toBe('sku-1');
     expect(sessionId.length).toBeGreaterThan(0);
     expect(String(receivedEvent)).toBe('product_view');
     expect(api.post).toHaveBeenCalledWith('/analytics/token', { session_id: sessionId }, { 'X-Silent': '1' });

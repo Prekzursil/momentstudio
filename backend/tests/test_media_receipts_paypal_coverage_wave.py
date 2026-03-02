@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+import math
 from pathlib import Path
 from types import SimpleNamespace
 from urllib.parse import parse_qs, urlsplit
@@ -42,7 +43,7 @@ def test_media_dam_helper_branches(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     assert normalized.max_attempts == media_dam.MAX_RETRY_POLICY_ATTEMPTS
     assert normalized.schedule == [30]
-    assert normalized.jitter_ratio == 0.0
+    assert math.isclose(normalized.jitter_ratio, 0.0, rel_tol=0.0, abs_tol=1e-9)
     assert normalized.enabled is True
 
     assert media_dam._retry_policy_from_raw({"max_attempts": 0, "schedule": [1]}) is None
@@ -58,7 +59,7 @@ def test_media_dam_helper_branches(monkeypatch: pytest.MonkeyPatch) -> None:
     assert parsed is not None
     assert parsed.max_attempts == 4
     assert parsed.schedule == [10, 20]
-    assert parsed.jitter_ratio == 1.0
+    assert math.isclose(parsed.jitter_ratio, 1.0, rel_tol=0.0, abs_tol=1e-9)
     assert parsed.enabled is False
     assert parsed.version_ts == "snapshot-1"
 

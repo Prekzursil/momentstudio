@@ -23,7 +23,7 @@ type AuthInternals = {
 };
 
 function base64UrlEncode(input: string): string {
-  return btoa(input).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/g, '');
+  return btoa(input).replaceAll('+', '-').replaceAll('/', '_').replaceAll(/=+$/g, '');
 }
 
 function createJwt(payload: Record<string, unknown>): string {

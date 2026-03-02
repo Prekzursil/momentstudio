@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+import math
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
@@ -213,8 +214,8 @@ def test_media_retry_policy_serialization_helpers_more() -> None:
 
     assert media_dam._parse_positive_int("12") == 12
     assert media_dam._parse_positive_int("-1") is None
-    assert media_dam._parse_ratio("1.5") == 1.0
-    assert media_dam._parse_ratio("-1") == 0.0
+    assert math.isclose(media_dam._parse_ratio("1.5"), 1.0, rel_tol=0.0, abs_tol=1e-9)
+    assert math.isclose(media_dam._parse_ratio("-1"), 0.0, rel_tol=0.0, abs_tol=1e-9)
     assert media_dam._parse_retry_schedule(["5", "bad", 10]) == [5, 10]
 
     assert media_dam.can_approve_or_purge("owner") is True

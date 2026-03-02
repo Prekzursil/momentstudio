@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from uuid import uuid4
@@ -103,15 +104,15 @@ async def test_content_redirect_async_helper_branches() -> None:
             self._scalar_values = list(scalar_values or [])
             self.added: list[object] = []
 
-        async def execute(self, _stmt: object) -> _Result:
+        def execute(self, _stmt: object):
             if not self._results:
                 raise AssertionError('Unexpected execute() call')
-            return self._results.pop(0)
+            return asyncio.sleep(0, result=self._results.pop(0))
 
-        async def scalar(self, _stmt: object) -> object | None:
+        def scalar(self, _stmt: object):
             if not self._scalar_values:
-                return None
-            return self._scalar_values.pop(0)
+                return asyncio.sleep(0, result=None)
+            return asyncio.sleep(0, result=self._scalar_values.pop(0))
 
         def add(self, value: object) -> None:
             self.added.append(value)

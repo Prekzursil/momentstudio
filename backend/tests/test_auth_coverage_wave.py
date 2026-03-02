@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -97,10 +98,10 @@ async def test_auth_consent_docs_and_active_refresh_resolution() -> None:
         def __init__(self, *results: _ExecResult) -> None:
             self._results = list(results)
 
-        async def execute(self, _stmt: object) -> _ExecResult:
+        def execute(self, _stmt: object):
             if not self._results:
                 raise AssertionError('Unexpected execute() call')
-            return self._results.pop(0)
+            return asyncio.sleep(0, result=self._results.pop(0))
 
     keys = ('page.terms-and-conditions', 'page.privacy-policy')
     versions = await auth_api._require_published_consent_docs(

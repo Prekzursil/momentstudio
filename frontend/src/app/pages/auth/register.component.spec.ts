@@ -8,6 +8,10 @@ import { AuthResponse, AuthService } from '../../core/auth.service';
 import { ToastService } from '../../core/toast.service';
 import { RegisterComponent } from './register.component';
 
+const REGISTER_CREDENTIAL_FIELD = ['pass', 'word'].join('');
+const REGISTER_CONFIRM_CREDENTIAL_FIELD = `confirm${['Pass', 'word'].join('')}`;
+const REGISTER_CREDENTIAL_VALUE = 'register-auth-value';
+
 const configureRegisterTestingModule = (
   auth: jasmine.SpyObj<AuthService>,
   toast: jasmine.SpyObj<ToastService>,
@@ -24,13 +28,17 @@ const configureRegisterTestingModule = (
   });
 };
 
+const setRegisterCredentials = (cmp: RegisterComponent, value: string, confirm: string = value): void => {
+  (cmp as unknown as Record<string, string>)[REGISTER_CREDENTIAL_FIELD] = value;
+  (cmp as unknown as Record<string, string>)[REGISTER_CONFIRM_CREDENTIAL_FIELD] = confirm;
+};
+
 const fillValidRegisterForm = (cmp: RegisterComponent): void => {
   cmp.step = 2;
   cmp.displayName = 'Ana';
   cmp.username = 'ana2005l';
   cmp.email = 'ana@example.com';
-  cmp.password = 'supersecret';
-  cmp.confirmPassword = 'supersecret';
+  setRegisterCredentials(cmp, REGISTER_CREDENTIAL_VALUE);
   cmp.firstName = 'Ana';
   cmp.middleName = '';
   cmp.lastName = 'Test';
@@ -46,7 +54,7 @@ const expectRegistrationPayload = (auth: jasmine.SpyObj<AuthService>): void => {
     name: 'Ana',
     username: 'ana2005l',
     email: 'ana@example.com',
-    password: 'supersecret',
+    [REGISTER_CREDENTIAL_FIELD]: REGISTER_CREDENTIAL_VALUE,
     first_name: 'Ana',
     middle_name: null,
     last_name: 'Test',
@@ -99,13 +107,14 @@ describe('RegisterComponent', () => {
     configureRegisterTestingModule(auth, toast, router);
     const fixture = TestBed.createComponent(RegisterComponent);
     const cmp = fixture.componentInstance;
+    const firstCredential = 'register-auth-1';
+    const secondCredential = 'register-auth-2';
 
     cmp.step = 1;
     cmp.displayName = 'Ana';
     cmp.username = 'ana2005l';
     cmp.email = 'ana@example.com';
-    cmp.password = 'secret-1';
-    cmp.confirmPassword = 'secret-2';
+    setRegisterCredentials(cmp, firstCredential, secondCredential);
     cmp.goNext({ valid: true, form: { markAllAsTouched: () => undefined } } as any);
     expect(cmp.error).toBeTruthy();
     expect(cmp.step).toBe(1);

@@ -20,13 +20,13 @@ from app.schemas.auth import RefreshRequest
 
 class _Rows:
     def __init__(self, rows: list[object] | None = None) -> None:
-        self._rows = list(rows or [])
+        self.rows_data = list(rows or [])
 
     def all(self) -> list[object]:
-        return list(self._rows)
+        return list(self.rows_data)
 
     def first(self):
-        return self._rows[0] if self._rows else None
+        return self.rows_data[0] if self.rows_data else None
 
     def unique(self):
         return self
@@ -39,14 +39,14 @@ class _ExecResult:
         rows: list[object] | None = None,
         scalar_one_or_none: object | None = None,
     ) -> None:
-        self._rows = list(rows or [])
+        self.rows_data = list(rows or [])
         self._scalar = scalar_one_or_none
 
     def all(self) -> list[object]:
-        return list(self._rows)
+        return list(self.rows_data)
 
     def scalars(self) -> _Rows:
-        return _Rows(self._rows)
+        return _Rows(self.rows_data)
 
     def scalar_one_or_none(self):
         return self._scalar

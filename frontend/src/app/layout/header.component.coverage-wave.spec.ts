@@ -223,9 +223,9 @@ describe('HeaderComponent coverage wave', () => {
     const setIntervalSpy = spyOn(globalThis, 'setInterval').and.returnValue(99 as any);
     const clearIntervalSpy = spyOn(globalThis, 'clearInterval');
 
-    (cmp as any).startUnreadPolling();
+    cmp.startUnreadPolling();
     expect(setIntervalSpy).toHaveBeenCalled();
-    (cmp as any).stopUnreadPolling();
+    cmp.stopUnreadPolling();
     expect(clearIntervalSpy).toHaveBeenCalled();
 
     cmp.signOut();
@@ -233,7 +233,7 @@ describe('HeaderComponent coverage wave', () => {
     expect(auth.logout).toHaveBeenCalled();
 
     ops.getActiveBanner.and.returnValue(throwError(() => new Error('banner fail')));
-    (cmp as any).refreshBanner();
+    cmp.refreshBanner();
     expect(cmp.banner()).toBeNull();
 
     cmp.ngOnDestroy();

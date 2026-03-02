@@ -441,8 +441,8 @@ async def test_cli_wave_customer_resolution_helpers() -> None:
         def __init__(self, user: object | None) -> None:
             self._user = user
 
-        async def get(self, model: object, value: object):  # noqa: ARG002
-            return self._user
+        def get(self, model: object, value: object):  # noqa: ARG002
+            return asyncio.sleep(0, result=self._user)
 
     user_id = uuid.uuid4()
     email, name = await cli._fill_customer_from_order_user(

@@ -510,10 +510,10 @@ describe('AccountState coverage wave 2', () => {
 
   it('covers receipt download guards plus success and error callbacks', () => {
     const state = createHarness();
-    const order = { id: 'order-1', reference_code: 'R-1' } as any;
+    const order = { id: 'order-1', reference_code: 'R-1' };
     const originalCreateElement = document.createElement.bind(document);
-    const anchor = originalCreateElement('a') as HTMLAnchorElement;
-    const appendSpy = spyOn(document.body, 'appendChild').and.callFake(((node: Node) => node) as any);
+    const anchor = originalCreateElement('a');
+    const appendSpy = spyOn(document.body, 'appendChild').and.callFake((node: Node) => node);
     const clickSpy = spyOn(anchor, 'click');
     const createElementSpy = spyOn(document, 'createElement').and.callFake((tag: string) => {
       if (tag.toLowerCase() === 'a') return anchor;

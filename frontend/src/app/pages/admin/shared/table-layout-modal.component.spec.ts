@@ -1,30 +1,30 @@
 import { TableLayoutModalComponent } from './table-layout-modal.component';
 
-describe('TableLayoutModalComponent', () => {
-  function createComponent(): TableLayoutModalComponent {
-    const component = new TableLayoutModalComponent();
-    component.columns = [
-      { id: 'id', labelKey: 'table.id', required: true },
-      { id: 'name', labelKey: 'table.name' },
-      { id: 'status', labelKey: 'table.status' }
-    ] as any;
-    component.layout = {
-      version: 1,
-      order: ['name', 'id', 'status'],
-      hidden: ['status'],
-      density: 'compact'
-    } as any;
-    component.defaults = {
-      version: 1,
-      order: ['id', 'name', 'status'],
-      hidden: [],
-      density: 'comfortable'
-    } as any;
-    return component;
-  }
+function createTableLayoutModalComponent(): TableLayoutModalComponent {
+  const component = new TableLayoutModalComponent();
+  component.columns = [
+    { id: 'id', labelKey: 'table.id', required: true },
+    { id: 'name', labelKey: 'table.name' },
+    { id: 'status', labelKey: 'table.status' }
+  ] as any;
+  component.layout = {
+    version: 1,
+    order: ['name', 'id', 'status'],
+    hidden: ['status'],
+    density: 'compact'
+  } as any;
+  component.defaults = {
+    version: 1,
+    order: ['id', 'name', 'status'],
+    hidden: [],
+    density: 'comfortable'
+  } as any;
+  return component;
+}
 
+describe('TableLayoutModalComponent', () => {
   it('resets draft when modal opens via ngOnChanges', () => {
-    const component = createComponent();
+    const component = createTableLayoutModalComponent();
     component.open = true;
 
     component.ngOnChanges({ open: { currentValue: true, previousValue: false, firstChange: false, isFirstChange: () => false } as any });
@@ -35,7 +35,7 @@ describe('TableLayoutModalComponent', () => {
   });
 
   it('restores defaults and toggles optional columns', () => {
-    const component = createComponent();
+    const component = createTableLayoutModalComponent();
     component.resetToDefaults();
 
     expect(component.draftOrder).toEqual(['id', 'name', 'status']);
@@ -52,7 +52,7 @@ describe('TableLayoutModalComponent', () => {
   });
 
   it('moves columns within bounds and ignores invalid moves', () => {
-    const component = createComponent();
+    const component = createTableLayoutModalComponent();
     component.draftOrder = ['id', 'name', 'status'];
 
     component.move(1, 1);
@@ -66,7 +66,7 @@ describe('TableLayoutModalComponent', () => {
   });
 
   it('applies sanitized draft and emits close', () => {
-    const component = createComponent();
+    const component = createTableLayoutModalComponent();
     component.draftOrder = ['status', 'id', 'name'];
     component.draftHidden = new Set(['name']);
     component.draftDensity = 'compact';
@@ -85,7 +85,7 @@ describe('TableLayoutModalComponent', () => {
   });
 
   it('reports required and label values for columns', () => {
-    const component = createComponent();
+    const component = createTableLayoutModalComponent();
 
     expect(component.isRequired('id')).toBeTrue();
     expect(component.isRequired('missing')).toBeFalse();

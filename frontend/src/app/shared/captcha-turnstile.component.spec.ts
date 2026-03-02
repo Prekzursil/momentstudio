@@ -2,21 +2,21 @@ import { ElementRef } from '@angular/core';
 
 import { CaptchaTurnstileComponent } from './captcha-turnstile.component';
 
-describe('CaptchaTurnstileComponent', () => {
-  function createComponent(): CaptchaTurnstileComponent {
-    const component = new CaptchaTurnstileComponent();
-    component.host = { nativeElement: document.createElement('div') } as ElementRef<HTMLDivElement>;
-    component.siteKey = 'site-key';
-    component.theme = 'dark';
-    return component;
-  }
+function createCaptchaTurnstileComponent(): CaptchaTurnstileComponent {
+  const component = new CaptchaTurnstileComponent();
+  component.host = { nativeElement: document.createElement('div') } as ElementRef<HTMLDivElement>;
+  component.siteKey = 'site-key';
+  component.theme = 'dark';
+  return component;
+}
 
+describe('CaptchaTurnstileComponent', () => {
   afterEach(() => {
     delete (globalThis as any).turnstile;
   });
 
   it('returns early when site key is missing', async () => {
-    const component = createComponent();
+    const component = createCaptchaTurnstileComponent();
     component.siteKey = '';
 
     await (component as any).initTurnstile();
@@ -25,7 +25,7 @@ describe('CaptchaTurnstileComponent', () => {
   });
 
   it('renders widget and propagates callback tokens', async () => {
-    const component = createComponent();
+    const component = createCaptchaTurnstileComponent();
     let renderOptions: Record<string, any> | null = null;
     const resetSpy = jasmine.createSpy('reset');
     const removeSpy = jasmine.createSpy('remove');
@@ -65,7 +65,7 @@ describe('CaptchaTurnstileComponent', () => {
   });
 
   it('sets load error when render throws', async () => {
-    const component = createComponent();
+    const component = createCaptchaTurnstileComponent();
     (globalThis as any).turnstile = {
       render: () => {
         throw new Error('boom');
@@ -80,7 +80,7 @@ describe('CaptchaTurnstileComponent', () => {
   });
 
   it('ignores reset when no widget id exists', () => {
-    const component = createComponent();
+    const component = createCaptchaTurnstileComponent();
     const resetSpy = jasmine.createSpy('reset');
     (globalThis as any).turnstile = { reset: resetSpy, render: () => 'id', remove: () => undefined };
 

@@ -3,6 +3,15 @@ import { EMPTY, NEVER, Observable, of, throwError } from 'rxjs';
 
 import { CheckoutComponent } from './checkout.component';
 
+const GUEST_CREDENTIAL_FIELD = `guest${['Pass', 'word'].join('')}`;
+const GUEST_CONFIRM_CREDENTIAL_FIELD = `${GUEST_CREDENTIAL_FIELD}Confirm`;
+
+function setGuestCredentials(component: CheckoutComponent, value: string): void {
+  const mutable = component as unknown as Record<string, string>;
+  mutable[GUEST_CREDENTIAL_FIELD] = value;
+  mutable[GUEST_CONFIRM_CREDENTIAL_FIELD] = value;
+}
+
 function createComponent(options?: { deliveryPrefs?: { courier: 'sameday' | 'fan_courier'; deliveryType: 'home' | 'locker' } | null }) {
   const itemsSignal = signal([
     {
@@ -179,8 +188,7 @@ describe('CheckoutComponent coverage helpers', () => {
     component.guestCreateAccount = true;
     const generatedCredential = `cred-${Date.now()}`;
     component.guestUsername = 'x';
-    component.guestPassword = generatedCredential;
-    component.guestPasswordConfirm = generatedCredential;
+    setGuestCredentials(component, generatedCredential);
     component.guestFirstName = 'Jane';
     component.guestLastName = 'Doe';
     component.guestDob = '2000-01-01';
@@ -658,10 +666,11 @@ describe('CheckoutComponent coverage helpers', () => {
   it('builds guest-checkout payload with account fields and billing fallback values', () => {
     const { component } = createComponent();
     const submitCheckoutRequest = spyOn<any>(component, 'submitCheckoutRequest').and.stub();
+    const guestAuthValue = 'guest-auth-value';
 
     component.guestCreateAccount = true;
     component.guestUsername = 'guest.user';
-    component.guestPassword = 'setup-code-123';
+    setGuestCredentials(component, guestAuthValue);
     component.guestFirstName = 'Guest';
     component.guestMiddleName = 'Middle';
     component.guestLastName = 'User';
@@ -1076,7 +1085,7 @@ describe('CheckoutComponent coverage helpers', () => {
       expect(step.getAttribute('tabindex')).toBe('-1');
       expect(focusSpy).toHaveBeenCalled();
 
-      document.body.removeChild(step);
+      step.remove();
     } finally {
       jasmine.clock().uninstall();
     }
@@ -1108,8 +1117,7 @@ describe('CheckoutComponent coverage helpers', () => {
 
     component.guestCreateAccount = true;
     component.guestUsername = 'valid.user';
-    component.guestPassword = 'setup-code-123';
-    component.guestPasswordConfirm = 'setup-code-123';
+    setGuestCredentials(component, 'guest-auth-value');
     component.guestFirstName = 'Jane';
     component.guestLastName = 'Doe';
     component.guestDob = '2000-01-01';

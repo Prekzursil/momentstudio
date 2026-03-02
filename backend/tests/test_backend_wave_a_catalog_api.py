@@ -1,5 +1,6 @@
 from __future__ import annotations
 import asyncio
+import math
 
 from decimal import Decimal
 from io import BytesIO
@@ -154,8 +155,8 @@ async def test_catalog_csv_and_listing_wrappers(monkeypatch: pytest.MonkeyPatch)
         tags=None,
         current_user=SimpleNamespace(role=UserRole.customer),
     )
-    assert bounds.min_price == 1.0
-    assert bounds.max_price == 9.0
+    assert math.isclose(bounds.min_price, 1.0, rel_tol=0.0, abs_tol=1e-9)
+    assert math.isclose(bounds.max_price, 9.0, rel_tol=0.0, abs_tol=1e-9)
     assert bounds_calls[0]["category_slug"] is None
     assert bounds_calls[0]["on_sale"] is True
     assert bounds_calls[0]["include_unpublished"] is False

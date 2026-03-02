@@ -4,27 +4,27 @@ import { ContentRevisionsComponent } from './content-revisions.component';
 
 type AdminSpy = jasmine.SpyObj<any>;
 
-describe('ContentRevisionsComponent', () => {
-  function createComponent(): {
-    component: ContentRevisionsComponent;
-    admin: AdminSpy;
-    toast: jasmine.SpyObj<any>;
-  } {
-    const admin = jasmine.createSpyObj('AdminService', [
-      'listContentVersions',
-      'getContent',
-      'getContentVersion',
-      'rollbackContentVersion'
-    ]);
-    const toast = jasmine.createSpyObj('ToastService', ['success', 'error']);
-    const translate = { instant: (key: string) => key };
-    const component = new ContentRevisionsComponent(admin as any, toast as any, translate as any);
-    component.contentKey = 'site.block';
-    return { component, admin, toast };
-  }
+function createContentRevisionsComponent(): {
+  component: ContentRevisionsComponent;
+  admin: AdminSpy;
+  toast: jasmine.SpyObj<any>;
+} {
+  const admin = jasmine.createSpyObj('AdminService', [
+    'listContentVersions',
+    'getContent',
+    'getContentVersion',
+    'rollbackContentVersion'
+  ]);
+  const toast = jasmine.createSpyObj('ToastService', ['success', 'error']);
+  const translate = { instant: (key: string) => key };
+  const component = new ContentRevisionsComponent(admin as any, toast as any, translate as any);
+  component.contentKey = 'site.block';
+  return { component, admin, toast };
+}
 
+describe('ContentRevisionsComponent', () => {
   it('reloads when content key changes and ignores empty key', () => {
-    const { component } = createComponent();
+    const { component } = createContentRevisionsComponent();
     const reloadSpy = spyOn(component, 'reload');
 
     component.contentKey = '  ';
@@ -40,7 +40,7 @@ describe('ContentRevisionsComponent', () => {
   });
 
   it('loads revisions, current version, and computes diff', () => {
-    const { component, admin } = createComponent();
+    const { component, admin } = createContentRevisionsComponent();
     admin.listContentVersions.and.returnValue(
       of([
         { version: 3, status: 'draft', created_at: '2026-02-27T10:00:00Z' },
@@ -71,7 +71,7 @@ describe('ContentRevisionsComponent', () => {
   });
 
   it('handles load errors and selected-version errors', () => {
-    const { component, admin, toast } = createComponent();
+    const { component, admin, toast } = createContentRevisionsComponent();
     admin.listContentVersions.and.returnValue(throwError(() => ({ status: 500, error: { request_id: 'req-1' } })));
     admin.getContent.and.returnValue(throwError(() => ({ status: 404 })));
 
@@ -86,7 +86,7 @@ describe('ContentRevisionsComponent', () => {
   });
 
   it('rolls back selected version on confirm and handles failure', () => {
-    const { component, admin, toast } = createComponent();
+    const { component, admin, toast } = createContentRevisionsComponent();
     component.selectedRead.set({ version: 7 } as any);
     component.contentKey = 'site.block';
     const reloadSpy = spyOn(component, 'reload');
@@ -109,7 +109,7 @@ describe('ContentRevisionsComponent', () => {
   });
 
   it('cleans subscriptions on destroy', () => {
-    const { component } = createComponent();
+    const { component } = createContentRevisionsComponent();
     const sub = (component as any).subs;
     const unsubscribeSpy = spyOn(sub, 'unsubscribe');
 

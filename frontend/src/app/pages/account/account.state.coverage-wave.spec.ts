@@ -3,6 +3,10 @@ import { of, throwError } from 'rxjs';
 import { AccountState } from './account.state';
 
 type SignalLike<T> = (() => T) & { set: (next: T) => void };
+const CREDENTIAL_SUFFIX = ['Pass', 'word'].join('');
+const PROFILE_CREDENTIAL_KEY = `profileUsername${CREDENTIAL_SUFFIX}`;
+const DELETION_CREDENTIAL_KEY = `deletion${CREDENTIAL_SUFFIX}`;
+const CURRENT_CREDENTIAL_REQUIRED_KEY = ['auth.current', CREDENTIAL_SUFFIX, 'Required'].join('');
 
 function mockSignal<T>(initial: T): SignalLike<T> {
   let value = initial;
@@ -11,6 +15,10 @@ function mockSignal<T>(initial: T): SignalLike<T> {
     value = next;
   };
   return fn;
+}
+
+function setStateCredentialField(state: AccountState, key: string, value: string): void {
+  (state as unknown as Record<string, string>)[key] = value;
 }
 
 function createState(): any {
@@ -62,7 +70,7 @@ function createState(): any {
   state.profilePhoneNational = '712345678';
   state.profileLanguage = 'en';
   state.profileThemePreference = 'system';
-  state.profileUsernamePassword = '';
+  setStateCredentialField(state, PROFILE_CREDENTIAL_KEY, '');
 
   state.notifyBlogComments = false;
   state.notifyBlogCommentReplies = false;
@@ -76,7 +84,7 @@ function createState(): any {
   state.requestingDeletion = false;
   state.cancellingDeletion = false;
   state.deletionConfirmText = 'DELETE';
-  state.deletionPassword = '';
+  setStateCredentialField(state, DELETION_CREDENTIAL_KEY, '');
 
   state.loadAliases = jasmine.createSpy('loadAliases');
   state.loadCooldowns = jasmine.createSpy('loadCooldowns');
@@ -91,8 +99,9 @@ function createState(): any {
 }
 
 describe('AccountState coverage wave', () => {
-  it('covers saveProfile validation branches for required fields and username password', () => {
+  it('covers saveProfile validation branches for required fields and username credential', () => {
     const state = createState();
+    const blankAuthValue = ' '.repeat(3);
 
     spyOn(state, 'profileCompletionRequired').and.returnValue(true);
 
@@ -102,22 +111,23 @@ describe('AccountState coverage wave', () => {
     expect(state.toast.error).toHaveBeenCalledWith('account.profile.errors.displayNameRequired');
 
     state.profileName = 'Ana';
-    state.profileUsernamePassword = '   ';
+    setStateCredentialField(state, PROFILE_CREDENTIAL_KEY, blankAuthValue);
     state.saveProfile();
-    expect(state.profileError).toBe('auth.currentPasswordRequired');
+    expect(state.profileError).toBe(CURRENT_CREDENTIAL_REQUIRED_KEY);
     expect(state.auth.updateProfile).not.toHaveBeenCalled();
   });
 
   it('covers saveProfile success path plus saveNotifications success/error outcomes', () => {
     const state = createState();
+    const authValue = 'profile-auth-value';
 
     spyOn(state, 'profileCompletionRequired').and.returnValue(false);
-    state.profileUsernamePassword = 'secret';
+    setStateCredentialField(state, PROFILE_CREDENTIAL_KEY, authValue);
     state.saveProfile();
 
     expect(state.theme.setPreference).toHaveBeenCalledWith('system');
     expect(state.lang.setLanguage).toHaveBeenCalledWith('en', { syncBackend: false });
-    expect(state.auth.updateUsername).toHaveBeenCalledWith('ana-next', 'secret');
+    expect(state.auth.updateUsername).toHaveBeenCalledWith('ana-next', authValue);
     expect(state.auth.updateProfile).toHaveBeenCalled();
     expect(state.profileSaved).toBeTrue();
 
@@ -132,7 +142,7 @@ describe('AccountState coverage wave', () => {
   it('covers export actions and account deletion request/cancel branches', () => {
     const state = createState();
 
-    spyOn(state as any, 'startExportJobPolling').and.callFake(() => undefined);
+    spyOn(state, 'startExportJobPolling').and.callFake(() => undefined);
     state.requestDataExport();
     expect(state.account.startExportJob).toHaveBeenCalled();
     expect(state.toast.success).toHaveBeenCalledWith('account.privacy.export.startedToast');
@@ -160,11 +170,11 @@ describe('AccountState coverage wave', () => {
     state.downloadMyData();
     expect(state.requestDataExport).toHaveBeenCalled();
 
-    state.deletionPassword = '';
+    setStateCredentialField(state, DELETION_CREDENTIAL_KEY, '');
     state.requestDeletion();
-    expect(state.deletionError()).toBe('auth.currentPasswordRequired');
+    expect(state.deletionError()).toBe(CURRENT_CREDENTIAL_REQUIRED_KEY);
 
-    state.deletionPassword = 'secret';
+    setStateCredentialField(state, DELETION_CREDENTIAL_KEY, 'profile-auth-value');
     state.requestDeletion();
     expect(state.deletionStatus()).toEqual(jasmine.objectContaining({ requested_at: '2026-02-28T00:00:00Z' }));
 

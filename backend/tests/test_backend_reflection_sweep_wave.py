@@ -43,6 +43,7 @@ class _DummySession:
     def __init__(self) -> None:
         self.added: list[object] = []
         self.deleted: list[object] = []
+        self.flush_calls = 0
 
     async def execute(self, *_args, **_kwargs):
         await asyncio.sleep(0)
@@ -54,10 +55,12 @@ class _DummySession:
 
     async def get(self, *_args, **_kwargs):
         await asyncio.sleep(0)
-        return SimpleNamespace(id='id-1', user_id='u-test')
+        user_payload = {'id': 'id-1', 'user_id': 'u-test'}
+        return SimpleNamespace(**user_payload)
 
     async def _flush(self, *_args, **_kwargs):
         await asyncio.sleep(0)
+        self.flush_calls += 1
         return None
 
     commit = _flush

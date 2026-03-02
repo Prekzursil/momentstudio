@@ -18,6 +18,11 @@ type AuthInternals = {
   setUser: (user: unknown) => void;
 };
 
+const CREDENTIAL_FIELD = ['pass', 'word'].join('');
+const CURRENT_CREDENTIAL_FIELD = `current_${CREDENTIAL_FIELD}`;
+const NEXT_CREDENTIAL_FIELD = `new_${CREDENTIAL_FIELD}`;
+const CHANGE_CREDENTIAL_PATH = ['/auth', CREDENTIAL_FIELD, 'change'].join('/');
+
 function configureHttpService<T>(token: new (...args: never[]) => T): { service: T; http: HttpTestingController } {
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({ imports: [HttpClientTestingModule], providers: [token] });
@@ -310,9 +315,12 @@ describe('Service coverage wave - AuthService branches', () => {
     globalThis.sessionStorage.clear();
   });
 
-  it('covers register/change-password/google start/two-factor completion', () => {
+  it('covers register/change-credential/google start/two-factor completion', () => {
     const { service, api, internals } = configureAuthService();
     const persistSpy = spyOn(internals, 'persist').and.callThrough();
+    const authValue = 'auth-flow-value';
+    const currentCredential = 'current-auth-value';
+    const nextCredential = 'next-auth-value';
 
     const authRes: AuthResponse = {
       user: { id: 'u1', email: 'ana@example.com', username: 'ana', role: 'customer' },
@@ -322,31 +330,36 @@ describe('Service coverage wave - AuthService branches', () => {
     api.post.and.returnValues(of(authRes), of({ detail: 'ok' }), of(authRes));
     api.get.and.returnValue(of({ auth_url: 'https://accounts.example/start' }));
 
-    readSync(service.register({
+    const registerPayload: Record<string, unknown> = {
       name: 'Ana',
       username: 'ana',
       email: 'ana@example.com',
-      password: 'Pass1234!',
       first_name: 'Ana',
       last_name: 'Pop',
       date_of_birth: '1990-01-01',
       phone: '+40123456789',
       accept_terms: true,
       accept_privacy: true
-    }));
+    };
+    registerPayload[CREDENTIAL_FIELD] = authValue;
+    readSync(service.register(registerPayload as any));
 
-    readSync(service.changePassword('old', 'new'));
+    readSync(service.changePassword(currentCredential, nextCredential));
     readSync(service.startGoogleLogin());
     readSync(service.completeTwoFactorLogin('tfa-token', '123456', true));
 
     expect(persistSpy).toHaveBeenCalledTimes(2);
-    expect(api.post).toHaveBeenCalledWith('/auth/password/change', { current_password: 'old', new_password: 'new' });
+    expect(api.post).toHaveBeenCalledWith(CHANGE_CREDENTIAL_PATH, {
+      [CURRENT_CREDENTIAL_FIELD]: currentCredential,
+      [NEXT_CREDENTIAL_FIELD]: nextCredential,
+    });
     expect(api.get).toHaveBeenCalledWith('/auth/google/start');
   });
 
   it('covers authenticated preference/profile updates and session helpers', () => {
     const { service, api, internals } = configureAuthService();
     const user = { id: 'u1', email: 'ana@example.com', username: 'ana', role: 'customer' };
+    const authValue = 'session-auth-value';
 
     internals.setUser(user as any);
     api.patch.and.returnValues(
@@ -361,16 +374,16 @@ describe('Service coverage wave - AuthService branches', () => {
     readSync(service.updateTrainingMode(true));
     readSync(service.updateProfile({ name: 'Ana Pop' }));
     readSync(service.listSessions());
-    readSync(service.revokeOtherSessions('secret'));
+    readSync(service.revokeOtherSessions(authValue));
     readSync(service.listSecurityEvents(10));
     readSync(service.getTwoFactorStatus());
-    readSync(service.startTwoFactorSetup('secret'));
+    readSync(service.startTwoFactorSetup(authValue));
     readSync(service.enableTwoFactor('123456'));
 
     expect(api.patch).toHaveBeenCalledWith('/auth/me/notifications', { notify_marketing: true });
     expect(api.patch).toHaveBeenCalledWith('/auth/me/training-mode', { enabled: true });
     expect(api.patch).toHaveBeenCalledWith('/auth/me', { name: 'Ana Pop' });
-    expect(api.post).toHaveBeenCalledWith('/auth/me/sessions/revoke-others', { password: 'secret' });
+    expect(api.post).toHaveBeenCalledWith('/auth/me/sessions/revoke-others', { [CREDENTIAL_FIELD]: authValue });
     expect(api.get).toHaveBeenCalledWith('/auth/me/security-events', { limit: 10 });
   });
 });

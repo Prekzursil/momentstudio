@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 from uuid import uuid4
@@ -34,6 +35,11 @@ def _request_with_scope(headers: list[tuple[bytes, bytes]] | None = None, client
     return Request(scope)
 
 
+def _assert_close(actual: float | int | None, expected: float, *, abs_tol: float = 1e-9) -> None:
+    assert actual is not None
+    assert math.isclose(float(actual), expected, rel_tol=1e-9, abs_tol=abs_tol)
+
+
 def test_request_audit_metadata_extracts_user_agent_and_ip() -> None:
     client_ip = _ipv4(1, 2, 3, 4)
     request = _request_with_scope(headers=[(b'user-agent', b'Agent/1.0')], client=(client_ip, 1234))
@@ -58,15 +64,15 @@ def test_admin_dashboard_threshold_and_summary_helpers() -> None:
     )
     payload = admin_dashboard._dashboard_alert_thresholds_payload(record)  # type: ignore[arg-type]
     assert payload['failed_payments_min_count'] == 2
-    assert payload['failed_payments_min_delta_pct'] == pytest.approx(12.5)
-    assert payload['refund_requests_min_rate_pct'] == pytest.approx(8.4)
+    _assert_close(payload['failed_payments_min_delta_pct'], 12.5)
+    _assert_close(payload['refund_requests_min_rate_pct'], 8.4)
 
     assert admin_dashboard._decimal_or_none(None) is None
     assert str(admin_dashboard._decimal_or_none('3.75')) == '3.75'
 
-    assert admin_dashboard._summary_delta_pct(20, 10) == pytest.approx(100.0)
+    _assert_close(admin_dashboard._summary_delta_pct(20, 10), 100.0)
     assert admin_dashboard._summary_delta_pct(20, 0) is None
-    assert admin_dashboard._summary_rate_pct(10, 20) == pytest.approx(50.0)
+    _assert_close(admin_dashboard._summary_rate_pct(10, 20), 50.0)
     assert admin_dashboard._summary_rate_pct(10, 0) is None
 
 
@@ -160,7 +166,7 @@ def test_admin_dashboard_summary_and_audit_payload_helpers() -> None:
         threshold_min_count=2,
         threshold_min_delta_pct=50.0,
     )
-    assert failed_payload['delta_pct'] == pytest.approx(100.0)
+    _assert_close(failed_payload['delta_pct'], 100.0)
     assert failed_payload['is_alert'] is True
 
     refund_payload = admin_dashboard._summary_refund_requests_payload(
@@ -171,8 +177,8 @@ def test_admin_dashboard_summary_and_audit_payload_helpers() -> None:
         threshold_min_count=2,
         threshold_min_rate_pct=15.0,
     )
-    assert refund_payload['current_rate_pct'] == pytest.approx(20.0)
-    assert refund_payload['rate_delta_pct'] == pytest.approx(0.0)
+    _assert_close(refund_payload['current_rate_pct'], 20.0)
+    _assert_close(refund_payload['rate_delta_pct'], 0.0)
     assert refund_payload['is_alert'] is True
 
     anomalies = admin_dashboard._summary_anomalies_payload(
@@ -250,7 +256,7 @@ def test_admin_dashboard_summary_and_audit_payload_helpers() -> None:
     assert len(str(audit_data['error'])) == 500
 
     assert admin_dashboard._funnel_rate(1, 0) is None
-    assert admin_dashboard._funnel_rate(2, 4) == pytest.approx(0.5)
+    _assert_close(admin_dashboard._funnel_rate(2, 4), 0.5)
 
 
 def test_admin_reports_parse_helpers() -> None:
@@ -659,11 +665,11 @@ def test_admin_dashboard_channel_shipping_and_refund_helper_branches() -> None:
         },
     )
     assert tracked_orders == 2
-    assert tracked_sales == pytest.approx(150.0)
+    _assert_close(tracked_sales, 150.0)
     assert channel_rows[0]['source'] == 'newsletter'
     assert channel_rows[0]['orders'] == 1
     assert admin_dashboard._channel_coverage_pct(0, 0) is None
-    assert admin_dashboard._channel_coverage_pct(1, 4) == pytest.approx(0.25)
+    _assert_close(admin_dashboard._channel_coverage_pct(1, 4), 0.25)
 
     start = datetime(2026, 2, 1, tzinfo=timezone.utc)
     end = datetime(2026, 2, 8, tzinfo=timezone.utc)
@@ -674,7 +680,7 @@ def test_admin_dashboard_channel_shipping_and_refund_helper_branches() -> None:
         total_orders=2,
         total_gross_sales=99.0,
     )
-    assert empty_payload['coverage_pct'] == 0.0
+    assert math.isclose(empty_payload['coverage_pct'], 0.0, rel_tol=0.0, abs_tol=1e-9)
     limited_payload = admin_dashboard._channel_limited_response(
         effective_range_days=7,
         start=start,
@@ -687,7 +693,7 @@ def test_admin_dashboard_channel_shipping_and_refund_helper_branches() -> None:
         limit=1,
     )
     assert len(limited_payload['channels']) == 1
-    assert limited_payload['coverage_pct'] == pytest.approx(0.5)
+    _assert_close(limited_payload['coverage_pct'], 0.5)
 
     duration_rows = [
         ('sameday', start, start + timedelta(hours=5)),
@@ -704,7 +710,7 @@ def test_admin_dashboard_channel_shipping_and_refund_helper_branches() -> None:
     )
     sameday = next(item for item in shipping_rows if item['courier'] == 'sameday')
     assert sameday['current']['count'] == 2
-    assert sameday['delta_pct']['avg_hours'] == pytest.approx(0.0)
+    _assert_close(sameday['delta_pct']['avg_hours'], 0.0)
     shipping_payload = admin_dashboard._shipping_response_payload(
         7,
         start,

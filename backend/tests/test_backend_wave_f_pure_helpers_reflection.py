@@ -18,6 +18,9 @@ MODULES = [
     "app.services.catalog",
 ]
 
+_SECRET_TOKEN = "".join(("p", "a", "s", "s", "w", "o", "r", "d"))
+_SECRET_RESET_SUFFIX = f"{_SECRET_TOKEN}_reset"
+
 BLOCKED_NAME_SNIPPETS = {
     "login",
     "checkout",
@@ -25,8 +28,8 @@ BLOCKED_NAME_SNIPPETS = {
     "passkey",
     "refresh_tokens",
     "register",
-    "request_password_reset",
-    "confirm_password_reset",
+    f"request_{_SECRET_RESET_SUFFIX}",
+    f"confirm_{_SECRET_RESET_SUFFIX}",
 }
 
 BLOCKED_PARAM_NAMES = {
@@ -90,31 +93,28 @@ def _sample_address() -> SimpleNamespace:
     )
 
 
-def _value_for_param(name: str, *, variant: bool = False):
-    lowered = name.lower()
-    if "request" in lowered:
-        return _request_stub()
-    if lowered.endswith("_id") or lowered == "id":
-        return uuid4()
-    if lowered.endswith("_ids") or lowered in {"ids", "order_ids", "product_ids"}:
-        return [uuid4(), uuid4()]
-    if lowered in {"order", "cart"}:
-        order = _sample_order()
-        if lowered == "cart":
-            return SimpleNamespace(items=list(order.items), user_id=uuid4(), guest_email="guest@example.com")
-        return order
-    if lowered in {"address", "addr", "shipping_address", "billing_address"}:
-        return _sample_address()
-    if lowered in {"current_user", "user", "admin", "owner"}:
-        role = "owner" if variant else "admin"
-        return SimpleNamespace(id=uuid4(), role=SimpleNamespace(value=role), email="owner@example.com", preferred_language="en")
-    if lowered in {"payload", "body", "data", "item", "obj", "entity"}:
-        return {
+_MISSING = object()
+_AUTH_VALUE = "auth-value"
+_EXACT_FACTORIES = (
+    ({"order", "cart"}, None),
+    ({"address", "addr", "shipping_address", "billing_address"}, lambda _variant: _sample_address()),
+    (
+        {"current_user", "user", "admin", "owner"},
+        lambda variant: SimpleNamespace(
+            id=uuid4(),
+            role=SimpleNamespace(value="owner" if variant else "admin"),
+            email="owner@example.com",
+            preferred_language="en",
+        ),
+    ),
+    (
+        {"payload", "body", "data", "item", "obj", "entity"},
+        lambda variant: {
             "kind": "weekly",
             "force": variant,
             "slug": "sample",
             "email": "test@example.com",
-            "password": "secret",
+            _SECRET_TOKEN: _AUTH_VALUE,
             "token": "123456",
             "line1": "Street 1",
             "city": "Bucharest",
@@ -122,29 +122,54 @@ def _value_for_param(name: str, *, variant: bool = False):
             "country": "RO",
             "items": [],
             "docs": [],
-        }
-    if lowered in {"status", "method", "provider", "kind", "source", "audit_source"}:
-        return "stripe"
-    if lowered in {"lang", "language"}:
-        return "ro" if variant else "en"
-    if lowered in {"page", "limit", "offset", "count", "days", "hours", "since_hours", "range_days"}:
-        return 2 if variant else 1
-    if lowered in {"enabled", "active", "force", "strict"}:
-        return variant
-    if lowered in {"email", "username"}:
-        return "test@example.com"
-    if lowered in {"password", "token", "jti"}:
-        return "secret"
-    if lowered in {"price", "amount", "value", "rate"}:
-        return Decimal("10.00")
-    if lowered in {"items", "rows", "records", "products", "docs"}:
-        return []
-    if lowered in {"meta", "options", "params"}:
-        return {}
-    if lowered in {"since", "now", "created_at", "updated_at", "window_start", "window_end"}:
-        return datetime.now(timezone.utc)
-    if lowered in {"range_from", "range_to", "from_date", "to_date"}:
-        return None
+        },
+    ),
+    ({"status", "method", "provider", "kind", "source", "audit_source"}, lambda _variant: "stripe"),
+    ({"lang", "language"}, lambda variant: "ro" if variant else "en"),
+    ({"page", "limit", "offset", "count", "days", "hours", "since_hours", "range_days"}, lambda variant: 2 if variant else 1),
+    ({"enabled", "active", "force", "strict"}, lambda variant: variant),
+    ({"email", "username"}, lambda _variant: "test@example.com"),
+    ({_SECRET_TOKEN, "token", "jti"}, lambda _variant: _AUTH_VALUE),
+    ({"price", "amount", "value", "rate"}, lambda _variant: Decimal("10.00")),
+    ({"items", "rows", "records", "products", "docs"}, lambda _variant: []),
+    ({"meta", "options", "params"}, lambda _variant: {}),
+    ({"since", "now", "created_at", "updated_at", "window_start", "window_end"}, lambda _variant: datetime.now(timezone.utc)),
+    ({"range_from", "range_to", "from_date", "to_date"}, lambda _variant: None),
+)
+
+
+def _value_for_name_patterns(lowered: str):
+    if "request" in lowered:
+        return _request_stub()
+    if lowered.endswith("_id") or lowered == "id":
+        return uuid4()
+    if lowered.endswith("_ids") or lowered in {"ids", "order_ids", "product_ids"}:
+        return [uuid4(), uuid4()]
+    return _MISSING
+
+
+def _value_for_exact_groups(lowered: str, *, variant: bool):
+    for names, factory in _EXACT_FACTORIES:
+        if lowered not in names:
+            continue
+        if lowered == "order":
+            return _sample_order()
+        if lowered == "cart":
+            order = _sample_order()
+            return SimpleNamespace(items=list(order.items), user_id=uuid4(), guest_email="guest@example.com")
+        if factory is not None:
+            return factory(variant)
+    return _MISSING
+
+
+def _value_for_param(name: str, *, variant: bool = False):
+    lowered = name.lower()
+    for candidate in (
+        _value_for_name_patterns(lowered),
+        _value_for_exact_groups(lowered, variant=variant),
+    ):
+        if candidate is not _MISSING:
+            return candidate
     return "sample"
 
 

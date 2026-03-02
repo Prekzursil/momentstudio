@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+import math
 from pathlib import Path, PurePosixPath
 from types import SimpleNamespace
 from uuid import uuid4
@@ -163,7 +164,7 @@ def test_backend_wave_b_media_retry_policy_payload_edges() -> None:
     assert policy is not None
     assert policy.max_attempts == 4
     assert policy.schedule == [5, 10]
-    assert policy.jitter_ratio == 0.25
+    assert math.isclose(policy.jitter_ratio, 0.25, rel_tol=0.0, abs_tol=1e-9)
 
     assert media_dam.can_approve_or_purge("owner") is True
     assert media_dam.can_approve_or_purge("viewer") is False
@@ -270,7 +271,10 @@ def test_backend_wave_b_receipts_helpers_and_render_fallback(monkeypatch: pytest
     minimal_receipt = receipts.build_order_receipt(minimal_order, items=[], redacted=False)
     assert receipts._reportlab_info_lines(minimal_receipt) == []
 
-    monkeypatch.setattr(receipts, "_render_order_receipt_pdf_reportlab", lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("boom")))
+    def _raise_receipt_failure(*_args, **_kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(receipts, "_render_order_receipt_pdf_reportlab", _raise_receipt_failure)
     monkeypatch.setattr(receipts, "render_order_receipt_pdf_raster", lambda *_args, **_kwargs: b"fallback-pdf")
     assert receipts.render_order_receipt_pdf(minimal_order, items=[], redacted=False) == b"fallback-pdf"
 

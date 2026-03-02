@@ -2,25 +2,25 @@ import { of, throwError } from 'rxjs';
 
 import { CmsFormBlockComponent } from './cms-form-block.component';
 
-describe('CmsFormBlockComponent', () => {
-  function createComponent(): {
-    component: CmsFormBlockComponent;
-    support: jasmine.SpyObj<any>;
-    newsletter: jasmine.SpyObj<any>;
-  } {
-    const auth = {
-      user: jasmine.createSpy('user').and.returnValue({ email: ' user@example.com ', name: ' User Name ' })
-    };
-    const support = jasmine.createSpyObj('SupportService', ['submitContact']);
-    const newsletter = jasmine.createSpyObj('NewsletterService', ['subscribe']);
-    const translate = { instant: (key: string) => key };
-    const component = new CmsFormBlockComponent(auth as any, support as any, newsletter as any, translate as any);
-    component.block = { form_type: 'contact', topic: 'support' } as any;
-    return { component, support, newsletter };
-  }
+function createCmsFormBlockComponent(): {
+  component: CmsFormBlockComponent;
+  support: jasmine.SpyObj<any>;
+  newsletter: jasmine.SpyObj<any>;
+} {
+  const auth = {
+    user: jasmine.createSpy('user').and.returnValue({ email: ' user@example.com ', name: ' User Name ' })
+  };
+  const support = jasmine.createSpyObj('SupportService', ['submitContact']);
+  const newsletter = jasmine.createSpyObj('NewsletterService', ['subscribe']);
+  const translate = { instant: (key: string) => key };
+  const component = new CmsFormBlockComponent(auth as any, support as any, newsletter as any, translate as any);
+  component.block = { form_type: 'contact', topic: 'support' } as any;
+  return { component, support, newsletter };
+}
 
+describe('CmsFormBlockComponent', () => {
   it('resets messages and prefills user data on changes', () => {
-    const { component } = createComponent();
+    const { component } = createCmsFormBlockComponent();
     component.contactError.set('boom');
     component.newsletterError.set('boom');
     component.formTopic = 'refund';
@@ -36,7 +36,7 @@ describe('CmsFormBlockComponent', () => {
   });
 
   it('submits contact successfully and resets captcha state', () => {
-    const { component, support } = createComponent();
+    const { component, support } = createCmsFormBlockComponent();
     component.captchaEnabled = true;
     component.contactCaptchaToken = 'token-1';
     component.contactCaptcha = { reset: jasmine.createSpy('reset') } as any;
@@ -66,7 +66,7 @@ describe('CmsFormBlockComponent', () => {
   });
 
   it('handles contact captcha requirement and API errors', () => {
-    const { component, support } = createComponent();
+    const { component, support } = createCmsFormBlockComponent();
     component.captchaEnabled = true;
     component.contactCaptchaToken = null;
 
@@ -86,7 +86,7 @@ describe('CmsFormBlockComponent', () => {
   });
 
   it('submits newsletter with already-subscribed and success/error branches', () => {
-    const { component, newsletter } = createComponent();
+    const { component, newsletter } = createCmsFormBlockComponent();
     component.block = { form_type: 'newsletter' } as any;
     component.newsletterEmail = '  news@example.com  ';
     component.newsletterCaptcha = { reset: jasmine.createSpy('reset') } as any;
@@ -117,7 +117,7 @@ describe('CmsFormBlockComponent', () => {
   });
 
   it('does not submit when loading or wrong block type', () => {
-    const { component, support, newsletter } = createComponent();
+    const { component, support, newsletter } = createCmsFormBlockComponent();
     component.contactSubmitting.set(true);
     component.submitContact();
     expect(support.submitContact).not.toHaveBeenCalled();

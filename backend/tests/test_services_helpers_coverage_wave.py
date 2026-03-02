@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from types import SimpleNamespace
@@ -377,8 +378,8 @@ async def test_paypal_service_currency_and_fx_helpers(monkeypatch: pytest.Monkey
     assert await paypal_service._fx_per_ron("RON", fx_eur_per_ron=None, fx_usd_per_ron=None) == Decimal("1.0")
     assert await paypal_service._fx_per_ron("EUR", fx_eur_per_ron=0.2, fx_usd_per_ron=None) == Decimal("0.2")
 
-    async def fake_rates() -> object:
-        return SimpleNamespace(usd_per_ron=Decimal("0.22"), eur_per_ron=Decimal("0.20"))
+    def fake_rates():
+        return asyncio.sleep(0, result=SimpleNamespace(usd_per_ron=Decimal("0.22"), eur_per_ron=Decimal("0.20")))
 
     monkeypatch.setattr(paypal_service.fx_rates, "get_fx_rates", fake_rates)
     assert await paypal_service._fx_per_ron("USD", fx_eur_per_ron=None, fx_usd_per_ron=None) == Decimal("0.22")
