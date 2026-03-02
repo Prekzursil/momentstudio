@@ -513,7 +513,7 @@ describe('AccountState coverage wave 2', () => {
     const order = { id: 'order-1', reference_code: 'R-1' };
     const originalCreateElement = document.createElement.bind(document);
     const anchor = originalCreateElement('a');
-    const appendSpy = spyOn(document.body, 'appendChild').and.callFake((node: Node) => node);
+    const appendSpy = spyOn(document.body, 'appendChild').and.callFake(<T extends Node>(node: T): T => node);
     const clickSpy = spyOn(anchor, 'click');
     const createElementSpy = spyOn(document, 'createElement').and.callFake((tag: string) => {
       if (tag.toLowerCase() === 'a') return anchor;

@@ -50,7 +50,7 @@ const fillValidRegisterForm = (cmp: RegisterComponent): void => {
 };
 
 const expectRegistrationPayload = (auth: jasmine.SpyObj<AuthService>): void => {
-  expect(auth.register).toHaveBeenCalledWith({
+  const expectedPayload = {
     name: 'Ana',
     username: 'ana2005l',
     email: 'ana@example.com',
@@ -63,7 +63,8 @@ const expectRegistrationPayload = (auth: jasmine.SpyObj<AuthService>): void => {
     preferred_language: 'en',
     accept_terms: true,
     accept_privacy: true
-  });
+  } as any;
+  expect(auth.register).toHaveBeenCalledWith(expectedPayload);
 };
 
 describe('RegisterComponent', () => {
