@@ -124,12 +124,7 @@ For the weekly cycle:
 1. Ensure `Audit Weekly Evidence` succeeds.
 2. Run/confirm `Audit Weekly Agent`.
 3. Verify severe findings (`severity:s1/s2`) were upserted.
-4. If `ROADMAP_PROJECT_WRITE_TOKEN` is configured:
-   - severe audit issues should be synced to `AdrianaArt Roadmap` lane `Now`.
-5. If token is not configured:
-   - workflow remains green and reports an explicit skip reason in the summary.
-
-The weekly project sync is additive-only in this phase: it does not auto-remove or archive project items when issues later close.
+4. Verify lower-severity findings (`severity:s3/s4`) are reflected in the rolling digest issue body.
 
 ## Required checks for `main`
 

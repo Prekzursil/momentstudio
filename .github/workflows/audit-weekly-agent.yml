@@ -124,34 +124,6 @@ jobs:
             --severe-output artifacts/audit-evidence/severe-issues-upserted.json \
             --skip-digest
 
-      - name: Sync severe issues to roadmap project
-        if: steps.resolve.outputs.skip_followup != 'true'
-        id: project_sync
-        env:
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          ROADMAP_PROJECT_WRITE_TOKEN: ${{ secrets.ROADMAP_PROJECT_WRITE_TOKEN }}
-          ROADMAP_PROJECT_OWNER: ${{ vars.ROADMAP_PROJECT_OWNER }}
-          ROADMAP_PROJECT_NUMBER: ${{ vars.ROADMAP_PROJECT_NUMBER }}
-        run: |
-          set -euo pipefail
-          severe_count="$(jq 'length' artifacts/audit-evidence/severe-issues-upserted.json)"
-          echo "severe_count=${severe_count}" >> "$GITHUB_OUTPUT"
-
-          if [[ "${severe_count}" == "0" ]]; then
-            python3 -c 'import json, pathlib; pathlib.Path("artifacts/audit-evidence/project-sync-summary.json").write_text(json.dumps({"scanned":0,"added":0,"updated":0,"lane_updates":0,"status_updates":0,"skipped_run":True,"skip_reason":"no_severe_issues","project_owner":"Prekzursil","project_number":2,"project_url":""}, indent=2) + "\n", encoding="utf-8")'
-            exit 0
-          fi
-
-          python3 scripts/audit/sync_severe_issues_to_project.py \
-            --repo "${GITHUB_REPOSITORY}" \
-            --project-owner "${ROADMAP_PROJECT_OWNER:-Prekzursil}" \
-            --project-number "${ROADMAP_PROJECT_NUMBER:-2}" \
-            --issues-json artifacts/audit-evidence/severe-issues-upserted.json \
-            --lane-name "Now" \
-            --status-name "Todo" \
-            --summary-output artifacts/audit-evidence/project-sync-summary.json \
-            --allow-skip-missing-token
-
       - name: Build weekly digest issue body
         if: steps.resolve.outputs.skip_followup != 'true'
         run: |
