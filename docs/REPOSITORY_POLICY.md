@@ -159,29 +159,13 @@ Security constraints:
   - requires `audit:deep` label.
   - produces/updates one deep-audit issue for that PR.
 
-## AI Audit Phase 2: Roadmap Auto-Sync
+## AI Audit Phase 2: Retired Project Sync
 
-Phase 2 extends the weekly agent flow with optional project synchronization:
+Roadmap project auto-sync is no longer part of the active audit contract.
+Weekly automation now:
 
-- Source: severe issue upsert output from `scripts/audit/upsert_audit_issues.py` (`--severe-output`).
-- Target: `AdrianaArt Roadmap` (`Prekzursil` project `#2` by default, overridable via variables).
-- Behavior:
-  - upsert open severe issues into project items.
-  - enforce `Roadmap Lane=Now`.
-  - set `Status=Todo` only when status is empty or non-terminal.
-  - do not auto-remove/archive items in this phase.
-
-Configuration:
-
-- Secret: `ROADMAP_PROJECT_WRITE_TOKEN` (optional)
-- Variable: `ROADMAP_PROJECT_OWNER` (optional, default `Prekzursil`)
-- Variable: `ROADMAP_PROJECT_NUMBER` (optional, default `2`)
-
-Safety rules:
-
-- If project write token is missing, the sync step is skipped safely and workflow stays green.
-- Skip reason is emitted in weekly workflow summary.
-- No token value is printed in logs.
+- upserts severe findings as issues via `scripts/audit/upsert_audit_issues.py`,
+- and maintains the rolling digest issue for lower-severity findings.
 
 ## Sentry Observability Baseline
 

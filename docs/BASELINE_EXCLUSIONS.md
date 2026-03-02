@@ -21,7 +21,6 @@ AdrianaArt has a comprehensive Phase 1/2 audit pipeline that is **intentionally 
 - `.github/workflows/audit-weekly-agent.yml` - Weekly audit digest
 - `.github/workflows/audit-agent-watchdog.yml` - Stale issue de-escalation
 - Scripts: `scripts/audit/upsert_audit_issues.py`
-- Scripts: `scripts/audit/sync_severe_issues_to_project.py`
 - Scripts: `scripts/audit/agent_issue_watchdog.py`
 
 **Why excluded:**
@@ -29,7 +28,6 @@ AdrianaArt has a comprehensive Phase 1/2 audit pipeline that is **intentionally 
 - Depends on route mapping and SEO snapshot capabilities
 - Produces artifacts specific to storefront/account/admin shell architecture
 - Includes complex fingerprinting and deduplication logic
-- Integrates with GitHub Projects for roadmap sync (Phase 2)
 
 **Baseline-lite replacement:**
 - Use simpler curation digest workflow (`.github/workflows/curation-weekly-digest.yml`) for manual quality tracking
