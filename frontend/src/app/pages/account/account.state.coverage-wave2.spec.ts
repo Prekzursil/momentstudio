@@ -593,7 +593,7 @@ describe('AccountState coverage wave 2', () => {
     state.route = {
       snapshot: {
         queryParamMap: {
-          get: (_unusedKey: string) => null,
+          get: () => null,
         },
       },
     };
