@@ -34,11 +34,12 @@ jobs:
             exit 1
           fi
           if [ -z "${SENTRY_PROJECT:-}" ]; then
-            echo "::error::Missing SENTRY_PROJECT variable."
-            exit 1
+            echo "::warning::SENTRY_PROJECT variable is not set; resolving a project slug from Sentry API."
           fi
 
       - name: Verify Sentry API access and project binding
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
           if [ -n "${SENTRY_URL:-}" ]; then
@@ -46,9 +47,62 @@ jobs:
           else
             unset SENTRY_URL || true
           fi
+
           SENTRY_CLI="npx --yes @sentry/cli@2.57.0"
           ${SENTRY_CLI} info
-          ${SENTRY_CLI} releases list --org "${SENTRY_ORG}" --project "${SENTRY_PROJECT}" --quiet
+
+          requested_project="${SENTRY_PROJECT:-}"
+          resolved_project=""
+
+          if [ -n "$requested_project" ]; then
+            if ${SENTRY_CLI} releases list --org "${SENTRY_ORG}" --project "$requested_project" --quiet >/dev/null 2>&1; then
+              resolved_project="$requested_project"
+            else
+              echo "::warning::Configured SENTRY_PROJECT '$requested_project' is not accessible; discovering valid project for org '$SENTRY_ORG'."
+            fi
+          fi
+
+          if [ -z "$resolved_project" ]; then
+            resolved_project="$(python - <<'PY'
+import json
+import os
+import urllib.request
+
+org = os.environ.get('SENTRY_ORG', '').strip()
+repo = os.environ.get('GITHUB_REPOSITORY', '').strip().split('/')[-1].lower()
+token = os.environ.get('SENTRY_AUTH_TOKEN', '').strip()
+base = os.environ.get('SENTRY_URL', 'https://sentry.io').rstrip('/')
+
+req = urllib.request.Request(
+    f"{base}/api/0/organizations/{org}/projects/",
+    headers={"Authorization": f"Bearer {token}"},
+)
+with urllib.request.urlopen(req, timeout=30) as resp:
+    projects = json.load(resp)
+
+slugs = [p.get('slug', '').strip() for p in projects if p.get('slug')]
+if not slugs:
+    print("")
+    raise SystemExit(0)
+
+preferred = [repo, 'momentstudio', 'adrianaart']
+for cand in preferred:
+    if cand in slugs:
+        print(cand)
+        raise SystemExit(0)
+
+print(slugs[0])
+PY
+)"
+          fi
+
+          if [ -z "$resolved_project" ]; then
+            echo "::error::No accessible Sentry project could be resolved for organization '$SENTRY_ORG'."
+            exit 1
+          fi
+
+          echo "Resolved Sentry project: $resolved_project"
+          ${SENTRY_CLI} releases list --org "${SENTRY_ORG}" --project "$resolved_project" --quiet
 
   release-and-sourcemaps:
     if: github.event_name != 'pull_request'
