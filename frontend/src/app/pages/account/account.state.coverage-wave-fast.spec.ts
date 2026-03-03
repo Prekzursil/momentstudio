@@ -1,4 +1,5 @@
 import { AccountState } from './account.state';
+import { of, throwError } from 'rxjs';
 
 type SignalLike<T> = (() => T) & { set: (next: T) => void };
 
@@ -354,5 +355,146 @@ describe('AccountState fast notification unsaved-change branch', () => {
 
     state.notifyMarketing = true;
     expect(state.notificationsHasUnsavedChanges()).toBeTrue();
+  });
+});
+
+describe('AccountState fast comments and security loaders', () => {
+  function primeAsyncSignals(state: any): void {
+    state.myCommentsLoading = mockSignal(false);
+    state.myCommentsError = mockSignal<string | null>(null);
+    state.myComments = mockSignal<any[]>([]);
+    state.myCommentsMeta = mockSignal<any>(null);
+    state.secondaryEmailsLoading = mockSignal(false);
+    state.secondaryEmailsLoaded = mockSignal(false);
+    state.secondaryEmailsError = mockSignal<string | null>(null);
+    state.secondaryEmails = mockSignal<any[]>([]);
+    state.sessionsLoading = mockSignal(false);
+    state.sessionsLoaded = mockSignal(false);
+    state.sessionsError = mockSignal<string | null>(null);
+    state.sessions = mockSignal<any[]>([]);
+    state.securityEventsLoading = mockSignal(false);
+    state.securityEventsLoaded = mockSignal(false);
+    state.securityEventsError = mockSignal<string | null>(null);
+    state.securityEvents = mockSignal<any[]>([]);
+    state.twoFactorLoading = mockSignal(false);
+    state.twoFactorLoaded = mockSignal(false);
+    state.twoFactorError = mockSignal<string | null>(null);
+    state.twoFactorStatus = mockSignal<any>(null);
+  }
+
+  it('loads my comments and paginates forward/backward', () => {
+    const state = createAccountHarness();
+    primeAsyncSignals(state);
+    state.auth = { isAuthenticated: () => true };
+    state.lang = { language: () => 'en' };
+    state.blog = {
+      listMyComments: jasmine.createSpy('listMyComments').and.returnValue(
+        of({
+          items: [{ id: 'c1' }],
+          meta: { page: 2, total_pages: 3 },
+        })
+      ),
+    };
+    spyOn(state, 'loadMyComments').and.callThrough();
+
+    state.loadMyComments(2);
+    expect(state.myComments().length).toBe(1);
+    expect(state.myCommentsMeta().page).toBe(2);
+    expect(state.myCommentsPage).toBe(2);
+    expect(state.myCommentsLoading()).toBeFalse();
+
+    state.nextMyCommentsPage();
+    expect(state.loadMyComments).toHaveBeenCalledWith(3);
+
+    state.myCommentsMeta.set({ page: 2, total_pages: 3 });
+    state.prevMyCommentsPage();
+    expect(state.loadMyComments).toHaveBeenCalledWith(1);
+  });
+
+  it('handles my comments load errors and status chip/timestamp fallbacks', () => {
+    const state = createAccountHarness();
+    primeAsyncSignals(state);
+    state.auth = { isAuthenticated: () => true };
+    state.lang = { language: () => 'ro' };
+    state.blog = {
+      listMyComments: jasmine.createSpy('listMyComments').and.returnValue(
+        throwError(() => ({ error: { detail: 'fail' } }))
+      ),
+    };
+
+    state.loadMyComments(1);
+    expect(state.myCommentsError()).toContain('account.comments.loadError');
+    expect(state.myCommentsLoading()).toBeFalse();
+    expect(state.commentStatusChipClass('posted')).toContain('emerald');
+    expect(state.commentStatusChipClass('hidden')).toContain('amber');
+    expect(state.commentStatusChipClass('deleted')).toContain('slate');
+    expect(state.commentStatusChipClass('other')).toContain('slate');
+    expect(state.formatTimestamp(null)).toBe('');
+    expect(typeof state.formatTimestamp('2026-03-03T00:00:00Z')).toBe('string');
+  });
+
+  it('loads security side resources and records error states', () => {
+    const state = createAccountHarness();
+    primeAsyncSignals(state);
+    state.auth = {
+      isAuthenticated: () => true,
+      listEmails: jasmine.createSpy('listEmails').and.returnValue(throwError(() => new Error('email-fail'))),
+      listSessions: jasmine.createSpy('listSessions').and.returnValue(throwError(() => new Error('sessions-fail'))),
+      listSecurityEvents: jasmine.createSpy('listSecurityEvents').and.returnValue(throwError(() => new Error('events-fail'))),
+      getTwoFactorStatus: jasmine.createSpy('getTwoFactorStatus').and.returnValue(throwError(() => new Error('2fa-fail'))),
+    };
+    spyOn(state, 'passkeysSupported').and.returnValue(true);
+    state.loadSecondaryEmails(true);
+    state.loadSessions(true);
+    state.loadSecurityEvents(true);
+    state.loadTwoFactorStatus(true);
+
+    expect(state.secondaryEmailsError()).toContain('account.security.emails.loadError');
+    expect(state.sessionsError()).toContain('account.security.devices.loadError');
+    expect(state.securityEventsError()).toContain('account.security.activity.loadError');
+    expect(state.twoFactorError()).toContain('account.security.twoFactor.loadError');
+    expect(state.twoFactorLoaded()).toBeTrue();
+  });
+});
+
+describe('AccountState fast idle and destroy branches', () => {
+  it('resets idle timer and triggers warning/signout callback', () => {
+    const state = createAccountHarness();
+    state.idleWarning = mockSignal<string | null>('old-warning');
+    state.idleTimer = 111;
+    state.signOut = jasmine.createSpy('signOut');
+    state.t = (key: string) => key;
+    const clearTimeoutSpy = spyOn(globalThis, 'clearTimeout').and.stub();
+    const setTimeoutSpy = spyOn(globalThis, 'setTimeout').and.callFake(((fn: unknown) => {
+      if (typeof fn === 'function') fn();
+      return 222 as any;
+    }) as any);
+
+    state.resetIdleTimer();
+    expect(clearTimeoutSpy).toHaveBeenCalledWith(111);
+    expect(setTimeoutSpy).toHaveBeenCalled();
+    expect(state.idleWarning()).toContain('account.security.session.idleLogout');
+    expect(state.signOut).toHaveBeenCalled();
+  });
+
+  it('cleans subscriptions/effects/listeners on destroy', () => {
+    const state = createAccountHarness();
+    state.nowInterval = 100;
+    state.idleTimer = 200;
+    state.routerEventsSub = { unsubscribe: jasmine.createSpy('unsubscribe') };
+    state.phoneCountriesEffect = { destroy: jasmine.createSpy('destroy') };
+    state.handleUserActivity = () => undefined;
+    state.handleBeforeUnload = () => undefined;
+    const clearIntervalSpy = spyOn(globalThis, 'clearInterval').and.stub();
+    const clearTimeoutSpy = spyOn(globalThis, 'clearTimeout').and.stub();
+    const removeSpy = spyOn(globalThis, 'removeEventListener').and.stub();
+
+    state.ngOnDestroy();
+    expect(clearIntervalSpy).toHaveBeenCalledWith(100);
+    expect(clearTimeoutSpy).toHaveBeenCalledWith(200);
+    expect(state.stopExportJobPolling).toHaveBeenCalled();
+    expect(state.routerEventsSub.unsubscribe).toHaveBeenCalled();
+    expect(state.phoneCountriesEffect.destroy).toHaveBeenCalled();
+    expect(removeSpy).toHaveBeenCalled();
   });
 });

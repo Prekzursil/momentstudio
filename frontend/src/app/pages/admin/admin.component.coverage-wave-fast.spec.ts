@@ -1,6 +1,6 @@
 import { DomSanitizer } from '@angular/platform-browser';
 import { ActivatedRoute } from '@angular/router';
-import { Subject } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 
 import { AdminComponent } from './admin.component';
 
@@ -258,5 +258,172 @@ describe('AdminComponent fast poller and reset helpers', () => {
     expect(component.maintenanceEnabled()).toBeTrue();
     expect(component.maintenanceEnabledValue).toBeTrue();
     expect(component.loading()).toBeFalse();
+  });
+});
+
+describe('AdminComponent fast info and structured-data branches', () => {
+  it('runs structured-data validation success and error branches', () => {
+    const component = createAdminHarness() as any;
+    component.admin = {
+      validateStructuredData: jasmine
+        .createSpy('validateStructuredData')
+        .and.returnValues(of({ issues: [] }), throwError(() => ({ error: { detail: 'schema-invalid' } }))),
+    };
+
+    component.runStructuredDataValidation();
+    expect(component.structuredDataLoading).toBeFalse();
+    expect(component.structuredDataResult).toEqual({ issues: [] });
+    expect(component.structuredDataError).toBeNull();
+
+    component.runStructuredDataValidation();
+    expect(component.structuredDataLoading).toBeFalse();
+    expect(component.structuredDataResult).toBeNull();
+    expect(component.structuredDataError).toContain('schema-invalid');
+  });
+
+  it('loads info blocks and handles missing-language fallback', async () => {
+    const component = createAdminHarness() as any;
+    component.infoForm = {
+      about: { en: '', ro: '' },
+      faq: { en: '', ro: '' },
+      shipping: { en: '', ro: '' },
+      contact: { en: '', ro: '' },
+    };
+    component.rememberContentVersion = jasmine.createSpy('rememberContentVersion');
+    component.admin = {
+      getContent: jasmine.createSpy('getContent').and.callFake((key: string, lang?: string) => {
+        if (key === 'page.faq' && lang === 'ro') return throwError(() => new Error('ro-faq-missing'));
+        return of({ body_markdown: `${key}-${lang || 'en'}` });
+      }),
+    };
+
+    component.loadInfo();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(component.infoForm.about.en).toContain('page.about-en');
+    expect(component.infoForm.about.ro).toContain('page.about-ro');
+    expect(component.infoForm.faq.en).toContain('page.faq-en');
+    expect(component.infoForm.faq.ro).toBe('');
+    expect(component.rememberContentVersion).toHaveBeenCalled();
+  });
+
+  it('routes saveInfoUi to side-by-side and single-language branches', () => {
+    const component = createAdminHarness() as any;
+    component.infoLang = 'ro';
+    component.cmsPrefs = { translationLayout: () => 'sideBySide' };
+    component.saveInfoBoth = jasmine.createSpy('saveInfoBoth');
+    component.saveInfo = jasmine.createSpy('saveInfo');
+    const body = { en: 'Hello', ro: 'Salut' };
+
+    component.saveInfoUi('page.about', body);
+    expect(component.saveInfoBoth).toHaveBeenCalledWith('page.about', body);
+
+    component.cmsPrefs = { translationLayout: () => 'stacked' };
+    component.saveInfoUi('page.about', body);
+    expect(component.saveInfo).toHaveBeenCalledWith('page.about', 'Salut', 'ro');
+  });
+});
+
+describe('AdminComponent fast page/link/legal helpers', () => {
+  it('loads link-check data and maps error state', () => {
+    const component = createAdminHarness() as any;
+    component.admin = {
+      linkCheckContent: jasmine
+        .createSpy('linkCheckContent')
+        .and.returnValues(of({ issues: [{ id: 'i1' }] }), throwError(() => ({ error: { detail: 'load-failed' } }))),
+    };
+
+    component.runLinkCheck('page.about');
+    expect(component.linkCheckIssues.length).toBe(1);
+    expect(component.linkCheckLoading).toBeFalse();
+    expect(component.linkCheckError).toBeNull();
+
+    component.runLinkCheck('page.about');
+    expect(component.linkCheckIssues.length).toBe(0);
+    expect(component.linkCheckError).toContain('load-failed');
+    expect(component.linkCheckLoading).toBeFalse();
+  });
+
+  it('maps redirect URLs, labels, reserved slugs, and rename guards', () => {
+    const component = createAdminHarness() as any;
+
+    expect(component.redirectKeyToUrl('page.about')).toBe('/pages/about');
+    expect(component.redirectKeyToUrl('/account')).toBe('/account');
+    expect(component.pageKeySupportsRequiresAuth('page.custom')).toBeTrue();
+    expect(component.pageKeySupportsRequiresAuth('blog.custom')).toBeFalse();
+    expect(component.pageBlockTypeLabelKey('image')).toContain('image');
+    expect(component.pageBlockTypeLabelKey('carousel')).toContain('carousel');
+    expect(component.pageBlockTypeLabelKey('text')).toContain('text');
+    expect(component.canRenamePageKey('page.custom')).toBeTrue();
+    expect(component.canRenamePageKey('page.about')).toBeFalse();
+    expect(component.canRenamePageKey('blog.custom')).toBeFalse();
+    expect(component.slugifyPageSlug(' Șlug Custom URL ')).toBe('slug-custom-url');
+    expect(component.isReservedPageSlug('checkout')).toBeTrue();
+    expect(component.isReservedPageSlug('custom-page')).toBeFalse();
+    expect(component.pagePublicUrlForKey('page.contact')).toBe('/contact');
+    expect(component.pagePublicUrlForKey('page.custom')).toBe('/pages/custom');
+    expect(component.pagePublicUrlForKey('')).toBe('/pages');
+  });
+
+  it('handles renameCustomPageUrl success/redirect and update failure branches', () => {
+    const component = createAdminHarness() as any;
+    const toast = jasmine.createSpyObj('ToastService', ['success', 'error']);
+    component.toast = toast;
+    component.pageBlocksKey = 'page.old-path';
+    component.loadContentPages = jasmine.createSpy('loadContentPages');
+    component.loadPageBlocks = jasmine.createSpy('loadPageBlocks');
+    component.loadContentRedirects = jasmine.createSpy('loadContentRedirects');
+    component.admin = {
+      renameContentPage: jasmine.createSpy('renameContentPage').and.returnValue(of({ old_key: 'page.old-path', new_key: 'page.new-path' })),
+      upsertContentRedirect: jasmine.createSpy('upsertContentRedirect').and.returnValue(of({ ok: true })),
+    };
+    const promptSpy = spyOn(globalThis, 'prompt').and.returnValue('new-path');
+    const confirmSpy = spyOn(globalThis, 'confirm').and.returnValues(true, true);
+
+    component.renameCustomPageUrl();
+    expect(promptSpy).toHaveBeenCalled();
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(component.admin.renameContentPage).toHaveBeenCalledWith('old-path', 'new-path');
+    expect(component.admin.upsertContentRedirect).toHaveBeenCalled();
+    expect(component.pageBlocksKey).toBe('page.new-path');
+    expect(component.loadContentRedirects).toHaveBeenCalledWith(true);
+    expect(toast.success).toHaveBeenCalled();
+
+    component.admin.renameContentPage.and.returnValue(throwError(() => ({ error: { detail: 'rename-failed' } })));
+    component.renameCustomPageUrl();
+    expect(toast.error).toHaveBeenCalled();
+  });
+
+  it('loads and saves legal-page metadata branches', () => {
+    const component = createAdminHarness() as any;
+    component.legalPageKey = 'page.terms';
+    component.infoLang = 'en';
+    component.legalPageForm = { en: '', ro: '' };
+    component.rememberContentVersion = jasmine.createSpy('rememberContentVersion');
+    component.savePageMarkdownInternal = jasmine.createSpy('savePageMarkdownInternal').and.callFake(
+      (_key: string, _body: string, _lang: string, onSuccess: () => void) => onSuccess()
+    );
+    component.admin = {
+      getContent: jasmine
+        .createSpy('getContent')
+        .and.returnValues(
+          of({ body_markdown: 'terms-en', meta: { last_updated: '2026-03-01' } }),
+          of({ body_markdown: 'terms-ro', meta: { last_updated: '2026-03-01' } })
+        ),
+      updateContentBlock: jasmine.createSpy('updateContentBlock').and.returnValue(
+        of({ meta: { last_updated: '2026-03-02' } })
+      ),
+    };
+
+    component.loadLegalPage('page.terms');
+    expect(component.legalPageLoading).toBeFalse();
+    expect(component.legalPageForm.en).toBe('terms-en');
+    expect(component.legalPageForm.ro).toBe('terms-ro');
+    expect(component.legalPageLastUpdated).toBe('2026-03-01');
+
+    component.legalPageLastUpdated = '2026-03-02';
+    component.saveLegalPageUi();
+    expect(component.admin.updateContentBlock).toHaveBeenCalled();
+    expect(component.savePageMarkdownInternal).toHaveBeenCalled();
+    expect(component.legalPageMessage).toContain('adminUi.site.pages.success.save');
   });
 });

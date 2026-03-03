@@ -316,3 +316,190 @@ describe('CheckoutComponent fast primary-email resend branch', () => {
     expect(cmp.primaryEmailVerificationBusy).toBeFalse();
   });
 });
+
+describe('CheckoutComponent fast promo error and guest branches', () => {
+  it('handles applyPromo non-eligible, fallback-404, and generic-error branches', () => {
+    const cmp = createCheckoutHarness();
+    cmp.couponsService = {
+      validate: jasmine
+        .createSpy('validate')
+        .and.returnValues(
+          of({
+            eligible: false,
+            reasons: ['minimum_order'],
+            coupon: { code: 'SAVE10' },
+            estimated_discount_ron: '0',
+            estimated_shipping_discount_ron: '0',
+          }),
+          throwError(() => ({ status: 404 })),
+          throwError(() => ({ status: 500, error: { detail: 'coupon-api-error' } }))
+        ),
+    };
+    cmp.describeCouponReasons = jasmine.createSpy('describeCouponReasons').and.returnValue('minimum order');
+    cmp.minSubtotalShortfall = jasmine.createSpy('minSubtotalShortfall').and.returnValue({ remaining: 10, min: 50 });
+    cmp.refreshQuote = jasmine.createSpy('refreshQuote');
+    cmp.applyLegacyPromo = jasmine.createSpy('applyLegacyPromo');
+    cmp.auth.isAuthenticated = () => true;
+    cmp.promo = 'SAVE10';
+
+    cmp.applyPromo();
+    expect(cmp.promoStatus).toBe('warn');
+    expect(cmp.promoValid).toBeFalse();
+    expect(cmp.promoMessage).toContain('checkout.couponNotEligible');
+    expect(cmp.refreshQuote).toHaveBeenCalledWith(null);
+
+    cmp.applyPromo();
+    expect(cmp.applyLegacyPromo).toHaveBeenCalledWith('SAVE10');
+
+    cmp.applyPromo();
+    expect(cmp.promoMessage).toContain('coupon-api-error');
+  });
+
+  it('requires login for promo application in guest mode', () => {
+    const cmp = createCheckoutHarness();
+    cmp.auth.isAuthenticated = () => false;
+    cmp.refreshQuote = jasmine.createSpy('refreshQuote');
+    cmp.promo = 'SAVEGUEST';
+
+    cmp.applyPromo();
+    expect(cmp.promoStatus).toBe('warn');
+    expect(cmp.promoValid).toBeFalse();
+    expect(cmp.promoMessage).toContain('checkout.couponsLoginRequired');
+    expect(cmp.promo).toBe('');
+    expect(cmp.refreshQuote).toHaveBeenCalledWith(null);
+  });
+});
+
+describe('CheckoutComponent fast cart sync/load error branches', () => {
+  it('queues sync when already syncing and flushes immediate sync without delay', () => {
+    const cmp = createCheckoutHarness();
+    cmp.syncing = true;
+    cmp.syncQueued = false;
+    cmp.queuedSyncItems = null;
+    cmp.queueCartSync([{ sku: 'sku-1', quantity: 1 } as any]);
+    expect(cmp.syncQueued).toBeTrue();
+    expect(cmp.queuedSyncItems.length).toBe(1);
+
+    cmp.syncing = false;
+    cmp.syncBackendCart = jasmine.createSpy('syncBackendCart');
+    spyOn(globalThis, 'setTimeout').and.callFake(((fn: unknown) => {
+      if (typeof fn === 'function') fn();
+      return 1 as any;
+    }) as any);
+    cmp.queueCartSync([{ sku: 'sku-2', quantity: 1 } as any], { immediate: true });
+    expect(cmp.syncBackendCart).toHaveBeenCalled();
+  });
+
+  it('covers loadCartFromServer auth and cart-api error branches', () => {
+    const cmp = createCheckoutHarness();
+    cmp.cartApi = { get: jasmine.createSpy('get').and.returnValue(throwError(() => new Error('cart-error'))) };
+    cmp.auth = {
+      ensureAuthenticated: jasmine.createSpy('ensureAuthenticated').and.returnValue(of(true)),
+      isAuthenticated: () => true,
+      user: () => null,
+    };
+    cmp.cartQuoteParams = jasmine.createSpy('cartQuoteParams').and.returnValue({ country: 'RO' });
+    cmp.hydrateCartAndQuote = jasmine.createSpy('hydrateCartAndQuote');
+
+    cmp.loadCartFromServer();
+    expect(cmp.syncing).toBeFalse();
+    expect(cmp.errorMessage).toContain('checkout.cartLoadError');
+    expect(cmp.hydrateCartAndQuote).not.toHaveBeenCalled();
+
+    cmp.auth.ensureAuthenticated.and.returnValue(throwError(() => new Error('auth-error')));
+    cmp.loadCartFromServer();
+    expect(cmp.syncing).toBeFalse();
+    expect(cmp.errorMessage).toContain('checkout.cartLoadError');
+  });
+
+  it('covers refreshQuote fallback when promo quote fails', () => {
+    const cmp = createCheckoutHarness();
+    const hydrated = jasmine.createSpy('hydrateCartAndQuote');
+    cmp.hydrateCartAndQuote = hydrated;
+    cmp.cartApi = {
+      get: jasmine
+        .createSpy('get')
+        .and.returnValues(
+          throwError(() => ({ error: { detail: 'promo quote failed' } })),
+          of({ items: [], quote: { total: 1 } })
+        ),
+    };
+    cmp.cartQuoteParams = jasmine.createSpy('cartQuoteParams').and.callFake((promo: string | null) =>
+      promo ? { country: 'RO', promo_code: promo } : { country: 'RO' }
+    );
+
+    cmp.refreshQuote('SAVE10');
+    expect(cmp.promoStatus).toBe('warn');
+    expect(cmp.promoValid).toBeFalse();
+    expect(cmp.promoMessage).toContain('promo quote failed');
+    expect(cmp.cartApi.get).toHaveBeenCalledTimes(2);
+    expect(hydrated).toHaveBeenCalled();
+  });
+});
+
+describe('CheckoutComponent fast placeOrder guard branches', () => {
+  function buildForm(valid: boolean): any {
+    return {
+      valid,
+      control: {
+        updateValueAndValidity: jasmine.createSpy('updateValueAndValidity'),
+      },
+    };
+  }
+
+  it('returns early on invalid country, invalid form, missing locker, and missing verification', () => {
+    const cmp = createCheckoutHarness();
+    cmp.normalizeCheckoutCountries = jasmine.createSpy('normalizeCheckoutCountries').and.returnValue(false);
+    cmp.focusFirstInvalidField = jasmine.createSpy('focusFirstInvalidField');
+    cmp.focusLockerPicker = jasmine.createSpy('focusLockerPicker');
+    cmp.emailVerified = jasmine.createSpy('emailVerified').and.returnValue(false);
+    cmp.auth.isAuthenticated = () => true;
+
+    cmp.placeOrder(buildForm(true));
+    expect(cmp.addressError).toContain('checkout.countryInvalid');
+
+    cmp.normalizeCheckoutCountries.and.returnValue(true);
+    cmp.placeOrder(buildForm(false));
+    expect(cmp.addressError).toContain('checkout.addressRequired');
+
+    cmp.deliveryType = 'locker';
+    cmp.locker = null;
+    cmp.placeOrder(buildForm(true));
+    expect(cmp.deliveryError).toContain('checkout.deliveryLockerRequired');
+
+    cmp.deliveryType = 'home';
+    cmp.auth.isAuthenticated = () => true;
+    cmp.placeOrder(buildForm(true));
+    expect(cmp.errorMessage).toContain('auth.emailVerificationNeeded');
+
+    cmp.auth.isAuthenticated = () => false;
+    cmp.guestEmailVerified = false;
+    cmp.placeOrder(buildForm(true));
+    expect(cmp.errorMessage).toContain('auth.emailVerificationNeeded');
+  });
+
+  it('validates guest-create-account password and phone branches', () => {
+    const cmp = createCheckoutHarness();
+    cmp.normalizeCheckoutCountries = jasmine.createSpy('normalizeCheckoutCountries').and.returnValue(true);
+    cmp.focusFirstInvalidField = jasmine.createSpy('focusFirstInvalidField');
+    cmp.focusGlobalError = jasmine.createSpy('focusGlobalError');
+    cmp.auth.isAuthenticated = () => false;
+    cmp.guestEmailVerified = true;
+    cmp.guestCreateAccount = true;
+    cmp.guestPassword = '123';
+    cmp.guestPasswordConfirm = '123';
+    cmp.guestPhoneE164 = jasmine.createSpy('guestPhoneE164').and.returnValue(null);
+
+    cmp.placeOrder(buildForm(true));
+    expect(cmp.errorMessage).toContain('validation.passwordMin');
+
+    cmp.guestPassword = '123456';
+    cmp.guestPasswordConfirm = 'abcdef';
+    cmp.placeOrder(buildForm(true));
+    expect(cmp.errorMessage).toContain('validation.passwordMismatch');
+
+    cmp.guestPasswordConfirm = '123456';
+    cmp.placeOrder(buildForm(true));
+    expect(cmp.errorMessage).toContain('validation.phoneInvalid');
+  });
+});
