@@ -43,7 +43,7 @@ jobs:
         run: |
           set -euo pipefail
           base_url="${SENTRY_URL:-https://sentry.io}"
-          http_code="$(
+          list_http_code="$(
             curl -sS \
               -H "Authorization: Bearer ${SENTRY_AUTH_TOKEN}" \
               -H "Content-Type: application/json" \
@@ -51,20 +51,39 @@ jobs:
               -w "%{http_code}" \
               "${base_url%/}/api/0/projects/"
           )"
-          if [ "${http_code}" != "200" ]; then
-            echo "::error::Sentry API access failed with HTTP ${http_code}."
+          if [ "${list_http_code}" != "200" ]; then
+            echo "::error::Sentry API access failed with HTTP ${list_http_code}."
             cat /tmp/sentry-projects.json || true
             exit 1
           fi
-          jq -e --arg org "${SENTRY_ORG}" --arg project "${SENTRY_PROJECT}" '
+
+          query_http_code="$(
+            curl -sS \
+              -H "Authorization: Bearer ${SENTRY_AUTH_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -o /tmp/sentry-project-query.json \
+              -w "%{http_code}" \
+              "${base_url%/}/api/0/projects/?query=${SENTRY_PROJECT}"
+          )"
+          if [ "${query_http_code}" != "200" ]; then
+            echo "::error::Sentry project query failed with HTTP ${query_http_code}."
+            cat /tmp/sentry-project-query.json || true
+            exit 1
+          fi
+
+          jq -e --arg project "${SENTRY_PROJECT}" '
             map(
               (.slug == $project) or
               ((.id | tostring) == $project) or
-              (.organization.slug == $org) or
-              ((.organization.id | tostring) == $org)
+              (.name == $project) or
+              (.organization.slug? == $project) or
+              ((.organization.id? | tostring) == $project)
             ) | any
-          ' /tmp/sentry-projects.json > /dev/null || {
-            echo "::error::Configured SENTRY_ORG/SENTRY_PROJECT not visible to the token."
+          ' /tmp/sentry-project-query.json > /dev/null || {
+            echo "::error::SENTRY_PROJECT is not visible to this token via Sentry project search."
+            echo "::group::Sentry visible project slugs (debug)"
+            jq -r '.[] | [.id, .slug, (.organization.slug // \"-\")] | @tsv' /tmp/sentry-projects.json | sed -n '1,50p'
+            echo "::endgroup::"
             exit 1
           }
 
