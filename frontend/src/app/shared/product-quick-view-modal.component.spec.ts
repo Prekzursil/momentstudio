@@ -168,8 +168,20 @@ describe('ProductQuickViewModalComponent', () => {
     expect(component.selectedVariantId).toBeNull();
     expect(component.quantity).toBe(1);
 
+    catalog.getProduct.and.returnValue(
+      of({
+        id: 'p-3',
+        slug: 'ring',
+        name: 'Ring',
+        base_price: 100,
+        currency: 'RON',
+        stock_quantity: 2,
+        images: [{ url: '/a.jpg' }],
+      } as any)
+    );
     component.retry();
-    expect(catalog.getProduct).not.toHaveBeenCalled();
+    expect(catalog.getProduct).toHaveBeenCalledWith('ring');
   });
 });
+
 

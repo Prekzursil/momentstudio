@@ -38,11 +38,17 @@ function createAdminHarness(): AdminComponent {
       mode: () => 'advanced',
       previewDevice: () => 'desktop',
       previewLayout: () => 'split',
+      previewLang: () => 'en',
+      previewTheme: () => 'light',
+      translationLayout: () => 'stacked',
     } as any,
     jasmine.createSpyObj('ToastService', ['success', 'error']) as any,
     { instant: (k: string) => k } as any,
     { render: (value: string) => value } as any,
-    { bypassSecurityTrustHtml: (value: string) => value } as unknown as DomSanitizer
+    {
+      bypassSecurityTrustHtml: (value: string) => value,
+      bypassSecurityTrustResourceUrl: (value: string) => value,
+    } as unknown as DomSanitizer
   );
 }
 
@@ -533,3 +539,4 @@ describe('AdminComponent fast preview/blog seo/page-visibility branches', () => 
     expect(component.contentPages[0].hidden).toBeFalse();
   });
 });
+

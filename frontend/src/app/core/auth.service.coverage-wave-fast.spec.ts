@@ -103,6 +103,9 @@ describe('AuthService coverage fast wave', () => {
     expect(service.getAccessToken()).toBeNull();
 
     service.clearSession();
+    expect(router.navigateByUrl).not.toHaveBeenCalled();
+
+    service.clearSession({ redirectTo: '/login' });
     expect(router.navigateByUrl).toHaveBeenCalledWith('/login');
 
     router.navigateByUrl.calls.reset();
@@ -114,3 +117,4 @@ describe('AuthService coverage fast wave', () => {
     expect(router.navigateByUrl).toHaveBeenCalledWith('/account');
   });
 });
+

@@ -50,21 +50,81 @@ jobs:
           ${SENTRY_CLI} info
 
           project_slug="${SENTRY_PROJECT:-}"
-          if [ -n "$project_slug" ] && ${SENTRY_CLI} releases list --org "${SENTRY_ORG}" --project "$project_slug" --quiet >/dev/null 2>&1; then
+
+          validate_project_slug() {
+            local candidate="${1:-}"
+            [ -n "$candidate" ] || return 1
+            ${SENTRY_CLI} releases list --org "${SENTRY_ORG}" --project "$candidate" --quiet >/dev/null 2>&1
+          }
+
+          if validate_project_slug "$project_slug"; then
             echo "Using configured Sentry project: $project_slug"
           else
             if [ -n "$project_slug" ]; then
-              echo "::warning::Configured SENTRY_PROJECT '$project_slug' is not accessible; resolving project slug from Sentry API."
+              echo "::warning::Configured SENTRY_PROJECT '$project_slug' is not accessible; resolving project slug from Sentry APIs."
             fi
-                        sentry_api_base="${SENTRY_URL:-https://sentry.io}"
-            project_slug="$(
+
+            sentry_api_base="${SENTRY_URL:-https://sentry.io}"
+            api_candidate="$(
               curl -fsSL \
                 -H "Authorization: Bearer ${SENTRY_AUTH_TOKEN}" \
                 -H "Content-Type: application/json" \
                 "${sentry_api_base%/}/api/0/organizations/${SENTRY_ORG}/projects/" 2>/dev/null \
-              | python -c 'import json,sys; data=json.load(sys.stdin); print((data[0].get("slug") if data else ""))' 2>/dev/null \
-              || true
+              | python - <<'PY'
+          import json
+          import sys
+          
+          def emit_first_slug(items):
+              if isinstance(items, list):
+                  for item in items:
+                      if isinstance(item, dict):
+                          slug = item.get("slug")
+                          if slug:
+                              print(slug)
+                              return
+              print("")
+          
+          raw = sys.stdin.read().strip()
+          if not raw:
+              print("")
+              raise SystemExit
+          
+          try:
+              payload = json.loads(raw)
+          except Exception:
+              print("")
+              raise SystemExit
+          
+          if isinstance(payload, list):
+              emit_first_slug(payload)
+          elif isinstance(payload, dict):
+              for key in ("results", "projects", "data"):
+                  candidate = payload.get(key)
+                  if isinstance(candidate, list):
+                      emit_first_slug(candidate)
+                      break
+              else:
+                  print("")
+          else:
+              print("")
+          PY
             )"
+
+            if validate_project_slug "$api_candidate"; then
+              project_slug="$api_candidate"
+            else
+              cli_candidate="$(
+                ${SENTRY_CLI} projects list --org "${SENTRY_ORG}" 2>/dev/null \
+                | awk 'NF { print $1 }' \
+                | sed -E 's|.*/||' \
+                | head -n 1
+              )"
+              if validate_project_slug "$cli_candidate"; then
+                project_slug="$cli_candidate"
+              else
+                project_slug=""
+              fi
+            fi
           fi
 
           if [ -z "$project_slug" ]; then
