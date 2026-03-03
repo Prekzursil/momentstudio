@@ -4,12 +4,11 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
-from uuid import UUID, uuid4
+from uuid import uuid4
 import zipfile
 
 import pytest
 from starlette.requests import Request
-from starlette.responses import Response
 
 from app.api.v1 import admin_dashboard as admin_dashboard_api
 from app.api.v1 import auth as auth_api
@@ -607,3 +606,4 @@ def test_catalog_relationship_and_import_parser_helpers() -> None:
         description_en=None,
     ) is not None
     assert catalog_service._csv_trimmed_value({"name": "  value  "}, "name") == "value"
+

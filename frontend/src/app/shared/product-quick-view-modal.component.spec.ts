@@ -131,7 +131,7 @@ describe('ProductQuickViewModalComponent', () => {
     component.addToCart();
     expect(cart.addFromProduct).not.toHaveBeenCalled();
 
-    component.product.allow_backorder = true;
+    (component.product as any).allow_backorder = true;
     component.quantity = 3;
     component.addToCart();
 
@@ -172,3 +172,4 @@ describe('ProductQuickViewModalComponent', () => {
     expect(catalog.getProduct).not.toHaveBeenCalled();
   });
 });
+

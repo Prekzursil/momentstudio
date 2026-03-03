@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from types import SimpleNamespace
-from uuid import uuid4, UUID
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi import Response
@@ -13,8 +13,6 @@ from app.api.v1 import admin_dashboard as admin_dashboard_api
 from app.api.v1 import auth as auth_api
 from app.api.v1 import orders as orders_api
 from app.models.order import OrderStatus
-from app.models.user import UserRole
-from app.schemas.catalog import CategoryReorderItem
 from app.services import catalog as catalog_service
 
 
@@ -462,3 +460,5 @@ def test_auth_build_cooldown_info_branches() -> None:
     )
     assert elapsed.remaining_seconds == 0
     assert elapsed.next_allowed_at is None
+
+

@@ -444,11 +444,11 @@ describe('AdminComponent coverage wave 7 coupon and link-check matrix', () => {
     component.findReplaceFind = 'hero';
     component.findReplaceReplace = 'headline';
     component.findReplaceCaseSensitive = false;
-    component.findReplaceKeyPrefix = () => 'page.';
+    (component as any).findReplaceKeyPrefix = () => 'page.';
     component.findReplaceLoading = false;
     component.findReplaceApplying = false;
     component.findReplacePreview = null;
-    component.findReplacePreviewKey = null;
+    (component as any).findReplacePreviewKey = null;
 
     component.applyFindReplace();
     expect(toast.error).toHaveBeenCalledWith('adminUi.content.findReplace.errors.previewFirst');
@@ -546,7 +546,7 @@ describe('AdminComponent coverage wave 7 page rename and preview utilities', () 
       of({ token: 'preview-token-2', expires_at: '2026-03-03T12:00:00Z', url: '::invalid-url::' })
     );
     component.generatePagePreviewLink('fallback');
-    expect(component.pagePreviewOrigin).toBeTruthy();
+    expect((component as any).pagePreviewOrigin).toBeTruthy();
 
     component.copyPreviewLink('');
     component.copyPreviewLink('https://momentstudio.example/pages/fallback?preview=preview-token-2');
@@ -616,11 +616,11 @@ describe('AdminComponent coverage wave 7 page rename and preview utilities', () 
       { key: 'page.about', type: 'text', status: 'draft', title: 'About', body_markdown: 'Body', meta: {} },
       { key: 'blog.one', type: 'blog_post', status: 'published', title: 'Post', body_markdown: 'Body', meta: { pinned: true, pin_order: 1 } }
     ] as any;
-    component.pageBlocksDraft = { blocks: [] } as any;
+    (component as any).pageBlocksDraft = { blocks: [] } as any;
     component.pageBlocksKey = 'page.about' as any;
     component.pagePreviewToken = 'token';
     component.pagePreviewForSlug = 'about';
-    component.pagePreviewOrigin = 'https://momentstudio.example';
+    (component as any).pagePreviewOrigin = 'https://momentstudio.example';
     component.findReplaceFind = 'hero';
     component.findReplaceReplace = 'headline';
     component.linkCheckKey = 'page.about';
@@ -629,3 +629,4 @@ describe('AdminComponent coverage wave 7 page rename and preview utilities', () 
     expect(attempted).toBeGreaterThan(80);
   });
 });
+

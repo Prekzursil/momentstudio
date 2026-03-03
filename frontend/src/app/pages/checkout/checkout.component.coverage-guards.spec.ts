@@ -1,3 +1,4 @@
+import { of, throwError } from 'rxjs';
 import { CheckoutComponent } from './checkout.component';
 
 const configureCheckoutCore = (cmp: any): void => {
@@ -485,3 +486,5 @@ describe('CheckoutComponent targeted branch coverage guards', () => {
     expect(attempted).toBeGreaterThan(30);
   });
 });
+
+

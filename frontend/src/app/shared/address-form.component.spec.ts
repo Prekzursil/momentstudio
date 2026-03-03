@@ -161,24 +161,25 @@ function defineAutocompleteFetchBranchesSpec(): void {
   it('covers autocomplete timer, fetch non-ok, and successful parse branches', async () => {
     const fixture = TestBed.createComponent(AddressFormComponent);
     const component = fixture.componentInstance;
-    component.addressAutocompleteEnabled = true;
+    (component as any).addressAutocompleteEnabled = true;
     component.model = { line1: '', city: '', postal_code: '', country: 'RO' };
 
     component.onAutocompleteQueryChange('ab');
     expect(component.autocompleteResults).toEqual([]);
 
     const fetchSpy = spyOn(globalThis as any, 'fetch');
-    fetchSpy.and.returnValue(Promise.resolve({ ok: false, json: async () => [] } as any));
+    fetchSpy.and.returnValue(Promise.resolve({ ok: false, json: () => Promise.resolve([]) } as any));
     await (component as any).fetchAutocomplete('Bucharest');
     expect(component.autocompleteResults).toEqual([]);
 
     fetchSpy.and.returnValue(
       Promise.resolve({
         ok: true,
-        json: async () => [
-          { display_name: 'Bucharest', address: { city: 'Bucharest' } },
-          { display_name: '', address: {} },
-        ],
+        json: () =>
+          Promise.resolve([
+            { display_name: 'Bucharest', address: { city: 'Bucharest' } },
+            { display_name: '', address: {} },
+          ]),
       } as any)
     );
     await (component as any).fetchAutocomplete('Bucharest');
@@ -191,7 +192,7 @@ function defineCountryChangeAndLabelPresetSpec(): void {
   it('covers country change and custom label preset branches', () => {
     const fixture = TestBed.createComponent(AddressFormComponent);
     const component = fixture.componentInstance;
-    component.addressAutocompleteEnabled = true;
+    (component as any).addressAutocompleteEnabled = true;
     component.autocompleteQuery = 'Bucharest';
     component.autocompleteResults = [{ display_name: 'Old', address: {} }];
 
@@ -209,3 +210,6 @@ function defineCountryChangeAndLabelPresetSpec(): void {
     expect(component.model.label).toBeNull();
   });
 };
+
+
+

@@ -68,7 +68,7 @@ class _RecorderSession:
         self.refreshed.append(obj)
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_orders_create_order_checkout_and_refresh_existing_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     cart = SimpleNamespace(id=uuid4(), items=[SimpleNamespace(id="item-1")])
     existing_order = SimpleNamespace(id=uuid4(), reference_code="REF-1")
@@ -161,12 +161,14 @@ async def test_orders_create_order_checkout_and_refresh_existing_paths(monkeypat
     assert checkout_result.reference_code == "REF-X"
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_orders_payment_confirmation_and_admin_export_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     # Cover `/paypal/capture` captured and non-captured branches.
     order_id = uuid4()
+    current_user_id = uuid4()
     order = SimpleNamespace(
         id=order_id,
+        user_id=current_user_id,
         reference_code="REF-CAP",
         payment_method="paypal",
         status=OrderStatus.pending_payment,
@@ -181,7 +183,7 @@ async def test_orders_payment_confirmation_and_admin_export_paths(monkeypatch: p
         payload=SimpleNamespace(paypal_order_id="paypal-1", order_id=order_id),
         background_tasks=BackgroundTasks(),
         session=SimpleNamespace(),
-        current_user=SimpleNamespace(id=uuid4()),
+        current_user=SimpleNamespace(id=current_user_id),
     )
     assert capture_response.paypal_capture_id == "existing-capture"
 
@@ -207,7 +209,7 @@ async def test_orders_payment_confirmation_and_admin_export_paths(monkeypatch: p
         payload=SimpleNamespace(paypal_order_id="paypal-2", order_id=order_id),
         background_tasks=BackgroundTasks(),
         session=SimpleNamespace(),
-        current_user=SimpleNamespace(id=uuid4()),
+        current_user=SimpleNamespace(id=current_user_id),
     )
     assert capture_response.paypal_capture_id == "capture-123"
 
@@ -231,17 +233,27 @@ async def test_orders_payment_confirmation_and_admin_export_paths(monkeypatch: p
         payload=SimpleNamespace(session_id="sess-1", order_id=stripe_order.id),
         background_tasks=BackgroundTasks(),
         session=SimpleNamespace(),
-        current_user=SimpleNamespace(id=uuid4()),
+        current_user=SimpleNamespace(id=current_user_id),
     )
     assert stripe_response.reference_code == "REF-STR"
 
     # Cover `/netopia/confirm` guard and success branch.
+    async def _get_by_id_guard(*_args, **_kwargs):
+        return SimpleNamespace(
+            id=uuid4(),
+            user_id=current_user_id,
+            payment_method="paypal",
+            status=OrderStatus.pending_payment,
+            reference_code="REF-GUARD",
+        )
+
+    monkeypatch.setattr(orders_api, "_get_order_by_id_for_confirmation", _get_by_id_guard)
     with pytest.raises(HTTPException):
         await orders_api.confirm_netopia_payment(
             payload=SimpleNamespace(order_id=uuid4(), ntp_id="ntp-guard"),
             background_tasks=BackgroundTasks(),
             session=SimpleNamespace(),
-            current_user=SimpleNamespace(id=uuid4()),
+            current_user=SimpleNamespace(id=current_user_id),
         )
 
     netopia_order = SimpleNamespace(
@@ -267,7 +279,7 @@ async def test_orders_payment_confirmation_and_admin_export_paths(monkeypatch: p
         payload=SimpleNamespace(order_id=netopia_order.id, ntp_id="ntp-1"),
         background_tasks=BackgroundTasks(),
         session=SimpleNamespace(),
-        current_user=SimpleNamespace(id=uuid4()),
+        current_user=SimpleNamespace(id=current_user_id),
     )
     assert netopia_response.reference_code == "REF-NET"
 
@@ -311,7 +323,7 @@ async def test_orders_payment_confirmation_and_admin_export_paths(monkeypatch: p
     assert exports_payload.items[0].order_count == 2
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_orders_email_verification_and_admin_email_events_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     # Cover `/admin/{order_id}/email-events` no-email and masked-email branches.
     order_id = uuid4()
@@ -407,7 +419,7 @@ async def test_orders_email_verification_and_admin_email_events_paths(monkeypatc
     assert status_result.verified is True
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_admin_dashboard_summary_channel_and_search_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     # Cover `_summary_sales_metrics` and `_summary_day_metrics` late return fields.
     class _ScalarSession:
@@ -504,6 +516,7 @@ async def test_admin_dashboard_summary_channel_and_search_paths(monkeypatch: pyt
                 name="Ring",
                 slug="ring",
                 base_price=10,
+                currency="RON",
                 stock_quantity=2,
                 status=SimpleNamespace(value="active"),
             )
@@ -597,8 +610,9 @@ def test_orders_admin_list_item_and_response_builders(monkeypatch: pytest.Monkey
     assert response.items[0].reference_code == "REF-ADM"
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_orders_admin_search_and_my_orders_response_paths(monkeypatch: pytest.MonkeyPatch) -> None:
+    current_user_id = uuid4()
     with pytest.raises(HTTPException):
         await orders_api.list_my_orders(
             q=None,
@@ -607,12 +621,26 @@ async def test_orders_admin_search_and_my_orders_response_paths(monkeypatch: pyt
             to_date=date(2026, 3, 4),
             page=1,
             limit=10,
-            current_user=SimpleNamespace(id=uuid4()),
+            current_user=SimpleNamespace(id=current_user_id),
             session=SimpleNamespace(),
         )
 
     async def _search_orders_for_user(*_args, **_kwargs):
-        return [SimpleNamespace(reference_code="ME-1")], 1, 0
+        now = datetime.now(timezone.utc)
+        order = SimpleNamespace(
+            id=uuid4(),
+            reference_code="ME-1",
+            status=OrderStatus.pending_payment,
+            payment_retry_count=0,
+            total_amount=Decimal("19.99"),
+            tax_amount=Decimal("3.80"),
+            shipping_amount=Decimal("0.00"),
+            currency="RON",
+            payment_method="card",
+            created_at=now,
+            updated_at=now,
+        )
+        return [order], 1, 0
 
     monkeypatch.setattr(orders_api.order_service, "search_orders_for_user", _search_orders_for_user)
     me_payload = await orders_api.list_my_orders(
@@ -622,7 +650,7 @@ async def test_orders_admin_search_and_my_orders_response_paths(monkeypatch: pyt
         to_date=date(2026, 3, 8),
         page=1,
         limit=10,
-        current_user=SimpleNamespace(id=uuid4()),
+        current_user=SimpleNamespace(id=current_user_id),
         session=SimpleNamespace(),
     )
     assert me_payload.meta.total_items == 1
@@ -655,7 +683,7 @@ async def test_orders_admin_search_and_my_orders_response_paths(monkeypatch: pyt
         request=_make_request(),
         q="abc",
         user_id=None,
-        status="pending_any",
+        status="pending",
         tag=None,
         sla="any",
         fraud="review",
@@ -671,3 +699,4 @@ async def test_orders_admin_search_and_my_orders_response_paths(monkeypatch: pyt
     assert pii_calls
     assert search_payload.meta.total_items == 1
     assert search_payload.items[0].reference_code == "ADM-1"
+

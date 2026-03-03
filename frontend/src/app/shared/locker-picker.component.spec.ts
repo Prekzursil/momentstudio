@@ -195,17 +195,18 @@ function defineFanCourierFetchBranchesSpec(): void {
     const fetchSpy = spyOn(globalThis as any, 'fetch');
     lockerPickerComponent.provider = 'fan_courier';
 
-    fetchSpy.and.returnValue(Promise.resolve({ ok: false, json: async () => [] } as any));
+    fetchSpy.and.returnValue(Promise.resolve({ ok: false, json: () => Promise.resolve([]) } as any));
     await (lockerPickerComponent as any).fetchLocations('Cluj');
     expect(lockerPickerComponent.searchError).toContain('checkout.lockers.searchError');
 
     fetchSpy.and.returnValue(
       Promise.resolve({
         ok: true,
-        json: async () => [
-          { display_name: 'Cluj', lat: '46.7', lon: '23.6' },
-          { display_name: '', lat: 'x', lon: 'y' },
-        ],
+        json: () =>
+          Promise.resolve([
+            { display_name: 'Cluj', lat: '46.7', lon: '23.6' },
+            { display_name: '', lat: 'x', lon: 'y' },
+          ]),
       } as any)
     );
     lockerPickerComponent.searchError = '';
@@ -306,3 +307,5 @@ function defineMirrorSnapshotRefreshGuardSpec(): void {
     expect(lockerPickerComponent.mirrorSnapshot?.stale).toBeTrue();
   });
 }
+
+
