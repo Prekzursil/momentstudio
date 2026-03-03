@@ -262,6 +262,14 @@ describe('AdminOrdersComponent shipping label utilities', () => {
     component.updateShippingLabelUpload(0, { status: 'success' });
     expect(component.shippingLabelsUploads[0].status).toBe('success');
   });
+
+  it('returns neutral status class for unknown value and null when auto-assign has no match', () => {
+    const { component } = createHarness();
+    component.shippingLabelsOrderOptions = [{ id: 'order-a', ref: 'REF-100', shortId: 'aaa111bb', label: 'A' }];
+
+    expect(component.shippingLabelStatusPillClass('mystery' as any)).toContain('border-slate-200');
+    expect(component.autoAssignShippingLabel(new File(['x'], 'unmatched.pdf'))).toBeNull();
+  });
 });
 
 describe('AdminOrdersComponent display badge helpers', () => {
@@ -285,5 +293,86 @@ describe('AdminOrdersComponent display badge helpers', () => {
 
     const futureSla = component.slaBadge({ sla_kind: 'ship', sla_due_at: '2026-03-01T00:00:00Z' });
     expect(futureSla).toBeNull();
+  });
+
+  it('covers due-soon SLA and medium fraud severity branches', () => {
+    const { component } = createHarness();
+    spyOn(Date, 'now').and.returnValue(Date.parse('2026-02-27T00:00:00Z'));
+
+    const dueSoonSla = component.slaBadge({ sla_kind: 'accept', sla_due_at: '2026-02-27T02:00:00Z' });
+    expect(dueSoonSla?.className).toContain('amber');
+
+    const mediumFraud = component.fraudBadge({ fraud_severity: 'medium' });
+    expect(mediumFraud?.className).toContain('amber');
+
+    const invalidKind = component.slaBadge({ sla_kind: 'other', sla_due_at: '2026-02-27T02:00:00Z' });
+    expect(invalidKind).toBeNull();
+  });
+});
+
+describe('AdminOrdersComponent private storage and coercion paths', () => {
+  it('loads and persists view mode with invalid storage fallback', () => {
+    const { component } = createHarness();
+    spyOn(localStorage, 'getItem').and.returnValue('invalid');
+    expect(component.loadViewMode()).toBe('table');
+
+    (localStorage.getItem as jasmine.Spy).and.returnValue('kanban');
+    expect(component.loadViewMode()).toBe('kanban');
+
+    const setSpy = spyOn(localStorage, 'setItem');
+    (component as any).persistViewMode = (AdminOrdersComponent.prototype as any)['persistViewMode'];
+    component.viewMode.set('kanban');
+    component.persistViewMode();
+    expect(setSpy).toHaveBeenCalled();
+  });
+
+  it('coerces preset helper primitives', () => {
+    const { component } = createHarness();
+    expect(component.coercePresetIncludeTestOrders(false)).toBeFalse();
+    expect(component.coercePresetIncludeTestOrders('x')).toBeTrue();
+    expect(component.coercePresetLimit(50)).toBe(50);
+    expect(component.coercePresetLimit('50')).toBe(20);
+    expect(component.coercePresetSlaFilter('accept_overdue')).toBe('accept_overdue');
+    expect(component.coercePresetSlaFilter('x')).toBe('all');
+    expect(component.coercePresetFraudFilter('approved')).toBe('approved');
+    expect(component.coercePresetFraudFilter('x')).toBe('all');
+  });
+});
+
+describe('AdminOrdersComponent export state paths', () => {
+  it('loads export state defaults and template-selected columns', () => {
+    const { component } = createHarness();
+    component.exportColumnOptions = ['id', 'reference_code', 'status', 'total_amount'];
+    spyOn(localStorage, 'getItem').and.returnValue(null);
+    component.loadExportState();
+    expect(component.exportColumns.id).toBeTrue();
+    expect(component.exportColumns.reference_code).toBeTrue();
+
+    (localStorage.getItem as jasmine.Spy).and.returnValue(
+      JSON.stringify({
+        templates: [{ id: 'tpl-1', name: 'A', columns: ['status'] }],
+        selectedTemplateId: 'tpl-1',
+        columns: ['id'],
+      })
+    );
+    component.loadExportState();
+    expect(component.selectedExportTemplateId).toBe('tpl-1');
+    expect(component.exportColumns.status).toBeTrue();
+    expect(component.exportColumns.id).toBeFalse();
+  });
+
+  it('falls back to default export columns when stored export state JSON is malformed', () => {
+    const { component } = createHarness();
+    component.exportColumnOptions = ['id', 'reference_code', 'status', 'total_amount'];
+    spyOn(localStorage, 'getItem').and.returnValue('{bad-json');
+
+    component.loadExportState();
+
+    expect(component.exportTemplates).toEqual([]);
+    expect(component.selectedExportTemplateId).toBe('');
+    expect(component.exportColumns.id).toBeTrue();
+    expect(component.exportColumns.reference_code).toBeTrue();
+    expect(component.exportColumns.status).toBeTrue();
+    expect(component.exportColumns.total_amount).toBeTrue();
   });
 });

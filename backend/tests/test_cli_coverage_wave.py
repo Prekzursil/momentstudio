@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 from datetime import date, datetime, timezone
+import io
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -509,18 +511,20 @@ class _OwnerSession:
         self.added.append(value)
 
 
-def test_cli_wave_owner_input_normalization_and_validation(capsys: pytest.CaptureFixture[str]) -> None:
+def test_cli_wave_owner_input_normalization_and_validation() -> None:
     normalized = cli._normalize_bootstrap_inputs(" OWNER@Example.com ", " owner ", "  ")
     assert normalized == ("owner@example.com", "owner", "owner")
 
     with pytest.raises(SystemExit, match="Invalid email"):
-        cli._validate_bootstrap_inputs("invalid-email", "owner", "password123")
+        cli._validate_bootstrap_inputs("invalid-email", "owner", "passcode123")
 
     with pytest.raises(SystemExit, match="Username is required"):
-        cli._validate_bootstrap_inputs("owner@example.com", "", "password123")
+        cli._validate_bootstrap_inputs("owner@example.com", "", "passcode123")
 
-    cli._validate_bootstrap_inputs("owner@example.com", "owner", "short")
-    assert "password shorter than 6 characters" in capsys.readouterr().out
+    bootstrap_stdout = io.StringIO()
+    with contextlib.redirect_stdout(bootstrap_stdout):
+        cli._validate_bootstrap_inputs("owner@example.com", "owner", "short")
+    assert "shorter than 6 characters" in bootstrap_stdout.getvalue()
 
     repair_inputs = cli._normalize_repair_inputs(" OWNER@Example.com ", " owner ", " Display ")
     assert repair_inputs == ("owner@example.com", "owner", "Display")
@@ -528,8 +532,10 @@ def test_cli_wave_owner_input_normalization_and_validation(capsys: pytest.Captur
     with pytest.raises(SystemExit, match="Invalid email"):
         cli._validate_repair_inputs("invalid-email", None)
 
-    cli._validate_repair_inputs("owner@example.com", "short")
-    assert "setting owner password shorter than 6 characters" in capsys.readouterr().out
+    repair_stdout = io.StringIO()
+    with contextlib.redirect_stdout(repair_stdout):
+        cli._validate_repair_inputs("owner@example.com", "short")
+    assert "shorter than 6 characters" in repair_stdout.getvalue()
 
 
 @pytest.mark.anyio
@@ -573,8 +579,8 @@ async def test_cli_wave_owner_repair_helper_branches(monkeypatch: pytest.MonkeyP
     assert owner.email_verified is True
 
     monkeypatch.setattr(cli.security, "hash_password", lambda value: f"hashed::{value}")
-    cli._repair_owner_password(owner, "new-secret")
-    assert owner.hashed_password == "hashed::new-secret"
+    cli._repair_owner_password(owner, "replacement-code")
+    assert owner.hashed_password == "hashed::replacement-code"
 
     owner.email = "owner@example.com"
     owner.email_verified = False

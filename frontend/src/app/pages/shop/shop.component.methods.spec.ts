@@ -1,4 +1,16 @@
 import { ShopComponent } from './shop.component';
+import { of, throwError } from 'rxjs';
+
+type SignalLike<T> = (() => T) & { set: (next: T) => void };
+
+function signalValue<T>(initial: T): SignalLike<T> {
+  let value = initial;
+  const fn = (() => value) as SignalLike<T>;
+  fn.set = (next: T) => {
+    value = next;
+  };
+  return fn;
+}
 
 function instantTranslate(key: string, params?: Record<string, unknown>): string {
   if (!params) return key;
@@ -158,5 +170,119 @@ describe('ShopComponent method harness', () => {
     cmp.paginationMode = 'load_more';
     cmp.products = [{ id: 'p1' }, { id: 'p2' }, { id: 'p3' }] as any[];
     expect(cmp.resultsMetaParams()).toEqual({ total: 25, from: 1, to: 3 });
+  });
+
+  it('resolves active category labels and canonical subcategory retention', () => {
+    const cmp = createShopHarness();
+    cmp.categoriesBySlug.set('chairs', { id: 'c1', slug: 'chairs', name: 'Chairs' });
+    cmp.categoriesBySlug.set('office', { id: 'c2', slug: 'office', name: 'Office', parent_id: 'c1' });
+
+    cmp.activeCategorySlug = 'sale';
+    expect(cmp['resolveActiveCategoryLabel']()).toContain('shop.sale');
+
+    cmp.activeCategorySlug = 'chairs';
+    cmp.activeSubcategorySlug = 'office';
+    expect(cmp['shouldKeepSubcategoryInCanonical']()).toBeTrue();
+
+    cmp.activeSubcategorySlug = 'bad';
+    expect(cmp['shouldKeepSubcategoryInCanonical']()).toBeFalse();
+  });
+
+  it('builds category trees and compares category order safely', () => {
+    const cmp = createShopHarness();
+    cmp.categories = [
+      { id: 'p1', slug: 'parent', name: 'Parent', sort_order: 2, parent_id: null },
+      { id: 'c2', slug: 'child-b', name: 'B', sort_order: 2, parent_id: 'p1' },
+      { id: 'c1', slug: 'child-a', name: 'A', sort_order: 1, parent_id: 'p1' },
+    ];
+    cmp.categoriesById = new Map();
+    cmp.childrenByParentId = new Map();
+    cmp.rootCategories = [];
+
+    cmp['rebuildCategoryTree']();
+    expect(cmp.rootCategories.length).toBe(1);
+    expect(cmp.getSubcategories({ id: 'p1' } as any).map((item: any) => item.slug)).toEqual(['child-a', 'child-b']);
+    expect(cmp['normalizedCategorySortOrder'](Number.NaN)).toBe(0);
+    expect(cmp['compareCategoriesByOrderThenName'](
+      { name: 'B', sort_order: 2 } as any,
+      { name: 'A', sort_order: 2 } as any
+    )).toBeGreaterThan(0);
+  });
+
+  it('evaluates reorder guards and leaf-category detection', () => {
+    const cmp = createShopHarness();
+    cmp.storefrontAdminMode = { enabled: () => true };
+    cmp.bulkSelectMode = () => false;
+    cmp.productReorderSaving = () => false;
+    cmp.loading = () => false;
+    cmp.hasError = () => false;
+    cmp.filters.sort = 'recommended';
+    cmp.pageMeta = { total_pages: 1, page: 1, total_items: 2 };
+    cmp.products = [{ id: 'p1' }, { id: 'p2' }];
+    cmp.categoriesBySlug = new Map([['chairs', { id: 'c1', slug: 'chairs', name: 'Chairs' }]]);
+    cmp.childrenByParentId = new Map();
+    cmp.activeCategorySlug = 'chairs';
+    cmp.activeSubcategorySlug = '';
+
+    expect(cmp['activeLeafCategorySlug']()).toBe('chairs');
+    expect(cmp.canReorderProducts()).toBeTrue();
+
+    cmp.filters.sort = 'newest';
+    expect(cmp.canReorderProducts()).toBeFalse();
+  });
+});
+
+describe('ShopComponent reorder branches', () => {
+  it('reorders and restores product arrays across false/true branches', () => {
+    const cmp = createShopHarness();
+    cmp.products = [{ id: 'p1' }, { id: 'p2' }, { id: 'p3' }] as any[];
+
+    expect(cmp['reorderProducts']('missing', 'p2')).toBeFalse();
+    expect(cmp['reorderProducts']('p1', 'p1')).toBeFalse();
+
+    expect(cmp['reorderProducts']('p1', 'p3')).toBeTrue();
+    expect(cmp.products.map((p: any) => p.id)).toEqual(['p2', 'p3', 'p1']);
+
+    cmp['restoreProductOrder'](['p1', 'p2', 'p3']);
+    expect(cmp.products.map((p: any) => p.id)).toEqual(['p1', 'p2', 'p3']);
+  });
+
+  it('covers onProductDrop success and pinProductToTop error rollback', () => {
+    const cmp = createShopHarness();
+    const reorderSaving = signalValue(false);
+    cmp.productReorderSaving = reorderSaving;
+    cmp.storefrontAdminMode = { enabled: () => true };
+    cmp.bulkSelectMode = () => false;
+    cmp.loading = () => false;
+    cmp.hasError = () => false;
+    cmp.filters.sort = 'recommended';
+    cmp.paginationMode = 'pages';
+    cmp.pageMeta = { total_pages: 1, page: 1, total_items: 3 };
+    cmp.products = [{ id: 'p1' }, { id: 'p2' }, { id: 'p3' }] as any[];
+    cmp.activeCategorySlug = 'chairs';
+    cmp.activeSubcategorySlug = '';
+    cmp.categoriesBySlug = new Map([['chairs', { id: 'c1', slug: 'chairs', name: 'Chairs' }]]);
+    cmp.childrenByParentId = new Map([['c1', []]]);
+    cmp.admin = {
+      bulkUpdateProducts: jasmine.createSpy('bulkUpdateProducts').and.returnValue(of([])),
+    };
+    cmp.toast = jasmine.createSpyObj('ToastService', ['action', 'error']);
+
+    cmp.draggingProductId = 'p1';
+    const dropEvent = { preventDefault: jasmine.createSpy('preventDefault'), dataTransfer: {} } as any;
+    cmp.onProductDrop(dropEvent, 'p3');
+    expect(dropEvent.preventDefault).toHaveBeenCalled();
+    expect(cmp.admin.bulkUpdateProducts).toHaveBeenCalled();
+    expect(cmp.products.map((p: any) => p.id)).toEqual(['p2', 'p3', 'p1']);
+    expect(cmp.toast.action).toHaveBeenCalled();
+    expect(cmp.productReorderSaving()).toBeFalse();
+
+    cmp.products = [{ id: 'p1' }, { id: 'p2' }] as any[];
+    cmp.pageMeta = { total_pages: 1, page: 1, total_items: 2 };
+    cmp.admin.bulkUpdateProducts.and.returnValue(throwError(() => new Error('reorder-failed')));
+    cmp.pinProductToTop('p2');
+    expect(cmp.products.map((p: any) => p.id)).toEqual(['p1', 'p2']);
+    expect(cmp.toast.error).toHaveBeenCalled();
+    expect(cmp.productReorderSaving()).toBeFalse();
   });
 });
