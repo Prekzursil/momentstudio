@@ -1,3 +1,4 @@
+import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 
 import { AccountState } from './account.state';
@@ -26,7 +27,50 @@ function createState(): any {
   return state;
 }
 
+function createConstructedState(): AccountState {
+  const toast = jasmine.createSpyObj('ToastService', ['success', 'error']);
+  const auth = jasmine.createSpyObj('AuthService', ['requestEmailVerification', 'isAuthenticated']);
+  auth.requestEmailVerification.and.returnValue(of({}));
+  auth.isAuthenticated.and.returnValue(true);
+
+  return TestBed.runInInjectionContext(
+    () =>
+      new AccountState(
+        toast as any,
+        auth as any,
+        {} as any,
+        {} as any,
+        { loadFromBackend: jasmine.createSpy('loadFromBackend') } as any,
+        {
+          events: of(),
+          url: '/account/overview',
+          navigate: () => Promise.resolve(true),
+          navigateByUrl: () => Promise.resolve(true),
+        } as any,
+        { snapshot: { queryParamMap: { get: () => null } } } as any,
+        {} as any,
+        { ensureLoaded: jasmine.createSpy('ensureLoaded'), isLoaded: () => true, items: () => [] } as any,
+        { unreadCount: () => 0, refreshUnreadCount: jasmine.createSpy('refreshUnreadCount') } as any,
+        {} as any,
+        { myCoupons: jasmine.createSpy('myCoupons').and.returnValue(of([])) } as any,
+        { setPreference: jasmine.createSpy('setPreference') } as any,
+        { language: () => 'en', setLanguage: jasmine.createSpy('setLanguage') } as any,
+        { instant: (key: string) => key } as any,
+        { read: () => null, clear: jasmine.createSpy('clear') } as any
+      )
+  );
+}
+
 describe('AccountState coverage wave 3', () => {
+  it('initializes constructor defaults and phone-country derived state', () => {
+    const state = createConstructedState();
+
+    expect(state.profile()).toBeNull();
+    expect(state.profileThemePreference).toBe('system');
+    expect(Array.isArray(state.phoneCountries)).toBeTrue();
+    expect(state.requiredFieldLabelKey('phone')).toBe('auth.phone');
+  });
+
   it('maps required profile fields to translation keys', () => {
     const state = createState();
 
