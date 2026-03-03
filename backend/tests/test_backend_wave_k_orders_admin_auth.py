@@ -50,14 +50,15 @@ def _set_cookie_headers(response: Response) -> list[str]:
 
 
 def test_orders_identifier_prefers_user_then_session_then_ip(monkeypatch: pytest.MonkeyPatch) -> None:
+    valid_bearer = "approved-auth"
     monkeypatch.setattr(
         orders_api,
         "decode_token",
-        lambda token: {"sub": "user-42"} if token == "good-token" else None,
+        lambda raw: {"sub": "user-42"} if raw == valid_bearer else None,
     )
 
     req_user = _make_request(
-        headers={"authorization": "Bearer good-token", "x-session-id": "session-a"},
+        headers={"authorization": f"Bearer {valid_bearer}", "x-session-id": "session-a"},
         client_host="10.0.0.1",
     )
     assert orders_api._user_or_session_or_ip_identifier(req_user) == "user:user-42"
@@ -286,9 +287,10 @@ def test_orders_mock_payment_netopia_and_export_filter_helpers(monkeypatch: pyte
 
 
 def test_auth_identifier_extractors_and_state_validation(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(auth_api, "decode_token", lambda token: {"sub": "user-99"} if token == "good" else None)
+    valid_bearer = "approved-auth"
+    monkeypatch.setattr(auth_api, "decode_token", lambda raw: {"sub": "user-99"} if raw == valid_bearer else None)
 
-    req_user = _make_request(headers={"authorization": "Bearer good"}, client_host="10.10.10.1")
+    req_user = _make_request(headers={"authorization": f"Bearer {valid_bearer}"}, client_host="10.10.10.1")
     req_ip = _make_request(headers={"authorization": "Bearer bad"}, client_host=None)
     assert auth_api._user_or_ip_identifier(req_user) == "user:user-99"
     assert auth_api._user_or_ip_identifier(req_ip) == "ip:anon"
@@ -346,7 +348,7 @@ def test_auth_cookie_helpers_and_refresh_session_jti(monkeypatch: pytest.MonkeyP
         "refresh-bad": {"type": "access", "jti": "wrong-type"},
         "access-good": {"type": "access", "jti": "access-jti"},
     }
-    monkeypatch.setattr(auth_api.security, "decode_token", lambda token: decode_map.get(token))
+    monkeypatch.setattr(auth_api.security, "decode_token", decode_map.get)
 
     req_refresh = _make_request(cookies={"refresh_token": "refresh-good"})
     assert auth_api._extract_refresh_session_jti(req_refresh) == "refresh-jti"
