@@ -1,0 +1,61 @@
+name: BrowserStack Check
+
+on:
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browserstack-auth:
+    name: browserstack-auth
+    runs-on: ubuntu-latest
+    env:
+      BROWSERSTACK_USERNAME: ${{ secrets.BROWSERSTACK_USERNAME }}
+      BROWSERSTACK_ACCESS_KEY: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
+    steps:
+      - name: Validate BrowserStack credentials
+        run: |
+          set -euo pipefail
+          if [ -z "${BROWSERSTACK_USERNAME:-}" ]; then
+            echo "::error::Missing BROWSERSTACK_USERNAME secret."
+            exit 1
+          fi
+          if [ -z "${BROWSERSTACK_ACCESS_KEY:-}" ]; then
+            echo "::error::Missing BROWSERSTACK_ACCESS_KEY secret."
+            exit 1
+          fi
+
+      - name: BrowserStack auth check
+        run: |
+          set -euo pipefail
+          http_code="$(
+            curl -sS -u "${BROWSERSTACK_USERNAME}:${BROWSERSTACK_ACCESS_KEY}" \
+              -o /tmp/browserstack-plan.json \
+              -w "%{http_code}" \
+              "https://api-cloud.browserstack.com/automate/plan.json"
+          )"
+          if [ "${http_code}" != "200" ]; then
+            echo "::error::BrowserStack auth check failed with HTTP ${http_code}."
+            cat /tmp/browserstack-plan.json || true
+            exit 1
+          fi
+          jq -e '.parallel_sessions_current != null' /tmp/browserstack-plan.json > /dev/null
+
+      - name: BrowserStack deterministic smoke
+        run: |
+          set -euo pipefail
+          http_code="$(
+            curl -sS -u "${BROWSERSTACK_USERNAME}:${BROWSERSTACK_ACCESS_KEY}" \
+              -o /tmp/browserstack-builds.json \
+              -w "%{http_code}" \
+              "https://api-cloud.browserstack.com/automate/builds.json?limit=1"
+          )"
+          if [ "${http_code}" != "200" ]; then
+            echo "::error::BrowserStack smoke call failed with HTTP ${http_code}."
+            cat /tmp/browserstack-builds.json || true
+            exit 1
+          fi
+          jq -e 'type == "array"' /tmp/browserstack-builds.json > /dev/null
