@@ -1,6 +1,8 @@
 name: Sentry Release
 
 on:
+  pull_request:
+    branches: [ main ]
   push:
     branches: [ main ]
     tags:
@@ -11,7 +13,63 @@ permissions:
   contents: read
 
 jobs:
+  sentry-pr-verify:
+    name: sentry-pr-verify
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+      SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+      SENTRY_URL: ${{ vars.SENTRY_URL }}
+    steps:
+      - name: Validate Sentry configuration
+        run: |
+          set -euo pipefail
+          if [ -z "${SENTRY_AUTH_TOKEN:-}" ]; then
+            echo "::error::Missing SENTRY_AUTH_TOKEN secret."
+            exit 1
+          fi
+          if [ -z "${SENTRY_ORG:-}" ]; then
+            echo "::error::Missing SENTRY_ORG variable."
+            exit 1
+          fi
+          if [ -z "${SENTRY_PROJECT:-}" ]; then
+            echo "::error::Missing SENTRY_PROJECT variable."
+            exit 1
+          fi
+
+      - name: Verify Sentry API access and project binding
+        run: |
+          set -euo pipefail
+          base_url="${SENTRY_URL:-https://sentry.io}"
+          http_code="$(
+            curl -sS \
+              -H "Authorization: Bearer ${SENTRY_AUTH_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -o /tmp/sentry-projects.json \
+              -w "%{http_code}" \
+              "${base_url%/}/api/0/projects/"
+          )"
+          if [ "${http_code}" != "200" ]; then
+            echo "::error::Sentry API access failed with HTTP ${http_code}."
+            cat /tmp/sentry-projects.json || true
+            exit 1
+          fi
+          jq -e --arg org "${SENTRY_ORG}" --arg project "${SENTRY_PROJECT}" '
+            map(
+              (.slug == $project) or
+              ((.id | tostring) == $project) or
+              (.organization.slug == $org) or
+              ((.organization.id | tostring) == $org)
+            ) | any
+          ' /tmp/sentry-projects.json > /dev/null || {
+            echo "::error::Configured SENTRY_ORG/SENTRY_PROJECT not visible to the token."
+            exit 1
+          }
+
   release-and-sourcemaps:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Check Sentry configuration
