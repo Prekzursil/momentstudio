@@ -210,8 +210,9 @@ function defineFanCourierFetchBranchesSpec(): void {
       } as any)
     );
     lockerPickerComponent.searchError = '';
-    await (lockerPickerComponent as any).fetchLocations('Cluj', { applyFirst: true });
+    await (lockerPickerComponent as any).fetchLocations('Cluj');
     expect(lockerPickerComponent.searchResults.length).toBeGreaterThan(0);
+    expect(lockerPickerComponent.searchResults[0].display_name).toContain('Cluj');
   });
 };
 

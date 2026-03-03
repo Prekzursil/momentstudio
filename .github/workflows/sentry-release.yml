@@ -56,7 +56,15 @@ jobs:
             if [ -n "$project_slug" ]; then
               echo "::warning::Configured SENTRY_PROJECT '$project_slug' is not accessible; resolving project slug from Sentry API."
             fi
-            project_slug="$(${SENTRY_CLI} projects list --org "${SENTRY_ORG}" --json | python -c 'import json,sys; data=json.load(sys.stdin); print((data[0].get("slug") if data else ""))')"
+                        sentry_api_base="${SENTRY_URL:-https://sentry.io}"
+            project_slug="$(
+              curl -fsSL \
+                -H "Authorization: Bearer ${SENTRY_AUTH_TOKEN}" \
+                -H "Content-Type: application/json" \
+                "${sentry_api_base%/}/api/0/organizations/${SENTRY_ORG}/projects/" 2>/dev/null \
+              | python -c 'import json,sys; data=json.load(sys.stdin); print((data[0].get("slug") if data else ""))' 2>/dev/null \
+              || true
+            )"
           fi
 
           if [ -z "$project_slug" ]; then
@@ -163,3 +171,4 @@ jobs:
             echo ""
             echo "Published release \`$RELEASE\` and uploaded frontend sourcemaps from \`frontend/dist/app/browser\`."
           } >> "$GITHUB_STEP_SUMMARY"
+

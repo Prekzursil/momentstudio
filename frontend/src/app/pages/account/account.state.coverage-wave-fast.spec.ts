@@ -395,7 +395,8 @@ describe('AccountState fast comments and security loaders', () => {
         })
       ),
     };
-    spyOn(state, 'loadMyComments').and.callThrough();
+    state.loadMyComments = (AccountState.prototype as any).loadMyComments;
+    const loadMyCommentsSpy = spyOn(state, 'loadMyComments').and.callThrough();
 
     state.loadMyComments(2);
     expect(state.myComments().length).toBe(1);
@@ -404,11 +405,11 @@ describe('AccountState fast comments and security loaders', () => {
     expect(state.myCommentsLoading()).toBeFalse();
 
     state.nextMyCommentsPage();
-    expect(state.loadMyComments).toHaveBeenCalledWith(3);
+    expect(loadMyCommentsSpy).toHaveBeenCalledWith(3);
 
     state.myCommentsMeta.set({ page: 2, total_pages: 3 });
     state.prevMyCommentsPage();
-    expect(state.loadMyComments).toHaveBeenCalledWith(1);
+    expect(loadMyCommentsSpy).toHaveBeenCalledWith(1);
   });
 
   it('handles my comments load errors and status chip/timestamp fallbacks', () => {
@@ -422,6 +423,9 @@ describe('AccountState fast comments and security loaders', () => {
       ),
     };
 
+    state.t = (key: string) => key;
+    state.myCommentsLimit = 10;
+    state.loadMyComments = (AccountState.prototype as any).loadMyComments;
     state.loadMyComments(1);
     expect(state.myCommentsError()).toContain('account.comments.loadError');
     expect(state.myCommentsLoading()).toBeFalse();
@@ -444,6 +448,11 @@ describe('AccountState fast comments and security loaders', () => {
       getTwoFactorStatus: jasmine.createSpy('getTwoFactorStatus').and.returnValue(throwError(() => new Error('2fa-fail'))),
     };
     spyOn(state, 'passkeysSupported').and.returnValue(true);
+    state.t = (key: string) => key;
+    state.loadSecondaryEmails = (AccountState.prototype as any).loadSecondaryEmails;
+    state.loadSessions = (AccountState.prototype as any).loadSessions;
+    state.loadSecurityEvents = (AccountState.prototype as any).loadSecurityEvents;
+    state.loadTwoFactorStatus = (AccountState.prototype as any).loadTwoFactorStatus;
     state.loadSecondaryEmails(true);
     state.loadSessions(true);
     state.loadSecurityEvents(true);
@@ -642,6 +651,10 @@ describe('AccountState fast profile-save and completion branches', () => {
         username: { next_allowed_at: '2026-03-03T00:00:05Z' },
       })
     );
+
+    state.t = (key: string) => key;
+    state.loadAliases = (AccountState.prototype as any).loadAliases;
+    state.loadCooldowns = (AccountState.prototype as any).loadCooldowns;
 
     state.loadAliases();
     expect(state.aliases()?.aliases?.length).toBe(1);

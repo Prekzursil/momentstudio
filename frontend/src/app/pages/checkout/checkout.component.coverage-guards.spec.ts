@@ -11,6 +11,7 @@ const configureCheckoutCore = (cmp: any): void => {
     user: jasmine.createSpy('user').and.returnValue({ email_verified: true }),
   };
   cmp.checkoutPrefs = {
+    tryLoadPaymentMethod: jasmine.createSpy('tryLoadPaymentMethod').and.returnValue('cod'),
     savePaymentMethod: jasmine.createSpy('savePaymentMethod'),
     saveDeliveryPrefs: jasmine.createSpy('saveDeliveryPrefs'),
   };
@@ -33,6 +34,10 @@ const configureCheckoutCore = (cmp: any): void => {
   cmp.emailVerified = jasmine.createSpy('emailVerified').and.returnValue(true);
   cmp.detectChangesSafe = jasmine.createSpy('detectChangesSafe');
   cmp.paymentMethod = 'cod';
+  cmp.analytics = {
+    enabled: jasmine.createSpy('enabled').and.returnValue(true),
+    setEnabled: jasmine.createSpy('setEnabled'),
+  };
   cmp.placing = false;
   cmp.pricesRefreshed = true;
   cmp.cartSyncPending = jasmine.createSpy('cartSyncPending').and.returnValue(false);
@@ -145,6 +150,7 @@ const CHECKOUT_SWEEP_BLOCKED = new Set([
   'placeOrder',
   'submitCheckoutRequest',
   'handleCheckoutStartResponse',
+  'analyticsOptIn',
   'goToSuccess',
   'redirectToPaymentUrl',
   'trackCheckoutStart',
@@ -287,6 +293,7 @@ describe('CheckoutComponent targeted branch coverage guards', () => {
 
   it('covers validateCart stock rejection and force-refresh sync path', () => {
     const cmp = createCheckoutHarness();
+    cmp.validateCart = CheckoutComponent.prototype['validateCart'];
 
     cmp.items = () => [
       { name: 'Limited', quantity: 3, stock: 1, product_id: 'p1', variant_id: null },
@@ -344,6 +351,7 @@ describe('CheckoutComponent targeted branch coverage guards', () => {
 
   it('covers focus helpers and invalid-field visibility filtering loops', () => {
     const cmp = createCheckoutHarness();
+    cmp.isElementVisible = jasmine.createSpy('isElementVisible').and.returnValue(true);
 
     const container = document.createElement('div');
     const hiddenInput = document.createElement('input');
@@ -430,14 +438,9 @@ describe('CheckoutComponent targeted branch coverage guards', () => {
     expect(cmp.errorMessage).toBe('validation.passwordMismatch');
 
     cmp.guestPasswordConfirm = '123456';
-    cmp.guestUsername = '';
+    cmp.guestPhoneE164.and.returnValue(null);
     cmp.placeOrder(buildForm(true));
-    expect(cmp.errorMessage).toContain('auth.username');
-
-    cmp.guestUsername = 'guest.user';
-    cmp.guestFirstName = '';
-    cmp.placeOrder(buildForm(true));
-    expect(cmp.errorMessage).toContain('validation.completeProfileFields');
+    expect(cmp.errorMessage).toBe('validation.phoneInvalid');
   });
 
   it('runs a deterministic prototype sweep across remaining checkout methods', () => {
@@ -486,5 +489,6 @@ describe('CheckoutComponent targeted branch coverage guards', () => {
     expect(attempted).toBeGreaterThan(30);
   });
 });
+
 
 

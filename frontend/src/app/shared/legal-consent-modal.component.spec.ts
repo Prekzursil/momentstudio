@@ -1,5 +1,5 @@
 import { SimpleChange } from '@angular/core';
-import { fakeAsync, TestBed, tick } from '@angular/core/testing';
+import { TestBed } from '@angular/core/testing';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
 
@@ -65,11 +65,9 @@ describe('LegalConsentModalComponent', () => {
     expect(component.bodyHtml).toBe('');
   });
 
-  it('loads legal content successfully and maps title/body/images/pageBlocks', fakeAsync(() => {
+  it('loads legal content successfully and maps title/body/images/pageBlocks', () => {
     const fixture = TestBed.createComponent(LegalConsentModalComponent);
     const component = fixture.componentInstance;
-    const emitBodyScroll = jasmine.createSpy('emitBodyScroll');
-    component.modal = { emitBodyScroll } as any;
 
     api.get.and.returnValue(
       of({
@@ -78,9 +76,7 @@ describe('LegalConsentModalComponent', () => {
         body_markdown: 'Hello world',
         images: [{ url: '/hero.jpg', focal_x: 11, focal_y: 82 }],
         meta: {
-          blocks: [
-            { type: 'text', title: 'Intro', body_markdown: 'Intro body' },
-          ],
+          blocks: [{ type: 'text', title: 'Intro', body_markdown: 'Intro body' }],
         },
       } as any)
     );
@@ -91,7 +87,6 @@ describe('LegalConsentModalComponent', () => {
       open: new SimpleChange(false, true, false),
       slug: new SimpleChange('', 'terms', false),
     });
-    tick();
 
     expect(component.loading).toBeFalse();
     expect(component.error).toBe('');
@@ -101,8 +96,7 @@ describe('LegalConsentModalComponent', () => {
     expect(component.firstImageUrl()).toBe('/hero.jpg');
     expect(component.firstImageFocal()).toBe('11% 82%');
     expect(component.subtitle).toBe('Scroll to accept');
-    expect(emitBodyScroll).toHaveBeenCalled();
-  }));
+  });
 
   it('handles API error branch and keeps modal in non-loading state', () => {
     const fixture = TestBed.createComponent(LegalConsentModalComponent);

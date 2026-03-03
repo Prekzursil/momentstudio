@@ -1,14 +1,20 @@
 import { NavigationEnd } from '@angular/router';
+import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 
 import { AccountState } from './account.state';
-
 type Harness = {
   state: AccountState;
   auth: jasmine.SpyObj<any>;
   account: jasmine.SpyObj<any>;
   tickets: jasmine.SpyObj<any>;
 };
+
+
+beforeAll(() => {
+  TestBed.configureTestingModule({});
+});
+
 
 function createRouterAndRoute() {
   const router = jasmine.createSpyObj('Router', ['navigateByUrl']);
@@ -56,27 +62,34 @@ function createHarness(): Harness {
   const { router, route } = createRouterAndRoute();
   const { toast, auth, account, tickets } = createServiceSpies();
 
-  const state = new AccountState(
-    toast as any,
-    auth as any,
-    account as any,
-    jasmine.createSpyObj('BlogService', ['listMyComments']) as any,
-    jasmine.createSpyObj('CartStore', ['clear']) as any,
-    router as any,
-    route,
-    jasmine.createSpyObj('ApiService', ['patch']) as any,
-    jasmine.createSpyObj('WishlistService', ['listMine']) as any,
-    Object.assign(jasmine.createSpyObj('NotificationsService', ['refreshUnreadCount', 'unreadCount']), {
-      unreadCount: jasmine.createSpy('unreadCount').and.returnValue(2),
-    }) as any,
-    tickets as any,
-    Object.assign(jasmine.createSpyObj('CouponsService', ['listMine']), { listMine: jasmine.createSpy().and.returnValue(of([])) }) as any,
-    Object.assign(jasmine.createSpyObj('ThemeService', ['mode', 'setMode']), { mode: jasmine.createSpy().and.returnValue('system') }) as any,
-    { language: () => 'en', setLanguage: () => undefined } as any,
-    { instant: (key: string) => key, currentLang: 'en' } as any,
-    Object.assign(jasmine.createSpyObj('GoogleLinkPendingService', ['getPending', 'clear']), {
-      getPending: jasmine.createSpy().and.returnValue(null),
-    }) as any,
+  const state = TestBed.runInInjectionContext(
+    () =>
+      new AccountState(
+        toast as any,
+        auth as any,
+        account as any,
+        jasmine.createSpyObj('BlogService', ['listMyComments']) as any,
+        jasmine.createSpyObj('CartStore', ['clear']) as any,
+        router as any,
+        route,
+        jasmine.createSpyObj('ApiService', ['patch']) as any,
+        jasmine.createSpyObj('WishlistService', ['listMine']) as any,
+        Object.assign(jasmine.createSpyObj('NotificationsService', ['refreshUnreadCount', 'unreadCount']), {
+          unreadCount: jasmine.createSpy('unreadCount').and.returnValue(2),
+        }) as any,
+        tickets as any,
+        Object.assign(jasmine.createSpyObj('CouponsService', ['listMine']), {
+          listMine: jasmine.createSpy().and.returnValue(of([])),
+        }) as any,
+        Object.assign(jasmine.createSpyObj('ThemeService', ['mode', 'setMode']), {
+          mode: jasmine.createSpy().and.returnValue('system'),
+        }) as any,
+        { language: () => 'en', setLanguage: () => undefined } as any,
+        { instant: (key: string) => key, currentLang: 'en' } as any,
+        Object.assign(jasmine.createSpyObj('GoogleLinkPendingService', ['getPending', 'clear']), {
+          getPending: jasmine.createSpy().and.returnValue(null),
+        }) as any,
+      ),
   );
 
   return { state, auth, account, tickets };

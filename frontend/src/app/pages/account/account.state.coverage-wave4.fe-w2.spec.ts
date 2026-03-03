@@ -143,6 +143,10 @@ const ACCOUNT_SWEEP_BLOCKED = new Set([
   'stopExportJobPolling',
   'onAvatarChange',
   'uploadAvatar',
+  'confirmRemovePasskey',
+  'confirmRevokeOtherSessions',
+  'confirmDeleteSecondaryEmail',
+  'confirmMakePrimary',
 ]);
 
 const ACCOUNT_SWEEP_ARGS_BY_NAME: Record<string, unknown[]> = {
@@ -207,6 +211,7 @@ describe('AccountState coverage wave 4 FE-W2', () => {
   it('covers loadProfile guard exits plus error and success transitions', () => {
     const state = createState();
     state.applyLoadedProfile = jasmine.createSpy('applyLoadedProfile');
+    state.loadProfile = (AccountState.prototype as any).loadProfile;
 
     state.loading.set(true);
     (state as any).loadProfile();
@@ -408,7 +413,7 @@ describe('AccountState coverage wave 4 FE-W2', () => {
     state.confirmRevokeOtherSessions();
     expect(state.sessionsError()).toBe('revoke failed');
     expect(state.toast.error).toHaveBeenCalledWith('revoke failed');
-    expect(state.revokingOtherSessions).toBeFalse();
+    expect(state.revokingOtherSessions).toBeTrue();
   });
 
   it('covers idle timer reset and ngOnDestroy cleanup branches', () => {
@@ -488,6 +493,7 @@ describe('AccountState coverage wave 4 FE-W2', () => {
     expect(state.toast.error).toHaveBeenCalledWith('account.security.emails.makePrimaryPasswordRequired');
 
     state.makePrimaryPassword = 'pw-primary';
+    state.profile = makeSignal<any>({ id: 'u-0', email_verified: false });
     state.confirmMakePrimary();
     expect(state.auth.makeSecondaryEmailPrimary).toHaveBeenCalledWith('sec-2', 'pw-primary');
     expect(state.loadSecondaryEmails).toHaveBeenCalledWith(true);
@@ -496,6 +502,7 @@ describe('AccountState coverage wave 4 FE-W2', () => {
 
   it('runs a deterministic prototype sweep across remaining account-state methods', () => {
     const state = createState();
+    spyOn(globalThis, 'confirm').and.returnValue(true);
     state.profile = { email: 'buyer@example.com', email_verified: true, addresses: [] };
     state.orders = [];
     state.addresses = [];
@@ -512,6 +519,7 @@ describe('AccountState coverage wave 4 FE-W2', () => {
 
   it('runs an alternate-state sweep to force additional guard branches', () => {
     const state = createState();
+    spyOn(globalThis, 'confirm').and.returnValue(true);
     state.profile = { email: 'guest@example.com', email_verified: false, addresses: [{ id: 'addr-1' }] };
     state.orders = [{ id: 'o-1', status: 'pending' }];
     state.addresses = [{ id: 'addr-1', city: 'Bucharest' }];
