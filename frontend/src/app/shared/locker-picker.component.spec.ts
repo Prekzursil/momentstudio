@@ -1,3 +1,4 @@
+import { SimpleChange } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { TranslateModule } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
@@ -67,6 +68,11 @@ describe('LockerPickerComponent', () => {
   defineGeoSuccessAndDeniedSpec();
   defineSearchFirstResultFallbackSpec();
   defineFanCourierFetchBranchesSpec();
+  defineProviderChangeRefreshSpec();
+  defineSelectedChangeRedrawSpec();
+  defineAbortErrorSuppressionSpec();
+  defineDestroyCleanupSpec();
+  defineMirrorSnapshotRefreshGuardSpec();
 });
 
 function defineCitySuggestionSpec(): void {
@@ -207,3 +213,96 @@ function defineFanCourierFetchBranchesSpec(): void {
     expect(lockerPickerComponent.searchResults.length).toBeGreaterThan(0);
   });
 };
+
+function defineProviderChangeRefreshSpec(): void {
+  it('resets transient state and refreshes nearby results when provider changes after initialization', () => {
+    const refreshSpy = spyOn<any>(lockerPickerComponent as any, 'refreshMirrorSnapshot').and.returnValue(Promise.resolve());
+    const searchAreaSpy = spyOn(lockerPickerComponent, 'searchThisArea');
+    const selectSpy = spyOn(lockerPickerComponent, 'selectLocker').and.callThrough();
+    lockerPickerComponent.searchResults = [{ display_name: 'Old', lat: 1, lng: 2 }];
+    lockerPickerComponent.searchError = 'old error';
+    lockerPickerComponent.searchQuery = 'old query';
+    lockerPickerComponent.mirrorSnapshot = { stale: true } as any;
+    (lockerPickerComponent as any).initialized = true;
+
+    lockerPickerComponent.provider = 'fan_courier';
+    lockerPickerComponent.ngOnChanges({
+      provider: new SimpleChange('sameday', 'fan_courier', false),
+    });
+
+    expect(selectSpy).toHaveBeenCalledWith(null);
+    expect(lockerPickerComponent.searchResults).toEqual([]);
+    expect(lockerPickerComponent.searchError).toBe('');
+    expect(lockerPickerComponent.searchQuery).toBe('');
+    expect(lockerPickerComponent.mirrorSnapshot).toBeNull();
+    expect(searchAreaSpy).toHaveBeenCalled();
+
+    lockerPickerComponent.provider = 'sameday';
+    lockerPickerComponent.ngOnChanges({
+      provider: new SimpleChange('fan_courier', 'sameday', false),
+    });
+    expect(refreshSpy).toHaveBeenCalled();
+  });
+}
+
+function defineSelectedChangeRedrawSpec(): void {
+  it('redraws markers when selected locker input changes after initialization', () => {
+    const redrawSpy = spyOn<any>(lockerPickerComponent as any, 'redrawMarkers');
+    (lockerPickerComponent as any).initialized = true;
+
+    lockerPickerComponent.ngOnChanges({
+      selected: new SimpleChange(null, { id: 'locker-1' } as any, false),
+    });
+
+    expect(redrawSpy).toHaveBeenCalled();
+  });
+}
+
+function defineAbortErrorSuppressionSpec(): void {
+  it('suppresses user-facing errors for aborted sameday city searches', async () => {
+    lockerPickerComponent.provider = 'sameday';
+    lockerPickerComponent.searchError = 'stale error';
+    lockerPickerShipping.listLockerCities.and.returnValue(throwError(() => ({ name: 'AbortError' })));
+
+    await (lockerPickerComponent as any).fetchLocations('Bucuresti');
+
+    expect(lockerPickerComponent.searchLoading).toBeFalse();
+    expect(lockerPickerComponent.searchResults).toEqual([]);
+    expect(lockerPickerComponent.searchError).toBe('');
+  });
+}
+
+function defineDestroyCleanupSpec(): void {
+  it('cleans map resources, timers, and abort controllers on destroy', () => {
+    const mapRemoveSpy = jasmine.createSpy('remove');
+    const controller = new AbortController();
+    const abortSpy = spyOn(controller, 'abort').and.callThrough();
+    (lockerPickerComponent as any).map = { remove: mapRemoveSpy } as any;
+    (lockerPickerComponent as any).markers = {} as any;
+    (lockerPickerComponent as any).searchTimer = window.setTimeout(() => void 0, 1000);
+    (lockerPickerComponent as any).searchAbort = controller;
+
+    lockerPickerComponent.ngOnDestroy();
+
+    expect(mapRemoveSpy).toHaveBeenCalled();
+    expect(abortSpy).toHaveBeenCalled();
+    expect((lockerPickerComponent as any).map).toBeNull();
+    expect((lockerPickerComponent as any).markers).toBeNull();
+    expect((lockerPickerComponent as any).searchAbort).toBeNull();
+  });
+}
+
+function defineMirrorSnapshotRefreshGuardSpec(): void {
+  it('skips or tolerates mirror snapshot refresh based on provider and failures', async () => {
+    lockerPickerShipping.listLockerCities.calls.reset();
+    lockerPickerComponent.provider = 'fan_courier';
+    await (lockerPickerComponent as any).refreshMirrorSnapshot();
+    expect(lockerPickerShipping.listLockerCities).not.toHaveBeenCalled();
+
+    lockerPickerComponent.provider = 'sameday';
+    lockerPickerComponent.mirrorSnapshot = { stale: true } as any;
+    lockerPickerShipping.listLockerCities.and.returnValue(throwError(() => new Error('mirror unavailable')));
+    await (lockerPickerComponent as any).refreshMirrorSnapshot();
+    expect(lockerPickerComponent.mirrorSnapshot?.stale).toBeTrue();
+  });
+}
