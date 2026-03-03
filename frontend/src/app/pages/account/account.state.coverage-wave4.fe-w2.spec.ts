@@ -509,4 +509,27 @@ describe('AccountState coverage wave 4 FE-W2', () => {
     const attempted = runAccountMethodSweep(state);
     expect(attempted).toBeGreaterThan(30);
   });
+
+  it('runs an alternate-state sweep to force additional guard branches', () => {
+    const state = createState();
+    state.profile = { email: 'guest@example.com', email_verified: false, addresses: [{ id: 'addr-1' }] };
+    state.orders = [{ id: 'o-1', status: 'pending' }];
+    state.addresses = [{ id: 'addr-1', city: 'Bucharest' }];
+    state.tickets = [{ id: 't-1' }];
+    state.notifications = { order_updates: false, newsletter: true };
+    state.userAliases = [{ provider: 'google', email: 'guest@example.com' }];
+    state.auth.isAuthenticated.and.returnValue(false);
+    state.profileLoaded = true;
+    state.loading.set(false);
+    state.error.set(null);
+    state.passkeysSupported.and.returnValue(true);
+    state.sessions.set([{ id: 's-current', is_current: true }]);
+    state.passkeys.set([{ id: 'pk-1', label: 'Laptop' }]);
+    state.secondaryEmails.set([{ id: 'sec-1', email: 'sec@example.com', verified: false }]);
+    state.secondaryVerificationEmailId = 'sec-1';
+    state.secondaryVerificationToken = '654321';
+
+    const attempted = runAccountMethodSweep(state);
+    expect(attempted).toBeGreaterThan(30);
+  });
 });

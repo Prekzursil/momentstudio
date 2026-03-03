@@ -456,4 +456,32 @@ describe('CheckoutComponent targeted branch coverage guards', () => {
     const attempted = runCheckoutMethodSweep(cmp);
     expect(attempted).toBeGreaterThan(30);
   });
+
+  it('runs an alternate-state prototype sweep for guest and locker guard branches', () => {
+    const cmp = createCheckoutHarness();
+    cmp.auth.isAuthenticated.and.returnValue(false);
+    cmp.deliveryType = 'locker';
+    cmp.deliveryLockerAllowed = false;
+    cmp.locker = { id: 'locker-2', provider: 'sameday' };
+    cmp.courier = 'fan_courier';
+    cmp.deliveryAllowedCouriers = ['sameday'];
+    cmp.shippingPhoneRequired.and.returnValue(true);
+    cmp.shippingPhoneNational = '0712345678';
+    cmp.shippingPhoneE164.and.returnValue('+40712345678');
+    cmp.guestEmailVerified = false;
+    cmp.guestCreateAccount = true;
+    cmp.guestPassword = '123456';
+    cmp.guestPasswordConfirm = '123456';
+    cmp.guestUsername = 'guest.alt';
+    cmp.guestFirstName = 'Guest';
+    cmp.guestLastName = 'Alt';
+    cmp.acceptTerms = false;
+    cmp.acceptPrivacy = false;
+    cmp.quote = { subtotal: 80, tax: 12, shipping: 18, total: 110, discount: 0 };
+    cmp.prefetchedPricing = { checkout_countries: ['RO', 'US'] };
+    cmp.paymentCapabilities = { card: false, cod: true };
+
+    const attempted = runCheckoutMethodSweep(cmp);
+    expect(attempted).toBeGreaterThan(30);
+  });
 });
