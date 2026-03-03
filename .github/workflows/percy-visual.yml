@@ -15,11 +15,11 @@ env:
 
 jobs:
   percy-core-pr:
-    if: (github.event_name == 'pull_request' && vars.PERCY_PR_ENABLED == '1') || (github.event_name == 'workflow_dispatch' && (env.PERCY_VISUAL_SCOPE == 'core' || env.PERCY_VISUAL_SCOPE == 'both'))
+    name: percy-core-pr
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && (env.PERCY_VISUAL_SCOPE == 'core' || env.PERCY_VISUAL_SCOPE == 'both'))
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    continue-on-error: true
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
@@ -32,38 +32,39 @@ jobs:
       - name: Upgrade npm
         run: npm i -g npm@11.7.0
 
-      - name: Resolve Percy token availability
-        id: token
+      - name: Validate Percy PR configuration
+        id: config
         env:
           PERCY_TOKEN: ${{ secrets.PERCY_TOKEN }}
+          PERCY_PR_ENABLED: ${{ vars.PERCY_PR_ENABLED || '0' }}
         run: |
-          if [ -n "${PERCY_TOKEN:-}" ]; then
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-            {
-              echo "## Percy Visual (Core)"
-              echo ""
-              echo "Skipped: \`PERCY_TOKEN\` is not configured."
-            } >> "$GITHUB_STEP_SUMMARY"
+          set -euo pipefail
+          if [ "${PERCY_PR_ENABLED}" != "1" ]; then
+            echo "::error::PERCY_PR_ENABLED must be set to '1' for PR checks."
+            exit 1
           fi
+          if [ -z "${PERCY_TOKEN:-}" ]; then
+            echo "::error::Missing PERCY_TOKEN secret."
+            exit 1
+          fi
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
 
       - name: Install frontend dependencies
-        if: steps.token.outputs.enabled == 'true'
+        if: steps.config.outputs.enabled == 'true'
         run: |
           cd frontend
           npm ci
           npx playwright install --with-deps chromium
 
       - name: Build and start compose stack
-        if: steps.token.outputs.enabled == 'true'
+        if: steps.config.outputs.enabled == 'true'
         env:
           LOCKERS_USE_OVERPASS_FALLBACK: "0"
           PAYMENTS_PROVIDER: "mock"
         run: docker compose -f infra/docker-compose.yml up -d --build
 
       - name: Wait for frontend/backend
-        if: steps.token.outputs.enabled == 'true'
+        if: steps.config.outputs.enabled == 'true'
         run: |
           set -euo pipefail
           for i in $(seq 1 60); do
@@ -80,33 +81,24 @@ jobs:
           done
           curl -fsS http://localhost:4201 >/dev/null
 
-      - name: Percy core snapshot run (non-blocking)
-        if: steps.token.outputs.enabled == 'true'
+      - name: Percy core snapshot run
+        if: steps.config.outputs.enabled == 'true'
         env:
           PERCY_TOKEN: ${{ secrets.PERCY_TOKEN }}
           E2E_BASE_URL: http://localhost:4201
         run: |
-          set +e
+          set -euo pipefail
           cd frontend
           npx percy exec -- npm run e2e -- e2e/percy-core-routes.spec.ts --project=chromium --workers=1
-          status=$?
-          if [ "$status" -eq 0 ]; then
-            {
-              echo "## Percy Visual (Core)"
-              echo ""
-              echo "Core snapshot run completed."
-            } >> "$GITHUB_STEP_SUMMARY"
-          else
-            {
-              echo "## Percy Visual (Core)"
-              echo ""
-              echo "Core snapshot run reported failures (non-blocking)."
-            } >> "$GITHUB_STEP_SUMMARY"
-          fi
-          exit 0
+          {
+            echo "## Percy Visual (Core)"
+            echo ""
+            echo "Core snapshot run completed."
+          } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Auto-approve Percy PR build (non-blocking)
-        if: steps.token.outputs.enabled == 'true' && github.event_name == 'pull_request'
+      - name: Auto-approve Percy PR build (optional helper)
+        if: steps.config.outputs.enabled == 'true' && github.event_name == 'pull_request'
+        continue-on-error: true
         env:
           PERCY_TOKEN: ${{ secrets.PERCY_TOKEN }}
           BROWSERSTACK_USERNAME: ${{ secrets.BROWSERSTACK_USERNAME }}
@@ -167,11 +159,11 @@ jobs:
           fi
 
       - name: Logs (on failure)
-        if: failure() && steps.token.outputs.enabled == 'true'
+        if: failure() && steps.config.outputs.enabled == 'true'
         run: docker compose -f infra/docker-compose.yml logs --no-color --tail=200
 
       - name: Tear down
-        if: always() && steps.token.outputs.enabled == 'true'
+        if: always() && steps.config.outputs.enabled == 'true'
         run: docker compose -f infra/docker-compose.yml down -v
 
   percy-full-nightly:
