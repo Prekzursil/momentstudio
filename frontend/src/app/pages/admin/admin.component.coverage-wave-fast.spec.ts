@@ -427,3 +427,107 @@ describe('AdminComponent fast page/link/legal helpers', () => {
     expect(component.legalPageMessage).toContain('adminUi.site.pages.success.save');
   });
 });
+
+describe('AdminComponent fast preview/blog seo/page-visibility branches', () => {
+  it('covers page/home preview token generation and clipboard result branches', async () => {
+    const component = createAdminHarness() as any;
+    component.cmsPrefs = {
+      previewLang: () => 'en',
+      previewTheme: () => 'light',
+    };
+    component.t = (key: string) => key;
+    component.toast = jasmine.createSpyObj('ToastService', ['success', 'error', 'info']);
+    component.copyToClipboard = jasmine
+      .createSpy('copyToClipboard')
+      .and.returnValues(Promise.resolve(true), Promise.resolve(false), Promise.resolve(false));
+    component.admin = {
+      createPagePreviewToken: jasmine.createSpy('createPagePreviewToken').and.returnValue(
+        of({ token: 'page-preview', expires_at: '2026-03-10T12:00:00Z', origin: 'https://preview.example' })
+      ),
+      createHomePreviewToken: jasmine.createSpy('createHomePreviewToken').and.returnValue(
+        of({ token: 'home-preview', expires_at: '2026-03-10T12:00:00Z', origin: 'https://preview.example' })
+      ),
+    };
+
+    component.generatePagePreviewLink('page.about');
+    expect(component.pagePreviewToken).toBe('page-preview');
+    expect(component.pagePreviewForSlug).toBe('page.about');
+    expect(component.pagePreviewShareUrl('page.about')).toContain('preview=');
+
+    component.generateHomePreviewLink();
+    expect(component.homePreviewToken).toBe('home-preview');
+    expect(component.homePreviewShareUrl()).toContain('preview=');
+    expect(component.homePreviewIframeSrc()).toBeTruthy();
+    component.copyPreviewLink('https://preview.example/pages/about');
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(component.toast.success).toHaveBeenCalled();
+    expect(component.toast.info).toHaveBeenCalled();
+    expect(component.toast.error).toHaveBeenCalled();
+  });
+
+  it('covers blog SEO helpers and copy-text success/error branches', async () => {
+    const component = createAdminHarness() as any;
+    component.selectedBlogKey = 'blog.coverage-wave';
+    component.blogEditLang = 'en';
+    component.blogForm = { title: 'SEO Title', body_markdown: 'Body **markdown** with [link](https://example.com)', status: 'draft' };
+    component.blogMeta = { summary: { en: 'Summary text' } };
+    component.blogSeoSnapshots = { en: null, ro: { title: 'Titlu', body_markdown: 'Descriere ro' } };
+    component.blogPreviewToken = null;
+    component.t = (key: string) => key;
+    component.copyToClipboard = jasmine.createSpy('copyToClipboard').and.returnValues(Promise.resolve(true), Promise.resolve(false));
+    component.toast = jasmine.createSpyObj('ToastService', ['info', 'error']);
+
+    expect(component.blogSeoHasContent('en')).toBeTrue();
+    expect(component.blogSeoHasContent('ro')).toBeTrue();
+    expect(component.blogSeoTitlePreview('en').length).toBeGreaterThan(0);
+    expect(component.blogSeoDescriptionPreview('en').length).toBeGreaterThan(0);
+    expect(component.blogSeoIssues('en').length).toBeGreaterThan(0);
+    expect(component.blogPublishedOgImageUrl('en')).toContain('/blog/posts/');
+    expect(component.blogPreviewOgImageUrl('en')).toBeNull();
+
+    component.blogPreviewToken = 'preview-token';
+    expect(component.blogPreviewOgImageUrl('en')).toContain('token=');
+
+    component.copyText(' https://momentstudio.example/blog/post ');
+    component.copyText('another value');
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(component.toast.info).toHaveBeenCalled();
+    expect(component.toast.error).toHaveBeenCalled();
+  });
+
+  it('covers saveInfoInternal fallback/create path and page visibility update error rollback', () => {
+    const component = createAdminHarness() as any;
+    component.rememberContentVersion = jasmine.createSpy('rememberContentVersion');
+    component.loadContentPages = jasmine.createSpy('loadContentPages');
+    component.toRecord = (value: unknown) => (value && typeof value === 'object' ? { ...(value as Record<string, unknown>) } : {});
+    component.withExpectedVersion = (_key: string, payload: unknown) => payload;
+    component.handleContentConflict = jasmine.createSpy('handleContentConflict').and.returnValue(false);
+    component.toast = jasmine.createSpyObj('ToastService', ['success', 'error']);
+
+    const onSuccess = jasmine.createSpy('onSuccess');
+    const onError = jasmine.createSpy('onError');
+    component.admin = {
+      updateContentBlock: jasmine.createSpy('updateContentBlock').and.returnValues(
+        throwError(() => ({ error: { detail: 'exists' } })),
+        throwError(() => ({ error: { detail: 'save-failed' } }))
+      ),
+      createContent: jasmine.createSpy('createContent').and.returnValue(
+        of({ key: 'page.about', body_markdown: 'saved', meta: { hidden: false } })
+      ),
+      getContent: jasmine.createSpy('getContent').and.returnValue(of({ meta: { hidden: false } })),
+    };
+
+    component['saveInfoInternal']('page.about', 'About body', 'en', onSuccess, onError);
+    expect(component.admin.createContent).toHaveBeenCalled();
+    expect(onSuccess).toHaveBeenCalled();
+
+    component.contentPages = [{ key: 'page.custom', hidden: false }];
+    component.showHiddenPages = false;
+    component.ensureSelectedPageIsVisible = jasmine.createSpy('ensureSelectedPageIsVisible');
+    component['setPageHidden']('page.custom', true);
+    expect(component.toast.error).toHaveBeenCalled();
+    expect(component.contentPages[0].hidden).toBeFalse();
+  });
+});

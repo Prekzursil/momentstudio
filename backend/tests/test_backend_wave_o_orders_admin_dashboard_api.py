@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -513,3 +514,160 @@ async def test_admin_dashboard_summary_channel_and_search_paths(monkeypatch: pyt
         _=SimpleNamespace(id=uuid4()),
     )
     assert products[0]["name"] == "Ring"
+
+
+def test_orders_confirmation_and_admin_filter_helpers() -> None:
+    # Confirmation helpers around Stripe/Netopia branches.
+    with pytest.raises(HTTPException):
+        orders_api._assert_netopia_status_completed({"payment": {"status": "x"}})
+
+    orders_api._assert_netopia_status_completed({"payment": {"status": "5"}})
+    orders_api._assert_netopia_error_success({"error": {"code": "00", "message": "approved"}})
+
+    with pytest.raises(HTTPException):
+        orders_api._assert_netopia_error_success({"error": {"code": "12", "message": "denied"}})
+
+    # Admin filter parsing helpers.
+    assert orders_api._parse_admin_sla_filter(None) is None
+    assert orders_api._parse_admin_sla_filter("accept_overdue") == "accept_overdue"
+    assert orders_api._parse_admin_sla_filter("ship_overdue") == "ship_overdue"
+    assert orders_api._parse_admin_sla_filter("any") == "any_overdue"
+    with pytest.raises(HTTPException):
+        orders_api._parse_admin_sla_filter("invalid")
+
+    assert orders_api._parse_admin_fraud_filter(None) is None
+    assert orders_api._parse_admin_fraud_filter("review") == "queue"
+    assert orders_api._parse_admin_fraud_filter("risk") == "flagged"
+    assert orders_api._parse_admin_fraud_filter("approved") == "approved"
+    assert orders_api._parse_admin_fraud_filter("denied") == "denied"
+    with pytest.raises(HTTPException):
+        orders_api._parse_admin_fraud_filter("unknown")
+
+    naive = datetime(2026, 3, 3, 12, 0, 0)
+    aware = datetime(2026, 3, 3, 12, 0, 0, tzinfo=timezone.utc)
+    assert orders_api._ensure_utc_datetime(naive).tzinfo == timezone.utc
+    assert orders_api._ensure_utc_datetime(aware).tzinfo == timezone.utc
+    assert orders_api._ensure_utc_datetime(None) is None
+
+
+def test_orders_admin_list_item_and_response_builders(monkeypatch: pytest.MonkeyPatch) -> None:
+    now = datetime.now(timezone.utc)
+    order = SimpleNamespace(
+        id=uuid4(),
+        reference_code="REF-ADM",
+        status=OrderStatus.pending_payment,
+        total_amount=Decimal("125.00"),
+        currency="RON",
+        payment_method="card",
+        created_at=now,
+        tags=[SimpleNamespace(tag="vip"), SimpleNamespace(tag="gift")],
+    )
+    row = (order, "buyer@example.com", "buyer", "accept", now - timedelta(hours=25), 1, "high")
+    monkeypatch.setattr(orders_api.pii_service, "mask_email", lambda value: f"MASK:{value}")
+
+    item_masked = orders_api._admin_order_list_item_from_row(
+        row,
+        include_pii=False,
+        now=now,
+        accept_hours=24,
+        ship_hours=48,
+    )
+    assert item_masked.customer_email.startswith("MASK:")
+    assert item_masked.sla_overdue is True
+    assert "vip" in item_masked.tags
+
+    item_pii = orders_api._admin_order_list_item_from_row(
+        row,
+        include_pii=True,
+        now=now,
+        accept_hours=24,
+        ship_hours=48,
+    )
+    assert item_pii.customer_email == "buyer@example.com"
+
+    response = orders_api._admin_order_list_response(
+        [row],
+        include_pii=False,
+        total_items=11,
+        page=2,
+        limit=5,
+    )
+    assert response.meta.total_items == 11
+    assert response.meta.total_pages == 3
+    assert response.items[0].reference_code == "REF-ADM"
+
+
+@pytest.mark.asyncio
+async def test_orders_admin_search_and_my_orders_response_paths(monkeypatch: pytest.MonkeyPatch) -> None:
+    with pytest.raises(HTTPException):
+        await orders_api.list_my_orders(
+            q=None,
+            status=None,
+            from_date=date(2026, 3, 5),
+            to_date=date(2026, 3, 4),
+            page=1,
+            limit=10,
+            current_user=SimpleNamespace(id=uuid4()),
+            session=SimpleNamespace(),
+        )
+
+    async def _search_orders_for_user(*_args, **_kwargs):
+        return [SimpleNamespace(reference_code="ME-1")], 1, 0
+
+    monkeypatch.setattr(orders_api.order_service, "search_orders_for_user", _search_orders_for_user)
+    me_payload = await orders_api.list_my_orders(
+        q="needle",
+        status=None,
+        from_date=date(2026, 3, 1),
+        to_date=date(2026, 3, 8),
+        page=1,
+        limit=10,
+        current_user=SimpleNamespace(id=uuid4()),
+        session=SimpleNamespace(),
+    )
+    assert me_payload.meta.total_items == 1
+    assert me_payload.meta.total_pages == 1
+
+    pii_calls: list[object] = []
+
+    def _require_pii(admin, request):
+        pii_calls.append((admin, request))
+
+    async def _admin_search_orders(*_args, **_kwargs):
+        order = SimpleNamespace(
+            id=uuid4(),
+            reference_code="ADM-1",
+            status=OrderStatus.paid,
+            total_amount=Decimal("9.99"),
+            currency="RON",
+            payment_method="card",
+            created_at=datetime.now(timezone.utc),
+            tags=[],
+        )
+        row = (order, "admin-buyer@example.com", "buyer", "ship", datetime.now(timezone.utc), 0, None)
+        return [row], 1
+
+    monkeypatch.setattr(orders_api.pii_service, "require_pii_reveal", _require_pii)
+    monkeypatch.setattr(orders_api.pii_service, "mask_email", lambda value: f"MASK:{value}")
+    monkeypatch.setattr(orders_api.order_service, "admin_search_orders", _admin_search_orders)
+
+    search_payload = await orders_api.admin_search_orders(
+        request=_make_request(),
+        q="abc",
+        user_id=None,
+        status="pending_any",
+        tag=None,
+        sla="any",
+        fraud="review",
+        from_dt=None,
+        to_dt=None,
+        page=1,
+        limit=20,
+        include_pii=True,
+        include_test=True,
+        session=SimpleNamespace(),
+        admin=SimpleNamespace(id=uuid4()),
+    )
+    assert pii_calls
+    assert search_payload.meta.total_items == 1
+    assert search_payload.items[0].reference_code == "ADM-1"

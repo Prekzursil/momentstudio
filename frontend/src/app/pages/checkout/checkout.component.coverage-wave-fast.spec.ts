@@ -503,3 +503,99 @@ describe('CheckoutComponent fast placeOrder guard branches', () => {
     expect(cmp.errorMessage).toContain('validation.phoneInvalid');
   });
 });
+
+describe('CheckoutComponent fast payment/analytics/finalize branches', () => {
+  it('covers checkout start response branches for paypal/stripe/netopia/cod/default', () => {
+    const cmp = createCheckoutHarness();
+    cmp.persistAddressIfRequested = jasmine.createSpy('persistAddressIfRequested');
+    cmp.redirectToPaymentUrl = jasmine.createSpy('redirectToPaymentUrl');
+    cmp.cart = { clear: jasmine.createSpy('clear') };
+    cmp.goToSuccess = jasmine.createSpy('goToSuccess');
+    cmp.showPaymentNotReadyError = jasmine.createSpy('showPaymentNotReadyError');
+    cmp.buildSuccessSummary = jasmine.createSpy('buildSuccessSummary').and.returnValue({ id: 'summary' });
+
+    cmp.paymentMethod = 'paypal';
+    cmp.handleCheckoutStartResponse({ order_id: 'o1', reference_code: 'R1', payment_method: 'paypal', paypal_approval_url: 'https://paypal.com/x' });
+    expect(cmp.redirectToPaymentUrl).toHaveBeenCalledWith('https://paypal.com/x', ['paypal.com']);
+
+    cmp.paymentMethod = 'stripe';
+    cmp.handleCheckoutStartResponse({ order_id: 'o2', reference_code: 'R2', payment_method: 'stripe', stripe_checkout_url: 'https://checkout.stripe.com/x' });
+    expect(cmp.redirectToPaymentUrl).toHaveBeenCalledWith('https://checkout.stripe.com/x', ['checkout.stripe.com']);
+
+    cmp.paymentMethod = 'netopia';
+    cmp.handleCheckoutStartResponse({ order_id: 'o3', reference_code: 'R3', payment_method: 'netopia', netopia_payment_url: 'https://secure.netopia-payments.com/x' });
+    expect(cmp.redirectToPaymentUrl).toHaveBeenCalledWith('https://secure.netopia-payments.com/x', ['mobilpay.ro', 'netopia-payments.com']);
+
+    cmp.paymentMethod = 'cod';
+    cmp.handleCheckoutStartResponse({ order_id: 'o4', reference_code: 'R4', payment_method: 'cod' });
+    expect(cmp.cart.clear).toHaveBeenCalled();
+    expect(cmp.goToSuccess).toHaveBeenCalled();
+
+    cmp.paymentMethod = 'unknown';
+    cmp.handleCheckoutStartResponse({ order_id: 'o5', reference_code: 'R5', payment_method: 'unknown' });
+    expect(cmp.showPaymentNotReadyError).toHaveBeenCalled();
+  });
+
+  it('covers request-error/finalize and analytics tracking guard branches', () => {
+    const cmp = createCheckoutHarness();
+    cmp.detectChangesSafe = jasmine.createSpy('detectChangesSafe');
+    cmp.announceAssertive = jasmine.createSpy('announceAssertive');
+    cmp.focusGlobalError = jasmine.createSpy('focusGlobalError');
+
+    cmp.handleCheckoutRequestError({ name: 'TimeoutError' });
+    expect(cmp.errorMessage).toContain('checkout.checkoutFailed');
+
+    cmp.checkoutFlowCompleted = false;
+    cmp.errorMessage = '';
+    cmp.handleCheckoutFinalize(false);
+    expect(cmp.announceAssertive).toHaveBeenCalled();
+    expect(cmp.focusGlobalError).toHaveBeenCalled();
+
+    cmp.analytics = {
+      enabled: jasmine.createSpy('enabled').and.returnValue(true),
+      track: jasmine.createSpy('track'),
+    };
+    cmp.checkoutStartTracked = false;
+    cmp.items = () => [{ quantity: 2, currency: 'RON' }, { quantity: 1, currency: 'RON' }];
+    cmp.subtotal = () => 150;
+    cmp.quoteTotal = () => 170;
+    cmp.step1Complete = jasmine.createSpy('step1Complete').and.returnValue(true);
+    cmp.step2Complete = jasmine.createSpy('step2Complete').and.returnValue(false);
+    cmp.auth.isAuthenticated = () => false;
+
+    cmp.trackCheckoutStart();
+    cmp.trackCheckoutAbandon();
+    expect(cmp.analytics.track).toHaveBeenCalledWith(
+      'checkout_start',
+      jasmine.objectContaining({ line_items: 2, units: 3, subtotal: 150, total: 170 })
+    );
+    expect(cmp.analytics.track).toHaveBeenCalledWith(
+      'checkout_abandon',
+      jasmine.objectContaining({ payment_method: cmp.paymentMethod, signed_in: false })
+    );
+  });
+
+  it('covers submitCheckoutRequest success and error observer branches', () => {
+    const cmp = createCheckoutHarness();
+    cmp.zone = { run: (fn: () => void) => fn() };
+    cmp.cartApi = { headers: jasmine.createSpy('headers').and.returnValue({}) };
+    cmp.handleCheckoutStartResponse = jasmine.createSpy('handleCheckoutStartResponse');
+    cmp.handleCheckoutRequestError = jasmine.createSpy('handleCheckoutRequestError');
+    cmp.handleCheckoutFinalize = jasmine.createSpy('handleCheckoutFinalize');
+    cmp.api = {
+      post: jasmine
+        .createSpy('post')
+        .and.returnValues(
+          of({ order_id: 'o1', reference_code: 'R1', payment_method: 'cod' }),
+          throwError(() => ({ error: { detail: 'boom' } }))
+        ),
+    };
+
+    cmp.submitCheckoutRequest('/orders/checkout', { payload: true });
+    expect(cmp.handleCheckoutStartResponse).toHaveBeenCalled();
+    expect(cmp.handleCheckoutFinalize).toHaveBeenCalled();
+
+    cmp.submitCheckoutRequest('/orders/checkout', { payload: true });
+    expect(cmp.handleCheckoutRequestError).toHaveBeenCalled();
+  });
+});

@@ -498,3 +498,158 @@ describe('AccountState fast idle and destroy branches', () => {
     expect(removeSpy).toHaveBeenCalled();
   });
 });
+
+describe('AccountState fast profile-save and completion branches', () => {
+  function primeProfile(state: any) {
+    state.profile = mockSignal({
+      id: 'user-1',
+      username: 'existing-user',
+      name: 'Existing Name',
+      email: 'user@example.com',
+      email_verified: true,
+      google_sub: 'google-user',
+      avatar_url: null,
+    });
+    state.auth = {
+      isAuthenticated: () => true,
+      updateUsername: jasmine.createSpy('updateUsername').and.returnValue(of(null)),
+      updateProfile: jasmine.createSpy('updateProfile').and.returnValue(
+        of({
+          id: 'user-1',
+          username: 'new-user',
+          name: 'Updated Name',
+          email: 'user@example.com',
+          email_verified: true,
+          google_sub: 'google-user',
+          avatar_url: null,
+        })
+      ),
+    };
+    state.theme = { setPreference: jasmine.createSpy('setPreference') };
+    state.lang = { setLanguage: jasmine.createSpy('setLanguage') };
+    state.toast = jasmine.createSpyObj('ToastService', ['success', 'error']);
+    state.translate = { instant: (key: string) => key };
+    state.t = (key: string) => key;
+    state.captureProfileSnapshot = jasmine.createSpy('captureProfileSnapshot').and.returnValue({ username: 'new-user' });
+    state.syncProfileFormFromUser = jasmine.createSpy('syncProfileFormFromUser');
+    state.completeForcedProfileFlowIfSatisfied = jasmine.createSpy('completeForcedProfileFlowIfSatisfied');
+    state.loadAliases = jasmine.createSpy('loadAliases');
+    state.loadCooldowns = jasmine.createSpy('loadCooldowns');
+    state.profileThemePreference = 'system';
+    state.profileLanguage = 'en';
+    state.profileSaved = false;
+    state.profileError = null;
+    state.savingProfile = false;
+  }
+
+  it('covers required-profile validation and username-password guard branches', () => {
+    const state = createAccountHarness();
+    primeProfile(state);
+    state.forceProfileCompletion = true;
+
+    state.profileName = '';
+    state.profileUsername = 'valid_user';
+    state.profileFirstName = 'First';
+    state.profileMiddleName = '';
+    state.profileLastName = 'Last';
+    state.profileDateOfBirth = '2000-01-01';
+    state.profilePhoneCountry = 'RO';
+    state.profilePhoneNational = '0712345678';
+    state.profileUsernamePassword = '';
+
+    state.saveProfile();
+    expect(state.profileError).toContain('account.profile.errors.displayNameRequired');
+    expect(state.savingProfile).toBeFalse();
+
+    state.profileName = 'Display';
+    state.profileUsername = 'new-user';
+    state.profileFirstName = 'First';
+    state.profileLastName = 'Last';
+    state.profileDateOfBirth = '2000-01-01';
+    state.profilePhoneNational = '0712345678';
+    state.profileUsernamePassword = '';
+    state.saveProfile();
+    expect(state.profileError).toContain('auth.currentPasswordRequired');
+    expect(state.auth.updateUsername).not.toHaveBeenCalled();
+  });
+
+  it('covers profile save success path and forced-profile completion navigation', () => {
+    const state = createAccountHarness();
+    primeProfile(state);
+    state.forceProfileCompletion = true;
+    state.router = {
+      ...state.router,
+      navigate: jasmine.createSpy('navigate').and.returnValue(Promise.resolve(true)),
+    };
+
+    state.profileName = 'Updated Name';
+    state.profileUsername = 'new-user';
+    state.profileFirstName = 'First';
+    state.profileMiddleName = '';
+    state.profileLastName = 'Last';
+    state.profileDateOfBirth = '2000-01-01';
+    state.profilePhoneCountry = 'RO';
+    state.profilePhoneNational = '0712345678';
+    state.profileUsernamePassword = 'current-password';
+
+    state.saveProfile();
+    expect(state.theme.setPreference).toHaveBeenCalledWith('system');
+    expect(state.lang.setLanguage).toHaveBeenCalledWith('en', { syncBackend: false });
+    expect(state.auth.updateUsername).toHaveBeenCalledWith('new-user', 'current-password');
+    expect(state.auth.updateProfile).toHaveBeenCalled();
+    expect(state.profileSaved).toBeTrue();
+    expect(state.loadAliases).toHaveBeenCalledWith(true);
+    expect(state.loadCooldowns).toHaveBeenCalledWith(true);
+    expect(state.completeForcedProfileFlowIfSatisfied).toHaveBeenCalled();
+
+    const completionState = createAccountHarness();
+    completionState.forceProfileCompletion = true;
+    completionState.router = {
+      ...completionState.router,
+      navigate: jasmine.createSpy('navigate').and.returnValue(Promise.resolve(true)),
+    };
+    completionState.route = {};
+    completionState.completeForcedProfileFlowIfSatisfied = (AccountState.prototype as any).completeForcedProfileFlowIfSatisfied;
+    completionState.completeForcedProfileFlowIfSatisfied.call(completionState, {
+      id: 'user-1',
+      username: 'new-user',
+      name: 'Updated Name',
+      email: 'user@example.com',
+      email_verified: true,
+      first_name: 'First',
+      last_name: 'Last',
+      date_of_birth: '2000-01-01',
+      phone: '+40712345678',
+      google_sub: 'google-user',
+    });
+    expect(completionState.router.navigate).toHaveBeenCalled();
+  });
+
+  it('covers alias/cooldown load success branches and guards', () => {
+    const state = createAccountHarness();
+    primeProfile(state);
+    state.aliasesLoading = mockSignal(false);
+    state.aliasesError = mockSignal<string | null>(null);
+    state.aliases = mockSignal<any>(null);
+    state.cooldownsLoading = mockSignal(false);
+    state.cooldownsError = mockSignal<string | null>(null);
+    state.cooldownsLoaded = mockSignal(false);
+    state.cooldowns = mockSignal<any>(null);
+
+    state.auth.getAliases = jasmine.createSpy('getAliases').and.returnValue(of({ aliases: [{ email: 'alt@example.com' }] }));
+    state.auth.getCooldowns = jasmine.createSpy('getCooldowns').and.returnValue(
+      of({
+        username: { next_allowed_at: '2026-03-03T00:00:05Z' },
+      })
+    );
+
+    state.loadAliases();
+    expect(state.aliases()?.aliases?.length).toBe(1);
+    expect(state.aliasesLoading()).toBeFalse();
+
+    state.loadCooldowns();
+    expect(state.cooldownsLoaded()).toBeTrue();
+    expect(state.cooldowns()?.username?.next_allowed_at).toContain('2026-03-03');
+    expect(state.cooldownsLoading()).toBeFalse();
+  });
+});
