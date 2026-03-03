@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 from decimal import Decimal
 from types import SimpleNamespace
@@ -16,11 +17,16 @@ from app.models.user import UserRole
 from app.services import catalog as catalog_service
 
 
+async def _tick() -> None:
+    await asyncio.sleep(0)
+
+
 class _ScalarQueueSession:
     def __init__(self, values: list[object | None]) -> None:
         self._values = list(values)
 
     async def execute(self, _statement: object) -> object:
+        await _tick()
         value = self._values.pop(0) if self._values else None
         return SimpleNamespace(scalar_one_or_none=lambda: value)
 
@@ -30,6 +36,7 @@ class _ChildRowsSession:
         self._batches = list(batches)
 
     async def execute(self, _statement: object) -> object:
+        await _tick()
         rows = self._batches.pop(0) if self._batches else []
         return SimpleNamespace(scalars=lambda: rows)
 
@@ -44,7 +51,7 @@ def test_wave_i_admin_dashboard_helper_branches(monkeypatch: pytest.MonkeyPatch)
     assert admin_dashboard._channel_int_or_zero(Decimal("4")) == 4
 
     assert admin_dashboard._refund_delta_pct(20.0, 0.0) is None
-    assert admin_dashboard._refund_delta_pct(12.0, 8.0) == 50.0
+    assert admin_dashboard._refund_delta_pct(12.0, 8.0) == pytest.approx(50.0)
 
     item_id = uuid4()
     assert admin_dashboard._global_search_parse_uuid(str(item_id)) == item_id
@@ -93,6 +100,7 @@ async def test_wave_i_orders_notification_and_cancel_helpers(monkeypatch: pytest
     created_notifications: list[dict[str, object]] = []
 
     async def _fake_create_notification(_session: object, **kwargs: object) -> None:
+        await _tick()
         created_notifications.append(kwargs)
 
     monkeypatch.setattr(orders_api.notification_service, "create_notification", _fake_create_notification)
@@ -101,6 +109,7 @@ async def test_wave_i_orders_notification_and_cancel_helpers(monkeypatch: pytest
     owner = SimpleNamespace(id=uuid4(), email="owner@example.com", preferred_language="ro")
 
     async def _fake_owner(_session: object) -> object:
+        await _tick()
         return owner
 
     monkeypatch.setattr(orders_api.auth_service, "get_owner_user", _fake_owner)
@@ -157,6 +166,7 @@ async def test_wave_i_orders_status_email_and_user_notification_helpers(monkeypa
         *,
         customer_lang: str | None,
     ) -> None:
+        await _tick()
         reward_calls.append(getattr(order, "status"))
 
     monkeypatch.setattr(orders_api, "_queue_first_order_reward_email", _fake_first_order_reward_email)
@@ -164,6 +174,7 @@ async def test_wave_i_orders_status_email_and_user_notification_helpers(monkeypa
     status_calls: list[dict[str, object]] = []
 
     async def _fake_create_notification(_session: object, **kwargs: object) -> None:
+        await _tick()
         status_calls.append(kwargs)
 
     monkeypatch.setattr(orders_api.notification_service, "create_notification", _fake_create_notification)
@@ -210,6 +221,7 @@ async def test_wave_i_auth_admin_device_and_silent_refresh_helpers(monkeypatch: 
     seen_device_calls: list[dict[str, object]] = []
 
     async def _fake_seen_refresh_device(_session: object, **kwargs: object) -> bool:
+        await _tick()
         seen_device_calls.append(kwargs)
         return False
 
@@ -223,6 +235,7 @@ async def test_wave_i_auth_admin_device_and_silent_refresh_helpers(monkeypatch: 
     assert len(seen_device_calls) == 1
 
     async def _fake_get_owner(_session: object) -> object:
+        await _tick()
         return SimpleNamespace(email="owner@example.com", preferred_language="ro")
 
     monkeypatch.setattr(auth_api.auth_service, "get_owner_user", _fake_get_owner)
@@ -263,15 +276,18 @@ async def test_wave_i_catalog_translation_and_lookup_helpers(monkeypatch: pytest
     assert resolved_ids == [root_id, child_id, grandchild_id]
 
     async def _missing_category(_session: object, _slug: str) -> object:
+        await _tick()
         return None
 
     monkeypatch.setattr(catalog_service, "get_category_by_slug", _missing_category)
     assert await catalog_service._get_category_and_descendant_ids_by_slug(SimpleNamespace(), "missing") == []
 
     async def _fake_get_category(_session: object, _slug: str) -> object:
+        await _tick()
         return SimpleNamespace(id=root_id)
 
     async def _fake_descendants(_session: object, _root: UUID) -> list[UUID]:
+        await _tick()
         return [root_id, child_id]
 
     monkeypatch.setattr(catalog_service, "get_category_by_slug", _fake_get_category)
@@ -342,6 +358,7 @@ async def test_wave_i_catalog_unique_slug_and_sku_helpers(monkeypatch: pytest.Mo
     monkeypatch.setattr(catalog_service.secrets, "choice", lambda _pool: next(digits))
 
     async def _fake_get_product_by_sku(_session: object, candidate: str) -> object | None:
+        await _tick()
         if candidate.endswith("0000"):
             return object()
         return None
