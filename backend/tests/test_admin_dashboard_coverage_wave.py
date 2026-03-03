@@ -1281,6 +1281,7 @@ async def test_admin_dashboard_public_endpoint_reflection_superstep_a(monkeypatc
     monkeypatch.setattr(admin_dashboard, '_dashboard_alert_thresholds_payload', lambda *_args, **_kwargs: {'ok': True})
 
     invoked = 0
+    failed_calls: list[tuple[str, str]] = []
     for name, func in inspect.getmembers(admin_dashboard, inspect.iscoroutinefunction):
         if func.__module__ != admin_dashboard.__name__ or name.startswith('_'):
             continue
@@ -1296,8 +1297,8 @@ async def test_admin_dashboard_public_endpoint_reflection_superstep_a(monkeypatc
             )
         try:
             await func(**kwargs)
-        except Exception:
-            pass
+        except Exception as exc:
+            failed_calls.append((name, type(exc).__name__))
         invoked += 1
 
     assert invoked >= 40
