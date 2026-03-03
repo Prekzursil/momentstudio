@@ -485,3 +485,166 @@ def test_cli_wave_run_cli_command_seed_and_unknown(monkeypatch: pytest.MonkeyPat
     assert cli._run_cli_command(argparse.Namespace(command="seed-data", profile="adriana")) is True
     assert ran["seed"] == "adriana"
     assert cli._run_cli_command(argparse.Namespace(command="unknown")) is False
+
+
+class _ScalarOneResult:
+    def __init__(self, value: object | None) -> None:
+        self._value = value
+
+    def scalar_one_or_none(self) -> object | None:
+        return self._value
+
+
+class _OwnerSession:
+    def __init__(self, execute_values: list[object | None] | None = None) -> None:
+        self._execute_values = list(execute_values or [])
+        self.added: list[object] = []
+
+    async def execute(self, _stmt: object) -> _ScalarOneResult:
+        await asyncio.sleep(0)
+        value = self._execute_values.pop(0) if self._execute_values else None
+        return _ScalarOneResult(value)
+
+    def add(self, value: object) -> None:
+        self.added.append(value)
+
+
+def test_cli_wave_owner_input_normalization_and_validation(capsys: pytest.CaptureFixture[str]) -> None:
+    normalized = cli._normalize_bootstrap_inputs(" OWNER@Example.com ", " owner ", "  ")
+    assert normalized == ("owner@example.com", "owner", "owner")
+
+    with pytest.raises(SystemExit, match="Invalid email"):
+        cli._validate_bootstrap_inputs("invalid-email", "owner", "password123")
+
+    with pytest.raises(SystemExit, match="Username is required"):
+        cli._validate_bootstrap_inputs("owner@example.com", "", "password123")
+
+    cli._validate_bootstrap_inputs("owner@example.com", "owner", "short")
+    assert "password shorter than 6 characters" in capsys.readouterr().out
+
+    repair_inputs = cli._normalize_repair_inputs(" OWNER@Example.com ", " owner ", " Display ")
+    assert repair_inputs == ("owner@example.com", "owner", "Display")
+
+    with pytest.raises(SystemExit, match="Invalid email"):
+        cli._validate_repair_inputs("invalid-email", None)
+
+    cli._validate_repair_inputs("owner@example.com", "short")
+    assert "setting owner password shorter than 6 characters" in capsys.readouterr().out
+
+
+@pytest.mark.anyio
+async def test_cli_wave_owner_repair_helper_branches(monkeypatch: pytest.MonkeyPatch) -> None:
+    owner_id = uuid.uuid4()
+    now = datetime(2026, 3, 3, 10, 0, tzinfo=timezone.utc)
+
+    owner = SimpleNamespace(
+        id=owner_id,
+        email="owner@example.com",
+        email_verified=False,
+        username="owner",
+        name="Owner",
+        name_tag=0,
+        hashed_password="old-hash",
+    )
+
+    cli._set_owner_verified_without_email_change(owner, verify_email=False)
+    assert owner.email_verified is False
+    cli._set_owner_verified_without_email_change(owner, verify_email=True)
+    assert owner.email_verified is True
+
+    cli._raise_if_owner_email_taken(None, owner_id=owner_id, email_norm="owner@example.com")
+    cli._raise_if_owner_email_taken(owner, owner_id=owner_id, email_norm="owner@example.com")
+    with pytest.raises(SystemExit, match="Email already registered"):
+        cli._raise_if_owner_email_taken(
+            SimpleNamespace(id=uuid.uuid4()),
+            owner_id=owner_id,
+            email_norm="owner@example.com",
+        )
+
+    session = _OwnerSession()
+    cli._update_owner_email_if_needed(session, owner=owner, email_norm="owner@example.com", now=now)
+    assert session.added == []
+    cli._update_owner_email_if_needed(session, owner=owner, email_norm="next@example.com", now=now)
+    assert owner.email == "next@example.com"
+    assert len(session.added) == 1
+
+    owner.email_verified = True
+    cli._update_owner_email_verification(owner, verify_email=False, email_norm="different@example.com")
+    assert owner.email_verified is False
+    cli._update_owner_email_verification(owner, verify_email=True, email_norm="different@example.com")
+    assert owner.email_verified is True
+
+    monkeypatch.setattr(cli.security, "hash_password", lambda value: f"hashed::{value}")
+    cli._repair_owner_password(owner, "new-secret")
+    assert owner.hashed_password == "hashed::new-secret"
+
+    owner.email = "owner@example.com"
+    owner.email_verified = False
+    await cli._repair_owner_email(
+        _OwnerSession(),
+        owner=owner,
+        email_norm=None,
+        verify_email=True,
+        now=now,
+    )
+    assert owner.email == "owner@example.com"
+    assert owner.email_verified is True
+
+    with pytest.raises(SystemExit, match="Email already registered"):
+        await cli._repair_owner_email(
+            _OwnerSession([SimpleNamespace(id=uuid.uuid4())]),
+            owner=owner,
+            email_norm="taken@example.com",
+            verify_email=False,
+            now=now,
+        )
+
+    owner.email_verified = False
+    email_session = _OwnerSession([None])
+    await cli._repair_owner_email(
+        email_session,
+        owner=owner,
+        email_norm="updated@example.com",
+        verify_email=True,
+        now=now,
+    )
+    assert owner.email == "updated@example.com"
+    assert owner.email_verified is True
+    assert len(email_session.added) == 1
+
+    with pytest.raises(SystemExit, match="Username already taken"):
+        await cli._repair_owner_username(
+            _OwnerSession([SimpleNamespace(id=uuid.uuid4())]),
+            owner=owner,
+            username_norm="taken-user",
+            now=now,
+        )
+
+    username_session = _OwnerSession([None])
+    await cli._repair_owner_username(
+        username_session,
+        owner=owner,
+        username_norm="new-owner",
+        now=now,
+    )
+    assert owner.username == "new-owner"
+    assert len(username_session.added) == 1
+
+    async def _fake_allocate_name_tag(_session: object, *, name: str, exclude_user_id: uuid.UUID | None = None) -> int:
+        await asyncio.sleep(0)
+        assert name == "New Display"
+        assert exclude_user_id == owner_id
+        return 7
+
+    monkeypatch.setattr(cli, "_allocate_name_tag", _fake_allocate_name_tag)
+
+    display_session = _OwnerSession()
+    await cli._repair_owner_display_name(
+        display_session,
+        owner=owner,
+        display_name_norm="New Display",
+        now=now,
+    )
+    assert owner.name == "New Display"
+    assert owner.name_tag == 7
+    assert len(display_session.added) == 1
