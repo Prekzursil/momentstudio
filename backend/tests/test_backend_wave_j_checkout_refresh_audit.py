@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from types import SimpleNamespace
@@ -13,6 +14,10 @@ from starlette.requests import Request
 from app.api.v1 import admin_dashboard
 from app.api.v1 import auth as auth_api
 from app.api.v1 import orders as orders_api
+
+
+async def _yield_once() -> None:
+    await asyncio.sleep(0)
 
 
 def _request(*, headers: dict[str, str] | None = None, client_host: str = "127.0.0.1") -> Request:
@@ -37,6 +42,7 @@ class _AddressRecorder:
         self.calls: list[tuple[object | None, object]] = []
 
     async def create_address(self, _session: object, user_id: object | None, payload: object) -> object:
+        await _yield_once()
         self.calls.append((user_id, payload))
         return SimpleNamespace(id=uuid4(), payload=payload)
 
@@ -46,6 +52,7 @@ class _ScalarQueueSession:
         self._values = list(values)
 
     async def execute(self, _statement: object) -> object:
+        await _yield_once()
         value = self._values.pop(0) if self._values else None
         return SimpleNamespace(scalar_one_or_none=lambda: value)
 
@@ -61,12 +68,15 @@ class _RefreshRotateSession:
         self.added.append(value)
 
     async def flush(self) -> None:
+        await _yield_once()
         self.flush_count += 1
 
     async def commit(self) -> None:
+        await _yield_once()
         self.commit_count += 1
 
     async def refresh(self, _value: object) -> None:
+        await _yield_once()
         self.refresh_count += 1
 
 
@@ -231,6 +241,7 @@ async def test_wave_j_orders_guest_checkout_and_payment_branches(monkeypatch: py
         checkout_settings: object,
         country_code: str | None,
     ) -> tuple[object, object]:
+        await _yield_once()
         calculate_calls.append(
             {
                 "shipping_method": shipping_method,
@@ -274,6 +285,7 @@ async def test_wave_j_orders_guest_checkout_and_payment_branches(monkeypatch: py
     monkeypatch.setattr(orders_api, "_build_stripe_line_items", lambda _cart, _totals, *, lang=None: [{"sku": "x"}])
 
     async def _fake_checkout_session(**kwargs: object) -> dict[str, object]:
+        await _yield_once()
         return {"session_id": "stripe-session", "checkout_url": "https://checkout.example.test"}
 
     monkeypatch.setattr(orders_api.payments, "create_checkout_session", _fake_checkout_session)
@@ -294,6 +306,7 @@ async def test_wave_j_orders_guest_checkout_and_payment_branches(monkeypatch: py
     monkeypatch.setattr(orders_api, "_build_paypal_items", lambda _cart, *, lang=None: [{"name": "item"}])
 
     async def _fake_paypal_create_order(**kwargs: object) -> tuple[str, str]:
+        await _yield_once()
         return "paypal-order", "https://approve.example.test"
 
     monkeypatch.setattr(orders_api.paypal_service, "create_order", _fake_paypal_create_order)
@@ -333,6 +346,7 @@ async def test_wave_j_orders_netopia_payment_branches(monkeypatch: pytest.Monkey
     order = SimpleNamespace(netopia_ntp_id=None, netopia_payment_url=None)
 
     async def _fake_start_netopia_payment_for_order(*args: object, **kwargs: object) -> tuple[str, str] | None:
+        await _yield_once()
         order_ref = args[0] if args else kwargs.get("order")
         if getattr(order_ref, "skip_netopia", False):
             return None
@@ -433,9 +447,11 @@ async def test_wave_j_auth_refresh_session_rotation_helpers(monkeypatch: pytest.
             self._user = user
 
         async def get(self, _model: object, _id: object) -> object | None:
+            await _yield_once()
             return self._user
 
     async def _ensure_active(_session: object, _user: object) -> None:
+        await _yield_once()
         return None
 
     monkeypatch.setattr(auth_api, "_ensure_user_account_active", _ensure_active)
@@ -493,6 +509,7 @@ async def test_wave_j_auth_reused_rotated_token_pair_and_rotate(monkeypatch: pyt
         user_id: Any,
         now: datetime,
     ) -> object | None:
+        await _yield_once()
         if replacement_jti == "replacement-jti":
             return SimpleNamespace(jti="replacement-jti", expires_at=now + timedelta(minutes=20), persistent=False, revoked=False, user_id=user_id)
         return None
@@ -537,6 +554,7 @@ async def test_wave_j_auth_reused_rotated_token_pair_and_rotate(monkeypatch: pyt
         ip_address: str | None,
         country_code: str | None,
     ) -> object:
+        await _yield_once()
         assert persistent is True
         assert user_agent == "CLI/2.0"
         assert ip_address == "198.51.100.99"
