@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
@@ -7,7 +8,7 @@ from uuid import uuid4
 import zipfile
 
 import pytest
-from fastapi import HTTPException
+from fastapi import BackgroundTasks, HTTPException, Response
 from starlette.requests import Request
 
 from app.api.v1 import orders as orders_api
@@ -47,9 +48,11 @@ def _guest_payload(**overrides: object) -> SimpleNamespace:
         _SECRET_FIELD: auth_value,
         'username': 'guestuser',
         'first_name': 'Guest',
+        'middle_name': '',
         'last_name': 'User',
         'date_of_birth': '2000-01-01',
         'phone': '+40723204204',
+        'preferred_language': None,
     }
     base.update(overrides)
     return SimpleNamespace(**base)
@@ -485,3 +488,621 @@ def test_orders_payment_confirmation_helpers() -> None:
     assert contact == ('owner@example.com', 'ro')
     fallback_contact = orders_api._payment_capture_contact(SimpleNamespace(user=None, customer_email='fallback@example.com'))
     assert fallback_contact == ('fallback@example.com', None)
+
+
+class _RecorderCheckoutSession:
+    def __init__(self, *, scalar_values: list[object] | None = None, cart_row: object | None = None) -> None:
+        self.scalar_values = list(scalar_values or [])
+        self.cart_row = cart_row
+        self.added: list[object] = []
+        self.commits = 0
+        self.refreshed: list[object] = []
+
+    async def scalar(self, _stmt: object) -> object | None:
+        return self.scalar_values.pop(0) if self.scalar_values else None
+
+    async def get(self, _model: object, _key: object) -> object | None:
+        return self.cart_row
+
+    def add(self, obj: object) -> None:
+        self.added.append(obj)
+
+    async def commit(self) -> None:
+        self.commits += 1
+
+    async def refresh(self, obj: object) -> None:
+        self.refreshed.append(obj)
+
+
+class _ScalarOneOrNoneResult:
+    def __init__(self, value: object | None) -> None:
+        self._value = value
+
+    def scalar_one_or_none(self) -> object | None:
+        return self._value
+
+
+class _ExecuteSession:
+    def __init__(self, value: object | None) -> None:
+        self._value = value
+
+    async def execute(self, _stmt: object) -> _ScalarOneOrNoneResult:
+        return _ScalarOneOrNoneResult(self._value)
+
+
+@pytest.mark.anyio
+async def test_orders_loader_and_small_branch_helpers(monkeypatch: pytest.MonkeyPatch) -> None:
+    missing_id = uuid4()
+
+    async def _missing_admin_order(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr(orders_api.order_service, 'get_order_by_id_admin', _missing_admin_order)
+    with pytest.raises(HTTPException, match='Order not found'):
+        await orders_api._load_admin_order_or_404(SimpleNamespace(), missing_id)
+
+    order = SimpleNamespace(id=missing_id)
+
+    async def _found_admin_order(*_args, **_kwargs):
+        return order
+
+    monkeypatch.setattr(orders_api.order_service, 'get_order_by_id_admin', _found_admin_order)
+    assert await orders_api._load_admin_order_or_404(SimpleNamespace(), missing_id) is order
+
+    assert orders_api._order_placed_title('ro') == 'Comandă plasată'
+    assert orders_api._order_reference_body(SimpleNamespace(reference_code='')) is None
+    orders_api._assert_confirmation_access(SimpleNamespace(id=uuid4(), user_id=None), current_user=None, payload_order_id=None)
+    orders_api._apply_stripe_confirmation_outcome(
+        SimpleNamespace(mock='success'),
+        mock_mode=True,
+        order=SimpleNamespace(stripe_payment_intent_id=None),
+        checkout_session=None,
+    )
+    assert await orders_api._payment_capture_receipt_share_days(
+        SimpleNamespace(),
+        include_receipt_share_days=False,
+    ) is None
+
+
+@pytest.mark.anyio
+async def test_orders_create_order_paths_with_existing_and_new_order(monkeypatch: pytest.MonkeyPatch) -> None:
+    cart = SimpleNamespace(id=uuid4(), items=[SimpleNamespace(id=1)])
+    existing_order = SimpleNamespace(id=uuid4(), reference_code='EXIST')
+    created_order = SimpleNamespace(id=uuid4(), reference_code='NEW')
+    current_user = SimpleNamespace(id=uuid4(), email='buyer@example.com', name='Buyer', preferred_language='en')
+    payload = SimpleNamespace(shipping_method_id=uuid4(), shipping_address_id=uuid4(), billing_address_id=uuid4())
+
+    async def _load_cart(_session, _user_id):
+        return cart
+
+    async def _resolve_existing(_session, _cart):
+        return existing_order
+
+    monkeypatch.setattr(orders_api, '_load_user_cart_for_create_order', _load_cart)
+    monkeypatch.setattr(orders_api, '_resolve_existing_cart_order', _resolve_existing)
+
+    existing_response = Response()
+    existing_result = await orders_api.create_order(
+        response=existing_response,
+        background_tasks=BackgroundTasks(),
+        payload=payload,
+        session=SimpleNamespace(),
+        current_user=current_user,
+    )
+    assert existing_result is existing_order
+    assert existing_response.status_code == 200
+
+    async def _resolve_missing_existing(_session, _cart):
+        return None
+
+    async def _resolve_country(*_args, **_kwargs):
+        return 'RO'
+
+    async def _resolve_shipping_method(*_args, **_kwargs):
+        return SimpleNamespace(id=uuid4())
+
+    async def _settings(*_args, **_kwargs):
+        return SimpleNamespace(receipt_share_days=9)
+
+    async def _totals(*_args, **_kwargs):
+        return (SimpleNamespace(tax=Decimal('1.0'), fee=Decimal('2.0'), shipping=Decimal('3.0'), total=Decimal('4.0')), None)
+
+    async def _build_order(*_args, **_kwargs):
+        return created_order
+
+    queued: list[object] = []
+
+    async def _queue_notifications(*_args, **_kwargs):
+        queued.append(True)
+
+    monkeypatch.setattr(orders_api, '_resolve_existing_cart_order', _resolve_missing_existing)
+    monkeypatch.setattr(orders_api, '_resolve_shipping_country_for_create_order', _resolve_country)
+    monkeypatch.setattr(orders_api, '_resolve_shipping_method_for_create_order', _resolve_shipping_method)
+    monkeypatch.setattr(orders_api.checkout_settings_service, 'get_checkout_settings', _settings)
+    monkeypatch.setattr(orders_api.cart_service, 'calculate_totals_async', _totals)
+    monkeypatch.setattr(orders_api.order_service, 'build_order_from_cart', _build_order)
+    monkeypatch.setattr(orders_api, '_queue_create_order_notifications', _queue_notifications)
+
+    created_result = await orders_api.create_order(
+        response=Response(),
+        background_tasks=BackgroundTasks(),
+        payload=payload,
+        session=SimpleNamespace(),
+        current_user=current_user,
+    )
+    assert created_result is created_order
+    assert queued == [True]
+
+
+@pytest.mark.anyio
+async def test_orders_checkout_route_paths_without_network(monkeypatch: pytest.MonkeyPatch) -> None:
+    user = SimpleNamespace(
+        id=uuid4(),
+        email='buyer@example.com',
+        preferred_language='en',
+        phone='+40123',
+    )
+    cart = SimpleNamespace(id=uuid4(), items=[SimpleNamespace(id=1)])
+    payload = SimpleNamespace(
+        accept_terms=False,
+        accept_privacy=False,
+        shipping_method_id=None,
+        courier='fan',
+        delivery_type='home',
+        locker_id=None,
+        locker_name=None,
+        locker_address=None,
+        locker_lat=None,
+        locker_lng=None,
+        phone=None,
+        payment_method='cod',
+        promo_code='',
+        invoice_company=None,
+        invoice_vat_id=None,
+    )
+    request = _request(headers={'origin': 'https://allowed.example'})
+
+    async def _required_versions(*_args, **_kwargs):
+        return {'terms': 1}
+
+    async def _accepted_versions(*_args, **_kwargs):
+        return {}
+
+    monkeypatch.setattr(orders_api.legal_consents_service, 'required_doc_versions', _required_versions)
+    monkeypatch.setattr(orders_api.legal_consents_service, 'latest_accepted_versions', _accepted_versions)
+    monkeypatch.setattr(orders_api.legal_consents_service, 'is_satisfied', lambda *_args, **_kwargs: False)
+
+    with pytest.raises(HTTPException, match='Legal consents required'):
+        await orders_api.checkout(
+            payload=payload,
+            request=request,
+            response=Response(),
+            background_tasks=BackgroundTasks(),
+            _=None,
+            session=SimpleNamespace(),
+            current_user=user,
+            session_id='sid-1',
+        )
+
+    payload.accept_terms = True
+    payload.accept_privacy = True
+
+    async def _get_cart(*_args, **_kwargs):
+        return cart
+
+    async def _existing_checkout(*_args, **_kwargs):
+        return SimpleNamespace(order_id=uuid4(), reference_code='EXISTING')
+
+    monkeypatch.setattr(orders_api.cart_service, 'get_cart', _get_cart)
+    monkeypatch.setattr(orders_api, '_resolve_existing_checkout_response', _existing_checkout)
+
+    existing_response = Response()
+    existing = await orders_api.checkout(
+        payload=payload,
+        request=request,
+        response=existing_response,
+        background_tasks=BackgroundTasks(),
+        _=None,
+        session=SimpleNamespace(),
+        current_user=user,
+        session_id='sid-1',
+    )
+    assert existing.reference_code == 'EXISTING'
+    assert existing_response.status_code == 200
+
+    async def _no_existing_checkout(*_args, **_kwargs):
+        return None
+
+    async def _prepare(*_args, **_kwargs):
+        return SimpleNamespace(order=SimpleNamespace(id=uuid4()), payment_method='cod')
+
+    async def _finalize(*_args, **_kwargs):
+        return SimpleNamespace(order_id=uuid4(), reference_code='FINAL')
+
+    monkeypatch.setattr(orders_api, '_resolve_existing_checkout_response', _no_existing_checkout)
+    monkeypatch.setattr(orders_api, '_prepare_logged_checkout_data', _prepare)
+    monkeypatch.setattr(orders_api, '_finalize_logged_checkout', _finalize)
+
+    finalized = await orders_api.checkout(
+        payload=payload,
+        request=request,
+        response=Response(),
+        background_tasks=BackgroundTasks(),
+        _=None,
+        session=SimpleNamespace(),
+        current_user=user,
+        session_id='sid-1',
+    )
+    assert finalized.reference_code == 'FINAL'
+
+
+@pytest.mark.anyio
+async def test_orders_capture_paypal_path_and_coupon_notifications(monkeypatch: pytest.MonkeyPatch) -> None:
+    order_id = uuid4()
+    order = SimpleNamespace(
+        id=order_id,
+        reference_code='REF-1',
+        payment_method='paypal',
+        status=OrderStatus.pending_payment,
+        paypal_capture_id=None,
+        events=[],
+        user_id=None,
+    )
+    payload = SimpleNamespace(paypal_order_id='PO-1', order_id=order_id, mock='success')
+    session = SimpleNamespace()
+    background_tasks = BackgroundTasks()
+    current_user = SimpleNamespace(id=uuid4())
+
+    async def _load_order(*_args, **_kwargs):
+        return order
+
+    monkeypatch.setattr(orders_api, '_get_order_by_paypal_order_id_for_confirmation', _load_order)
+    monkeypatch.setattr(orders_api, 'is_mock_payments', lambda: True)
+
+    finalized: list[str] = []
+    redeemed: list[str] = []
+    queued: list[str] = []
+
+    async def _finalize(_session, _order, *, note: str, add_capture_event: bool):
+        finalized.append(note)
+        return True
+
+    async def _redeem(_session, *, order: object, note: str):
+        redeemed.append(note)
+
+    async def _queue(*_args, **_kwargs):
+        queued.append('queued')
+
+    monkeypatch.setattr(orders_api, '_finalize_order_after_payment_capture', _finalize)
+    monkeypatch.setattr(orders_api.coupons_service, 'redeem_coupon_for_order', _redeem)
+    monkeypatch.setattr(orders_api, '_queue_payment_capture_notifications', _queue)
+
+    result = await orders_api.capture_paypal_order(
+        payload=payload,
+        background_tasks=background_tasks,
+        session=session,
+        current_user=current_user,
+    )
+    assert result.order_id == order_id
+    assert order.paypal_capture_id is not None
+    assert len(finalized) == 1
+    assert len(redeemed) == 1
+    assert queued == ['queued']
+
+    order_with_capture = SimpleNamespace(
+        id=order_id,
+        reference_code='REF-1',
+        payment_method='paypal',
+        status=OrderStatus.pending_payment,
+        paypal_capture_id='existing-cap',
+        events=[],
+        user_id=None,
+    )
+
+    async def _load_existing_capture(*_args, **_kwargs):
+        return order_with_capture
+
+    monkeypatch.setattr(orders_api, '_get_order_by_paypal_order_id_for_confirmation', _load_existing_capture)
+    existing_result = await orders_api.capture_paypal_order(
+        payload=payload,
+        background_tasks=BackgroundTasks(),
+        session=session,
+        current_user=current_user,
+    )
+    assert existing_result.paypal_capture_id == 'existing-cap'
+
+
+@pytest.mark.anyio
+async def test_orders_checkout_discount_coupon_and_guest_user_creation(monkeypatch: pytest.MonkeyPatch) -> None:
+    payload = SimpleNamespace(promo_code='PROMO', country='RO')
+    current_user = SimpleNamespace(id=uuid4(), email='buyer@example.com')
+    cart = SimpleNamespace(id=uuid4())
+    checkout_settings = SimpleNamespace()
+    shipping_method = SimpleNamespace()
+
+    async def _apply_discount(*_args, **_kwargs):
+        return SimpleNamespace(coupon='COUPON', shipping_discount_ron=Decimal('4.25'))
+
+    monkeypatch.setattr(orders_api.coupons_service, 'apply_discount_code_to_cart', _apply_discount)
+    promo, discount, coupon, shipping_discount = await orders_api._resolve_logged_checkout_discount(
+        SimpleNamespace(),
+        payload=payload,
+        current_user=current_user,
+        cart=cart,
+        checkout_settings=checkout_settings,
+        shipping_method=shipping_method,
+    )
+    assert promo is None
+    assert discount is not None
+    assert coupon == 'COUPON'
+    assert shipping_discount == Decimal('4.25')
+
+    async def _apply_not_found(*_args, **_kwargs):
+        raise HTTPException(status_code=404, detail='no discount')
+
+    async def _validate_promo(*_args, **_kwargs):
+        return 'PROMO-VALID'
+
+    monkeypatch.setattr(orders_api.coupons_service, 'apply_discount_code_to_cart', _apply_not_found)
+    monkeypatch.setattr(orders_api.cart_service, 'validate_promo', _validate_promo)
+    promo2, discount2, coupon2, shipping_discount2 = await orders_api._resolve_logged_checkout_discount(
+        SimpleNamespace(),
+        payload=payload,
+        current_user=current_user,
+        cart=cart,
+        checkout_settings=checkout_settings,
+        shipping_method=shipping_method,
+    )
+    assert promo2 == 'PROMO-VALID'
+    assert discount2 is None
+    assert coupon2 is None
+    assert shipping_discount2 == Decimal('0.00')
+
+    async def _apply_error(*_args, **_kwargs):
+        raise HTTPException(status_code=500, detail='boom')
+
+    monkeypatch.setattr(orders_api.coupons_service, 'apply_discount_code_to_cart', _apply_error)
+    with pytest.raises(HTTPException, match='boom'):
+        await orders_api._resolve_logged_checkout_discount(
+            SimpleNamespace(),
+            payload=payload,
+            current_user=current_user,
+            cart=cart,
+            checkout_settings=checkout_settings,
+            shipping_method=shipping_method,
+        )
+
+    reserve_calls: list[str] = []
+    redeem_calls: list[str] = []
+
+    async def _reserve(*_args, **_kwargs):
+        reserve_calls.append('reserve')
+
+    async def _redeem(*_args, **_kwargs):
+        redeem_calls.append('redeem')
+
+    monkeypatch.setattr(orders_api.coupons_service, 'reserve_coupon_for_order', _reserve)
+    monkeypatch.setattr(orders_api.coupons_service, 'redeem_coupon_for_order', _redeem)
+    await orders_api._reserve_checkout_coupon(
+        SimpleNamespace(),
+        current_user=current_user,
+        order=SimpleNamespace(id=uuid4()),
+        applied_coupon='COUPON',
+        discount_val=Decimal('5.00'),
+        coupon_shipping_discount=Decimal('1.00'),
+        payment_method='cod',
+    )
+    assert reserve_calls == ['reserve']
+    assert redeem_calls == ['redeem']
+
+    async def _email_taken(*_args, **_kwargs):
+        return True
+
+    monkeypatch.setattr(orders_api.auth_service, 'is_email_taken', _email_taken)
+    with pytest.raises(HTTPException, match='already registered'):
+        await orders_api._assert_guest_email_available(SimpleNamespace(), 'guest@example.com')
+
+    session = _RecorderCheckoutSession()
+    background_tasks = BackgroundTasks()
+    payload_no_account = _guest_payload(create_account=False)
+    assert (
+        await orders_api._maybe_create_guest_checkout_user(
+            session,
+            background_tasks,
+            payload=payload_no_account,
+            email='guest@example.com',
+            customer_name='Guest User',
+        )
+        is None
+    )
+
+    created_user = SimpleNamespace(
+        id=uuid4(),
+        email='guest@example.com',
+        first_name='Guest',
+        preferred_language='en',
+        email_verified=False,
+    )
+
+    async def _create_user(*_args, **_kwargs):
+        return created_user
+
+    monkeypatch.setattr(orders_api.auth_service, 'create_user', _create_user)
+    payload_account = _guest_payload(create_account=True)
+    created_user_id = await orders_api._maybe_create_guest_checkout_user(
+        session,
+        background_tasks,
+        payload=payload_account,
+        email='guest@example.com',
+        customer_name='Guest User',
+    )
+    assert created_user_id == created_user.id
+    assert created_user.email_verified is True
+    assert session.commits >= 1
+    assert len(background_tasks.tasks) >= 1
+
+
+@pytest.mark.anyio
+async def test_orders_checkout_pipeline_helpers_resolved_payment_and_prepare(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = SimpleNamespace()
+    payload = SimpleNamespace(
+        shipping_method_id=uuid4(),
+        courier='sameday',
+        delivery_type='home',
+        locker_id=None,
+        locker_name=None,
+        locker_address=None,
+        locker_lat=None,
+        locker_lng=None,
+        phone='+40000',
+        promo_code='',
+        payment_method='cod',
+        invoice_company=None,
+        invoice_vat_id=None,
+    )
+    current_user = SimpleNamespace(
+        id=uuid4(),
+        email='buyer@example.com',
+        phone='+40123',
+        preferred_language='en',
+        name='Buyer',
+    )
+    cart = SimpleNamespace(id=uuid4(), items=[SimpleNamespace(id=1)])
+
+    async def _shipping_method(*_args, **_kwargs):
+        return SimpleNamespace(id=uuid4())
+
+    async def _checkout_settings(*_args, **_kwargs):
+        return SimpleNamespace(phone_required=False, receipt_share_days=5)
+
+    monkeypatch.setattr(orders_api, '_resolve_shipping_method_for_create_order', _shipping_method)
+    monkeypatch.setattr(orders_api.checkout_settings_service, 'get_checkout_settings', _checkout_settings)
+    monkeypatch.setattr(
+        orders_api,
+        '_resolve_delivery_and_phone',
+        lambda *_args, **_kwargs: (('fan', 'home', None, None, None, None, None), '+40123'),
+    )
+
+    async def _discount(*_args, **_kwargs):
+        return ('PROMO', None, None, Decimal('0.00'))
+
+    monkeypatch.setattr(orders_api, '_resolve_logged_checkout_discount', _discount)
+    resolved = await orders_api._resolve_logged_checkout_inputs(
+        session,
+        payload=payload,
+        current_user=current_user,
+        cart=cart,
+    )
+    assert resolved.phone == '+40123'
+    assert resolved.promo == 'PROMO'
+
+    shipping_addr = SimpleNamespace(country='RO', id=uuid4())
+    billing_addr = SimpleNamespace(country='RO', id=uuid4())
+
+    async def _create_addresses(*_args, **_kwargs):
+        return shipping_addr, billing_addr
+
+    async def _resolve_totals(*_args, **_kwargs):
+        return SimpleNamespace(total=Decimal('10.0')), Decimal('2.0')
+
+    async def _initialize_payment(*_args, **_kwargs):
+        return 'cod', 'sess', 'url', 'pp-order', 'pp-url'
+
+    monkeypatch.setattr(orders_api, '_create_checkout_addresses', _create_addresses)
+    monkeypatch.setattr(orders_api, '_resolve_checkout_totals', _resolve_totals)
+    monkeypatch.setattr(orders_api, '_initialize_checkout_payment', _initialize_payment)
+    payment_data = await orders_api._resolve_logged_checkout_payment_data(
+        session,
+        payload=payload,
+        current_user=current_user,
+        cart=cart,
+        base='https://frontend.example',
+        resolved=resolved,
+    )
+    assert payment_data.payment_method == 'cod'
+    assert payment_data.stripe_session_id == 'sess'
+
+    async def _build_order(*_args, **_kwargs):
+        return SimpleNamespace(id=uuid4(), items=[], reference_code='REF')
+
+    monkeypatch.setattr(orders_api, '_build_checkout_order', _build_order)
+    prepared = await orders_api._build_logged_checkout_data(
+        session,
+        payload=payload,
+        current_user=current_user,
+        cart=cart,
+        base='https://frontend.example',
+        resolved=resolved,
+    )
+    assert prepared.order.reference_code == 'REF'
+
+    async def _resolve_inputs(*_args, **_kwargs):
+        return resolved
+
+    async def _build_data(*_args, **_kwargs):
+        return prepared
+
+    monkeypatch.setattr(orders_api, '_resolve_logged_checkout_inputs', _resolve_inputs)
+    monkeypatch.setattr(orders_api, '_build_logged_checkout_data', _build_data)
+    prepared_again = await orders_api._prepare_logged_checkout_data(
+        session,
+        payload=payload,
+        current_user=current_user,
+        cart=cart,
+        base='https://frontend.example',
+    )
+    assert prepared_again is prepared
+
+
+@pytest.mark.anyio
+async def test_orders_cart_loader_and_netopia_refresh_helpers(monkeypatch: pytest.MonkeyPatch) -> None:
+    user_id = uuid4()
+    cart = SimpleNamespace(id=uuid4(), items=[SimpleNamespace(id=1)], last_order_id=uuid4())
+    execute_session = _ExecuteSession(cart)
+    loaded = await orders_api._load_user_cart_for_create_order(execute_session, user_id)
+    assert loaded is cart
+
+    with pytest.raises(HTTPException, match='Cart is empty'):
+        await orders_api._load_user_cart_for_create_order(_ExecuteSession(SimpleNamespace(id=uuid4(), items=[])), user_id)
+
+    with pytest.raises(HTTPException, match='Cart is empty'):
+        await orders_api._load_user_cart_for_create_order(_ExecuteSession(None), user_id)
+
+    checkout_session = _RecorderCheckoutSession(scalar_values=[cart.id], cart_row=cart)
+    order = SimpleNamespace(id=uuid4(), payment_method='netopia', status=OrderStatus.pending_payment)
+
+    monkeypatch.setattr(orders_api, '_can_restart_existing_netopia_payment', lambda *_args, **_kwargs: True)
+
+    async def _start_payment(*_args, **_kwargs):
+        return ('ntp-id', 'https://pay.example')
+
+    monkeypatch.setattr(orders_api, '_start_netopia_payment_for_order', _start_payment)
+    await orders_api._refresh_existing_order_netopia_payment(
+        checkout_session,
+        order,
+        email='buyer@example.com',
+        phone='+40123',
+        lang='en',
+        base='https://frontend.example',
+    )
+    assert order.netopia_ntp_id == 'ntp-id'
+    assert checkout_session.commits == 1
+    assert checkout_session.refreshed == [order]
+
+    async def _no_payment(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr(orders_api, '_start_netopia_payment_for_order', _no_payment)
+    await orders_api._refresh_existing_order_netopia_payment(
+        checkout_session,
+        order,
+        email='buyer@example.com',
+        phone='+40123',
+        lang='en',
+        base='https://frontend.example',
+    )
+    assert checkout_session.commits == 1
+
+    no_cart_session = _RecorderCheckoutSession(cart_row=None)
+    await orders_api._clear_cart_last_order_pointer(no_cart_session, cart_id=uuid4())
+    assert no_cart_session.added == []

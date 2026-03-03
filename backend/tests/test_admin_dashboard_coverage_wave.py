@@ -812,3 +812,386 @@ def test_admin_dashboard_audit_duplicate_and_gdpr_helpers(monkeypatch: pytest.Mo
         )
         is None
     )
+
+
+class _ScalarSession:
+    def __init__(self, values: list[object | None]) -> None:
+        self.values = list(values)
+
+    async def scalar(self, _stmt: object) -> object | None:
+        return self.values.pop(0) if self.values else None
+
+
+class _RowsResult:
+    def __init__(self, rows: list[object] | None = None, *, one_row: tuple[object, object] | None = None) -> None:
+        self._rows = list(rows or [])
+        self._one_row = one_row or (0, 0.0)
+
+    def all(self) -> list[object]:
+        return list(self._rows)
+
+    def one(self) -> tuple[object, object]:
+        return self._one_row
+
+    def scalars(self) -> "_RowsResultScalars":
+        return _RowsResultScalars(self._rows)
+
+
+class _RowsResultScalars:
+    def __init__(self, rows: list[object]) -> None:
+        self._rows = list(rows)
+
+    def all(self) -> list[object]:
+        return list(self._rows)
+
+
+class _ExecuteQueueSession:
+    def __init__(self, results: list[_RowsResult]) -> None:
+        self._results = list(results)
+
+    async def execute(self, _stmt: object) -> _RowsResult:
+        if not self._results:
+            raise AssertionError("Unexpected execute() call")
+        return self._results.pop(0)
+
+
+@pytest.mark.anyio
+async def test_admin_dashboard_summary_metric_wrappers_high_yield(monkeypatch: pytest.MonkeyPatch) -> None:
+    totals_session = _ScalarSession([5, 8, 3, 2])
+    totals = await admin_dashboard._summary_totals(totals_session, exclude_test_orders=True)
+    assert totals == {'products': 5, 'orders': 8, 'users': 3, 'low_stock': 2}
+
+    sales_session = _ScalarSession([120.0, 150.0, 10.0, 5.0, 7])
+    sales = await admin_dashboard._summary_sales_metrics(
+        sales_session,
+        datetime(2026, 2, 1, tzinfo=timezone.utc),
+        datetime(2026, 2, 2, tzinfo=timezone.utc),
+        (admin_dashboard.OrderStatus.paid,),
+        (admin_dashboard.OrderStatus.paid, admin_dashboard.OrderStatus.refunded),
+        True,
+    )
+    assert sales['orders'] == 7
+    _assert_close(float(sales['gross_sales']), 150.0)
+    _assert_close(float(sales['net_sales']), 135.0)
+
+    refunded_session = _ScalarSession([4])
+    assert (
+        await admin_dashboard._summary_refunded_order_count(
+            refunded_session,
+            datetime(2026, 2, 1, tzinfo=timezone.utc),
+            datetime(2026, 2, 2, tzinfo=timezone.utc),
+            True,
+        )
+        == 4
+    )
+
+    async def _sales_metrics(*_args, **_kwargs):
+        if _kwargs.get('start') and _kwargs.get('end'):
+            raise AssertionError('unexpected kwargs style')
+        start = _args[1]
+        if start.hour == 0 and start.day == 20:
+            return {'orders': 4, 'sales': 80.0, 'gross_sales': 100.0, 'net_sales': 70.0}
+        return {'orders': 2, 'sales': 50.0, 'gross_sales': 60.0, 'net_sales': 40.0}
+
+    async def _refund_count(*_args, **_kwargs):
+        start = _args[1]
+        return 3 if start.day == 20 else 1
+
+    monkeypatch.setattr(admin_dashboard, '_summary_sales_metrics', _sales_metrics)
+    monkeypatch.setattr(admin_dashboard, '_summary_refunded_order_count', _refund_count)
+    day_metrics = await admin_dashboard._summary_day_metrics(
+        SimpleNamespace(),
+        datetime(2026, 2, 20, 12, 0, tzinfo=timezone.utc),
+        (admin_dashboard.OrderStatus.paid,),
+        (admin_dashboard.OrderStatus.paid,),
+        True,
+    )
+    assert day_metrics['today_orders'] == 4
+    assert day_metrics['today_refunds'] == 3
+
+    failed_session = _ScalarSession([6, 2])
+    assert await admin_dashboard._summary_failed_payment_counts(
+        failed_session,
+        datetime(2026, 2, 20, 12, 0, tzinfo=timezone.utc),
+        True,
+    ) == (6, 2)
+
+    refund_session = _ScalarSession([5, 3, 40, 30])
+    refund_counts = await admin_dashboard._summary_refund_request_counts(
+        refund_session,
+        datetime(2026, 2, 20, 12, 0, tzinfo=timezone.utc),
+        True,
+    )
+    assert refund_counts['refund_requests'] == 5
+    assert refund_counts['refund_window_orders_prev'] == 30
+
+    async def _failed_counts(*_args, **_kwargs):
+        return (9, 4)
+
+    async def _refund_counts(*_args, **_kwargs):
+        return {'refund_requests': 8, 'refund_requests_prev': 2, 'refund_window_orders': 50, 'refund_window_orders_prev': 40}
+
+    async def _stockouts(*_args, **_kwargs):
+        return 11
+
+    monkeypatch.setattr(admin_dashboard, '_summary_failed_payment_counts', _failed_counts)
+    monkeypatch.setattr(admin_dashboard, '_summary_refund_request_counts', _refund_counts)
+    monkeypatch.setattr(admin_dashboard, '_summary_stockouts_count', _stockouts)
+    anomaly_inputs = await admin_dashboard._summary_anomaly_inputs(
+        SimpleNamespace(),
+        datetime(2026, 2, 20, 12, 0, tzinfo=timezone.utc),
+        True,
+    )
+    assert anomaly_inputs['failed_payments'] == 9
+    assert anomaly_inputs['stockouts'] == 11
+
+
+@pytest.mark.anyio
+async def test_admin_dashboard_funnel_channel_and_payment_query_helpers(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def _funnel_counts(*_args, **_kwargs):
+        return (10, 7, 5, 3)
+
+    monkeypatch.setattr(
+        admin_dashboard,
+        '_summary_resolve_range',
+        lambda now, _range_days, _range_from, _range_to: (
+            datetime(2026, 2, 1, tzinfo=timezone.utc),
+            datetime(2026, 2, 8, tzinfo=timezone.utc),
+            7,
+        ),
+    )
+    monkeypatch.setattr(admin_dashboard, '_funnel_counts', _funnel_counts)
+    funnel_payload = await admin_dashboard.admin_funnel_metrics(
+        session=SimpleNamespace(),
+        _=object(),
+        range_days=7,
+        range_from=None,
+        range_to=None,
+    )
+    assert funnel_payload.counts.orders == 3
+    _assert_close(funnel_payload.conversions.to_cart, 0.7)
+
+    row_gross = [('stripe', 3, 100.0), ('paypal', 2, 30.0)]
+    row_refunds = [('stripe', 10.0)]
+    row_missing = [('paypal', 5.0)]
+    channel_session = _ExecuteQueueSession(
+        [_RowsResult(row_gross), _RowsResult(row_refunds), _RowsResult(row_missing)]
+    )
+    channel_items = await admin_dashboard._channel_breakdown_items(
+        channel_session,
+        datetime(2026, 2, 1, tzinfo=timezone.utc),
+        datetime(2026, 2, 2, tzinfo=timezone.utc),
+        (admin_dashboard.OrderStatus.paid,),
+        True,
+        col=admin_dashboard.Order.payment_method,
+    )
+    assert channel_items[0]['key'] == 'stripe'
+    assert channel_items[1]['net_sales'] == 25.0
+
+    payments_session = _ExecuteQueueSession([_RowsResult([('stripe', 4), (None, 1)])])
+    payments_counts = await admin_dashboard._payments_method_counts(
+        payments_session,
+        since=datetime(2026, 2, 1, tzinfo=timezone.utc),
+        now=datetime(2026, 2, 2, tzinfo=timezone.utc),
+        exclude_test_orders=True,
+        status_clause=True,
+    )
+    assert payments_counts == {'stripe': 4, 'unknown': 1}
+
+    webhook_rows = [SimpleNamespace(id='e1'), SimpleNamespace(id='e2')]
+    recent_session = _ExecuteQueueSession([_RowsResult(webhook_rows)])
+    recent = await admin_dashboard._payments_recent_webhook_rows(
+        recent_session,
+        since=datetime(2026, 2, 1, tzinfo=timezone.utc),
+        model=admin_dashboard.StripeWebhookEvent,
+    )
+    assert len(recent) == 2
+
+
+@pytest.mark.anyio
+async def test_admin_dashboard_refunds_shipping_and_stockout_paths(monkeypatch: pytest.MonkeyPatch) -> None:
+    provider_rows_session = _ExecuteQueueSession([_RowsResult([(None, 2, 30.5), ('stripe', 1, 9.0)])])
+    provider_rows = await admin_dashboard._refund_provider_rows(
+        provider_rows_session,
+        provider_col=admin_dashboard.Order.payment_method,
+        exclude_test_orders=True,
+        window_start=datetime(2026, 2, 1, tzinfo=timezone.utc),
+        window_end=datetime(2026, 2, 2, tzinfo=timezone.utc),
+    )
+    assert provider_rows[0] == ('unknown', 2, 30.5)
+
+    missing_session = _ExecuteQueueSession([_RowsResult([], one_row=(3, 44.0))])
+    assert (
+        await admin_dashboard._refund_missing_refunds(
+            missing_session,
+            exclude_test_orders=True,
+            window_start=datetime(2026, 2, 1, tzinfo=timezone.utc),
+            window_end=datetime(2026, 2, 2, tzinfo=timezone.utc),
+        )
+        == (3, 44.0)
+    )
+
+    reasons_session = _ExecuteQueueSession([_RowsResult(['Damaged item', '', 'Wrong product'])])
+    reasons = await admin_dashboard._refund_reason_counts(
+        reasons_session,
+        exclude_test_orders=True,
+        window_start=datetime(2026, 2, 1, tzinfo=timezone.utc),
+        window_end=datetime(2026, 2, 2, tzinfo=timezone.utc),
+    )
+    assert reasons['damaged'] == 1
+    assert reasons['other'] == 1
+
+    async def _provider(*_args, **_kwargs):
+        window_end = _kwargs.get('window_end') if _kwargs else None
+        if window_end is None and len(_args) >= 5:
+            window_end = _args[4]
+        if window_end and window_end.day == 1:
+            return [('stripe', 1, 10.0)]
+        return [('stripe', 2, 30.0)]
+
+    async def _missing(*_args, **_kwargs):
+        return (2, 20.0)
+
+    async def _reasons(*_args, **_kwargs):
+        return {'damaged': 2}
+
+    monkeypatch.setattr(admin_dashboard, '_refund_provider_rows', _provider)
+    monkeypatch.setattr(admin_dashboard, '_refund_missing_refunds', _missing)
+    monkeypatch.setattr(admin_dashboard, '_refund_reason_counts', _reasons)
+    refund_payload = await admin_dashboard.admin_refunds_breakdown(
+        session=SimpleNamespace(),
+        _=object(),
+        window_days=7,
+    )
+    assert refund_payload['window_days'] == 7
+    assert refund_payload['providers'][0]['provider'] == 'stripe'
+
+    ship_rows_session = _ExecuteQueueSession(
+        [_RowsResult([(datetime(2026, 2, 1, tzinfo=timezone.utc), 'fan', datetime(2026, 2, 1, 4, tzinfo=timezone.utc))])]
+    )
+    ship_map = await admin_dashboard._shipping_collect_ship_durations(
+        ship_rows_session,
+        window_start=datetime(2026, 2, 1, tzinfo=timezone.utc),
+        window_end=datetime(2026, 2, 2, tzinfo=timezone.utc),
+        exclude_test_orders=True,
+        courier_col=admin_dashboard.Order.courier,
+        shipped_subq=admin_dashboard._shipping_shipped_subquery(),
+    )
+    assert ship_map == {'fan': [4.0]}
+
+    delivery_rows_session = _ExecuteQueueSession(
+        [_RowsResult([('fan', datetime(2026, 2, 1, tzinfo=timezone.utc), datetime(2026, 2, 2, tzinfo=timezone.utc))])]
+    )
+    delivery_map = await admin_dashboard._shipping_collect_delivery_durations(
+        delivery_rows_session,
+        window_start=datetime(2026, 2, 1, tzinfo=timezone.utc),
+        window_end=datetime(2026, 2, 3, tzinfo=timezone.utc),
+        exclude_test_orders=True,
+        courier_col=admin_dashboard.Order.courier,
+        shipped_subq=admin_dashboard._shipping_shipped_subquery(),
+        delivered_subq=admin_dashboard._shipping_delivered_subquery(),
+    )
+    assert delivery_map == {'fan': [24.0]}
+
+    async def _ship_collect(*_args, **_kwargs):
+        return {'fan': [4.0]}
+
+    async def _delivery_collect(*_args, **_kwargs):
+        return {'fan': [20.0]}
+
+    monkeypatch.setattr(admin_dashboard, '_shipping_collect_ship_durations', _ship_collect)
+    monkeypatch.setattr(admin_dashboard, '_shipping_collect_delivery_durations', _delivery_collect)
+    current_ship, previous_ship, current_delivery, previous_delivery = await admin_dashboard._shipping_period_durations(
+        session=SimpleNamespace(),
+        start=datetime(2026, 2, 10, tzinfo=timezone.utc),
+        now=datetime(2026, 2, 20, tzinfo=timezone.utc),
+        prev_start=datetime(2026, 2, 1, tzinfo=timezone.utc),
+        exclude_test_orders=True,
+        courier_col='fan',
+        shipped_subq='ship',
+        delivered_subq='delivered',
+    )
+    assert current_ship == {'fan': [4.0]}
+    assert previous_delivery == {'fan': [20.0]}
+
+    monkeypatch.setattr(
+        admin_dashboard,
+        '_shipping_window_bounds',
+        lambda _window_days: (
+            datetime(2026, 2, 20, tzinfo=timezone.utc),
+            datetime(2026, 2, 10, tzinfo=timezone.utc),
+            datetime(2026, 2, 1, tzinfo=timezone.utc),
+        ),
+    )
+    monkeypatch.setattr(admin_dashboard, '_shipping_query_context', lambda: (True, 'ship', 'deliver', 'fan'))
+    async def _period_durations(*_args, **_kwargs):
+        return (
+            {'fan': [4.0]},
+            {'fan': [6.0]},
+            {'fan': [20.0]},
+            {'fan': [24.0]},
+        )
+
+    monkeypatch.setattr(admin_dashboard, '_shipping_period_durations', _period_durations)
+    shipping_payload = await admin_dashboard.admin_shipping_performance(
+        session=SimpleNamespace(),
+        _=object(),
+        window_days=10,
+    )
+    assert shipping_payload['window_days'] == 10
+    assert shipping_payload['time_to_ship'][0]['courier'] == 'fan'
+
+    demand_session = _ExecuteQueueSession([_RowsResult([(uuid4(), 3, 45.0)])])
+    demand = await admin_dashboard._stockout_demand_map(
+        demand_session,
+        since=datetime(2026, 2, 1, tzinfo=timezone.utc),
+        now=datetime(2026, 2, 2, tzinfo=timezone.utc),
+        successful_statuses=(admin_dashboard.OrderStatus.paid,),
+        product_ids=[uuid4()],
+        exclude_test_orders=True,
+    )
+    assert next(iter(demand.values())) == (3, 45.0)
+    assert admin_dashboard._stockout_avg_price(0, 0.0, 12.5) == 12.5
+
+    async def _empty_restock(*_args, **_kwargs):
+        return []
+
+    monkeypatch.setattr(admin_dashboard.inventory_service, 'list_restock_list', _empty_restock)
+    empty_stockout = await admin_dashboard.admin_stockout_impact(
+        session=SimpleNamespace(),
+        _=object(),
+        window_days=7,
+        limit=5,
+    )
+    assert empty_stockout['items'] == []
+
+    restock_row = SimpleNamespace(
+        product_id=uuid4(),
+        product_slug='ring',
+        product_name='Ring',
+        available_quantity=0,
+        reserved_in_carts=3,
+        reserved_in_orders=1,
+        stock_quantity=0,
+    )
+
+    async def _restock(*_args, **_kwargs):
+        return [restock_row]
+
+    async def _demand_map(*_args, **_kwargs):
+        return {restock_row.product_id: (6, 180.0)}
+
+    async def _product_map(*_args, **_kwargs):
+        return {restock_row.product_id: {'base_price': 30.0, 'sale_price': None, 'currency': 'RON', 'allow_backorder': False}}
+
+    monkeypatch.setattr(admin_dashboard.inventory_service, 'list_restock_list', _restock)
+    monkeypatch.setattr(admin_dashboard, '_stockout_demand_map', _demand_map)
+    monkeypatch.setattr(admin_dashboard, '_stockout_product_map', _product_map)
+    stockout_payload = await admin_dashboard.admin_stockout_impact(
+        session=SimpleNamespace(),
+        _=object(),
+        window_days=7,
+        limit=5,
+    )
+    assert len(stockout_payload['items']) == 1
+    assert stockout_payload['items'][0]['product_slug'] == 'ring'

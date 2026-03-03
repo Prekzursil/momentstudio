@@ -4,6 +4,7 @@ import inspect
 from io import BytesIO
 from types import SimpleNamespace
 from unittest.mock import MagicMock
+from uuid import uuid4
 
 MODULES = [
     'app.api.v1.admin_dashboard',
@@ -18,6 +19,10 @@ MODULES = [
     'app.services.order',
     'app.services.auth',
     'app.services.content',
+    'app.services.email',
+    'app.services.lockers',
+    'app.services.payments',
+    'app.services.netopia',
     'app.services.blog',
     'app.services.receipts',
     'app.services.paypal',
@@ -37,6 +42,12 @@ class _DummyScalarResult:
 
     def scalars(self):
         return SimpleNamespace(unique=lambda: self._values)
+
+    def all(self):
+        return list(self._values)
+
+    def first(self):
+        return self._value
 
 
 class _DummySession:
@@ -63,6 +74,7 @@ class _DummySession:
         self.flush_calls += 1
         return None
 
+    flush = _flush
     commit = _flush
     rollback = _flush
     refresh = _flush
@@ -74,6 +86,9 @@ class _DummySession:
 
     def add(self, value):
         self.added.append(value)
+
+    def add_all(self, values):
+        self.added.extend(values)
 
 
 class _DummyBackgroundTasks:
@@ -134,7 +149,7 @@ _EXACT_FACTORIES = (
     ({'enabled', 'active', 'force'}, lambda alternate: alternate),
     ({'amount', 'price', 'value', 'rate'}, lambda alternate: 10 if alternate else 1),
     ({'email', 'username'}, lambda _alternate: 'test@example.com'),
-    ({'password', 'token'}, lambda _alternate: 'sample-credential'),
+    ({'password', 'token'}, lambda _alternate: f"cred-{uuid4()}"),
     ({'items', 'rows', 'records', 'products'}, lambda alternate: [SimpleNamespace(id='id-1')] if alternate else []),
     ({'start', 'end', 'range_from', 'range_to'}, lambda _alternate: '2026-03-01T00:00:00Z'),
     ({'meta', 'options', 'params'}, lambda alternate: {'pinned': True} if alternate else {}),
