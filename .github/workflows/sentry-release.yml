@@ -66,10 +66,12 @@ jobs:
 
             sentry_api_base="${SENTRY_URL:-https://sentry.io}"
             api_candidate="$(
-              curl -fsSL \
-                -H "Authorization: Bearer ${SENTRY_AUTH_TOKEN}" \
-                -H "Content-Type: application/json" \
-                "${sentry_api_base%/}/api/0/organizations/${SENTRY_ORG}/projects/" 2>/dev/null \
+              {
+                curl -sSL \
+                  -H "Authorization: Bearer ${SENTRY_AUTH_TOKEN}" \
+                  -H "Content-Type: application/json" \
+                  "${sentry_api_base%/}/api/0/organizations/${SENTRY_ORG}/projects/" 2>/dev/null || true
+              } \
               | python - <<'PY'
           import json
           import sys
@@ -231,4 +233,5 @@ jobs:
             echo ""
             echo "Published release \`$RELEASE\` and uploaded frontend sourcemaps from \`frontend/dist/app/browser\`."
           } >> "$GITHUB_STEP_SUMMARY"
+
 
