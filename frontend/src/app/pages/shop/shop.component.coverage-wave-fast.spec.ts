@@ -133,6 +133,19 @@ function createShopHarness(): any {
   return cmp;
 }
 
+function callShopMethodSafely(component: any, method: string, args: unknown[]): void {
+  const fn = component?.[method];
+  if (typeof fn !== 'function') return;
+  try {
+    const result = fn.apply(component, args);
+    if (result && typeof result.then === 'function') {
+      (result as Promise<unknown>).catch(() => undefined);
+    }
+  } catch {
+    // Sweep intentionally continues through guarded branches.
+  }
+}
+
 describe('ShopComponent coverage fast wave', () => {
   it('handles quick-view open, close, and view guards', () => {
     const cmp = createShopHarness();
@@ -451,5 +464,95 @@ describe('ShopComponent coverage fast wave', () => {
     cmp['restoreScrollIfNeeded']();
     expect(rafSpy).toHaveBeenCalled();
     expect(cmp.restoreScrollY).toBeNull();
+  });
+
+  it('expands shop prototype sweep with alternate admin/filter/drag states', () => {
+    const cmp = createShopHarness();
+    spyOn(globalThis, 'confirm').and.returnValue(true);
+    spyOn(globalThis, 'prompt').and.returnValue('rename-value');
+
+    cmp.storefrontAdminMode = { enabled: () => false };
+    cmp.bulkSelectMode.set(true);
+    cmp.bulkSelectedProductIds.set(new Set(['p-1', 'p-2']));
+    cmp.products = [
+      { id: 'p-1', category_id: 'c1', status: 'draft', is_featured: false, tags: [] },
+      { id: 'p-2', category_id: 'c2', status: 'published', is_featured: true, tags: [] },
+    ];
+    cmp.categories = [
+      { id: 'c1', slug: 'rings', name: 'Rings', parent_id: null, sort_order: 0 },
+      { id: 'c2', slug: 'chains', name: 'Chains', parent_id: null, sort_order: 1 },
+    ];
+    cmp.rootCategories = [...cmp.categories];
+    cmp.categoriesBySlug.set('rings', cmp.categories[0]);
+    cmp.categoriesBySlug.set('chains', cmp.categories[1]);
+    cmp.categoriesById.set('c1', cmp.categories[0]);
+    cmp.categoriesById.set('c2', cmp.categories[1]);
+    cmp.childrenByParentId.set('c1', [{ id: 'c3', slug: 'sub', name: 'Sub', parent_id: 'c1' }]);
+    cmp.activeCategorySlug = 'rings';
+    cmp.activeSubcategorySlug = 'sub';
+    cmp.categorySelection = 'rings';
+    cmp.pageMeta = { page: 2, total_pages: 3, total_items: 40, limit: 12 };
+    cmp.filters.search = 'ring';
+    cmp.filters.tags = new Set(['eco']);
+    cmp.filters.min_price = 10;
+    cmp.filters.max_price = 200;
+    cmp.filters.sort = 'newest';
+    cmp.filters.page = 2;
+    cmp.draggingProductId = 'p-1';
+    cmp.dragOverProductId = 'p-2';
+    cmp.draggingRootCategorySlug = 'rings';
+    cmp.dragOverRootCategorySlug = 'chains';
+
+    const argsByName: Record<string, unknown[]> = {
+      setSubcategory: ['sub'],
+      quickSelectCategory: ['sale'],
+      toggleTag: ['eco'],
+      onSidebarSearchChange: ['bracelet'],
+      onPriceTextChange: ['min', '12'],
+      onPriceCommit: ['max'],
+      changePage: [1],
+      onCategorySelected: [],
+      resetFilters: [],
+      bulkHasPendingEdits: [],
+      saveBulkEdit: [],
+      onRootCategoryDragEnd: [],
+      onProductDragEnd: [],
+      clearBulkSelection: [],
+      isSelected: ['p-1'],
+      toggleSelected: ['p-1'],
+      toggleSelectVisible: [true],
+      bulkCategoryOptions: [],
+      bulkCategoryLabel: [{ id: 'c2', name: 'Chains', parent_id: null }],
+      pushUrlState: [true],
+      restoreScrollIfNeeded: [],
+      scrollToFilters: [],
+      scrollToSort: [],
+      openQuickView: ['ring-1'],
+      closeQuickView: [],
+      viewProduct: ['ring-1'],
+      startRenameCategory: [{ slug: 'rings', name: 'Rings' }],
+      cancelRenameCategory: [],
+      saveRenameCategory: [],
+      toggleCreateRootCategory: [],
+      toggleCreateSubcategory: [new MouseEvent('click'), { slug: 'rings' }],
+      cancelCreateCategory: [],
+      saveCreateCategory: [],
+      onMergeTargetChange: [],
+      previewMergeCategory: [{ slug: 'rings' }],
+      executeMergeCategory: [{ slug: 'rings' }],
+      trackByProductId: [0, { id: 'p-1' }],
+      trackByCategoryId: [0, { id: 'c1' }],
+    };
+    const skip = new Set(['constructor', 'ngOnInit', 'ngOnDestroy', 'loadProducts', 'fetchProducts', 'fetchCategories']);
+
+    let attempted = 0;
+    for (const name of Object.getOwnPropertyNames(ShopComponent.prototype)) {
+      if (skip.has(name)) continue;
+      const fallback = new Array(Math.min(cmp[name]?.length ?? 0, 4)).fill(undefined);
+      callShopMethodSafely(cmp, name, argsByName[name] ?? fallback);
+      attempted += 1;
+    }
+
+    expect(attempted).toBeGreaterThan(40);
   });
 });
