@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 
 from decimal import Decimal
 from pathlib import Path
@@ -498,18 +499,22 @@ class _RecorderCheckoutSession:
         self.refreshed: list[object] = []
 
     async def scalar(self, _stmt: object) -> object | None:
+        await asyncio.sleep(0)
         return self.scalar_values.pop(0) if self.scalar_values else None
 
     async def get(self, _model: object, _key: object) -> object | None:
+        await asyncio.sleep(0)
         return self.cart_row
 
     def add(self, obj: object) -> None:
         self.added.append(obj)
 
     async def commit(self) -> None:
+        await asyncio.sleep(0)
         self.commits += 1
 
     async def refresh(self, obj: object) -> None:
+        await asyncio.sleep(0)
         self.refreshed.append(obj)
 
 
@@ -526,6 +531,7 @@ class _ExecuteSession:
         self._value = value
 
     async def execute(self, _stmt: object) -> _ScalarOneOrNoneResult:
+        await asyncio.sleep(0)
         return _ScalarOneOrNoneResult(self._value)
 
 
@@ -534,6 +540,7 @@ async def test_orders_loader_and_small_branch_helpers(monkeypatch: pytest.Monkey
     missing_id = uuid4()
 
     async def _missing_admin_order(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return None
 
     monkeypatch.setattr(orders_api.order_service, 'get_order_by_id_admin', _missing_admin_order)
@@ -543,6 +550,7 @@ async def test_orders_loader_and_small_branch_helpers(monkeypatch: pytest.Monkey
     order = SimpleNamespace(id=missing_id)
 
     async def _found_admin_order(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return order
 
     monkeypatch.setattr(orders_api.order_service, 'get_order_by_id_admin', _found_admin_order)
@@ -572,9 +580,11 @@ async def test_orders_create_order_paths_with_existing_and_new_order(monkeypatch
     payload = SimpleNamespace(shipping_method_id=uuid4(), shipping_address_id=uuid4(), billing_address_id=uuid4())
 
     async def _load_cart(_session, _user_id):
+        await asyncio.sleep(0)
         return cart
 
     async def _resolve_existing(_session, _cart):
+        await asyncio.sleep(0)
         return existing_order
 
     monkeypatch.setattr(orders_api, '_load_user_cart_for_create_order', _load_cart)
@@ -592,26 +602,33 @@ async def test_orders_create_order_paths_with_existing_and_new_order(monkeypatch
     assert existing_response.status_code == 200
 
     async def _resolve_missing_existing(_session, _cart):
+        await asyncio.sleep(0)
         return None
 
     async def _resolve_country(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return 'RO'
 
     async def _resolve_shipping_method(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return SimpleNamespace(id=uuid4())
 
     async def _settings(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return SimpleNamespace(receipt_share_days=9)
 
     async def _totals(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return (SimpleNamespace(tax=Decimal('1.0'), fee=Decimal('2.0'), shipping=Decimal('3.0'), total=Decimal('4.0')), None)
 
     async def _build_order(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return created_order
 
     queued: list[object] = []
 
     async def _queue_notifications(*_args, **_kwargs):
+        await asyncio.sleep(0)
         queued.append(True)
 
     monkeypatch.setattr(orders_api, '_resolve_existing_cart_order', _resolve_missing_existing)
@@ -662,9 +679,11 @@ async def test_orders_checkout_route_paths_without_network(monkeypatch: pytest.M
     request = _request(headers={'origin': 'https://allowed.example'})
 
     async def _required_versions(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return {'terms': 1}
 
     async def _accepted_versions(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return {}
 
     monkeypatch.setattr(orders_api.legal_consents_service, 'required_doc_versions', _required_versions)
@@ -687,9 +706,11 @@ async def test_orders_checkout_route_paths_without_network(monkeypatch: pytest.M
     payload.accept_privacy = True
 
     async def _get_cart(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return cart
 
     async def _existing_checkout(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return SimpleNamespace(order_id=uuid4(), reference_code='EXISTING')
 
     monkeypatch.setattr(orders_api.cart_service, 'get_cart', _get_cart)
@@ -710,12 +731,15 @@ async def test_orders_checkout_route_paths_without_network(monkeypatch: pytest.M
     assert existing_response.status_code == 200
 
     async def _no_existing_checkout(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return None
 
     async def _prepare(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return SimpleNamespace(order=SimpleNamespace(id=uuid4()), payment_method='cod')
 
     async def _finalize(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return SimpleNamespace(order_id=uuid4(), reference_code='FINAL')
 
     monkeypatch.setattr(orders_api, '_resolve_existing_checkout_response', _no_existing_checkout)
@@ -753,6 +777,7 @@ async def test_orders_capture_paypal_path_and_coupon_notifications(monkeypatch: 
     current_user = SimpleNamespace(id=uuid4())
 
     async def _load_order(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return order
 
     monkeypatch.setattr(orders_api, '_get_order_by_paypal_order_id_for_confirmation', _load_order)
@@ -763,13 +788,16 @@ async def test_orders_capture_paypal_path_and_coupon_notifications(monkeypatch: 
     queued: list[str] = []
 
     async def _finalize(_session, _order, *, note: str, add_capture_event: bool):
+        await asyncio.sleep(0)
         finalized.append(note)
         return True
 
     async def _redeem(_session, *, order: object, note: str):
+        await asyncio.sleep(0)
         redeemed.append(note)
 
     async def _queue(*_args, **_kwargs):
+        await asyncio.sleep(0)
         queued.append('queued')
 
     monkeypatch.setattr(orders_api, '_finalize_order_after_payment_capture', _finalize)
@@ -799,6 +827,7 @@ async def test_orders_capture_paypal_path_and_coupon_notifications(monkeypatch: 
     )
 
     async def _load_existing_capture(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return order_with_capture
 
     monkeypatch.setattr(orders_api, '_get_order_by_paypal_order_id_for_confirmation', _load_existing_capture)
@@ -820,6 +849,7 @@ async def test_orders_checkout_discount_coupon_and_guest_user_creation(monkeypat
     shipping_method = SimpleNamespace()
 
     async def _apply_discount(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return SimpleNamespace(coupon='COUPON', shipping_discount_ron=Decimal('4.25'))
 
     monkeypatch.setattr(orders_api.coupons_service, 'apply_discount_code_to_cart', _apply_discount)
@@ -837,9 +867,11 @@ async def test_orders_checkout_discount_coupon_and_guest_user_creation(monkeypat
     assert shipping_discount == Decimal('4.25')
 
     async def _apply_not_found(*_args, **_kwargs):
+        await asyncio.sleep(0)
         raise HTTPException(status_code=404, detail='no discount')
 
     async def _validate_promo(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return 'PROMO-VALID'
 
     monkeypatch.setattr(orders_api.coupons_service, 'apply_discount_code_to_cart', _apply_not_found)
@@ -858,6 +890,7 @@ async def test_orders_checkout_discount_coupon_and_guest_user_creation(monkeypat
     assert shipping_discount2 == Decimal('0.00')
 
     async def _apply_error(*_args, **_kwargs):
+        await asyncio.sleep(0)
         raise HTTPException(status_code=500, detail='boom')
 
     monkeypatch.setattr(orders_api.coupons_service, 'apply_discount_code_to_cart', _apply_error)
@@ -875,9 +908,11 @@ async def test_orders_checkout_discount_coupon_and_guest_user_creation(monkeypat
     redeem_calls: list[str] = []
 
     async def _reserve(*_args, **_kwargs):
+        await asyncio.sleep(0)
         reserve_calls.append('reserve')
 
     async def _redeem(*_args, **_kwargs):
+        await asyncio.sleep(0)
         redeem_calls.append('redeem')
 
     monkeypatch.setattr(orders_api.coupons_service, 'reserve_coupon_for_order', _reserve)
@@ -895,6 +930,7 @@ async def test_orders_checkout_discount_coupon_and_guest_user_creation(monkeypat
     assert redeem_calls == ['redeem']
 
     async def _email_taken(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return True
 
     monkeypatch.setattr(orders_api.auth_service, 'is_email_taken', _email_taken)
@@ -924,6 +960,7 @@ async def test_orders_checkout_discount_coupon_and_guest_user_creation(monkeypat
     )
 
     async def _create_user(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return created_user
 
     monkeypatch.setattr(orders_api.auth_service, 'create_user', _create_user)
@@ -969,9 +1006,11 @@ async def test_orders_checkout_pipeline_helpers_resolved_payment_and_prepare(mon
     cart = SimpleNamespace(id=uuid4(), items=[SimpleNamespace(id=1)])
 
     async def _shipping_method(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return SimpleNamespace(id=uuid4())
 
     async def _checkout_settings(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return SimpleNamespace(phone_required=False, receipt_share_days=5)
 
     monkeypatch.setattr(orders_api, '_resolve_shipping_method_for_create_order', _shipping_method)
@@ -983,6 +1022,7 @@ async def test_orders_checkout_pipeline_helpers_resolved_payment_and_prepare(mon
     )
 
     async def _discount(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return ('PROMO', None, None, Decimal('0.00'))
 
     monkeypatch.setattr(orders_api, '_resolve_logged_checkout_discount', _discount)
@@ -999,12 +1039,15 @@ async def test_orders_checkout_pipeline_helpers_resolved_payment_and_prepare(mon
     billing_addr = SimpleNamespace(country='RO', id=uuid4())
 
     async def _create_addresses(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return shipping_addr, billing_addr
 
     async def _resolve_totals(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return SimpleNamespace(total=Decimal('10.0')), Decimal('2.0')
 
     async def _initialize_payment(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return 'cod', 'sess', 'url', 'pp-order', 'pp-url'
 
     monkeypatch.setattr(orders_api, '_create_checkout_addresses', _create_addresses)
@@ -1022,6 +1065,7 @@ async def test_orders_checkout_pipeline_helpers_resolved_payment_and_prepare(mon
     assert payment_data.stripe_session_id == 'sess'
 
     async def _build_order(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return SimpleNamespace(id=uuid4(), items=[], reference_code='REF')
 
     monkeypatch.setattr(orders_api, '_build_checkout_order', _build_order)
@@ -1036,9 +1080,11 @@ async def test_orders_checkout_pipeline_helpers_resolved_payment_and_prepare(mon
     assert prepared.order.reference_code == 'REF'
 
     async def _resolve_inputs(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return resolved
 
     async def _build_data(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return prepared
 
     monkeypatch.setattr(orders_api, '_resolve_logged_checkout_inputs', _resolve_inputs)
@@ -1073,6 +1119,7 @@ async def test_orders_cart_loader_and_netopia_refresh_helpers(monkeypatch: pytes
     monkeypatch.setattr(orders_api, '_can_restart_existing_netopia_payment', lambda *_args, **_kwargs: True)
 
     async def _start_payment(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return ('ntp-id', 'https://pay.example')
 
     monkeypatch.setattr(orders_api, '_start_netopia_payment_for_order', _start_payment)
@@ -1089,6 +1136,7 @@ async def test_orders_cart_loader_and_netopia_refresh_helpers(monkeypatch: pytes
     assert checkout_session.refreshed == [order]
 
     async def _no_payment(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return None
 
     monkeypatch.setattr(orders_api, '_start_netopia_payment_for_order', _no_payment)
@@ -1117,9 +1165,11 @@ class _AdminRouteSession:
         self.added.append(obj)
 
     async def commit(self) -> None:
+        await asyncio.sleep(0)
         self.commits += 1
 
     async def refresh(self, obj: object, *, attribute_names: object | None = None) -> None:
+        await asyncio.sleep(0)
         self.refreshed.append((obj, attribute_names))
 
 
@@ -1138,12 +1188,15 @@ def _admin_order_stub() -> SimpleNamespace:
 
 def _install_order_admin_stubs(monkeypatch: pytest.MonkeyPatch, order: SimpleNamespace) -> None:
     async def _return_order(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return order
 
     async def _return_order_admin(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return order
 
     async def _serialize(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return order
 
     monkeypatch.setattr(orders_api.order_service, 'get_order_by_id', _return_order)
@@ -1161,12 +1214,14 @@ async def test_orders_admin_mutation_routes_superstep_a(monkeypatch: pytest.Monk
     _install_order_admin_stubs(monkeypatch, order)
 
     async def _update(*_args, **_kwargs):
+        await asyncio.sleep(0)
         order.status = OrderStatus.shipped
         return order
 
     monkeypatch.setattr(orders_api.order_service, 'update_order', _update)
 
     async def _record_status_change(*_args, **_kwargs):
+        await asyncio.sleep(0)
         status_changes.append('changed')
 
     monkeypatch.setattr(orders_api, '_handle_admin_order_status_change', _record_status_change)
@@ -1185,6 +1240,7 @@ async def test_orders_admin_mutation_routes_superstep_a(monkeypatch: pytest.Monk
     monkeypatch.setattr(orders_api.order_service, 'remove_order_tag', _update)
     monkeypatch.setattr(orders_api.order_service, 'review_order_fraud', _update)
     async def _noop_async(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return None
 
     monkeypatch.setattr(orders_api.order_service, 'update_fulfillment', _noop_async)
@@ -1208,27 +1264,35 @@ async def test_orders_admin_refund_email_cancel_and_reorder_routes_superstep_a(m
     _install_order_admin_stubs(monkeypatch, order)
 
     async def _return_order(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return order
 
     async def _return_owner(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return owner
 
     async def _record_refunded(*_args, **_kwargs):
+        await asyncio.sleep(0)
         queued.append('refunded')
 
     async def _record_owner_cancel(*_args, **_kwargs):
+        await asyncio.sleep(0)
         queued.append('owner-cancel')
 
     async def _record_user_cancel(*_args, **_kwargs):
+        await asyncio.sleep(0)
         queued.append('user-cancel')
 
     async def _settings(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return SimpleNamespace(receipt_share_days=7)
 
     async def _reorder(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return SimpleNamespace(id=uuid4())
 
     async def _serialize_cart(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return SimpleNamespace(items=[])
 
     monkeypatch.setattr(orders_api.order_service, 'retry_payment', _return_order)

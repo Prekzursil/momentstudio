@@ -820,6 +820,7 @@ class _ScalarSession:
         self.values = list(values)
 
     async def scalar(self, _stmt: object) -> object | None:
+        await asyncio.sleep(0)
         return self.values.pop(0) if self.values else None
 
 
@@ -851,6 +852,7 @@ class _ExecuteQueueSession:
         self._results = list(results)
 
     async def execute(self, _stmt: object) -> _RowsResult:
+        await asyncio.sleep(0)
         if not self._results:
             raise AssertionError("Unexpected execute() call")
         return self._results.pop(0)
@@ -887,6 +889,7 @@ async def test_admin_dashboard_summary_metric_wrappers_high_yield(monkeypatch: p
     )
 
     async def _sales_metrics(*_args, **_kwargs):
+        await asyncio.sleep(0)
         if _kwargs.get('start') and _kwargs.get('end'):
             raise AssertionError('unexpected kwargs style')
         start = _args[1]
@@ -895,6 +898,7 @@ async def test_admin_dashboard_summary_metric_wrappers_high_yield(monkeypatch: p
         return {'orders': 2, 'sales': 50.0, 'gross_sales': 60.0, 'net_sales': 40.0}
 
     async def _refund_count(*_args, **_kwargs):
+        await asyncio.sleep(0)
         start = _args[1]
         return 3 if start.day == 20 else 1
 
@@ -927,12 +931,15 @@ async def test_admin_dashboard_summary_metric_wrappers_high_yield(monkeypatch: p
     assert refund_counts['refund_window_orders_prev'] == 30
 
     async def _failed_counts(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return (9, 4)
 
     async def _refund_counts(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return {'refund_requests': 8, 'refund_requests_prev': 2, 'refund_window_orders': 50, 'refund_window_orders_prev': 40}
 
     async def _stockouts(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return 11
 
     monkeypatch.setattr(admin_dashboard, '_summary_failed_payment_counts', _failed_counts)
@@ -950,6 +957,7 @@ async def test_admin_dashboard_summary_metric_wrappers_high_yield(monkeypatch: p
 @pytest.mark.anyio
 async def test_admin_dashboard_funnel_channel_and_payment_query_helpers(monkeypatch: pytest.MonkeyPatch) -> None:
     async def _funnel_counts(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return (10, 7, 5, 3)
 
     monkeypatch.setattr(
@@ -987,7 +995,7 @@ async def test_admin_dashboard_funnel_channel_and_payment_query_helpers(monkeypa
         col=admin_dashboard.Order.payment_method,
     )
     assert channel_items[0]['key'] == 'stripe'
-    assert channel_items[1]['net_sales'] == 25.0
+    assert channel_items[1]['net_sales'] == pytest.approx(25.0)
 
     payments_session = _ExecuteQueueSession([_RowsResult([('stripe', 4), (None, 1)])])
     payments_counts = await admin_dashboard._payments_method_counts(
@@ -1043,6 +1051,7 @@ async def test_admin_dashboard_refunds_shipping_and_stockout_paths(monkeypatch: 
     assert reasons['other'] == 1
 
     async def _provider(*_args, **_kwargs):
+        await asyncio.sleep(0)
         window_end = _kwargs.get('window_end') if _kwargs else None
         if window_end is None and len(_args) >= 5:
             window_end = _args[4]
@@ -1051,9 +1060,11 @@ async def test_admin_dashboard_refunds_shipping_and_stockout_paths(monkeypatch: 
         return [('stripe', 2, 30.0)]
 
     async def _missing(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return (2, 20.0)
 
     async def _reasons(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return {'damaged': 2}
 
     monkeypatch.setattr(admin_dashboard, '_refund_provider_rows', _provider)
@@ -1095,14 +1106,16 @@ async def test_admin_dashboard_refunds_shipping_and_stockout_paths(monkeypatch: 
     assert delivery_map == {'fan': [24.0]}
 
     async def _ship_collect(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return {'fan': [4.0]}
 
     async def _delivery_collect(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return {'fan': [20.0]}
 
     monkeypatch.setattr(admin_dashboard, '_shipping_collect_ship_durations', _ship_collect)
     monkeypatch.setattr(admin_dashboard, '_shipping_collect_delivery_durations', _delivery_collect)
-    current_ship, previous_ship, current_delivery, previous_delivery = await admin_dashboard._shipping_period_durations(
+    current_ship, _previous_ship, _current_delivery, previous_delivery = await admin_dashboard._shipping_period_durations(
         session=SimpleNamespace(),
         start=datetime(2026, 2, 10, tzinfo=timezone.utc),
         now=datetime(2026, 2, 20, tzinfo=timezone.utc),
@@ -1126,6 +1139,7 @@ async def test_admin_dashboard_refunds_shipping_and_stockout_paths(monkeypatch: 
     )
     monkeypatch.setattr(admin_dashboard, '_shipping_query_context', lambda: (True, 'ship', 'deliver', 'fan'))
     async def _period_durations(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return (
             {'fan': [4.0]},
             {'fan': [6.0]},
@@ -1152,9 +1166,10 @@ async def test_admin_dashboard_refunds_shipping_and_stockout_paths(monkeypatch: 
         exclude_test_orders=True,
     )
     assert next(iter(demand.values())) == (3, 45.0)
-    assert admin_dashboard._stockout_avg_price(0, 0.0, 12.5) == 12.5
+    assert admin_dashboard._stockout_avg_price(0, 0.0, 12.5) == pytest.approx(12.5)
 
     async def _empty_restock(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return []
 
     monkeypatch.setattr(admin_dashboard.inventory_service, 'list_restock_list', _empty_restock)
@@ -1177,12 +1192,15 @@ async def test_admin_dashboard_refunds_shipping_and_stockout_paths(monkeypatch: 
     )
 
     async def _restock(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return [restock_row]
 
     async def _demand_map(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return {restock_row.product_id: (6, 180.0)}
 
     async def _product_map(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return {restock_row.product_id: {'base_price': 30.0, 'sale_price': None, 'currency': 'RON', 'allow_backorder': False}}
 
     monkeypatch.setattr(admin_dashboard.inventory_service, 'list_restock_list', _restock)
@@ -1204,21 +1222,26 @@ class _AdminSweepSession:
         self.commits = 0
 
     async def execute(self, *_args, **_kwargs) -> _RowsResult:
+        await asyncio.sleep(0)
         return _RowsResult([])
 
     async def scalar(self, *_args, **_kwargs) -> object | None:
+        await asyncio.sleep(0)
         return None
 
     async def get(self, *_args, **_kwargs) -> object | None:
+        await asyncio.sleep(0)
         return None
 
     def add(self, value: object) -> None:
         self.added.append(value)
 
     async def commit(self) -> None:
+        await asyncio.sleep(0)
         self.commits += 1
 
     async def refresh(self, *_args, **_kwargs) -> None:
+        await asyncio.sleep(0)
         return None
 
 
@@ -1272,6 +1295,7 @@ async def test_admin_dashboard_public_endpoint_reflection_superstep_a(monkeypatc
     admin_user = SimpleNamespace(id=uuid4(), email='admin@example.com', role='owner', preferred_language='en')
 
     async def _owner(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return admin_user
 
     monkeypatch.setattr(admin_dashboard.pii_service, 'require_pii_reveal', lambda *_args, **_kwargs: None)

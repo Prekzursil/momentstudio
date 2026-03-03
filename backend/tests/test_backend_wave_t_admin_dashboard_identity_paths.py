@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 
 from datetime import datetime, timezone
 from types import SimpleNamespace
@@ -89,14 +90,17 @@ class _Session:
         self.refreshed: list[object] = []
 
     async def get(self, _model: object, key: UUID):
+        await asyncio.sleep(0)
         return self.get_map.get(key)
 
     async def execute(self, _stmt: object) -> _ExecResult:
+        await asyncio.sleep(0)
         if not self.execute_results:
             raise AssertionError("Unexpected execute() call")
         return self.execute_results.pop(0)
 
     async def scalar(self, _stmt: object):
+        await asyncio.sleep(0)
         if self.scalar_results:
             return self.scalar_results.pop(0)
         return None
@@ -110,12 +114,15 @@ class _Session:
         self.added_all_batches.append(batch)
 
     async def flush(self) -> None:
+        await asyncio.sleep(0)
         self.flushes += 1
 
     async def commit(self) -> None:
+        await asyncio.sleep(0)
         self.commits += 1
 
     async def refresh(self, value: object) -> None:
+        await asyncio.sleep(0)
         self.refreshed.append(value)
 
 
@@ -253,6 +260,7 @@ async def test_admin_dashboard_resend_email_verification_paths(monkeypatch: pyte
     )
 
     async def _create_verification(_session: object, _user_obj: object):
+        await asyncio.sleep(0)
         return record
 
     monkeypatch.setattr(admin_dashboard.auth_service, "create_email_verification", _create_verification)
@@ -260,6 +268,7 @@ async def test_admin_dashboard_resend_email_verification_paths(monkeypatch: pyte
     audit_calls: list[dict[str, object]] = []
 
     async def _audit_log(_session: object, **kwargs: object) -> None:
+        await asyncio.sleep(0)
         audit_calls.append(kwargs)
 
     monkeypatch.setattr(admin_dashboard.audit_chain_service, "add_admin_audit_log", _audit_log)
@@ -289,6 +298,7 @@ async def test_admin_dashboard_resend_password_reset_paths(monkeypatch: pytest.M
     request = _request(headers={"user-agent": "AdminAgent/2.0"})
 
     async def _no_target_email(_session: object, *, user: object, requested_email: str):
+        await asyncio.sleep(0)
         return "", "primary"
 
     monkeypatch.setattr(admin_dashboard, "_password_reset_target_email", _no_target_email)
@@ -304,9 +314,11 @@ async def test_admin_dashboard_resend_password_reset_paths(monkeypatch: pytest.M
         )
 
     async def _target_primary(_session: object, *, user: object, requested_email: str):
+        await asyncio.sleep(0)
         return "primary@example.com", "primary"
 
     async def _missing_reset(_session: object, _email: str):
+        await asyncio.sleep(0)
         return None
 
     monkeypatch.setattr(admin_dashboard, "_password_reset_target_email", _target_primary)
@@ -323,6 +335,7 @@ async def test_admin_dashboard_resend_password_reset_paths(monkeypatch: pytest.M
         )
 
     async def _target_secondary(_session: object, *, user: object, requested_email: str):
+        await asyncio.sleep(0)
         return "secondary@example.com", "secondary"
 
     reset = SimpleNamespace(
@@ -332,6 +345,7 @@ async def test_admin_dashboard_resend_password_reset_paths(monkeypatch: pytest.M
     )
 
     async def _create_reset(_session: object, _email: str):
+        await asyncio.sleep(0)
         return reset
 
     monkeypatch.setattr(admin_dashboard, "_password_reset_target_email", _target_secondary)
@@ -341,6 +355,7 @@ async def test_admin_dashboard_resend_password_reset_paths(monkeypatch: pytest.M
     audit_calls: list[dict[str, object]] = []
 
     async def _audit_log(_session: object, **kwargs: object) -> None:
+        await asyncio.sleep(0)
         audit_calls.append(kwargs)
 
     monkeypatch.setattr(admin_dashboard.audit_chain_service, "add_admin_audit_log", _audit_log)
@@ -374,6 +389,7 @@ async def test_admin_dashboard_override_email_verification_paths(monkeypatch: py
     marked_user_ids: list[UUID] = []
 
     async def _mark_tokens(_session: object, marked_user_id: UUID) -> None:
+        await asyncio.sleep(0)
         marked_user_ids.append(marked_user_id)
 
     monkeypatch.setattr(admin_dashboard, "_set_unused_email_verification_tokens_used", _mark_tokens)
@@ -381,6 +397,7 @@ async def test_admin_dashboard_override_email_verification_paths(monkeypatch: py
     audit_calls: list[dict[str, object]] = []
 
     async def _audit_log(_session: object, **kwargs: object) -> None:
+        await asyncio.sleep(0)
         audit_calls.append(kwargs)
 
     monkeypatch.setattr(admin_dashboard.audit_chain_service, "add_admin_audit_log", _audit_log)
@@ -452,6 +469,7 @@ async def test_admin_dashboard_impersonate_user_paths(monkeypatch: pytest.Monkey
     audit_calls: list[dict[str, object]] = []
 
     async def _audit_log(_session: object, **kwargs: object) -> None:
+        await asyncio.sleep(0)
         audit_calls.append(kwargs)
 
     monkeypatch.setattr(admin_dashboard.audit_chain_service, "add_admin_audit_log", _audit_log)
@@ -487,6 +505,7 @@ async def test_admin_dashboard_transfer_owner_paths(monkeypatch: pytest.MonkeyPa
     payload = SimpleNamespace(identifier="owner@example.com", confirm="TRANSFER", password=_credential_value())
 
     async def _same_owner(_session: object, _identifier: str):
+        await asyncio.sleep(0)
         return owner
 
     monkeypatch.setattr(admin_dashboard, "_owner_transfer_target", _same_owner)
@@ -512,6 +531,7 @@ async def test_admin_dashboard_transfer_owner_paths(monkeypatch: pytest.MonkeyPa
     )
 
     async def _new_owner(_session: object, _identifier: str):
+        await asyncio.sleep(0)
         return new_owner
 
     monkeypatch.setattr(admin_dashboard, "_owner_transfer_target", _new_owner)
@@ -519,6 +539,7 @@ async def test_admin_dashboard_transfer_owner_paths(monkeypatch: pytest.MonkeyPa
     audit_calls: list[dict[str, object]] = []
 
     async def _audit_log(_session: object, **kwargs: object) -> None:
+        await asyncio.sleep(0)
         audit_calls.append(kwargs)
 
     monkeypatch.setattr(admin_dashboard.audit_chain_service, "add_admin_audit_log", _audit_log)

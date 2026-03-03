@@ -159,6 +159,8 @@ async function runAdminMethodSweep(component: any): Promise<number> {
   return attempted;
 }
 
+const GLOBAL_CTX = globalThis as Window & typeof globalThis;
+
 describe('AdminComponent coverage wave 7 content editor matrix', () => {
   it('hydrates selected content and records expected version on load', () => {
     const { component, admin } = createAdminHarness();
@@ -435,7 +437,7 @@ describe('AdminComponent coverage wave 7 coupon and link-check matrix', () => {
 
   it('covers find/replace preview+apply guards and link-check success/error paths', () => {
     const { component, admin, toast } = createAdminHarness();
-    const confirmSpy = spyOn(window, 'confirm').and.returnValue(true);
+    const confirmSpy = spyOn(GLOBAL_CTX, 'confirm').and.returnValue(true);
 
     component.findReplaceFind = '';
     component.applyFindReplace();
@@ -485,8 +487,8 @@ describe('AdminComponent coverage wave 7 coupon and link-check matrix', () => {
 describe('AdminComponent coverage wave 7 page rename and preview utilities', () => {
   it('covers page-key helpers and rename page URL branches including redirect creation', () => {
     const { component, admin, toast } = createAdminHarness();
-    const promptSpy = spyOn(window, 'prompt');
-    const confirmSpy = spyOn(window, 'confirm');
+    const promptSpy = spyOn(GLOBAL_CTX, 'prompt');
+    const confirmSpy = spyOn(GLOBAL_CTX, 'confirm');
     const loadContentPagesSpy = spyOn(component as any, 'loadContentPages').and.stub();
     const loadPageBlocksSpy = spyOn(component as any, 'loadPageBlocks').and.stub();
     const loadRedirectsSpy = spyOn(component as any, 'loadContentRedirects').and.stub();

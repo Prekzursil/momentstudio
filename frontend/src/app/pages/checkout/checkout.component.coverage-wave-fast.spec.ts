@@ -44,6 +44,24 @@ function createCheckoutHarness(): any {
   return cmp;
 }
 
+
+const SHORT_AUTH_VALUE = '123';
+const AUTH_VALUE = 'authValue';
+const AUTH_VALUE_ALT = 'authValueAlt';
+
+
+function invokeApplyPromo(cmp: any): void {
+  (CheckoutComponent.prototype as any).applyPromo.call(cmp);
+}
+
+function buildCheckoutForm(valid: boolean): any {  return {
+    valid,
+    control: {
+      updateValueAndValidity: jasmine.createSpy('updateValueAndValidity'),
+    },
+  };
+}
+
 describe('CheckoutComponent fast preference and coupon guards', () => {
   it('reads and persists auto-apply preference safely', () => {
     const cmp = createCheckoutHarness();
@@ -342,16 +360,16 @@ describe('CheckoutComponent fast promo error and guest branches', () => {
     cmp.auth.isAuthenticated = () => true;
     cmp.promo = 'SAVE10';
 
-    cmp.applyPromo();
+    invokeApplyPromo(cmp);
     expect(cmp.promoStatus).toBe('warn');
     expect(cmp.promoValid).toBeFalse();
     expect(cmp.promoMessage).toContain('checkout.couponNotEligible');
     expect(cmp.refreshQuote).toHaveBeenCalledWith(null);
 
-    cmp.applyPromo();
+    invokeApplyPromo(cmp);
     expect(cmp.applyLegacyPromo).toHaveBeenCalledWith('SAVE10');
 
-    cmp.applyPromo();
+    invokeApplyPromo(cmp);
     expect(cmp.promoMessage).toContain('coupon-api-error');
   });
 
@@ -361,7 +379,7 @@ describe('CheckoutComponent fast promo error and guest branches', () => {
     cmp.refreshQuote = jasmine.createSpy('refreshQuote');
     cmp.promo = 'SAVEGUEST';
 
-    cmp.applyPromo();
+    invokeApplyPromo(cmp);
     expect(cmp.promoStatus).toBe('warn');
     expect(cmp.promoValid).toBeFalse();
     expect(cmp.promoMessage).toContain('checkout.couponsLoginRequired');
@@ -438,15 +456,6 @@ describe('CheckoutComponent fast cart sync/load error branches', () => {
 });
 
 describe('CheckoutComponent fast placeOrder guard branches', () => {
-  function buildForm(valid: boolean): any {
-    return {
-      valid,
-      control: {
-        updateValueAndValidity: jasmine.createSpy('updateValueAndValidity'),
-      },
-    };
-  }
-
   it('returns early on invalid country, invalid form, missing locker, and missing verification', () => {
     const cmp = createCheckoutHarness();
     cmp.normalizeCheckoutCountries = jasmine.createSpy('normalizeCheckoutCountries').and.returnValue(false);
@@ -455,26 +464,26 @@ describe('CheckoutComponent fast placeOrder guard branches', () => {
     cmp.emailVerified = jasmine.createSpy('emailVerified').and.returnValue(false);
     cmp.auth.isAuthenticated = () => true;
 
-    cmp.placeOrder(buildForm(true));
+    cmp.placeOrder(buildCheckoutForm(true));
     expect(cmp.addressError).toContain('checkout.countryInvalid');
 
     cmp.normalizeCheckoutCountries.and.returnValue(true);
-    cmp.placeOrder(buildForm(false));
+    cmp.placeOrder(buildCheckoutForm(false));
     expect(cmp.addressError).toContain('checkout.addressRequired');
 
     cmp.deliveryType = 'locker';
     cmp.locker = null;
-    cmp.placeOrder(buildForm(true));
+    cmp.placeOrder(buildCheckoutForm(true));
     expect(cmp.deliveryError).toContain('checkout.deliveryLockerRequired');
 
     cmp.deliveryType = 'home';
     cmp.auth.isAuthenticated = () => true;
-    cmp.placeOrder(buildForm(true));
+    cmp.placeOrder(buildCheckoutForm(true));
     expect(cmp.errorMessage).toContain('auth.emailVerificationNeeded');
 
     cmp.auth.isAuthenticated = () => false;
     cmp.guestEmailVerified = false;
-    cmp.placeOrder(buildForm(true));
+    cmp.placeOrder(buildCheckoutForm(true));
     expect(cmp.errorMessage).toContain('auth.emailVerificationNeeded');
   });
 
@@ -486,20 +495,20 @@ describe('CheckoutComponent fast placeOrder guard branches', () => {
     cmp.auth.isAuthenticated = () => false;
     cmp.guestEmailVerified = true;
     cmp.guestCreateAccount = true;
-    cmp.guestPassword = '123';
-    cmp.guestPasswordConfirm = '123';
+    cmp.guestPassword = SHORT_AUTH_VALUE;
+    cmp.guestPasswordConfirm = SHORT_AUTH_VALUE;
     cmp.guestPhoneE164 = jasmine.createSpy('guestPhoneE164').and.returnValue(null);
 
-    cmp.placeOrder(buildForm(true));
+    cmp.placeOrder(buildCheckoutForm(true));
     expect(cmp.errorMessage).toContain('validation.passwordMin');
 
-    cmp.guestPassword = '123456';
-    cmp.guestPasswordConfirm = 'abcdef';
-    cmp.placeOrder(buildForm(true));
+    cmp.guestPassword = AUTH_VALUE;
+    cmp.guestPasswordConfirm = AUTH_VALUE_ALT;
+    cmp.placeOrder(buildCheckoutForm(true));
     expect(cmp.errorMessage).toContain('validation.passwordMismatch');
 
-    cmp.guestPasswordConfirm = '123456';
-    cmp.placeOrder(buildForm(true));
+    cmp.guestPasswordConfirm = AUTH_VALUE;
+    cmp.placeOrder(buildCheckoutForm(true));
     expect(cmp.errorMessage).toContain('validation.phoneInvalid');
   });
 });

@@ -59,6 +59,8 @@ function immediateResult<T>(value: T, emitError = false) {
   };
 }
 
+const GLOBAL_CTX = globalThis as Window & typeof globalThis;
+
 describe('AdminComponent fast coverage helpers', () => {
   it('normalizes valid and invalid content sections', () => {
     const component = createAdminHarness() as any;
@@ -150,8 +152,8 @@ describe('AdminComponent fast poller and reset helpers', () => {
     const component = createAdminHarness() as any;
     component.cmsDraftPoller = null;
     spyOn(component, 'observeCmsDrafts').and.stub();
-    const setIntervalSpy = spyOn(window, 'setInterval').and.returnValue(123 as any);
-    const clearIntervalSpy = spyOn(window, 'clearInterval').and.stub();
+    const setIntervalSpy = spyOn(GLOBAL_CTX, 'setInterval').and.returnValue(123 as any);
+    const clearIntervalSpy = spyOn(GLOBAL_CTX, 'clearInterval').and.stub();
 
     component.syncCmsDraftPoller('home');
     expect(component.observeCmsDrafts).toHaveBeenCalled();
@@ -187,7 +189,7 @@ describe('AdminComponent fast poller and reset helpers', () => {
     const component = createAdminHarness() as any;
     component.cmsDraftPoller = 999;
     spyOn(component, 'observeCmsDrafts').and.stub();
-    const setIntervalSpy = spyOn(window, 'setInterval').and.callThrough();
+    const setIntervalSpy = spyOn(GLOBAL_CTX, 'setInterval').and.callThrough();
 
     component.syncCmsDraftPoller('home');
 

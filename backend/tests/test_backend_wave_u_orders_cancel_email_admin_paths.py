@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
@@ -21,9 +22,11 @@ class _RecorderSession:
         self.added.append(obj)
 
     async def commit(self) -> None:
+        await asyncio.sleep(0)
         self.commits += 1
 
     async def refresh(self, obj: object, attribute_names=None) -> None:
+        await asyncio.sleep(0)
         names = tuple(attribute_names) if attribute_names else None
         self.refreshed.append((obj, names))
 
@@ -48,6 +51,7 @@ async def test_orders_guest_email_request_and_confirm_guard_matrix(monkeypatch: 
         )
 
     async def _email_taken(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return True
 
     monkeypatch.setattr(orders_api.auth_service, "is_email_taken", _email_taken)
@@ -93,6 +97,7 @@ async def test_orders_admin_email_resend_endpoints_success_and_guard_paths(monke
     admin = SimpleNamespace(id=uuid4(), email="admin@example.com")
 
     async def _missing_order(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return None
 
     monkeypatch.setattr(orders_api.order_service, "get_order_by_id", _missing_order)
@@ -108,6 +113,7 @@ async def test_orders_admin_email_resend_endpoints_success_and_guard_paths(monke
     order_without_email = SimpleNamespace(id=order_id, customer_email=None, user=None, items=[])
 
     async def _order_no_email(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return order_without_email
 
     monkeypatch.setattr(orders_api.order_service, "get_order_by_id", _order_no_email)
@@ -128,9 +134,11 @@ async def test_orders_admin_email_resend_endpoints_success_and_guard_paths(monke
     )
 
     async def _order_found(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return order
 
     async def _checkout_settings(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return SimpleNamespace(receipt_share_days=14)
 
     monkeypatch.setattr(orders_api.order_service, "get_order_by_id", _order_found)
@@ -167,6 +175,7 @@ async def test_orders_cancel_request_matrix(monkeypatch: pytest.MonkeyPatch) -> 
     background_tasks = BackgroundTasks()
 
     async def _order_missing(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return None
 
     monkeypatch.setattr(orders_api.order_service, "get_order", _order_missing)
@@ -182,6 +191,7 @@ async def test_orders_cancel_request_matrix(monkeypatch: pytest.MonkeyPatch) -> 
     ineligible_order = SimpleNamespace(id=order_id, status=OrderStatus.shipped, events=[], reference_code="REF-1")
 
     async def _order_ineligible(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return ineligible_order
 
     monkeypatch.setattr(orders_api.order_service, "get_order", _order_ineligible)
@@ -202,6 +212,7 @@ async def test_orders_cancel_request_matrix(monkeypatch: pytest.MonkeyPatch) -> 
     )
 
     async def _order_duplicate(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return duplicate_order
 
     monkeypatch.setattr(orders_api.order_service, "get_order", _order_duplicate)
@@ -224,14 +235,17 @@ async def test_orders_cancel_request_matrix(monkeypatch: pytest.MonkeyPatch) -> 
     )
 
     async def _order_success(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return success_order
 
     async def _owner_user(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return SimpleNamespace(id=uuid4(), email="owner@example.com", preferred_language="en")
 
     notifications: list[dict[str, object]] = []
 
     async def _create_notification(_session, **kwargs):
+        await asyncio.sleep(0)
         notifications.append(kwargs)
 
     monkeypatch.setattr(orders_api.order_service, "get_order", _order_success)

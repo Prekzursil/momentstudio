@@ -57,12 +57,15 @@ class _SessionStub:
         self.refreshed: list[object] = []
 
     async def scalar(self, _statement: object) -> object | None:
+        await asyncio.sleep(0)
         return self._scalar_values.pop(0) if self._scalar_values else None
 
     async def get(self, _model: object, _id: object) -> object | None:
+        await asyncio.sleep(0)
         return self._get_values.pop(0) if self._get_values else None
 
     async def execute(self, _statement: object) -> _ExecuteResult:
+        await asyncio.sleep(0)
         if self._execute_results:
             return self._execute_results.pop(0)
         return _ExecuteResult()
@@ -74,15 +77,19 @@ class _SessionStub:
         self.added.extend(list(values))
 
     async def delete(self, value: object) -> None:
+        await asyncio.sleep(0)
         self.deleted.append(value)
 
     async def flush(self) -> None:
+        await asyncio.sleep(0)
         self.flushed += 1
 
     async def commit(self) -> None:
+        await asyncio.sleep(0)
         self.commits += 1
 
     async def refresh(self, value: object) -> None:
+        await asyncio.sleep(0)
         self.refreshed.append(value)
 
 
@@ -142,6 +149,7 @@ async def test_service_auth_secondary_email_error_paths(monkeypatch: pytest.Monk
         await auth_service.add_secondary_email(_SessionStub(), user, "primary@example.com")
 
     async def _always_taken(_session: object, _email: str, *, exclude_user_id: object | None = None) -> bool:
+        await asyncio.sleep(0)
         _ = exclude_user_id
         return True
 
@@ -252,6 +260,7 @@ async def test_service_auth_deleted_login_guard_executes_due_deletion(monkeypatc
     called: list[object] = []
 
     async def _fake_execute_account_deletion(_session: object, user: object) -> None:
+        await asyncio.sleep(0)
         called.append(user)
 
     monkeypatch.setattr(auth_service.self_service, "is_deletion_due", lambda _user: True)

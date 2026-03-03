@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -28,9 +29,11 @@ class _SessionRecorder:
         self.added.append(obj)
 
     async def commit(self) -> None:
+        await asyncio.sleep(0)
         self.committed = True
 
     async def refresh(self, obj: object) -> None:
+        await asyncio.sleep(0)
         self.refreshed.append(obj)
 
 
@@ -66,6 +69,7 @@ class _BatchSession:
         self._values = values
 
     async def execute(self, _stmt):
+        await asyncio.sleep(0)
         return _ExecuteResult(self._values)
 
 
@@ -355,7 +359,7 @@ def test_admin_dashboard_payload_and_channel_helpers() -> None:
         )
     )
     assert payload["failed_payments_min_count"] == 1
-    assert payload["failed_payments_min_delta_pct"] == 120.5
+    assert payload["failed_payments_min_delta_pct"] == pytest.approx(120.5)
     assert admin_dashboard_api._decimal_or_none(None) is None
     assert admin_dashboard_api._decimal_or_none("1.25") == Decimal("1.25")
 
@@ -376,12 +380,12 @@ def test_admin_dashboard_payload_and_channel_helpers() -> None:
         label_unknown="unknown",
     )
     assert items[0]["key"] == "unknown"
-    assert items[1]["net_sales"] == 7.0
+    assert items[1]["net_sales"] == pytest.approx(7.0)
 
 
 def test_admin_dashboard_payment_and_shipping_math_helpers() -> None:
     assert admin_dashboard_api._payments_success_rate(0, 0) is None
-    assert admin_dashboard_api._payments_success_rate(3, 1) == 0.75
+    assert admin_dashboard_api._payments_success_rate(3, 1) == pytest.approx(0.75)
 
     sorted_methods = admin_dashboard_api._payments_sorted_methods({"paypal": 1}, {"stripe": 2})
     assert sorted_methods[:2] == ["stripe", "paypal"]
@@ -392,16 +396,16 @@ def test_admin_dashboard_payment_and_shipping_math_helpers() -> None:
         {"stripe": 5},
         {"stripe": {"errors": 2, "backlog": 1}},
     )
-    assert provider["success_rate"] == 0.5
+    assert provider["success_rate"] == pytest.approx(0.5)
 
     rows = admin_dashboard_api._payments_provider_rows({"paypal": 1}, {"paypal": 0}, {})
     assert any(row["provider"] == "paypal" for row in rows)
 
-    assert admin_dashboard_api._refund_delta_pct(4.0, 2.0) == 100.0
+    assert admin_dashboard_api._refund_delta_pct(4.0, 2.0) == pytest.approx(100.0)
     assert admin_dashboard_api._refund_delta_pct(1.0, 0.0) is None
-    assert admin_dashboard_api._shipping_delta_pct(4.0, 2.0) == 100.0
+    assert admin_dashboard_api._shipping_delta_pct(4.0, 2.0) == pytest.approx(100.0)
     assert admin_dashboard_api._shipping_delta_pct(None, 2.0) is None
-    assert admin_dashboard_api._shipping_avg([1.0, 3.0]) == 2.0
+    assert admin_dashboard_api._shipping_avg([1.0, 3.0]) == pytest.approx(2.0)
 
     start = datetime(2026, 1, 1, tzinfo=timezone.utc)
     valid_end = start + timedelta(hours=3)
@@ -466,7 +470,7 @@ def test_auth_registration_google_and_passkey_helpers(monkeypatch: pytest.Monkey
     assert len(session.added) == 2
 
     monkeypatch.setattr(auth_api.settings, "google_allowed_domains", ["example.com"])
-    sub, email, name, picture, email_verified = auth_api._extract_valid_google_profile(
+    sub, _email, name, picture, email_verified = auth_api._extract_valid_google_profile(
         {"sub": "s1", "email": "user@example.com", "name": "User", "picture": "pic", "email_verified": True}
     )
     assert (sub, email_verified) == ("s1", True)

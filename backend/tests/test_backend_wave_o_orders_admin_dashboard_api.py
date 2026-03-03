@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
@@ -49,6 +50,7 @@ class _EmailSession:
         self._rows = rows
 
     async def execute(self, _stmt):
+        await asyncio.sleep(0)
         return _EmailRowsResult(self._rows)
 
 
@@ -62,9 +64,11 @@ class _RecorderSession:
         self.added.append(obj)
 
     async def commit(self) -> None:
+        await asyncio.sleep(0)
         self.commits += 1
 
     async def refresh(self, obj: object) -> None:
+        await asyncio.sleep(0)
         self.refreshed.append(obj)
 
 
@@ -75,9 +79,11 @@ async def test_orders_create_order_checkout_and_refresh_existing_paths(monkeypat
     response = Response()
 
     async def _load_cart(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return cart
 
     async def _existing_order(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return existing_order
 
     monkeypatch.setattr(orders_api, "_load_user_cart_for_create_order", _load_cart)
@@ -98,6 +104,7 @@ async def test_orders_create_order_checkout_and_refresh_existing_paths(monkeypat
     monkeypatch.setattr(orders_api, "_can_restart_existing_netopia_payment", lambda _order: True)
 
     async def _start_payment(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return ("ntp-1", "https://pay.example/ntp-1")
 
     monkeypatch.setattr(orders_api, "_start_netopia_payment_for_order", _start_payment)
@@ -116,9 +123,11 @@ async def test_orders_create_order_checkout_and_refresh_existing_paths(monkeypat
 
     # Cover `/checkout` consent + existing response short-circuit.
     async def _required_versions(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return {"terms": 1}
 
     async def _accepted_versions(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return {}
 
     monkeypatch.setattr(orders_api.legal_consents_service, "required_doc_versions", _required_versions)
@@ -140,9 +149,11 @@ async def test_orders_create_order_checkout_and_refresh_existing_paths(monkeypat
     monkeypatch.setattr(orders_api.legal_consents_service, "is_satisfied", lambda *_args, **_kwargs: True)
 
     async def _get_cart(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return cart
 
     async def _existing_checkout(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return SimpleNamespace(order_id=uuid4(), reference_code="REF-X")
 
     monkeypatch.setattr(orders_api.cart_service, "get_cart", _get_cart)
@@ -176,6 +187,7 @@ async def test_orders_payment_confirmation_and_admin_export_paths(monkeypatch: p
     )
 
     async def _get_by_paypal(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return order
 
     monkeypatch.setattr(orders_api, "_get_order_by_paypal_order_id_for_confirmation", _get_by_paypal)
@@ -190,15 +202,19 @@ async def test_orders_payment_confirmation_and_admin_export_paths(monkeypatch: p
     order.paypal_capture_id = None
 
     async def _resolve_capture(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return "capture-123"
 
     async def _noop_finalize(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return True
 
     async def _noop_redeem(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return None
 
     async def _noop_queue(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return None
 
     monkeypatch.setattr(orders_api, "_resolve_paypal_capture_id", _resolve_capture)
@@ -217,6 +233,7 @@ async def test_orders_payment_confirmation_and_admin_export_paths(monkeypatch: p
     stripe_order = SimpleNamespace(id=uuid4(), reference_code="REF-STR", status=OrderStatus.pending_payment)
 
     async def _get_by_stripe(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return stripe_order
 
     monkeypatch.setattr(orders_api, "is_mock_payments", lambda: False)
@@ -239,6 +256,7 @@ async def test_orders_payment_confirmation_and_admin_export_paths(monkeypatch: p
 
     # Cover `/netopia/confirm` guard and success branch.
     async def _get_by_id_guard(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return SimpleNamespace(
             id=uuid4(),
             user_id=current_user_id,
@@ -264,9 +282,11 @@ async def test_orders_payment_confirmation_and_admin_export_paths(monkeypatch: p
     )
 
     async def _get_by_id(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return netopia_order
 
     async def _netopia_status(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return {"payment": {"status": 5}, "error": {"code": "00"}}
 
     monkeypatch.setattr(orders_api, "_get_order_by_id_for_confirmation", _get_by_id)
@@ -285,6 +305,7 @@ async def test_orders_payment_confirmation_and_admin_export_paths(monkeypatch: p
 
     # Cover `/admin/export` and `/admin/exports`.
     async def _list_orders(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return [SimpleNamespace(reference_code="REF-CSV", id=uuid4())]
 
     monkeypatch.setattr(orders_api.step_up_service, "require_step_up", lambda *_args, **_kwargs: None)
@@ -300,6 +321,7 @@ async def test_orders_payment_confirmation_and_admin_export_paths(monkeypatch: p
     assert "orders.csv" in export_response.headers.get("content-disposition", "")
 
     async def _list_exports(*_args, **_kwargs):
+        await asyncio.sleep(0)
         export = SimpleNamespace(
             id=uuid4(),
             kind=SimpleNamespace(value="packing_slips"),
@@ -330,6 +352,7 @@ async def test_orders_email_verification_and_admin_email_events_paths(monkeypatc
     order_without_email = SimpleNamespace(customer_email=None, user=None, reference_code="REF-0")
 
     async def _order_by_id(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return order_without_email
 
     monkeypatch.setattr(orders_api.order_service, "get_order_by_id_admin", _order_by_id)
@@ -351,6 +374,7 @@ async def test_orders_email_verification_and_admin_email_events_paths(monkeypatc
     )
 
     async def _order_with_email_fn(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return order_with_email
 
     monkeypatch.setattr(orders_api.order_service, "get_order_by_id_admin", _order_with_email_fn)
@@ -381,9 +405,11 @@ async def test_orders_email_verification_and_admin_email_events_paths(monkeypatc
     session = _RecorderSession()
 
     async def _cart_get(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return cart
 
     async def _email_taken(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return False
 
     monkeypatch.setattr(orders_api.cart_service, "get_cart", _cart_get)
@@ -427,6 +453,7 @@ async def test_admin_dashboard_summary_channel_and_search_paths(monkeypatch: pyt
             self._values = list(values)
 
         async def scalar(self, _stmt):
+            await asyncio.sleep(0)
             return self._values.pop(0)
 
     scalar_session = _ScalarSession([100, 120, 10, 5, 7])
@@ -443,9 +470,11 @@ async def test_admin_dashboard_summary_channel_and_search_paths(monkeypatch: pyt
     assert sales["orders"] == 7
 
     async def _sales_metrics(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return {"orders": 4, "sales": 30.0, "gross_sales": 30.0, "net_sales": 26.0}
 
     async def _refund_counts(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return 2
 
     monkeypatch.setattr(admin_dashboard_api, "_summary_sales_metrics", _sales_metrics)
@@ -463,12 +492,15 @@ async def test_admin_dashboard_summary_channel_and_search_paths(monkeypatch: pyt
 
     # Cover `_channel_breakdown_items` return branch.
     async def _gross_rows(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return [("online", 3, 120)]
 
     async def _refund_rows(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return [("online", 20)]
 
     async def _missing_rows(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return [("online", 10)]
 
     monkeypatch.setattr(admin_dashboard_api, "_channel_gross_rows", _gross_rows)
@@ -487,12 +519,15 @@ async def test_admin_dashboard_summary_channel_and_search_paths(monkeypatch: pyt
 
     # Cover `_global_search_by_text` aggregation.
     async def _orders_text(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return [SimpleNamespace(type="order", id="o1")]
 
     async def _products_text(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return [SimpleNamespace(type="product", id="p1")]
 
     async def _users_text(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return [SimpleNamespace(type="user", id="u1")]
 
     monkeypatch.setattr(admin_dashboard_api, "_global_search_orders_by_text", _orders_text)
@@ -511,6 +546,7 @@ async def test_admin_dashboard_summary_channel_and_search_paths(monkeypatch: pyt
 
     class _ExecuteSession:
         async def execute(self, _stmt):
+            await asyncio.sleep(0)
             product = SimpleNamespace(
                 id=uuid4(),
                 name="Ring",
@@ -626,6 +662,7 @@ async def test_orders_admin_search_and_my_orders_response_paths(monkeypatch: pyt
         )
 
     async def _search_orders_for_user(*_args, **_kwargs):
+        await asyncio.sleep(0)
         now = datetime.now(timezone.utc)
         order = SimpleNamespace(
             id=uuid4(),
@@ -662,6 +699,7 @@ async def test_orders_admin_search_and_my_orders_response_paths(monkeypatch: pyt
         pii_calls.append((admin, request))
 
     async def _admin_search_orders(*_args, **_kwargs):
+        await asyncio.sleep(0)
         order = SimpleNamespace(
             id=uuid4(),
             reference_code="ADM-1",

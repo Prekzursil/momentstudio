@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -60,6 +61,7 @@ class _QueueSession:
         self._results = list(results)
 
     async def execute(self, _stmt):
+        await asyncio.sleep(0)
         if not self._results:
             raise AssertionError("No queued results")
         return self._results.pop(0)
@@ -308,7 +310,7 @@ def test_orders_guest_and_paypal_validation_helpers() -> None:
         accept_privacy=True,
         promo_code="",
         create_account=True,
-        password="pass",
+        password="cred-1",
         username="guest",
         first_name="First",
         last_name="Last",
@@ -413,7 +415,7 @@ def test_admin_dashboard_alert_and_channel_math_helpers() -> None:
         threshold_min_delta_pct=90.0,
     )
     assert payload["is_alert"] is True
-    assert payload["delta_pct"] == 100.0
+    assert payload["delta_pct"] == pytest.approx(100.0)
 
     refund_payload = admin_dashboard_api._summary_refund_requests_payload(
         refund_requests=3,
@@ -424,12 +426,12 @@ def test_admin_dashboard_alert_and_channel_math_helpers() -> None:
         threshold_min_rate_pct=25.0,
     )
     assert refund_payload["is_alert"] is True
-    assert refund_payload["current_rate_pct"] == 30.0
+    assert refund_payload["current_rate_pct"] == pytest.approx(30.0)
 
     assert admin_dashboard_api._funnel_rate(1, 0) is None
-    assert admin_dashboard_api._funnel_rate(3, 6) == 0.5
+    assert admin_dashboard_api._funnel_rate(3, 6) == pytest.approx(0.5)
     assert admin_dashboard_api._channel_coverage_pct(0, 0) is None
-    assert admin_dashboard_api._channel_coverage_pct(3, 6) == 0.5
+    assert admin_dashboard_api._channel_coverage_pct(3, 6) == pytest.approx(0.5)
 
 
 def test_auth_build_cooldown_info_branches() -> None:

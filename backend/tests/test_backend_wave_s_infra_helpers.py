@@ -65,7 +65,10 @@ def test_netopia_parse_der_and_error_detail(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setattr(netopia_service.x509, "load_der_x509_certificate", lambda _raw: _FakeCert())
     assert "BEGIN PUBLIC KEY" in netopia_service._parse_der_public_material(b"\x30\x82")
 
-    monkeypatch.setattr(netopia_service.x509, "load_der_x509_certificate", lambda _raw: (_ for _ in ()).throw(ValueError("bad cert")))
+    def _raise_bad_cert(_raw):
+        raise ValueError("bad cert")
+
+    monkeypatch.setattr(netopia_service.x509, "load_der_x509_certificate", _raise_bad_cert)
     monkeypatch.setattr(netopia_service.serialization, "load_der_public_key", lambda _raw: _FakePublicKey())
     assert "BEGIN PUBLIC KEY" in netopia_service._parse_der_public_material(b"\x30\x82")
 
@@ -114,7 +117,7 @@ def test_payments_line_item_total_coupon_and_stripe_selection(monkeypatch: pytes
 
 
 def test_lockers_pure_helpers_and_parsers(monkeypatch: pytest.MonkeyPatch) -> None:
-    assert lockers_service._round_coord(44.4268) == 44.43
+    assert lockers_service._round_coord(44.4268) == pytest.approx(44.43)
     assert lockers_service._haversine_km(44.4268, 26.1025, 44.4268, 26.1025) == pytest.approx(0.0)
 
     q_sameday = lockers_service._build_query(lockers_service.LockerProvider.sameday, lat=44.4, lng=26.1, radius_m=5000)
