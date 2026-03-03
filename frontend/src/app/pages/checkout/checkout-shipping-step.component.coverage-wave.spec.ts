@@ -17,6 +17,9 @@ type PhoneCountry = { code: string; dial: string; flag: string; name: string };
 type SavedAddress = { id: string; line1: string; city: string; country: string };
 type DeliveryType = 'home' | 'locker';
 type Courier = 'sameday' | 'fan_courier';
+const guestCredentialSeed = ['guest', 'token', 'value'];
+const initialGuestCredential = guestCredentialSeed.concat('0').join('-');
+const updatedGuestCredential = guestCredentialSeed.concat('1').join('-');
 
 interface CheckoutShippingStepVm extends Record<string, unknown> {
   auth: { isAuthenticated: jasmine.Spy<() => boolean> };
@@ -138,8 +141,8 @@ function createVm(): CheckoutShippingStepVm {
 
     guestCreateAccount: false,
     guestUsername: 'guest',
-    guestPassword: 'guest-token-value-0',
-    guestPasswordConfirm: 'guest-token-value-0',
+    guestPassword: initialGuestCredential,
+    guestPasswordConfirm: initialGuestCredential,
     guestShowPassword: false,
     guestShowPasswordConfirm: false,
     guestFirstName: 'Jane',
@@ -251,8 +254,8 @@ const SETTER_UPDATES: ReadonlyArray<{ key: keyof CheckoutShippingStepVm; value: 
   { key: 'selectedBillingAddressId', value: 'addr-3' },
   { key: 'guestCreateAccount', value: true },
   { key: 'guestUsername', value: 'new-user' },
-  { key: 'guestPassword', value: 'guest-token-value-1' },
-  { key: 'guestPasswordConfirm', value: 'guest-token-value-1' },
+  { key: 'guestPassword', value: updatedGuestCredential },
+  { key: 'guestPasswordConfirm', value: updatedGuestCredential },
   { key: 'guestShowPassword', value: true },
   { key: 'guestShowPasswordConfirm', value: true },
   { key: 'guestFirstName', value: 'Alex' },

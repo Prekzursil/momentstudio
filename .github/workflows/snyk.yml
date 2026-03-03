@@ -22,7 +22,7 @@ jobs:
         with:
           node-version: "24"
 
-      - uses: actions/setup-python@42375524b4358e8ec2f671ec1fbe6014c88c98df # v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 

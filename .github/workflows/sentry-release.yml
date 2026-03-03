@@ -43,6 +43,8 @@ jobs:
           set -euo pipefail
           if [ -n "${SENTRY_URL:-}" ]; then
             export SENTRY_URL
+          else
+            unset SENTRY_URL || true
           fi
           SENTRY_CLI="npx --yes @sentry/cli@2.57.0"
           ${SENTRY_CLI} info
