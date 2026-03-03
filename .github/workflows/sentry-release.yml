@@ -41,40 +41,12 @@ jobs:
       - name: Verify Sentry API access and project binding
         run: |
           set -euo pipefail
-          base_url="${SENTRY_URL:-https://sentry.io}"
-          list_http_code="$(
-            curl -sS \
-              -H "Authorization: Bearer ${SENTRY_AUTH_TOKEN}" \
-              -H "Content-Type: application/json" \
-              -o /tmp/sentry-projects.json \
-              -w "%{http_code}" \
-              "${base_url%/}/api/0/projects/"
-          )"
-          if [ "${list_http_code}" != "200" ]; then
-            echo "::error::Sentry API access failed with HTTP ${list_http_code}."
-            cat /tmp/sentry-projects.json || true
-            exit 1
+          if [ -n "${SENTRY_URL:-}" ]; then
+            export SENTRY_URL
           fi
-
-          jq -e --arg org "${SENTRY_ORG}" --arg project "${SENTRY_PROJECT}" '
-            map(
-              (
-                (.slug == $project) or
-                ((.id | tostring) == $project) or
-                (.name == $project)
-              ) and
-              (
-                (.organization.slug? == $org) or
-                ((.organization.id? | tostring) == $org)
-              )
-            ) | any
-          ' /tmp/sentry-projects.json > /dev/null || {
-            echo "::error::SENTRY_PROJECT/SENTRY_ORG are not visible to this token via Sentry projects API."
-            echo "::group::Sentry visible project slugs (debug)"
-            jq -r '.[] | [.id, .slug, (.organization.slug // "-"), ((.organization.id // "-") | tostring)] | @tsv' /tmp/sentry-projects.json | sed -n '1,100p'
-            echo "::endgroup::"
-            exit 1
-          }
+          SENTRY_CLI="npx --yes @sentry/cli@2.57.0"
+          ${SENTRY_CLI} info
+          ${SENTRY_CLI} releases list --org "${SENTRY_ORG}" --project "${SENTRY_PROJECT}" --quiet
 
   release-and-sourcemaps:
     if: github.event_name != 'pull_request'

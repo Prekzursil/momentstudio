@@ -22,6 +22,10 @@ jobs:
         with:
           node-version: "24"
 
+      - uses: actions/setup-python@42375524b4358e8ec2f671ec1fbe6014c88c98df # v5
+        with:
+          python-version: "3.12"
+
       - name: Validate Snyk token
         run: |
           set -euo pipefail
@@ -29,6 +33,14 @@ jobs:
             echo "::error::Missing SNYK_TOKEN secret."
             exit 1
           fi
+
+      - name: Prepare deterministic Python environment for Snyk
+        run: |
+          set -euo pipefail
+          python -m venv .snyk-venv
+          . .snyk-venv/bin/activate
+          python -m pip install --upgrade pip
+          python -m pip install -r backend/requirements.txt
 
       - name: Install Snyk CLI
         run: npm i -g snyk@1.1296.2
@@ -43,12 +55,14 @@ jobs:
             snyk test --org="${SNYK_ORG}" \
               --file=backend/requirements.txt \
               --package-manager=pip \
+              --command=.snyk-venv/bin/python \
               --skip-unresolved \
               --severity-threshold=low
           else
             snyk test \
               --file=backend/requirements.txt \
               --package-manager=pip \
+              --command=.snyk-venv/bin/python \
               --skip-unresolved \
               --severity-threshold=low
           fi
