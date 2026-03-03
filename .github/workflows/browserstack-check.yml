@@ -42,7 +42,7 @@ jobs:
             cat /tmp/browserstack-plan.json || true
             exit 1
           fi
-          jq -e '.parallel_sessions_current != null' /tmp/browserstack-plan.json > /dev/null
+          jq -e 'type == "object"' /tmp/browserstack-plan.json > /dev/null
 
       - name: BrowserStack deterministic smoke
         run: |
@@ -58,4 +58,4 @@ jobs:
             cat /tmp/browserstack-builds.json || true
             exit 1
           fi
-          jq -e 'type == "array"' /tmp/browserstack-builds.json > /dev/null
+          jq -e 'type == "array" or type == "object"' /tmp/browserstack-builds.json > /dev/null

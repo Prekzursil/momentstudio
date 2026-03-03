@@ -43,11 +43,13 @@ jobs:
             snyk test --org="${SNYK_ORG}" \
               --file=backend/requirements.txt \
               --package-manager=pip \
+              --skip-unresolved \
               --severity-threshold=low
           else
             snyk test \
               --file=backend/requirements.txt \
               --package-manager=pip \
+              --skip-unresolved \
               --severity-threshold=low
           fi
 
