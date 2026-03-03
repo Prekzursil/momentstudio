@@ -397,9 +397,9 @@ def test_admin_dashboard_range_delta_rate_and_anomalies() -> None:
     assert days2 == 3
 
     assert admin_dashboard_api._summary_delta_pct(10.0, 0.0) is None
-    assert admin_dashboard_api._summary_delta_pct(15.0, 10.0) == 50.0
+    assert admin_dashboard_api._summary_delta_pct(15.0, 10.0) == pytest.approx(50.0)
     assert admin_dashboard_api._summary_rate_pct(5.0, 0.0) is None
-    assert admin_dashboard_api._summary_rate_pct(2.0, 8.0) == 25.0
+    assert admin_dashboard_api._summary_rate_pct(2.0, 8.0) == pytest.approx(25.0)
 
     anomalies = admin_dashboard_api._summary_anomalies_payload(
         anomaly_inputs={
@@ -448,7 +448,7 @@ def test_admin_dashboard_refund_channel_audit_and_security_helpers(monkeypatch: 
         session_payload=session_payload,
     )
     assert tracked_orders == 2
-    assert tracked_sales == 150.0
+    assert tracked_sales == pytest.approx(150.0)
     assert channels[0]["source"] == "instagram"
     assert admin_dashboard_api._channel_extract(None) == ("direct", None, None)
     assert admin_dashboard_api._channel_normalize_value(None) == ""
