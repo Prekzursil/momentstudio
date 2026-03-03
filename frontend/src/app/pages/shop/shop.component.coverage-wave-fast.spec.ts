@@ -549,6 +549,7 @@ describe('ShopComponent coverage fast wave: search/price/page/tag setters', () =
     cmp.toggleTag('eco');
     expect(cmp.filters.tags.has('eco')).toBeTrue();
 
+    cmp.categorySelection = 'root';
     cmp.onCategorySelected();
     expect(cmp.loadProducts).toHaveBeenCalled();
 
@@ -580,6 +581,9 @@ describe('ShopComponent coverage fast wave: URL state + scroll restore', () => {
     cmp['clearShopReturnContext']();
     expect(removeSpy).toHaveBeenCalled();
 
+    delete cmp.restoreScrollIfNeeded;
+    cmp.restoreScrollIfNeeded = (ShopComponent.prototype as any).restoreScrollIfNeeded;
+
     cmp.restoreScrollY = 77;
     const rafSpy = spyOn(globalThis, 'requestAnimationFrame').and.callFake(((cb: FrameRequestCallback) => {
       cb(0);
@@ -601,6 +605,7 @@ describe('ShopComponent coverage fast wave: prototype sweep states', () => {
     expect(attempted).toBeGreaterThan(40);
   });
 });
+
 
 
 
