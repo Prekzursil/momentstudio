@@ -545,8 +545,6 @@ async def test_cli_wave_owner_repair_helper_branches(monkeypatch: pytest.MonkeyP
         name="Owner",
         name_tag=0,
     )
-    setattr(owner, "_".join(["hashed", "pass", "word"]), "old-hash")
-
     cli._set_owner_verified_without_email_change(owner, verify_email=False)
     assert owner.email_verified is False
     cli._set_owner_verified_without_email_change(owner, verify_email=True)
