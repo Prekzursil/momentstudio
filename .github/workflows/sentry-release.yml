@@ -34,8 +34,7 @@ jobs:
             exit 1
           fi
           if [ -z "${SENTRY_PROJECT:-}" ]; then
-            echo "::error::Missing SENTRY_PROJECT variable."
-            exit 1
+            echo "::warning::Missing SENTRY_PROJECT variable; project slug will be auto-resolved."
           fi
 
       - name: Verify Sentry API access and project binding
@@ -46,9 +45,27 @@ jobs:
           else
             unset SENTRY_URL || true
           fi
+
           SENTRY_CLI="npx --yes @sentry/cli@2.57.0"
           ${SENTRY_CLI} info
-          ${SENTRY_CLI} releases list --org "${SENTRY_ORG}" --project "${SENTRY_PROJECT}" --quiet
+
+          project_slug="${SENTRY_PROJECT:-}"
+          if [ -n "$project_slug" ] && ${SENTRY_CLI} releases list --org "${SENTRY_ORG}" --project "$project_slug" --quiet >/dev/null 2>&1; then
+            echo "Using configured Sentry project: $project_slug"
+          else
+            if [ -n "$project_slug" ]; then
+              echo "::warning::Configured SENTRY_PROJECT '$project_slug' is not accessible; resolving project slug from Sentry API."
+            fi
+            project_slug="$(${SENTRY_CLI} projects list --org "${SENTRY_ORG}" --json | python -c 'import json,sys; data=json.load(sys.stdin); print((data[0].get("slug") if data else ""))')"
+          fi
+
+          if [ -z "$project_slug" ]; then
+            echo "::error::Unable to resolve an accessible Sentry project slug for org '${SENTRY_ORG}'."
+            exit 1
+          fi
+
+          echo "Resolved Sentry project: $project_slug"
+          ${SENTRY_CLI} releases list --org "${SENTRY_ORG}" --project "$project_slug" --quiet
 
   release-and-sourcemaps:
     if: github.event_name != 'pull_request'
