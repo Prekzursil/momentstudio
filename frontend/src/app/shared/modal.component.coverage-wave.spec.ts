@@ -149,4 +149,34 @@ describe('ModalComponent coverage wave', () => {
     expect(component.effectiveConfirmDisabled()).toBeFalse();
     component.ngOnDestroy();
   }));
+
+  it('covers focus trap branches with removed target and hidden/inert elements', fakeAsync(() => {
+    const fixture = TestBed.createComponent(ModalComponent);
+    const component = fixture.componentInstance;
+    component.open = true;
+    fixture.detectChanges();
+    tick();
+    fixture.detectChanges();
+
+    const dialog = component.dialogRef?.nativeElement as HTMLElement;
+    const hidden = document.createElement('button');
+    hidden.setAttribute('aria-hidden', 'true');
+    const inert = document.createElement('button');
+    inert.setAttribute('inert', '');
+    const visible = document.createElement('button');
+    dialog.append(hidden, inert, visible);
+
+    const focusable = (component as any).getFocusableElements(dialog) as HTMLElement[];
+    expect(focusable.includes(hidden)).toBeFalse();
+    expect(focusable.includes(inert)).toBeFalse();
+    expect(focusable.includes(visible)).toBeTrue();
+
+    const opener = document.createElement('button');
+    document.body.appendChild(opener);
+    opener.focus();
+    component.close();
+    opener.remove();
+    tick();
+    expect(document.contains(opener)).toBeFalse();
+  }));
 });

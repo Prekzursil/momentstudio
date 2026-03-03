@@ -64,6 +64,9 @@ describe('LockerPickerComponent', () => {
   defineSearchFirstResultSpec();
   defineGenericLoadErrorSpec();
   defineStaleDaysSpec();
+  defineGeoSuccessAndDeniedSpec();
+  defineSearchFirstResultFallbackSpec();
+  defineFanCourierFetchBranchesSpec();
 });
 
 function defineCitySuggestionSpec(): void {
@@ -152,5 +155,55 @@ function defineStaleDaysSpec(): void {
 
     lockerPickerComponent.mirrorSnapshot = { stale_age_seconds: 86400 * 7.9 } as any;
     expect(lockerPickerComponent.staleDays()).toBe(7);
+  });
+};
+
+function defineGeoSuccessAndDeniedSpec(): void {
+  it('covers geolocation success and denied callbacks', () => {
+    const getCurrentPosition = jasmine.createSpy('getCurrentPosition').and.callFake((onSuccess: any, onError: any) => {
+      onSuccess({ coords: { latitude: 45.1, longitude: 26.2 } });
+      onError(new Error('denied'));
+    });
+    spyOnProperty(globalThis.navigator, 'geolocation', 'get').and.returnValue({ getCurrentPosition } as any);
+
+    lockerPickerComponent.useMyLocation();
+    expect(lockerPickerComponent['lastCenter']).toEqual({ lat: 45.1, lng: 26.2 });
+    expect(lockerPickerComponent.error).toContain('checkout.lockers.geoDenied');
+  });
+};
+
+function defineSearchFirstResultFallbackSpec(): void {
+  it('uses remote lookup when in-memory result list is empty', async () => {
+    lockerPickerShipping.listLockerCities.and.returnValue(of({ items: [], snapshot: null } as any));
+    lockerPickerComponent.searchResults = [];
+    lockerPickerComponent.searchQuery = 'Bucuresti';
+
+    await (lockerPickerComponent as any).fetchLocations('Bucuresti', { applyFirst: true });
+
+    expect(lockerPickerComponent.searchError).toContain('checkout.lockers.searchNoResults');
+  });
+};
+
+function defineFanCourierFetchBranchesSpec(): void {
+  it('covers fan-courier fetch non-ok and success parsing branches', async () => {
+    const fetchSpy = spyOn(globalThis as any, 'fetch');
+    lockerPickerComponent.provider = 'fan_courier';
+
+    fetchSpy.and.returnValue(Promise.resolve({ ok: false, json: async () => [] } as any));
+    await (lockerPickerComponent as any).fetchLocations('Cluj');
+    expect(lockerPickerComponent.searchError).toContain('checkout.lockers.searchError');
+
+    fetchSpy.and.returnValue(
+      Promise.resolve({
+        ok: true,
+        json: async () => [
+          { display_name: 'Cluj', lat: '46.7', lon: '23.6' },
+          { display_name: '', lat: 'x', lon: 'y' },
+        ],
+      } as any)
+    );
+    lockerPickerComponent.searchError = '';
+    await (lockerPickerComponent as any).fetchLocations('Cluj', { applyFirst: true });
+    expect(lockerPickerComponent.searchResults.length).toBeGreaterThan(0);
   });
 };

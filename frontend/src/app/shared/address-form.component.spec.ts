@@ -11,6 +11,8 @@ describe('AddressFormComponent', () => {
   definePhoneValidationSpec();
   defineLabelSyncSpec();
   defineAutocompleteApplySpec();
+  defineAutocompleteFetchBranchesSpec();
+  defineCountryChangeAndLabelPresetSpec();
 });
 
 function registerAddressFormSetup(): void {
@@ -152,5 +154,58 @@ function defineAutocompleteApplySpec(): void {
     expect(component.model.postal_code).toBe('010203');
     expect(component.autocompleteQuery).toBe('');
     expect(component.autocompleteResults).toEqual([]);
+  });
+};
+
+function defineAutocompleteFetchBranchesSpec(): void {
+  it('covers autocomplete timer, fetch non-ok, and successful parse branches', async () => {
+    const fixture = TestBed.createComponent(AddressFormComponent);
+    const component = fixture.componentInstance;
+    component.addressAutocompleteEnabled = true;
+    component.model = { line1: '', city: '', postal_code: '', country: 'RO' };
+
+    component.onAutocompleteQueryChange('ab');
+    expect(component.autocompleteResults).toEqual([]);
+
+    const fetchSpy = spyOn(globalThis as any, 'fetch');
+    fetchSpy.and.returnValue(Promise.resolve({ ok: false, json: async () => [] } as any));
+    await (component as any).fetchAutocomplete('Bucharest');
+    expect(component.autocompleteResults).toEqual([]);
+
+    fetchSpy.and.returnValue(
+      Promise.resolve({
+        ok: true,
+        json: async () => [
+          { display_name: 'Bucharest', address: { city: 'Bucharest' } },
+          { display_name: '', address: {} },
+        ],
+      } as any)
+    );
+    await (component as any).fetchAutocomplete('Bucharest');
+    expect(component.autocompleteResults.length).toBe(1);
+    expect(component.autocompleteResults[0].display_name).toBe('Bucharest');
+  });
+};
+
+function defineCountryChangeAndLabelPresetSpec(): void {
+  it('covers country change and custom label preset branches', () => {
+    const fixture = TestBed.createComponent(AddressFormComponent);
+    const component = fixture.componentInstance;
+    component.addressAutocompleteEnabled = true;
+    component.autocompleteQuery = 'Bucharest';
+    component.autocompleteResults = [{ display_name: 'Old', address: {} }];
+
+    const autoSpy = spyOn(component, 'onAutocompleteQueryChange').and.callThrough();
+    component.onCountryChange();
+    expect(autoSpy).toHaveBeenCalledWith('Bucharest');
+
+    component.labelPreset = 'custom';
+    component.labelCustom = '  Family  ';
+    component.applyLabelPreset();
+    expect(component.model.label).toBe('Family');
+
+    component.labelCustom = '   ';
+    component.applyLabelPreset();
+    expect(component.model.label).toBeNull();
   });
 };
