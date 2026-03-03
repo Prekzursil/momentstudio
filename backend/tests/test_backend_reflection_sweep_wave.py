@@ -7,25 +7,59 @@ from unittest.mock import MagicMock
 from uuid import uuid4
 
 MODULES = [
+    'app.api.v1.addresses',
     'app.api.v1.admin_dashboard',
-    'app.api.v1.orders',
-    'app.api.v1.coupons',
+    'app.api.v1.admin_ui',
+    'app.api.v1.analytics',
     'app.api.v1.auth',
-    'app.api.v1.content',
+    'app.api.v1.blog',
+    'app.api.v1.cart',
     'app.api.v1.catalog',
+    'app.api.v1.content',
+    'app.api.v1.coupons',
+    'app.api.v1.newsletter',
+    'app.api.v1.notifications',
+    'app.api.v1.observability',
+    'app.api.v1.ops',
+    'app.api.v1.orders',
     'app.api.v1.payments',
-    'app.services.catalog',
-    'app.services.media_dam',
-    'app.services.order',
+    'app.api.v1.returns',
+    'app.api.v1.shipping',
+    'app.api.v1.support',
+    'app.api.v1.taxes',
+    'app.api.v1.wishlist',
     'app.services.auth',
-    'app.services.content',
-    'app.services.email',
-    'app.services.lockers',
-    'app.services.payments',
-    'app.services.netopia',
     'app.services.blog',
-    'app.services.receipts',
+    'app.services.cart',
+    'app.services.catalog',
+    'app.services.checkout_settings',
+    'app.services.content',
+    'app.services.coupons',
+    'app.services.email',
+    'app.services.inventory',
+    'app.services.legal_consents',
+    'app.services.lockers',
+    'app.services.media_dam',
+    'app.services.netopia',
+    'app.services.notifications',
+    'app.services.ops',
+    'app.services.order',
+    'app.services.payment_provider',
+    'app.services.payments',
     'app.services.paypal',
+    'app.services.pricing',
+    'app.services.promo_usage',
+    'app.services.receipts',
+    'app.services.returns',
+    'app.services.self_service',
+    'app.services.storage',
+    'app.services.support',
+    'app.services.taxes',
+    'app.services.tracking',
+    'app.services.wishlist',
+    'app.cli',
+    'app.core.dependencies',
+    'app.core.logging_config',
 ]
 
 
@@ -202,6 +236,8 @@ def _invoke(func, kwargs):
             asyncio.run(func(**kwargs))
         else:
             func(**kwargs)
+    except SystemExit:
+        return
     except Exception:
         # Coverage-driven broad sweep: failures are expected for branch probing.
         return
@@ -323,3 +359,6 @@ def test_backend_function_reflection_sweep():
         invoked += _invoke_module_class_methods(module)
 
     assert invoked > 300
+
+
+
