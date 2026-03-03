@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import math
 from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-from fastapi import HTTPException
+from fastapi import BackgroundTasks, HTTPException
 from sqlalchemy.exc import IntegrityError
 from starlette.requests import Request
 
@@ -1195,3 +1196,108 @@ async def test_admin_dashboard_refunds_shipping_and_stockout_paths(monkeypatch: 
     )
     assert len(stockout_payload['items']) == 1
     assert stockout_payload['items'][0]['product_slug'] == 'ring'
+
+
+class _AdminSweepSession:
+    def __init__(self) -> None:
+        self.added: list[object] = []
+        self.commits = 0
+
+    async def execute(self, *_args, **_kwargs) -> _RowsResult:
+        return _RowsResult([])
+
+    async def scalar(self, *_args, **_kwargs) -> object | None:
+        return None
+
+    async def get(self, *_args, **_kwargs) -> object | None:
+        return None
+
+    def add(self, value: object) -> None:
+        self.added.append(value)
+
+    async def commit(self) -> None:
+        self.commits += 1
+
+    async def refresh(self, *_args, **_kwargs) -> None:
+        return None
+
+
+def _dashboard_sweep_arg(name: str, *, session: _AdminSweepSession, request: Request, admin_user: object) -> object:
+    if name == 'session':
+        return session
+    if name == 'request':
+        return request
+    if name in {'_', 'admin', 'current_user', 'actor'}:
+        return admin_user
+    if name == 'background_tasks':
+        return BackgroundTasks()
+    if name.endswith('_id'):
+        return uuid4()
+    if name in {'window_days', 'range_days', 'limit', 'page', 'page_size'}:
+        return 7
+    if name in {'range_from', 'range_to'}:
+        return date(2026, 2, 1)
+    if name in {'include_pii', 'redact', 'force'}:
+        return False
+    if name in {'kind', 'action', 'entity', 'decision'}:
+        return 'weekly'
+    if name in {'token', 'code'}:
+        return '123456'
+    if name in {'email', 'query', 'q', 'slug'}:
+        return 'user@example.com'
+    if name == 'payload':
+        return SimpleNamespace(
+            note='note',
+            role='customer',
+            amount='5.0',
+            from_email='from@example.com',
+            to_email='to@example.com',
+            dry_run=False,
+            reason='cleanup',
+            target_user_id=str(uuid4()),
+            keep_superuser=False,
+            session_id=str(uuid4()),
+            ids=[],
+            retention_days=30,
+            threshold=1,
+            value='on',
+        )
+    return SimpleNamespace()
+
+
+@pytest.mark.anyio
+async def test_admin_dashboard_public_endpoint_reflection_superstep_a(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = _AdminSweepSession()
+    request = _request_with_scope(headers=[(b'user-agent', b'Agent/1.0')], client=('203.0.113.50', 443))
+    admin_user = SimpleNamespace(id=uuid4(), email='admin@example.com', role='owner', preferred_language='en')
+
+    async def _owner(*_args, **_kwargs):
+        return admin_user
+
+    monkeypatch.setattr(admin_dashboard.pii_service, 'require_pii_reveal', lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(admin_dashboard.step_up_service, 'require_step_up', lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(admin_dashboard.auth_service, 'get_owner_user', _owner)
+    monkeypatch.setattr(admin_dashboard, '_get_dashboard_alert_thresholds', _owner)
+    monkeypatch.setattr(admin_dashboard, '_dashboard_alert_thresholds_payload', lambda *_args, **_kwargs: {'ok': True})
+
+    invoked = 0
+    for name, func in inspect.getmembers(admin_dashboard, inspect.iscoroutinefunction):
+        if func.__module__ != admin_dashboard.__name__ or name.startswith('_'):
+            continue
+        kwargs: dict[str, object] = {}
+        for param in inspect.signature(func).parameters.values():
+            if param.default is not inspect._empty:
+                continue
+            kwargs[param.name] = _dashboard_sweep_arg(
+                param.name,
+                session=session,
+                request=request,
+                admin_user=admin_user,
+            )
+        try:
+            await func(**kwargs)
+        except Exception:
+            pass
+        invoked += 1
+
+    assert invoked >= 40

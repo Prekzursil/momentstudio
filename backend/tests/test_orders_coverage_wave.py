@@ -1106,3 +1106,157 @@ async def test_orders_cart_loader_and_netopia_refresh_helpers(monkeypatch: pytes
     no_cart_session = _RecorderCheckoutSession(cart_row=None)
     await orders_api._clear_cart_last_order_pointer(no_cart_session, cart_id=uuid4())
     assert no_cart_session.added == []
+
+
+class _AdminRouteSession:
+    def __init__(self) -> None:
+        self.added: list[object] = []
+        self.commits = 0
+        self.refreshed: list[tuple[object, object | None]] = []
+
+    def add(self, obj: object) -> None:
+        self.added.append(obj)
+
+    async def commit(self) -> None:
+        self.commits += 1
+
+    async def refresh(self, obj: object, *, attribute_names: object | None = None) -> None:
+        self.refreshed.append((obj, attribute_names))
+
+
+def _admin_order_stub() -> SimpleNamespace:
+    return SimpleNamespace(
+        id=uuid4(),
+        status=OrderStatus.pending_payment,
+        reference_code='REF-ADMIN',
+        events=[],
+        user=SimpleNamespace(id=uuid4(), email='buyer@example.com', preferred_language='en'),
+        customer_email='buyer@example.com',
+        items=[SimpleNamespace(id=uuid4())],
+        refunds=[],
+    )
+
+
+def _install_order_admin_stubs(monkeypatch: pytest.MonkeyPatch, order: SimpleNamespace) -> None:
+    async def _return_order(*_args, **_kwargs):
+        return order
+
+    async def _return_order_admin(*_args, **_kwargs):
+        return order
+
+    async def _serialize(*_args, **_kwargs):
+        return order
+
+    monkeypatch.setattr(orders_api.order_service, 'get_order_by_id', _return_order)
+    monkeypatch.setattr(orders_api.order_service, 'get_order_by_id_admin', _return_order_admin)
+    monkeypatch.setattr(orders_api, '_serialize_admin_order', _serialize)
+    monkeypatch.setattr(orders_api.pii_service, 'require_pii_reveal', lambda *_args, **_kwargs: None)
+
+
+@pytest.mark.anyio
+async def test_orders_admin_mutation_routes_superstep_a(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = _AdminRouteSession()
+    order = _admin_order_stub()
+    admin = SimpleNamespace(id=uuid4(), email='admin@example.com', username='admin')
+    status_changes: list[str] = []
+    _install_order_admin_stubs(monkeypatch, order)
+
+    async def _update(*_args, **_kwargs):
+        order.status = OrderStatus.shipped
+        return order
+
+    monkeypatch.setattr(orders_api.order_service, 'update_order', _update)
+
+    async def _record_status_change(*_args, **_kwargs):
+        status_changes.append('changed')
+
+    monkeypatch.setattr(orders_api, '_handle_admin_order_status_change', _record_status_change)
+    await orders_api.admin_update_order(BackgroundTasks(), order.id, SimpleNamespace(shipping_method_id=None), _request(), False, session, admin)
+    assert status_changes == ['changed']
+
+    for name in ('update_order_addresses', 'create_order_shipment', 'update_order_shipment', 'delete_order_shipment'):
+        monkeypatch.setattr(orders_api.order_service, name, _update)
+    await orders_api.admin_update_order_addresses(order.id, _request(), SimpleNamespace(), False, session, admin)
+    await orders_api.admin_create_order_shipment(order.id, _request(), SimpleNamespace(), False, session, admin)
+    await orders_api.admin_update_order_shipment(order.id, uuid4(), _request(), SimpleNamespace(), False, session, admin)
+    await orders_api.admin_delete_order_shipment(order.id, uuid4(), _request(), False, session, admin)
+
+    monkeypatch.setattr(orders_api.order_service, 'add_admin_note', _update)
+    monkeypatch.setattr(orders_api.order_service, 'add_order_tag', _update)
+    monkeypatch.setattr(orders_api.order_service, 'remove_order_tag', _update)
+    monkeypatch.setattr(orders_api.order_service, 'review_order_fraud', _update)
+    async def _noop_async(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr(orders_api.order_service, 'update_fulfillment', _noop_async)
+    await orders_api.admin_add_order_note(order.id, _request(), SimpleNamespace(note='note'), False, session, admin)
+    await orders_api.admin_add_order_tag(order.id, _request(), SimpleNamespace(tag='priority'), False, session, admin)
+    await orders_api.admin_remove_order_tag(order.id, 'priority', _request(), False, session, admin)
+    await orders_api.admin_review_order_fraud(order.id, _request(), SimpleNamespace(decision='clear', note='ok'), False, session, admin)
+    await orders_api.admin_fulfill_item(order.id, uuid4(), _request(), 1, False, session, admin)
+    events = await orders_api.admin_order_events(order.id, session, object())
+    assert events == order.events
+
+
+@pytest.mark.anyio
+async def test_orders_admin_refund_email_cancel_and_reorder_routes_superstep_a(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = _AdminRouteSession()
+    order = _admin_order_stub()
+    owner = SimpleNamespace(id=uuid4(), email='owner@example.com', preferred_language='en')
+    user = SimpleNamespace(id=order.user.id, email='buyer@example.com', preferred_language='en')
+    admin_user = SimpleNamespace(email='admin@example.com', username='admin')
+    queued: list[str] = []
+    _install_order_admin_stubs(monkeypatch, order)
+
+    async def _return_order(*_args, **_kwargs):
+        return order
+
+    async def _return_owner(*_args, **_kwargs):
+        return owner
+
+    async def _record_refunded(*_args, **_kwargs):
+        queued.append('refunded')
+
+    async def _record_owner_cancel(*_args, **_kwargs):
+        queued.append('owner-cancel')
+
+    async def _record_user_cancel(*_args, **_kwargs):
+        queued.append('user-cancel')
+
+    async def _settings(*_args, **_kwargs):
+        return SimpleNamespace(receipt_share_days=7)
+
+    async def _reorder(*_args, **_kwargs):
+        return SimpleNamespace(id=uuid4())
+
+    async def _serialize_cart(*_args, **_kwargs):
+        return SimpleNamespace(items=[])
+
+    monkeypatch.setattr(orders_api.order_service, 'retry_payment', _return_order)
+    monkeypatch.setattr(orders_api.auth_service, 'get_owner_user', _return_owner)
+    monkeypatch.setattr(orders_api, '_notify_user_order_refunded', _record_refunded)
+    monkeypatch.setattr(orders_api, '_notify_owner_cancel_request', _record_owner_cancel)
+    monkeypatch.setattr(orders_api, '_notify_user_cancel_requested', _record_user_cancel)
+    monkeypatch.setattr(orders_api.checkout_settings_service, 'get_checkout_settings', _settings)
+    monkeypatch.setattr(orders_api.order_service, 'refund_order', _return_order)
+    monkeypatch.setattr(orders_api.order_service, 'create_order_refund', _return_order)
+    monkeypatch.setattr(orders_api.order_service, 'get_order', _return_order)
+    monkeypatch.setattr(orders_api.cart_service, 'reorder_from_order', _reorder)
+    monkeypatch.setattr(orders_api.cart_service, 'serialize_cart', _serialize_cart)
+
+    await orders_api.admin_send_delivery_email(BackgroundTasks(), order.id, SimpleNamespace(note='resend'), session, admin_user)
+    await orders_api.admin_send_confirmation_email(BackgroundTasks(), order.id, SimpleNamespace(note='resend'), session, admin_user)
+    await orders_api.admin_refund_order(BackgroundTasks(), order.id, _request(), SimpleNamespace(note='manual'), session, admin_user)
+    await orders_api.admin_create_order_refund(
+        BackgroundTasks(),
+        order.id,
+        _request(),
+        SimpleNamespace(amount=Decimal('12.50'), note='partial', items=[SimpleNamespace(order_item_id=uuid4(), quantity=1)], process_payment=False),
+        session,
+        admin_user,
+    )
+    await orders_api.admin_retry_payment(order.id, session, 'admin')
+    await orders_api.request_order_cancellation(order.id, SimpleNamespace(reason='Changed mind'), BackgroundTasks(), session, user)
+    reorder = await orders_api.reorder_order(order.id, user, session)
+    assert hasattr(reorder, 'items')
+    assert {'refunded', 'owner-cancel', 'user-cancel'}.issubset(set(queued))
