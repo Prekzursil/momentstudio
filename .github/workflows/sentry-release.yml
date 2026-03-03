@@ -9,14 +9,13 @@ on:
       - "v*"
   workflow_dispatch:
 
-permissions:
-  contents: read
-
 jobs:
   sentry-pr-verify:
     name: sentry-pr-verify
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     env:
       SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
       SENTRY_ORG: ${{ vars.SENTRY_ORG }}
@@ -57,32 +56,22 @@ jobs:
             exit 1
           fi
 
-          query_http_code="$(
-            curl -sS \
-              -H "Authorization: Bearer ${SENTRY_AUTH_TOKEN}" \
-              -H "Content-Type: application/json" \
-              -o /tmp/sentry-project-query.json \
-              -w "%{http_code}" \
-              "${base_url%/}/api/0/projects/?query=${SENTRY_PROJECT}"
-          )"
-          if [ "${query_http_code}" != "200" ]; then
-            echo "::error::Sentry project query failed with HTTP ${query_http_code}."
-            cat /tmp/sentry-project-query.json || true
-            exit 1
-          fi
-
-          jq -e --arg project "${SENTRY_PROJECT}" '
+          jq -e --arg org "${SENTRY_ORG}" --arg project "${SENTRY_PROJECT}" '
             map(
-              (.slug == $project) or
-              ((.id | tostring) == $project) or
-              (.name == $project) or
-              (.organization.slug? == $project) or
-              ((.organization.id? | tostring) == $project)
+              (
+                (.slug == $project) or
+                ((.id | tostring) == $project) or
+                (.name == $project)
+              ) and
+              (
+                (.organization.slug? == $org) or
+                ((.organization.id? | tostring) == $org)
+              )
             ) | any
-          ' /tmp/sentry-project-query.json > /dev/null || {
-            echo "::error::SENTRY_PROJECT is not visible to this token via Sentry project search."
+          ' /tmp/sentry-projects.json > /dev/null || {
+            echo "::error::SENTRY_PROJECT/SENTRY_ORG are not visible to this token via Sentry projects API."
             echo "::group::Sentry visible project slugs (debug)"
-            jq -r '.[] | [.id, .slug, (.organization.slug // \"-\")] | @tsv' /tmp/sentry-projects.json | sed -n '1,50p'
+            jq -r '.[] | [.id, .slug, (.organization.slug // "-"), ((.organization.id // "-") | tostring)] | @tsv' /tmp/sentry-projects.json | sed -n '1,100p'
             echo "::endgroup::"
             exit 1
           }
@@ -90,6 +79,8 @@ jobs:
   release-and-sourcemaps:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Check Sentry configuration
         id: config

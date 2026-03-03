@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 from types import SimpleNamespace
 from urllib.parse import parse_qs, urlparse
@@ -27,6 +28,7 @@ class _CatalogSession:
         self._rows = list(rows)
 
     async def execute(self, _statement: object) -> _RowsResult:
+        await asyncio.sleep(0)
         return _RowsResult(self._rows)
 
 
@@ -232,6 +234,7 @@ async def test_email_send_verification_email_query_branches(monkeypatch: pytest.
         headers: dict[str, str] | None = None,
         attachments: list[dict[str, object]] | None = None,
     ) -> bool:
+        await asyncio.sleep(0)
         sent_payloads.append(
             {
                 "to_email": to_email,

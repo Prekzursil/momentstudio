@@ -41,9 +41,9 @@ describe('AccountState coverage wave 3', () => {
   it('normalizes localized address labels and preserves unknown custom labels', () => {
     const state = createState();
 
-    expect((state as any).normalizeAddressLabel('serviciu')).toBe('work');
-    expect((state as any).normalizeAddressLabel('altele')).toBe('other');
-    expect((state as any).normalizeAddressLabel('Vacation Home')).toBe('Vacation Home');
+    expect(state.normalizeAddressLabel('serviciu')).toBe('work');
+    expect(state.normalizeAddressLabel('altele')).toBe('other');
+    expect(state.normalizeAddressLabel('Vacation Home')).toBe('Vacation Home');
   });
 
   it('requests verification and applies resend cooldown on success', () => {

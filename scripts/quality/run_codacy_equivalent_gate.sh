@@ -71,9 +71,11 @@ SEMGREP_CMD="$(resolve_cmd_or semgrep '.venv/bin/semgrep')"
 MARKDOWNLINT_CONFIG="$OUT_DIR/.markdownlint-cli2.jsonc"
 cat > "$MARKDOWNLINT_CONFIG" <<'MARKDOWNLINT_JSON'
 {
-  "default": false,
-  "MD032": true,
-  "MD034": true
+  "config": {
+    "default": false,
+    "MD032": true,
+    "MD034": true
+  }
 }
 MARKDOWNLINT_JSON
 

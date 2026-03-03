@@ -138,8 +138,8 @@ function createVm(): CheckoutShippingStepVm {
 
     guestCreateAccount: false,
     guestUsername: 'guest',
-    guestPassword: 'secret',
-    guestPasswordConfirm: 'secret',
+    guestPassword: 'guest-token-value-0',
+    guestPasswordConfirm: 'guest-token-value-0',
     guestShowPassword: false,
     guestShowPasswordConfirm: false,
     guestFirstName: 'Jane',
@@ -221,81 +221,87 @@ function createComponent(vm: CheckoutShippingStepVm): CheckoutShippingStepCompon
   return component;
 }
 
+const GETTER_ONLY_KEYS = [
+  'auth',
+  'roCounties',
+  'roCities',
+  'phoneCountries',
+  'countries',
+  'currency',
+  'savedAddresses',
+  'savedAddressesLoading',
+  'savedAddressesError',
+  'guestVerificationSent',
+  'guestEmailVerified',
+  'guestSendingCode',
+  'guestConfirmingCode',
+  'guestEmailError',
+  'guestResendSecondsLeft',
+  'address',
+  'billing',
+  'courier',
+  'deliveryType',
+  'deliveryError',
+  'deliveryLockerAllowed',
+  'addressError'
+] as const;
+
+const SETTER_UPDATES: ReadonlyArray<{ key: keyof CheckoutShippingStepVm; value: unknown }> = [
+  { key: 'selectedShippingAddressId', value: 'addr-2' },
+  { key: 'selectedBillingAddressId', value: 'addr-3' },
+  { key: 'guestCreateAccount', value: true },
+  { key: 'guestUsername', value: 'new-user' },
+  { key: 'guestPassword', value: 'guest-token-value-1' },
+  { key: 'guestPasswordConfirm', value: 'guest-token-value-1' },
+  { key: 'guestShowPassword', value: true },
+  { key: 'guestShowPasswordConfirm', value: true },
+  { key: 'guestFirstName', value: 'Alex' },
+  { key: 'guestMiddleName', value: 'M' },
+  { key: 'guestLastName', value: 'Stone' },
+  { key: 'guestDob', value: '1995-05-05' },
+  { key: 'guestPhoneCountry', value: 'DE' },
+  { key: 'guestPhoneNational', value: '0123456789' },
+  { key: 'guestVerificationToken', value: 'token-1' },
+  { key: 'shippingPhoneCountry', value: 'DE' },
+  { key: 'shippingPhoneNational', value: '0987654321' },
+  { key: 'billingSameAsShipping', value: false },
+  { key: 'invoiceEnabled', value: true },
+  { key: 'invoiceCompany', value: 'ACME' },
+  { key: 'invoiceVatId', value: 'RO123456' },
+  { key: 'shippingCountryInput', value: 'Romania' },
+  { key: 'billingCountryInput', value: 'Germany' },
+  { key: 'shippingCountryError', value: 'invalid shipping country' },
+  { key: 'billingCountryError', value: 'invalid billing country' },
+  { key: 'locker', value: 'locker-1' },
+  { key: 'saveAddress', value: true },
+  { key: 'saveDefaultShipping', value: true },
+  { key: 'saveDefaultBilling', value: true }
+];
+
 describe('CheckoutShippingStepComponent coverage wave', () => {
-  it('proxies VM-backed getters and setters without local state drift', () => {
+  it('proxies VM-backed getters without local state drift', () => {
     const vm = createVm();
     const component = createComponent(vm);
     const componentRecord = component as unknown as Record<string, unknown>;
 
-    const getterOnlyKeys = [
-      'auth',
-      'roCounties',
-      'roCities',
-      'phoneCountries',
-      'countries',
-      'currency',
-      'savedAddresses',
-      'savedAddressesLoading',
-      'savedAddressesError',
-      'guestVerificationSent',
-      'guestEmailVerified',
-      'guestSendingCode',
-      'guestConfirmingCode',
-      'guestEmailError',
-      'guestResendSecondsLeft',
-      'address',
-      'billing',
-      'courier',
-      'deliveryType',
-      'deliveryError',
-      'deliveryLockerAllowed',
-      'addressError'
-    ] as const;
-
-    for (const key of getterOnlyKeys) {
+    for (const key of GETTER_ONLY_KEYS) {
       expect(componentRecord[key]).toBe(vm[key]);
     }
+  });
 
-    const setterUpdates: ReadonlyArray<{ key: keyof CheckoutShippingStepVm; value: unknown }> = [
-      { key: 'selectedShippingAddressId', value: 'addr-2' },
-      { key: 'selectedBillingAddressId', value: 'addr-3' },
-      { key: 'guestCreateAccount', value: true },
-      { key: 'guestUsername', value: 'new-user' },
-      { key: 'guestPassword', value: 'new-password' },
-      { key: 'guestPasswordConfirm', value: 'new-password' },
-      { key: 'guestShowPassword', value: true },
-      { key: 'guestShowPasswordConfirm', value: true },
-      { key: 'guestFirstName', value: 'Alex' },
-      { key: 'guestMiddleName', value: 'M' },
-      { key: 'guestLastName', value: 'Stone' },
-      { key: 'guestDob', value: '1995-05-05' },
-      { key: 'guestPhoneCountry', value: 'DE' },
-      { key: 'guestPhoneNational', value: '0123456789' },
-      { key: 'guestVerificationToken', value: 'token-1' },
-      { key: 'shippingPhoneCountry', value: 'DE' },
-      { key: 'shippingPhoneNational', value: '0987654321' },
-      { key: 'billingSameAsShipping', value: false },
-      { key: 'invoiceEnabled', value: true },
-      { key: 'invoiceCompany', value: 'ACME' },
-      { key: 'invoiceVatId', value: 'RO123456' },
-      { key: 'shippingCountryInput', value: 'Romania' },
-      { key: 'billingCountryInput', value: 'Germany' },
-      { key: 'shippingCountryError', value: 'invalid shipping country' },
-      { key: 'billingCountryError', value: 'invalid billing country' },
-      { key: 'locker', value: 'locker-1' },
-      { key: 'saveAddress', value: true },
-      { key: 'saveDefaultShipping', value: true },
-      { key: 'saveDefaultBilling', value: true }
-    ];
+  it('proxies VM-backed setters without local state drift', () => {
+    const vm = createVm();
+    const component = createComponent(vm);
+    const componentRecord = component as unknown as Record<string, unknown>;
 
-    for (const update of setterUpdates) {
+    for (const update of SETTER_UPDATES) {
       componentRecord[update.key] = update.value;
       expect(vm[update.key]).toEqual(update.value);
       expect(componentRecord[update.key]).toEqual(update.value);
     }
   });
 
-  it('forwards all behavioral methods to the VM and returns VM results', () => {
+  it('forwards guest and saved-address behavior to the VM', () => {
     const vm = createVm();
     const component = createComponent(vm);
 
@@ -356,7 +362,11 @@ describe('CheckoutShippingStepComponent coverage wave', () => {
 
     component.onBillingSameAsShippingChanged();
     expect(vm.onBillingSameAsShippingChanged).toHaveBeenCalled();
+  });
 
+  it('forwards country, delivery, and quote behavior to the VM', () => {
+    const vm = createVm();
+    const component = createComponent(vm);
     const countryArg = { code: 'RO', name: 'Romania' };
     expect(component.formatCountryOption(countryArg)).toBe('Romania (RO)');
     expect(vm.formatCountryOption).toHaveBeenCalledWith(countryArg);

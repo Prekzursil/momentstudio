@@ -45,6 +45,12 @@ function flushSignalEffects(): void {
   TestBed.flushEffects();
 }
 
+function createService(): WishlistService {
+  const service = TestBed.inject(WishlistService);
+  flushSignalEffects();
+  return service;
+}
+
 describe('WishlistService', () => {
   let api: jasmine.SpyObj<Pick<ApiService, 'get' | 'post' | 'delete'>>;
   let auth: AuthServiceStub;
@@ -66,12 +72,6 @@ describe('WishlistService', () => {
   afterEach(() => {
     localStorage.clear();
   });
-
-  function createService(): WishlistService {
-    const service = TestBed.inject(WishlistService);
-    flushSignalEffects();
-    return service;
-  }
 
   it('loads, normalizes, and snapshots remote wishlist items for authenticated users', () => {
     auth.setUser(createUser('user-load'));

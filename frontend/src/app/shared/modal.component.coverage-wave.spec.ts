@@ -67,7 +67,12 @@ describe('ModalComponent coverage wave', () => {
     component.emitBodyScroll();
 
     expect(component.effectiveConfirmDisabled()).toBeFalse();
-    const lastEvent = scrollEvents[scrollEvents.length - 1];
+    const lastEvent = scrollEvents.at(-1);
+    expect(lastEvent).toBeDefined();
+    if (!lastEvent) {
+      fail('Expected at least one modal body scroll event');
+      return;
+    }
     expect(lastEvent.atBottom).toBeTrue();
   }));
 
