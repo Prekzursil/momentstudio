@@ -1541,6 +1541,64 @@ describe('AdminComponent sweep coverage', () => {
     expect(after.find((b: any) => b.key === 'faq-1').faq_items.length).toBe(1);
     expect(after.find((b: any) => b.key === 'testimonials-1').testimonials.length).toBe(1);
   });
+
+  it('covers checklist, navigation, legal dual-save and payload parser branches', () => {
+    const { component, admin, toast } = createComponent();
+    const dynamic = component as any;
+
+    dynamic.navigationForm = {
+      header_links: [{ id: 'first' }, { id: 'second' }],
+      footer_handcrafted_links: [],
+      footer_legal_links: []
+    };
+    dynamic.moveNavigationLink('header', ' ', 1);
+    dynamic.moveNavigationLink('header', 'first', 1);
+    expect(dynamic.navigationForm.header_links[1].id).toBe('first');
+
+    expect(dynamic.readCmsBlockPayload({ dataTransfer: { getData: () => '' } } as any)).toBeNull();
+    const payload = dynamic.readCmsBlockPayload({
+      dataTransfer: {
+        getData: () => JSON.stringify({ kind: 'cms-block', scope: 'page', type: 'text', template: 'blank' })
+      }
+    } as any);
+    expect(payload?.scope).toBe('page');
+    expect(payload?.type).toBe('text');
+
+    dynamic.pageBlocks = {
+      'page.about': [{ key: 'img-block', type: 'image', url: '', focal_x: 50, focal_y: 50 }]
+    };
+    dynamic.setPageImageBlockUrl('page.about', 'img-block', { url: ' /asset.jpg ', focal_x: 33, focal_y: 66 } as any);
+    expect(dynamic.pageBlocks['page.about'][0].url).toBe('/asset.jpg');
+    expect(toast.success).toHaveBeenCalled();
+
+    (admin as any).linkCheckContentPreview = jasmine
+      .createSpy('linkCheckContentPreview')
+      .and.returnValue(of({ issues: [{ code: 'broken-link' }] }));
+
+    dynamic.openPagePublishChecklist('page.about');
+    expect(dynamic.pagePublishChecklistOpen).toBeTrue();
+    expect(dynamic.pagePublishChecklistLoading).toBeFalse();
+    expect(dynamic.pagePublishChecklistResult?.linkIssues.length).toBe(1);
+
+    (admin as any).linkCheckContentPreview.and.returnValue(throwError(() => ({ error: { detail: 'boom' } })));
+    dynamic.openPagePublishChecklist('page.about');
+    expect(dynamic.pagePublishChecklistError).toBe('boom');
+
+    const saveLegalMetaIfNeeded = spyOn(dynamic, 'saveLegalMetaIfNeeded').and.callFake((_key: string, onSuccess: () => void) => {
+      onSuccess();
+    });
+    const savePageMarkdownInternal = spyOn(dynamic, 'savePageMarkdownInternal').and.callFake(
+      (_key: string, _body: string, _lang: string, onSuccess: () => void) => {
+        onSuccess();
+      },
+    );
+
+    dynamic.saveLegalPageBoth('page.about', { en: 'Privacy EN', ro: 'Privacy RO' });
+    expect(saveLegalMetaIfNeeded).toHaveBeenCalled();
+    expect(savePageMarkdownInternal).toHaveBeenCalledTimes(2);
+    expect(dynamic.legalPageMessage).toBe('adminUi.site.pages.success.save');
+  });
+
 });
 
 
