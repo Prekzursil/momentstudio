@@ -433,7 +433,11 @@ describe('BlogPostComponent', () => {
 
     spyOn(globalThis, 'open').and.returnValue(null);
     spyOn(globalThis, 'confirm').and.returnValue(false);
-    spyOn(navigator.clipboard, 'writeText').and.returnValue(Promise.resolve());
+    const clipboardStub = navigator.clipboard ?? ({ writeText: () => Promise.resolve() } as unknown as Clipboard);
+    if (!navigator.clipboard) {
+      Object.defineProperty(navigator, 'clipboard', { value: clipboardStub, configurable: true });
+    }
+    spyOn(clipboardStub, 'writeText').and.returnValue(Promise.resolve());
 
     const attempted = runBlogPrototypeSweep(cmp);
     expect(attempted).toBeGreaterThan(35);
@@ -463,3 +467,5 @@ function configureBlogPostTestingModule(deps: BlogPostSpecDeps): void {
   translate.setTranslation('en', { blog: { post: { metaTitle: 'Blog post', metaDescription: 'Desc' } } }, true);
   translate.use('en');
 }
+
+
