@@ -6,7 +6,7 @@ from decimal import Decimal
 from types import SimpleNamespace
 import uuid
 
-from fastapi import BackgroundTasks, HTTPException
+from fastapi import BackgroundTasks, HTTPException, status
 import pytest
 
 from app.api.v1 import coupons as coupons_api
@@ -982,6 +982,12 @@ class _AdminSessionStub:
     def add(self, value: object) -> None:
         self.added.append(value)
 
+    async def flush(self) -> None:
+        await asyncio.sleep(0)
+        for value in self.added:
+            if getattr(value, "id", None) is None:
+                setattr(value, "id", uuid.uuid4())
+
     async def commit(self) -> None:
         await asyncio.sleep(0)
         self.commits += 1
@@ -1208,3 +1214,201 @@ async def test_coupon_api_admin_list_coupon_assignments_maps_user_fields(monkeyp
     assert result[0].user_email == 'first@example.com'
     assert result[0].user_username == 'first'
     assert result[1].user_email is None
+
+
+@pytest.mark.anyio
+async def test_coupon_api_admin_promotion_assign_revoke_and_segment_paths(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_model_validate_to_stub(monkeypatch, coupons_api.PromotionRead)
+    _patch_model_validate_to_stub(monkeypatch, coupons_api.CouponRead)
+    _patch_model_validate_to_stub(monkeypatch, coupons_api.CouponBulkJobRead)
+
+    now = datetime(2026, 3, 4, tzinfo=timezone.utc)
+    promo_id = uuid.uuid4()
+    coupon_id = uuid.uuid4()
+    user_id = uuid.uuid4()
+    included_product = uuid.uuid4()
+    excluded_category = uuid.uuid4()
+
+    created_scope_calls: list[dict[str, object]] = []
+
+    async def _replace_scopes(*_args, **kwargs):
+        await asyncio.sleep(0)
+        created_scope_calls.append(kwargs)
+
+    monkeypatch.setattr(coupons_api, "_replace_promotion_scopes", _replace_scopes)
+    monkeypatch.setattr(coupons_api, "_clean_and_validate_promotion_key", lambda *_args, **_kwargs: asyncio.sleep(0, result="PROMO-CLEAN"))
+
+    create_session = _AdminSessionStub()
+    created = await coupons_api.admin_create_promotion(
+        payload=coupons_api.PromotionCreate(
+            key=" promo-clean ",
+            name="Spring promo",
+            description="Desc",
+            discount_type=PromotionDiscountType.percent,
+            percentage_off=Decimal("12.50"),
+            amount_off=None,
+            max_discount_amount=None,
+            min_subtotal=None,
+            included_product_ids=[included_product],
+            excluded_product_ids=[],
+            included_category_ids=[],
+            excluded_category_ids=[excluded_category],
+            allow_on_sale_items=True,
+            first_order_only=False,
+            is_active=True,
+            starts_at=None,
+            ends_at=None,
+            is_automatic=False,
+        ),
+        session=create_session,
+        _=None,
+    )
+    assert created.key == "PROMO-CLEAN"
+    assert create_session.commits == 1
+    assert created_scope_calls
+
+    promo = coupons_api.Promotion(
+        id=promo_id,
+        key="OLD",
+        name="Old",
+        description="Old desc",
+        discount_type=PromotionDiscountType.percent,
+        percentage_off=Decimal("5.00"),
+        amount_off=None,
+        max_discount_amount=None,
+        min_subtotal=None,
+        allow_on_sale_items=True,
+        first_order_only=False,
+        is_active=True,
+        starts_at=None,
+        ends_at=None,
+        is_automatic=False,
+        created_at=now,
+        updated_at=now,
+    )
+    promo.scopes = []
+
+    update_session = _AdminSessionStub(execute_results=[_Result(scalars=[promo])])
+    updated = await coupons_api.admin_update_promotion(
+        promotion_id=promo_id,
+        payload=coupons_api.PromotionUpdate(
+            key="promo-next",
+            name="Renamed promo",
+            percentage_off=Decimal("15.00"),
+            included_product_ids=[included_product],
+            excluded_product_ids=[],
+            included_category_ids=[],
+            excluded_category_ids=[excluded_category],
+        ),
+        session=update_session,
+        _=None,
+    )
+    assert updated.name == "Renamed promo"
+    assert updated.key == "PROMO-CLEAN"
+    assert update_session.commits == 1
+
+    with pytest.raises(HTTPException, match="Promotion not found"):
+        await coupons_api.admin_update_promotion(
+            promotion_id=uuid.uuid4(),
+            payload=coupons_api.PromotionUpdate(name="Missing"),
+            session=_AdminSessionStub(execute_results=[_Result(scalars=[])]),
+            _=None,
+        )
+
+    coupon = SimpleNamespace(
+        id=coupon_id,
+        code="SAVE15",
+        promotion=promo,
+        promotion_id=promo_id,
+        starts_at=None,
+        ends_at=None,
+        visibility=CouponVisibility.public,
+        is_active=True,
+        global_max_redemptions=None,
+        per_customer_max_redemptions=None,
+        created_at=now,
+        revoked_at=None,
+        revoked_reason=None,
+    )
+
+    user = SimpleNamespace(
+        id=user_id,
+        email="coupon-user@example.com",
+        preferred_language="en",
+        notify_marketing=True,
+    )
+
+    assign_session = _AdminSessionStub(
+        execute_results=[_Result(scalars=[coupon]), _Result(scalars=[])],
+        get_map={user_id: user},
+    )
+    assign_tasks = BackgroundTasks()
+    assign_response = await coupons_api.admin_assign_coupon(
+        coupon_id=coupon_id,
+        payload=coupons_api.CouponAssignRequest(user_id=user_id, send_email=True),
+        background_tasks=assign_tasks,
+        session=assign_session,
+        _=None,
+    )
+    assert assign_response.status_code == status.HTTP_204_NO_CONTENT
+    assert assign_session.commits == 1
+    assert len(assign_tasks.tasks) == 1
+
+    active_assignment = SimpleNamespace(revoked_at=None, revoked_reason=None)
+    revoke_session = _AdminSessionStub(
+        execute_results=[_Result(scalars=[coupon]), _Result(scalars=[active_assignment])],
+        get_map={user_id: user},
+    )
+    revoke_tasks = BackgroundTasks()
+    revoke_response = await coupons_api.admin_revoke_coupon(
+        coupon_id=coupon_id,
+        payload=coupons_api.CouponRevokeRequest(user_id=user_id, reason="cleanup", send_email=True),
+        background_tasks=revoke_tasks,
+        session=revoke_session,
+        _=None,
+    )
+    assert revoke_response.status_code == status.HTTP_204_NO_CONTENT
+    assert active_assignment.revoked_reason == "cleanup"
+    assert revoke_session.commits == 1
+    assert len(revoke_tasks.tasks) == 1
+
+    monkeypatch.setattr(coupons_api, "_parse_bucket_config", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        coupons_api,
+        "_preview_segment_assign",
+        lambda *_args, **_kwargs: asyncio.sleep(0, result=SimpleNamespace(total_candidates=7)),
+    )
+    monkeypatch.setattr(
+        coupons_api,
+        "_preview_segment_revoke",
+        lambda *_args, **_kwargs: asyncio.sleep(0, result=SimpleNamespace(total_candidates=4)),
+    )
+
+    segment_coupon = SimpleNamespace(id=coupon_id)
+    segment_admin = SimpleNamespace(id=uuid.uuid4())
+
+    assign_segment_session = _AdminSessionStub(get_map={(coupons_api.Coupon, coupon_id): segment_coupon})
+    assign_segment_tasks = BackgroundTasks()
+    assign_job = await coupons_api.admin_start_segment_assign_job(
+        coupon_id=coupon_id,
+        payload=coupons_api.CouponBulkSegmentAssignRequest(send_email=True),
+        background_tasks=assign_segment_tasks,
+        session=assign_segment_session,
+        admin_user=segment_admin,
+    )
+    assert assign_job.action == CouponBulkJobAction.assign
+    assert assign_segment_session.commits == 1
+    assert len(assign_segment_tasks.tasks) == 1
+
+    revoke_segment_session = _AdminSessionStub(
+        get_map={(coupons_api.Coupon, coupon_id): segment_coupon},
+        bind=None,
+    )
+    with pytest.raises(HTTPException, match="Database engine unavailable"):
+        await coupons_api.admin_start_segment_revoke_job(
+            coupon_id=coupon_id,
+            payload=coupons_api.CouponBulkSegmentRevokeRequest(send_email=False, reason="cleanup"),
+            background_tasks=BackgroundTasks(),
+            session=revoke_segment_session,
+            admin_user=segment_admin,
+        )

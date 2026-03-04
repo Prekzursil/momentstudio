@@ -1502,3 +1502,165 @@ async def test_admin_dashboard_gdpr_deletion_request_execute_and_cancel_paths(mo
     assert 'gdpr.deletion.cancel' in audit_calls
 
 
+
+
+@pytest.mark.anyio
+async def test_admin_dashboard_user_search_duplicate_segment_and_alias_paths(monkeypatch: pytest.MonkeyPatch) -> None:
+    pii_calls: list[str] = []
+
+    def _record_pii(*_args, **_kwargs):
+        pii_calls.append("pii")
+
+    monkeypatch.setattr(admin_dashboard.pii_service, 'require_pii_reveal', _record_pii)
+
+    monkeypatch.setattr(
+        admin_dashboard,
+        '_duplicate_slug_matches_and_suggestion',
+        lambda *_args, **_kwargs: asyncio.sleep(0, result=([{'id': uuid4(), 'slug': 'ring', 'sku': 'SKU-1', 'name': 'Ring', 'status': 'published', 'is_active': True}], 'ring-2')),
+    )
+    monkeypatch.setattr(
+        admin_dashboard,
+        '_duplicate_sku_matches',
+        lambda *_args, **_kwargs: asyncio.sleep(0, result=[{'id': uuid4(), 'slug': 'ring', 'sku': 'SKU-1', 'name': 'Ring', 'status': 'published', 'is_active': True}]),
+    )
+    monkeypatch.setattr(
+        admin_dashboard,
+        '_duplicate_name_matches',
+        lambda *_args, **_kwargs: asyncio.sleep(0, result=[{'id': uuid4(), 'slug': 'ring', 'sku': 'SKU-1', 'name': 'Ring', 'status': 'published', 'is_active': True}]),
+    )
+
+    duplicate_response = await admin_dashboard.duplicate_check_products(
+        session=SimpleNamespace(),
+        _=None,
+        name=' Ring ',
+        sku='SKU-1',
+        exclude_slug='ring-old',
+    )
+    assert duplicate_response.suggested_slug == 'ring-2'
+    assert len(duplicate_response.slug_matches) == 1
+
+    class _Stmt:
+        def with_only_columns(self, *_args, **_kwargs):
+            return self
+
+        def order_by(self, *_args, **_kwargs):
+            return self
+
+        def limit(self, *_args, **_kwargs):
+            return self
+
+        def offset(self, *_args, **_kwargs):
+            return self
+
+    class _Session:
+        def __init__(self) -> None:
+            self._rows = [
+                SimpleNamespace(
+                    id=uuid4(),
+                    email='u@example.com',
+                    username='user',
+                    name='User Name',
+                    name_tag='1234',
+                    role=admin_dashboard.UserRole.customer,
+                    created_at=datetime(2026, 3, 1, tzinfo=timezone.utc),
+                )
+            ]
+            self._user = self._rows[0]
+
+        async def scalar(self, _stmt: object) -> int:
+            await asyncio.sleep(0)
+            return 1
+
+        async def execute(self, _stmt: object) -> _RowsResult:
+            await asyncio.sleep(0)
+            return _RowsResult(rows=self._rows)
+
+        async def get(self, _model: object, _key: object) -> object:
+            await asyncio.sleep(0)
+            return self._user
+
+    monkeypatch.setattr(admin_dashboard, '_search_users_stmt', lambda *_args, **_kwargs: _Stmt())
+    monkeypatch.setattr(
+        admin_dashboard,
+        '_admin_user_list_item_payload',
+        lambda user, include_pii: {'id': str(user.id), 'username': user.username, 'role': user.role, 'email': user.email if include_pii else 'masked', 'email_verified': True, 'created_at': user.created_at, 'name': user.name, 'name_tag': user.name_tag},
+    )
+
+    request = _request_with_scope(headers=[(b'user-agent', b'Agent/segments')], client=('198.51.100.4', 443))
+    current_user = SimpleNamespace(id=uuid4(), role=admin_dashboard.UserRole.owner)
+    session = _Session()
+
+    user_search = await admin_dashboard.search_users(
+        request=request,
+        q='user',
+        role=None,
+        page=1,
+        limit=25,
+        include_pii=True,
+        session=session,
+        current_user=current_user,
+    )
+    assert user_search.meta.total_items == 1
+    assert pii_calls
+
+    monkeypatch.setattr(admin_dashboard, '_user_order_stats_subquery', lambda: object())
+    monkeypatch.setattr(admin_dashboard, '_repeat_buyers_order_by', lambda _stats: tuple())
+    monkeypatch.setattr(admin_dashboard, '_high_aov_order_by', lambda _stats: tuple())
+    monkeypatch.setattr(admin_dashboard, '_user_segment_stmt', lambda *_a, **_k: object())
+    monkeypatch.setattr(admin_dashboard, '_user_segment_total_and_pages', lambda *_a, **_k: asyncio.sleep(0, result=(1, 1)))
+    monkeypatch.setattr(admin_dashboard, '_user_segment_rows', lambda *_a, **_k: asyncio.sleep(0, result=[session._user]))
+    monkeypatch.setattr(admin_dashboard, '_user_segment_items', lambda rows, include_pii: [{'user': {'id': str(rows[0].id), 'username': rows[0].username, 'role': rows[0].role, 'email': rows[0].email if include_pii else 'masked', 'email_verified': True, 'created_at': rows[0].created_at, 'name': rows[0].name, 'name_tag': rows[0].name_tag}, 'orders_count': 2, 'total_spent': 100.0, 'avg_order_value': 50.0}] if rows else [])
+    monkeypatch.setattr(
+        admin_dashboard,
+        '_user_segment_meta',
+        lambda *, total_items, total_pages, page, limit: {'total_items': total_items, 'total_pages': total_pages, 'page': page, 'limit': limit},
+    )
+
+    repeat_buyers = await admin_dashboard.admin_user_segment_repeat_buyers(
+        request=request,
+        q='user',
+        min_orders=2,
+        page=1,
+        limit=25,
+        include_pii=True,
+        session=session,
+        current_user=current_user,
+    )
+    assert repeat_buyers.meta.total_items == 1
+
+    high_aov = await admin_dashboard.admin_user_segment_high_aov(
+        request=request,
+        q='user',
+        min_orders=1,
+        min_aov=10,
+        page=1,
+        limit=25,
+        include_pii=False,
+        session=session,
+        current_user=current_user,
+    )
+    assert high_aov.meta.page == 1
+
+    monkeypatch.setattr(
+        admin_dashboard.auth_service,
+        'list_username_history',
+        lambda *_args, **_kwargs: asyncio.sleep(0, result=[SimpleNamespace(username='old_user', created_at=datetime(2026, 1, 1, tzinfo=timezone.utc))]),
+    )
+    monkeypatch.setattr(
+        admin_dashboard.auth_service,
+        'list_display_name_history',
+        lambda *_args, **_kwargs: asyncio.sleep(0, result=[SimpleNamespace(name='Old Name', name_tag='4444', created_at=datetime(2026, 1, 2, tzinfo=timezone.utc))]),
+    )
+    monkeypatch.setattr(admin_dashboard.pii_service, 'mask_email', lambda value: f"masked:{value}")
+    monkeypatch.setattr(admin_dashboard.pii_service, 'mask_text', lambda value, keep=1: f"masked:{value}:{keep}")
+
+    aliases = await admin_dashboard.admin_user_aliases(
+        user_id=session._user.id,
+        request=request,
+        include_pii=False,
+        session=session,
+        current_user=current_user,
+    )
+    assert aliases['user']['email'].startswith('masked:')
+    assert len(aliases['usernames']) == 1
+    assert len(aliases['display_names']) == 1
