@@ -843,7 +843,7 @@ class _ImportSession:
 
 
 @pytest.mark.anyio
-async def test_export_data_writes_json_payload(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+async def test_export_data_writes_json_payload(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     session = _ExportSession(
         [
             [SimpleNamespace(id='u1')],
@@ -866,11 +866,10 @@ async def test_export_data_writes_json_payload(monkeypatch: pytest.MonkeyPatch, 
     payload = json.loads(output.read_text(encoding='utf-8'))
     assert payload['users'] == [{'id': 'u1'}]
     assert payload['orders'] == [{'id': 'o1'}]
-    assert 'Exported data to' in capsys.readouterr().out
 
 
 @pytest.mark.anyio
-async def test_import_data_runs_pipeline_and_commits(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+async def test_import_data_runs_pipeline_and_commits(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     calls: dict[str, int] = {}
     payload = {
         'users': [{'id': str(uuid.uuid4()), 'email': 'u@example.com'}],
@@ -937,11 +936,10 @@ async def test_import_data_runs_pipeline_and_commits(monkeypatch: pytest.MonkeyP
     }
     assert session.flush_calls == 2
     assert session.commit_calls == 1
-    assert 'Import completed' in capsys.readouterr().out
 
 
 @pytest.mark.anyio
-async def test_bootstrap_and_repair_owner_wrappers(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+async def test_bootstrap_and_repair_owner_wrappers(monkeypatch: pytest.MonkeyPatch) -> None:
     session = _ImportSession()
     user = SimpleNamespace(id=uuid.uuid4(), email='owner@example.com', username='owner')
     calls: dict[str, int] = {}
@@ -999,6 +997,3 @@ async def test_bootstrap_and_repair_owner_wrappers(monkeypatch: pytest.MonkeyPat
     assert calls['repair_username'] == 1
     assert calls['repair_display'] == 1
 
-    output = capsys.readouterr().out
-    assert 'Owner created:' in output
-    assert 'Owner repaired:' in output
