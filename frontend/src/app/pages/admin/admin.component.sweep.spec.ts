@@ -1599,6 +1599,92 @@ describe('AdminComponent sweep coverage', () => {
     expect(dynamic.legalPageMessage).toBe('adminUi.site.pages.success.save');
   });
 
+  it('covers blog list and moderation error callbacks', () => {
+    const { component, admin, toast } = createComponent();
+    const blog = (component as any).blog as jasmine.SpyObj<any>;
+
+    component.selectedBlogKey = 'blog.entry';
+    admin.listContentVersions.and.returnValue(throwError(() => ({ status: 500 })));
+    component.loadBlogVersions();
+    expect(toast.error).toHaveBeenCalledWith('adminUi.blog.revisions.errors.load');
+
+    blog.listFlaggedComments.and.returnValue(throwError(() => ({ status: 500 })));
+    component.loadFlaggedComments();
+    expect(component.flaggedCommentsError).toBe('adminUi.blog.moderation.errors.load');
+
+    blog.resolveCommentFlagsAdmin.and.returnValue(throwError(() => ({ status: 500 })));
+    component.resolveFlags({ id: 'flag-1' } as any);
+    expect(toast.error).toHaveBeenCalledWith('adminUi.blog.moderation.errors.resolveFlags');
+  });
+
+  it('covers toggleHide busy, cancel, and error branches', () => {
+    const { component, toast } = createComponent();
+    const blog = (component as any).blog as jasmine.SpyObj<any>;
+    const promptSpy = spyOn(globalThis, 'prompt');
+
+    component.flaggedComments.set([
+      { id: 'c-1', is_hidden: true },
+      { id: 'c-2', is_hidden: false }
+    ] as any);
+
+    component.blogCommentModerationBusy.add('c-busy');
+    component.toggleHide({ id: 'c-busy', is_hidden: true } as any);
+    expect(blog.unhideCommentAdmin).not.toHaveBeenCalled();
+
+    blog.unhideCommentAdmin.and.returnValue(throwError(() => ({ status: 500 })));
+    component.toggleHide({ id: 'c-1', is_hidden: true } as any);
+    expect(toast.error).toHaveBeenCalledWith('adminUi.blog.moderation.errors.unhide');
+
+    promptSpy.and.returnValue(null);
+    component.toggleHide({ id: 'c-2', is_hidden: false } as any);
+    expect(blog.hideCommentAdmin).not.toHaveBeenCalled();
+
+    promptSpy.and.returnValue('need context');
+    blog.hideCommentAdmin.and.returnValue(throwError(() => ({ status: 500 })));
+    component.toggleHide({ id: 'c-2', is_hidden: false } as any);
+    expect(toast.error).toHaveBeenCalledWith('adminUi.blog.moderation.errors.hide');
+  });
+
+  it('covers rollback and cover focal-point validation branches', () => {
+    const { component, admin, toast } = createComponent();
+    const confirmSpy = spyOn(globalThis, 'confirm');
+    const promptSpy = spyOn(globalThis, 'prompt');
+
+    component.selectedBlogKey = 'blog.entry';
+    confirmSpy.and.returnValue(false);
+    component.rollbackBlogVersion(3);
+    expect(admin.rollbackContentVersion).not.toHaveBeenCalled();
+
+    const reloadSpy = spyOn(component as any, 'reloadContentBlocks').and.stub();
+    const loadEditorSpy = spyOn(component as any, 'loadBlogEditor').and.stub();
+    const loadVersionsSpy = spyOn(component, 'loadBlogVersions').and.stub();
+
+    confirmSpy.and.returnValue(true);
+    admin.rollbackContentVersion.and.returnValue(of({}));
+    component.rollbackBlogVersion(4);
+    expect(reloadSpy).toHaveBeenCalled();
+    expect(loadEditorSpy).toHaveBeenCalledWith('blog.entry');
+    expect(loadVersionsSpy).toHaveBeenCalled();
+
+    admin.rollbackContentVersion.and.returnValue(throwError(() => ({ status: 500 })));
+    component.rollbackBlogVersion(5);
+    expect(toast.error).toHaveBeenCalledWith('adminUi.blog.revisions.errors.rollback');
+
+    component.blogEditLang = 'en';
+    component.blogBaseLang = 'en';
+    component.blogForm.cover_image_url = '/cover.jpg';
+    component.blogImages = [{ id: 'asset-1', url: '/cover.jpg', focal_x: 50, focal_y: 50, sort_order: 0 }] as any;
+
+    promptSpy.and.returnValues('invalid-value', 'NaN,50');
+    component.editBlogCoverFocalPoint();
+    component.editBlogCoverFocalPoint();
+    expect(toast.error).toHaveBeenCalledWith('adminUi.site.assets.library.focalErrorsFormat');
+
+    promptSpy.and.returnValue('20,30');
+    admin.updateContentImageFocalPoint.and.returnValue(throwError(() => ({ status: 500 })));
+    component.editBlogCoverFocalPoint();
+    expect(toast.error).toHaveBeenCalledWith('adminUi.site.assets.library.focalErrorsSave');
+  });
 });
 
 
