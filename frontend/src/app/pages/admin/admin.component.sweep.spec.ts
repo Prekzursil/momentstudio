@@ -1279,7 +1279,7 @@ describe('AdminComponent sweep coverage', () => {
   it('covers rollback confirmation and moderation delete success/failure paths', () => {
     const { component, admin, blog, toast } = createComponent();
     component.selectedBlogKey = 'blog.first-post';
-    spyOn(globalThis, 'confirm').and.returnValues(false, true, true, true);
+    spyOn(globalThis, 'confirm').and.returnValues(false, true, true, true, true);
 
     component.rollbackBlogVersion(4);
     expect(admin.rollbackContentVersion).not.toHaveBeenCalled();
@@ -1688,6 +1688,73 @@ describe('AdminComponent sweep coverage', () => {
     component.editBlogCoverFocalPoint();
     expect(toast.error).toHaveBeenCalledWith('adminUi.site.assets.library.focalErrorsSave');
   });
+
+  it('covers blog revision and moderation delete branches with success and failure paths', () => {
+    const { component, admin, blog, toast } = createComponent();
+    component.selectedBlogKey = 'blog.first-post';
+    component.blogForm.body_markdown = 'current markdown body';
+    spyOn(globalThis, 'confirm').and.returnValues(false, true, true, true);
+
+    component.selectBlogVersion(2);
+    expect(admin.getContentVersion).toHaveBeenCalledWith('blog.first-post', 2);
+    expect(component.blogDiffParts.length).toBeGreaterThan(0);
+
+    admin.getContentVersion.and.returnValue(throwError(() => new Error('version-load-failed')));
+    component.selectBlogVersion(3);
+    expect(toast.error).toHaveBeenCalledWith('adminUi.blog.revisions.errors.loadVersion');
+
+    component.rollbackBlogVersion(4);
+    expect(admin.rollbackContentVersion).not.toHaveBeenCalled();
+
+    component.rollbackBlogVersion(4);
+    expect(admin.rollbackContentVersion).toHaveBeenCalledWith('blog.first-post', 4);
+
+    admin.rollbackContentVersion.and.returnValue(throwError(() => new Error('rollback-failed')));
+    component.rollbackBlogVersion(5);
+    expect(toast.error).toHaveBeenCalledWith('adminUi.blog.revisions.errors.rollback');
+
+    (globalThis.confirm as jasmine.Spy).and.returnValue(true);
+    toast.error.calls.reset();
+    component.adminDeleteComment({ id: 'comment-1' } as any);
+    expect(blog.deleteComment).toHaveBeenCalledWith('comment-1');
+
+    blog.deleteComment.and.returnValue(throwError(() => new Error('delete-failed')));
+    component.adminDeleteComment({ id: 'comment-2' } as any);
+    expect(toast.error).toHaveBeenCalledWith('adminUi.blog.moderation.errors.delete');
+  });
+
+  it('covers blog image upload/drop rich-target and focal-point validation branches', async () => {
+    const { component, admin, toast } = createComponent();
+    const richTarget = { insertMarkdown: jasmine.createSpy('insertMarkdown') } as any;
+    component.selectedBlogKey = 'blog.first-post';
+
+    const file = new File(['image-bytes'], 'cover.png', { type: 'image/png' });
+    const input = { files: [file], value: 'selected' } as any;
+    component.uploadAndInsertBlogImage(richTarget, { target: input } as any);
+    expect(richTarget.insertMarkdown).toHaveBeenCalled();
+    expect(input.value).toBe('');
+
+    const dropEvent = {
+      dataTransfer: { files: [file], types: ['Files'], dropEffect: 'none' },
+      preventDefault: jasmine.createSpy('preventDefault'),
+      stopPropagation: jasmine.createSpy('stopPropagation')
+    } as any;
+    await component.onBlogImageDrop(richTarget, dropEvent);
+    expect(dropEvent.preventDefault).toHaveBeenCalled();
+    expect(richTarget.insertMarkdown).toHaveBeenCalled();
+
+    component.blogEditLang = 'en';
+    component.blogBaseLang = 'en';
+    component.blogImages = [{ id: 'asset-1', url: '/asset-1.jpg', focal_x: 50, focal_y: 50, sort_order: 1 } as any];
+    spyOn(globalThis, 'prompt').and.returnValues('invalid', '10, 20');
+
+    component.editBlogCoverFocalPoint();
+    expect(toast.error).toHaveBeenCalledWith('adminUi.site.assets.library.focalErrorsFormat');
+
+    component.editBlogCoverFocalPoint();
+    expect(admin.updateContentImageFocalPoint).toHaveBeenCalledWith('asset-1', 10, 20);
+  });
+
 });
 
 
