@@ -652,3 +652,150 @@ async def test_cli_wave_owner_repair_helper_branches(monkeypatch: pytest.MonkeyP
     assert owner.name == "New Display"
     assert owner.name_tag == 7
     assert len(display_session.added) == 1
+
+
+
+class _ScalarOneMaybe:
+    def __init__(self, value: object | None) -> None:
+        self._value = value
+
+    def scalar_one_or_none(self) -> object | None:
+        return self._value
+
+
+class _ImportWaveSession:
+    def __init__(self) -> None:
+        self.get_map: dict[tuple[object, object], object] = {}
+        self.execute_queue: list[object | None] = []
+        self.added: list[object] = []
+
+    async def get(self, model: object, key: object) -> object | None:
+        await asyncio.sleep(0)
+        return self.get_map.get((model, key))
+
+    async def execute(self, _stmt: object):
+        await asyncio.sleep(0)
+        value = self.execute_queue.pop(0) if self.execute_queue else None
+        if isinstance(value, list):
+            return _ExecuteResult(value)
+        return _ScalarOneMaybe(value)
+
+    async def flush(self) -> None:
+        await asyncio.sleep(0)
+
+    async def commit(self) -> None:
+        await asyncio.sleep(0)
+
+    def add(self, value: object) -> None:
+        self.added.append(value)
+
+
+@pytest.mark.anyio
+async def test_cli_wave_import_categories_products_and_addresses() -> None:
+    session = _ImportWaveSession()
+    category_id = uuid.uuid4()
+    existing_category = cli.Category(id=category_id, slug='old-cat', name='Old cat')
+    session.get_map[(cli.Category, category_id)] = existing_category
+
+    await cli._import_categories(
+        session,
+        categories_payload=[
+            {'id': category_id, 'slug': 'rings', 'name': 'Rings', 'description': 'Fine rings', 'sort_order': 2},
+            {'id': uuid.uuid4(), 'slug': 'bracelets', 'name': 'Bracelets', 'description': 'Bracelets', 'sort_order': 3},
+        ],
+    )
+    assert existing_category.slug == 'rings'
+
+    existing_tag = cli.Tag(slug='new', name='New')
+    session.execute_queue.extend([existing_tag, None])
+    tag_cache = await cli._build_tag_cache(
+        session,
+        products_payload=[{'tags': ['new', 'sale']}],
+    )
+    assert set(tag_cache.keys()) == {'new', 'sale'}
+
+    product_id = uuid.uuid4()
+    session.get_map[(cli.Product, product_id)] = None
+    payload = {
+        'id': product_id,
+        'category_id': category_id,
+        'sku': 'sku-1',
+        'slug': 'ring-one',
+        'name': 'Ring One',
+        'base_price': 99,
+        'currency': 'RON',
+        'tags': ['new'],
+        'images': [{'id': uuid.uuid4(), 'url': '/ring.jpg', 'alt_text': 'ring'}],
+        'options': [{'id': uuid.uuid4(), 'option_name': 'size', 'values': ['M']}],
+        'variants': [{'id': uuid.uuid4(), 'name': 'Default', 'price_delta': 0, 'stock_quantity': 2}],
+    }
+    await cli._import_products(session, products_payload=[payload], tag_cache=tag_cache)
+    product_models = [item for item in session.added if isinstance(item, cli.Product)]
+    assert product_models and product_models[-1].slug == 'ring-one'
+
+    address_id = uuid.uuid4()
+    session.get_map[(cli.Address, address_id)] = None
+    await cli._import_addresses(
+        session,
+        addresses_payload=[
+            {
+                'id': address_id,
+                'user_id': uuid.uuid4(),
+                'line1': '  Main st  ',
+                'line2': '  ',
+                'city': ' Bucharest ',
+                'state': ' Sector 1 ',
+                'postal_code': '010101',
+                'country': ' RO ',
+            }
+        ],
+    )
+    imported_addresses = [item for item in session.added if isinstance(item, cli.Address)]
+    assert imported_addresses and imported_addresses[-1].line2 is None
+
+
+@pytest.mark.anyio
+async def test_cli_wave_import_orders_and_shipping_lookup() -> None:
+    session = _ImportWaveSession()
+    shipping_method_id = uuid.uuid4()
+    user_id = uuid.uuid4()
+    session.get_map[(cli.ShippingMethod, shipping_method_id)] = None
+    session.get_map[(cli.User, user_id)] = SimpleNamespace(email='buyer@example.com', name='Buyer Name')
+
+    shipping = await cli._ensure_shipping_methods(
+        session,
+        orders_payload=[
+            {'shipping_method_id': shipping_method_id},
+            {'shipping_method_id': shipping_method_id},
+            {},
+        ],
+    )
+    assert shipping_method_id in shipping
+
+    order_id = uuid.uuid4()
+    session.get_map[(cli.Order, order_id)] = None
+    await cli._import_orders(
+        session,
+        orders_payload=[
+            {
+                'id': str(order_id),
+                'user_id': str(user_id),
+                'status': 'pending',
+                'total_amount': 120,
+                'currency': 'RON',
+                'reference_code': 'REF-100',
+                'shipping_method_id': shipping_method_id,
+                'items': [
+                    {
+                        'id': uuid.uuid4(),
+                        'product_id': uuid.uuid4(),
+                        'quantity': 1,
+                        'unit_price': 120,
+                        'subtotal': 120,
+                    }
+                ],
+            }
+        ],
+    )
+    imported_orders = [item for item in session.added if isinstance(item, cli.Order)]
+    assert imported_orders and imported_orders[-1].customer_email == 'buyer@example.com'
