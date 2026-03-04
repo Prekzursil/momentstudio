@@ -50,11 +50,19 @@ jobs:
           ${SENTRY_CLI} info
 
           project_slug="${SENTRY_PROJECT:-}"
+          sentry_api_base="${SENTRY_URL:-https://sentry.io}"
 
           validate_project_slug() {
             local candidate="${1:-}"
             [ -n "$candidate" ] || return 1
-            ${SENTRY_CLI} releases list --org "${SENTRY_ORG}" --project "$candidate" --quiet >/dev/null 2>&1
+            local code
+            code="$(
+              curl -sS -o /dev/null -w '%{http_code}' \
+                -H "Authorization: Bearer ${SENTRY_AUTH_TOKEN}" \
+                -H "Content-Type: application/json" \
+                "${sentry_api_base%/}/api/0/projects/${SENTRY_ORG}/${candidate}/" || echo "000"
+            )"
+            [ "$code" = "200" ]
           }
 
           if validate_project_slug "$project_slug"; then
@@ -64,7 +72,6 @@ jobs:
               echo "::warning::Configured SENTRY_PROJECT '$project_slug' is not accessible; resolving project slug from Sentry APIs."
             fi
 
-            sentry_api_base="${SENTRY_URL:-https://sentry.io}"
             api_candidate="$(
               {
                 curl -sSL \
@@ -135,7 +142,10 @@ jobs:
           fi
 
           echo "Resolved Sentry project: $project_slug"
-          ${SENTRY_CLI} releases list --org "${SENTRY_ORG}" --project "$project_slug" --quiet
+          curl -fsSL \
+            -H "Authorization: Bearer ${SENTRY_AUTH_TOKEN}" \
+            -H "Content-Type: application/json" \
+            "${sentry_api_base%/}/api/0/projects/${SENTRY_ORG}/${project_slug}/" >/dev/null
 
   release-and-sourcemaps:
     if: github.event_name != 'pull_request'
