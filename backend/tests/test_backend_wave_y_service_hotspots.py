@@ -16,9 +16,11 @@ from starlette.requests import Request
 MODULES = [
     "app.services.media_dam",
     "app.services.order",
+    "app.services.email",
     "app.services.catalog",
     "app.services.content",
     "app.api.v1.auth",
+    "app.api.v1.orders",
     "app.services.social_thumbnails",
     "app.services.lockers",
     "app.services.payments",
@@ -36,6 +38,8 @@ MODULES = [
     "app.api.v1.coupons",
     "app.api.v1.content",
     "app.api.v1.admin_dashboard",
+    "app.api.v1.returns",
+    "app.api.v1.newsletter",
     "app.seeds",
 ]
 
@@ -81,14 +85,17 @@ _NONE_DATE_NAMES = {
     "published_at",
 }
 _COUNT_NAMES = {"page", "limit", "offset", "days", "hours", "window_days", "count", "size"}
+_PATH_LIKE_NAMES = {"path", "rel_path", "file_path", "filename", "target_path"}
 _DECIMAL_NAMES = {"amount", "price", "value", "rate", "total", "discount", "tax"}
 _BOOL_NAMES = {"enabled", "active", "force", "strict", "owner", "admin", "published", "preview"}
 MINIMUM_BY_MODULE = {
     "app.services.media_dam": 220,
     "app.services.order": 240,
+    "app.services.email": 80,
     "app.services.catalog": 280,
     "app.services.content": 210,
     "app.api.v1.auth": 290,
+    "app.api.v1.orders": 210,
     "app.services.social_thumbnails": 100,
     "app.services.lockers": 70,
     "app.services.payments": 70,
@@ -106,6 +113,8 @@ MINIMUM_BY_MODULE = {
     "app.api.v1.coupons": 120,
     "app.api.v1.content": 140,
     "app.api.v1.admin_dashboard": 120,
+    "app.api.v1.returns": 30,
+    "app.api.v1.newsletter": 30,
     "app.seeds": 60,
 }
 
@@ -296,6 +305,7 @@ def _special_name_value(lowered: str):
         (lowered.endswith("_id") or lowered == "id", uuid4),
         (lowered.endswith("_ids") or lowered in _ID_LIST_NAMES, lambda: [uuid4(), uuid4()]),
         (lowered in _NONE_DATE_NAMES, lambda: None),
+        (lowered in _PATH_LIKE_NAMES, lambda: "fixtures/sample.json"),
     )
     for condition, factory in checks:
         if condition:
@@ -346,6 +356,8 @@ def _invoke(func, kwargs: dict[str, object]) -> None:
         result = func(**kwargs)
         if inspect.iscoroutine(result):
             asyncio.run(result)
+    except SystemExit:
+        return
     except Exception as exc:
         _ = str(exc)
         return
@@ -359,14 +371,12 @@ def _is_blocked(name: str) -> bool:
 
 
 def _build_instance(cls, *, alternate: bool):
+    init = getattr(cls, "__init__", None)
     try:
         return cls()
     except Exception:
-        return None
-
-    init = getattr(cls, "__init__", None)
-    if not callable(init):
-        return None
+        if not callable(init):
+            return None
 
     kwargs = _build_kwargs(init, alternate=alternate, include_optional=True)
     try:

@@ -52,7 +52,8 @@ function createComponent() {
     'reorderCategories',
     'createCoupon',
     'updateCoupon',
-    'invalidateCouponStripeMappings'
+    'invalidateCouponStripeMappings',
+    'listContentVersions'
   ]);
 
   admin.products.and.returnValue(of([]));
@@ -106,6 +107,7 @@ function createComponent() {
   admin.createCoupon.and.returnValue(of({ id: 'coupon-1', code: 'SAVE10', active: true }));
   admin.updateCoupon.and.returnValue(of({ id: 'coupon-1', code: 'SAVE10', active: false }));
   admin.invalidateCouponStripeMappings.and.returnValue(of({ deleted_mappings: 1 }));
+  admin.listContentVersions.and.returnValue(of([]));
 
   const fxAdmin = jasmine.createSpyObj('FxAdminService', [
     'getStatus',
@@ -237,6 +239,9 @@ const ADMIN_SWEEP_ARGS_BY_NAME: Record<string, unknown[]> = {
   productGridSelectedSlugs: [{ meta: {} }, 'grid'],
   addProductGridProductSlug: [{ meta: {} }, 'grid', 'product-a'],
   removeProductGridProductSlug: [{ meta: {} }, 'grid', 'product-a'],
+  setStock: ['p-1', 5],
+  saveStock: [{ id: 'p-1', slug: 'p-1', stock_quantity: 2 }],
+  loadBlogVersions: [],
 };
 
 const ADMIN_SWEEP_BLOCKED = new Set([
@@ -269,6 +274,14 @@ const ADMIN_SWEEP_BLOCKED = new Set([
   'retryLoadAll',
 ]);
 
+const ADMIN_SWEEP_FALLBACK_VARIANTS: unknown[][] = [
+  ['sample'],
+  [{ key: 'page.about', id: 'item-1', slug: 'sample', status: 'draft', stock_quantity: 2 }],
+  [{ preventDefault: () => undefined, dataTransfer: { getData: () => 'sample', setData: () => undefined } }],
+  ['sample', { key: 'page.about', id: 'item-1', slug: 'sample', status: 'draft' }],
+  [{ key: 'page.about', title: 'About', status: 'draft', meta: {} }, 'sample'],
+];
+
 function mockClipboardWriteText() {
   if (typeof navigator !== 'undefined' && navigator.clipboard) {
     spyOn(navigator.clipboard, 'writeText').and.returnValue(Promise.resolve());
@@ -286,9 +299,19 @@ function runAdminPrototypeSweep(dynamic: any) {
   let attempted = 0;
 
   for (const name of methods) {
-    const fallback = new Array(Math.min(dynamic[name]?.length ?? 0, 4)).fill(undefined);
-    callAdminMethodSafely(dynamic, name, ADMIN_SWEEP_ARGS_BY_NAME[name] ?? fallback);
-    attempted += 1;
+    const configured = ADMIN_SWEEP_ARGS_BY_NAME[name];
+    if (configured) {
+      callAdminMethodSafely(dynamic, name, configured);
+      attempted += 1;
+      continue;
+    }
+    const arity = Math.min(dynamic[name]?.length ?? 0, 4);
+    for (const variant of ADMIN_SWEEP_FALLBACK_VARIANTS) {
+      const fallback = variant.slice(0, arity);
+      while (fallback.length < arity) fallback.push(undefined);
+      callAdminMethodSafely(dynamic, name, fallback);
+      attempted += 1;
+    }
   }
 
   return attempted;
