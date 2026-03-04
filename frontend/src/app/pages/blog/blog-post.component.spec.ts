@@ -176,6 +176,10 @@ describe('BlogPostComponent', () => {
       params: routeParams$.asObservable(),
       queryParams: routeQueryParams$.asObservable()
     };
+
+    if (typeof globalThis.prompt === 'function' && !jasmine.isSpy(globalThis.prompt as jasmine.Func)) {
+      spyOn(globalThis, 'prompt').and.returnValue('');
+    }
   });
 
   it('loads a post and sets canonical/OG tags', () => {
@@ -430,6 +434,53 @@ describe('BlogPostComponent', () => {
 
     spyOn(globalThis, 'open').and.returnValue(null);
     spyOn(globalThis, 'confirm').and.returnValue(false);
+    const clipboardStub = navigator.clipboard ?? ({ writeText: () => Promise.resolve() } as unknown as Clipboard);
+    if (!navigator.clipboard) {
+      Object.defineProperty(navigator, 'clipboard', { value: clipboardStub, configurable: true });
+    }
+    const maybeWriteText = (clipboardStub as any).writeText;
+    if (jasmine.isSpy(maybeWriteText as jasmine.Func)) {
+      (maybeWriteText as jasmine.Spy).and.returnValue(Promise.resolve());
+    } else {
+      spyOn(clipboardStub as any, 'writeText').and.returnValue(Promise.resolve());
+    }
+
+    const attempted = runBlogPrototypeSweep(cmp);
+    expect(attempted).toBeGreaterThan(35);
+  });
+
+  it('re-sweeps prototype methods with authenticated preview/moderation state', () => {
+    configureBlogPostTestingModule({ meta, title, blog, toast, markdown, auth, routeStub, doc });
+    const fixture = TestBed.createComponent(BlogPostComponent);
+    const cmp = fixture.componentInstance as any;
+    const admin = TestBed.inject(AdminService) as jasmine.SpyObj<AdminService>;
+    const catalog = TestBed.inject(CatalogService) as jasmine.SpyObj<CatalogService>;
+    const newsletter = TestBed.inject(NewsletterService) as jasmine.SpyObj<NewsletterService>;
+
+    admin.getContent.and.returnValue(of({ key: 'blog.first-post', body_markdown: 'Preview body', meta: {}, version: 2 } as any));
+    admin.updateContentBlock.and.returnValue(of({ key: 'blog.first-post', body_markdown: 'Preview body', meta: {}, version: 3 } as any));
+    catalog.getProduct.and.returnValue(of({ slug: 'ring-1' } as any));
+    catalog.listCategories.and.returnValue(of([{ slug: 'rings' }] as any));
+    catalog.listFeaturedCollections.and.returnValue(of([{ slug: 'collection-1' }] as any));
+    newsletter.subscribe.and.returnValue(of({ ok: true } as any));
+
+    auth.isAuthenticated.and.returnValue(true);
+    auth.user.and.returnValue({ id: 'user-1' } as any);
+
+    cmp.slug = 'first-post';
+    cmp.previewToken = 'preview-value';
+    cmp.post.set({ ...BLOG_POST_FIXTURE, slug: 'first-post', title: 'Preview title' });
+    cmp.bodyHtml.set('<h2>Preview</h2><p>Body</p>');
+    cmp.galleryImages.set([{ url: '/b.jpg', alt: 'B' }] as any);
+    cmp.commentBody = 'Second pass';
+    cmp.newsletterEmail = 'owner@example.com';
+    cmp.commentsMeta.set({ total_items: 2, total_pages: 3, page: 2, limit: 10 });
+    cmp.threadMap = new Map<string, any>();
+    cmp.threadMap.set('parent-1', [{ id: 'reply-1', parent_id: 'parent-1' }] as any);
+
+    spyOn(globalThis, 'open').and.returnValue(null);
+    spyOn(globalThis, 'confirm').and.returnValue(true);
+
     const clipboardStub = navigator.clipboard ?? ({ writeText: () => Promise.resolve() } as unknown as Clipboard);
     if (!navigator.clipboard) {
       Object.defineProperty(navigator, 'clipboard', { value: clipboardStub, configurable: true });
