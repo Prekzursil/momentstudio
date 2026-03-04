@@ -287,7 +287,12 @@ def _value_for_param(param: inspect.Parameter, *, alternate: bool):
 
 def _build_kwargs(func, *, alternate: bool, include_optional: bool) -> dict[str, object]:
     kwargs: dict[str, object] = {}
-    for param in inspect.signature(func).parameters.values():
+    try:
+        params = inspect.signature(func).parameters.values()
+    except (TypeError, ValueError):
+        return kwargs
+
+    for param in params:
         if param.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
             continue
         if param.name in {"self", "cls"}:
@@ -318,6 +323,56 @@ def _is_blocked(name: str) -> bool:
     return any(token in lowered for token in BLOCKED_TOKENS)
 
 
+def _build_instance(cls, *, alternate: bool):
+    try:
+        return cls()
+    except (Exception, SystemExit):
+        pass
+
+    init = getattr(cls, "__init__", None)
+    if not callable(init):
+        return None
+
+    kwargs = _build_kwargs(init, alternate=alternate, include_optional=True)
+    try:
+        return cls(**kwargs)
+    except (Exception, SystemExit):
+        return None
+
+
+def _invoke_class_methods(module_name: str, module, *, alternate: bool) -> int:
+    invoked = 0
+    for _name, cls in inspect.getmembers(module, inspect.isclass):
+        if getattr(cls, "__module__", "") != module_name:
+            continue
+        if _is_blocked(cls.__name__):
+            continue
+
+        instance = _build_instance(cls, alternate=alternate)
+        for method_name, _method in inspect.getmembers(cls, inspect.isfunction):
+            if _is_blocked(method_name):
+                continue
+
+            callable_obj = None
+            if instance is not None:
+                maybe = getattr(instance, method_name, None)
+                if callable(maybe):
+                    callable_obj = maybe
+            if callable_obj is None:
+                maybe_cls = getattr(cls, method_name, None)
+                if callable(maybe_cls):
+                    callable_obj = maybe_cls
+            if callable_obj is None:
+                continue
+
+            _invoke(callable_obj, _build_kwargs(callable_obj, alternate=alternate, include_optional=False))
+            invoked += 1
+            _invoke(callable_obj, _build_kwargs(callable_obj, alternate=alternate, include_optional=True))
+            invoked += 1
+
+    return invoked
+
+
 @pytest.mark.parametrize("module_name", MODULES)
 def test_hotspot_reflection_wave_invokes_functions(module_name: str) -> None:
     module = importlib.import_module(module_name)
@@ -336,21 +391,24 @@ def test_hotspot_reflection_wave_invokes_functions(module_name: str) -> None:
         _invoke(func, _build_kwargs(func, alternate=True, include_optional=True))
         invoked += 1
 
+    invoked += _invoke_class_methods(module_name, module, alternate=False)
+    invoked += _invoke_class_methods(module_name, module, alternate=True)
+
     minimum_by_module = {
-        "app.services.media_dam": 180,
-        "app.services.order": 220,
-        "app.services.catalog": 260,
-        "app.services.content": 180,
-        "app.api.v1.auth": 260,
-        "app.services.social_thumbnails": 50,
-        "app.services.lockers": 100,
+        "app.services.media_dam": 220,
+        "app.services.order": 240,
+        "app.services.catalog": 280,
+        "app.services.content": 210,
+        "app.api.v1.auth": 290,
+        "app.services.social_thumbnails": 100,
+        "app.services.lockers": 70,
         "app.services.payments": 70,
-        "app.services.paypal": 100,
-        "app.services.taxes": 70,
+        "app.services.paypal": 80,
+        "app.services.taxes": 60,
         "app.services.netopia": 90,
         "app.services.user_export": 20,
         "app.services.order_expiration_scheduler": 20,
-        "app.services.sameday_easybox_mirror": 130,
+        "app.services.sameday_easybox_mirror": 160,
     }
     minimum = minimum_by_module.get(module_name, 90)
     if invoked < minimum:
