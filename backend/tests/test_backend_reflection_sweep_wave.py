@@ -221,13 +221,13 @@ def _value_for_param(name: str, *, alternate: bool = False):
     return MagicMock()
 
 
-def _build_required_kwargs(func, *, alternate: bool = False):
+def _build_required_kwargs(func, *, alternate: bool = False, include_optional: bool = False):
     kwargs = {}
     sig = inspect.signature(func)
     for param in sig.parameters.values():
         if param.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
             continue
-        if param.default is not inspect._empty:
+        if param.default is not inspect._empty and not include_optional:
             continue
         kwargs[param.name] = _value_for_param(param.name, alternate=alternate)
     return kwargs
@@ -265,7 +265,13 @@ def _instantiate_class(cls):
             return None
 
 
-def _build_method_kwargs(func, skip_first: bool, *, alternate: bool = False):
+def _build_method_kwargs(
+    func,
+    skip_first: bool,
+    *,
+    alternate: bool = False,
+    include_optional: bool = False,
+):
     kwargs = {}
     sig = inspect.signature(func)
     params = list(sig.parameters.values())
@@ -274,7 +280,7 @@ def _build_method_kwargs(func, skip_first: bool, *, alternate: bool = False):
     for param in params:
         if param.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
             continue
-        if param.default is not inspect._empty:
+        if param.default is not inspect._empty and not include_optional:
             continue
         kwargs[param.name] = _value_for_param(param.name, alternate=alternate)
     return kwargs
@@ -284,6 +290,8 @@ def _invoke_with_variants(func):
     for alternate in (False, True):
         kwargs = _build_required_kwargs(func, alternate=alternate)
         _invoke(func, kwargs)
+        kwargs_optional = _build_required_kwargs(func, alternate=alternate, include_optional=True)
+        _invoke(func, kwargs_optional)
 
 
 def _method_signature(method):
@@ -303,6 +311,19 @@ def _invoke_bound_method_variants(method, bound_obj):
                 method(bound_obj, **kwargs)
         except Exception:
             continue
+        kwargs_optional = _build_method_kwargs(
+            method,
+            skip_first=True,
+            alternate=alternate,
+            include_optional=True,
+        )
+        try:
+            if inspect.iscoroutinefunction(method):
+                asyncio.run(method(bound_obj, **kwargs_optional))
+            else:
+                method(bound_obj, **kwargs_optional)
+        except Exception:
+            continue
 
 
 def _invoke_method(cls, instance, method):
@@ -314,6 +335,13 @@ def _invoke_method(cls, instance, method):
         for alternate in (False, True):
             kwargs = _build_method_kwargs(method, skip_first=False, alternate=alternate)
             _invoke(method, kwargs)
+            kwargs_optional = _build_method_kwargs(
+                method,
+                skip_first=False,
+                alternate=alternate,
+                include_optional=True,
+            )
+            _invoke(method, kwargs_optional)
         return
     bound_obj = cls if params[0].name == 'cls' else instance
     if bound_obj is not None:
