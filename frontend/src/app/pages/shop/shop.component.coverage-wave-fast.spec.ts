@@ -39,6 +39,7 @@ function createShopHarness(): any {
     reorderCategories: jasmine.createSpy('reorderCategories').and.returnValue(of([])),
     bulkUpdateProducts: jasmine.createSpy('bulkUpdateProducts').and.returnValue(of([])),
     previewMergeCategory: jasmine.createSpy('previewMergeCategory').and.returnValue(of({ can_merge: true })),
+    previewDeleteCategory: jasmine.createSpy('previewDeleteCategory').and.returnValue(of({ can_delete: true, product_count: 0, child_count: 0 })),
     uploadCategoryImage: jasmine.createSpy('uploadCategoryImage').and.returnValue(of({})),
     createCategory: jasmine.createSpy('createCategory').and.returnValue(of({ slug: 'new-cat' })),
     upsertCategoryTranslation: jasmine.createSpy('upsertCategoryTranslation').and.returnValue(of({})),
@@ -661,3 +662,85 @@ describe('ShopComponent coverage fast wave: reorder guard matrix', () => {
   });
 });
 
+
+
+describe('ShopComponent coverage fast wave: image/upload + undo branches', () => {
+  it('covers category image upload guards and success/error flows', () => {
+    const cmp = createShopHarness();
+    cmp.canEditCategories = jasmine.createSpy('canEditCategories').and.returnValue(true);
+
+    const input = { files: [new File(['x'], 'cat.png', { type: 'image/png' })], value: 'selected' } as any;
+    cmp.onCategoryImageSelected({ target: input } as any, 'rings', 'thumbnail');
+    expect(cmp.admin.uploadCategoryImage).toHaveBeenCalledWith('rings', 'thumbnail', jasmine.any(File), { source: 'storefront' });
+    expect(cmp.categoryImageSavingSlug).toBeNull();
+
+    cmp.admin.uploadCategoryImage.and.returnValue(throwError(() => new Error('upload-failed')));
+    cmp.onCategoryImageSelected({ target: input } as any, 'rings', 'banner');
+    expect(cmp.categoryImageError).toContain('adminUi.storefront.categories.imageUploadError');
+
+    cmp.canEditCategories.and.returnValue(false);
+    cmp.onCategoryImageSelected({ target: input } as any, 'rings', 'thumbnail');
+    expect(cmp.admin.uploadCategoryImage.calls.count()).toBe(2);
+  });
+
+  it('covers root/product undo order success and error branches', () => {
+    const cmp = createShopHarness();
+    cmp.rebuildCategoryTree = jasmine.createSpy('rebuildCategoryTree');
+    cmp.reorderSaving.set(false);
+    cmp.productReorderSaving.set(false);
+    cmp.categories = [
+      { slug: 'rings', sort_order: 1, parent_id: null },
+      { slug: 'chains', sort_order: 0, parent_id: null },
+    ];
+
+    cmp.undoRootCategoryOrder(['rings', 'chains'], ['chains', 'rings']);
+    expect(cmp.admin.reorderCategories).toHaveBeenCalled();
+    expect(cmp.toast.success).toHaveBeenCalled();
+
+    cmp.admin.reorderCategories.and.returnValue(throwError(() => new Error('reorder-failed')));
+    cmp.undoRootCategoryOrder(['chains', 'rings'], ['rings', 'chains']);
+    expect(cmp.toast.error).toHaveBeenCalled();
+
+    cmp.admin.bulkUpdateProducts.and.returnValue(of([]));
+    cmp.products = [{ id: 'p1' }, { id: 'p2' }];
+    cmp.undoProductOrder(['p2', 'p1'], ['p1', 'p2']);
+    expect(cmp.admin.bulkUpdateProducts).toHaveBeenCalled();
+
+    cmp.admin.bulkUpdateProducts.and.returnValue(throwError(() => new Error('undo-failed')));
+    cmp.undoProductOrder(['p1', 'p2'], ['p2', 'p1']);
+    expect(cmp.toast.error).toHaveBeenCalled();
+  });
+
+  it('covers session restore and merge/delete preview guards', () => {
+    const cmp = createShopHarness();
+    cmp.canEditCategories = jasmine.createSpy('canEditCategories').and.returnValue(true);
+
+    spyOn(sessionStorage, 'getItem').and.callFake((key: string) => {
+      const map: Record<string, string> = {
+        shop_return_pending: '1',
+        shop_return_url: '/shop',
+        shop_return_scroll_y: '140',
+        shop_return_at: String(Date.now()),
+      };
+      return map[key] ?? null;
+    });
+    cmp.router.url = '/shop';
+    cmp.initScrollRestoreFromSession();
+    expect(cmp.restoreScrollY).toBe(140);
+
+    cmp.mergePreviewLoading = false;
+    cmp.mergeSaving = false;
+    cmp.mergeTargetSlug = '';
+    cmp.previewCategoryMerge({ slug: 'rings', name: 'Rings' } as any);
+    expect(cmp.mergeError).toContain('adminUi.storefront.categories.mergeSelectTarget');
+
+    cmp.mergeTargetSlug = 'chains';
+    cmp.admin.previewMergeCategory.and.returnValue(of({ can_merge: false, reason: 'different_parent' }));
+    cmp.previewCategoryMerge({ slug: 'rings', name: 'Rings' } as any);
+    expect(cmp.mergeError).toContain('adminUi.storefront.categories.mergeReasonParent');
+
+    cmp.admin.previewDeleteCategory.and.returnValue(of({ can_delete: false, product_count: 3, child_count: 1 }));
+    cmp.previewCategoryDelete({ slug: 'rings', name: 'Rings' } as any);
+    expect(cmp.deleteError).toContain('adminUi.storefront.categories.deleteNotAllowed');
+  });
+});

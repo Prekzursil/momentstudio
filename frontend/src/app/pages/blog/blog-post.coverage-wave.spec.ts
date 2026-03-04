@@ -26,6 +26,7 @@ type BlogHarness = {
   auth: jasmine.SpyObj<AuthService>;
   toast: jasmine.SpyObj<ToastService>;
   newsletter: jasmine.SpyObj<NewsletterService>;
+  markdown: jasmine.SpyObj<MarkdownService>;
 };
 
 function createHarness(): BlogHarness {
@@ -116,7 +117,7 @@ function createHarness(): BlogHarness {
   const fixture = TestBed.createComponent(BlogPostComponent);
   fixture.detectChanges();
 
-  return { component: fixture.componentInstance, admin, blog, auth, toast, newsletter };
+  return { component: fixture.componentInstance, admin, blog, auth, toast, newsletter, markdown };
 }
 
 function callBlogMethodSafely(component: any, method: string, args: unknown[]): void {
@@ -462,5 +463,70 @@ describe('BlogPostComponent coverage wave: article interaction matrix', () => {
     expect(cmp.galleryImages().length).toBeGreaterThan(0);
     expect(cmp.readingProgress()).toBeGreaterThanOrEqual(0);
   });
+
+  it('covers renderPostBody transforms for toc, gallery, embeds, callouts, and code blocks', () => {
+    const { component, markdown } = createHarness();
+    const cmp = component as any;
+    cmp.document = document;
+
+    markdown.render.and.returnValue(`
+      <h2>Section</h2>
+      <h2>Section</h2>
+      <p><img src="/a.jpg" title="gallery" /></p>
+      <p><img src="/b.jpg" title="gallery" /></p>
+      <p>{{product:ring-one}}</p>
+      <blockquote><p>[!TIP] Helpful tip</p><p>Extra line</p></blockquote>
+      <pre><code class="language-js">const x = 1;</code></pre>
+    `);
+
+    const rendered = cmp.renderPostBody('irrelevant');
+
+    expect(markdown.render).toHaveBeenCalledWith('irrelevant');
+    expect(rendered.toc.length).toBeGreaterThan(0);
+    expect(rendered.toc[0].id).toContain('section');
+    expect(rendered.embeds).toEqual([{ type: 'product', slug: 'ring-one' }]);
+    expect(rendered.html).toContain('blog-gallery');
+    expect(rendered.html).toContain('data-embed-type="product"');
+    expect(rendered.html).toContain('blog-callout--tip');
+    expect(rendered.html).toContain('blog-codeblock');
+  });
+
+  it('covers related-post scoring and more-from-author branches', () => {
+    const { component, blog } = createHarness();
+    const cmp = component as any;
+
+    const post = {
+      slug: 'first-post',
+      series: 'series-a',
+      tags: ['jewelry', 'tips'],
+      author: { id: 'author-1' },
+    } as any;
+
+    blog.listPosts.and.returnValue(
+      of({
+        items: [
+          { slug: 'first-post', series: 'series-a', tags: ['jewelry'], published_at: '2026-03-01T00:00:00Z' },
+          { slug: 'second-post', series: 'series-a', tags: ['jewelry', 'tips'], published_at: '2026-03-02T00:00:00Z' },
+          { slug: 'third-post', series: 'series-b', tags: ['tips'], published_at: '2026-03-03T00:00:00Z' },
+        ],
+      } as any),
+    );
+
+    cmp.loadRelatedPosts('en', post);
+    expect(cmp.relatedPosts().length).toBe(2);
+    expect(cmp.relatedPosts()[0].slug).toBe('second-post');
+
+    cmp.loadMoreFromAuthor('en', post);
+    expect(cmp.moreFromAuthor().length).toBeGreaterThanOrEqual(1);
+    expect(cmp.loadingMoreFromAuthor()).toBeFalse();
+
+    blog.listPosts.and.returnValue(throwError(() => new Error('boom')));
+    cmp.loadRelatedPosts('en', post);
+    expect(cmp.relatedPosts()).toEqual([]);
+
+    cmp.loadMoreFromAuthor('en', { ...post, author: null } as any);
+    expect(cmp.moreFromAuthor()).toEqual([]);
+  });
+
 });
 
