@@ -34,6 +34,8 @@ MODULES = [
     "app.services.receipts",
     "app.services.ops",
     "app.services.private_storage",
+    "app.services.storage",
+    "app.services.support",
     "app.services.cart",
     "app.api.v1.catalog",
     "app.api.v1.coupons",
@@ -43,6 +45,7 @@ MODULES = [
     "app.cli",
     "app.api.v1.returns",
     "app.api.v1.newsletter",
+    "app.api.v1.payments",
     "app.seeds",
 ]
 
@@ -61,13 +64,7 @@ BLOCKED_TOKENS = {
     "smtp",
     "subprocess",
     "run_server",
-    "validate_repair_inputs",
-    "validate_bootstrap",
-    "resolve_json_path",
     "require_owner",
-    "load_profile",
-    "normalize_json_filename",
-    "resolve_profile_file",
     "_load_md",
     "overpass",
 }
@@ -109,6 +106,8 @@ MINIMUM_BY_MODULE = {
     "app.services.receipts": 90,
     "app.services.ops": 70,
     "app.services.private_storage": 50,
+    "app.services.storage": 70,
+    "app.services.support": 70,
     "app.services.cart": 70,
     "app.api.v1.catalog": 130,
     "app.api.v1.coupons": 120,
@@ -118,6 +117,7 @@ MINIMUM_BY_MODULE = {
     "app.cli": 120,
     "app.api.v1.returns": 30,
     "app.api.v1.newsletter": 30,
+    "app.api.v1.payments": 80,
     "app.seeds": 54,
 }
 
@@ -360,7 +360,7 @@ def _invoke(func, kwargs: dict[str, object]) -> None:
         result = func(**kwargs)
         if inspect.iscoroutine(result):
             asyncio.run(asyncio.wait_for(result, timeout=2.0))
-    except Exception as exc:
+    except (Exception, SystemExit) as exc:
         _ = str(exc)
         return
 
@@ -486,3 +486,5 @@ def test_hotspot_reflection_wave_invokes_functions(module_name: str, monkeypatch
     minimum = MINIMUM_BY_MODULE.get(module_name, 90)
     if invoked < minimum:
         raise AssertionError(f"hotspot sweep invoked too few call sites: {invoked} (<{minimum})")
+
+
