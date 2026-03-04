@@ -1446,7 +1446,10 @@ describe('AdminComponent sweep coverage', () => {
     if (typeof navAny.clipboard.writeText !== 'function') {
       navAny.clipboard.writeText = () => Promise.resolve();
     }
-    spyOn(navAny.clipboard, 'writeText').and.returnValue(Promise.reject(new Error('clipboard-denied')));
+    const writeTextSpy = jasmine.isSpy(navAny.clipboard.writeText)
+      ? (navAny.clipboard.writeText as jasmine.Spy)
+      : spyOn(navAny.clipboard, 'writeText');
+    writeTextSpy.and.returnValue(Promise.reject(new Error('clipboard-denied')));
     (document as any).execCommand ??= () => true;
     const execSpy = spyOn(document as any, 'execCommand').and.returnValue(true);
 
