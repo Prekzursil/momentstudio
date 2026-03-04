@@ -1,20 +1,23 @@
-import { Injectable } from '@angular/core';
+import { Injectable, SecurityContext, inject } from '@angular/core';
+import { DomSanitizer } from '@angular/platform-browser';
 import { marked } from 'marked';
-import createDOMPurify from 'dompurify';
 
 @Injectable({ providedIn: 'root' })
 export class MarkdownService {
-  private readonly purify = typeof window !== 'undefined' ? createDOMPurify(window) : null;
+  private readonly sanitizer = inject(DomSanitizer);
 
   render(markdown: string): string {
     const raw = marked.parse(markdown || '', { breaks: true }) as string;
-    return this.purify ? this.purify.sanitize(raw) : raw;
+    return this.sanitize(raw);
   }
 
   renderWithSanitizationReport(markdown: string): { html: string; sanitized: boolean } {
     const raw = marked.parse(markdown || '', { breaks: true }) as string;
-    if (!this.purify) return { html: raw, sanitized: false };
-    const cleaned = this.purify.sanitize(raw);
+    const cleaned = this.sanitize(raw);
     return { html: cleaned, sanitized: cleaned !== raw };
+  }
+
+  private sanitize(value: string): string {
+    return this.sanitizer.sanitize(SecurityContext.HTML, value) || '';
   }
 }

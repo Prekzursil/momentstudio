@@ -1024,7 +1024,6 @@ describe('AdminComponent sweep coverage', () => {
   it('covers user/content and bulk/order legacy error branches', async () => {
     const { component, admin, toast } = createComponent();
     const dynamic = component as any;
-    void toast;
 
     component.selectedUserId = 'user-1';
     component.selectedUserRole = 'admin';
@@ -1099,9 +1098,8 @@ describe('AdminComponent sweep coverage', () => {
   });
 
   it('covers reusable/page-drop/media and blog-bulk helper branches', () => {
-    const { component, admin, toast } = createComponent();
+    const { component, admin } = createComponent();
     const dynamic = component as any;
-    void toast;
     spyOn(globalThis, 'prompt').and.returnValues('Reusable hero', '');
     spyOn(globalThis, 'confirm').and.returnValue(true);
 
@@ -1159,7 +1157,6 @@ describe('AdminComponent sweep coverage', () => {
 
   it('covers additional high-miss blog preview and collection save branches', () => {
     const { component, admin, toast } = createComponent();
-    void toast;
 
     component.blogBulkSelection = new Set(['blog.1', 'blog.2']);
     component.blogBulkAction = 'publish';
@@ -1243,12 +1240,3 @@ describe('AdminComponent sweep coverage', () => {
     expect(insertHomeMedia).toHaveBeenCalled();
   });
 });
-
-
-
-
-
-
-
-
-
