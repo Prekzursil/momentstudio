@@ -28,6 +28,15 @@ MODULES = [
     "app.services.user_export",
     "app.services.order_expiration_scheduler",
     "app.services.sameday_easybox_mirror",
+    "app.services.receipts",
+    "app.services.ops",
+    "app.services.private_storage",
+    "app.services.cart",
+    "app.api.v1.catalog",
+    "app.api.v1.coupons",
+    "app.api.v1.content",
+    "app.api.v1.admin_dashboard",
+    "app.seeds",
 ]
 
 BLOCKED_TOKENS = {
@@ -409,6 +418,15 @@ def test_hotspot_reflection_wave_invokes_functions(module_name: str) -> None:
         "app.services.user_export": 20,
         "app.services.order_expiration_scheduler": 20,
         "app.services.sameday_easybox_mirror": 160,
+        "app.services.receipts": 90,
+        "app.services.ops": 70,
+        "app.services.private_storage": 50,
+        "app.services.cart": 70,
+        "app.api.v1.catalog": 130,
+        "app.api.v1.coupons": 120,
+        "app.api.v1.content": 140,
+        "app.api.v1.admin_dashboard": 120,
+        "app.seeds": 60,
     }
     minimum = minimum_by_module.get(module_name, 90)
     if invoked < minimum:
