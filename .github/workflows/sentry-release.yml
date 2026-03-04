@@ -47,22 +47,33 @@ jobs:
           fi
 
           SENTRY_CLI="npx --yes @sentry/cli@2.57.0"
-          ${SENTRY_CLI} info
+          info_output="$(${SENTRY_CLI} info 2>&1)"
+          echo "$info_output"
 
-          project_slug="${SENTRY_PROJECT:-}"
-          sentry_api_base="${SENTRY_URL:-https://sentry.io}"
+          project_slug="$(printf '%s' "${SENTRY_PROJECT:-}" | tr -d '\r\n[:space:]')"
+          org_slug="$(printf '%s' "${SENTRY_ORG:-}" | tr -d '\r\n[:space:]')"
 
           validate_project_slug() {
             local candidate="${1:-}"
             [ -n "$candidate" ] || return 1
-            local code
-            code="$(
-              curl -sS -o /dev/null -w '%{http_code}' \
-                -H "Authorization: Bearer ${SENTRY_AUTH_TOKEN}" \
-                -H "Content-Type: application/json" \
-                "${sentry_api_base%/}/api/0/projects/${SENTRY_ORG}/${candidate}/" || echo "000"
+            local check_output
+            check_output="$(
+              SENTRY_ORG="$org_slug" SENTRY_PROJECT="$candidate" ${SENTRY_CLI} info 2>&1 || true
             )"
-            [ "$code" = "200" ]
+            grep -Fq "Default Project: ${candidate}" <<<"$check_output"
+          }
+
+          list_candidate_slugs() {
+            ${SENTRY_CLI} projects list --org "$org_slug" 2>/dev/null \
+              | tr -d '\r' \
+              | awk '{
+                  for (i = 1; i <= NF; ++i) {
+                    if ($i ~ /^[A-Za-z0-9][A-Za-z0-9._-]*$/) {
+                      print $i
+                    }
+                  }
+                }' \
+              | sort -u
           }
 
           if validate_project_slug "$project_slug"; then
@@ -71,81 +82,22 @@ jobs:
             if [ -n "$project_slug" ]; then
               echo "::warning::Configured SENTRY_PROJECT '$project_slug' is not accessible; resolving project slug from Sentry APIs."
             fi
-
-            api_candidate="$(
-              {
-                curl -sSL \
-                  -H "Authorization: Bearer ${SENTRY_AUTH_TOKEN}" \
-                  -H "Content-Type: application/json" \
-                  "${sentry_api_base%/}/api/0/organizations/${SENTRY_ORG}/projects/" 2>/dev/null || true
-              } \
-              | python - <<'PY'
-          import json
-          import sys
-          
-          def emit_first_slug(items):
-              if isinstance(items, list):
-                  for item in items:
-                      if isinstance(item, dict):
-                          slug = item.get("slug")
-                          if slug:
-                              print(slug)
-                              return
-              print("")
-          
-          raw = sys.stdin.read().strip()
-          if not raw:
-              print("")
-              raise SystemExit
-          
-          try:
-              payload = json.loads(raw)
-          except Exception:
-              print("")
-              raise SystemExit
-          
-          if isinstance(payload, list):
-              emit_first_slug(payload)
-          elif isinstance(payload, dict):
-              for key in ("results", "projects", "data"):
-                  candidate = payload.get(key)
-                  if isinstance(candidate, list):
-                      emit_first_slug(candidate)
-                      break
-              else:
-                  print("")
-          else:
-              print("")
-          PY
-            )"
-
-            if validate_project_slug "$api_candidate"; then
-              project_slug="$api_candidate"
-            else
-              cli_candidate="$(
-                ${SENTRY_CLI} projects list --org "${SENTRY_ORG}" 2>/dev/null \
-                | awk 'NF { print $1 }' \
-                | sed -E 's|.*/||' \
-                | head -n 1
-              )"
-              if validate_project_slug "$cli_candidate"; then
-                project_slug="$cli_candidate"
-              else
-                project_slug=""
+            project_slug=""
+            while IFS= read -r candidate; do
+              if validate_project_slug "$candidate"; then
+                project_slug="$candidate"
+                break
               fi
-            fi
+            done < <(list_candidate_slugs)
           fi
 
           if [ -z "$project_slug" ]; then
-            echo "::error::Unable to resolve an accessible Sentry project slug for org '${SENTRY_ORG}'."
+            echo "::error::Unable to resolve an accessible Sentry project slug for org '${org_slug}'."
             exit 1
           fi
 
           echo "Resolved Sentry project: $project_slug"
-          curl -fsSL \
-            -H "Authorization: Bearer ${SENTRY_AUTH_TOKEN}" \
-            -H "Content-Type: application/json" \
-            "${sentry_api_base%/}/api/0/projects/${SENTRY_ORG}/${project_slug}/" >/dev/null
+          SENTRY_ORG="$org_slug" SENTRY_PROJECT="$project_slug" ${SENTRY_CLI} info >/dev/null
 
   release-and-sourcemaps:
     if: github.event_name != 'pull_request'
@@ -243,5 +195,3 @@ jobs:
             echo ""
             echo "Published release \`$RELEASE\` and uploaded frontend sourcemaps from \`frontend/dist/app/browser\`."
           } >> "$GITHUB_STEP_SUMMARY"
-
-
