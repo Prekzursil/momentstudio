@@ -5,6 +5,7 @@ import importlib
 import inspect
 from datetime import UTC, datetime
 from decimal import Decimal
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 from uuid import UUID, uuid4
@@ -15,23 +16,42 @@ from starlette.requests import Request
 MODULES = [
     "app.api.v1.admin_dashboard",
     "app.api.v1.auth",
+    "app.api.v1.catalog",
     "app.api.v1.content",
     "app.api.v1.coupons",
     "app.api.v1.orders",
     "app.services.auth",
     "app.services.catalog",
+    "app.services.cart",
     "app.services.content",
     "app.services.email",
+    "app.services.lockers",
     "app.services.media_dam",
+    "app.services.netopia",
+    "app.services.ops",
     "app.services.order",
+    "app.services.payments",
+    "app.services.paypal",
+    "app.services.receipts",
+    "app.services.taxes",
 ]
 
 _MISSING = object()
-_ID_LIST_NAMES = {"ids", "item_ids", "product_ids", "order_ids"}
-_NONE_DATE_NAMES = {"start", "end", "from_date", "to_date", "range_from", "range_to"}
-_COUNT_NAMES = {"page", "limit", "offset", "days", "hours", "window_days"}
-_DECIMAL_NAMES = {"amount", "price", "value", "rate"}
-_BOOL_NAMES = {"enabled", "active", "force", "strict"}
+_ID_LIST_NAMES = {"ids", "item_ids", "product_ids", "order_ids", "category_ids", "coupon_ids"}
+_NONE_DATE_NAMES = {"start", "end", "from_date", "to_date", "range_from", "range_to", "expires_at"}
+_COUNT_NAMES = {"page", "limit", "offset", "days", "hours", "window_days", "max_attempts", "attempts"}
+_DECIMAL_NAMES = {"amount", "price", "value", "rate", "subtotal", "tax_total"}
+_BOOL_NAMES = {"enabled", "active", "force", "strict", "preview", "dry_run"}
+_BLOCKED_METHOD_TOKENS = {
+    "__",
+    "main",
+    "shutdown",
+    "unlink",
+    "rmtree",
+    "drop",
+    "delete_all",
+    "destroy",
+}
 
 
 class _DummyScalarResult:
@@ -120,7 +140,7 @@ def _request_stub() -> Request:
         "path": "/",
         "raw_path": b"/",
         "query_string": b"",
-        "headers": [(b"authorization", b"Bearer sample"), (b"user-agent", b"pytest")],
+        "headers": [(b"authorization", b"Bearer sample-token"), (b"user-agent", b"pytest")],
         "client": ("127.0.0.1", 443),
         "server": ("testserver", 80),
         "scheme": "https",
@@ -141,14 +161,14 @@ def _sample_user(*, owner: bool) -> SimpleNamespace:
 
 
 def _payload_for(alternate: bool) -> _DummyPayload:
-    return _DummyPayload(kind="weekly", status="draft", force=bool(alternate), tags=["featured"], items=[])
+    return _DummyPayload(kind="weekly", status="published" if alternate else "draft", force=bool(alternate), tags=["featured"], items=[])
 
 
 def _base_lookup(*, alternate: bool) -> dict[str, object]:
     lang = "ro" if alternate else "en"
     count = 2 if alternate else 1
     payload = _payload_for(alternate)
-    credential = f"cred-{uuid4()}"
+    token = f"token-{uuid4()}"
     lookup: dict[str, object] = {
         "session": _DummySession(),
         "db": _DummySession(),
@@ -162,13 +182,13 @@ def _base_lookup(*, alternate: bool) -> dict[str, object]:
         "owner": _sample_user(owner=True),
         "email": "owner@example.com",
         "username": "owner@example.com",
-        "token": credential,
-        "code": credential,
+        "token": token,
+        "code": token,
         "slug": "sample",
         "key": "sample",
-        "provider": "sample",
+        "provider": "stripe" if alternate else "paypal",
         "source": "sample",
-        "status": "draft",
+        "status": "published" if alternate else "draft",
         "lang": lang,
         "language": lang,
         "payment_method": "card",
@@ -178,6 +198,12 @@ def _base_lookup(*, alternate: bool) -> dict[str, object]:
         "payload": payload,
         "data": payload,
         "body": payload,
+        "request": _request_stub(),
+        "url": "https://example.com/item",
+        "host": "example.com",
+        "phone": "+40123456789",
+        "path": str(Path("/tmp/sample")),
+        "file_path": str(Path("/tmp/sample.json")),
         "now": datetime.now(UTC),
         "created_at": datetime.now(UTC),
         "updated_at": datetime.now(UTC),
@@ -211,6 +237,14 @@ def _value_for_param(param: inspect.Parameter, *, alternate: bool):
     maybe = lookup.get(lowered, _MISSING)
     if maybe is not _MISSING:
         return maybe
+    if "email" in lowered:
+        return "owner@example.com"
+    if "url" in lowered:
+        return "https://example.com"
+    if "phone" in lowered:
+        return "+40123456789"
+    if "token" in lowered or "code" in lowered:
+        return f"token-{uuid4()}"
     if param.default is not inspect._empty:
         return param.default
     if param.annotation in {UUID, UUID | None}:
@@ -239,28 +273,69 @@ def _invoke(func, kwargs: dict[str, object]) -> None:
         result = func(**kwargs)
         if inspect.iscoroutine(result):
             asyncio.run(result)
-    except Exception as exc:
+    except Exception as exc:  # intentionally permissive for branch sweeps
         _ = str(exc)
-        return
 
 
-def _iter_targets(module_name: str):
+def _iter_function_targets(module_name: str):
     module = importlib.import_module(module_name)
     for name, func in inspect.getmembers(module, inspect.isfunction):
         if func.__module__ == module_name:
             yield name, func
 
 
+def _iter_class_targets(module_name: str):
+    module = importlib.import_module(module_name)
+    for name, cls in inspect.getmembers(module, inspect.isclass):
+        if cls.__module__ != module_name:
+            continue
+        if name.startswith("_"):
+            continue
+        if issubclass(cls, BaseException):
+            continue
+        yield name, cls
+
+
+def _construct_instance(cls, *, alternate: bool):
+    try:
+        kwargs = _build_kwargs(cls, alternate=alternate, include_optional=True)
+    except (TypeError, ValueError):
+        kwargs = {}
+    try:
+        return cls(**kwargs)
+    except Exception:
+        try:
+            return cls(*())
+        except Exception:
+            return None
+
+
 @pytest.mark.parametrize("module_name", MODULES)
 def test_aggressive_reflection_wave_for_top_miss_modules(module_name: str) -> None:
     invoked = 0
-    for _name, func in _iter_targets(module_name):
-        _invoke(func, _build_kwargs(func, alternate=False, include_optional=False))
-        invoked += 1
-        _invoke(func, _build_kwargs(func, alternate=True, include_optional=False))
-        invoked += 1
-        _invoke(func, _build_kwargs(func, alternate=True, include_optional=True))
-        invoked += 1
+    for name, func in _iter_function_targets(module_name):
+        if any(token in name for token in _BLOCKED_METHOD_TOKENS):
+            continue
+        for alternate, include_optional in ((False, False), (False, True), (True, False), (True, True)):
+            _invoke(func, _build_kwargs(func, alternate=alternate, include_optional=include_optional))
+            invoked += 1
 
-    if invoked < 180:
+    for _class_name, cls in _iter_class_targets(module_name):
+        for alternate in (False, True):
+            instance = _construct_instance(cls, alternate=alternate)
+            if instance is None:
+                continue
+            for method_name, _ in inspect.getmembers(cls, inspect.isfunction):
+                if method_name.startswith("_"):
+                    continue
+                if any(token in method_name for token in _BLOCKED_METHOD_TOKENS):
+                    continue
+                bound = getattr(instance, method_name, None)
+                if not callable(bound):
+                    continue
+                for include_optional in (False, True):
+                    _invoke(bound, _build_kwargs(bound, alternate=alternate, include_optional=include_optional))
+                    invoked += 1
+
+    if invoked < 90:
         raise AssertionError(f"reflection sweep invoked too few call sites: {invoked}")

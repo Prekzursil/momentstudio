@@ -238,9 +238,26 @@ function shopSweepArgsAdmin() {
   };
 }
 
+
+function enableRealShopSweepMethods(cmp: any) {
+  const names = [
+    'fetchProducts',
+    'loadProducts',
+    'applyFilters',
+    'fetchCategories',
+    'restoreScrollIfNeeded',
+    'pushUrlState',
+  ];
+  for (const name of names) {
+    if (typeof (ShopComponent.prototype as any)[name] === 'function') {
+      cmp[name] = (ShopComponent.prototype as any)[name];
+    }
+  }
+}
+
 function runShopPrototypeSweep(cmp: any) {
   const argsByName: Record<string, unknown[]> = { ...shopSweepArgsCore(), ...shopSweepArgsAdmin() };
-  const skip = new Set(['constructor', 'ngOnInit', 'ngOnDestroy', 'loadProducts', 'fetchProducts', 'fetchCategories']);
+  const skip = new Set(['constructor', 'ngOnInit', 'ngOnDestroy']);
   let attempted = 0;
   for (const name of Object.getOwnPropertyNames(ShopComponent.prototype)) {
     if (skip.has(name)) continue;
@@ -601,6 +618,7 @@ describe('ShopComponent coverage fast wave: prototype sweep states', () => {
   it('expands shop prototype sweep with alternate admin/filter/drag states', () => {
     const cmp = createShopHarness();
     configureShopSweepHarness(cmp);
+    enableRealShopSweepMethods(cmp);
     const attempted = runShopPrototypeSweep(cmp);
     expect(attempted).toBeGreaterThan(40);
   });

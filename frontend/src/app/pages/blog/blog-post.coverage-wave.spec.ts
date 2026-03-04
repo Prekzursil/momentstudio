@@ -317,7 +317,7 @@ describe('BlogPostComponent coverage wave', () => {
     blog.getCommentSubscription.and.returnValue(throwError(() => new Error('subscription-fail')));
     newsletter.subscribe.and.returnValue(throwError(() => new Error('newsletter-fail')));
 
-    const skip = new Set(['constructor', 'ngOnInit', 'ngOnDestroy']);
+    const skip = new Set(['constructor', 'ngOnDestroy']);
     const argsByName: Record<string, unknown[]> = {
       navigateCommentPage: [1],
       onCommentSortChanged: ['oldest'],
