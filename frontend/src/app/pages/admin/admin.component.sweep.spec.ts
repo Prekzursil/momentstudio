@@ -109,6 +109,16 @@ function createComponent() {
   admin.invalidateCouponStripeMappings.and.returnValue(of({ deleted_mappings: 1 }));
   admin.listContentVersions.and.returnValue(of([]));
 
+
+  const adminProducts = jasmine.createSpyObj('AdminProductsService', ['search']);
+  adminProducts.search.and.returnValue(of({ items: [] }));
+
+  const blog = jasmine.createSpyObj('BlogService', ['listFlaggedComments', 'resolveCommentFlagsAdmin', 'hideCommentAdmin', 'pinPostAdmin', 'unpinPostAdmin']);
+  blog.listFlaggedComments.and.returnValue(of({ items: [] }));
+  blog.resolveCommentFlagsAdmin.and.returnValue(of({}));
+  blog.hideCommentAdmin.and.returnValue(of({}));
+  blog.pinPostAdmin.and.returnValue(of({}));
+  blog.unpinPostAdmin.and.returnValue(of({}));
   const fxAdmin = jasmine.createSpyObj('FxAdminService', [
     'getStatus',
     'listOverrideAudit',
@@ -166,8 +176,8 @@ function createComponent() {
   const component = new AdminComponent(
     route,
     admin as any,
-    {} as any,
-    {} as any,
+    adminProducts as any,
+    blog as any,
     fxAdmin as any,
     taxesAdmin as any,
     auth as any,
@@ -283,9 +293,16 @@ const ADMIN_SWEEP_FALLBACK_VARIANTS: unknown[][] = [
 ];
 
 function mockClipboardWriteText() {
-  if (typeof navigator !== 'undefined' && navigator.clipboard) {
-    spyOn(navigator.clipboard, 'writeText').and.returnValue(Promise.resolve());
+  if (typeof navigator === 'undefined') return;
+  const clipboardAny = (navigator as any).clipboard as { writeText?: unknown } | undefined;
+  if (!clipboardAny || typeof clipboardAny.writeText !== 'function') return;
+
+  if (jasmine.isSpy(clipboardAny.writeText as jasmine.Func)) {
+    (clipboardAny.writeText as jasmine.Spy).and.returnValue(Promise.resolve());
+    return;
   }
+
+  spyOn(clipboardAny as any, 'writeText').and.returnValue(Promise.resolve());
 }
 
 function listAdminSweepMethods(dynamic: any) {

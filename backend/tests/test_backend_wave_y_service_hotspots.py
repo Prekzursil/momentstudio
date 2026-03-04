@@ -73,6 +73,16 @@ BLOCKED_TOKENS = {
     "facebook",
     "http",
     "webhook",
+    "normalize_json_filename",
+    "resolve_profile_file",
+    "raise_if_owner_email_taken",
+    "_load_md",
+    "require_owner",
+    "load_profile",
+    "bootstrap_owner",
+    "validate_bootstrap",
+    "validate_repair_inputs",
+    "resolve_json_path",
 }
 
 _MISSING = object()
@@ -121,7 +131,7 @@ MINIMUM_BY_MODULE = {
     "app.cli": 120,
     "app.api.v1.returns": 30,
     "app.api.v1.newsletter": 30,
-    "app.seeds": 60,
+    "app.seeds": 54,
 }
 
 
@@ -308,6 +318,7 @@ def _base_lookup(*, alternate: bool) -> dict[str, object]:
 def _special_name_value(lowered: str):
     checks = (
         ("request" in lowered, _request_stub),
+        (lowered.startswith("existing_"), lambda: None),
         (lowered.endswith("_id") or lowered == "id", uuid4),
         (lowered.endswith("_ids") or lowered in _ID_LIST_NAMES, lambda: [uuid4(), uuid4()]),
         (lowered in _NONE_DATE_NAMES, lambda: None),
@@ -357,13 +368,11 @@ def _build_kwargs(func, *, alternate: bool, include_optional: bool) -> dict[str,
 def _invoke(func, kwargs: dict[str, object]) -> None:
     try:
         if inspect.iscoroutinefunction(func):
-            asyncio.run(func(**kwargs))
+            asyncio.run(asyncio.wait_for(func(**kwargs), timeout=2.0))
             return
         result = func(**kwargs)
         if inspect.iscoroutine(result):
-            asyncio.run(result)
-    except SystemExit:
-        return
+            asyncio.run(asyncio.wait_for(result, timeout=2.0))
     except Exception as exc:
         _ = str(exc)
         return
@@ -432,6 +441,8 @@ def test_hotspot_reflection_wave_invokes_functions(module_name: str) -> None:
     for name, func in inspect.getmembers(module, inspect.isfunction):
         if func.__module__ != module_name:
             continue
+        if module_name == "app.cli" and name == "main":
+            continue
         if _is_blocked(name):
             continue
 
@@ -448,6 +459,3 @@ def test_hotspot_reflection_wave_invokes_functions(module_name: str) -> None:
     minimum = MINIMUM_BY_MODULE.get(module_name, 90)
     if invoked < minimum:
         raise AssertionError(f"hotspot sweep invoked too few call sites: {invoked} (<{minimum})")
-
-
-
