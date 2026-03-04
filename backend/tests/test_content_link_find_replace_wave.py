@@ -261,3 +261,168 @@ async def test_content_load_context_helpers_and_preview_link_checks(monkeypatch:
         images=["/media/also-missing.png"],
     )
     assert isinstance(preview, list)
+
+
+def test_content_find_replace_plan_and_apply_helpers(monkeypatch: pytest.MonkeyPatch) -> None:
+    block = SimpleNamespace(
+        key="page.terms",
+        lang="ro",
+        title="alpha",
+        body_markdown="alpha",
+        meta={"k": "alpha"},
+        needs_translation_en=False,
+        needs_translation_ro=True,
+        translations=[SimpleNamespace(lang="en", title="alpha", body_markdown="alpha")],
+    )
+
+    base_changed, base_matches, next_title, next_body, next_meta = content_service._plan_base_find_replace_update(
+        block,
+        find="alpha",
+        replace="beta",
+        case_sensitive=False,
+    )
+    assert base_changed is True
+    assert base_matches >= 3
+
+    langs, rows_changed, tr_total, updates = content_service._plan_translation_find_replace_updates(
+        block,
+        find="alpha",
+        replace="beta",
+        case_sensitive=False,
+    )
+    assert langs == {"en"}
+    assert rows_changed == 1
+    assert tr_total == 2
+
+    content_service._apply_translation_replacements(updates)
+    content_service._apply_base_replacement(
+        block,
+        base_changed=base_changed,
+        next_title=next_title,
+        next_body=next_body,
+        next_meta=next_meta,
+    )
+
+    marks: list[str] = []
+    clears: list[str] = []
+    monkeypatch.setattr(content_service, "_mark_other_needs_translation", lambda _block, lang: marks.append(lang))
+    monkeypatch.setattr(content_service, "_clear_needs_translation", lambda _block, lang: clears.append(lang))
+    content_service._update_translation_flags_after_find_replace(
+        block,
+        base_changed=True,
+        translations_changed_langs={"en"},
+    )
+    assert marks == ["ro"]
+    assert clears == ["en"]
+
+
+class _NestedSession(_FakeSession):
+    def __init__(self):
+        super().__init__()
+        self.added: list[object] = []
+        self.commit_calls = 0
+        self.refresh_calls = 0
+
+    class _BeginNested:
+        async def __aenter__(self):
+            return None
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    def begin_nested(self):
+        return self._BeginNested()
+
+    def add(self, value: object) -> None:
+        self.added.append(value)
+
+    async def refresh(self, _obj, attribute_names=None):
+        await asyncio.sleep(0)
+        self.refresh_calls += 1
+
+    async def commit(self):
+        await asyncio.sleep(0)
+        self.commit_calls += 1
+
+
+@pytest.mark.anyio
+async def test_content_apply_find_replace_paths(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = _NestedSession()
+    block = SimpleNamespace(
+        key="page.legal",
+        lang="ro",
+        title="alpha",
+        body_markdown="alpha",
+        meta={},
+        version=1,
+        translations=[SimpleNamespace(lang="en", title="alpha", body_markdown="alpha")],
+    )
+
+    async def _audit(*_args, **_kwargs):
+        await asyncio.sleep(0)
+
+    monkeypatch.setattr(content_service, "_add_block_version_and_audit", _audit)
+    monkeypatch.setattr(content_service, "_enforce_legal_pages_bilingual", lambda *_args, **_kwargs: None)
+
+    changed, tr_rows, matches = await content_service._apply_find_replace_to_block(
+        session,
+        block=block,
+        find="alpha",
+        replace="beta",
+        case_sensitive=False,
+        actor_id=None,
+    )
+    assert changed is True
+    assert tr_rows == 1
+    assert matches >= 3
+    assert block.version == 2
+
+    blocks = [SimpleNamespace(key="page.ok"), SimpleNamespace(key="page.bad")]
+    session.execute_results = [_ExecuteResult(scalar_values=blocks)]
+
+    async def _apply_one(_session, *, block, **_kwargs):
+        await asyncio.sleep(0)
+        if block.key == "page.bad":
+            raise content_service.HTTPException(status_code=400, detail="bad")
+        return True, 2, 5
+
+    monkeypatch.setattr(content_service, "_apply_find_replace_to_block", _apply_one)
+    updated_blocks, updated_translations, replacements, errors = await content_service.apply_find_replace(
+        session,
+        find="x",
+        replace="y",
+        case_sensitive=True,
+    )
+    assert (updated_blocks, updated_translations, replacements) == (1, 2, 5)
+    assert errors == [{"key": "page.bad", "error": "bad"}]
+    assert session.refresh_calls == 1
+    assert session.commit_calls >= 1
+
+
+@pytest.mark.anyio
+async def test_content_check_links_not_found_and_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = _FakeSession()
+
+    async def _none(_session, _key):
+        await asyncio.sleep(0)
+        return None
+
+    monkeypatch.setattr(content_service, "get_block_by_key", _none)
+    with pytest.raises(content_service.HTTPException, match="Content not found"):
+        await content_service.check_content_links(session, key="page.missing")
+
+    block = SimpleNamespace(key="page.home", body_markdown="[ok](/pages/a)", meta=None, images=[])
+
+    async def _block(_session, _key):
+        await asyncio.sleep(0)
+        return block
+
+    async def _ctx(_session, **_kwargs):
+        await asyncio.sleep(0)
+        return {}, set(), {"page.a": ("page.a", None)}, {"page.a": (content_service.ContentStatus.published, None, None)}
+
+    monkeypatch.setattr(content_service, "get_block_by_key", _block)
+    monkeypatch.setattr(content_service, "_load_link_validation_context", _ctx)
+
+    issues = await content_service.check_content_links(session, key="page.home")
+    assert issues == []
