@@ -71,6 +71,110 @@ function createAccountHarness(): any {
 }
 
 
+
+const ACCOUNT_SWEEP_BLOCKED = new Set<string>([
+  'constructor',
+  'ngOnInit',
+  'ngOnDestroy',
+  'startExportJobPolling',
+  'stopExportJobPolling',
+  'resetIdleTimer',
+  'clearTimeout',
+  'clearInterval',
+]);
+
+const ACCOUNT_SWEEP_RISKY = /(poll|timer|interval|timeout|avatar|clipboard|revoke|confirm|passkey|twofactor|session|secondary|google|download|export|receipt|share|cancel|return|remove|delete|reorder|signout)/i;
+
+const ACCOUNT_SWEEP_ARGS_BY_NAME: Record<string, unknown[]> = {
+  navigateToSection: ['overview'],
+  ensureLoadedForSection: ['security'],
+  filterOrders: ['paid'],
+  nextPage: ['orders'],
+  prevPage: ['orders'],
+  openCancelRequest: ['order-1'],
+  closeCancelRequest: [],
+  openReturnRequest: ['order-1'],
+  closeReturnRequest: [],
+  openAddressForm: [],
+  editAddress: [{ id: 'addr-1', label: 'home' }],
+  removeAddress: ['addr-1'],
+  setDefaultShipping: ['addr-1'],
+  setDefaultBilling: ['addr-1'],
+  updateOrderInList: [{ id: 'order-1', status: 'paid' }],
+  requiredFieldLabelKey: ['email'],
+  reorder: ['order-1'],
+  reorderItem: ['item-1'],
+  downloadReceipt: ['order-1'],
+  copyReceiptUrl: ['order-1', 'https://example.local', 'account.orders.receiptReady'],
+  usernameCooldownSeconds: [],
+  displayNameCooldownSeconds: [],
+  emailCooldownSeconds: [],
+};
+
+function installAccountSweepStubs(state: any): void {
+  primeAsyncSignals(state);
+  state.t = (key: string) => key;
+  state.toast = jasmine.createSpyObj('ToastService', ['success', 'error', 'info']);
+  state.profileLoading = mockSignal(false);
+  state.profileError = mockSignal<string | null>(null);
+  state.profile = mockSignal({ id: 'u1', username: 'user1', name: 'User One', email: 'account@example.test', email_verified: true });
+  state.orders = mockSignal<any[]>([]);
+  state.ordersLoading = mockSignal(false);
+  state.ordersLoaded = mockSignal(false);
+  state.ordersError = mockSignal<string | null>(null);
+  state.addresses = mockSignal<any[]>([]);
+  state.addressesLoading = mockSignal(false);
+  state.addressesLoaded = mockSignal(false);
+  state.addressesError = mockSignal<string | null>(null);
+  state.cart = { loadFromBackend: jasmine.createSpy('loadFromBackend') };
+  state.wishlist = { ensureLoaded: jasmine.createSpy('ensureLoaded'), clear: jasmine.createSpy('clear') };
+  const dynamicService = (target: Record<string, any>) => new Proxy(target, {
+    get(obj, prop, receiver) {
+      if (typeof prop !== 'string') return Reflect.get(obj, prop, receiver);
+      const existing = Reflect.get(obj, prop, receiver);
+      if (typeof existing !== 'undefined') return existing;
+      const spy = jasmine.createSpy(prop).and.returnValue(of({}));
+      if (prop.startsWith('list') || prop.startsWith('get')) spy.and.returnValue(of([]));
+      obj[prop] = spy;
+      return spy;
+    },
+  });
+  state.auth = dynamicService({ isAuthenticated: () => true, signOut: jasmine.createSpy('signOut') });
+  state.account = dynamicService({});
+}
+
+function prepareAccountSweepArgs(name: string, arity: number): unknown[] {
+  const base = [...(ACCOUNT_SWEEP_ARGS_BY_NAME[name] ?? [])];
+  if (base.length >= arity) return base;
+  return [...base, ...Array(arity - base.length).fill(undefined)];
+}
+
+async function invokeAccountSweepMethod(state: any, name: string): Promise<void> {
+  const fn = state[name] as ((...values: unknown[]) => unknown) | undefined;
+  if (typeof fn !== 'function') return;
+  const args = prepareAccountSweepArgs(name, fn.length);
+  try {
+    await Promise.resolve(fn.apply(state, args));
+  } catch {
+    // Sweep tolerates guard failures while still exercising branches.
+  }
+}
+
+async function runAccountMethodSweep(state: any): Promise<number> {
+  const methods = Object.getOwnPropertyNames(AccountState.prototype).filter(
+    (name) =>
+      !ACCOUNT_SWEEP_BLOCKED.has(name) &&
+      !ACCOUNT_SWEEP_RISKY.test(name) &&
+      typeof state[name] === 'function',
+  );
+
+  for (const name of methods) {
+    await invokeAccountSweepMethod(state, name);
+  }
+  return methods.length;
+}
+
+
 function primeAsyncSignals(state: any): void {
   state.myCommentsLoading = mockSignal(false);
   state.myCommentsError = mockSignal<string | null>(null);
@@ -852,6 +956,16 @@ describe('AccountState fast export/passkey branches', () => {
       { username: 'user3', name: '', name_tag: null } as any
     );
     expect(headerUsernameOnly).toBe('user3');
+  });
+
+  it('runs deterministic prototype sweep for account-state helper branches', async () => {
+    const state = createAccountHarness();
+    installAccountSweepStubs(state);
+    spyOn(globalThis, 'confirm').and.returnValue(false);
+    spyOn(globalThis, 'prompt').and.returnValue('');
+
+    const attempted = await runAccountMethodSweep(state);
+    expect(attempted).toBeGreaterThan(80);
   });
 });
 

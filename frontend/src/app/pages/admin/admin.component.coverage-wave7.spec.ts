@@ -18,13 +18,8 @@ function createRouteStub(section: string, query: Record<string, unknown> = {}): 
   };
 }
 
-function createAdminHarness(): {
-  component: AdminComponent;
-  admin: jasmine.SpyObj<any>;
-  toast: jasmine.SpyObj<any>;
-} {
-  const routeStub = createRouteStub('settings');
-  const admin = jasmine.createSpyObj('AdminService', [
+function createAdminSpy(): jasmine.SpyObj<any> {
+  return jasmine.createSpyObj('AdminService', [
     'getContent',
     'updateContentBlock',
     'getCategoryTranslations',
@@ -43,7 +38,9 @@ function createAdminHarness(): {
     'content',
     'listContentPages'
   ]);
+}
 
+function seedAdminSpyDefaults(admin: jasmine.SpyObj<any>): void {
   admin.getContent.and.returnValue(of({ title: '', body_markdown: '', status: 'draft', version: 1 }));
   admin.updateContentBlock.and.returnValue(of({ version: 1, meta: {} }));
   admin.getCategoryTranslations.and.returnValue(of([]));
@@ -57,24 +54,14 @@ function createAdminHarness(): {
   admin.linkCheckContent.and.returnValue(of({ issues: [] }));
   admin.renameContentPage.and.returnValue(of({ old_key: 'page.old', new_key: 'page.fresh' }));
   admin.upsertContentRedirect.and.returnValue(of({}));
-  admin.createPagePreviewToken.and.returnValue(
-    of({
-      token: 'preview-token',
-      expires_at: '2026-03-03T12:00:00Z',
-      url: 'https://momentstudio.example/pages/fresh?preview=preview-token'
-    })
-  );
-  admin.createHomePreviewToken.and.returnValue(
-    of({
-      token: 'home-token',
-      expires_at: '2026-03-03T12:00:00Z',
-      url: 'https://momentstudio.example/?preview=home-token'
-    })
-  );
+  admin.createPagePreviewToken.and.returnValue(of({ token: 'preview-token', expires_at: '2026-03-03T12:00:00Z', url: 'https://momentstudio.example/pages/fresh?preview=preview-token' }));
+  admin.createHomePreviewToken.and.returnValue(of({ token: 'home-token', expires_at: '2026-03-03T12:00:00Z', url: 'https://momentstudio.example/?preview=home-token' }));
   admin.content.and.returnValue(of([]));
   admin.listContentPages.and.returnValue(of([]));
+}
 
-  const fallbackAdmin = new Proxy(admin as Record<string, any>, {
+function withAdminFallback(admin: jasmine.SpyObj<any>): Record<string, any> {
+  return new Proxy(admin as Record<string, any>, {
     get(target, prop, receiver) {
       if (typeof prop !== 'string') return Reflect.get(target, prop, receiver);
       const existing = Reflect.get(target, prop, receiver);
@@ -90,7 +77,16 @@ function createAdminHarness(): {
       return dynamicSpy;
     }
   });
+}
 
+function createAdminHarness(): {
+  component: AdminComponent;
+  admin: jasmine.SpyObj<any>;
+  toast: jasmine.SpyObj<any>;
+} {
+  const routeStub = createRouteStub('settings');
+  const admin = createAdminSpy();
+  seedAdminSpyDefaults(admin);
   const toast = jasmine.createSpyObj('ToastService', ['success', 'error', 'info']);
 
   const component = new AdminComponent(
@@ -99,7 +95,7 @@ function createAdminHarness(): {
       data: routeStub.data.asObservable(),
       queryParams: routeStub.queryParams.asObservable()
     } as unknown as ActivatedRoute,
-    fallbackAdmin as any,
+    withAdminFallback(admin) as any,
     {} as any,
     {} as any,
     {} as any,

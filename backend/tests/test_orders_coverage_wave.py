@@ -1429,3 +1429,114 @@ async def test_orders_admin_route_and_shipping_method_guard_branches(monkeypatch
     monkeypatch.setattr(orders_api.order_service, 'get_shipping_method', _shipping_ok)
     resolved = await orders_api._resolve_shipping_method_for_order_update(SimpleNamespace(), SimpleNamespace(shipping_method_id='ship-1'))
     assert resolved.id == 'ship-1'
+
+
+@pytest.mark.anyio
+async def test_orders_additional_admin_not_found_guards_a(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def _missing(*_args, **_kwargs):
+        await asyncio.sleep(0)
+        return None
+
+    monkeypatch.setattr(orders_api.order_service, 'get_order_by_id_admin', _missing)
+    monkeypatch.setattr(orders_api.order_service, 'get_order_by_id', _missing)
+    monkeypatch.setattr(orders_api.pii_service, 'require_pii_reveal', lambda *_args, **_kwargs: None)
+
+    req = _request()
+    session = _AdminRouteSession()
+    admin = SimpleNamespace(id=uuid4(), email='admin@example.com', username='admin')
+    oid = uuid4()
+
+    with pytest.raises(HTTPException, match='Order not found'):
+        await orders_api.admin_update_order_addresses(oid, req, SimpleNamespace(), False, session, admin)
+    with pytest.raises(HTTPException, match='Order not found'):
+        await orders_api.admin_list_order_shipments(oid, session, object())
+    with pytest.raises(HTTPException, match='Order not found'):
+        await orders_api.admin_create_order_shipment(oid, req, SimpleNamespace(), False, session, admin)
+    with pytest.raises(HTTPException, match='Order not found'):
+        await orders_api.admin_update_order_shipment(oid, uuid4(), req, SimpleNamespace(), False, session, admin)
+    with pytest.raises(HTTPException, match='Order not found'):
+        await orders_api.admin_delete_order_shipment(oid, uuid4(), req, False, session, admin)
+
+
+@pytest.mark.anyio
+async def test_orders_additional_admin_not_found_guards_b(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def _missing(*_args, **_kwargs):
+        await asyncio.sleep(0)
+        return None
+
+    monkeypatch.setattr(orders_api.order_service, 'get_order_by_id_admin', _missing)
+    monkeypatch.setattr(orders_api.order_service, 'get_order_by_id', _missing)
+    monkeypatch.setattr(orders_api.pii_service, 'require_pii_reveal', lambda *_args, **_kwargs: None)
+
+    req = _request()
+    session = _AdminRouteSession()
+    admin = SimpleNamespace(id=uuid4(), email='admin@example.com', username='admin')
+    oid = uuid4()
+
+    with pytest.raises(HTTPException, match='Order not found'):
+        await orders_api.admin_fulfill_item(oid, uuid4(), req, 1, False, session, admin)
+    with pytest.raises(HTTPException, match='Order not found'):
+        await orders_api.admin_order_events(oid, session, object())
+    with pytest.raises(HTTPException, match='Order not found'):
+        await orders_api.admin_packing_slip(oid, req, session, admin)
+    with pytest.raises(HTTPException, match='Order not found'):
+        await orders_api.admin_upload_shipping_label(oid, req, SimpleNamespace(filename='x.pdf'), False, session, admin)
+    with pytest.raises(HTTPException, match='Order not found'):
+        await orders_api.admin_download_shipping_label(oid, session, object())
+    with pytest.raises(HTTPException, match='Order not found'):
+        await orders_api.admin_delete_shipping_label(oid, session, object())
+
+
+@pytest.mark.anyio
+async def test_orders_receipt_and_payment_guard_branches(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def _missing(*_args, **_kwargs):
+        await asyncio.sleep(0)
+        return None
+
+    monkeypatch.setattr(orders_api.order_service, 'get_order_by_id', _missing)
+    monkeypatch.setattr(orders_api.order_service, 'get_order', _missing)
+
+    req = _request()
+    session = _AdminRouteSession()
+    admin = SimpleNamespace(id=uuid4(), email='admin@example.com', username='admin')
+    oid = uuid4()
+
+    with pytest.raises(HTTPException, match='Order not found'):
+        await orders_api.admin_download_receipt_pdf(oid, req, session, admin)
+    with pytest.raises(HTTPException, match='Order not found'):
+        await orders_api.admin_capture_payment(BackgroundTasks(), oid, None, session, 'admin')
+    with pytest.raises(HTTPException, match='Order not found'):
+        await orders_api.admin_void_payment(BackgroundTasks(), oid, None, session, 'admin')
+    with pytest.raises(HTTPException, match='Order not found'):
+        await orders_api.get_order(oid, SimpleNamespace(id=uuid4()), session)
+    with pytest.raises(HTTPException, match='Order not found'):
+        await orders_api.create_receipt_share_token(oid, session, SimpleNamespace(id=uuid4(), role='customer'))
+    with pytest.raises(HTTPException, match='Order not found'):
+        await orders_api.revoke_receipt_share_token(oid, session, SimpleNamespace(id=uuid4(), role='customer'))
+
+
+@pytest.mark.anyio
+async def test_orders_receipt_pdf_success_and_notification_early_returns(monkeypatch: pytest.MonkeyPatch) -> None:
+    order = SimpleNamespace(id=uuid4(), reference_code='REF-PDF', items=[SimpleNamespace(id=uuid4())], user=None, customer_email='')
+
+    async def _get_order(*_args, **_kwargs):
+        await asyncio.sleep(0)
+        return order
+
+    async def _record_export(*_args, **_kwargs):
+        await asyncio.sleep(0)
+        return None
+
+    monkeypatch.setattr(orders_api.step_up_service, 'require_step_up', lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(orders_api.order_service, 'get_order_by_id', _get_order)
+    monkeypatch.setattr(orders_api.order_exports_service, 'create_pdf_export', _record_export)
+    monkeypatch.setattr(orders_api.receipt_service, 'render_order_receipt_pdf', lambda *_args, **_kwargs: b'%PDF-fast%')
+
+    response = await orders_api.admin_download_receipt_pdf(order.id, _request(), _AdminRouteSession(), SimpleNamespace(id=uuid4()))
+    assert response.headers['content-disposition'].endswith('receipt-REF-PDF.pdf"')
+
+    monkeypatch.setattr(orders_api.settings, 'admin_alert_email', '', raising=False)
+    orders_api._queue_order_refunded_email(BackgroundTasks(), order)
+    await orders_api._notify_user_order_refunded(_AdminRouteSession(), order)
+    orders_api._queue_admin_refund_requested_email(BackgroundTasks(), None, order, SimpleNamespace(email='admin@example.com'), note='n')
+    await orders_api._notify_partial_refund_user(_AdminRouteSession(), order, SimpleNamespace(amount=Decimal('1.00')))
