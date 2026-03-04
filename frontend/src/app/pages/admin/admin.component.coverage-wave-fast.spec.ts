@@ -902,3 +902,186 @@ describe('AdminComponent fast blog editor branches', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 });
+
+describe('AdminComponent fast blog moderation and residual branch closures', () => {
+  it('covers blog version list/detail load and error paths', () => {
+    const component = createAdminHarness() as any;
+    const { admin, toast } = attachBlogHarness(component);
+
+    admin.listContentVersions = jasmine
+      .createSpy('listContentVersions')
+      .and.returnValues(of([{ version: 2 }]), throwError(() => ({ error: { detail: 'version-load-failed' } })));
+    admin.getContentVersion = jasmine
+      .createSpy('getContentVersion')
+      .and.returnValues(of({ version: 2, body_markdown: 'old body' }), throwError(() => ({ error: { detail: 'detail-failed' } })));
+
+    component.selectedBlogKey = 'blog.hello';
+    component.blogForm.body_markdown = 'new body';
+
+    component.loadBlogVersions();
+    expect(component.blogVersions.length).toBe(1);
+
+    component.loadBlogVersions();
+    expect(toast.error).toHaveBeenCalled();
+
+    component.selectBlogVersion(2);
+    expect(component.blogVersionDetail?.version).toBe(2);
+
+    component.selectBlogVersion(3);
+    expect(toast.error).toHaveBeenCalled();
+  });
+
+  it('covers rollbackBlogVersion confirm, success, and error branches', () => {
+    const component = createAdminHarness() as any;
+    const { admin, toast } = attachBlogHarness(component);
+
+    admin.rollbackContentVersion = jasmine
+      .createSpy('rollbackContentVersion')
+      .and.returnValues(of({}), throwError(() => ({ error: { detail: 'rollback-failed' } })));
+    component.selectedBlogKey = 'blog.hello';
+    spyOn(component, 'loadBlogVersions').and.stub();
+    spyOn(globalThis, 'confirm').and.returnValues(false, true, true);
+
+    component.rollbackBlogVersion(4);
+    expect(admin.rollbackContentVersion).not.toHaveBeenCalled();
+
+    component.rollbackBlogVersion(5);
+    expect(admin.rollbackContentVersion).toHaveBeenCalledWith('blog.hello', 5);
+    expect(component.reloadContentBlocks).toHaveBeenCalled();
+    expect(component.loadBlogEditor).toHaveBeenCalledWith('blog.hello');
+
+    component.rollbackBlogVersion(6);
+    expect(toast.error).toHaveBeenCalled();
+  });
+
+  it('covers flagged-comment moderation branches', () => {
+    const component = createAdminHarness() as any;
+    const { toast } = attachBlogHarness(component);
+    const blog = jasmine.createSpyObj('BlogService', [
+      'listFlaggedComments',
+      'resolveCommentFlagsAdmin',
+      'hideCommentAdmin',
+      'unhideCommentAdmin',
+      'deleteComment',
+    ]);
+    blog.listFlaggedComments.and.returnValues(
+      of({ items: [{ id: 'c1', is_hidden: false }] }),
+      throwError(() => ({ error: { detail: 'load-failed' } }))
+    );
+    blog.resolveCommentFlagsAdmin.and.returnValue(of({}));
+    blog.hideCommentAdmin.and.returnValues(of({}), throwError(() => ({ error: { detail: 'hide-failed' } })));
+    blog.unhideCommentAdmin.and.returnValue(of({}));
+    blog.deleteComment.and.returnValues(of({}), throwError(() => ({ error: { detail: 'delete-failed' } })));
+    component.blog = blog;
+
+    component.loadFlaggedComments();
+    expect(component.flaggedComments().length).toBe(1);
+
+    component.loadFlaggedComments();
+    expect(component.flaggedCommentsError).toContain('errors.load');
+
+    const comment = { id: 'c1', is_hidden: false } as any;
+    spyOn(globalThis, 'prompt').and.returnValues(null, '  reason  ', 'again');
+    spyOn(globalThis, 'confirm').and.returnValues(false, true, true);
+    spyOn(component, 'loadFlaggedComments').and.stub();
+
+    component.resolveFlags(comment);
+    expect(blog.resolveCommentFlagsAdmin).toHaveBeenCalledWith('c1');
+
+    component.toggleHide(comment);
+    expect(blog.hideCommentAdmin).not.toHaveBeenCalled();
+
+    component.toggleHide(comment);
+    expect(blog.hideCommentAdmin).toHaveBeenCalledWith('c1', { reason: 'reason' });
+
+    component.toggleHide(comment);
+    expect(toast.error).toHaveBeenCalled();
+
+    component.toggleHide({ id: 'c2', is_hidden: true } as any);
+    expect(blog.unhideCommentAdmin).toHaveBeenCalledWith('c2');
+
+    component.adminDeleteComment(comment);
+    expect(blog.deleteComment).not.toHaveBeenCalledWith('c1');
+
+    component.adminDeleteComment(comment);
+    expect(blog.deleteComment).toHaveBeenCalledWith('c1');
+
+    component.adminDeleteComment(comment);
+    expect(toast.error).toHaveBeenCalled();
+  });
+
+  it('covers blog image drag/drop and embed insertion branches', async () => {
+    const component = createAdminHarness() as any;
+    const { admin, toast } = attachBlogHarness(component);
+
+    const target = { insertMarkdown: jasmine.createSpy('insertMarkdown') } as any;
+    const image = new File(['img'], 'hero.png', { type: 'image/png' });
+    const dragEvent = {
+      dataTransfer: { types: ['Files'], files: [image], dropEffect: 'none' },
+      preventDefault: jasmine.createSpy('preventDefault'),
+      stopPropagation: jasmine.createSpy('stopPropagation'),
+    } as any;
+
+    component.selectedBlogKey = 'blog.hello';
+    component.blogImageLayout = 'full';
+    spyOn(globalThis, 'prompt').and.returnValue('hero-slug');
+    admin.uploadContentImage = jasmine
+      .createSpy('uploadContentImage')
+      .and.returnValues(
+        of({ images: [{ id: 'i1', url: 'https://cdn/img.jpg', sort_order: 1, focal_x: 50, focal_y: 50 }] }),
+        throwError(() => ({ error: { detail: 'upload-failed' } }))
+      );
+
+    component.insertBlogEmbed(target, 'product');
+    component.onBlogImageDragOver(dragEvent as DragEvent);
+    expect(dragEvent.preventDefault).toHaveBeenCalled();
+
+    await component.onBlogImageDrop(target, dragEvent as DragEvent);
+    expect(target.insertMarkdown).toHaveBeenCalled();
+
+    await component.onBlogImageDrop(target, dragEvent as DragEvent);
+    expect(toast.error).toHaveBeenCalled();
+  });
+
+  it('covers blog bulk payload and meta sync helper branches', () => {
+    const component = createAdminHarness() as any;
+
+    component.blogBulkAction = 'schedule';
+    component.blogBulkPublishAt = '2026-03-05T10:00';
+    component.blogBulkUnpublishAt = '2026-03-04T10:00';
+    expect(component['buildBlogBulkPayload']({ meta: {} })).toBeNull();
+
+    component.blogBulkUnpublishAt = '2026-03-06T10:00';
+    const scheduled = component['buildBlogBulkPayload']({ meta: {} });
+    expect((scheduled as any).status).toBe('published');
+
+    component.blogBulkAction = 'tags_add';
+    component.blogBulkTags = 'new, featured';
+    const tagged = component['buildBlogBulkPayload']({ meta: { tags: ['old'] } }) as any;
+    expect(tagged.meta.tags.length).toBe(3);
+
+    component.blogBulkAction = 'tags_remove';
+    component.blogBulkTags = 'old';
+    const removed = component['buildBlogBulkPayload']({ meta: { tags: ['old', 'fresh'] } }) as any;
+    expect(removed.meta.tags).toEqual(['fresh']);
+
+    component.blogMeta = {
+      summary: { en: 'Summary EN', ro: 'Rezumat RO' },
+      tags: ['tag1', 'tag2'],
+      series: 'Series',
+      cover_image_url: 'https://cdn/cover.jpg',
+      cover_fit: 'contain',
+      reading_time_minutes: 7,
+      pinned: true,
+      pin_order: 4,
+    };
+    component.blogForm = { summary: '', tags: '', series: '', cover_image_url: '', cover_fit: 'cover', reading_time_minutes: '', pinned: false, pin_order: '' };
+
+    component['syncBlogMetaToForm']('ro');
+    expect(component.blogForm.summary).toBe('Rezumat RO');
+
+    const meta = component.buildBlogMeta('en');
+    expect((meta as any).summary.en).toBeTruthy();
+    expect((meta as any).pin_order).toBeGreaterThan(0);
+  });
+});

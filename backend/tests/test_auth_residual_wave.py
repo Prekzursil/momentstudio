@@ -326,3 +326,88 @@ def test_google_complete_request_validators_cover_error_paths() -> None:
             accept_terms=True,
             accept_privacy=True,
         )
+
+@pytest.mark.anyio
+async def test_admin_ip_bypass_missing_secret_invalid_token_and_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    payload = auth_api.AdminIpBypassRequest(token='tok')
+    request = _request(user_agent='pytest-agent', client_host='10.0.0.5')
+    current_user = SimpleNamespace(id=uuid4())
+    session = SimpleNamespace()
+
+    monkeypatch.setattr(auth_api.settings, 'admin_ip_bypass_token', '', raising=False)
+    with pytest.raises(HTTPException, match='not configured'):
+        await auth_api.admin_ip_bypass(payload, request, session, current_user, SimpleNamespace())
+
+    monkeypatch.setattr(auth_api.settings, 'admin_ip_bypass_token', 'expected-token', raising=False)
+    with pytest.raises(HTTPException, match='Invalid bypass token'):
+        await auth_api.admin_ip_bypass(payload, request, session, current_user, SimpleNamespace())
+
+    events: list[tuple[str, str | None]] = []
+    monkeypatch.setattr(auth_api.security, 'create_admin_ip_bypass_token', lambda _uid: 'signed-bypass')
+
+    async def _record_event(_session, _uid, action, user_agent=None, ip_address=None):
+        events.append((action, ip_address))
+
+    monkeypatch.setattr(auth_api.auth_service, 'record_security_event', _record_event)
+    set_calls: list[str] = []
+    monkeypatch.setattr(auth_api, 'set_admin_ip_bypass_cookie', lambda _resp, token: set_calls.append(token))
+
+    await auth_api.admin_ip_bypass(
+        auth_api.AdminIpBypassRequest(token='expected-token'),
+        request,
+        session,
+        current_user,
+        SimpleNamespace(),
+    )
+
+    assert set_calls == ['signed-bypass']
+    assert events == [('admin_ip_bypass_used', '10.0.0.5')]
+
+
+@pytest.mark.anyio
+async def test_update_training_mode_role_guard_and_success() -> None:
+    class _Session:
+        def __init__(self):
+            self.added = []
+            self.commits = 0
+            self.refreshes = 0
+
+        def add(self, obj):
+            self.added.append(obj)
+
+        async def commit(self):
+            self.commits += 1
+
+        async def refresh(self, _obj):
+            self.refreshes += 1
+
+    payload = auth_api.TrainingModeUpdateRequest(enabled=True)
+    denied_user = SimpleNamespace(role=auth_api.UserRole.customer, admin_training_mode=False)
+    with pytest.raises(HTTPException, match='Staff access required'):
+        await auth_api.update_training_mode(payload, denied_user, _Session())
+
+    allowed_user = SimpleNamespace(
+        id=uuid4(),
+        role=auth_api.UserRole.admin,
+        admin_training_mode=False,
+        email='admin@example.test',
+        username='admin',
+        name='Admin User',
+        name_tag='001',
+        first_name='Admin',
+        middle_name=None,
+        last_name='User',
+        date_of_birth=None,
+        phone=None,
+        avatar_url=None,
+        preferred_language='en',
+        email_verified=True,
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+    session = _Session()
+    result = await auth_api.update_training_mode(payload, allowed_user, session)
+    assert allowed_user.admin_training_mode is True
+    assert session.commits == 1
+    assert session.refreshes == 1
+    assert result.email == 'admin@example.test'

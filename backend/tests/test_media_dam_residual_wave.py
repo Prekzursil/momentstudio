@@ -463,3 +463,174 @@ async def test_rollback_retry_policy_creates_row_and_returns_updated_read(monkey
     assert read.job_type == 'ingest'
     assert read.max_attempts == 3
     assert 'rollback' in events
+
+@pytest.mark.anyio('asyncio')
+async def test_process_edit_job_success_adds_variant(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    src = tmp_path / 'source.jpg'
+    Image.new('RGB', (160, 120), color='blue').save(src, format='JPEG')
+
+    asset = SimpleNamespace(
+        id=uuid4(),
+        asset_type=MediaAssetType.image,
+        public_url='/media/source.jpg',
+        status=MediaAssetStatus.approved,
+        visibility=MediaVisibility.public,
+    )
+    session = _SessionStub(scalar_values=[asset])
+    monkeypatch.setattr(media_dam, '_asset_file_path', lambda _asset: src)
+    monkeypatch.setattr(media_dam, '_storage_path_for_key', lambda _key, public_root: tmp_path / 'edited.jpg')
+    monkeypatch.setattr(media_dam, '_public_url_from_storage_key', lambda _key: '/media/edited.jpg')
+
+    job = SimpleNamespace(id=uuid4(), asset_id=asset.id, payload_json='{}')
+    await media_dam._process_edit_job(session, job)
+
+    variants = [row for row in session.added if isinstance(row, media_dam.MediaVariant)]
+    assert variants
+    assert variants[-1].public_url == '/media/edited.jpg'
+    assert variants[-1].width > 0
+    assert variants[-1].height > 0
+
+
+@pytest.mark.anyio('asyncio')
+async def test_duplicate_scan_and_usage_reconcile_progress(monkeypatch: pytest.MonkeyPatch) -> None:
+    primary = SimpleNamespace(id=uuid4(), checksum_sha256='abcdef0123456789abcdef0123456789')
+    dup_a = SimpleNamespace(id=uuid4(), checksum_sha256=primary.checksum_sha256)
+    dup_b = SimpleNamespace(id=uuid4(), checksum_sha256=primary.checksum_sha256)
+    duplicate_session = _SessionStub(scalar_values=[primary], execute_values=[[dup_a, dup_b]])
+
+    await media_dam._process_duplicate_scan_job(duplicate_session, SimpleNamespace(asset_id=primary.id))
+    expected_group = primary.checksum_sha256[:16]
+    assert primary.dedupe_group == expected_group
+    assert dup_a.dedupe_group == expected_group
+    assert dup_b.dedupe_group == expected_group
+
+    reconcile_assets = [SimpleNamespace(id=uuid4()), SimpleNamespace(id=uuid4())]
+    reconcile_session = _SessionStub(execute_values=[reconcile_assets])
+    calls: list[object] = []
+
+    async def _fake_rebuild(_session, asset, commit: bool):
+        assert commit is False
+        calls.append(asset.id)
+
+    monkeypatch.setattr(media_dam, 'rebuild_usage_edges', _fake_rebuild)
+    job = SimpleNamespace(payload_json='{"limit":2}', progress_pct=0)
+    await media_dam._process_usage_reconcile_job(reconcile_session, job)
+
+    assert len(calls) == 2
+    assert reconcile_session.flushes == 2
+    assert job.progress_pct == 100
+
+
+@pytest.mark.anyio('asyncio')
+async def test_bulk_retry_jobs_filters_records_and_refreshes(monkeypatch: pytest.MonkeyPatch) -> None:
+    retryable = SimpleNamespace(
+        id=uuid4(),
+        status=MediaJobStatus.failed,
+        progress_pct=99,
+        error_code='E',
+        error_message='x',
+        next_retry_at=datetime.now(timezone.utc),
+        started_at=datetime.now(timezone.utc),
+        completed_at=datetime.now(timezone.utc),
+        dead_lettered_at=datetime.now(timezone.utc),
+        triage_state='open',
+        attempt=1,
+        max_attempts=3,
+        tags=[],
+    )
+    skipped = SimpleNamespace(
+        id=uuid4(),
+        status=MediaJobStatus.completed,
+        progress_pct=100,
+        error_code=None,
+        error_message=None,
+        next_retry_at=None,
+        started_at=None,
+        completed_at=None,
+        dead_lettered_at=None,
+        triage_state='resolved',
+        attempt=1,
+        max_attempts=1,
+        tags=[],
+    )
+    session = _SessionStub(execute_values=[[retryable, skipped]])
+
+    async def _record(*_args, **_kwargs):
+        return None
+
+    queued: list[object] = []
+
+    async def _queue(job_id):
+        queued.append(job_id)
+
+    monkeypatch.setattr(media_dam, '_record_job_event', _record)
+    monkeypatch.setattr(media_dam, '_maybe_queue_job', _queue)
+    monkeypatch.setattr(media_dam, '_is_retryable_job', lambda job: job is retryable)
+
+    out = await media_dam.bulk_retry_jobs(session, job_ids=[retryable.id, skipped.id], actor_user_id=uuid4())
+
+    assert out == [retryable]
+    assert retryable.status == MediaJobStatus.queued
+    assert retryable.progress_pct == 0
+    assert retryable.error_code is None
+    assert retryable.error_message is None
+    assert retryable.triage_state == 'retrying'
+    assert session.commits == 1
+    assert queued == [retryable.id]
+
+
+@pytest.mark.anyio('asyncio')
+async def test_collection_upsert_and_public_asset_guard_paths() -> None:
+    owner_id = uuid4()
+    collection_id = uuid4()
+
+    create_session = _SessionStub(scalar_values=[None, 2])
+    created = await media_dam.upsert_collection(
+        create_session,
+        collection_id=collection_id,
+        payload=media_dam.MediaCollectionUpsertRequest(name='  Hero  ', slug=' Hero-Slug ', visibility='public'),
+        actor_id=owner_id,
+    )
+    assert created.slug == 'hero-slug'
+    assert created.visibility == 'public'
+    assert created.item_count == 2
+
+    existing = SimpleNamespace(
+        id=collection_id,
+        name='Old',
+        slug='old',
+        visibility=MediaVisibility.private,
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+    update_session = _SessionStub(scalar_values=[existing, 1])
+    updated = await media_dam.upsert_collection(
+        update_session,
+        collection_id=collection_id,
+        payload=media_dam.MediaCollectionUpsertRequest(name=' Updated ', slug=' Updated ', visibility='private'),
+        actor_id=owner_id,
+    )
+    assert updated.name == 'Updated'
+    assert updated.slug == 'updated'
+    assert updated.visibility == 'private'
+
+    class _EnsureSession:
+        def __init__(self, rows):
+            self._rows = list(rows)
+
+        async def scalar(self, _stmt):
+            return self._rows.pop(0) if self._rows else None
+
+    session = _EnsureSession([
+        None,
+        SimpleNamespace(id=uuid4(), visibility=MediaVisibility.private, status=MediaAssetStatus.approved),
+        SimpleNamespace(id=uuid4(), visibility=MediaVisibility.public, status=MediaAssetStatus.rejected),
+        SimpleNamespace(id=uuid4(), visibility=MediaVisibility.public, status=MediaAssetStatus.archived),
+    ])
+
+    assert await media_dam.ensure_public_asset(session, uuid4()) is None
+    assert await media_dam.ensure_public_asset(session, uuid4()) is None
+    assert await media_dam.ensure_public_asset(session, uuid4()) is None
+    ok = await media_dam.ensure_public_asset(session, uuid4())
+    assert ok is not None
+    assert ok.visibility == MediaVisibility.public
