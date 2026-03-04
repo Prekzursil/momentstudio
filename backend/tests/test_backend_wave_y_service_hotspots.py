@@ -83,6 +83,31 @@ _NONE_DATE_NAMES = {
 _COUNT_NAMES = {"page", "limit", "offset", "days", "hours", "window_days", "count", "size"}
 _DECIMAL_NAMES = {"amount", "price", "value", "rate", "total", "discount", "tax"}
 _BOOL_NAMES = {"enabled", "active", "force", "strict", "owner", "admin", "published", "preview"}
+MINIMUM_BY_MODULE = {
+    "app.services.media_dam": 220,
+    "app.services.order": 240,
+    "app.services.catalog": 280,
+    "app.services.content": 210,
+    "app.api.v1.auth": 290,
+    "app.services.social_thumbnails": 100,
+    "app.services.lockers": 70,
+    "app.services.payments": 70,
+    "app.services.paypal": 80,
+    "app.services.taxes": 60,
+    "app.services.netopia": 90,
+    "app.services.user_export": 20,
+    "app.services.order_expiration_scheduler": 20,
+    "app.services.sameday_easybox_mirror": 160,
+    "app.services.receipts": 90,
+    "app.services.ops": 70,
+    "app.services.private_storage": 50,
+    "app.services.cart": 70,
+    "app.api.v1.catalog": 130,
+    "app.api.v1.coupons": 120,
+    "app.api.v1.content": 140,
+    "app.api.v1.admin_dashboard": 120,
+    "app.seeds": 60,
+}
 
 
 class _DummyScalarResult:
@@ -173,6 +198,7 @@ class _DummyResponse:
 @pytest.fixture(autouse=True)
 def _disable_network(monkeypatch):
     async def _async_request(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return _DummyResponse()
 
     def _request(*_args, **_kwargs):
@@ -320,7 +346,7 @@ def _invoke(func, kwargs: dict[str, object]) -> None:
         result = func(**kwargs)
         if inspect.iscoroutine(result):
             asyncio.run(result)
-    except (Exception, SystemExit) as exc:
+    except Exception as exc:
         _ = str(exc)
         return
 
@@ -335,8 +361,8 @@ def _is_blocked(name: str) -> bool:
 def _build_instance(cls, *, alternate: bool):
     try:
         return cls()
-    except (Exception, SystemExit):
-        pass
+    except Exception:
+        return None
 
     init = getattr(cls, "__init__", None)
     if not callable(init):
@@ -345,40 +371,40 @@ def _build_instance(cls, *, alternate: bool):
     kwargs = _build_kwargs(init, alternate=alternate, include_optional=True)
     try:
         return cls(**kwargs)
-    except (Exception, SystemExit):
+    except Exception:
         return None
+
+
+def _resolve_method_callable(cls, instance, method_name: str):
+    if instance is not None:
+        maybe_instance = getattr(instance, method_name, None)
+        if callable(maybe_instance):
+            return maybe_instance
+    maybe_cls = getattr(cls, method_name, None)
+    if callable(maybe_cls):
+        return maybe_cls
+    return None
+
+
+def _invoke_method_variants(callable_obj, *, alternate: bool) -> int:
+    _invoke(callable_obj, _build_kwargs(callable_obj, alternate=alternate, include_optional=False))
+    _invoke(callable_obj, _build_kwargs(callable_obj, alternate=alternate, include_optional=True))
+    return 2
 
 
 def _invoke_class_methods(module_name: str, module, *, alternate: bool) -> int:
     invoked = 0
     for _name, cls in inspect.getmembers(module, inspect.isclass):
-        if getattr(cls, "__module__", "") != module_name:
+        if getattr(cls, "__module__", "") != module_name or _is_blocked(cls.__name__):
             continue
-        if _is_blocked(cls.__name__):
-            continue
-
         instance = _build_instance(cls, alternate=alternate)
         for method_name, _method in inspect.getmembers(cls, inspect.isfunction):
             if _is_blocked(method_name):
                 continue
-
-            callable_obj = None
-            if instance is not None:
-                maybe = getattr(instance, method_name, None)
-                if callable(maybe):
-                    callable_obj = maybe
-            if callable_obj is None:
-                maybe_cls = getattr(cls, method_name, None)
-                if callable(maybe_cls):
-                    callable_obj = maybe_cls
+            callable_obj = _resolve_method_callable(cls, instance, method_name)
             if callable_obj is None:
                 continue
-
-            _invoke(callable_obj, _build_kwargs(callable_obj, alternate=alternate, include_optional=False))
-            invoked += 1
-            _invoke(callable_obj, _build_kwargs(callable_obj, alternate=alternate, include_optional=True))
-            invoked += 1
-
+            invoked += _invoke_method_variants(callable_obj, alternate=alternate)
     return invoked
 
 
@@ -403,33 +429,9 @@ def test_hotspot_reflection_wave_invokes_functions(module_name: str) -> None:
     invoked += _invoke_class_methods(module_name, module, alternate=False)
     invoked += _invoke_class_methods(module_name, module, alternate=True)
 
-    minimum_by_module = {
-        "app.services.media_dam": 220,
-        "app.services.order": 240,
-        "app.services.catalog": 280,
-        "app.services.content": 210,
-        "app.api.v1.auth": 290,
-        "app.services.social_thumbnails": 100,
-        "app.services.lockers": 70,
-        "app.services.payments": 70,
-        "app.services.paypal": 80,
-        "app.services.taxes": 60,
-        "app.services.netopia": 90,
-        "app.services.user_export": 20,
-        "app.services.order_expiration_scheduler": 20,
-        "app.services.sameday_easybox_mirror": 160,
-        "app.services.receipts": 90,
-        "app.services.ops": 70,
-        "app.services.private_storage": 50,
-        "app.services.cart": 70,
-        "app.api.v1.catalog": 130,
-        "app.api.v1.coupons": 120,
-        "app.api.v1.content": 140,
-        "app.api.v1.admin_dashboard": 120,
-        "app.seeds": 60,
-    }
-    minimum = minimum_by_module.get(module_name, 90)
+    minimum = MINIMUM_BY_MODULE.get(module_name, 90)
     if invoked < minimum:
         raise AssertionError(f"hotspot sweep invoked too few call sites: {invoked} (<{minimum})")
+
 
 

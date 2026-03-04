@@ -2,11 +2,11 @@ import { of, throwError } from 'rxjs';
 
 import { CmsProductGridBlockComponent } from './cms-product-grid-block.component';
 
-describe('CmsProductGridBlockComponent', () => {
-  function createCatalogSpy() {
-    return jasmine.createSpyObj('CatalogService', ['listProducts', 'listFeaturedCollections', 'getProduct']);
-  }
+function createCatalogSpy() {
+  return jasmine.createSpyObj('CatalogService', ['listProducts', 'listFeaturedCollections', 'getProduct']);
+}
 
+describe('CmsProductGridBlockComponent', () => {
   it('loads category products and updates state', () => {
     const catalog = createCatalogSpy();
     const product = { id: 'p1', slug: 'ring' } as any;
@@ -49,7 +49,9 @@ describe('CmsProductGridBlockComponent', () => {
     const p1 = { id: 'p1', slug: 'ring' } as any;
     const p2 = { id: 'p2', slug: 'chain' } as any;
     catalog.getProduct.and.callFake((slug: string) => {
-      if (slug === 'missing') return throwError(() => ({ status: 404 }));
+      if (slug === 'missing') {
+        return throwError(() => ({ status: 404 }));
+      }
       return of(slug === 'ring' ? p1 : p2);
     });
     catalog.listProducts.and.returnValue(throwError(() => ({ status: 500 })));

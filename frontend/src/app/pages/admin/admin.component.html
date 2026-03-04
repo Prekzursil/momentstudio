@@ -4880,13 +4880,13 @@
             </div>
             <div class="grid md:grid-cols-[1.5fr_1fr] gap-4">
               <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
-                <div *ngFor="let order of filteredOrders()" class="rounded-lg border border-slate-200 p-3 cursor-pointer dark:border-slate-700" role="button" tabindex="0" (click)="selectOrder(order)" (keydown.enter)="selectOrder(order)" (keydown.space)="selectOrder(order); $event.preventDefault()">
+                <button type="button" *ngFor="let order of filteredOrders()" class="w-full rounded-lg border border-slate-200 p-3 text-left cursor-pointer dark:border-slate-700" (click)="selectOrder(order)">
                   <div class="flex items-center justify-between">
                     <span class="font-semibold text-slate-900 dark:text-slate-50">Order #{{ order.id }}</span>
                     <span class="text-xs rounded-full bg-slate-100 px-2 py-1 dark:bg-slate-800">{{ order.status }}</span>
                   </div>
                   <p>{{ order.customer }} — {{ order.total_amount | localizedCurrency : order.currency || 'RON' }}</p>
-                </div>
+                </button>
               </div>
               <div class="rounded-lg border border-slate-200 p-4 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200" *ngIf="activeOrder">
                 <div class="flex items-center justify-between">
@@ -6525,3 +6525,4 @@
 	        </ng-template>
 	      </div>
 	  
+

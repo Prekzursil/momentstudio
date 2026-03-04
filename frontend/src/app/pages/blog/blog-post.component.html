@@ -184,7 +184,7 @@
       <div *ngIf="!loadingPost() && !hasPostError() && post()">
         <div class="grid gap-6 lg:grid-cols-[1fr_260px] lg:items-start">
           <app-card>
-            <div #articleContent class="grid gap-6" tabindex="0" (click)="handleArticleClick($event)" (keydown.enter)="handleArticleClick($event)" (keydown.space)="handleArticleClick($event); $event.preventDefault()">
+            <div #articleContent class="grid gap-6" (click)="handleArticleClick($event)">
               <img
                 *ngIf="post()!.cover_image_url"
                 [src]="post()!.cover_image_url"
@@ -685,7 +685,7 @@
       (keydown.escape)="closeLightbox()"
       aria-modal="true"
     >
-      <div class="relative w-full max-w-5xl" tabindex="0" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()" (keydown.space)="$event.stopPropagation(); $event.preventDefault()">
+      <div class="relative w-full max-w-5xl" (click)="$event.stopPropagation()">
         <button
           type="button"
           class="absolute -top-3 -right-3 h-10 w-10 rounded-full bg-white text-slate-900 shadow-soft hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-50 dark:hover:bg-slate-800"

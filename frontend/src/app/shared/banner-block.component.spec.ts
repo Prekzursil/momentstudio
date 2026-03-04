@@ -1,26 +1,26 @@
 import { BannerBlockComponent } from './banner-block.component';
 
-describe('BannerBlockComponent', () => {
-  function createComponent(): BannerBlockComponent {
-    const component = new BannerBlockComponent();
-    component.slide = {
-      variant: 'full',
-      headline: 'Headline',
-      subheadline: 'Sub',
-      cta_label: 'Explore',
-      cta_url: '/shop',
-      image_url: 'assets/home/banner_image.jpeg',
-      alt: 'Banner',
-      text_style: 'light',
-      size: 'M',
-      focal_x: 50,
-      focal_y: 50,
-    } as any;
-    return component;
-  }
+function createBannerComponent(): BannerBlockComponent {
+  const component = new BannerBlockComponent();
+  component.slide = {
+    variant: 'full',
+    headline: 'Headline',
+    subheadline: 'Sub',
+    cta_label: 'Explore',
+    cta_url: '/shop',
+    image_url: 'assets/home/banner_image.jpeg',
+    alt: 'Banner',
+    text_style: 'light',
+    size: 'M',
+    focal_x: 50,
+    focal_y: 50,
+  } as any;
+  return component;
+}
 
+describe('BannerBlockComponent', () => {
   it('detects internal urls and trims image url values', () => {
-    const component = createComponent();
+    const component = createBannerComponent();
 
     expect(component.isInternalUrl('/shop')).toBeTrue();
     expect(component.isInternalUrl(' /shop ')).toBeTrue();
@@ -30,7 +30,7 @@ describe('BannerBlockComponent', () => {
   });
 
   it('builds optimized srcsets only for optimized banner asset names', () => {
-    const component = createComponent();
+    const component = createBannerComponent();
 
     expect(component.useOptimizedAsset()).toBeTrue();
     expect(component.optimizedSrcset('avif')).toContain('banner_image-640.avif 640w');
@@ -43,7 +43,7 @@ describe('BannerBlockComponent', () => {
   });
 
   it('computes layout, focal and text style classes for all size tokens', () => {
-    const component = createComponent();
+    const component = createBannerComponent();
 
     component.slide.size = 'S';
     expect(component.imageClass()).toContain('aspect-[16/8]');

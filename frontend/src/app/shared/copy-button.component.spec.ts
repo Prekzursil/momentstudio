@@ -1,13 +1,13 @@
 import { CopyButtonComponent } from './copy-button.component';
 
-describe('CopyButtonComponent', () => {
-  function setClipboard(value: any): void {
-    Object.defineProperty(navigator, 'clipboard', {
-      value,
-      configurable: true,
-    });
-  }
+function setClipboard(value: any): void {
+  Object.defineProperty(navigator, 'clipboard', {
+    value,
+    configurable: true,
+  });
+}
 
+describe('CopyButtonComponent', () => {
   beforeEach(() => {
     jasmine.clock().install();
   });
