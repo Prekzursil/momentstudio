@@ -28,7 +28,9 @@ function createAdminSpy(): jasmine.SpyObj<any> {
     'getContent',
     'listContentPages',
     'updateContentBlock',
-    'createContent'
+    'createContent',
+    'uploadContentImage',
+    'updateContentImageFocalPoint'
   ]);
 }
 
@@ -44,6 +46,8 @@ function createHarness(): { component: AdminComponent; admin: jasmine.SpyObj<any
   admin.listContentPages.and.returnValue(of([]));
   admin.updateContentBlock.and.returnValue(of({ version: 2, needs_translation_en: false, needs_translation_ro: false }));
   admin.createContent.and.returnValue(of({ version: 3, needs_translation_en: false, needs_translation_ro: false }));
+  admin.uploadContentImage.and.returnValue(of({ images: [{ id: 'img-1', url: 'https://cdn.test/1.jpg', sort_order: 0, focal_x: 50, focal_y: 50 }] }));
+  admin.updateContentImageFocalPoint.and.returnValue(of({ focal_x: 20, focal_y: 80 }));
 
   const toast = jasmine.createSpyObj('ToastService', ['success', 'error', 'info']);
 
@@ -79,6 +83,16 @@ function createHarness(): { component: AdminComponent; admin: jasmine.SpyObj<any
 }
 
 const GLOBAL_CTX = globalThis as Window & typeof globalThis;
+
+function dragEventWithFiles(files: File[]): DragEvent {
+  const event = new DragEvent('drop');
+  const dt = {
+    files,
+    types: ['Files']
+  } as unknown as DataTransfer;
+  Object.defineProperty(event, 'dataTransfer', { value: dt, configurable: true });
+  return event;
+}
 
 describe('AdminComponent coverage wave 8 branch matrix', () => {
   it('covers additional revision key and viewport-width switch branches', () => {
@@ -275,6 +289,132 @@ describe('AdminComponent coverage wave 8 branch matrix', () => {
         lang: 'en'
       })
     );
+  });
+
+
+  it('covers starter template defaults and custom-page creation branches', () => {
+    const { component, admin, toast } = createHarness();
+
+    const starterText: any = { key: 'b1', type: 'text', enabled: true };
+    const starterFaq: any = { key: 'b2', type: 'faq', enabled: true };
+    (component as any).applyStarterTemplateToCustomBlock('text', starterText);
+    (component as any).applyStarterTemplateToCustomBlock('faq', starterFaq);
+    expect(starterText.title.en).toContain('Section');
+    expect(starterFaq.faq_items.length).toBeGreaterThan(0);
+
+    component.newCustomPageTitle = 'Checkout';
+    component.createCustomPage();
+    expect(toast.error).toHaveBeenCalled();
+
+    component.newCustomPageTitle = 'Coverage Page';
+    component.newCustomPageTemplate = 'starter' as any;
+    component.newCustomPageStatus = 'published';
+    component.newCustomPagePublishedAt = '2026-03-04T09:00';
+    component.newCustomPagePublishedUntil = '2026-03-05T09:00';
+    component.contentPages = [{ slug: 'coverage-page' }] as any;
+    component.createCustomPage();
+    expect(admin.createContent).toHaveBeenCalledWith('page.coverage-page-2', jasmine.any(Object));
+  });
+
+  it('covers page drag-drop reorder/payload/media branches', () => {
+    const { component } = createHarness();
+    const safeKey = 'page.about';
+    component.pageBlocks[safeKey as any] = [
+      { key: 'a', type: 'text', enabled: true } as any,
+      { key: 'b', type: 'text', enabled: true } as any
+    ];
+    component.draggingPageBlocksKey = safeKey as any;
+    component.draggingPageBlockKey = 'a';
+    const dragEndSpy = spyOn(component, 'onPageBlockDragEnd').and.callThrough();
+    const insertSpy = spyOn(component as any, 'insertPageBlockAt').and.stub();
+    const mediaSpy = spyOn(component as any, 'insertPageMediaFiles').and.returnValue(Promise.resolve());
+    const payloadSpy = spyOn(component as any, 'readCmsBlockPayload').and.returnValues(
+      null,
+      { scope: 'page', type: 'text', template: 'blank' }
+    );
+
+    component.onPageBlockDropZone(new DragEvent('drop'), safeKey as any, 1);
+    expect(dragEndSpy).toHaveBeenCalled();
+
+    component.onPageBlockDrop(new DragEvent('drop'), safeKey as any, 'b');
+    expect(payloadSpy).toHaveBeenCalled();
+
+    const image = new File(['x'], 'cover.jpg', { type: 'image/jpeg' });
+    component.onPageBlockDrop(dragEventWithFiles([image]), safeKey as any, 'b');
+    expect(mediaSpy).toHaveBeenCalled();
+    expect(insertSpy).toHaveBeenCalledTimes(0);
+  });
+
+  it('covers savePageBlocks checklist, update, and 404-create fallback', () => {
+    const { component, admin } = createHarness();
+    const key = 'page.about';
+    const openChecklistSpy = spyOn(component as any, 'openPagePublishChecklist').and.stub();
+    const conflictSpy = spyOn(component as any, 'handleContentConflict').and.returnValue(false);
+    spyOn(component as any, 'ensurePageDraft').and.returnValue({ markServerSaved: () => undefined, initFromServer: () => undefined });
+    spyOn(component as any, 'buildPageBlocksMeta').and.returnValue({ blocks: [] });
+    spyOn(component, 'loadPageBlocks').and.stub();
+
+    component.pageBlocksStatus[key as any] = 'published';
+    component.savePageBlocks(key as any);
+    expect(openChecklistSpy).toHaveBeenCalledWith(key);
+
+    component.savePageBlocks(key as any, { bypassChecklist: true });
+    expect(admin.updateContentBlock).toHaveBeenCalled();
+
+    admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 404 })));
+    component.savePageBlocks(key as any, { bypassChecklist: true });
+    expect(admin.createContent).toHaveBeenCalled();
+    expect(conflictSpy).toHaveBeenCalled();
+  });
+
+  it('covers blog image upload/drop helpers and focal-point edit branches', async () => {
+    const { component, admin, toast } = createHarness();
+    const area = document.createElement('textarea');
+    component.selectedBlogKey = 'blog.coverage';
+    component.blogForm = { body_markdown: '' } as any;
+    component.blogImageLayout = 'wide';
+
+    const file = new File(['abc'], 'photo.jpg', { type: 'image/jpeg' });
+    const input = document.createElement('input');
+    Object.defineProperty(input, 'files', { value: [file], configurable: true });
+    component.uploadAndInsertBlogImage(area, { target: input } as any);
+    expect(admin.uploadContentImage).toHaveBeenCalled();
+
+    await component.onBlogImageDrop(area, dragEventWithFiles([file]));
+    expect(component.blogImages.length).toBeGreaterThan(0);
+    expect(toast.success).toHaveBeenCalled();
+
+    component.blogEditLang = 'en';
+    component.blogBaseLang = 'en';
+    component.blogImages = [{ id: 'img-1', url: 'https://cdn.test/1.jpg', focal_x: 50, focal_y: 50 }] as any;
+    spyOn(component, 'blogCoverPreviewAsset').and.returnValue(component.blogImages[0]);
+    spyOn(globalThis, 'prompt').and.returnValues('bad', '20,80');
+    component.editBlogCoverFocalPoint();
+    component.editBlogCoverFocalPoint();
+    expect(admin.updateContentImageFocalPoint).toHaveBeenCalledWith('img-1', 20, 80);
+  });
+
+  it('covers saveBlogPost base-lang and translation branches', () => {
+    const { component, admin } = createHarness();
+    component.selectedBlogKey = 'blog.sample';
+    component.blogBaseLang = 'en';
+    component.blogEditLang = 'en';
+    component.blogForm = { title: 'New title', body_markdown: 'Body', status: 'draft', published_at: '', published_until: '' } as any;
+    component.blogMeta = {};
+    spyOn(component as any, 'buildBlogMeta').and.returnValue({});
+    spyOn(component as any, 'blogA11yIssues').and.returnValue([]);
+    spyOn(component as any, 'reloadContentBlocks').and.stub();
+    spyOn(component as any, 'loadBlogEditor').and.stub();
+    spyOn(component as any, 'ensureBlogDraft').and.returnValue({ markServerSaved: () => undefined, initFromServer: () => undefined });
+    spyOn(component as any, 'currentBlogDraftState').and.returnValue({});
+    spyOn(component as any, 'handleContentConflict').and.returnValue(false);
+
+    component.saveBlogPost();
+    expect(admin.updateContentBlock).toHaveBeenCalled();
+
+    component.blogEditLang = 'ro';
+    component.saveBlogPost();
+    expect(admin.updateContentBlock.calls.count()).toBeGreaterThan(1);
   });
 
 });

@@ -995,7 +995,7 @@ async def test_admin_dashboard_funnel_channel_and_payment_query_helpers(monkeypa
         col=admin_dashboard.Order.payment_method,
     )
     assert channel_items[0]['key'] == 'stripe'
-    assert channel_items[1]['net_sales'] == pytest.approx(25.0)
+    assert math.isclose(float(channel_items[1]['net_sales']), 25.0, rel_tol=1e-9, abs_tol=1e-9)
 
     payments_session = _ExecuteQueueSession([_RowsResult([('stripe', 4), (None, 1)])])
     payments_counts = await admin_dashboard._payments_method_counts(
@@ -1166,7 +1166,7 @@ async def test_admin_dashboard_refunds_shipping_and_stockout_paths(monkeypatch: 
         exclude_test_orders=True,
     )
     assert next(iter(demand.values())) == (3, 45.0)
-    assert admin_dashboard._stockout_avg_price(0, 0.0, 12.5) == pytest.approx(12.5)
+    assert math.isclose(admin_dashboard._stockout_avg_price(0, 0.0, 12.5), 12.5, rel_tol=1e-9, abs_tol=1e-9)
 
     async def _empty_restock(*_args, **_kwargs):
         await asyncio.sleep(0)
@@ -1702,7 +1702,7 @@ def test_admin_dashboard_channel_and_payment_helpers() -> None:
     assert any(item['key'] == 'unknown' for item in channel_items)
 
     assert admin_dashboard._payments_success_rate(0, 0) is None
-    assert admin_dashboard._payments_success_rate(8, 2) == pytest.approx(0.8)
+    assert math.isclose(admin_dashboard._payments_success_rate(8, 2) or 0.0, 0.8, rel_tol=1e-9, abs_tol=1e-9)
 
     stripe_row = SimpleNamespace(
         stripe_event_id='evt_stripe',
@@ -1743,14 +1743,14 @@ def test_admin_dashboard_payment_provider_row_helpers() -> None:
 
 def test_admin_dashboard_refund_reason_and_breakdown_helpers() -> None:
     assert admin_dashboard._refund_delta_pct(10.0, 0.0) is None
-    assert admin_dashboard._refund_delta_pct(10.0, 5.0) == pytest.approx(100.0)
+    assert math.isclose(admin_dashboard._refund_delta_pct(10.0, 5.0) or 0.0, 100.0, rel_tol=1e-9, abs_tol=1e-9)
 
     providers = admin_dashboard._refund_provider_payload(
         [('stripe', 4, 120.0), ('paypal', 1, 20.0)],
         [('stripe', 2, 80.0)],
     )
     assert providers[0]['provider'] == 'stripe'
-    assert providers[0]['delta_pct']['count'] == pytest.approx(100.0)
+    assert math.isclose(float(providers[0]['delta_pct']['count']), 100.0, rel_tol=1e-9, abs_tol=1e-9)
 
     assert admin_dashboard._normalize_refund_reason_text('  Ștricat produs ') == 'stricat produs'
     assert admin_dashboard._refund_reason_category('Wrong item received') == 'wrong_item'
@@ -1778,9 +1778,9 @@ def test_admin_dashboard_refund_reason_and_breakdown_helpers() -> None:
 
 def test_admin_dashboard_shipping_stockout_and_channel_response_helpers() -> None:
     ship_delta = admin_dashboard._shipping_delta_pct(12.0, 6.0)
-    assert ship_delta == pytest.approx(100.0)
+    assert math.isclose(ship_delta or 0.0, 100.0, rel_tol=1e-9, abs_tol=1e-9)
     assert admin_dashboard._shipping_delta_pct(None, 6.0) is None
-    assert admin_dashboard._shipping_avg([2.0, 4.0, 6.0]) == pytest.approx(4.0)
+    assert math.isclose(admin_dashboard._shipping_avg([2.0, 4.0, 6.0]) or 0.0, 4.0, rel_tol=1e-9, abs_tol=1e-9)
 
     duration_rows = [
         ('sameday', datetime(2026, 3, 1, tzinfo=timezone.utc), datetime(2026, 3, 1, 3, tzinfo=timezone.utc)),
@@ -1805,7 +1805,7 @@ def test_admin_dashboard_shipping_stockout_and_channel_response_helpers() -> Non
     demand_map = {stock_row.product_id: (4, 80.0)}
     product_map = {stock_row.product_id: {'base_price': 20.0, 'sale_price': None, 'currency': 'RON', 'allow_backorder': False}}
     stock_item = admin_dashboard._stockout_item(stock_row, demand_map=demand_map, product_map=product_map)
-    assert stock_item['estimated_missed_revenue'] == pytest.approx(40.0)
+    assert math.isclose(float(stock_item['estimated_missed_revenue']), 40.0, rel_tol=1e-9, abs_tol=1e-9)
 
     stock_items = admin_dashboard._stockout_items([stock_row], demand_map=demand_map, product_map=product_map)
     assert len(stock_items) == 1

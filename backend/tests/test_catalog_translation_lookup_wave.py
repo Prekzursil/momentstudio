@@ -206,7 +206,10 @@ async def test_catalog_product_image_translation_crud_branches(monkeypatch: pyte
 def test_catalog_image_optimization_error_mapping(monkeypatch: pytest.MonkeyPatch) -> None:
     image = SimpleNamespace(url='/media/test.jpg')
 
-    monkeypatch.setattr(catalog_service, 'get_media_image_stats', lambda _url: {'width': 100, 'height': 50})
+    def _stats_ok(_url):
+        return {'width': 100, 'height': 50}
+
+    monkeypatch.setattr(catalog_service, 'get_media_image_stats', _stats_ok)
     stats = catalog_service.get_product_image_optimization_stats(image)
     assert stats['width'] == 100
 
@@ -228,7 +231,10 @@ def test_catalog_image_optimization_error_mapping(monkeypatch: pytest.MonkeyPatc
 def test_catalog_thumbnail_reprocess_error_mapping(monkeypatch: pytest.MonkeyPatch) -> None:
     image = SimpleNamespace(url='/media/test.jpg')
 
-    monkeypatch.setattr(catalog_service, 'regenerate_media_thumbnails', lambda _url: {'generated': 3})
+    def _thumbs_ok(_url):
+        return {'generated': 3}
+
+    monkeypatch.setattr(catalog_service, 'regenerate_media_thumbnails', _thumbs_ok)
     result = catalog_service.reprocess_product_image_thumbnails(image)
     assert result['generated'] == 3
 

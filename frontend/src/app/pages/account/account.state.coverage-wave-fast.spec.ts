@@ -83,10 +83,31 @@ const ACCOUNT_SWEEP_BLOCKED = new Set<string>([
   'clearInterval',
 ]);
 
-const ACCOUNT_SWEEP_RISKY_PATTERNS: RegExp[] = [
-  /(poll|timer|interval|timeout|avatar|clipboard|revoke|confirm|passkey|twofactor|session|secondary|google)/i,
-  /(download|export|receipt|share|cancel|return|remove|delete|reorder|signout)/i,
-];
+const ACCOUNT_SWEEP_RISKY_TOKENS = [
+  'poll',
+  'timer',
+  'interval',
+  'timeout',
+  'avatar',
+  'clipboard',
+  'revoke',
+  'confirm',
+  'passkey',
+  'twofactor',
+  'session',
+  'secondary',
+  'google',
+  'download',
+  'export',
+  'receipt',
+  'share',
+  'cancel',
+  'return',
+  'remove',
+  'delete',
+  'reorder',
+  'signout',
+] as const;
 
 const ACCOUNT_SWEEP_ARGS_BY_NAME: Record<string, unknown[]> = {
   navigateToSection: ['overview'],
@@ -133,12 +154,13 @@ function installAccountSweepStubs(state: any): void {
   state.wishlist = { ensureLoaded: jasmine.createSpy('ensureLoaded'), clear: jasmine.createSpy('clear') };
   const dynamicService = (target: Record<string, any>) => new Proxy(target, {
     get(obj, prop, receiver) {
-      if (typeof prop !== 'string') return Reflect.get(obj, prop, receiver);
-      const existing = Reflect.get(obj, prop, receiver);
+      if (Object.prototype.toString.call(prop) !== '[object String]') return Reflect.get(obj, prop, receiver);
+      const key = String(prop);
+      const existing = Reflect.get(obj, key, receiver);
       if (existing !== undefined) return existing;
-      const spy = jasmine.createSpy(prop).and.returnValue(of({}));
-      if (prop.startsWith('list') || prop.startsWith('get')) spy.and.returnValue(of([]));
-      obj[prop] = spy;
+      const spy = jasmine.createSpy(key).and.returnValue(of({}));
+      if (key.startsWith('list') || key.startsWith('get')) spy.and.returnValue(of([]));
+      obj[key] = spy;
       return spy;
     },
   });
@@ -149,12 +171,21 @@ function installAccountSweepStubs(state: any): void {
 function prepareAccountSweepArgs(name: string, arity: number): unknown[] {
   const base = [...(ACCOUNT_SWEEP_ARGS_BY_NAME[name] ?? [])];
   if (base.length >= arity) return base;
-  return [...base, ...new Array(arity - base.length).fill(undefined)];
+  return [...base, ...Array.from({ length: arity - base.length }, () => undefined)];
+}
+
+function isSweepCallable(value: unknown): value is (...values: unknown[]) => unknown {
+  return Object.prototype.toString.call(value) === '[object Function]';
+}
+
+function isAccountRiskyMethod(name: string): boolean {
+  const lowered = name.toLowerCase();
+  return ACCOUNT_SWEEP_RISKY_TOKENS.some((token) => lowered.includes(token));
 }
 
 async function invokeAccountSweepMethod(state: any, name: string): Promise<void> {
   const fn = state[name] as ((...values: unknown[]) => unknown) | undefined;
-  if (typeof fn !== 'function') return;
+  if (!isSweepCallable(fn)) return;
   const args = prepareAccountSweepArgs(name, fn.length);
   try {
     await Promise.resolve(fn.apply(state, args));
@@ -167,8 +198,8 @@ async function runAccountMethodSweep(state: any): Promise<number> {
   const methods = Object.getOwnPropertyNames(AccountState.prototype).filter(
     (name) =>
       !ACCOUNT_SWEEP_BLOCKED.has(name) &&
-      !ACCOUNT_SWEEP_RISKY_PATTERNS.some((pattern) => pattern.test(name)) &&
-      typeof state[name] === 'function',
+      !isAccountRiskyMethod(name) &&
+      isSweepCallable(state[name]),
   );
 
   for (const name of methods) {

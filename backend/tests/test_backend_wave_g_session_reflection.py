@@ -75,9 +75,10 @@ class _DummySession:
         await asyncio.sleep(0)
         return None
 
-    async def get(self, *_args, **_kwargs):
+    async def get(self, *_args, **kwargs):
         await asyncio.sleep(0)
-        return SimpleNamespace(id='row-1')
+        entity_id = kwargs.get('id', 'row-1')
+        return SimpleNamespace(id=entity_id, loaded=True)
 
     async def commit(self):
         await asyncio.sleep(0)
@@ -217,27 +218,28 @@ def _invoke(func, kwargs):
         return
 
 
-@pytest.mark.parametrize('module_name', MODULES)
-def test_backend_session_reflection_wave(module_name: str) -> None:
-    module = importlib.import_module(module_name)
-
-    invoked = 0
+def _iter_reflectable_functions(module, module_name: str):
     for name, func in inspect.getmembers(module, inspect.isfunction):
         if func.__module__ != module_name:
             continue
         if _is_blocked(name):
             continue
+        yield func
 
-        kwargs = _build_kwargs(func, alternate=False)
-        _invoke(func, kwargs)
-        invoked += 1
 
-        kwargs_alt = _build_kwargs(func, alternate=True)
-        _invoke(func, kwargs_alt)
-        invoked += 1
+def _invoke_variants(func) -> int:
+    _invoke(func, _build_kwargs(func, alternate=False))
+    _invoke(func, _build_kwargs(func, alternate=True))
+    _invoke(func, _build_kwargs(func, alternate=True, include_optional=True))
+    return 3
 
-        kwargs_optional = _build_kwargs(func, alternate=True, include_optional=True)
-        _invoke(func, kwargs_optional)
-        invoked += 1
+
+@pytest.mark.parametrize('module_name', MODULES)
+def test_backend_session_reflection_wave(module_name: str) -> None:
+    module = importlib.import_module(module_name)
+
+    invoked = 0
+    for func in _iter_reflectable_functions(module, module_name):
+        invoked += _invoke_variants(func)
 
     assert invoked >= 60

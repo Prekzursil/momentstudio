@@ -63,20 +63,25 @@ function seedAdminSpyDefaults(admin: jasmine.SpyObj<any>): void {
 function withAdminFallback(admin: jasmine.SpyObj<any>): Record<string, any> {
   return new Proxy(admin as Record<string, any>, {
     get(target, prop, receiver) {
-      if (typeof prop !== 'string') return Reflect.get(target, prop, receiver);
-      const existing = Reflect.get(target, prop, receiver);
+      if (Object.prototype.toString.call(prop) !== '[object String]') return Reflect.get(target, prop, receiver);
+      const key = String(prop);
+      const existing = Reflect.get(target, key, receiver);
       if (existing !== undefined) return existing;
-      const dynamicSpy = jasmine.createSpy(prop);
-      const lower = prop.toLowerCase();
+      const dynamicSpy = jasmine.createSpy(key);
+      const lower = key.toLowerCase();
       if (lower.startsWith('list') || lower.startsWith('get') || lower.endsWith('history')) {
         dynamicSpy.and.returnValue(of([]));
       } else {
         dynamicSpy.and.returnValue(of({}));
       }
-      (target as any)[prop] = dynamicSpy;
+      (target as any)[key] = dynamicSpy;
       return dynamicSpy;
     }
   });
+}
+
+function isCallableMethod(value: unknown): value is (...args: unknown[]) => unknown {
+  return Object.prototype.toString.call(value) === '[object Function]';
 }
 
 function createAdminHarness(): {
@@ -153,7 +158,7 @@ const ADMIN_SWEEP_ARGS_BY_NAME: Record<string, unknown[]> = {
 
 async function callAdminMethodSafely(component: any, name: string, args: unknown[]): Promise<void> {
   const method = component?.[name] as ((...values: unknown[]) => unknown) | undefined;
-  if (typeof method !== 'function') return;
+  if (!isCallableMethod(method)) return;
   const preparedArgs = [...args];
   while (preparedArgs.length < method.length) {
     preparedArgs.push(() => void 0);
@@ -672,7 +677,7 @@ describe("AdminComponent coverage wave 7 permissive sweep", () => {
 
     const localBlocked = new Set(["constructor", "ngOnInit", "ngOnDestroy"]);
     const methods = Object.getOwnPropertyNames(AdminComponent.prototype).filter(
-      (name) => !localBlocked.has(name) && typeof (component as any)[name] === "function"
+      (name) => !localBlocked.has(name) && isCallableMethod((component as unknown as Record<string, unknown>)[name])
     );
 
     let attempted = 0;

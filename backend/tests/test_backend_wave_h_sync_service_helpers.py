@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from types import SimpleNamespace
 from uuid import uuid4
+from typing import cast
 
 import pytest
 
@@ -139,15 +140,21 @@ _EXACT_NAME_FACTORIES: tuple[tuple[set[str], Callable[[bool], object]], ...] = (
 )
 
 
-def _name_value(name: str, *, alternate: bool):
-    lowered = name.lower()
-
+def _direct_name_value(lowered: str, *, alternate: bool):
     if lowered.endswith('_id') or lowered == 'id':
         return uuid4()
     if lowered.endswith('_ids') or lowered in {'ids', 'product_ids', 'order_ids'}:
         return [uuid4(), uuid4()]
     if lowered in {'slug', 'key', 'path', 'name', 'lang', 'language'}:
         return 'ro' if alternate and lowered in {'lang', 'language'} else 'sample'
+    return _MISSING
+
+
+def _name_value(name: str, *, alternate: bool):
+    lowered = name.lower()
+    direct = _direct_name_value(lowered, alternate=alternate)
+    if direct is not _MISSING:
+        return direct
 
     for names, factory in _EXACT_NAME_FACTORIES:
         if lowered in names:
@@ -187,9 +194,13 @@ def _build_kwargs(func: Callable[..., object], *, alternate: bool, include_optio
     return kwargs
 
 
-def _invoke(func: Callable[..., object], kwargs: dict[str, object]) -> None:
+def _invoke(func: object, kwargs: dict[str, object]) -> None:
+    if not callable(func):
+        return
+
     try:
-        result = func(**kwargs)
+        callable_func = cast(Callable[..., object], func)
+        result = callable_func(**kwargs)
         if inspect.iscoroutine(result):
             return
     except Exception:
