@@ -274,3 +274,200 @@ async def test_service_auth_deleted_login_guard_executes_due_deletion(monkeypatc
     deleted_user = SimpleNamespace(deleted_at=datetime.now(timezone.utc), deletion_scheduled_for=None)
     with pytest.raises(HTTPException, match="Account deleted"):
         await auth_service._enforce_not_deleted_for_login(_SessionStub(), deleted_user)
+
+@pytest.mark.anyio
+async def test_service_auth_lookup_and_unique_username_edges(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert auth_service._is_expired_timestamp(None) is True
+    assert await auth_service.get_user_by_any_email(_SessionStub(), "   ") is None
+    assert await auth_service.is_email_taken(_SessionStub(), "   ") is False
+
+    taken_session = _SessionStub(scalar_values=[uuid4()])
+    assert await auth_service.is_email_taken(taken_session, "taken@example.com") is True
+
+    seen: list[str] = []
+
+    async def _get_user(_session: object, username: str):
+        seen.append(username)
+        return object() if len(seen) < 3 else None
+
+    monkeypatch.setattr(auth_service, "get_user_by_username", _get_user)
+    generated = await auth_service._generate_unique_username(_SessionStub(), "user@example.com")
+    assert generated.endswith("-3")
+
+    class _AlwaysInvalid:
+        def match(self, _value: str):
+            return None
+
+    monkeypatch.setattr(auth_service, "USERNAME_ALLOWED_RE", _AlwaysInvalid())
+    monkeypatch.setattr(auth_service.secrets, "token_hex", lambda _n: "abc123")
+    sanitized = auth_service._sanitize_username_from_email("!@example.com")
+    assert sanitized.startswith("user-")
+
+
+@pytest.mark.anyio
+async def test_service_auth_google_registration_update_branches(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = _SessionStub()
+    user = SimpleNamespace(id=uuid4(), username="current", name="Current", name_tag=1)
+    other = SimpleNamespace(id=uuid4())
+
+    async def _get_user(_session: object, username: str):
+        return other if username == "taken-name" else None
+
+    monkeypatch.setattr(auth_service, "get_user_by_username", _get_user)
+
+    with pytest.raises(HTTPException, match="Username already taken"):
+        await auth_service._update_google_registration_username(session, user, "taken-name")
+
+    await auth_service._update_google_registration_username(session, user, "new-name")
+    assert user.username == "new-name"
+
+    with pytest.raises(HTTPException, match="Display name is required"):
+        await auth_service._update_google_registration_display_name(session, user, "   ")
+
+    async def _reuse_none(_session: object, *, user_id: object, name: str):
+        _ = user_id
+        _ = name
+        return None
+
+    async def _allocate(_session: object, name: str, *, exclude_user_id: object | None = None):
+        _ = name
+        _ = exclude_user_id
+        return 7
+
+    monkeypatch.setattr(auth_service, "_try_reuse_name_tag", _reuse_none)
+    monkeypatch.setattr(auth_service, "_allocate_name_tag", _allocate)
+
+    await auth_service._update_google_registration_display_name(session, user, " Fresh Name ")
+    assert user.name == "Fresh Name"
+    assert user.name_tag == 7
+
+
+@pytest.mark.anyio
+async def test_service_auth_secondary_email_token_success_paths(monkeypatch: pytest.MonkeyPatch) -> None:
+    tok1 = SimpleNamespace(used=False)
+    tok2 = SimpleNamespace(used=False)
+    revoke_session = _SessionStub(execute_results=[_ExecuteResult(scalars_all=[tok1, tok2])])
+
+    await auth_service._revoke_other_secondary_email_tokens(revoke_session, uuid4())
+    assert tok1.used is True
+    assert tok2.used is True
+    assert revoke_session.flushed == 1
+
+    user = SimpleNamespace(id=uuid4())
+    secondary = SimpleNamespace(id=uuid4(), user_id=user.id, verified=False)
+    verify_session = _SessionStub(get_values=[secondary])
+    monkeypatch.setattr(auth_service.secrets, "token_urlsafe", lambda _n: "secondary-token")
+
+    token = await auth_service.request_secondary_email_verification(
+        verify_session,
+        user,
+        secondary.id,
+        expires_minutes=5,
+    )
+    assert token.token == "secondary-token"
+    assert verify_session.commits == 1
+    assert verify_session.refreshed and verify_session.refreshed[0] is token
+
+
+@pytest.mark.anyio
+async def test_service_auth_two_factor_extra_branches(monkeypatch: pytest.MonkeyPatch) -> None:
+    enabled_user = SimpleNamespace(two_factor_enabled=True)
+    with pytest.raises(HTTPException, match="already enabled"):
+        await auth_service.start_two_factor_setup(_SessionStub(), enabled_user)
+    with pytest.raises(HTTPException, match="already enabled"):
+        await auth_service.enable_two_factor(_SessionStub(), enabled_user, "123456")
+
+    setup_user = SimpleNamespace(
+        two_factor_enabled=False,
+        two_factor_totp_secret="enc_value",
+        two_factor_recovery_codes=None,
+        two_factor_confirmed_at=None,
+        email="user@example.com",
+    )
+    monkeypatch.setattr(auth_service, "_two_factor_secret", lambda _user: "plain_value")
+    monkeypatch.setattr(auth_service.totp_core, "verify_totp_code", lambda **_kwargs: False)
+    with pytest.raises(HTTPException, match="Invalid two-factor code"):
+        await auth_service.enable_two_factor(_SessionStub(), setup_user, "000000")
+
+    regen_user = SimpleNamespace(two_factor_enabled=True, two_factor_recovery_codes=None)
+    monkeypatch.setattr(auth_service, "_generate_recovery_codes", lambda count: (["RC-1"], ["hash-1"]))
+    regen_session = _SessionStub()
+    codes = await auth_service.regenerate_recovery_codes(regen_session, regen_user)
+    assert codes == ["RC-1"]
+    assert regen_user.two_factor_recovery_codes == ["hash-1"]
+    assert regen_session.commits == 1
+
+
+class _HttpResponseStub:
+    def __init__(self, status_code: int, payload: dict[str, object]) -> None:
+        self.status_code = status_code
+        self._payload = payload
+
+    def json(self) -> dict[str, object]:
+        return dict(self._payload)
+
+
+class _HttpClientStub:
+    def __init__(self, post_resp: _HttpResponseStub, get_resp: _HttpResponseStub) -> None:
+        self._post = post_resp
+        self._get = get_resp
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        _ = (exc_type, exc, tb)
+        return False
+
+    async def post(self, *_args, **_kwargs):
+        return self._post
+
+    async def get(self, *_args, **_kwargs):
+        return self._get
+
+
+@pytest.mark.anyio
+async def test_service_auth_refresh_and_google_exchange_error_paths(monkeypatch: pytest.MonkeyPatch) -> None:
+    refresh = SimpleNamespace(revoked=False, revoked_reason=None)
+    revoke_session = _SessionStub(execute_results=[_ExecuteResult(scalar_one_or_none=refresh)])
+    await auth_service.revoke_refresh_token(revoke_session, "jti-1", reason="manual")
+    assert refresh.revoked is True
+    assert refresh.revoked_reason == "manual"
+    assert revoke_session.commits == 1
+
+    monkeypatch.setattr(auth_service.security, "decode_token", lambda _token: {"type": "refresh", "jti": "j1", "sub": "u1"})
+    invalid_session = _SessionStub(execute_results=[_ExecuteResult(scalar_one_or_none=None)])
+    with pytest.raises(HTTPException, match="Invalid refresh token"):
+        await auth_service.validate_refresh_token(invalid_session, "refresh-token")
+
+    monkeypatch.setattr(auth_service.settings, "google_client_id", "client-id")
+    monkeypatch.setattr(auth_service.settings, "google_client_secret", "client-value")
+    monkeypatch.setattr(auth_service.settings, "google_redirect_uri", "https://app.example/redirect")
+
+    monkeypatch.setattr(
+        auth_service.httpx,
+        "AsyncClient",
+        lambda **_kwargs: _HttpClientStub(_HttpResponseStub(400, {}), _HttpResponseStub(200, {})),
+    )
+    with pytest.raises(HTTPException, match="Failed to exchange Google code"):
+        await auth_service.exchange_google_code("code-1")
+
+    monkeypatch.setattr(
+        auth_service.httpx,
+        "AsyncClient",
+        lambda **_kwargs: _HttpClientStub(_HttpResponseStub(200, {}), _HttpResponseStub(200, {})),
+    )
+    with pytest.raises(HTTPException, match="Missing Google access token"):
+        await auth_service.exchange_google_code("code-2")
+
+    monkeypatch.setattr(
+        auth_service.httpx,
+        "AsyncClient",
+        lambda **_kwargs: _HttpClientStub(
+            _HttpResponseStub(200, {"access_token": "at-1"}),
+            _HttpResponseStub(401, {}),
+        ),
+    )
+    with pytest.raises(HTTPException, match="Failed to fetch Google profile"):
+        await auth_service.exchange_google_code("code-3")
+
