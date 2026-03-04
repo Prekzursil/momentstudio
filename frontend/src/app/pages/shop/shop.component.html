@@ -152,7 +152,7 @@
 		                <div
 		                  *ngIf="editingCategorySlug === category.slug"
 		                  class="ml-6 grid gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900"
-		                  (click)="$event.stopPropagation()"
+		                  (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()" (keydown.space)="$event.stopPropagation(); $event.preventDefault()"
 		                >
 		                  <div *ngIf="renameLoading" class="text-xs text-slate-600 dark:text-slate-300">
 		                    {{ 'adminUi.common.loading' | translate }}
@@ -325,7 +325,7 @@
 		                  <div
 		                    *ngIf="isCreatingSubcategory(category.slug)"
 		                    class="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900"
-		                    (click)="$event.stopPropagation()"
+		                    (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()" (keydown.space)="$event.stopPropagation(); $event.preventDefault()"
 		                  >
 		                    <app-input
 		                      [label]="'adminUi.storefront.categories.nameRo' | translate"
@@ -675,7 +675,7 @@
                 [checked]="bulkIsSelected(product.id)"
                 [disabled]="bulkSaving()"
                 [attr.aria-label]="'adminUi.products.table.select' | translate"
-                (click)="$event.stopPropagation()"
+                (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()"
                 (change)="toggleBulkSelected($event, product.id)"
               />
 	              <app-product-card
