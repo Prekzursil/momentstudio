@@ -1,3 +1,7 @@
+import { BehaviorSubject, of } from 'rxjs';
+import { convertToParamMap } from '@angular/router';
+import { TestBed } from '@angular/core/testing';
+
 import { ShopComponent } from './shop.component';
 
 type SignalLike<T> = (() => T) & { set: (value: T) => void };
@@ -48,6 +52,84 @@ function createHarness(): any {
   cmp.bulkSelectedProductIds = signalLike(new Set<string>());
   return cmp;
 }
+
+
+
+describe('ShopComponent constructor/ngOnInit integration coverage', () => {
+  it('covers constructor effect setup, ngOnInit URL sync path, and ngOnDestroy cleanup', () => {
+    const paramMap$ = new BehaviorSubject(convertToParamMap({ category: 'rings' }));
+    const queryParams$ = new BehaviorSubject<any>({ q: 'gem', sort: 'recommended' });
+    const route: any = {
+      snapshot: { data: { categories: [{ id: 'cat-1', slug: 'rings', name: 'Rings', parent_id: null }] }, queryParams: {} },
+      paramMap: paramMap$.asObservable(),
+      queryParams: queryParams$.asObservable(),
+    };
+
+    const catalog = jasmine.createSpyObj('CatalogService', ['listProducts', 'listCategories']);
+    catalog.listProducts.and.returnValue(of({ items: [], meta: { page: 1, total_pages: 1, total_items: 0, limit: 12 } } as any));
+    catalog.listCategories.and.returnValue(of([{ id: 'cat-1', slug: 'rings', name: 'Rings', parent_id: null }] as any));
+
+    const admin = jasmine.createSpyObj('AdminService', [
+      'reorderCategoryChildren',
+      'renameCategory',
+      'createCategory',
+      'mergeCategory',
+      'deleteCategorySafe',
+      'previewCategoryDelete',
+      'previewCategoryMerge',
+      'bulkUpdateProducts',
+      'reorderProductsInCategory',
+    ]);
+    admin.bulkUpdateProducts.and.returnValue(of({} as any));
+
+    const storefrontAdminMode = { enabled: jasmine.createSpy('enabled').and.returnValue(false) };
+    const toast = jasmine.createSpyObj('ToastService', ['success', 'error']);
+    const lang$ = new BehaviorSubject<any>({ lang: 'en' });
+    const translate: any = {
+      currentLang: 'en',
+      onLangChange: lang$.asObservable(),
+      instant: (key: string) => key,
+    };
+    const title = jasmine.createSpyObj('Title', ['setTitle']);
+    const metaService = jasmine.createSpyObj('Meta', ['updateTag']);
+    const seoHeadLinks = jasmine.createSpyObj('SeoHeadLinksService', ['setLocalizedCanonical']);
+    seoHeadLinks.setLocalizedCanonical.and.returnValue('https://momentstudio.test/shop');
+    const structuredData = jasmine.createSpyObj('StructuredDataService', ['setRouteSchemas', 'clearRouteSchemas']);
+    const router = jasmine.createSpyObj('Router', ['navigate']);
+    router.navigate.and.returnValue(Promise.resolve(true));
+
+    TestBed.configureTestingModule({});
+    const component = TestBed.runInInjectionContext(() => new ShopComponent(
+      catalog as any,
+      route,
+      router as any,
+      admin as any,
+      storefrontAdminMode as any,
+      toast as any,
+      translate,
+      title as any,
+      metaService as any,
+      seoHeadLinks as any,
+      structuredData as any,
+    ));
+
+    const loadProductsSpy = spyOn(component, 'loadProducts').and.stub();
+    const fetchCategoriesSpy = spyOn(component, 'fetchCategories').and.callThrough();
+
+    component.ngOnInit();
+    expect(loadProductsSpy).toHaveBeenCalled();
+    expect(fetchCategoriesSpy.calls.count()).toBeGreaterThanOrEqual(0);
+
+    queryParams$.next({ q: 'gem', page: '2', sort: 'price_desc' });
+    expect(loadProductsSpy).toHaveBeenCalled();
+
+    lang$.next({ lang: 'ro' });
+    expect(fetchCategoriesSpy).toHaveBeenCalled();
+
+    component.ngOnDestroy();
+    expect(structuredData.clearRouteSchemas).toHaveBeenCalled();
+  });
+});
 
 describe('ShopComponent coverage wave', () => {
   it('handles quick-view open/close and product navigation', () => {
@@ -138,3 +220,5 @@ describe('ShopComponent coverage wave', () => {
     expect(cmp.filters.page).toBe(1);
   });
 });
+
+

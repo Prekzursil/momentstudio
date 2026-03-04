@@ -9,8 +9,12 @@ function createComponent() {
     'downloadBatchPackingSlips',
     'downloadPickListCsv',
     'downloadPickListPdf',
+    'downloadExport',
     'listOrderTagStats',
     'listOrderTags',
+    'addOrderTag',
+    'removeOrderTag',
+    'renameOrderTag',
     'uploadShippingLabel',
     'downloadBatchShippingLabelsZip',
     'resendDeliveryEmail',
@@ -21,8 +25,12 @@ function createComponent() {
   ordersApi.downloadBatchPackingSlips.and.returnValue(of(new Blob(['pdf'])));
   ordersApi.downloadPickListCsv.and.returnValue(of(new Blob(['csv'])));
   ordersApi.downloadPickListPdf.and.returnValue(of(new Blob(['pdf'])));
+  ordersApi.downloadExport.and.returnValue(of(new Blob(['csv'])));
   ordersApi.listOrderTagStats.and.returnValue(of([]));
   ordersApi.listOrderTags.and.returnValue(of([]));
+  ordersApi.addOrderTag.and.returnValue(of({} as any));
+  ordersApi.removeOrderTag.and.returnValue(of({} as any));
+  ordersApi.renameOrderTag.and.returnValue(of({ total: 1, from_tag: 'vip', to_tag: 'priority' } as any));
   ordersApi.uploadShippingLabel.and.returnValue(of({}));
   ordersApi.downloadBatchShippingLabelsZip.and.returnValue(of(new Blob(['zip'])));
   ordersApi.resendDeliveryEmail.and.returnValue(of({}));
@@ -345,6 +353,115 @@ describe('AdminOrdersComponent coverage wave 5', () => {
     expect(component.shippingLabelsBusy).toBeFalse();
   });
 
+
+
+  it('covers shipping-label zip error detail and generic fallback branches', () => {
+    const { component, ordersApi, toast } = createComponent();
+    component.selectedIds = new Set(['o-1', 'o-2']);
+
+    ordersApi.downloadBatchShippingLabelsZip.and.returnValue(
+      throwError(() => ({ error: { detail: { missing_shipping_label_order_ids: ['o-2'] } } })),
+    );
+    component.downloadSelectedShippingLabelsZip();
+    expect(toast.error).toHaveBeenCalledWith('adminUi.orders.shippingLabelsModal.errors.missingLabels');
+
+    toast.error.calls.reset();
+    ordersApi.downloadBatchShippingLabelsZip.and.returnValue(throwError(() => ({ error: { detail: {} } })));
+    component.downloadSelectedShippingLabelsZip();
+    expect(toast.error).toHaveBeenCalledWith('adminUi.orders.shippingLabelsModal.errors.zipFailed');
+  });
+
+  it('covers export modal save/download branches including prompt guards', () => {
+    const { component, ordersApi, toast } = createComponent();
+    component.exportColumns = {
+      id: true,
+      reference_code: false,
+      status: false,
+      total_amount: false,
+      currency: false,
+      customer_email: false,
+      customer_name: false,
+      customer_username: false,
+      user_id: false,
+      created_at: false,
+      updated_at: false,
+      payment_method: false,
+      promo_code: false,
+      shipping_amount: false,
+      tax_amount: false,
+      fee_amount: false,
+      invoice_company: false,
+      invoice_vat_id: false,
+      shipping_method_name: false,
+      locker_name: false,
+      locker_address: false,
+      courier: false,
+      delivery_type: false,
+      tracking_number: false,
+      tracking_url: false,
+      tag_list: false,
+    };
+
+    spyOn(globalThis, 'prompt').and.returnValues('', 'Wave Export');
+    component.saveExportTemplate();
+    expect(toast.error).toHaveBeenCalledWith('adminUi.orders.exportModal.errors.templateNameRequired');
+
+    component.saveExportTemplate();
+    expect(component.exportTemplates.length).toBeGreaterThan(0);
+
+    component.exportColumns = {};
+    component.downloadExport();
+    expect(toast.error).toHaveBeenCalledWith('adminUi.orders.exportModal.errors.noColumns');
+
+    component.exportColumns = { id: true };
+    const createSpy = spyOn(URL, 'createObjectURL').and.returnValue('blob:orders');
+    const revokeSpy = spyOn(URL, 'revokeObjectURL');
+    component.downloadExport();
+    expect(ordersApi.downloadExport).toHaveBeenCalledWith(['id']);
+    expect(createSpy).toHaveBeenCalled();
+    expect(revokeSpy).toHaveBeenCalledWith('blob:orders');
+  });
+
+  it('covers applyBulkTags and renameTag success/error decision branches', () => {
+    const { component, ordersApi, toast } = createComponent();
+    component.selectedIds = new Set(['o-1', 'o-2']);
+
+    component.bulkTagAdd = '';
+    component.bulkTagRemove = '';
+    component.applyBulkTags();
+    expect(toast.error).toHaveBeenCalledWith('adminUi.orders.bulk.errors.chooseTagAction');
+
+    component.bulkTagAdd = 'vip';
+    component.bulkTagRemove = 'fraud_risk';
+    ordersApi.addOrderTag.and.callFake((id: string) => (id === 'o-2' ? throwError(() => new Error('fail')) : of({} as any)));
+    ordersApi.removeOrderTag.and.returnValue(of({} as any));
+    component.applyBulkTags();
+    expect(component.selectedIds).toEqual(new Set(['o-2']));
+
+    component.tagRenameFrom = '';
+    component.tagRenameTo = '';
+    component.renameTag();
+    expect(component.tagRenameError).toBe('adminUi.orders.tags.errors.renameRequired');
+
+    spyOn(globalThis, 'confirm').and.returnValues(false, true, true);
+    component.tagRenameFrom = 'vip';
+    component.tagRenameTo = 'priority';
+    component.renameTag();
+    expect(ordersApi.renameOrderTag).not.toHaveBeenCalled();
+
+    ordersApi.renameOrderTag.and.returnValue(throwError(() => ({ error: { detail: 'rename failed' } })));
+    component.renameTag();
+    expect(component.tagRenameError).toBe('rename failed');
+    expect(component.tagRenameBusy).toBeTrue();
+
+    component.tagRenameBusy = false;
+
+    ordersApi.renameOrderTag.and.returnValue(of({ total: 2, from_tag: 'vip', to_tag: 'priority' } as any));
+    component.renameTag();
+    expect(ordersApi.renameOrderTag).toHaveBeenCalledTimes(2);
+    expect(component.tagRenameBusy).toBeFalse();
+  });
+
   it('sweeps prototype methods through guarded admin-orders branches', () => {
     const { component } = createComponent();
     const dynamic = component as any;
@@ -402,3 +519,4 @@ describe('AdminOrdersComponent coverage wave 5', () => {
     expect(attempted).toBeGreaterThan(80);
   });
 });
+

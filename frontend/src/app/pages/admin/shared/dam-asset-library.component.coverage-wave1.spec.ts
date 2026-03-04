@@ -428,6 +428,98 @@ describe('DamAssetLibraryComponent coverage wave 1', () => {
     expect(component.jobEvents()).toEqual([]);
   });
 
+
+
+  it('covers upload no-file, success, and error branches with input reset', async () => {
+    const { component, admin, toast } = createComponent();
+
+    const emptyInput = document.createElement('input');
+    Object.defineProperty(emptyInput, 'files', { value: [], configurable: true });
+    await component.upload({ target: emptyInput } as any);
+    expect(admin.uploadMediaAsset).not.toHaveBeenCalled();
+
+    const okInput = document.createElement('input');
+    Object.defineProperty(okInput, 'files', { value: [new File(['x'], 'asset.png', { type: 'image/png' })], configurable: true });
+    okInput.value = 'picked';
+    await component.upload({ target: okInput } as any);
+    expect(admin.uploadMediaAsset).toHaveBeenCalled();
+    expect(okInput.value).toBe('');
+
+    const badInput = document.createElement('input');
+    Object.defineProperty(badInput, 'files', { value: [new File(['x'], 'asset2.png', { type: 'image/png' })], configurable: true });
+    admin.uploadMediaAsset.and.returnValue(throwError(() => ({ error: { detail: 'upload blocked' } })));
+    await component.upload({ target: badInput } as any);
+    expect(toast.error).toHaveBeenCalledWith('upload blocked');
+    expect(badInput.value).toBe('');
+  });
+
+  it('covers bulk queue triage/tag actions across prompt and error branches', async () => {
+    const { component, admin, toast } = createComponent();
+
+    component.jobs.set([
+      { id: 'job-1', job_type: 'ingest', status: 'queued' },
+      { id: 'job-2', job_type: 'ingest', status: 'queued' },
+    ] as any);
+
+    component.selectedQueueJobIds.set(new Set(['job-1', 'job-2']));
+    await component.bulkRetrySelectedJobs();
+    expect(toast.success).toHaveBeenCalledWith('Queued 0 jobs for retry.');
+
+    component.selectedQueueJobIds.set(new Set(['job-1', 'job-2']));
+    admin.retryMediaJobsBulk.and.returnValue(throwError(() => ({ error: { detail: 'retry failed' } })));
+    await component.bulkRetrySelectedJobs();
+    expect(toast.error).toHaveBeenCalledWith('retry failed');
+
+    spyOn(globalThis, 'prompt').and.returnValues('', 'priority', 'priority');
+
+    component.selectedQueueJobIds.set(new Set(['job-1', 'job-2']));
+    await component.bulkAddTagToSelectedJobs();
+    expect(admin.updateMediaJobTriage).not.toHaveBeenCalledWith('job-1', { add_tags: [''] });
+
+    component.selectedQueueJobIds.set(new Set(['job-1', 'job-2']));
+    admin.updateMediaJobTriage.and.returnValue(throwError(() => ({ error: { detail: 'triage failed' } })));
+    await component.bulkMarkSelectedJobs('open');
+    expect(toast.error).toHaveBeenCalledWith('triage failed');
+
+    component.selectedQueueJobIds.set(new Set(['job-1', 'job-2']));
+    admin.updateMediaJobTriage.and.returnValue(of({ id: 'job-1' } as any));
+    await component.bulkRemoveTagFromSelectedJobs();
+    expect(admin.updateMediaJobTriage).toHaveBeenCalled();
+  });
+
+  it('covers collection and destructive action guards', async () => {
+    const { component, admin, toast } = createComponent();
+
+    component.newCollectionName = '';
+    component.newCollectionSlug = '';
+    await component.createCollection();
+    expect(toast.error).toHaveBeenCalledWith('Collection name and slug are required.');
+
+    component.newCollectionName = 'Wave Collection';
+    component.newCollectionSlug = 'wave-collection';
+    await component.createCollection();
+    expect(admin.createMediaCollection).toHaveBeenCalled();
+
+    component.selectedIds.set(new Set());
+    await component.attachSelectionToCollection({ id: 'collection-1', slug: 'collection-1' } as any);
+    expect(toast.error).toHaveBeenCalledWith('Select at least one asset first.');
+
+    component.selectedIds.set(new Set(['asset-1']));
+    await component.attachSelectionToCollection({ id: 'collection-1', slug: 'collection-1' } as any);
+    expect(admin.replaceMediaCollectionItems).toHaveBeenCalledWith('collection-1', ['asset-1']);
+
+    spyOn(globalThis, 'confirm').and.returnValues(false, true, true);
+    await component.softDelete({ id: 'asset-1' } as any);
+    expect(admin.softDeleteMediaAsset).not.toHaveBeenCalled();
+
+    await component.softDelete({ id: 'asset-1' } as any);
+    expect(admin.softDeleteMediaAsset).toHaveBeenCalledWith('asset-1');
+
+    admin.purgeMediaAsset.and.returnValue(throwError(() => ({ error: { detail: 'purge denied' } })));
+    await component.purge({ id: 'asset-2' } as any);
+    expect(toast.error).toHaveBeenCalledWith('purge denied');
+  });
+
   it('sweeps prototype methods for deterministic guarded branch coverage', () => {
     const { component } = createComponent();
     component.assets.set([{ id: 'asset-1', title_en: 'Asset', tags: ['featured'] }] as any);
@@ -449,3 +541,4 @@ describe('DamAssetLibraryComponent coverage wave 1', () => {
     expect(attempted).toBeGreaterThan(65);
   });
 });
+
