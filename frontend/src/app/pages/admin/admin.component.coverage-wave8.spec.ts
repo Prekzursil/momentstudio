@@ -24,7 +24,11 @@ function createAdminSpy(): jasmine.SpyObj<any> {
     'coupons',
     'lowStock',
     'audit',
-    'getMaintenance'
+    'getMaintenance',
+    'getContent',
+    'listContentPages',
+    'updateContentBlock',
+    'createContent'
   ]);
 }
 
@@ -36,6 +40,10 @@ function createHarness(): { component: AdminComponent; admin: jasmine.SpyObj<any
   admin.lowStock.and.returnValue(of([]));
   admin.audit.and.returnValue(of({ products: [], content: [], security: [] }));
   admin.getMaintenance.and.returnValue(of({ enabled: false }));
+  admin.getContent.and.returnValue(of({ body_markdown: '', status: 'published', version: 1, meta: {} }));
+  admin.listContentPages.and.returnValue(of([]));
+  admin.updateContentBlock.and.returnValue(of({ version: 2, needs_translation_en: false, needs_translation_ro: false }));
+  admin.createContent.and.returnValue(of({ version: 3, needs_translation_en: false, needs_translation_ro: false }));
 
   const toast = jasmine.createSpyObj('ToastService', ['success', 'error', 'info']);
 
@@ -200,4 +208,73 @@ describe('AdminComponent coverage wave 8 branch matrix', () => {
     (component as any).loadForSection('settings');
     expect(toast.error).toHaveBeenCalledWith('adminUi.audit.errors.loadTitle', 'adminUi.audit.errors.loadCopy');
   });
+
+
+  it('covers saveNavigation invalid, update success, create fallback, and fallback error branches', () => {
+    const { component, admin } = createHarness();
+
+    component.navigationForm = {
+      header_links: [{ id: '', url: '/about', label: { en: '', ro: 'Despre' } }],
+      footer_handcrafted_links: [],
+      footer_legal_links: []
+    } as any;
+    component.saveNavigation();
+    expect(component.navigationError).toBe('adminUi.site.navigation.errors.invalid');
+
+    component.navigationForm = {
+      header_links: [{ id: 'h1', url: '/about', label: { en: 'About', ro: 'Despre' } }],
+      footer_handcrafted_links: [{ id: 'f1', url: '/contact', label: { en: 'Contact', ro: 'Contact' } }],
+      footer_legal_links: [{ id: 'l1', url: '/privacy', label: { en: 'Privacy', ro: 'Confidentialitate' } }]
+    } as any;
+
+    admin.updateContentBlock.and.returnValue(of({ version: 11 }));
+    component.saveNavigation();
+    expect(component.navigationMessage).toBe('adminUi.site.navigation.success.save');
+    expect(admin.updateContentBlock).toHaveBeenCalled();
+
+    admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
+    admin.createContent.and.returnValue(of({ version: 12 }));
+    component.saveNavigation();
+    expect(admin.createContent).toHaveBeenCalledWith(
+      'site.navigation',
+      jasmine.objectContaining({
+        title: 'Site navigation',
+        status: 'published'
+      })
+    );
+
+    admin.createContent.and.returnValue(throwError(() => ({ status: 500 })));
+    component.saveNavigation();
+    expect(component.navigationError).toBe('adminUi.site.navigation.errors.save');
+  });
+
+  it('covers saveInfo success, conflict, and create fallback branches', () => {
+    const { component, admin } = createHarness();
+    const loadContentPagesSpy = spyOn(component, 'loadContentPages').and.stub();
+
+    component.infoForm.about = { en: 'About EN', ro: 'Despre RO' } as any;
+    component.infoLang = 'en';
+    admin.updateContentBlock.and.returnValue(of({ version: 21, needs_translation_en: true, needs_translation_ro: false }));
+
+    component.saveInfo('page.about', 'Body EN', 'en');
+    expect(component.infoMessage).toBe('adminUi.site.pages.success.save');
+    expect(loadContentPagesSpy).toHaveBeenCalled();
+
+    admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
+    component.saveInfo('page.about', 'Body conflict', 'en');
+    expect(component.infoError).toBe('adminUi.site.pages.errors.save');
+
+    admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
+    admin.createContent.and.returnValue(of({ version: 22, needs_translation_en: false, needs_translation_ro: true }));
+    component.saveInfo('page.about', 'Body fallback', 'en');
+    expect(admin.createContent).toHaveBeenCalledWith(
+      'page.about',
+      jasmine.objectContaining({
+        title: 'page.about',
+        status: 'published',
+        lang: 'en'
+      })
+    );
+  });
+
 });
