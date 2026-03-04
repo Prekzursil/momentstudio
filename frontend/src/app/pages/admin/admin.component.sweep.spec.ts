@@ -54,9 +54,12 @@ function createComponent() {
     'updateCoupon',
     'invalidateCouponStripeMappings',
     'listContentVersions',
+    'getContentVersion',
+    'rollbackContentVersion',
     'createFeaturedCollection',
     'updateFeaturedCollection',
-    'uploadContentImage'
+    'uploadContentImage',
+    'updateContentImageFocalPoint'
   ]);
 
   admin.products.and.returnValue(of([]));
@@ -111,19 +114,23 @@ function createComponent() {
   admin.updateCoupon.and.returnValue(of({ id: 'coupon-1', code: 'SAVE10', active: false }));
   admin.invalidateCouponStripeMappings.and.returnValue(of({ deleted_mappings: 1 }));
   admin.listContentVersions.and.returnValue(of([]));
+  admin.getContentVersion.and.returnValue(of({ version: 2, body_markdown: 'Version markdown', title: 'Version title' }));
+  admin.rollbackContentVersion.and.returnValue(of({}));
   admin.createFeaturedCollection.and.returnValue(of({ slug: 'new-collection', name: 'New', description: '', product_ids: [] }));
   admin.updateFeaturedCollection.and.returnValue(of({ slug: 'updated-collection', name: 'Updated', description: '', product_ids: [] }));
   admin.uploadContentImage.and.returnValue(of({ version: 2, images: [{ id: 'asset-1', url: '/asset-1.jpg', alt_text: null }] }));
+  admin.updateContentImageFocalPoint.and.returnValue(of({ id: 'asset-1', focal_x: 50, focal_y: 50 }));
 
 
   const adminProducts = jasmine.createSpyObj('AdminProductsService', ['search']);
   adminProducts.search.and.returnValue(of({ items: [] }));
 
-  const blog = jasmine.createSpyObj('BlogService', ['listFlaggedComments', 'resolveCommentFlagsAdmin', 'hideCommentAdmin', 'unhideCommentAdmin', 'pinPostAdmin', 'unpinPostAdmin']);
+  const blog = jasmine.createSpyObj('BlogService', ['listFlaggedComments', 'resolveCommentFlagsAdmin', 'hideCommentAdmin', 'unhideCommentAdmin', 'deleteComment', 'pinPostAdmin', 'unpinPostAdmin']);
   blog.listFlaggedComments.and.returnValue(of({ items: [] }));
   blog.resolveCommentFlagsAdmin.and.returnValue(of({}));
   blog.hideCommentAdmin.and.returnValue(of({}));
   blog.unhideCommentAdmin.and.returnValue(of({}));
+  blog.deleteComment.and.returnValue(of({}));
   blog.pinPostAdmin.and.returnValue(of({}));
   blog.unpinPostAdmin.and.returnValue(of({}));
   const fxAdmin = jasmine.createSpyObj('FxAdminService', [
@@ -198,7 +205,7 @@ function createComponent() {
     } as unknown as DomSanitizer
   );
 
-  return { component, routeData$, routeQuery$, admin, fxAdmin, taxesAdmin, auth, cmsPrefs, toast };
+  return { component, routeData$, routeQuery$, admin, blog, fxAdmin, taxesAdmin, auth, cmsPrefs, toast };
 }
 
 function callAdminMethodSafely(component: any, method: string, args: unknown[]): void {
@@ -1239,4 +1246,179 @@ describe('AdminComponent sweep coverage', () => {
     expect(insertPageMedia).toHaveBeenCalled();
     expect(insertHomeMedia).toHaveBeenCalled();
   });
+
+  it('covers blog version selection branches and handles load failures', () => {
+    const { component, admin, toast } = createComponent();
+    component.selectedBlogKey = 'blog.first-post';
+    component.blogForm.body_markdown = 'current markdown body';
+
+    component.selectBlogVersion(2);
+    expect(admin.getContentVersion).toHaveBeenCalledWith('blog.first-post', 2);
+    expect(component.blogDiffParts.length).toBeGreaterThan(0);
+
+    admin.getContentVersion.and.returnValue(throwError(() => new Error('version-load-failed')));
+    component.selectBlogVersion(3);
+    expect(toast.error).toHaveBeenCalledWith('adminUi.blog.revisions.errors.loadVersion');
+  });
+
+  it('covers rollback confirmation and moderation delete success/failure paths', () => {
+    const { component, admin, blog, toast } = createComponent();
+    component.selectedBlogKey = 'blog.first-post';
+    spyOn(globalThis, 'confirm').and.returnValues(false, true, true, true);
+
+    component.rollbackBlogVersion(4);
+    expect(admin.rollbackContentVersion).not.toHaveBeenCalled();
+
+    component.rollbackBlogVersion(4);
+    expect(admin.rollbackContentVersion).toHaveBeenCalledWith('blog.first-post', 4);
+
+    admin.rollbackContentVersion.and.returnValue(throwError(() => new Error('rollback-failed')));
+    component.rollbackBlogVersion(5);
+    expect(toast.error).toHaveBeenCalledWith('adminUi.blog.revisions.errors.rollback');
+
+    toast.error.calls.reset();
+    (globalThis.confirm as jasmine.Spy).and.returnValue(true);
+    component.adminDeleteComment({ id: 'comment-1' } as any);
+    expect(blog.deleteComment).toHaveBeenCalledWith('comment-1');
+
+    blog.deleteComment.and.returnValue(throwError(() => new Error('delete-failed')));
+    component.adminDeleteComment({ id: 'comment-2' } as any);
+    expect(toast.error).toHaveBeenCalledWith('adminUi.blog.moderation.errors.delete');
+  });
+
+  it('covers blog image upload and drop insertion branches', async () => {
+    const { component } = createComponent();
+    const richTarget = { insertMarkdown: jasmine.createSpy('insertMarkdown') } as any;
+    component.selectedBlogKey = 'blog.first-post';
+
+    const file = new File(['image-bytes'], 'cover.png', { type: 'image/png' });
+    const input = { files: [file], value: 'selected' } as any;
+    component.uploadAndInsertBlogImage(richTarget, { target: input } as any);
+    expect(richTarget.insertMarkdown).toHaveBeenCalled();
+    expect(input.value).toBe('');
+
+    const dropEvent = {
+      dataTransfer: { files: [file], types: ['Files'], dropEffect: 'none' },
+      preventDefault: jasmine.createSpy('preventDefault'),
+      stopPropagation: jasmine.createSpy('stopPropagation')
+    } as any;
+    await component.onBlogImageDrop(richTarget, dropEvent);
+    expect(dropEvent.preventDefault).toHaveBeenCalled();
+    expect(richTarget.insertMarkdown).toHaveBeenCalled();
+  });
+
+  it('covers blog cover focal-point validation and update branches', () => {
+    const { component, admin, toast } = createComponent();
+    component.selectedBlogKey = 'blog.first-post';
+    component.blogEditLang = 'en';
+    component.blogBaseLang = 'en';
+    component.blogImages = [{ id: 'asset-1', url: '/asset-1.jpg', focal_x: 50, focal_y: 50, sort_order: 1 } as any];
+    spyOn(globalThis, 'prompt').and.returnValues('invalid', '10, 20');
+
+    component.editBlogCoverFocalPoint();
+    expect(toast.error).toHaveBeenCalledWith('adminUi.site.assets.library.focalErrorsFormat');
+
+    component.editBlogCoverFocalPoint();
+    expect(admin.updateContentImageFocalPoint).toHaveBeenCalledWith('asset-1', 10, 20);
+  });
+
+  it('covers starter templates for rich CMS block types', () => {
+    const { component } = createComponent();
+    const dynamic = component as any;
+
+    const cta = { title: {}, body_markdown: {}, cta_label: {}, cta_url: '' } as any;
+    dynamic.applyStarterTemplateToCustomBlock('cta', cta);
+    expect(cta.cta_url).toBe('/shop');
+
+    const faq = { title: {}, faq_items: [] } as any;
+    dynamic.applyStarterTemplateToCustomBlock('faq', faq);
+    expect(faq.faq_items.length).toBe(2);
+
+    const testimonials = { title: {}, testimonials: [] } as any;
+    dynamic.applyStarterTemplateToCustomBlock('testimonials', testimonials);
+    expect(testimonials.testimonials.length).toBe(2);
+
+    const grid = { title: {}, product_grid_source: '', product_grid_limit: 0 } as any;
+    dynamic.applyStarterTemplateToCustomBlock('product_grid', grid);
+    expect(grid.product_grid_limit).toBe(6);
+
+    const form = { title: {}, form_type: '', form_topic: '' } as any;
+    dynamic.applyStarterTemplateToCustomBlock('form', form);
+    expect(form.form_type).toBe('contact');
+  });
+
+  it('covers image/gallery/banner/carousel starter template branches', () => {
+    const { component } = createComponent();
+    const dynamic = component as any;
+
+    const image = { title: {}, alt: {}, caption: {}, link_url: '' } as any;
+    dynamic.applyStarterTemplateToCustomBlock('image', image);
+    expect(image.link_url).toBe('/shop');
+
+    const gallery = { title: {}, images: [] } as any;
+    dynamic.applyStarterTemplateToCustomBlock('gallery', gallery);
+    expect(gallery.images.length).toBe(3);
+
+    const banner = { title: {}, slide: {} } as any;
+    dynamic.applyStarterTemplateToCustomBlock('banner', banner);
+    expect(banner.slide.cta_url).toBe('/shop');
+
+    const carousel = { title: {}, slides: [], settings: {} } as any;
+    dynamic.applyStarterTemplateToCustomBlock('carousel', carousel);
+    expect(carousel.slides.length).toBe(3);
+    expect(carousel.settings.autoplay).toBeTrue();
+  });
+
+  it('covers page media insertion guard and multi-image branches', async () => {
+    const { component, toast } = createComponent();
+    const dynamic = component as any;
+    const fileA = new File(['a'], 'first.png', { type: 'image/png' });
+    const fileB = new File(['b'], 'second.png', { type: 'image/png' });
+
+    dynamic.pageBlocks = { 'page.about': [] } as any;
+    spyOn(dynamic, 'safePageRecordKey').and.returnValue('page.about');
+    spyOn(dynamic, 'normalizeCmsImageFiles').and.returnValue([fileA, fileB]);
+    spyOn(dynamic, 'allowedPageBlockTypesForKey').and.returnValues([], ['image'], ['gallery']);
+    spyOn(dynamic, 'uploadCmsImageToKey').and.returnValues(
+      Promise.resolve({ url: '/u1.jpg', focal_x: 25, focal_y: 75 }),
+      Promise.resolve({ url: '/u2.jpg', focal_x: 50, focal_y: 50 }),
+      Promise.resolve({ url: '/u3.jpg', focal_x: 45, focal_y: 55 }),
+      Promise.resolve({ url: '/u4.jpg', focal_x: 40, focal_y: 60 })
+    );
+    spyOn(dynamic, 'insertPageBlockAt').and.returnValues('img-1', 'img-2', 'gallery-1');
+
+    await dynamic.insertPageMediaFiles('page.about', 0, [fileA, fileB]);
+    expect(toast.error).toHaveBeenCalledWith('adminUi.site.pages.builder.errors.blockTypeNotAllowed');
+
+    await dynamic.insertPageMediaFiles('page.about', 0, [fileA, fileB]);
+    expect(dynamic.insertPageBlockAt).toHaveBeenCalledWith('page.about', 'image', 0, 'blank');
+    expect(toast.success).toHaveBeenCalled();
+
+    await dynamic.insertPageMediaFiles('page.about', 0, [fileA, fileB]);
+    expect(dynamic.insertPageBlockAt).toHaveBeenCalledWith('page.about', 'gallery', 0, 'blank');
+  });
+
+  it('covers home media insertion single and gallery branches', async () => {
+    const { component, toast } = createComponent();
+    const dynamic = component as any;
+    const fileA = new File(['a'], 'first.png', { type: 'image/png' });
+    const fileB = new File(['b'], 'second.png', { type: 'image/png' });
+
+    dynamic.homeBlocks = [];
+    spyOn(dynamic, 'normalizeCmsImageFiles').and.returnValues([fileA], [fileA, fileB]);
+    spyOn(dynamic, 'uploadCmsImageToKey').and.returnValues(
+      Promise.resolve({ url: '/home-1.jpg', focal_x: 55, focal_y: 45 }),
+      Promise.resolve({ url: '/home-2.jpg', focal_x: 40, focal_y: 60 }),
+      Promise.resolve({ url: '/home-3.jpg', focal_x: 65, focal_y: 35 })
+    );
+    spyOn(dynamic, 'insertHomeBlockAt').and.returnValues('home-image', 'home-gallery');
+
+    await dynamic.insertHomeMediaFiles(0, [fileA]);
+    expect(dynamic.insertHomeBlockAt).toHaveBeenCalledWith('image', 0, 'blank');
+
+    await dynamic.insertHomeMediaFiles(0, [fileA, fileB]);
+    expect(dynamic.insertHomeBlockAt).toHaveBeenCalledWith('gallery', 0, 'blank');
+    expect(toast.success).toHaveBeenCalled();
+  });
+
 });
