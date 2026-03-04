@@ -1540,3 +1540,270 @@ async def test_orders_receipt_pdf_success_and_notification_early_returns(monkeyp
     await orders_api._notify_user_order_refunded(_AdminRouteSession(), order)
     orders_api._queue_admin_refund_requested_email(BackgroundTasks(), None, order, SimpleNamespace(email='admin@example.com'), note='n')
     await orders_api._notify_partial_refund_user(_AdminRouteSession(), order, SimpleNamespace(amount=Decimal('1.00')))
+
+def test_orders_delivery_batch_and_filename_helpers() -> None:
+    courier, delivery, locker_id, locker_name, locker_address, locker_lat, locker_lng = orders_api._delivery_from_payload(
+        courier='  fan_courier ',
+        delivery_type='home',
+        locker_id='ignored',
+        locker_name='ignored',
+        locker_address='ignored',
+        locker_lat=44.0,
+        locker_lng=26.0,
+    )
+    assert (courier, delivery, locker_id, locker_name, locker_address, locker_lat, locker_lng) == (
+        'fan_courier',
+        'home',
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+
+    locker_values = orders_api._delivery_from_payload(
+        courier='sameday',
+        delivery_type='locker',
+        locker_id='  LK-1 ',
+        locker_name=' Main Locker ',
+        locker_address=' Address 1 ',
+        locker_lat=44.43,
+        locker_lng=26.10,
+    )
+    assert locker_values[2] == 'LK-1'
+    assert locker_values[3] == 'Main Locker'
+    assert locker_values[4] == 'Address 1'
+
+    with pytest.raises(HTTPException, match='Locker selection is required'):
+        orders_api._delivery_from_payload(
+            courier='sameday',
+            delivery_type='locker',
+            locker_id='  ',
+            locker_name='missing',
+            locker_address='addr',
+            locker_lat=None,
+            locker_lng=26.10,
+        )
+
+    assert orders_api._sanitize_filename('../../path/to/report.pdf') == 'report.pdf'
+    assert orders_api._sanitize_filename('   ') == 'shipping-label'
+
+    id_one = uuid4()
+    id_two = uuid4()
+    normalized_ids = orders_api._normalize_batch_order_ids([id_one, id_two, id_one], max_selected=5)
+    assert normalized_ids == [id_one, id_two]
+
+    with pytest.raises(HTTPException, match='No orders selected'):
+        orders_api._normalize_batch_order_ids([], max_selected=1)
+    with pytest.raises(HTTPException, match='Too many orders selected'):
+        orders_api._normalize_batch_order_ids([id_one, id_two], max_selected=1)
+
+    order_a = SimpleNamespace(id=id_one)
+    order_b = SimpleNamespace(id=id_two)
+    assert orders_api._missing_batch_order_ids([id_one, id_two], [order_a]) == [str(id_two)]
+    assert orders_api._ordered_batch_orders([id_two, id_one], [order_a, order_b]) == [order_b, order_a]
+
+
+def test_orders_admin_filter_and_sla_helpers() -> None:
+    from datetime import datetime, timezone
+
+    assert orders_api._parse_admin_status_filter(None) == (False, None, None)
+    pending_filter = orders_api._parse_admin_status_filter(' pending ')
+    assert pending_filter == (True, None, None)
+    sales_filter = orders_api._parse_admin_status_filter('sales')
+    assert sales_filter[2] is not None and OrderStatus.paid in sales_filter[2]
+    status_filter = orders_api._parse_admin_status_filter('paid')
+    assert status_filter == (False, OrderStatus.paid, None)
+    with pytest.raises(HTTPException, match='Invalid order status'):
+        orders_api._parse_admin_status_filter('not-real')
+
+    assert orders_api._parse_admin_sla_filter(' ship_overdue ') == 'ship_overdue'
+    assert orders_api._parse_admin_sla_filter('overdue_acceptance') == 'accept_overdue'
+    assert orders_api._parse_admin_sla_filter('any') == 'any_overdue'
+    assert orders_api._parse_admin_sla_filter(None) is None
+    with pytest.raises(HTTPException, match='Invalid SLA filter'):
+        orders_api._parse_admin_sla_filter('unknown')
+
+    assert orders_api._parse_admin_fraud_filter(' review ') == 'queue'
+    assert orders_api._parse_admin_fraud_filter('risk') == 'flagged'
+    assert orders_api._parse_admin_fraud_filter('approved') == 'approved'
+    assert orders_api._parse_admin_fraud_filter('denied') == 'denied'
+    assert orders_api._parse_admin_fraud_filter(None) is None
+    with pytest.raises(HTTPException, match='Invalid fraud filter'):
+        orders_api._parse_admin_fraud_filter('invalid')
+
+    now = datetime(2026, 3, 1, tzinfo=timezone.utc)
+    naive = datetime(2026, 3, 1)
+    aware = datetime(2026, 3, 1, tzinfo=timezone.utc)
+    assert orders_api._ensure_utc_datetime(None) is None
+    assert orders_api._ensure_utc_datetime(naive).tzinfo == timezone.utc
+    assert orders_api._ensure_utc_datetime(aware).tzinfo == timezone.utc
+
+    due_accept, overdue_accept = orders_api._admin_order_sla_due(
+        sla_kind='accept',
+        sla_started_at=now,
+        now=now,
+        accept_hours=24,
+        ship_hours=48,
+    )
+    assert due_accept is not None and overdue_accept is False
+
+    due_ship, overdue_ship = orders_api._admin_order_sla_due(
+        sla_kind='ship',
+        sla_started_at=now,
+        now=now,
+        accept_hours=24,
+        ship_hours=0,
+    )
+    assert due_ship is not None and overdue_ship is True
+
+
+def test_orders_admin_list_export_and_payload_helpers(monkeypatch: pytest.MonkeyPatch) -> None:
+    from datetime import datetime, timezone
+
+    now = datetime(2026, 3, 1, tzinfo=timezone.utc)
+    order = SimpleNamespace(
+        id=uuid4(),
+        reference_code='REF-100',
+        status=OrderStatus.paid,
+        total_amount=Decimal('42.00'),
+        currency='RON',
+        payment_method='cod',
+        created_at=now,
+        tags=[SimpleNamespace(tag='vip')],
+    )
+
+    monkeypatch.setattr(orders_api.pii_service, 'mask_email', lambda value: f'masked:{(value or '').strip()}')
+
+    row = (
+        order,
+        'buyer@example.com',
+        'buyer-user',
+        'accept',
+        now,
+        True,
+        'high',
+    )
+    list_item = orders_api._admin_order_list_item_from_row(
+        row,
+        include_pii=False,
+        now=now,
+        accept_hours=24,
+        ship_hours=48,
+    )
+    assert str(list_item.customer_email).startswith('masked:')
+    assert list_item.fraud_flagged is True
+
+    response = orders_api._admin_order_list_response([row], include_pii=True, total_items=1, page=1, limit=20)
+    assert len(response.items) == 1
+    assert response.meta.total_pages == 1
+
+    order_stub = SimpleNamespace(
+        id=uuid4(),
+        reference_code='REF-CSV',
+        status=SimpleNamespace(value='paid'),
+        total_amount=Decimal('20.00'),
+        tax_amount=Decimal('2.00'),
+        fee_amount=Decimal('0.50'),
+        shipping_amount=Decimal('3.00'),
+        currency='RON',
+        user_id=uuid4(),
+        customer_email=' buyer@example.com ',
+        customer_name='Buyer Name',
+        payment_method='cod',
+        promo_code='SAVE10',
+        courier='sameday',
+        delivery_type='home',
+        tracking_number='TRK-1',
+        tracking_url='https://carrier.example/track',
+        invoice_company='Buyer SRL',
+        invoice_vat_id='RO123',
+        shipping_method=SimpleNamespace(name='Locker'),
+        locker_name='Main locker',
+        locker_address='Main str',
+        created_at=now,
+        updated_at=now,
+    )
+
+    assert orders_api._order_attr_as_str(order_stub, 'currency') == 'RON'
+    assert orders_api._order_attr_iso(order_stub, 'created_at').startswith('2026-03-01')
+    assert orders_api._order_status_value(order_stub) == 'paid'
+    assert orders_api._order_shipping_method_name(order_stub) == 'Locker'
+
+    allowed = orders_api._order_export_allowed_columns(include_pii=False)
+    selected = orders_api._selected_export_columns(['id,reference_code,status'], allowed=allowed)
+    csv_text = orders_api._render_orders_csv([order_stub], selected_columns=selected, allowed=allowed)
+    assert 'reference_code' in csv_text
+    assert 'REF-100' in csv_text or str(order_stub.id) in csv_text
+
+    with pytest.raises(HTTPException, match='Invalid export columns'):
+        orders_api._selected_export_columns(['id,unknown'], allowed=allowed)
+
+    masked_addr = orders_api._masked_admin_address(
+        SimpleNamespace(
+            id=uuid4(),
+            user_id=uuid4(),
+            label='home',
+            line2='line2',
+            region='B',
+            country='RO',
+            is_default_shipping=True,
+            is_default_billing=False,
+            created_at=now,
+            updated_at=now,
+        )
+    )
+    assert masked_addr is not None and masked_addr['line1'] == '***'
+    assert orders_api._masked_admin_address(None) is None
+
+
+def test_orders_admin_order_base_and_email_events_stmt_helpers(monkeypatch: pytest.MonkeyPatch) -> None:
+    from datetime import datetime, timezone, timedelta
+
+    now = datetime(2026, 3, 1, tzinfo=timezone.utc)
+    order = SimpleNamespace(
+        id=uuid4(),
+        customer_email='buyer@example.com',
+        customer_name='Buyer Name',
+        invoice_company='Buyer SRL',
+        invoice_vat_id='RO-123',
+        locker_address='Main st',
+        user=SimpleNamespace(email='owner@example.com'),
+        tags=[SimpleNamespace(tag='priority')],
+        reference_code='REF-11',
+    )
+
+    class _Validated:
+        def model_dump(self):
+            return {
+                'invoice_company': 'Buyer SRL',
+                'invoice_vat_id': 'RO-123',
+                'locker_address': 'Main st',
+            }
+
+    monkeypatch.setattr(orders_api.OrderRead, 'model_validate', staticmethod(lambda _order: _Validated()))
+    monkeypatch.setattr(orders_api.pii_service, 'mask_text', lambda value, keep=1: f'masked:{value}:{keep}')
+    monkeypatch.setattr(orders_api.pii_service, 'mask_email', lambda value: f'masked:{value}')
+
+    base_masked = orders_api._admin_order_base_payload(order, include_pii=False)
+    assert str(base_masked['invoice_company']).startswith('masked:')
+    assert base_masked['locker_address'] == '***'
+
+    base_raw = orders_api._admin_order_base_payload(order, include_pii=True)
+    assert base_raw['invoice_company'] == 'Buyer SRL'
+
+    assert orders_api._admin_order_customer_email(order, include_pii=False).startswith('masked:')
+    assert orders_api._admin_order_customer_email(order, include_pii=True) == 'buyer@example.com'
+    assert orders_api._admin_order_tags(order) == ['priority']
+    assert orders_api._normalized_admin_order_customer_email(order) == 'buyer@example.com'
+    assert orders_api._admin_order_reference_for_email_filter(order) == 'ref-11'
+
+    stmt = orders_api._build_admin_order_email_events_stmt(
+        cleaned_email='buyer@example.com',
+        since=now - timedelta(days=1),
+        limit=500,
+        ref_lower='ref-11',
+    )
+    compiled = str(stmt)
+    assert 'email_delivery_events' in compiled.lower()
+
