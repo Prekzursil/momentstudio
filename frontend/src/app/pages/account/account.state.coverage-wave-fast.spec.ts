@@ -1006,3 +1006,149 @@ describe('AccountState fast export/passkey branches', () => {
 
 
 
+
+describe('AccountState fast residual branch closures', () => {
+  it('covers saveProfile required-field and future-date guards', () => {
+    const state = createAccountHarness();
+    primeProfile(state);
+    state.forceProfileCompletion = true;
+    state.t = (key: string) => key;
+    state.toast = jasmine.createSpyObj('ToastService', ['success', 'error', 'info']);
+
+    state.profileName = 'Display';
+    state.profileUsername = 'valid_user';
+    state.profileFirstName = '';
+    state.profileMiddleName = '';
+    state.profileLastName = 'Last';
+    state.profileDateOfBirth = '2000-01-01';
+    state.profilePhoneCountry = 'RO';
+    state.profilePhoneNational = '0712345678';
+    state.saveProfile();
+    expect(state.profileError).toContain('account.profile.errors.firstNameRequired');
+
+    state.profileFirstName = 'First';
+    state.profileLastName = '';
+    state.saveProfile();
+    expect(state.profileError).toContain('account.profile.errors.lastNameRequired');
+
+    state.profileLastName = 'Last';
+    state.profileDateOfBirth = '';
+    state.saveProfile();
+    expect(state.profileError).toContain('account.profile.errors.dobRequired');
+
+    state.profileDateOfBirth = '2099-01-01';
+    state.profilePhoneNational = '0712345678';
+    state.saveProfile();
+    expect(state.profileError).toContain('account.profile.errors.dobFuture');
+  });
+
+  it('covers loadPasskeys unsupported and error branches', () => {
+    const state = createAccountHarness();
+    primeAsyncSignals(state);
+    state.t = (key: string) => key;
+    state.toast = jasmine.createSpyObj('ToastService', ['success', 'error', 'info']);
+    state.auth = {
+      isAuthenticated: () => true,
+      listPasskeys: jasmine.createSpy('listPasskeys').and.returnValue(throwError(() => new Error('passkeys-fail'))),
+    };
+    state.passkeys = mockSignal<any[]>([{ id: 'old' }]);
+    state.passkeysLoaded = mockSignal(false);
+    state.passkeysLoading = mockSignal(false);
+    state.passkeysError = mockSignal<string | null>(null);
+
+    spyOn(state, 'passkeysSupported').and.returnValue(false);
+    (AccountState.prototype as any).loadPasskeys.call(state, true);
+    expect(state.passkeys()).toEqual([]);
+    expect(state.passkeysLoaded()).toBeTrue();
+
+    (state.passkeysSupported as jasmine.Spy).and.returnValue(true);
+    state.passkeysLoaded.set(false);
+    state.passkeysLoading.set(false);
+    (AccountState.prototype as any).loadPasskeys.call(state, true);
+    expect(state.passkeysError()).toContain('account.security.passkeys.loadError');
+  });
+
+  it('covers registerPasskey guard and start-error branches', () => {
+    const state = createAccountHarness();
+    state.t = (key: string) => key;
+    state.toast = jasmine.createSpyObj('ToastService', ['success', 'error', 'info']);
+    state.passkeysError = mockSignal<string | null>(null);
+    state.auth = {
+      isAuthenticated: () => true,
+      startPasskeyRegistration: jasmine
+        .createSpy('startPasskeyRegistration')
+        .and.returnValue(throwError(() => ({ error: { detail: 'start-passkey-failed' } }))),
+      completePasskeyRegistration: jasmine.createSpy('completePasskeyRegistration'),
+    };
+    state.registerPasskey = (AccountState.prototype as any).registerPasskey;
+
+    spyOn(state, 'passkeysSupported').and.returnValue(false);
+    state.passkeyRegisterPassword = ACCOUNT_FAST_PASSKEY;
+    state.registerPasskey();
+    expect(state.toast.error).toHaveBeenCalledWith('account.security.passkeys.notSupported');
+
+    (state.passkeysSupported as jasmine.Spy).and.returnValue(true);
+    state.passkeyRegisterPassword = '';
+    state.registerPasskey();
+    expect(state.toast.error).toHaveBeenCalledWith('auth.completeForm');
+
+    state.passkeyRegisterPassword = ACCOUNT_FAST_PASSKEY;
+    state.registerPasskey();
+    expect(state.passkeysError()).toBe('start-passkey-failed');
+    expect(state.registeringPasskey).toBeFalse();
+  });
+
+  it('covers confirmDeleteSecondaryEmail guard/success/error branches', () => {
+    const state = createAccountHarness();
+    primeAsyncSignals(state);
+    state.t = (key: string) => key;
+    state.toast = jasmine.createSpyObj('ToastService', ['success', 'error', 'info']);
+    state.secondaryEmailResendUntilById = mockSignal<Record<string, number>>({});
+    state.secondaryEmails = mockSignal<any[]>([{ id: 'secondary-1', email: 'a@example.com' }, { id: 'secondary-2', email: 'b@example.com' }]);
+    state.auth = {
+      deleteSecondaryEmail: jasmine.createSpy('deleteSecondaryEmail').and.returnValue(of({})),
+    };
+    state.removeSecondaryEmailId = 'secondary-1';
+    state.removeSecondaryEmailPassword = '';
+
+    spyOn(globalThis, 'confirm').and.returnValue(true);
+    state.confirmDeleteSecondaryEmail();
+    expect(state.toast.error).toHaveBeenCalledWith('auth.currentPasswordRequired');
+
+    state.removeSecondaryEmailPassword = ACCOUNT_FAST_CRED;
+    state.confirmDeleteSecondaryEmail();
+    expect(state.secondaryEmails().some((e: any) => e.id === 'secondary-1')).toBeFalse();
+    expect(state.toast.success).toHaveBeenCalledWith('account.security.emails.removed');
+
+    state.secondaryEmails.set([{ id: 'secondary-2', email: 'b@example.com' }]);
+    state.removeSecondaryEmailId = 'secondary-2';
+    state.removeSecondaryEmailPassword = ACCOUNT_FAST_CRED;
+    state.auth.deleteSecondaryEmail.and.returnValue(throwError(() => ({ error: { detail: 'remove-failed' } })));
+    state.confirmDeleteSecondaryEmail();
+    expect(state.secondaryEmailMessage).toBe('remove-failed');
+    expect(state.toast.error).toHaveBeenCalledWith('remove-failed');
+  });
+
+  it('covers loadLatestExportJob 404 and generic-error branches', () => {
+    const state = createAccountHarness();
+    state.t = (key: string) => key;
+    state.toast = jasmine.createSpyObj('ToastService', ['success', 'error', 'info']);
+    state.auth = { isAuthenticated: () => true };
+    state.exportJobLoading = mockSignal(false);
+    state.exportJob = mockSignal<any>({ id: 'old', status: 'running' });
+    state.exportError = null;
+    state.startExportJobPolling = jasmine.createSpy('startExportJobPolling');
+    state.account = {
+      getLatestExportJob: jasmine.createSpy('getLatestExportJob').and.returnValue(throwError(() => ({ status: 404 }))),
+    };
+
+    (AccountState.prototype as any).loadLatestExportJob.call(state);
+    expect(state.exportJob()).toBeNull();
+
+    state.account.getLatestExportJob.and.returnValue(throwError(() => ({ status: 500, error: { detail: 'load-job-failed' } })));
+    (AccountState.prototype as any).loadLatestExportJob.call(state);
+    expect(state.exportError).toBe('load-job-failed');
+    expect(state.toast.error).toHaveBeenCalledWith('load-job-failed');
+  });
+});
+
