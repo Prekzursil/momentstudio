@@ -547,7 +547,8 @@ describe('AccountState coverage wave 4 FE-W2', () => {
 });
 
 
-  it('covers coupons/orders/addresses/tickets loader success paths', () => {
+describe('AccountState coverage wave 4 FE-W2 loader and overview helpers', () => {
+  it('covers coupons and orders loader success paths', () => {
     const state = createState();
     state.couponsService = jasmine.createSpyObj('CouponsService', ['myCoupons']);
     state.couponsService.myCoupons.and.returnValue(
@@ -580,6 +581,17 @@ describe('AccountState coverage wave 4 FE-W2', () => {
     state.ordersFrom = '';
     state.ordersTo = '';
 
+    state.loadCouponsCount();
+    state.loadOrders();
+
+    expect(state.couponsCount()).toBe(1);
+    expect(state.orders().length).toBe(1);
+    expect(state.latestOrder()?.id).toBe('o-1');
+    expect(state.totalPages).toBe(2);
+  });
+
+  it('covers addresses and tickets loader success paths', () => {
+    const state = createState();
     state.account.getAddresses = jasmine
       .createSpy('getAddresses')
       .and.returnValue(of([{ id: 'addr-1', city: 'Bucharest', line1: 'Main 1' }]));
@@ -600,21 +612,15 @@ describe('AccountState coverage wave 4 FE-W2', () => {
     state.ticketsLoaded = makeSignal(false);
     state.ticketsError = makeSignal<string | null>(null);
 
-    state.loadCouponsCount();
-    state.loadOrders();
     state.loadAddresses();
     state.loadTickets();
 
-    expect(state.couponsCount()).toBe(1);
-    expect(state.orders().length).toBe(1);
-    expect(state.latestOrder()?.id).toBe('o-1');
-    expect(state.totalPages).toBe(2);
     expect(state.addresses().length).toBe(1);
     expect(state.tickets()[0]?.id).toBe('t-newer');
     expect(state.ticketsLoaded()).toBeTrue();
   });
 
-  it('covers loader error and guard exits for authenticated account data methods', () => {
+  it('covers loader error branches for account data methods', () => {
     const state = createState();
     state.couponsService = jasmine.createSpyObj('CouponsService', ['myCoupons']);
     state.couponsService.myCoupons.and.returnValue(throwError(() => new Error('coupon-fail')));
@@ -660,13 +666,25 @@ describe('AccountState coverage wave 4 FE-W2', () => {
     expect(state.addressesError()).toBe('account.addresses.loadError');
     expect(state.ticketsError()).toBe('account.overview.support.loadError');
     expect(state.tickets()).toEqual([]);
+  });
 
+  it('covers loader guard exits for unauthenticated users', () => {
+    const state = createState();
     state.auth.isAuthenticated.and.returnValue(false);
+    state.account.getOrdersPage = jasmine.createSpy('getOrdersPage');
+    state.account.getAddresses = jasmine.createSpy('getAddresses');
+    state.ticketsService = jasmine.createSpyObj('TicketsService', ['listMine']);
+    state.couponsService = jasmine.createSpyObj('CouponsService', ['myCoupons']);
+
     state.loadCouponsCount(true);
     state.loadOrders(true);
     state.loadAddresses(true);
     state.loadTickets(true);
-    expect(state.account.getOrdersPage.calls.count()).toBeGreaterThan(0);
+
+    expect(state.account.getOrdersPage).not.toHaveBeenCalled();
+    expect(state.account.getAddresses).not.toHaveBeenCalled();
+    expect(state.ticketsService.listMine).not.toHaveBeenCalled();
+    expect(state.couponsService.myCoupons).not.toHaveBeenCalled();
   });
 
   it('covers account overview labels, cooldown formatting, and support status helpers', () => {
@@ -726,6 +744,8 @@ describe('AccountState coverage wave 4 FE-W2', () => {
     expect(state.emailCooldownSeconds()).toBe(0);
     expect(state.formatCooldown(3661)).toContain('1h');
   });
+});
+
 
 
 describe('AccountState coverage wave 4 FE-W2 orders and receipt flows', () => {
