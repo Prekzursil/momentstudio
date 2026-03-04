@@ -105,4 +105,35 @@ describe('RichEditorComponent', () => {
     expect(styles.ensure).toHaveBeenCalled();
     expect((component as any).editor).toBeNull();
   });
+
+  it('creates native editor shell and emits value changes from insert/input events', async () => {
+    const emitSpy = spyOn(component.valueChange, 'emit');
+    await (component as any).initEditor();
+
+    const hostEl = component.host.nativeElement;
+    const textarea = hostEl.querySelector('textarea') as HTMLTextAreaElement;
+    expect(textarea).toBeTruthy();
+
+    component.insertMarkdown('hello');
+    expect(textarea.value).toContain('hello');
+    expect(emitSpy).toHaveBeenCalled();
+
+    textarea.value = 'typed value';
+    textarea.dispatchEvent(new Event('input'));
+    expect(component.value).toBe('typed value');
+  });
+
+  it('supports cursor-to-end updates and clears host content on destroy', async () => {
+    await (component as any).initEditor();
+    const hostEl = component.host.nativeElement;
+    const textarea = hostEl.querySelector('textarea') as HTMLTextAreaElement;
+
+    (component as any).editor.setMarkdown('abc', true);
+    expect(textarea.selectionStart).toBe(3);
+    expect(textarea.selectionEnd).toBe(3);
+
+    component.ngOnDestroy();
+    expect(hostEl.innerHTML).toBe('');
+  });
+
 });
