@@ -4,7 +4,7 @@ import { ActivatedRoute } from '@angular/router';
 import { RouterTestingModule } from '@angular/router/testing';
 import { Meta, Title } from '@angular/platform-browser';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { Observable, of, Subject } from 'rxjs';
+import { Observable, of, Subject, throwError } from 'rxjs';
 
 import { BlogPostComponent } from './blog-post.component';
 import { AdminService } from '../../core/admin.service';
@@ -181,6 +181,31 @@ describe('BlogPostComponent', () => {
       spyOn(globalThis, 'prompt').and.returnValue('');
     }
   });
+  function createQuickEditHarness(): {
+    cmp: any;
+    admin: jasmine.SpyObj<AdminService>;
+    baseBlock: any;
+    toggleQuickEdit: jasmine.Spy;
+  } {
+    configureBlogPostTestingModule({ meta, title, blog, toast, markdown, auth, routeStub, doc });
+    const fixture = TestBed.createComponent(BlogPostComponent);
+    const cmp = fixture.componentInstance as any;
+    const admin = TestBed.inject(AdminService) as jasmine.SpyObj<AdminService>;
+    const baseBlock = {
+      version: 4,
+      status: 'draft',
+      published_at: '2999-01-01T00:00:00Z',
+      published_until: null,
+      meta: { tags: ['old'], summary: { en: 'Old summary' } }
+    } as any;
+
+    cmp.slug = 'first-post';
+    cmp.post.set({ ...BLOG_POST_FIXTURE, title: 'Old title' });
+    cmp.adminBlock.set(baseBlock);
+
+    const toggleQuickEdit = spyOn(cmp, 'toggleQuickEdit').and.stub();
+    return { cmp, admin, baseBlock, toggleQuickEdit };
+  }
 
   it('loads a post and sets canonical/OG tags', () => {
     configureBlogPostTestingModule({ meta, title, blog, toast, markdown, auth, routeStub, doc });
@@ -408,6 +433,80 @@ describe('BlogPostComponent', () => {
     expect(toast.error).toHaveBeenCalledWith('blog.comments.createErrorTitle', 'blog.comments.createErrorCopy');
   });
 
+  it('handles load failure branch and resets state deterministically', () => {
+    configureBlogPostTestingModule({ meta, title, blog, toast, markdown, auth, routeStub, doc });
+    const fixture = TestBed.createComponent(BlogPostComponent);
+    const cmp = fixture.componentInstance as any;
+
+    cmp.slug = 'missing-post';
+    blog.getPost.and.returnValue(throwError(() => new Error('missing')));
+
+    cmp.load();
+
+    expect(cmp.post()).toBeNull();
+    expect(cmp.hasPostError()).toBeTrue();
+    expect(cmp.loadingPost()).toBeFalse();
+    expect(cmp.commentsTotal()).toBe(0);
+    expect(cmp.commentSubscribed()).toBeFalse();
+  });
+
+  it('quick-edit exits early when there are no changes', () => {
+    const { cmp, toggleQuickEdit, baseBlock } = createQuickEditHarness();
+    cmp.quickEditTitle = 'Old title';
+    cmp.quickEditSummary = 'Old summary';
+    cmp.quickEditTags = 'old';
+    cmp.quickEditPublishAt = cmp.toDateTimeLocal(baseBlock.published_at);
+    cmp.quickEditUnpublishAt = '';
+    cmp.quickEditStatus = 'draft';
+
+    cmp.saveQuickEdit();
+
+    expect(toggleQuickEdit).toHaveBeenCalled();
+  });
+
+  it('quick-edit updates metadata and title when values changed', () => {
+    const { cmp, admin, baseBlock } = createQuickEditHarness();
+
+    toast.success.calls.reset();
+    cmp.quickEditTitle = 'New title';
+    cmp.quickEditSummary = 'New summary';
+    cmp.quickEditTags = 'new, featured';
+    cmp.quickEditStatus = 'published';
+    cmp.quickEditPublishAt = '';
+    cmp.quickEditUnpublishAt = '2030-01-01T10:30';
+
+    admin.updateContentBlock.and.returnValues(
+      of({ ...baseBlock, version: 5, status: 'published', meta: { tags: ['new', 'featured'], summary: { en: 'New summary' } } } as any),
+      of({ ...baseBlock, version: 6, title: 'New title' } as any),
+    );
+
+    cmp.saveQuickEdit();
+
+    expect(admin.updateContentBlock.calls.count()).toBe(2);
+    expect(cmp.quickEditSaving()).toBeFalse();
+    expect(cmp.post()?.title).toBe('New title');
+    expect(toast.success).toHaveBeenCalled();
+  });
+
+  it('quick-edit captures update errors and resets saving state', () => {
+    const { cmp, admin } = createQuickEditHarness();
+
+    toast.error.calls.reset();
+    cmp.quickEditTitle = '';
+    cmp.quickEditSummary = 'Broken save';
+    cmp.quickEditTags = 'broken';
+    cmp.quickEditStatus = 'draft';
+    cmp.quickEditPublishAt = '';
+    cmp.quickEditUnpublishAt = '';
+
+    admin.updateContentBlock.and.returnValue(throwError(() => ({ error: { detail: 'save failed' } })));
+
+    cmp.saveQuickEdit();
+
+    expect(cmp.quickEditSaving()).toBeFalse();
+    expect(cmp.quickEditError()).toBe('save failed');
+    expect(toast.error).toHaveBeenCalled();
+  });
   it('sweeps prototype methods through guarded branches without throwing', () => {
     configureBlogPostTestingModule({ meta, title, blog, toast, markdown, auth, routeStub, doc });
     const fixture = TestBed.createComponent(BlogPostComponent);
