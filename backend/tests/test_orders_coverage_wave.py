@@ -1325,3 +1325,107 @@ async def test_orders_admin_refund_email_cancel_and_reorder_routes_superstep_a(m
     assert {'refunded', 'owner-cancel', 'user-cancel'}.issubset(set(queued))
 
 
+
+
+@pytest.mark.anyio
+async def test_orders_status_email_and_refund_helper_branches(monkeypatch: pytest.MonkeyPatch) -> None:
+    order = SimpleNamespace(
+        id=uuid4(),
+        reference_code='REF-77',
+        status=OrderStatus.cancelled,
+        payment_method='paypal',
+        paypal_capture_id='cap-1',
+        stripe_payment_intent_id=None,
+        user=SimpleNamespace(id=uuid4(), email='buyer@example.com', preferred_language='ro'),
+        customer_email='buyer@example.com',
+        tracking_number='TRK-1',
+        events=[SimpleNamespace(event='payment_captured')],
+    )
+
+    assert orders_api._cancelled_order_refund_method(order) == 'paypal'
+    order.payment_method = 'stripe'
+    order.paypal_capture_id = None
+    order.stripe_payment_intent_id = 'pi_1'
+    assert orders_api._cancelled_order_refund_method(order) == 'stripe'
+    order.events = []
+    assert orders_api._cancelled_order_refund_method(order) is None
+
+    notifications: list[tuple[str, str]] = []
+
+    async def _owner(_session):
+        await asyncio.sleep(0)
+        return SimpleNamespace(id=uuid4(), preferred_language='en')
+
+    async def _notify(*_args, user_id, type, title, **_kwargs):
+        await asyncio.sleep(0)
+        notifications.append((str(user_id), f"{type}:{title}"))
+
+    monkeypatch.setattr(orders_api.auth_service, 'get_owner_user', _owner)
+    monkeypatch.setattr(orders_api.notification_service, 'create_notification', _notify)
+
+    order.status = OrderStatus.cancelled
+    order.payment_method = 'paypal'
+    order.paypal_capture_id = 'cap-1'
+    await orders_api._notify_owner_manual_refund_required(SimpleNamespace(), order)
+    await orders_api._notify_user_order_processing(SimpleNamespace(), order)
+    await orders_api._notify_user_order_cancelled(SimpleNamespace(), order)
+    await orders_api._notify_user_order_status_change(SimpleNamespace(), order)
+    assert notifications
+
+    order.events = []
+    background_tasks = BackgroundTasks()
+
+    async def _reward(*_args, **_kwargs):
+        await asyncio.sleep(0)
+        return None
+
+    monkeypatch.setattr(orders_api, '_queue_first_order_reward_email', _reward)
+    await orders_api._queue_customer_status_email(SimpleNamespace(), background_tasks, order)
+    assert len(background_tasks.tasks) >= 1
+
+    order.status = OrderStatus.shipped
+    await orders_api._queue_customer_status_email(SimpleNamespace(), background_tasks, order)
+    order.status = OrderStatus.delivered
+    await orders_api._queue_customer_status_email(SimpleNamespace(), background_tasks, order)
+    order.status = OrderStatus.cancelled
+    await orders_api._queue_customer_status_email(SimpleNamespace(), background_tasks, order)
+    order.status = OrderStatus.refunded
+    await orders_api._queue_customer_status_email(SimpleNamespace(), background_tasks, order)
+
+
+@pytest.mark.anyio
+async def test_orders_admin_route_and_shipping_method_guard_branches(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def _missing(*_args, **_kwargs):
+        await asyncio.sleep(0)
+        return None
+
+    monkeypatch.setattr(orders_api.order_service, 'get_order_by_id_admin', _missing)
+    request = _request()
+    admin = SimpleNamespace(id=uuid4(), email='admin@example.com', username='admin')
+
+    with pytest.raises(HTTPException, match='Order not found'):
+        await orders_api.admin_get_order(uuid4(), request, False, SimpleNamespace(), admin)
+
+    with pytest.raises(HTTPException, match='Order not found'):
+        await orders_api.admin_list_order_email_events(uuid4(), request, False, 50, 24, SimpleNamespace(), admin)
+
+    with pytest.raises(HTTPException, match='Missing guest session id'):
+        await orders_api.guest_checkout(SimpleNamespace(email='guest@example.com', preferred_language='en'), request, Response(), BackgroundTasks(), None, SimpleNamespace(), None)
+
+    assert await orders_api._resolve_shipping_method_for_order_update(SimpleNamespace(), SimpleNamespace(shipping_method_id=None)) is None
+
+    async def _shipping_none(*_args, **_kwargs):
+        await asyncio.sleep(0)
+        return None
+
+    monkeypatch.setattr(orders_api.order_service, 'get_shipping_method', _shipping_none)
+    with pytest.raises(HTTPException, match='Shipping method not found'):
+        await orders_api._resolve_shipping_method_for_order_update(SimpleNamespace(), SimpleNamespace(shipping_method_id='ship-1'))
+
+    async def _shipping_ok(*_args, **_kwargs):
+        await asyncio.sleep(0)
+        return SimpleNamespace(id='ship-1')
+
+    monkeypatch.setattr(orders_api.order_service, 'get_shipping_method', _shipping_ok)
+    resolved = await orders_api._resolve_shipping_method_for_order_update(SimpleNamespace(), SimpleNamespace(shipping_method_id='ship-1'))
+    assert resolved.id == 'ship-1'

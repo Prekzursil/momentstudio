@@ -541,3 +541,113 @@ describe('AccountState coverage wave 4 FE-W2', () => {
     expect(attempted).toBeGreaterThan(30);
   });
 });
+
+
+describe('AccountState coverage wave 4 FE-W2 orders and receipt flows', () => {
+  it('covers reorder and reorderItem success/error/guard branches', () => {
+    const state = createState();
+    state.cart = { loadFromBackend: jasmine.createSpy('loadFromBackend') };
+    state.router.navigateByUrl = jasmine.createSpy('navigateByUrl').and.returnValue(Promise.resolve(true));
+    state.api = jasmine.createSpyObj('ApiService', ['post']);
+    state.account.reorderOrder = jasmine.createSpy('reorderOrder').and.returnValue(of({}));
+    state.api.post.and.returnValue(of({}));
+
+    const order = { id: 'o-1', status: 'paid' } as any;
+    const item = { id: 'i-1', product_id: 'p-1', variant_id: null } as any;
+
+    state.reorder(order);
+    state.reorderItem(order, item);
+
+    expect(state.cart.loadFromBackend).toHaveBeenCalled();
+    expect(state.toast.success).toHaveBeenCalled();
+
+    state.account.reorderOrder.and.returnValue(throwError(() => ({ error: { detail: 'reorder-fail' } })));
+    state.reorder(order);
+    expect(state.toast.error).toHaveBeenCalledWith('reorder-fail');
+  });
+
+  it('covers cancel request open/submit branches including validation', () => {
+    const state = createState();
+    state.account.requestOrderCancellation = jasmine.createSpy('requestOrderCancellation').and.returnValue(
+      of({ id: 'o-1', status: 'cancel_requested' }),
+    );
+    state.cancelRequestedOrderIds = new Set<string>();
+    state.orders = makeSignal<any[]>([{ id: 'o-1', status: 'paid' }]);
+    state.latestOrder = makeSignal<any | null>(null);
+    spyOn(globalThis, 'confirm').and.returnValues(false, true);
+
+    const order = { id: 'o-1', status: 'paid', reference_code: 'REF-1', events: [] } as any;
+    state.openCancelRequest(order);
+    expect(state.cancelOrderId).toBe('o-1');
+
+    state.cancelReason = '';
+    state.submitCancelRequest(order);
+    expect(state.cancelRequestError).toBe('account.orders.cancel.errors.reasonRequired');
+
+    state.cancelReason = 'Need to cancel';
+    state.submitCancelRequest(order);
+    expect(state.account.requestOrderCancellation).not.toHaveBeenCalled();
+
+    state.submitCancelRequest(order);
+    expect(state.account.requestOrderCancellation).toHaveBeenCalledWith('o-1', 'Need to cancel');
+  });
+
+  it('covers return request validation and success/error transitions', () => {
+    const state = createState();
+    state.account.createReturnRequest = jasmine.createSpy('createReturnRequest').and.returnValue(of({ id: 'r-1' }));
+    state.returnRequestedOrderIds = new Set<string>();
+
+    const order = {
+      id: 'o-2',
+      status: 'delivered',
+      items: [{ id: 'i-1', quantity: 2 }, { id: 'i-2', quantity: 1 }],
+    } as any;
+
+    state.openReturnRequest(order);
+    state.returnReason = '';
+    state.submitReturnRequest(order);
+    expect(state.returnCreateError).toBe('account.orders.return.errors.reasonRequired');
+
+    state.returnReason = 'Size mismatch';
+    state.returnQty = { 'i-1': 3 };
+    state.submitReturnRequest(order);
+    expect(state.returnCreateError).toBe('account.orders.return.errors.invalidQuantity');
+
+    state.returnQty = { 'i-1': 1 };
+    state.submitReturnRequest(order);
+    expect(state.account.createReturnRequest).toHaveBeenCalled();
+    expect(state.toast.success).toHaveBeenCalled();
+
+    state.account.createReturnRequest.and.returnValue(throwError(() => ({ error: { detail: 'Return request already exists' } })));
+    state.openReturnRequest(order);
+    state.returnReason = 'Retry';
+    state.returnQty = { 'i-1': 1 };
+    state.submitReturnRequest(order);
+    expect(state.returnCreateError).toBe('account.orders.return.errors.alreadyExists');
+  });
+
+  it('covers receipt share existing token and revoke branch', () => {
+    const state = createState();
+    state.account.shareReceipt = jasmine.createSpy('shareReceipt').and.returnValue(
+      of({ receipt_url: 'https://example/receipt', expires_at: '2099-01-01T00:00:00Z' }),
+    );
+    state.receiptShares = makeSignal<Record<string, any>>({});
+    state.account.revokeReceiptShare = jasmine.createSpy('revokeReceiptShare').and.returnValue(of({}));
+    state.copyReceiptUrl = jasmine.createSpy('copyReceiptUrl').and.returnValue(Promise.resolve());
+    spyOn(globalThis, 'confirm').and.returnValue(true);
+
+    const order = { id: 'o-3' } as any;
+    state.receiptShares.set({ 'o-3': { receipt_url: 'https://unused', expires_at: '2000-01-01T00:00:00Z' } as any });
+    state.shareReceipt(order);
+    expect(state.account.shareReceipt).toHaveBeenCalledWith('o-3');
+
+    state.receiptShares.set({
+      'o-3': { receipt_url: 'https://example/receipt', expires_at: '2099-01-01T00:00:00Z' } as any,
+    });
+    state.shareReceipt(order);
+    expect(state.copyReceiptUrl).toHaveBeenCalled();
+
+    state.revokeReceiptShare(order);
+    expect(state.account.revokeReceiptShare).toHaveBeenCalledWith('o-3');
+  });
+});

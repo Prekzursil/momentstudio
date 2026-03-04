@@ -65,6 +65,42 @@ function immediateResult<T>(value: T, emitError = false) {
   };
 }
 
+
+function attachTaxCategoryAndFxHarness(component: any) {
+  const taxesAdmin = jasmine.createSpyObj('TaxesAdminService', [
+    'listGroups',
+    'createGroup',
+    'updateGroup',
+    'deleteGroup',
+    'upsertRate',
+    'deleteRate',
+  ]);
+  taxesAdmin.listGroups.and.returnValue(
+    immediateResult([{ id: 'g1', code: 'STD', name: 'Standard', is_default: false, rates: [] }]),
+  );
+  taxesAdmin.createGroup.and.returnValue(immediateResult({}));
+  taxesAdmin.updateGroup.and.returnValue(immediateResult({ low_stock_threshold: 3, tax_group_id: 'g1' }));
+  taxesAdmin.deleteGroup.and.returnValue(immediateResult({}));
+  taxesAdmin.upsertRate.and.returnValue(immediateResult({}));
+  taxesAdmin.deleteRate.and.returnValue(immediateResult({}));
+  component.taxesAdmin = taxesAdmin;
+
+  const admin = jasmine.createSpyObj('AdminService', ['updateCategory', 'deleteCategory', 'updateProduct']);
+  admin.updateCategory.and.returnValue(immediateResult({ low_stock_threshold: 3, tax_group_id: 'g2' }));
+  admin.deleteCategory.and.returnValue(immediateResult({}));
+  admin.updateProduct.and.returnValue(immediateResult({}));
+  component.admin = admin;
+
+  const fxAdmin = jasmine.createSpyObj('FxAdminService', ['clearOverride', 'setOverride']);
+  fxAdmin.clearOverride.and.returnValue(immediateResult({}));
+  fxAdmin.setOverride.and.returnValue(immediateResult({}));
+  component.fxAdmin = fxAdmin;
+  component.fxStatus = () => ({ override: { eur_per_ron: 4.95, usd_per_ron: 4.6 } });
+  component.loadFxStatus = jasmine.createSpy('loadFxStatus');
+
+  return { taxesAdmin, admin, fxAdmin };
+}
+
 const GLOBAL_CTX = globalThis as Window & typeof globalThis;
 
 describe('AdminComponent fast coverage helpers', () => {
@@ -540,3 +576,131 @@ describe('AdminComponent fast preview/blog seo/page-visibility branches', () => 
   });
 });
 
+
+
+describe('AdminComponent fast tax/category/fx/product branches', () => {
+  it('loads tax groups through success and error branches', () => {
+    const component = createAdminHarness() as any;
+    const { taxesAdmin } = attachTaxCategoryAndFxHarness(component);
+
+    component.loadTaxGroups();
+    expect(component.taxGroups.length).toBe(1);
+    expect(component.taxGroupsLoading).toBeFalse();
+    expect(component.taxGroupsError).toBeNull();
+
+    taxesAdmin.listGroups.and.returnValue(immediateResult([], true));
+    component.loadTaxGroups();
+    expect(component.taxGroups).toEqual([]);
+    expect(component.taxGroupsLoading).toBeFalse();
+    expect(component.taxGroupsError).toContain('boom');
+  });
+
+  it('covers tax group create/update/default/delete and rate upsert/delete guards', () => {
+    const component = createAdminHarness() as any;
+    const { taxesAdmin } = attachTaxCategoryAndFxHarness(component);
+    component.toast = jasmine.createSpyObj('ToastService', ['success', 'error']);
+    component.loadTaxGroups = jasmine.createSpy('loadTaxGroups');
+    component.taxGroupCreate = { code: ' ', name: ' ', description: '', is_default: false };
+
+    component.createTaxGroup();
+    expect(component.toast.error).toHaveBeenCalled();
+    expect(taxesAdmin.createGroup).not.toHaveBeenCalled();
+
+    component.taxGroupCreate = { code: 'STD', name: 'Standard', description: 'Desc', is_default: true };
+    component.createTaxGroup();
+    expect(taxesAdmin.createGroup).toHaveBeenCalled();
+    expect(component.loadTaxGroups).toHaveBeenCalled();
+
+    const group = { id: 'g1', name: '', description: '', is_default: false } as any;
+    component.saveTaxGroup(group);
+    expect(component.toast.error).toHaveBeenCalled();
+
+    group.name = 'Updated';
+    component.saveTaxGroup(group);
+    expect(taxesAdmin.updateGroup).toHaveBeenCalledWith('g1', jasmine.objectContaining({ name: 'Updated' }));
+
+    component.setDefaultTaxGroup({ id: 'g1', is_default: true } as any);
+    component.setDefaultTaxGroup({ id: 'g2', is_default: false } as any);
+    expect(taxesAdmin.updateGroup).toHaveBeenCalledWith('g2', { is_default: true });
+
+    component.deleteTaxGroup({ id: 'g1', is_default: true } as any);
+    component.deleteTaxGroup({ id: 'g2', is_default: false } as any);
+    expect(taxesAdmin.deleteGroup).toHaveBeenCalledWith('g2');
+
+    component.taxRateCountry = { g2: '' };
+    component.taxRatePercent = { g2: '' };
+    component.upsertTaxRate({ id: 'g2' } as any);
+    expect(component.toast.error).toHaveBeenCalled();
+
+    component.taxRateCountry.g2 = 'RO';
+    component.taxRatePercent.g2 = '19';
+    component.upsertTaxRate({ id: 'g2' } as any);
+    expect(taxesAdmin.upsertRate).toHaveBeenCalledWith('g2', { country_code: 'RO', vat_rate_percent: 19 });
+
+    component.deleteTaxRate({ id: 'g2' } as any, '   ');
+    component.deleteTaxRate({ id: 'g2' } as any, 'RO');
+    expect(taxesAdmin.deleteRate).toHaveBeenCalledWith('g2', 'RO');
+  });
+
+  it('covers category parent/threshold/tax-group/delete-confirm branches', () => {
+    const component = createAdminHarness() as any;
+    const { admin } = attachTaxCategoryAndFxHarness(component);
+    component.toast = jasmine.createSpyObj('ToastService', ['success', 'error']);
+    component.categories = [
+      { id: 'root', slug: 'root', name: 'Root', parent_id: null },
+      { id: 'child', slug: 'child', name: 'Child', parent_id: 'root' },
+      { id: 'leaf', slug: 'leaf', name: 'Leaf', parent_id: 'child' },
+    ];
+    const cat = { id: 'child', slug: 'child', parent_id: 'root', low_stock_threshold: null, tax_group_id: null } as any;
+
+    expect(component.categoryParentLabel(cat)).toBe('Root');
+    const options = component.categoryParentOptions(cat);
+    expect(options.some((row: any) => row.id === 'leaf')).toBeFalse();
+
+    component.updateCategoryLowStockThreshold(cat, 'bad');
+    expect(component.toast.error).toHaveBeenCalled();
+    const previousThreshold = cat.low_stock_threshold;
+    component.updateCategoryLowStockThreshold(cat, '5');
+    expect(admin.updateCategory).toHaveBeenCalledWith('child', { low_stock_threshold: 5 });
+    expect(cat.low_stock_threshold).not.toBe(previousThreshold);
+
+    component.updateCategoryTaxGroup(cat, '');
+    component.updateCategoryTaxGroup(cat, 'g2');
+    expect(admin.updateCategory).toHaveBeenCalledWith('child', { tax_group_id: 'g2' });
+
+    component.openCategoryDeleteConfirm(cat);
+    expect(component.categoryDeleteConfirmOpen()).toBeTrue();
+    component.confirmDeleteCategory();
+    expect(admin.deleteCategory).toHaveBeenCalledWith('child');
+
+    const done = jasmine.createSpy('done');
+    component.deleteCategory('child', { done });
+    expect(done).toHaveBeenCalledWith(true);
+  });
+
+  it('covers fx override clear branches and bulk stock save success/error', async () => {
+    const component = createAdminHarness() as any;
+    const { admin, fxAdmin } = attachTaxCategoryAndFxHarness(component);
+    component.toast = jasmine.createSpyObj('ToastService', ['success', 'error']);
+    spyOn(globalThis, 'confirm').and.returnValues(false, true);
+
+    component.clearFxOverride();
+    expect(fxAdmin.clearOverride).not.toHaveBeenCalled();
+
+    component.clearFxOverride();
+    expect(fxAdmin.clearOverride).toHaveBeenCalled();
+    expect(component.loadFxStatus).toHaveBeenCalled();
+
+    component.bulkStock = 7;
+    component.selectedIds = new Set(['p-1']);
+    component.products = [{ id: 'p-1', slug: 'slug-1', stock_quantity: 1 }];
+    await component.saveBulkStock();
+    expect(admin.updateProduct).toHaveBeenCalledWith('slug-1', { stock_quantity: 7 });
+    expect(component.products[0].stock_quantity).toBe(7);
+
+    admin.updateProduct.and.returnValue(throwError(() => new Error('bulk-fail')));
+    component.products[0].stock_quantity = 2;
+    await component.saveBulkStock();
+    expect(component.toast.error).toHaveBeenCalled();
+  });
+});
