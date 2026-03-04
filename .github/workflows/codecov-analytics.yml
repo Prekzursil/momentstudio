@@ -155,10 +155,18 @@ jobs:
             exit 0
           fi
           python -c "import json, os, pathlib; pathlib.Path('/tmp/codecov-bundle-browser.json').write_text(json.dumps({'gitService': 'github', 'oidc': {'useGitHubOIDC': True, 'gitHubOIDCTokenAudience': 'https://codecov.io'}, 'uploadOverrides': {'slug': os.environ['CODECOV_SLUG'], 'sha': os.environ['GITHUB_SHA'], 'pr': os.environ['CODECOV_PR'], 'branch': os.environ['CODECOV_BRANCH'], 'build': os.environ['CODECOV_BUILD']}}, indent=2), encoding='utf-8')"
-          npx --yes --package @codecov/bundle-analyzer bundle-analyzer ./frontend/dist/app/browser \
-            --bundle-name=adrianaart-frontend-browser \
-            --config-file=/tmp/codecov-bundle-browser.json
-          bundle_exit=$?
+          bundle_exit=1
+          for attempt in 1 2 3 4; do
+            npx --yes --package @codecov/bundle-analyzer bundle-analyzer ./frontend/dist/app/browser \
+              --bundle-name=adrianaart-frontend-browser \
+              --config-file=/tmp/codecov-bundle-browser.json
+            bundle_exit=$?
+            if [ "$bundle_exit" -eq 0 ]; then
+              break
+            fi
+            echo "::warning::Browser bundle upload attempt ${attempt} failed (exit=${bundle_exit}); retrying."
+            sleep $((attempt * 5))
+          done
           echo "bundle_exit_code=$bundle_exit" >> "$GITHUB_OUTPUT"
           exit 0
 
@@ -174,10 +182,18 @@ jobs:
           cd ..
           if [ "$ssr_build_exit" -eq 0 ] && [ -d frontend/dist/app/server ]; then
             python -c "import json, os, pathlib; pathlib.Path('/tmp/codecov-bundle-ssr.json').write_text(json.dumps({'gitService': 'github', 'oidc': {'useGitHubOIDC': True, 'gitHubOIDCTokenAudience': 'https://codecov.io'}, 'uploadOverrides': {'slug': os.environ['CODECOV_SLUG'], 'sha': os.environ['GITHUB_SHA'], 'pr': os.environ['CODECOV_PR'], 'branch': os.environ['CODECOV_BRANCH'], 'build': os.environ['CODECOV_BUILD']}}, indent=2), encoding='utf-8')"
-            npx --yes --package @codecov/bundle-analyzer bundle-analyzer ./frontend/dist/app/server \
-              --bundle-name=adrianaart-frontend-server \
-              --config-file=/tmp/codecov-bundle-ssr.json
-            ssr_bundle_exit=$?
+            ssr_bundle_exit=1
+            for attempt in 1 2 3 4; do
+              npx --yes --package @codecov/bundle-analyzer bundle-analyzer ./frontend/dist/app/server \
+                --bundle-name=adrianaart-frontend-server \
+                --config-file=/tmp/codecov-bundle-ssr.json
+              ssr_bundle_exit=$?
+              if [ "$ssr_bundle_exit" -eq 0 ]; then
+                break
+              fi
+              echo "::warning::SSR bundle upload attempt ${attempt} failed (exit=${ssr_bundle_exit}); retrying."
+              sleep $((attempt * 5))
+            done
           else
             ssr_bundle_exit=$ssr_build_exit
           fi
