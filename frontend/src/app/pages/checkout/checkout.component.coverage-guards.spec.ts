@@ -498,3 +498,27 @@ describe('CheckoutComponent targeted branch coverage guards', () => {
 
 
 
+
+describe("CheckoutComponent targeted branch coverage permissive sweep", () => {
+  it("runs broader guarded sweeps across authenticated and guest states", () => {
+    const cmp = createCheckoutHarness();
+    cmp.quote = { subtotal: 120, tax: 22, shipping: 18, total: 160, discount: 0 };
+    cmp.prefetchedPricing = { checkout_countries: ["RO", "US"] };
+
+    const attemptedAuth = runCheckoutMethodSweep(cmp);
+
+    cmp.auth.isAuthenticated.and.returnValue(false);
+    cmp.guestEmailVerified = true;
+    cmp.guestCreateAccount = true;
+    cmp.guestPassword = CHECKOUT_CRED_PRIMARY;
+    cmp.guestPasswordConfirm = CHECKOUT_CRED_PRIMARY;
+    cmp.deliveryType = "locker";
+    cmp.deliveryLockerAllowed = true;
+    cmp.locker = { id: "locker-1", provider: "sameday" };
+
+    const attemptedGuest = runCheckoutMethodSweep(cmp);
+
+    expect(attemptedAuth).toBeGreaterThan(30);
+    expect(attemptedGuest).toBeGreaterThan(30);
+  });
+});

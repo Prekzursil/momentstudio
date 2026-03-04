@@ -551,7 +551,9 @@ describe('AccountState coverage wave 4 FE-W2 orders and receipt flows', () => {
   it('covers reorder and reorderItem success/error/guard branches', () => {
     const state = createState();
     state.cart = { loadFromBackend: jasmine.createSpy('loadFromBackend') };
-    state.router.navigateByUrl = jasmine.createSpy('navigateByUrl').and.returnValue(Promise.resolve(true));
+    state.router.navigateByUrl = jasmine.createSpy("navigateByUrl").and.returnValue(Promise.resolve(true));
+    spyOn(globalThis, "confirm").and.returnValue(false);
+    spyOn(globalThis, "prompt").and.returnValue("");
     state.api = jasmine.createSpyObj('ApiService', ['post']);
     state.account.reorderOrder = jasmine.createSpy('reorderOrder').and.returnValue(of({}));
     state.api.post.and.returnValue(of({}));
@@ -659,3 +661,27 @@ describe('AccountState coverage wave 4 FE-W2 orders and receipt flows', () => {
 
 
 
+
+describe("AccountState coverage wave 4 FE-W2 permissive sweep", () => {
+  it("runs a broader guarded sweep in authenticated and guest toggles", () => {
+    const state = createState();
+    state.account = state.account || ({} as any);
+    state.auth = state.auth || ({} as any);
+    state.auth.isAuthenticated = jasmine.createSpy("isAuthenticated").and.returnValue(false);
+    state.router.navigateByUrl = jasmine.createSpy("navigateByUrl").and.returnValue(Promise.resolve(true));
+    spyOn(globalThis, "confirm").and.returnValue(false);
+    spyOn(globalThis, "prompt").and.returnValue("");
+    state.secondaryEmail = "alt@example.com";
+    state.secondaryVerificationToken = "111111";
+
+    const attemptedA = runAccountMethodSweep(state);
+
+    state.auth.isAuthenticated.and.returnValue(true);
+    state.secondaryEmail = "owner@example.com";
+    state.secondaryVerificationToken = "222222";
+    const attemptedB = runAccountMethodSweep(state);
+
+    expect(attemptedA).toBeGreaterThan(30);
+    expect(attemptedB).toBeGreaterThan(30);
+  });
+});

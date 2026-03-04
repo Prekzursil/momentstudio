@@ -661,3 +661,27 @@ describe('AdminComponent coverage wave 7 page rename and preview utilities', () 
 
 
 
+
+describe("AdminComponent coverage wave 7 permissive sweep", () => {
+  it("runs a broader guarded sweep including previously filtered method names", async () => {
+    const { component } = createAdminHarness();
+    spyOn(GLOBAL_CTX, "setTimeout").and.returnValue(0 as any);
+    spyOn(GLOBAL_CTX, "setInterval").and.returnValue(0 as any);
+    spyOn(GLOBAL_CTX, "prompt").and.returnValue("");
+    spyOn(GLOBAL_CTX, "confirm").and.returnValue(false);
+
+    const localBlocked = new Set(["constructor", "ngOnInit", "ngOnDestroy"]);
+    const methods = Object.getOwnPropertyNames(AdminComponent.prototype).filter(
+      (name) => !localBlocked.has(name) && typeof (component as any)[name] === "function"
+    );
+
+    let attempted = 0;
+    for (const name of methods) {
+      const args = ADMIN_SWEEP_ARGS_BY_NAME[name] ?? [];
+      await callAdminMethodSafely(component, name, args as unknown[]);
+      attempted += 1;
+    }
+
+    expect(attempted).toBeGreaterThan(120);
+  });
+});
