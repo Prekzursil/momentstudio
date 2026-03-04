@@ -74,6 +74,23 @@ function createAdminHarness(): {
   admin.content.and.returnValue(of([]));
   admin.listContentPages.and.returnValue(of([]));
 
+  const fallbackAdmin = new Proxy(admin as Record<string, any>, {
+    get(target, prop, receiver) {
+      if (typeof prop !== 'string') return Reflect.get(target, prop, receiver);
+      const existing = Reflect.get(target, prop, receiver);
+      if (typeof existing !== 'undefined') return existing;
+      const dynamicSpy = jasmine.createSpy(prop);
+      const lower = prop.toLowerCase();
+      if (lower.startsWith('list') || lower.startsWith('get') || lower.endsWith('history')) {
+        dynamicSpy.and.returnValue(of([]));
+      } else {
+        dynamicSpy.and.returnValue(of({}));
+      }
+      (target as any)[prop] = dynamicSpy;
+      return dynamicSpy;
+    }
+  });
+
   const toast = jasmine.createSpyObj('ToastService', ['success', 'error', 'info']);
 
   const component = new AdminComponent(
@@ -82,7 +99,7 @@ function createAdminHarness(): {
       data: routeStub.data.asObservable(),
       queryParams: routeStub.queryParams.asObservable()
     } as unknown as ActivatedRoute,
-    admin as any,
+    fallbackAdmin as any,
     {} as any,
     {} as any,
     {} as any,

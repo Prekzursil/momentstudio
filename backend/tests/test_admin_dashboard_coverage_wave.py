@@ -1604,12 +1604,34 @@ async def test_admin_dashboard_user_search_duplicate_segment_and_alias_paths(mon
     assert pii_calls
 
     monkeypatch.setattr(admin_dashboard, '_user_order_stats_subquery', lambda: object())
-    monkeypatch.setattr(admin_dashboard, '_repeat_buyers_order_by', lambda _stats: tuple())
-    monkeypatch.setattr(admin_dashboard, '_high_aov_order_by', lambda _stats: tuple())
+    monkeypatch.setattr(admin_dashboard, '_repeat_buyers_order_by', lambda _stats: ())
+    monkeypatch.setattr(admin_dashboard, '_high_aov_order_by', lambda _stats: ())
     monkeypatch.setattr(admin_dashboard, '_user_segment_stmt', lambda *_a, **_k: object())
     monkeypatch.setattr(admin_dashboard, '_user_segment_total_and_pages', lambda *_a, **_k: asyncio.sleep(0, result=(1, 1)))
     monkeypatch.setattr(admin_dashboard, '_user_segment_rows', lambda *_a, **_k: asyncio.sleep(0, result=[session._user]))
-    monkeypatch.setattr(admin_dashboard, '_user_segment_items', lambda rows, include_pii: [{'user': {'id': str(rows[0].id), 'username': rows[0].username, 'role': rows[0].role, 'email': rows[0].email if include_pii else 'masked', 'email_verified': True, 'created_at': rows[0].created_at, 'name': rows[0].name, 'name_tag': rows[0].name_tag}, 'orders_count': 2, 'total_spent': 100.0, 'avg_order_value': 50.0}] if rows else [])
+    
+    def _segment_items(rows, include_pii):
+        if not rows:
+            return []
+        first = rows[0]
+        email = first.email if include_pii else 'masked'
+        return [{
+            'user': {
+                'id': str(first.id),
+                'username': first.username,
+                'role': first.role,
+                'email': email,
+                'email_verified': True,
+                'created_at': first.created_at,
+                'name': first.name,
+                'name_tag': first.name_tag,
+            },
+            'orders_count': 2,
+            'total_spent': 100.0,
+            'avg_order_value': 50.0,
+        }]
+
+    monkeypatch.setattr(admin_dashboard, '_user_segment_items', _segment_items)
     monkeypatch.setattr(
         admin_dashboard,
         '_user_segment_meta',
