@@ -530,3 +530,103 @@ describe('BlogPostComponent coverage wave: article interaction matrix', () => {
 
 });
 
+
+describe('BlogPostComponent coverage wave residual method helpers', () => {
+  it('covers edit/lang/subscription/reply helper branches', () => {
+    const { component, auth } = createHarness();
+    const cmp = component as any;
+
+    cmp.slug = 'first-post';
+    const navigateSpy = spyOn((cmp as any).router, 'navigate').and.returnValue(Promise.resolve(true));
+
+    cmp.editBlogPost();
+    expect(navigateSpy).toHaveBeenCalledWith(['/admin/content/blog'], { queryParams: { edit: 'first-post' } });
+
+    cmp.slug = '   ';
+    cmp.editBlogPost();
+    expect(navigateSpy.calls.count()).toBe(1);
+
+    cmp.storefrontAdminMode.enabled = () => false;
+    expect(cmp.canEditBlog()).toBeFalse();
+    cmp.storefrontAdminMode.enabled = () => true;
+    expect(cmp.canEditBlog()).toBeTrue();
+
+    const langSpy = spyOnProperty(cmp.translate, 'currentLang', 'get');
+    langSpy.and.returnValue('ro');
+    expect(cmp.activeLang()).toBe('ro');
+    langSpy.and.returnValue('en');
+    expect(cmp.activeLang()).toBe('en');
+
+    auth.isAuthenticated.and.returnValue(false);
+    expect(cmp.canSubscribeToComments()).toBeFalse();
+
+    auth.isAuthenticated.and.returnValue(true);
+    auth.user.and.returnValue({ id: 'u1', email_verified: false } as any);
+    expect(cmp.canSubscribeToComments()).toBeFalse();
+
+    auth.user.and.returnValue({ id: 'u1', email_verified: true } as any);
+    expect(cmp.canSubscribeToComments()).toBeTrue();
+
+    cmp.comments.set([
+      { id: 'c1', parent_id: null },
+      { id: 'c2', parent_id: 'c1' },
+      { id: 'c3', parent_id: null },
+    ] as any);
+    expect(cmp.rootComments().length).toBe(2);
+
+    cmp.replyTo.set({ id: 'c1' } as any);
+    cmp.cancelReply();
+    expect(cmp.replyTo()).toBeNull();
+  });
+
+  it('covers scroll and share helper branches', () => {
+    const { component } = createHarness();
+    const cmp = component as any;
+
+    cmp.document = { defaultView: null };
+    cmp.scrollToTop();
+
+    cmp.document = document;
+    const scrollSpy = spyOn(window, 'scrollTo').and.stub();
+    cmp.scrollToTop();
+    expect(scrollSpy).toHaveBeenCalled();
+
+    spyOn(cmp, 'buildShareUrl').and.returnValue('https://momentstudio.test/blog/first-post');
+    cmp.post.set({ title: 'First Post' } as any);
+    const openSpy = spyOn(window, 'open').and.returnValue(null);
+
+    cmp.shareWhatsApp();
+    expect(openSpy).toHaveBeenCalledWith(
+      jasmine.stringContaining('wa.me/?text='),
+      '_blank',
+      'noopener,noreferrer',
+    );
+
+    openSpy.calls.reset();
+    cmp.shareFacebook();
+    expect(openSpy).toHaveBeenCalledWith(
+      jasmine.stringContaining('facebook.com/sharer/sharer.php?u='),
+      '_blank',
+      'noopener,noreferrer',
+    );
+  });
+
+  it('covers warning and note callout icon rendering branches', () => {
+    const { component, markdown } = createHarness();
+    const cmp = component as any;
+    cmp.document = document;
+
+    markdown.render.and.returnValue(`
+      <blockquote><p>[!WARNING] Warning callout</p><p>Warn body</p></blockquote>
+      <blockquote><p>[!NOTE] Note callout</p><p>Note body</p></blockquote>
+    `);
+
+    const rendered = cmp.renderPostBody('callout-body');
+
+    expect(rendered.html).toContain('blog-callout--warning');
+    expect(rendered.html).toContain('blog-callout--note');
+    expect(rendered.html).toContain('M10.29 3.86');
+    expect(rendered.html).toContain('M11 10h1v4h1');
+  });
+});
+
