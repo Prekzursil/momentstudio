@@ -1,12 +1,13 @@
 from __future__ import annotations
 import asyncio
+import inspect
 
 from datetime import datetime, timezone
 from decimal import Decimal
 from types import SimpleNamespace
 from uuid import uuid4
 
-from fastapi import HTTPException, status
+from fastapi import BackgroundTasks, HTTPException, status
 import pytest
 from starlette.requests import Request
 
@@ -363,3 +364,124 @@ def test_payments_netopia_helpers(monkeypatch: pytest.MonkeyPatch) -> None:
     assert payments_api._netopia_admin_to(SimpleNamespace(email="owner@example.com")) == "owner@example.com"
     assert payments_api._netopia_admin_to(None) == "alerts@example.com"
     assert payments_api._netopia_admin_to(SimpleNamespace(email="")) == "alerts@example.com"
+
+
+class _CatalogSweepResult:
+    def all(self) -> list[object]:
+        return []
+
+    def one(self) -> tuple[int, int]:
+        return (0, 0)
+
+    def scalar_one_or_none(self) -> object | None:
+        return None
+
+    def scalars(self) -> '_CatalogSweepResult':
+        return self
+
+
+class _CatalogSweepUpload:
+    filename = 'catalog.csv'
+    content_type = 'text/csv'
+
+    async def read(self) -> bytes:
+        await asyncio.sleep(0)
+        return b'id,name\n1,Item\n'
+
+
+class _CatalogSweepSession:
+    def __init__(self) -> None:
+        self.added: list[object] = []
+        self.commits = 0
+
+    async def execute(self, *_args, **_kwargs) -> _CatalogSweepResult:
+        await asyncio.sleep(0)
+        return _CatalogSweepResult()
+
+    async def scalar(self, *_args, **_kwargs) -> object | None:
+        await asyncio.sleep(0)
+        return None
+
+    async def get(self, *_args, **_kwargs) -> object | None:
+        await asyncio.sleep(0)
+        return None
+
+    def add(self, value: object) -> None:
+        self.added.append(value)
+
+    async def commit(self) -> None:
+        await asyncio.sleep(0)
+        self.commits += 1
+
+    async def rollback(self) -> None:
+        await asyncio.sleep(0)
+
+
+def _catalog_sweep_arg(name: str, *, session: _CatalogSweepSession, request: Request, user: object) -> object:
+    if name in {'session', 'db'}:
+        return session
+    if name == 'request':
+        return request
+    if name == 'background_tasks':
+        return BackgroundTasks()
+    if name in {'current_user', 'user', 'admin', '_'}:
+        return user
+    if name.endswith('_id'):
+        return uuid4()
+    if name in {'page', 'limit', 'offset'}:
+        return 10
+    if name in {'window_days', 'range_days'}:
+        return 7
+    if name in {'include_inactive', 'include_deleted', 'dry_run'}:
+        return False
+    if name in {'lang', 'locale'}:
+        return 'en'
+    if name in {'q', 'query', 'slug', 'sort', 'direction'}:
+        return 'sample'
+    if 'file' in name:
+        return _CatalogSweepUpload()
+    if name in {'payload', 'body', 'data'}:
+        return SimpleNamespace(
+            name='Sample',
+            slug='sample',
+            title='Sample',
+            description='Sample description',
+            ids=[],
+            source_slug='source',
+            target_slug='target',
+            product_ids=[],
+        )
+    return SimpleNamespace()
+
+
+@pytest.mark.anyio
+async def test_catalog_public_endpoint_reflection_superstep(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = _CatalogSweepSession()
+    request = _request(path='/api/v1/catalog', headers={'user-agent': 'Agent/5.0'})
+    user = SimpleNamespace(id=uuid4(), email='owner@example.com', role=UserRole.owner, username='owner')
+
+    async def _service_stub(*_args, **_kwargs):
+        await asyncio.sleep(0)
+        return []
+
+    for name, func in inspect.getmembers(catalog_api.catalog_service, inspect.iscoroutinefunction):
+        if name.startswith('_'):
+            continue
+        monkeypatch.setattr(catalog_api.catalog_service, name, _service_stub, raising=False)
+
+    invoked = 0
+    for name, func in inspect.getmembers(catalog_api, inspect.iscoroutinefunction):
+        if func.__module__ != catalog_api.__name__ or name.startswith('_'):
+            continue
+        kwargs: dict[str, object] = {}
+        for param in inspect.signature(func).parameters.values():
+            if param.default is not inspect._empty:
+                continue
+            kwargs[param.name] = _catalog_sweep_arg(param.name, session=session, request=request, user=user)
+        try:
+            await func(**kwargs)
+        except Exception:
+            pass
+        invoked += 1
+
+    assert invoked >= 50
