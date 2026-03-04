@@ -46,7 +46,8 @@ class _DummySession:
 
     async def get(self, *_args, **_kwargs):
         await asyncio.sleep(0)
-        return None
+        value = None
+        return value
 
     async def flush(self):
         await asyncio.sleep(0)
@@ -111,7 +112,7 @@ def _static_lookup(*, alternate: bool) -> dict[str, object]:
         "created_at": datetime.now(UTC),
         "updated_at": datetime.now(UTC),
         "ts": datetime.now(UTC),
-    } | {name: (26.10 if alternate else 44.43) for name in _COORD_NAMES} | {name: count for name in _COUNT_NAMES} | {name: bool(alternate) for name in _BOOL_NAMES} | {name: Decimal("1.00") for name in _DECIMAL_NAMES}
+    } | dict.fromkeys(_COORD_NAMES, 26.10 if alternate else 44.43) | dict.fromkeys(_COUNT_NAMES, count) | dict.fromkeys(_BOOL_NAMES, bool(alternate)) | dict.fromkeys(_DECIMAL_NAMES, Decimal("1.00"))
 
 
 def _special_value(lowered: str):

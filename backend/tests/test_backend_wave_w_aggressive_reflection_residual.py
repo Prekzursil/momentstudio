@@ -180,7 +180,7 @@ def _base_lookup(*, alternate: bool) -> dict[str, object]:
         "created_at": datetime.now(UTC),
         "updated_at": datetime.now(UTC),
     }
-    lookup.update({name: count for name in _COUNT_NAMES})
+    lookup.update(dict.fromkeys(_COUNT_NAMES, count))
     lookup.update({name: Decimal("10.00") for name in _DECIMAL_NAMES})
     lookup.update({name: bool(alternate) for name in _BOOL_NAMES})
     return lookup

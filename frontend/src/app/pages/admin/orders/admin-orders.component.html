@@ -659,6 +659,7 @@
               >
                 <table class="min-w-[1050px] w-full text-sm">
                   <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+                    <tr class="sr-only"><th scope="col">{{ 'adminUi.orders.table.reference' | translate }}</th></tr>
                     <ng-container [ngTemplateOutlet]="ordersTableHeader"></ng-container>
                   </thead>
                   <tbody>
@@ -675,6 +676,7 @@
             <ng-template #ordersTableStandard>
               <table class="min-w-[1050px] w-full text-sm">
                 <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+                  <tr class="sr-only"><th scope="col">{{ 'adminUi.orders.table.reference' | translate }}</th></tr>
                   <ng-container [ngTemplateOutlet]="ordersTableHeader"></ng-container>
                 </thead>
                 <tbody>
@@ -715,10 +717,10 @@
 			      </section>
 
         <ng-container *ngIf="shippingLabelsModalOpen()">
-          <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closeShippingLabelsModal()">
+          <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="button" tabindex="0" (click)="closeShippingLabelsModal()" (keydown.enter)="closeShippingLabelsModal()" (keydown.space)="closeShippingLabelsModal(); $event.preventDefault()">
             <div
               class="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
-              (click)="$event.stopPropagation()"
+              (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()" (keydown.space)="$event.stopPropagation(); $event.preventDefault()" tabindex="0"
             >
               <div class="flex items-center justify-between gap-3">
                 <div class="grid gap-1">
@@ -844,10 +846,10 @@
         </ng-container>
 
 	      <ng-container *ngIf="exportModalOpen()">
-	        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closeExportModal()">
+	        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="button" tabindex="0" (click)="closeExportModal()" (keydown.enter)="closeExportModal()" (keydown.space)="closeExportModal(); $event.preventDefault()">
 	          <div
 	            class="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
-            (click)="$event.stopPropagation()"
+            (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()" (keydown.space)="$event.stopPropagation(); $event.preventDefault()" tabindex="0"
           >
             <div class="flex items-center justify-between gap-3">
               <div class="grid gap-1">
@@ -940,10 +942,10 @@
       </ng-container>
 
       <ng-container *ngIf="tagManagerOpen()">
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closeTagManager()">
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="button" tabindex="0" (click)="closeTagManager()" (keydown.enter)="closeTagManager()" (keydown.space)="closeTagManager(); $event.preventDefault()">
           <div
             class="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
-            (click)="$event.stopPropagation()"
+            (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()" (keydown.space)="$event.stopPropagation(); $event.preventDefault()" tabindex="0"
           >
             <div class="flex items-center justify-between gap-3">
               <div class="grid gap-1">

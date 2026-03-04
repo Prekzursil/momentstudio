@@ -81,7 +81,7 @@ function withAdminFallback(admin: jasmine.SpyObj<any>): Record<string, any> {
 }
 
 function isCallableMethod(value: unknown): value is (...args: unknown[]) => unknown {
-  return value instanceof Function;
+  return typeof value === 'function';
 }
 
 function createAdminHarness(): {

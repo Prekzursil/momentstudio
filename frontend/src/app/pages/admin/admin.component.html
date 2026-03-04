@@ -4206,15 +4206,15 @@
               <app-button size="sm" variant="ghost" [label]="'adminUi.actions.reset' | translate" (action)="resetCollectionForm()"></app-button>
             </div>
             <div class="grid md:grid-cols-2 gap-3 text-sm">
-              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.home.collections.slug' | translate }}
+              <div class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                <span>{{ 'adminUi.home.collections.slug' | translate }}</span>
                 <div class="h-10 rounded-lg border border-slate-200 bg-slate-50 px-3 flex items-center font-mono text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-200">
                   <span *ngIf="editingCollection; else collectionSlugHint">{{ editingCollection }}</span>
                   <ng-template #collectionSlugHint>
                     <span class="text-slate-500 dark:text-slate-400">{{ 'adminUi.products.form.slugAutoHint' | translate }}</span>
                   </ng-template>
                 </div>
-              </label>
+              </div>
               <app-input [label]="'adminUi.home.collections.name' | translate" [(value)]="collectionForm.name"></app-input>
               <label class="grid text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
                 {{ 'adminUi.home.collections.description' | translate }}
@@ -4377,7 +4377,7 @@
             <div class="grid gap-2" *ngIf="productImages().length">
               <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{{ 'adminUi.products.form.images' | translate }}</p>
               <div *ngFor="let img of productImages()" class="flex items-center gap-3 rounded-lg border border-slate-200 p-2 dark:border-slate-700">
-                <img [src]="img.url" [alt]="img.alt_text || 'image'" class="h-12 w-12 rounded object-cover" />
+                <img [src]="img.url" [alt]="img.alt_text || 'product'" class="h-12 w-12 rounded object-cover" />
                 <div class="flex-1">
                   <p class="font-semibold text-slate-900 dark:text-slate-50">{{ img.alt_text || ('adminUi.products.form.image' | translate) }}</p>
                 </div>
@@ -4880,7 +4880,7 @@
             </div>
             <div class="grid md:grid-cols-[1.5fr_1fr] gap-4">
               <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
-                <div *ngFor="let order of filteredOrders()" class="rounded-lg border border-slate-200 p-3 cursor-pointer dark:border-slate-700" (click)="selectOrder(order)">
+                <div *ngFor="let order of filteredOrders()" class="rounded-lg border border-slate-200 p-3 cursor-pointer dark:border-slate-700" role="button" tabindex="0" (click)="selectOrder(order)" (keydown.enter)="selectOrder(order)" (keydown.space)="selectOrder(order); $event.preventDefault()">
                   <div class="flex items-center justify-between">
                     <span class="font-semibold text-slate-900 dark:text-slate-50">Order #{{ order.id }}</span>
                     <span class="text-xs rounded-full bg-slate-100 px-2 py-1 dark:bg-slate-800">{{ order.status }}</span>
@@ -5132,6 +5132,7 @@
               >
                 <label class="flex items-center gap-2">
                   <input type="checkbox" [checked]="isBlogSelected(post.key)" (change)="toggleBlogSelection(post.key, $event)" />
+                  <span class="sr-only">Select {{ post.title }}</span>
                 </label>
                 <div>
                   <p class="font-semibold text-slate-900 dark:text-slate-50">{{ post.title }}</p>
@@ -5171,15 +5172,15 @@
 	            <div *ngIf="showBlogCreate" class="grid gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
 	              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.blog.create.title' | translate }}</p>
 	              <div class="grid md:grid-cols-2 gap-3 text-sm">
-	                <label *ngIf="cmsAdvanced()" class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	                  {{ 'adminUi.blog.fields.slug' | translate }}
+	                <div *ngIf="cmsAdvanced()" class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+	                  <span>{{ 'adminUi.blog.fields.slug' | translate }}</span>
 	                  <div
 	                    class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-300"
 	                  >
 	                    {{ blogCreateSlug() || '—' }}
 	                  </div>
 	                  <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.products.form.slugAutoHint' | translate }}</span>
-	                </label>
+	                </div>
 	                <label class="grid text-sm font-medium text-slate-700 dark:text-slate-200">
 	                  {{ 'adminUi.blog.fields.baseLanguage' | translate }}
 	                  <select

@@ -1,17 +1,12 @@
-    <div
+    <progress
       *ngIf="post()"
-      class="fixed left-0 right-0 top-0 z-[110] h-1 bg-transparent no-print"
-      role="progressbar"
+      class="fixed left-0 right-0 top-0 z-[110] h-1 w-full no-print"
       [attr.aria-label]="'blog.post.progressLabel' | translate"
-      [attr.aria-valuemin]="0"
-      [attr.aria-valuemax]="100"
-      [attr.aria-valuenow]="progressPercent()"
+      [value]="progressPercent()"
+      max="100"
     >
-      <div
-        class="h-full bg-indigo-600 dark:bg-indigo-300 transition-[width] duration-100"
-        [style.width.%]="progressPercent()"
-      ></div>
-    </div>
+      {{ progressPercent() }}
+    </progress>
 
     <app-container classes="py-10 grid gap-6 max-w-4xl">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
@@ -189,7 +184,7 @@
       <div *ngIf="!loadingPost() && !hasPostError() && post()">
         <div class="grid gap-6 lg:grid-cols-[1fr_260px] lg:items-start">
           <app-card>
-            <div #articleContent class="grid gap-6" (click)="handleArticleClick($event)">
+            <div #articleContent class="grid gap-6" tabindex="0" (click)="handleArticleClick($event)" (keydown.enter)="handleArticleClick($event)" (keydown.space)="handleArticleClick($event); $event.preventDefault()">
               <img
                 *ngIf="post()!.cover_image_url"
                 [src]="post()!.cover_image_url"
@@ -682,14 +677,15 @@
       </section>
     </app-container>
 
-    <div
+    <dialog
       *ngIf="lightboxOpen()"
+      open
       class="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm p-4 grid place-items-center"
       (click)="closeLightbox()"
-      role="dialog"
+      (keydown.escape)="closeLightbox()"
       aria-modal="true"
     >
-      <div class="relative w-full max-w-5xl" (click)="$event.stopPropagation()">
+      <div class="relative w-full max-w-5xl" tabindex="0" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()" (keydown.space)="$event.stopPropagation(); $event.preventDefault()">
         <button
           type="button"
           class="absolute -top-3 -right-3 h-10 w-10 rounded-full bg-white text-slate-900 shadow-soft hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-50 dark:hover:bg-slate-800"
@@ -732,7 +728,7 @@
           </button>
         </div>
       </div>
-    </div>
+    </dialog>
 
     <button
       *ngIf="showBackToTop()"

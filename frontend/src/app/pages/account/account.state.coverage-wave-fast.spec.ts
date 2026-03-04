@@ -175,7 +175,7 @@ function prepareAccountSweepArgs(name: string, arity: number): unknown[] {
 }
 
 function isSweepCallable(value: unknown): value is (...values: unknown[]) => unknown {
-  return value instanceof Function;
+  return typeof value === 'function';
 }
 
 function isAccountRiskyMethod(name: string): boolean {

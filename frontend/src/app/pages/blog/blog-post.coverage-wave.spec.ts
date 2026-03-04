@@ -367,7 +367,7 @@ describe('BlogPostComponent coverage wave: article interaction matrix', () => {
     spyOn(cmp, 'openLightbox').and.callThrough();
 
     const link = doc.createElement('a');
-    link.setAttribute('data-router-link', '/blog/next');
+    link.dataset['routerLink'] = '/blog/next';
     const linkTarget = doc.createElement('span');
     link.appendChild(linkTarget);
     const linkEvent: any = {
@@ -387,7 +387,7 @@ describe('BlogPostComponent coverage wave: article interaction matrix', () => {
     const wrapper = doc.createElement('div');
     wrapper.className = 'blog-codeblock';
     const button = doc.createElement('button');
-    button.setAttribute('data-code-action', 'copy');
+    button.dataset['codeAction'] = 'copy';
     const inner = doc.createElement('span');
     button.appendChild(inner);
     const pre = doc.createElement('pre');
@@ -413,9 +413,9 @@ describe('BlogPostComponent coverage wave: article interaction matrix', () => {
     cmp.handleArticleClick(codeEvent as MouseEvent);
     expect(writeText).toHaveBeenCalled();
 
-    button.setAttribute('data-code-action', 'wrap');
-    button.setAttribute('data-wrap-label', 'Wrap');
-    button.setAttribute('data-unwrap-label', 'Unwrap');
+    button.dataset['codeAction'] = 'wrap';
+    button.dataset['wrapLabel'] = 'Wrap';
+    button.dataset['unwrapLabel'] = 'Unwrap';
     cmp.handleArticleClick(codeEvent as MouseEvent);
     expect(wrapper.classList.contains('blog-codeblock--wrap')).toBeTrue();
 
