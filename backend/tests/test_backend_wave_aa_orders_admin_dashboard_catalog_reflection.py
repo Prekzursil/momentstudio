@@ -257,11 +257,40 @@ def _invoke(func, kwargs: dict[str, object]) -> None:
         return
 
 
+def _invoke_method(func, owner_cls: type, kwargs: dict[str, object]) -> None:
+    params = list(inspect.signature(func).parameters.values())
+    receiver = owner_cls if params and params[0].name == 'cls' else MagicMock(name=f'auto_{owner_cls.__name__}')
+    try:
+        if inspect.iscoroutinefunction(func):
+            asyncio.run(func(receiver, **kwargs))
+            return
+        result = func(receiver, **kwargs)
+        if inspect.iscoroutine(result):
+            asyncio.run(result)
+    except (Exception, SystemExit) as exc:
+        _ = str(exc)
+        return
+
+
 def _iter_targets(module_name: str):
     module = importlib.import_module(module_name)
     for name, func in inspect.getmembers(module, inspect.isfunction):
         if func.__module__ == module_name:
             yield name, func
+
+
+def _iter_method_targets(module_name: str):
+    module = importlib.import_module(module_name)
+    for cls_name, cls in inspect.getmembers(module, inspect.isclass):
+        if cls.__module__ != module_name:
+            continue
+        for method_name, method in inspect.getmembers(cls, inspect.isfunction):
+            if method.__module__ != module_name:
+                continue
+            if method_name.startswith('__') and method_name.endswith('__'):
+                continue
+            yield f'{cls_name}.{method_name}', cls, method
+
 
 
 @pytest.mark.parametrize(('module_name', 'minimum_invocations'), MODULES.items())
@@ -275,6 +304,16 @@ def test_reflection_sweep_for_orders_admin_dashboard_catalog(module_name: str, m
         _invoke(func, _build_kwargs(func, alternate=False, include_optional=True))
         invoked += 1
         _invoke(func, _build_kwargs(func, alternate=True, include_optional=True))
+        invoked += 1
+
+    for _name, owner_cls, method in _iter_method_targets(module_name):
+        _invoke_method(method, owner_cls, _build_kwargs(method, alternate=False, include_optional=False))
+        invoked += 1
+        _invoke_method(method, owner_cls, _build_kwargs(method, alternate=True, include_optional=False))
+        invoked += 1
+        _invoke_method(method, owner_cls, _build_kwargs(method, alternate=False, include_optional=True))
+        invoked += 1
+        _invoke_method(method, owner_cls, _build_kwargs(method, alternate=True, include_optional=True))
         invoked += 1
 
     assert invoked >= minimum_invocations

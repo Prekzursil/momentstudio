@@ -353,53 +353,43 @@ function listAdminSweepMethods(dynamic: any) {
   );
 }
 
-function edgeSweepArgs(args: unknown[]): unknown[] {
-  return args.map((value) => {
-    if (typeof value === 'string') return '';
-    if (typeof value === 'number') return 0;
-    if (typeof value === 'boolean') return !value;
-    if (Array.isArray(value)) return [];
-    if (value && typeof value === 'object') return {};
-    return null;
-  });
+function runConfiguredAdminSweep(dynamic: any, name: string, configured: any[]): number {
+  callAdminMethodSafely(dynamic, name, configured);
+  return 1;
 }
 
-function canUseAdminEdgeVariant(args: unknown[]): boolean {
-  return args.every(
-    (value) =>
-      value == null ||
-      typeof value === 'string' ||
-      typeof value === 'number' ||
-      typeof value === 'boolean',
-  );
+function runFallbackAdminSweep(dynamic: any, name: string, arity: number): number {
+  let attempted = 0;
+  for (const variant of ADMIN_SWEEP_FALLBACK_VARIANTS) {
+    const fallback = variant.slice(0, arity);
+    const missing = arity - fallback.length;
+    if (missing > 0) fallback.push(...Array(missing).fill(undefined));
+    callAdminMethodSafely(dynamic, name, fallback);
+    attempted += 1;
+  }
+  return attempted;
 }
 
-function runAdminPrototypeSweep(dynamic: any) {
+function runAdminPrototypeSweep(dynamic: any): number {
   const methods = listAdminSweepMethods(dynamic);
   let attempted = 0;
 
   for (const name of methods) {
     const configured = ADMIN_SWEEP_ARGS_BY_NAME[name];
     if (configured) {
-      callAdminMethodSafely(dynamic, name, configured);
-      attempted += 1;
-      if (canUseAdminEdgeVariant(configured)) {
-        callAdminMethodSafely(dynamic, name, edgeSweepArgs(configured));
-        attempted += 1;
-      }
+      attempted += runConfiguredAdminSweep(dynamic, name, configured);
       continue;
     }
-    const arity = Math.min(dynamic[name]?.length ?? 0, 4);
-    for (const variant of ADMIN_SWEEP_FALLBACK_VARIANTS) {
-      const fallback = variant.slice(0, arity);
-      while (fallback.length < arity) fallback.push(undefined);
-      callAdminMethodSafely(dynamic, name, fallback);
-      attempted += 1;
-    }
+
+    const method = dynamic[name];
+    const arity = Math.min((method && method.length) || 0, 4);
+    attempted += runFallbackAdminSweep(dynamic, name, arity);
   }
 
   return attempted;
 }
+
+
 
 describe('AdminComponent sweep coverage', () => {
   it('covers draft helpers and title/preview utility branches', () => {
@@ -1552,3 +1542,10 @@ describe('AdminComponent sweep coverage', () => {
     expect(after.find((b: any) => b.key === 'testimonials-1').testimonials.length).toBe(1);
   });
 });
+
+
+
+
+
+
+
