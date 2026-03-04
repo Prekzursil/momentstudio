@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 from types import SimpleNamespace
 from uuid import uuid4
@@ -24,9 +25,11 @@ class _SessionStub:
         self._row_iter = iter(list(row_values))
 
     async def scalar(self, _stmt):
+        await asyncio.sleep(0)
         return next(self._scalar_iter)
 
     async def execute(self, _stmt):
+        await asyncio.sleep(0)
         return _ExecResult(next(self._row_iter))
 
 
@@ -160,10 +163,12 @@ async def test_media_dam_list_assets_and_jobs_meta_branches() -> None:
 async def test_media_dam_queue_depth_and_heartbeat_parsers(monkeypatch: pytest.MonkeyPatch) -> None:
     class _RedisGood:
         async def llen(self, _key):
+            await asyncio.sleep(0)
             return 9
 
     class _RedisBad:
         async def llen(self, _key):
+            await asyncio.sleep(0)
             raise RuntimeError('boom')
 
     assert await media_dam._redis_queue_depth(_RedisGood()) == 9

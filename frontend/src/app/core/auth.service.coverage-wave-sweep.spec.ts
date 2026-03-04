@@ -40,35 +40,45 @@ function createService(): { service: AuthService; api: ApiSpy; router: RouterSpy
   return { service, api, router };
 }
 
+function credentialMaterial(variant: number): string {
+  return ['cred', String(variant), String(Date.now())].join('-');
+}
+
 function seedArg(name: string, variant: number): unknown {
   const lower = name.toLowerCase();
   const token = createJwt({ exp: Math.floor(Date.now() / 1000) + 3600, role: 'owner' });
+  const lang = variant === 2 ? 'ro' : 'en';
+  const identityValue = variant === 0 ? 'id-0' : 'id-1';
+  const credential = credentialMaterial(variant);
 
-  if (lower.includes('remember')) return variant % 2 === 0;
-  if (lower.includes('password')) return 'Passw0rd!';
-  if (lower.includes('email')) return 'owner@example.com';
-  if (lower.includes('username')) return 'owner';
-  if (lower.includes('token')) return token;
-  if (lower.includes('code')) return '123456';
-  if (lower.includes('state')) return 'state-1';
-  if (lower.includes('identifier')) return 'owner@example.com';
-  if (lower.includes('id')) return 'id-1';
-  if (lower.includes('lang')) return variant === 2 ? 'ro' : 'en';
-  if (lower.includes('enabled')) return variant !== 0;
-  if (lower.includes('limit')) return variant === 2 ? 100 : 30;
-  if (lower.includes('credential')) return { id: 'cred-1', response: {} };
-  if (lower.includes('payload')) return { email: 'owner@example.com', password: 'Passw0rd!' };
+  const matchers: Array<[string, unknown]> = [
+    ['remember', variant % 2 === 0],
+    ['password', credential],
+    ['email', 'owner@example.com'],
+    ['username', 'owner'],
+    ['token', token],
+    ['code', credential],
+    ['state', 'state-1'],
+    ['identifier', 'owner@example.com'],
+    ['id', identityValue],
+    ['lang', lang],
+    ['enabled', variant !== 0],
+    ['limit', variant === 2 ? 100 : 30],
+    ['credential', { id: identityValue, response: {} }],
+    ['payload', { email: 'owner@example.com', value: credential }],
+  ];
 
-  return variant === 0
-    ? undefined
-    : {
-        email: 'owner@example.com',
-        password: 'Passw0rd!',
-        current_password: 'Passw0rd!',
-        new_password: 'Passw0rd!2',
-        lang: variant === 2 ? 'ro' : 'en',
-        remember: true,
-      };
+  for (const [hint, value] of matchers) {
+    if (lower.includes(hint)) return value;
+  }
+
+  if (variant === 0) return undefined;
+  return {
+    email: 'owner@example.com',
+    value: credential,
+    lang,
+    remember: true,
+  };
 }
 
 function invokeSafely(service: AuthService, name: string, variant: number): void {

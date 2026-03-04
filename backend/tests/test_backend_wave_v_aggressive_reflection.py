@@ -239,7 +239,7 @@ def _invoke(func, kwargs: dict[str, object]) -> None:
         result = func(**kwargs)
         if inspect.iscoroutine(result):
             asyncio.run(result)
-    except (Exception, SystemExit) as exc:
+    except Exception as exc:
         _ = str(exc)
         return
 
