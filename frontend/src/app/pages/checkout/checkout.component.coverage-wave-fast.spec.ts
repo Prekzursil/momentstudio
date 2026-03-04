@@ -608,3 +608,68 @@ describe('CheckoutComponent fast payment/analytics/finalize branches', () => {
     expect(cmp.handleCheckoutRequestError).toHaveBeenCalled();
   });
 });
+
+
+describe('CheckoutComponent fast residual focus/address/sync branches', () => {
+  it('covers focusFirstInvalidField and focusElementById guarded setTimeout branches', () => {
+    const cmp = createCheckoutHarness();
+    const invalid = document.createElement('input');
+    cmp.checkoutFormEl = { nativeElement: document.createElement('form') };
+    cmp.findFirstInvalidField = jasmine.createSpy('findFirstInvalidField').and.returnValue(invalid);
+    cmp.scrollAndFocus = jasmine.createSpy('scrollAndFocus');
+
+    spyOn(globalThis, 'setTimeout').and.callFake(((fn: unknown) => {
+      if (typeof fn === 'function') fn();
+      return 1 as any;
+    }) as any);
+
+    cmp.focusFirstInvalidField();
+    expect(cmp.findFirstInvalidField).toHaveBeenCalled();
+    expect(cmp.scrollAndFocus).toHaveBeenCalledWith(invalid);
+
+    const target = document.createElement('div');
+    target.id = 'checkout-global-error';
+    document.body.appendChild(target);
+    cmp.focusElementById('checkout-global-error');
+    expect(cmp.scrollAndFocus).toHaveBeenCalledWith(target);
+    target.remove();
+  });
+
+  it('covers saved-address defaults and billing prefill guard matrix', () => {
+    const cmp = createCheckoutHarness();
+    cmp.countryInputFromCode = jasmine.createSpy('countryInputFromCode').and.returnValue('RO');
+    cmp.applySavedAddressToBilling = jasmine.createSpy('applySavedAddressToBilling');
+    cmp.applySavedAddressToShipping = jasmine.createSpy('applySavedAddressToShipping');
+    cmp.savedAddressesLoading = true;
+    cmp.selectedBillingAddressId = '';
+    cmp.billingSameAsShipping = false;
+    cmp.billing = { line1: '', city: '', postal: '', line2: '', region: '', country: '' };
+    cmp.address = { ...cmp.address, line1: '', city: '', postal: '', line2: '', region: '', country: 'RO' };
+
+    const shipping = { id: 's-1', is_default_shipping: true, is_default_billing: false, line1: 'Ship', city: 'S', postal_code: '1', country: 'RO' } as any;
+    const billing = { id: 'b-1', is_default_shipping: false, is_default_billing: true, line1: 'Bill', city: 'B', postal_code: '2', country: 'RO' } as any;
+    cmp.handleSavedAddressesLoaded([shipping, billing]);
+
+    expect(cmp.selectedBillingAddressId).toBe('b-1');
+    expect(cmp.applySavedAddressToBilling).toHaveBeenCalledWith(billing);
+    expect(cmp.applySavedAddressToShipping).toHaveBeenCalledWith(shipping);
+    expect(cmp.savedAddressesLoading).toBeFalse();
+
+    cmp.billing.line1 = 'already-filled';
+    expect(cmp.shouldPrefillBillingFromSavedAddress()).toBeFalse();
+  });
+
+  it('covers syncBackendCart queued follow-up branch', () => {
+    const cmp = createCheckoutHarness();
+    cmp.cartApi = { sync: jasmine.createSpy('sync').and.returnValue(of({ items: [], quote: { total: 0 } })) };
+    cmp.hydrateCartAndQuote = jasmine.createSpy('hydrateCartAndQuote');
+    cmp.queueCartSync = jasmine.createSpy('queueCartSync');
+    cmp.queuedSyncItems = [{ sku: 'queued', quantity: 2 } as any];
+
+    cmp.syncBackendCart([{ sku: 'main', quantity: 1 } as any]);
+
+    expect(cmp.hydrateCartAndQuote).toHaveBeenCalled();
+    expect(cmp.queueCartSync).toHaveBeenCalledWith([{ sku: 'queued', quantity: 2 } as any], { immediate: true });
+    expect(cmp.queuedSyncItems).toBeNull();
+  });
+});

@@ -134,6 +134,131 @@ function callBlogMethodSafely(component: any, method: string, args: unknown[]): 
 }
 
 describe('BlogPostComponent coverage wave', () => {
+  it('covers author signals and lightbox keyboard branches', () => {
+    const { component } = createHarness();
+    const cmp = component as any;
+
+    cmp.post.set({
+      slug: 'first-post',
+      title: 'Hello',
+      body_markdown: 'Body',
+      images: [{ url: '/a.jpg' }, { url: '/b.jpg' }],
+      meta: {
+        author: {
+          name: 'Ana Maria',
+          bio: { en: ' Bio EN ', ro: ' Bio RO ' },
+          links: [{ label: 'Site', url: 'https://example.test' }, { label: '', url: 'invalid' }]
+        }
+      }
+    });
+    cmp.galleryImages.set([{ src: '/a.jpg', alt: '' }, { src: '/b.jpg', alt: '' }]);
+    cmp.lightboxIndex.set(0);
+
+    expect(cmp.lightboxImage()?.src).toBe('/a.jpg');
+    expect(cmp.authorBio()).toBe('Bio EN');
+    expect(cmp.authorLinks().length).toBe(1);
+
+    spyOn(cmp, 'closeLightbox').and.callFake(() => undefined);
+    spyOn(cmp, 'nextLightbox').and.callFake(() => undefined);
+    spyOn(cmp, 'prevLightbox').and.callFake(() => undefined);
+
+    const esc = { key: 'Escape', preventDefault: jasmine.createSpy('preventDefault') } as any;
+    const right = { key: 'ArrowRight', preventDefault: jasmine.createSpy('preventDefault') } as any;
+    const left = { key: 'ArrowLeft', preventDefault: jasmine.createSpy('preventDefault') } as any;
+
+    cmp.lightboxKeyListener(esc);
+    cmp.lightboxKeyListener(right);
+    cmp.lightboxKeyListener(left);
+
+    expect(cmp.closeLightbox).toHaveBeenCalled();
+    expect(cmp.nextLightbox).toHaveBeenCalled();
+    expect(cmp.prevLightbox).toHaveBeenCalled();
+    expect(esc.preventDefault).toHaveBeenCalled();
+    expect(right.preventDefault).toHaveBeenCalled();
+    expect(left.preventDefault).toHaveBeenCalled();
+  });
+
+  it('covers heading scroll and comment load/create error branches', () => {
+    const { component, blog } = createHarness();
+    const cmp = component as any;
+    cmp.document = document;
+
+    const originalDocument = cmp.document;
+    const heading = document.createElement('h2');
+    heading.id = 'faq-heading';
+    heading.getBoundingClientRect = () => ({ top: 220 } as DOMRect);
+    const scrollSpy = jasmine.createSpy('scrollTo');
+    const replaceSpy = jasmine.createSpy('replaceState');
+    const fakeWindow = {
+      scrollY: 0,
+      scrollTo: scrollSpy,
+      history: { replaceState: replaceSpy },
+      location: { pathname: '/blog/post', search: '' },
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    };
+    cmp.document = {
+      defaultView: fakeWindow,
+      getElementById: (id: string) => (id === 'faq-heading' ? heading : null),
+      createElement: document.createElement.bind(document),
+      body: document.body,
+    } as any;
+
+    const clickEvent = { preventDefault: jasmine.createSpy('preventDefault') } as any;
+    cmp.scrollToHeading(clickEvent, 'faq-heading');
+    expect(clickEvent.preventDefault).toHaveBeenCalled();
+    expect(scrollSpy).toHaveBeenCalled();
+    expect(replaceSpy).toHaveBeenCalled();
+    expect(cmp.activeHeadingId()).toBe('faq-heading');
+    cmp.document = originalDocument;
+
+    blog.listCommentThreads.and.returnValue(throwError(() => new Error('comments-fail')));
+    cmp.comments.set([{ id: 'existing' }]);
+    cmp.commentsMeta.set({ total_items: 1, total_pages: 1, page: 1, limit: 10 });
+    cmp.commentsTotal.set(1);
+    cmp.loadComments({ page: 2, sort: 'top' });
+    expect(cmp.comments()).toEqual([]);
+    expect(cmp.commentsMeta()).toBeNull();
+    expect(cmp.commentsTotal()).toBe(0);
+    expect(cmp.hasCommentsError()).toBeTrue();
+
+    const captcha = { reset: jasmine.createSpy('reset') };
+    cmp.commentCaptcha = captcha as any;
+    cmp.commentCaptchaToken = 'captcha-token';
+    cmp.commentBody = 'Body';
+    blog.createComment.and.returnValue(throwError(() => ({ error: { detail: 'create-fail' } })));
+    cmp.submitComment();
+    expect(cmp.commentCaptchaToken).toBeNull();
+    expect(captcha.reset).toHaveBeenCalled();
+  });
+
+  it('covers reading-progress empty-content and embed hydration update branches', () => {
+    const { component } = createHarness();
+    const cmp = component as any;
+    cmp.document = document;
+
+    cmp.readingProgress.set(0.8);
+    cmp.showBackToTop.set(true);
+    cmp.activeHeadingId.set('heading-1');
+    cmp.articleContent = null;
+    cmp.updateReadingProgress();
+    expect(cmp.readingProgress()).toBe(0);
+    expect(cmp.showBackToTop()).toBeFalse();
+    expect(cmp.activeHeadingId()).toBeNull();
+
+    cmp.catalog.getProduct.and.returnValue(of(null));
+    cmp.catalog.listCategories.and.returnValue(of([]));
+    cmp.catalog.listFeaturedCollections.and.returnValue(of([]));
+
+    cmp.embedRevision = 5;
+    cmp.bodyHtml.set('<div class="blog-embed" data-embed-type="product" data-embed-slug="ring-a"></div>');
+    spyOn(cmp, 'applyEmbedData').and.returnValue('<p>hydrated</p>');
+    spyOn(cmp, 'measureReadingProgressSoon').and.callFake(() => undefined);
+    cmp.hydrateEmbeds([{ type: 'product', slug: 'ring-a' }], 5, 'en');
+    expect(cmp.applyEmbedData).toHaveBeenCalled();
+    expect(cmp.bodyHtml()).toBe('<p>hydrated</p>');
+    expect(cmp.measureReadingProgressSoon).toHaveBeenCalled();
+  });
   it('covers quick-edit open/reset flow and admin-block hydration', () => {
     const { component, admin } = createHarness();
     const cmp = component as any;
@@ -587,7 +712,7 @@ describe('BlogPostComponent coverage wave residual method helpers', () => {
     cmp.scrollToTop();
 
     cmp.document = document;
-    const scrollSpy = spyOn(window, 'scrollTo').and.stub();
+    const scrollSpy = (window.scrollTo as any).and ? (window.scrollTo as any) : spyOn(window, 'scrollTo').and.stub();
     cmp.scrollToTop();
     expect(scrollSpy).toHaveBeenCalled();
 

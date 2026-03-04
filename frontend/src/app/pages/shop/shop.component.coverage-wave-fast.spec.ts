@@ -481,7 +481,7 @@ describe('ShopComponent coverage fast wave: scroll + category shortcuts', () => 
       if (typeof fn === 'function') fn();
       return 1 as any;
     }) as any);
-    spyOn(globalThis, 'scrollTo').and.stub();
+    if (!(globalThis.scrollTo as any).and) { spyOn(globalThis, 'scrollTo').and.stub(); }
 
     cmp.scrollToFilters();
     cmp.scrollToSort();
@@ -607,7 +607,7 @@ describe('ShopComponent coverage fast wave: URL state + scroll restore', () => {
       cb(0);
       return 1;
     }) as any);
-    spyOn(globalThis, 'scrollTo').and.stub();
+    if (!(globalThis.scrollTo as any).and) { spyOn(globalThis, 'scrollTo').and.stub(); }
 
     cmp['restoreScrollIfNeeded']();
     expect(rafSpy).toHaveBeenCalled();
@@ -742,5 +742,40 @@ describe('ShopComponent coverage fast wave: image/upload + undo branches', () =>
     cmp.admin.previewDeleteCategory.and.returnValue(of({ can_delete: false, product_count: 3, child_count: 1 }));
     cmp.previewCategoryDelete({ slug: 'rings', name: 'Rings' } as any);
     expect(cmp.deleteError).toContain('adminUi.storefront.categories.deleteNotAllowed');
+  });
+});
+
+
+describe('ShopComponent coverage fast wave: constructor effect + reorder fallback', () => {
+  it('covers root reorder error fallback and invalid session scroll restoration', () => {
+    const cmp = createShopHarness();
+    cmp.categories = [
+      { slug: 'rings', sort_order: 1, parent_id: null },
+      { slug: 'chains', sort_order: 0, parent_id: null },
+    ];
+    cmp.rootCategories = [
+      { slug: 'rings', sort_order: 0, parent_id: null },
+      { slug: 'chains', sort_order: 1, parent_id: null },
+    ];
+    cmp.rebuildCategoryTree = jasmine.createSpy('rebuildCategoryTree').and.callFake(() => undefined);
+    cmp.admin.reorderCategories.and.returnValue(throwError(() => new Error('reorder-fail')));
+
+    cmp.persistRootCategoryOrder(['chains', 'rings']);
+    expect(cmp.reorderSaving()).toBeFalse();
+    expect(cmp.toast.error).toHaveBeenCalled();
+
+    spyOn(cmp, 'clearShopReturnContext').and.callFake(() => undefined);
+    spyOn(sessionStorage, 'getItem').and.callFake((key: string) => {
+      const map: Record<string, string> = {
+        shop_return_pending: '1',
+        shop_return_url: '/shop',
+        shop_return_scroll_y: 'not-a-number',
+        shop_return_at: String(Date.now()),
+      };
+      return map[key] ?? null;
+    });
+    cmp.router.url = '/shop';
+    cmp.initScrollRestoreFromSession();
+    expect(cmp.clearShopReturnContext).toHaveBeenCalled();
   });
 });

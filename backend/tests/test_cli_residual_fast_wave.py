@@ -243,3 +243,53 @@ async def test_export_data_serializes_full_payload(monkeypatch: pytest.MonkeyPat
     assert payload['products'] == [{'p': 'p1'}]
     assert payload['addresses'] == [{'a': 'a1'}]
     assert payload['orders'] == [{'o': 'o1'}]
+
+
+@pytest.mark.anyio
+async def test_require_owner_success_and_import_display_name_early_return_branches() -> None:
+    owner = SimpleNamespace(id=uuid4(), role=UserRole.owner)
+    session = _SessionStub(execute_results=[_ExecuteScalarOne(owner)])
+
+    resolved = await cli._require_owner(session)
+    assert resolved is owner
+
+    user_obj = SimpleNamespace(id=uuid4(), name='Owner Name', name_tag=0)
+    idle_session = _SessionStub()
+    cli._sync_import_user_display_name(
+        idle_session,
+        user_obj=user_obj,
+        user_payload={'name': 'Owner Name'},
+        next_tag_by_name={},
+    )
+    assert idle_session.added == []
+
+
+@pytest.mark.anyio
+async def test_fill_customer_from_order_user_returns_original_when_user_missing() -> None:
+    class _GetSession:
+        async def get(self, *_args, **_kwargs):
+            await asyncio.sleep(0)
+            return None
+
+    email, name = await cli._fill_customer_from_order_user(
+        _GetSession(),
+        order_user_id=uuid4(),
+        customer_email='buyer@example.com',
+        customer_name='Buyer',
+    )
+    assert email == 'buyer@example.com'
+    assert name == 'Buyer'
+
+
+def test_main_entrypoint_executes_without_help_when_command_runs(monkeypatch: pytest.MonkeyPatch) -> None:
+    args = SimpleNamespace(command='noop')
+    parser = SimpleNamespace(parse_args=lambda: args, print_help=jasmine_like_noop)
+
+    monkeypatch.setattr(cli, '_build_parser', lambda: parser)
+    monkeypatch.setattr(cli, '_run_cli_command', lambda _args: True)
+
+    cli.main()
+
+
+def jasmine_like_noop(*_args, **_kwargs) -> None:
+    return None

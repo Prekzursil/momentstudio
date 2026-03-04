@@ -1283,3 +1283,59 @@ describe('AccountState fast residual branch closures', () => {
   });
 });
 
+
+
+describe('AccountState fast wave residual receipt/cancel/passkey branches', () => {
+  it('covers cancel toggle and not-eligible submit branches', () => {
+    const state = createAccountHarness();
+    state.t = (key: string) => key;
+    state.toast = jasmine.createSpyObj('ToastService', ['success', 'error', 'info']);
+    state.closeReturnRequest = jasmine.createSpy('closeReturnRequest').and.callFake(() => undefined);
+    state.closeCancelRequest = jasmine.createSpy('closeCancelRequest').and.callFake(() => {
+      state.cancelOrderId = null;
+      state.cancelReason = '';
+      state.cancelRequestError = null;
+    });
+    state.canRequestCancel = jasmine.createSpy('canRequestCancel').and.returnValue(true);
+    const order = { id: 'order-1', reference_code: 'REF-1' } as any;
+
+    state.openCancelRequest(order);
+    expect(state.cancelOrderId).toBe('order-1');
+
+    state.openCancelRequest(order);
+    expect(state.closeCancelRequest).toHaveBeenCalled();
+
+    state.cancelOrderId = 'order-1';
+    state.canRequestCancel.and.returnValue(false);
+    state.submitCancelRequest(order);
+    expect(state.cancelRequestError).toBe('account.orders.cancel.errors.notEligible');
+  });
+
+  it('covers copyReceiptLink fallback and share/revoke error detail branches', () => {
+    const state = createAccountHarness();
+    state.t = (key: string) => key;
+    state.toast = jasmine.createSpyObj('ToastService', ['success', 'error', 'info']);
+    state.account = {
+      shareReceipt: jasmine.createSpy('shareReceipt').and.returnValue(throwError(() => ({ error: { detail: 'share-failed' } }))),
+      revokeReceiptShare: jasmine.createSpy('revokeReceiptShare').and.returnValue(throwError(() => ({ error: { detail: 'revoke-failed' } }))),
+    };
+    state.shareReceipt = (AccountState.prototype as any).shareReceipt;
+    state.revokeReceiptShare = (AccountState.prototype as any).revokeReceiptShare;
+    state.copyReceiptLink = (AccountState.prototype as any).copyReceiptLink;
+    state.receiptShares = mockSignal({
+      'order-1': { receipt_url: 'https://receipt.test/1', expires_at: new Date(Date.now() + 5_000).toISOString() }
+    });
+    state.copyReceiptUrl = jasmine.createSpy('copyReceiptUrl');
+
+    const order = { id: 'order-1', reference_code: 'REF-1' } as any;
+    state.copyReceiptLink(order);
+    expect(state.account.shareReceipt).toHaveBeenCalledWith('order-1');
+    expect(state.toast.error).toHaveBeenCalledWith('share-failed');
+
+    spyOn(globalThis, 'confirm').and.returnValue(true);
+    state.revokingReceiptId = null;
+    state.revokeReceiptShare(order);
+    expect(state.toast.error).toHaveBeenCalledWith('revoke-failed');
+  });
+
+});
