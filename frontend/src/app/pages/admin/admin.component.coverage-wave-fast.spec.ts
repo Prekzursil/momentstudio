@@ -1085,3 +1085,125 @@ describe('AdminComponent fast blog moderation and residual branch closures', () 
     expect((meta as any).pin_order).toBeGreaterThan(0);
   });
 });
+
+describe('AdminComponent fast residual non-blog branch closures', () => {
+  it('covers audit/fx/category/tax error callbacks', () => {
+    const component = createAdminHarness() as any;
+    const { taxesAdmin, admin, fxAdmin } = attachTaxCategoryAndFxHarness(component);
+
+    admin.audit = jasmine.createSpy('audit').and.returnValue(throwError(() => ({ error: { detail: 'audit-fail' } })));
+    component.loadAudit();
+
+    component.fxStatus = () => ({ override: { eur_per_ron: 4.9 } });
+    spyOn(globalThis, 'confirm').and.returnValue(true);
+    fxAdmin.clearOverride.and.returnValue(throwError(() => ({ error: { detail: 'fx-fail' } })));
+    component.clearFxOverride();
+
+    component.categoryWizardStep.set(2);
+    component.categoryWizardPrev();
+    expect(component.categoryWizardStep()).toBe(1);
+
+    component.categoryName = 'New Cat';
+    admin.createCategory = jasmine.createSpy('createCategory').and.returnValue(throwError(() => ({ error: { detail: 'add-fail' } })));
+    component.addCategory();
+
+    taxesAdmin.createGroup.and.returnValue(throwError(() => ({ error: { detail: 'create-tax-fail' } })));
+    component.taxGroupCreate = { code: 'STD', name: 'Standard', description: '', is_default: false };
+    component.createTaxGroup();
+
+    taxesAdmin.updateGroup.and.returnValue(throwError(() => ({ error: { detail: 'update-tax-fail' } })));
+    component.saveTaxGroup({ id: 'g1', name: 'Group 1', description: '' } as any);
+    component.setDefaultTaxGroup({ id: 'g1', is_default: false } as any);
+
+    taxesAdmin.deleteGroup.and.returnValue(throwError(() => ({ error: { detail: 'delete-tax-fail' } })));
+    component.deleteTaxGroup({ id: 'g1', is_default: false } as any);
+
+    taxesAdmin.upsertRate.and.returnValue(throwError(() => ({ error: { detail: 'rate-fail' } })));
+    component.taxRateCountry = { g1: 'RO' };
+    component.taxRatePercent = { g1: '19' };
+    component.upsertTaxRate({ id: 'g1' } as any);
+
+    taxesAdmin.deleteRate.and.returnValue(throwError(() => ({ error: { detail: 'rate-del-fail' } })));
+    component.deleteTaxRate({ id: 'g1' } as any, 'RO');
+
+    expect(component.toast.error).toHaveBeenCalled();
+  });
+
+  it('covers category helper branches and translation-toggle close path', () => {
+    const component = createAdminHarness() as any;
+    const { admin } = attachTaxCategoryAndFxHarness(component);
+
+    component.categories = [
+      { id: 'root', slug: 'root', name: 'Root', parent_id: null },
+      { id: 'child-a', slug: 'a', name: 'A', parent_id: 'root' },
+      { id: 'child-b', slug: 'b', name: 'B', parent_id: 'child-a' },
+      { id: 'peer', slug: 'peer', name: 'Peer', parent_id: null },
+    ];
+
+    const options = component.categoryParentOptions({ id: 'root' } as any);
+    expect(options.some((o: any) => o.id === 'root')).toBeFalse();
+
+    component.categoryTranslationsSlug = 'same-slug';
+    spyOn(component, 'closeCategoryTranslations').and.callThrough();
+    component.toggleCategoryTranslations('same-slug');
+    expect(component.closeCategoryTranslations).toHaveBeenCalled();
+
+    const cat = { slug: 'cat-a', low_stock_threshold: 3 } as any;
+    admin.updateCategory.and.returnValue(throwError(() => ({ error: { detail: 'low-stock-fail' } })));
+    component.updateCategoryLowStockThreshold(cat, '7');
+    expect(cat.low_stock_threshold).toBe(3);
+  });
+
+  it('covers duplicate/save-stock/delete-image errors and toggleAll clear', () => {
+    const component = createAdminHarness() as any;
+    const { admin } = attachTaxCategoryAndFxHarness(component);
+
+    admin.duplicateProduct = jasmine.createSpy('duplicateProduct').and.returnValue(throwError(() => ({ error: {} })));
+    component.duplicateProduct('prod-a');
+
+    admin.updateProduct.and.returnValue(throwError(() => ({ error: {} })));
+    component.stockEdits = { p1: 11 };
+    component.saveStock({ id: 'p1', slug: 'prod-a', stock_quantity: 5 } as any);
+
+    component.editingId = 'prod-a';
+    admin.deleteProductImage = jasmine.createSpy('deleteProductImage').and.returnValue(throwError(() => ({ error: {} })));
+    component.deleteImage('img-1');
+
+    component.selectedIds = new Set(['p1', 'p2']);
+    component.toggleAll({ target: { checked: false } } as any);
+    expect(component.selectedIds.size).toBe(0);
+    expect(component.toast.error).toHaveBeenCalled();
+  });
+
+  it('covers blog bulk preview fallbacks and saveBlogPost conflict branch', () => {
+    const component = createAdminHarness() as any;
+    const { admin, toast } = attachBlogHarness(component);
+
+    component.blogBulkAction = 'schedule';
+    component.blogBulkPublishAt = '2026-03-05T10:00';
+    component.blogBulkUnpublishAt = '2026-03-06T12:00';
+    component.blogBulkSelection = new Set(['blog.a', 'blog.b']);
+    expect(component.blogBulkPreview()).toContain('adminUi.blog.bulk.previewSchedule');
+
+    component.blogBulkAction = 'tags_add';
+    component.blogBulkTags = 'alpha,beta';
+    expect(component.blogBulkPreview()).toContain('adminUi.blog.bulk.previewTagsAdd');
+
+    component.blogBulkAction = '' as any;
+    expect(component.blogBulkPreview()).toContain('adminUi.blog.bulk.previewEmpty');
+
+    component.selectedBlogKey = 'blog.hello';
+    component.blogEditLang = 'en';
+    component.blogBaseLang = 'en';
+    component.blogForm = { title: 'T', body_markdown: 'Body', status: 'draft', published_at: '', published_until: '' };
+    component.blogMeta = {};
+    spyOn(component, 'buildBlogMeta').and.returnValue({});
+    spyOn(component, 'blogA11yIssues').and.returnValue([]);
+    spyOn(component, 'handleContentConflict').and.returnValue(false);
+    admin.updateContentBlock.and.returnValue(throwError(() => ({ error: { detail: 'save-fail' } })));
+
+    component.saveBlogPost();
+    expect(toast.error).toHaveBeenCalled();
+  });
+});
+

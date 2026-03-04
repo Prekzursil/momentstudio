@@ -542,3 +542,140 @@ describe('DamAssetLibraryComponent coverage wave 1', () => {
   });
 });
 
+
+describe('DamAssetLibraryComponent coverage wave 1: residual pagination and retry helpers', () => {
+  it('covers page and queue pagination guards plus queue reset', () => {
+    const { component } = createComponent();
+    const reload = spyOn(component, 'reload').and.stub();
+    const loadJobs = spyOn(component, 'loadJobs').and.stub();
+
+    component.page = 1;
+    component.prevPage();
+    component.meta.set({ total_items: 10, total_pages: 3, page: 1, limit: 24 });
+    component.nextPage();
+    component.prevPage();
+
+    component.queuePage = 1;
+    component.prevQueuePage();
+    component.jobsMeta.set({ total_items: 10, total_pages: 2, page: 1, limit: 20 });
+    component.nextQueuePage();
+
+    component.queueStatus = 'queued';
+    component.queueTag = 'urgent';
+    component.queueAssignedToUserId = 'owner-1';
+    component.resetQueueFilters();
+
+    expect(reload).toHaveBeenCalledTimes(2);
+    expect(loadJobs).toHaveBeenCalledWith();
+    expect(loadJobs).toHaveBeenCalledWith(true);
+    expect(component.queueTag).toBe('');
+    expect(component.queueAssignedToUserId).toBe('');
+  });
+
+  it('covers private retry snapshot/diff helpers and rollback preview reset', () => {
+    const { component } = createComponent();
+    component.retryPolicies.set([
+      {
+        job_type: 'ingest',
+        max_attempts: 5,
+        backoff_schedule_seconds: [30, 60],
+        jitter_ratio: 0.2,
+        enabled: true,
+        updated_at: '2026-02-01T00:00:00Z',
+      } as any,
+    ]);
+
+    const snapshot = (component as any).currentRetryPolicySnapshot('ingest');
+    const changed = (component as any).computeRetryPolicyDiffRows(snapshot, {
+      ...snapshot,
+      max_attempts: 7,
+      backoff_schedule_seconds: [15, 60, 120],
+      jitter_ratio: 0.35,
+      enabled: false,
+    });
+
+    component.retryPolicyRollbackPreview.set({ jobType: 'ingest', diffs: changed } as any);
+    component.cancelRetryPolicyRollbackPreview();
+
+    expect(snapshot.max_attempts).toBe(5);
+    expect(changed.some((row: any) => row.changed)).toBeTrue();
+    expect(component.retryPolicyRollbackPreview()).toBeNull();
+  });
+
+  it('covers parse schedule and apply saved policy private helpers', () => {
+    const { component } = createComponent();
+    const parsed = (component as any).parseScheduleInput('1, 0, x, 5, 10, -3');
+    expect(parsed).toEqual([1, 5, 10]);
+
+    component.retryPolicies.set([
+      {
+        job_type: 'ingest',
+        max_attempts: 3,
+        backoff_schedule_seconds: [5],
+        jitter_ratio: 0.1,
+        enabled: true,
+        updated_at: '2026-01-01T00:00:00Z',
+      } as any,
+    ]);
+
+    (component as any).applyRetryPolicySavedState({
+      job_type: 'ingest',
+      max_attempts: 9,
+      backoff_schedule_seconds: [10, 20],
+      jitter_ratio: 0.45,
+      enabled: false,
+    } as any);
+
+    expect(component.retryPolicies()[0].max_attempts).toBe(9);
+    expect(component.retryDelayPreview('ingest' as any)).toContain('#1: 10s');
+  });
+});
+
+describe('DamAssetLibraryComponent coverage wave 1: residual details and queue internals', () => {
+  it('covers saveDetails success and error plus closeDetails', async () => {
+    const { component, admin, toast } = createComponent();
+    const reload = spyOn(component, 'reload').and.stub();
+    component.detailAsset.set({ id: 'asset-1' } as any);
+
+    await component.saveDetails();
+    expect(admin.updateMediaAsset).toHaveBeenCalled();
+    expect(toast.success).toHaveBeenCalledWith('Asset metadata updated.');
+    expect(component.detailAsset()).toBeNull();
+    expect(reload).toHaveBeenCalled();
+
+    component.detailAsset.set({ id: 'asset-1' } as any);
+    admin.updateMediaAsset.and.returnValue(throwError(() => ({ error: { detail: 'update failed' } })));
+    await component.saveDetails();
+    expect(toast.error).toHaveBeenCalledWith('update failed');
+  });
+
+  it('covers runUsageReconcile and private patch/replace/load helpers', async () => {
+    const { component, admin, toast } = createComponent();
+    const loadJobs = spyOn(component, 'loadJobs').and.stub();
+    component.tab.set('queue');
+    component.jobs.set([{ id: 'job-1' } as any]);
+
+    admin.requestMediaUsageReconcile.and.returnValue(of({ id: 'job-queued' } as any));
+    await component.runUsageReconcile();
+    expect(component.jobs()[0].id).toBe('job-queued');
+    expect(toast.success).toHaveBeenCalledWith('Usage reconciliation queued.');
+    expect(loadJobs).toHaveBeenCalledWith(true);
+
+    admin.requestMediaUsageReconcile.and.returnValue(throwError(() => ({ error: { detail: 'queue failed' } })));
+    await component.runUsageReconcile();
+    expect(toast.error).toHaveBeenCalledWith('queue failed');
+
+    const openJobEvents = spyOn(component, 'openJobEvents').and.stub();
+    component.activeJobEventsFor.set({ id: 'job-2' } as any);
+    (component as any).replaceJob({ id: 'job-2', status: 'queued' });
+    expect(openJobEvents).toHaveBeenCalled();
+
+    admin.getMediaTelemetry.and.returnValue(throwError(() => ({ error: { detail: 'telemetry-down' } })));
+    expect(() => (component as any).loadTelemetry()).not.toThrow();
+
+    admin.updateMediaJobTriage.and.returnValue(of({ id: 'job-2', status: 'done' } as any));
+    await (component as any).patchJobTriage({ id: 'job-2' }, { triage_state: 'resolved' }, 'ok');
+    expect(toast.success).toHaveBeenCalledWith('ok');
+  });
+});
+
