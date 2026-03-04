@@ -242,6 +242,9 @@ const ADMIN_SWEEP_ARGS_BY_NAME: Record<string, unknown[]> = {
   setStock: ['p-1', 5],
   saveStock: [{ id: 'p-1', slug: 'p-1', stock_quantity: 2 }],
   loadBlogVersions: [],
+  saveInfoInternal: ['page.about', 'Body', 'en', () => undefined, () => undefined],
+  saveLegalMetaIfNeeded: ['page.about', () => undefined, () => undefined],
+  savePageMarkdownInternal: ['page.about', 'Body', 'en', () => undefined, () => undefined],
 };
 
 const ADMIN_SWEEP_BLOCKED = new Set([
@@ -266,9 +269,6 @@ const ADMIN_SWEEP_BLOCKED = new Set([
   'insertAtCursor',
   'updateBlogBody',
   'setBlogMarkdownImageAlt',
-  'saveInfoInternal',
-  'saveLegalMetaIfNeeded',
-  'savePageMarkdownInternal',
   // Large fan-out loaders already covered by targeted tests.
   'loadAll',
   'retryLoadAll',
