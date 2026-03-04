@@ -377,6 +377,48 @@ describe('ShopComponent i18n meta', () => {
     expect(clearBulkSelection).toHaveBeenCalled();
     expect(cmp.hasError()).toBeTrue();
   });
+
+  it('covers storefront helper methods for bulk selection, filters, and pagination branches', () => {
+    const fixture = TestBed.createComponent(ShopComponent);
+    const cmp = fixture.componentInstance as any;
+
+    storefrontAdminMode.enabled.and.returnValue(true);
+    cmp.loading.set(false);
+    cmp.hasError.set(false);
+    cmp.bulkSelectMode.set(false);
+    cmp.bulkSelectedProductIds.set(new Set<string>());
+    cmp.products = [
+      { id: 'p1', slug: 'camera', name: 'Camera', base_price: 100, currency: 'RON', tags: ['vip'] },
+      { id: 'p2', slug: 'lens', name: 'Lens', base_price: 80, currency: 'RON', tags: [] },
+    ];
+    cmp.categories = [{ id: 'root', slug: 'root', name: 'Root', parent_id: null }];
+    cmp.rebuildCategoryTree();
+    cmp.pageMeta = { page: 1, total_pages: 3, total_items: 24, limit: 8 };
+    const loadProductsSpy = spyOn(cmp, 'loadProducts').and.stub();
+
+    cmp.toggleBulkSelectMode();
+    cmp.toggleBulkSelected({ preventDefault: () => undefined, stopPropagation: () => undefined, target: { checked: true } } as any, 'p1');
+    expect(cmp.bulkIsSelected('p1')).toBeTrue();
+    cmp.selectAllProductsOnPage();
+    expect(cmp.bulkSelectedProductIds().size).toBe(2);
+    cmp.clearBulkSelection();
+    expect(cmp.bulkSelectedProductIds().size).toBe(0);
+
+    cmp.filters.search = '  lens  ';
+    cmp.filters.tags = new Set<string>(['vip']);
+    cmp.toggleTag('vip');
+    cmp.onSidebarSearchChange('camera');
+    cmp.onPriceTextChange('min', '25');
+    cmp.onPriceTextChange('max', '150');
+    cmp.onPriceCommit('max');
+    cmp.onSearch();
+    cmp.changePage(1);
+    cmp.loadMore();
+
+    expect(loadProductsSpy.calls.count()).toBeGreaterThan(3);
+    expect(cmp.filters.search).toContain('camera');
+  });
+
 });
 
 function seedShopTranslations(translate: TranslateService): void {

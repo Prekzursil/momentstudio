@@ -548,6 +548,83 @@ describe('CheckoutComponent targeted branch coverage guards', () => {
     expect(payload.billing_line1).toBe('Billing street');
   });
 
+  it('covers ngOnInit branch with cart items present and promo query override', () => {
+    const cmp = createCheckoutHarness();
+    cmp.route = {
+      queryParamMap: of({
+        get: (key: string) => (key === 'promo' ? 'save10' : null),
+      }),
+    } as any;
+    cmp.loadAutoApplyBestCouponPreference = jasmine.createSpy('loadAutoApplyBestCouponPreference').and.returnValue(true);
+    cmp.applyPrefetchedPricingSettings = jasmine.createSpy('applyPrefetchedPricingSettings');
+    cmp.loadPaymentCapabilities = jasmine.createSpy('loadPaymentCapabilities');
+    cmp.prefillFromUser = jasmine.createSpy('prefillFromUser');
+    cmp.loadSavedAddresses = jasmine.createSpy('loadSavedAddresses');
+    cmp.loadGuestEmailVerificationStatus = jasmine.createSpy('loadGuestEmailVerificationStatus');
+    cmp.loadLegalConsentStatus = jasmine.createSpy('loadLegalConsentStatus');
+    cmp.trackCheckoutStart = jasmine.createSpy('trackCheckoutStart');
+    cmp.queueCartSync = jasmine.createSpy('queueCartSync');
+    cmp.items = () => [{ id: 'i-1', product_id: 'p-1', quantity: 1, stock: 3 }];
+
+    (CheckoutComponent.prototype as any).ngOnInit.call(cmp);
+
+    expect(cmp.autoApplyBestCoupon).toBeTrue();
+    expect(cmp.pendingPromoCode).toBe('SAVE10');
+    expect(cmp.trackCheckoutStart).toHaveBeenCalled();
+    expect(cmp.queueCartSync).toHaveBeenCalled();
+    expect(cmp.loadGuestEmailVerificationStatus).toHaveBeenCalled();
+    expect(cmp.loadLegalConsentStatus).toHaveBeenCalled();
+  });
+
+  it('covers ngOnInit empty-cart branches for guest redirect and authenticated server load', () => {
+    const cmp = createCheckoutHarness();
+    cmp.route = {
+      queryParamMap: of({ get: () => null }),
+    } as any;
+    cmp.loadAutoApplyBestCouponPreference = jasmine.createSpy('loadAutoApplyBestCouponPreference').and.returnValue(false);
+    cmp.applyPrefetchedPricingSettings = jasmine.createSpy('applyPrefetchedPricingSettings');
+    cmp.loadPaymentCapabilities = jasmine.createSpy('loadPaymentCapabilities');
+    cmp.prefillFromUser = jasmine.createSpy('prefillFromUser');
+    cmp.loadSavedAddresses = jasmine.createSpy('loadSavedAddresses');
+    cmp.loadGuestEmailVerificationStatus = jasmine.createSpy('loadGuestEmailVerificationStatus');
+    cmp.loadLegalConsentStatus = jasmine.createSpy('loadLegalConsentStatus');
+    cmp.redirectToCartIfEmpty = jasmine.createSpy('redirectToCartIfEmpty');
+    cmp.loadCartFromServer = jasmine.createSpy('loadCartFromServer');
+    cmp.items = () => [];
+
+    cmp.auth.isAuthenticated.and.returnValue(false);
+    (CheckoutComponent.prototype as any).ngOnInit.call(cmp);
+    expect(cmp.redirectToCartIfEmpty).toHaveBeenCalled();
+    expect(cmp.loadCartFromServer).not.toHaveBeenCalled();
+
+    cmp.redirectToCartIfEmpty.calls.reset();
+    cmp.auth.isAuthenticated.and.returnValue(true);
+    (CheckoutComponent.prototype as any).ngOnInit.call(cmp);
+    expect(cmp.redirectToCartIfEmpty).not.toHaveBeenCalled();
+    expect(cmp.loadCartFromServer).toHaveBeenCalled();
+  });
+
+  it('covers ngOnDestroy timer cleanup and abandon tracking', () => {
+    const cmp = createCheckoutHarness();
+    cmp.syncDebounceHandle = 101 as any;
+    cmp.guestResendTimer = 202 as any;
+    cmp.paymentNotReadyTimer = 303 as any;
+    cmp.trackCheckoutAbandon = jasmine.createSpy('trackCheckoutAbandon');
+    const clearTimeoutSpy = spyOn(globalThis, 'clearTimeout');
+    const clearIntervalSpy = spyOn(globalThis, 'clearInterval');
+
+    (CheckoutComponent.prototype as any).ngOnDestroy.call(cmp);
+
+    expect(clearTimeoutSpy).toHaveBeenCalledWith(101 as any);
+    expect(clearIntervalSpy).toHaveBeenCalledWith(202 as any);
+    expect(clearTimeoutSpy).toHaveBeenCalledWith(303 as any);
+    expect(cmp.syncDebounceHandle).toBeNull();
+    expect(cmp.guestResendTimer).toBeNull();
+    expect(cmp.paymentNotReadyTimer).toBeNull();
+    expect(cmp.trackCheckoutAbandon).toHaveBeenCalled();
+  });
+
+
   it('runs a deterministic prototype sweep across remaining checkout methods', () => {
     const cmp = createCheckoutHarness();
     cmp.quote = {

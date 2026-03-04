@@ -547,6 +547,187 @@ describe('AccountState coverage wave 4 FE-W2', () => {
 });
 
 
+  it('covers coupons/orders/addresses/tickets loader success paths', () => {
+    const state = createState();
+    state.couponsService = jasmine.createSpyObj('CouponsService', ['myCoupons']);
+    state.couponsService.myCoupons.and.returnValue(
+      of([
+        { is_active: true, starts_at: null, ends_at: null, promotion: { is_active: true } },
+        { is_active: false, starts_at: null, ends_at: null, promotion: { is_active: true } },
+      ]),
+    );
+    state.couponsCountLoading = makeSignal(false);
+    state.couponsCountLoaded = makeSignal(false);
+    state.couponsCount = makeSignal(0);
+
+    state.account.getOrdersPage = jasmine.createSpy('getOrdersPage').and.returnValue(
+      of({
+        items: [{ id: 'o-1', status: 'paid', reference_code: 'REF-1', total_amount: 100, currency: 'RON' }],
+        meta: { page: 1, total_pages: 2, pending_count: 1 },
+      }),
+    );
+    state.orders = makeSignal<any[]>([]);
+    state.ordersLoading = makeSignal(false);
+    state.ordersLoaded = makeSignal(false);
+    state.ordersError = makeSignal<string | null>(null);
+    state.ordersMeta = makeSignal<any>(null);
+    state.latestOrder = makeSignal<any>(null);
+    state.page = 1;
+    state.totalPages = 1;
+    state.pageSize = 10;
+    state.ordersQuery = '';
+    state.orderFilter = '';
+    state.ordersFrom = '';
+    state.ordersTo = '';
+
+    state.account.getAddresses = jasmine
+      .createSpy('getAddresses')
+      .and.returnValue(of([{ id: 'addr-1', city: 'Bucharest', line1: 'Main 1' }]));
+    state.addresses = makeSignal<any[]>([]);
+    state.addressesLoading = makeSignal(false);
+    state.addressesLoaded = makeSignal(false);
+    state.addressesError = makeSignal<string | null>(null);
+
+    state.ticketsService = jasmine.createSpyObj('TicketsService', ['listMine']);
+    state.ticketsService.listMine.and.returnValue(
+      of([
+        { id: 't-older', updated_at: '2026-03-02T00:00:00Z', status: 'open' },
+        { id: 't-newer', updated_at: '2026-03-03T00:00:00Z', status: 'resolved' },
+      ]),
+    );
+    state.tickets = makeSignal<any[]>([]);
+    state.ticketsLoading = makeSignal(false);
+    state.ticketsLoaded = makeSignal(false);
+    state.ticketsError = makeSignal<string | null>(null);
+
+    state.loadCouponsCount();
+    state.loadOrders();
+    state.loadAddresses();
+    state.loadTickets();
+
+    expect(state.couponsCount()).toBe(1);
+    expect(state.orders().length).toBe(1);
+    expect(state.latestOrder()?.id).toBe('o-1');
+    expect(state.totalPages).toBe(2);
+    expect(state.addresses().length).toBe(1);
+    expect(state.tickets()[0]?.id).toBe('t-newer');
+    expect(state.ticketsLoaded()).toBeTrue();
+  });
+
+  it('covers loader error and guard exits for authenticated account data methods', () => {
+    const state = createState();
+    state.couponsService = jasmine.createSpyObj('CouponsService', ['myCoupons']);
+    state.couponsService.myCoupons.and.returnValue(throwError(() => new Error('coupon-fail')));
+    state.couponsCountLoading = makeSignal(false);
+    state.couponsCountLoaded = makeSignal(false);
+    state.couponsCount = makeSignal(5);
+
+    state.account.getOrdersPage = jasmine
+      .createSpy('getOrdersPage')
+      .and.returnValue(throwError(() => ({ error: { detail: 'Invalid date range' } })));
+    state.ordersLoading = makeSignal(false);
+    state.ordersLoaded = makeSignal(false);
+    state.ordersError = makeSignal<string | null>(null);
+    state.ordersMeta = makeSignal<any>(null);
+    state.orders = makeSignal<any[]>([]);
+    state.ordersFrom = '2026-03-03';
+    state.ordersTo = '2026-03-02';
+    state.ordersQuery = '';
+    state.orderFilter = '';
+    state.page = 3;
+    state.pageSize = 10;
+
+    state.account.getAddresses = jasmine.createSpy('getAddresses').and.returnValue(throwError(() => new Error('addr-fail')));
+    state.addressesLoading = makeSignal(false);
+    state.addressesLoaded = makeSignal(false);
+    state.addressesError = makeSignal<string | null>(null);
+
+    state.ticketsService = jasmine.createSpyObj('TicketsService', ['listMine']);
+    state.ticketsService.listMine.and.returnValue(throwError(() => new Error('tickets-fail')));
+    state.tickets = makeSignal<any[]>([{ id: 'existing' }]);
+    state.ticketsLoading = makeSignal(false);
+    state.ticketsLoaded = makeSignal(false);
+    state.ticketsError = makeSignal<string | null>(null);
+
+    state.loadCouponsCount();
+    state.applyOrderFilters();
+    state.loadOrders(true);
+    state.loadAddresses();
+    state.loadTickets();
+
+    expect(state.couponsCount()).toBe(0);
+    expect(state.ordersError()).toBe('account.orders.invalidDateRange');
+    expect(state.addressesError()).toBe('account.addresses.loadError');
+    expect(state.ticketsError()).toBe('account.overview.support.loadError');
+    expect(state.tickets()).toEqual([]);
+
+    state.auth.isAuthenticated.and.returnValue(false);
+    state.loadCouponsCount(true);
+    state.loadOrders(true);
+    state.loadAddresses(true);
+    state.loadTickets(true);
+    expect(state.account.getOrdersPage.calls.count()).toBeGreaterThan(0);
+  });
+
+  it('covers account overview labels, cooldown formatting, and support status helpers', () => {
+    const state = createState();
+    state.translate = { instant: (key: string) => key };
+    state.t = (key: string, params?: Record<string, unknown>) =>
+      params ? `${key}:${Object.keys(params).join(',')}` : key;
+    state.ordersLoading = makeSignal(false);
+    state.ordersLoaded = makeSignal(true);
+    state.lastOrder = makeSignal<any>({
+      id: 'o-1',
+      reference_code: 'REF-1',
+      status: 'paid',
+      created_at: '2026-03-03T00:00:00Z',
+      total_amount: 100,
+      currency: 'RON',
+    });
+    state.addressesLoading = makeSignal(false);
+    state.addressesLoaded = makeSignal(true);
+    state.defaultShippingAddress = makeSignal<any>({
+      label: 'Home',
+      line1: 'Main 1',
+      city: 'Bucharest',
+    });
+    state.wishlist = {
+      isLoaded: () => true,
+      items: () => [{ id: 'w1' }, { id: 'w2' }],
+    };
+    state.profile = makeSignal<any>({ id: 'u-1', email_verified: true });
+    state.googleEmail = makeSignal<string | null>('linked@example.com');
+    state.emailVerified = makeSignal(true);
+    state.ticketsLoading = makeSignal(false);
+    state.ticketsLoaded = makeSignal(true);
+    state.ticketsError = makeSignal<string | null>(null);
+    state.tickets = makeSignal<any[]>([
+      { id: 't-1', status: 'open' },
+      { id: 't-2', status: 'resolved' },
+    ]);
+    state.cooldowns = makeSignal<any>({
+      username: { next_allowed_at: new Date(Date.now() + 2_000).toISOString() },
+      display_name: { next_allowed_at: new Date(Date.now() + 65_000).toISOString() },
+      email: { next_allowed_at: 'invalid-date' },
+    });
+    state.now = makeSignal(Date.now());
+
+    expect(state.lastOrderLabel()).toContain('account.overview.lastOrderLabel');
+    expect(state.lastOrderSubcopy()).toContain('RON');
+    expect(state.defaultAddressLabel()).toBe('Home');
+    expect(state.defaultAddressSubcopy()).toContain('Bucharest');
+    expect(state.wishlistCountLabel()).toContain('account.overview.wishlistCountMany');
+    expect(state.notificationsLabel()).toContain('account.overview.notificationsAllOff');
+    expect(state.securityLabel()).toContain('account.overview.security');
+    expect(state.supportTicketsLabel()).toContain('account.overview.support.openOne');
+    expect(state.supportTicketsSubcopy()).toContain('account.overview.support.hint');
+    expect(state.usernameCooldownSeconds()).toBeGreaterThanOrEqual(1);
+    expect(state.displayNameCooldownSeconds()).toBeGreaterThanOrEqual(60);
+    expect(state.emailCooldownSeconds()).toBe(0);
+    expect(state.formatCooldown(3661)).toContain('1h');
+  });
+
+
 describe('AccountState coverage wave 4 FE-W2 orders and receipt flows', () => {
   it('covers reorder and reorderItem success/error/guard branches', () => {
     const state = createState();
