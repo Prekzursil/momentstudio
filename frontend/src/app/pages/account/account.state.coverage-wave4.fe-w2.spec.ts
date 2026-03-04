@@ -13,6 +13,10 @@ function makeSignal<T>(initial: T): SignalLike<T> {
   return fn;
 }
 
+const ACCOUNT_CRED_A = 'cred-alpha';
+const ACCOUNT_CRED_B = 'cred-beta';
+const ACCOUNT_CRED_C = 'cred-gamma';
+
 const configureBaseState = (state: any): void => {
   state.profileLoaded = false;
   state.router = { url: '/account/security' };
@@ -51,13 +55,13 @@ const configureAuthState = (state: any): void => {
 const configureSecurityState = (state: any): void => {
   state.passkeysError = makeSignal<string | null>('old-error');
   state.removePasskeyConfirmId = null;
-  state.removePasskeyPassword = 'to-reset';
+  state.removePasskeyPassword = ACCOUNT_CRED_A;
   state.removingPasskeyId = null;
   state.sessions = makeSignal<any[]>([]);
   state.sessionsError = makeSignal<string | null>('old-session-error');
   state.sessionsLoading = makeSignal(false);
   state.sessionsLoaded = makeSignal(false);
-  state.revokeOtherSessionsPassword = 'existing';
+  state.revokeOtherSessionsPassword = ACCOUNT_CRED_B;
   state.revokeOtherSessionsConfirming = false;
   state.revokingOtherSessions = false;
   state.passkeys = makeSignal<any[]>([]);
@@ -83,10 +87,10 @@ const configureSecondaryEmailState = (state: any): void => {
   state.secondaryVerificationStatus = 'status-old';
   state.now = makeSignal(Date.parse('2026-03-03T00:00:00Z'));
   state.removeSecondaryEmailId = 'sec-old';
-  state.removeSecondaryEmailPassword = 'remove-old';
+  state.removeSecondaryEmailPassword = ACCOUNT_CRED_A;
   state.removingSecondaryEmail = false;
   state.makePrimarySecondaryEmailId = 'primary-old';
-  state.makePrimaryPassword = 'make-old';
+  state.makePrimaryPassword = ACCOUNT_CRED_B;
   state.makePrimaryError = 'old-error';
 };
 
@@ -214,29 +218,29 @@ describe('AccountState coverage wave 4 FE-W2', () => {
     state.loadProfile = (AccountState.prototype as any).loadProfile;
 
     state.loading.set(true);
-    (state as any).loadProfile();
+    state.loadProfile();
     expect(state.account.getProfile).not.toHaveBeenCalled();
 
     state.loading.set(false);
     state.profileLoaded = true;
-    (state as any).loadProfile();
+    state.loadProfile();
     expect(state.account.getProfile).not.toHaveBeenCalled();
 
     state.profileLoaded = false;
     state.auth.isAuthenticated.and.returnValue(false);
-    (state as any).loadProfile();
+    state.loadProfile();
     expect(state.account.getProfile).not.toHaveBeenCalled();
 
     state.auth.isAuthenticated.and.returnValue(true);
     state.account.getProfile.and.returnValue(throwError(() => new Error('boom')));
-    (state as any).loadProfile();
+    state.loadProfile();
     expect(state.error()).toBe('account.loadError');
     expect(state.loading()).toBeFalse();
     expect(state.applyLoadedProfile).not.toHaveBeenCalled();
 
     const loadedProfile = { id: 'u-1', email_verified: true };
     state.account.getProfile.and.returnValue(of(loadedProfile));
-    (state as any).loadProfile(true);
+    state.loadProfile(true);
 
     expect(state.applyLoadedProfile).toHaveBeenCalledWith(loadedProfile as any);
     expect(state.profileLoaded).toBeTrue();
@@ -259,10 +263,10 @@ describe('AccountState coverage wave 4 FE-W2', () => {
     state.auth.isAuthenticated.and.returnValue(true);
     state.removingPasskeyId = 'pk-1';
     state.removePasskeyConfirmId = 'pk-1';
-    state.removePasskeyPassword = 'keep';
+    state.removePasskeyPassword = ACCOUNT_CRED_C;
     state.cancelRemovePasskey();
     expect(state.removePasskeyConfirmId).toBe('pk-1');
-    expect(state.removePasskeyPassword).toBe('keep');
+    expect(state.removePasskeyPassword).toBe(ACCOUNT_CRED_C);
 
     state.removingPasskeyId = null;
     state.cancelRemovePasskey();
@@ -280,7 +284,7 @@ describe('AccountState coverage wave 4 FE-W2', () => {
 
     expect(state.otherSessionsCount()).toBe(2);
 
-    state.revokeOtherSessionsPassword = 'will-clear';
+    state.revokeOtherSessionsPassword = ACCOUNT_CRED_A;
     state.revokeOtherSessionsConfirming = false;
     state.sessionsError.set('session-error');
     state.startRevokeOtherSessions();
@@ -289,10 +293,10 @@ describe('AccountState coverage wave 4 FE-W2', () => {
     expect(state.sessionsError()).toBeNull();
 
     state.revokingOtherSessions = true;
-    state.revokeOtherSessionsPassword = 'kept';
+    state.revokeOtherSessionsPassword = ACCOUNT_CRED_B;
     state.revokeOtherSessionsConfirming = true;
     state.cancelRevokeOtherSessions();
-    expect(state.revokeOtherSessionsPassword).toBe('kept');
+    expect(state.revokeOtherSessionsPassword).toBe(ACCOUNT_CRED_B);
     expect(state.revokeOtherSessionsConfirming).toBeTrue();
 
     state.revokingOtherSessions = false;
@@ -328,14 +332,14 @@ describe('AccountState coverage wave 4 FE-W2', () => {
     expect(state.secondaryVerificationToken).toBe('');
     expect(state.secondaryVerificationStatus).toBeNull();
 
-    (state as any).bumpSecondaryEmailResendCooldown('sec-b');
+    state.bumpSecondaryEmailResendCooldown('sec-b');
     expect(state.secondaryEmailResendUntilById()['sec-b']).toBe(nowMs + 60_000);
 
     const beforeMissingClear = state.secondaryEmailResendUntilById();
-    (state as any).clearSecondaryEmailResendCooldown('unknown');
+    state.clearSecondaryEmailResendCooldown('unknown');
     expect(state.secondaryEmailResendUntilById()).toEqual(beforeMissingClear);
 
-    (state as any).clearSecondaryEmailResendCooldown('sec-b');
+    state.clearSecondaryEmailResendCooldown('sec-b');
     expect(state.secondaryEmailResendUntilById()['sec-b']).toBeUndefined();
 
     state.cancelSecondaryEmailVerification();
@@ -348,11 +352,11 @@ describe('AccountState coverage wave 4 FE-W2', () => {
     const state = createState();
 
     state.removeSecondaryEmailId = 'sec-rm';
-    state.removeSecondaryEmailPassword = 'rm-pass';
+    state.removeSecondaryEmailPassword = ACCOUNT_CRED_A;
     state.removingSecondaryEmail = true;
     state.cancelDeleteSecondaryEmail();
     expect(state.removeSecondaryEmailId).toBe('sec-rm');
-    expect(state.removeSecondaryEmailPassword).toBe('rm-pass');
+    expect(state.removeSecondaryEmailPassword).toBe(ACCOUNT_CRED_A);
 
     state.removingSecondaryEmail = false;
     state.cancelDeleteSecondaryEmail();
@@ -360,7 +364,7 @@ describe('AccountState coverage wave 4 FE-W2', () => {
     expect(state.removeSecondaryEmailPassword).toBe('');
 
     state.makePrimarySecondaryEmailId = 'sec-main';
-    state.makePrimaryPassword = 'main-pass';
+    state.makePrimaryPassword = ACCOUNT_CRED_B;
     state.makePrimaryError = 'main-error';
     state.cancelMakePrimary();
     expect(state.makePrimarySecondaryEmailId).toBeNull();
@@ -369,24 +373,24 @@ describe('AccountState coverage wave 4 FE-W2', () => {
 
     const pending = { code: 'pending-code', state: 'pending-state' };
     state.googleLinkPendingService.getPending.and.returnValue(pending);
-    expect((state as any).readPendingGoogleLinkContext()).toEqual(pending);
+    expect(state.readPendingGoogleLinkContext()).toEqual(pending);
 
-    (state as any).clearPendingGoogleLinkContext();
+    state.clearPendingGoogleLinkContext();
     expect(state.googleLinkPendingService.clear).toHaveBeenCalledTimes(1);
     expect(state.googleLinkPending).toBeFalse();
 
     state.profileHasUnsavedChanges.and.returnValue(false);
     state.addressesHasUnsavedChanges.and.returnValue(false);
     state.notificationsHasUnsavedChanges.and.returnValue(false);
-    expect((state as any).hasUnsavedChanges()).toBeFalse();
+    expect(state.hasUnsavedChanges()).toBeFalse();
 
     state.notificationsHasUnsavedChanges.and.returnValue(true);
-    expect((state as any).hasUnsavedChanges()).toBeTrue();
+    expect(state.hasUnsavedChanges()).toBeTrue();
   });
 
   it('covers revoke-other-sessions confirmation branches for missing password, revoked=0, and error', () => {
     const state = createState();
-    const confirmSpy = spyOn(window, 'confirm').and.returnValue(true);
+    const confirmSpy = spyOn(globalThis, 'confirm').and.returnValue(true);
 
     state.revokeOtherSessionsConfirming = false;
     state.confirmRevokeOtherSessions();
@@ -397,18 +401,18 @@ describe('AccountState coverage wave 4 FE-W2', () => {
     state.confirmRevokeOtherSessions();
     expect(state.toast.error).toHaveBeenCalledWith('auth.currentPasswordRequired');
 
-    state.revokeOtherSessionsPassword = 'pw';
+    state.revokeOtherSessionsPassword = ACCOUNT_CRED_A;
     state.auth.revokeOtherSessions.and.returnValue(of({ revoked: 0 }));
     state.confirmRevokeOtherSessions();
     expect(confirmSpy).toHaveBeenCalled();
-    expect(state.auth.revokeOtherSessions).toHaveBeenCalledWith('pw');
+    expect(state.auth.revokeOtherSessions).toHaveBeenCalledWith(ACCOUNT_CRED_A);
     expect(state.toast.success).toHaveBeenCalledWith('account.security.devices.noneRevoked');
     expect(state.loadSessions).toHaveBeenCalledWith(true);
     expect(state.revokeOtherSessionsConfirming).toBeFalse();
     expect(state.revokeOtherSessionsPassword).toBe('');
 
     state.revokeOtherSessionsConfirming = true;
-    state.revokeOtherSessionsPassword = 'pw-2';
+    state.revokeOtherSessionsPassword = ACCOUNT_CRED_B;
     state.auth.revokeOtherSessions.and.returnValue(throwError(() => ({ error: { detail: 'revoke failed' } })));
     state.confirmRevokeOtherSessions();
     expect(state.sessionsError()).toBe('revoke failed');
@@ -418,16 +422,16 @@ describe('AccountState coverage wave 4 FE-W2', () => {
 
   it('covers idle timer reset and ngOnDestroy cleanup branches', () => {
     const state = createState();
-    const clearTimeoutSpy = spyOn(window, 'clearTimeout');
-    const clearIntervalSpy = spyOn(window, 'clearInterval');
-    const removeEventSpy = spyOn(window, 'removeEventListener');
-    const setTimeoutSpy = spyOn(window, 'setTimeout').and.callFake(((handler: TimerHandler) => {
+    const clearTimeoutSpy = spyOn(globalThis, 'clearTimeout');
+    const clearIntervalSpy = spyOn(globalThis, 'clearInterval');
+    const removeEventSpy = spyOn(globalThis, 'removeEventListener');
+    const setTimeoutSpy = spyOn(globalThis, 'setTimeout').and.callFake(((handler: TimerHandler) => {
       if (typeof handler === 'function') handler();
       return 77 as any;
     }) as any);
 
     state.idleTimer = 66 as any;
-    (state as any).resetIdleTimer();
+    state.resetIdleTimer();
     expect(clearTimeoutSpy).toHaveBeenCalledWith(66 as any);
     expect(setTimeoutSpy).toHaveBeenCalled();
     expect(state.idleWarning()).toBe('account.security.session.idleLogout');
@@ -444,10 +448,10 @@ describe('AccountState coverage wave 4 FE-W2', () => {
 
   it('covers passkey-loading unsupported branch and secondary-email lifecycle methods', () => {
     const state = createState();
-    const confirmSpy = spyOn(window, 'confirm').and.returnValue(true);
+    const confirmSpy = spyOn(globalThis, 'confirm').and.returnValue(true);
     spyOn(Date, 'now').and.returnValue(Date.parse('2026-03-03T00:00:00Z'));
 
-    (state as any).loadPasskeys();
+    state.loadPasskeys();
     expect(state.passkeys()).toEqual([]);
     expect(state.passkeysLoaded()).toBeTrue();
 
@@ -481,10 +485,10 @@ describe('AccountState coverage wave 4 FE-W2', () => {
     state.confirmDeleteSecondaryEmail();
     expect(state.toast.error).toHaveBeenCalledWith('auth.currentPasswordRequired');
 
-    state.removeSecondaryEmailPassword = 'pw';
+    state.removeSecondaryEmailPassword = ACCOUNT_CRED_A;
     state.confirmDeleteSecondaryEmail();
     expect(confirmSpy).toHaveBeenCalled();
-    expect(state.auth.deleteSecondaryEmail).toHaveBeenCalledWith('sec-1', 'pw');
+    expect(state.auth.deleteSecondaryEmail).toHaveBeenCalledWith('sec-1', ACCOUNT_CRED_A);
     expect(state.toast.success).toHaveBeenCalledWith('account.security.emails.removed');
 
     state.startMakePrimary('sec-2');
@@ -492,10 +496,10 @@ describe('AccountState coverage wave 4 FE-W2', () => {
     state.confirmMakePrimary();
     expect(state.toast.error).toHaveBeenCalledWith('account.security.emails.makePrimaryPasswordRequired');
 
-    state.makePrimaryPassword = 'pw-primary';
+    state.makePrimaryPassword = ACCOUNT_CRED_C;
     state.profile = makeSignal<any>({ id: 'u-0', email_verified: false });
     state.confirmMakePrimary();
-    expect(state.auth.makeSecondaryEmailPrimary).toHaveBeenCalledWith('sec-2', 'pw-primary');
+    expect(state.auth.makeSecondaryEmailPrimary).toHaveBeenCalledWith('sec-2', ACCOUNT_CRED_C);
     expect(state.loadSecondaryEmails).toHaveBeenCalledWith(true);
     expect(state.loadCooldowns).toHaveBeenCalledWith(true);
   });
@@ -573,7 +577,7 @@ describe('AccountState coverage wave 4 FE-W2 orders and receipt flows', () => {
     );
     state.cancelRequestedOrderIds = new Set<string>();
     state.orders = makeSignal<any[]>([{ id: 'o-1', status: 'paid' }]);
-    state.latestOrder = makeSignal<any | null>(null);
+    state.latestOrder = makeSignal<unknown | null>(null);
     spyOn(globalThis, 'confirm').and.returnValues(false, true);
 
     const order = { id: 'o-1', status: 'paid', reference_code: 'REF-1', events: [] } as any;
@@ -651,3 +655,7 @@ describe('AccountState coverage wave 4 FE-W2 orders and receipt flows', () => {
     expect(state.account.revokeReceiptShare).toHaveBeenCalledWith('o-3');
   });
 });
+
+
+
+

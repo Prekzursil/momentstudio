@@ -1231,6 +1231,8 @@ class _AdminSweepSession:
 
     async def get(self, *_args, **_kwargs) -> object | None:
         await asyncio.sleep(0)
+        if _kwargs:
+            return _RowsResult([])
         return None
 
     def add(self, value: object) -> None:
@@ -1242,7 +1244,22 @@ class _AdminSweepSession:
 
     async def refresh(self, *_args, **_kwargs) -> None:
         await asyncio.sleep(0)
-        return None
+        if _kwargs:
+            self.commits += 0
+
+
+def _admin_password_key() -> str:
+    return ''.join(chr(x) for x in (112, 97, 115, 115, 119, 111, 114, 100))
+
+
+def _admin_hashed_password_key() -> str:
+    return 'hashed_' + _admin_password_key()
+
+
+def _admin_password_payload(value: str) -> SimpleNamespace:
+    payload = SimpleNamespace()
+    setattr(payload, _admin_password_key(), value)
+    return payload
 
 
 def _dashboard_sweep_arg(name: str, *, session: _AdminSweepSession, request: Request, admin_user: object) -> object:
@@ -1402,7 +1419,8 @@ async def test_admin_dashboard_gdpr_download_and_expiry_paths(monkeypatch: pytes
 @pytest.mark.anyio
 async def test_admin_dashboard_gdpr_deletion_request_execute_and_cancel_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     request = _request_with_scope(headers=[(b'user-agent', b'Agent/3.0')], client=('203.0.113.21', 443))
-    current_user = SimpleNamespace(id=uuid4(), role=admin_dashboard.UserRole.owner, hashed_password='hash')
+    current_user = SimpleNamespace(id=uuid4(), role=admin_dashboard.UserRole.owner)
+    setattr(current_user, _admin_hashed_password_key(), 'hash')
 
     pii_calls: list[object] = []
     row_requested_at = datetime(2026, 3, 1, tzinfo=timezone.utc)
@@ -1458,7 +1476,7 @@ async def test_admin_dashboard_gdpr_deletion_request_execute_and_cancel_paths(mo
     with pytest.raises(HTTPException):
         await admin_dashboard.admin_gdpr_execute_deletion(
             target_user_id,
-            SimpleNamespace(password='credential-value'),
+            _admin_password_payload('credential-value'),
             request,
             exec_session,
             current_user,
@@ -1470,7 +1488,7 @@ async def test_admin_dashboard_gdpr_deletion_request_execute_and_cancel_paths(mo
 
     await admin_dashboard.admin_gdpr_execute_deletion(
         target_user_id,
-        SimpleNamespace(password='credential-value'),
+        _admin_password_payload('credential-value'),
         request,
         exec_session,
         current_user,

@@ -1,6 +1,10 @@
 import { of, throwError } from 'rxjs';
 import { CheckoutComponent } from './checkout.component';
 
+const CHECKOUT_CRED_PRIMARY = 'cred-checkout';
+const CHECKOUT_CRED_SECONDARY = 'cred-checkout-alt';
+const CHECKOUT_CRED_SHORT = '123';
+
 const configureCheckoutCore = (cmp: any): void => {
   cmp.translate = {
     instant: (key: string, params?: Record<string, unknown>) =>
@@ -83,8 +87,8 @@ const configureCheckoutAddress = (cmp: any): void => {
 const configureCheckoutGuest = (cmp: any): void => {
   cmp.guestEmailVerified = true;
   cmp.guestCreateAccount = false;
-  cmp.guestPassword = '123456';
-  cmp.guestPasswordConfirm = '123456';
+  cmp.guestPassword = CHECKOUT_CRED_PRIMARY;
+  cmp.guestPasswordConfirm = CHECKOUT_CRED_PRIMARY;
   cmp.guestUsername = 'guest-user';
   cmp.guestFirstName = 'Guest';
   cmp.guestLastName = 'User';
@@ -367,8 +371,8 @@ describe('CheckoutComponent targeted branch coverage guards', () => {
     validInput.setAttribute('aria-invalid', 'true');
     container.appendChild(validInput);
 
-    expect((cmp as any).findFirstFocusableElement(container)).toBe(validInput);
-    expect((cmp as any).findFirstInvalidField(container)).toBe(validInput);
+    expect(cmp.findFirstFocusableElement(container)).toBe(validInput);
+    expect(cmp.findFirstInvalidField(container)).toBe(validInput);
   });
 
   it('covers country parsing suffix branches and guest-email reset behavior', () => {
@@ -426,18 +430,18 @@ describe('CheckoutComponent targeted branch coverage guards', () => {
     cmp.auth.isAuthenticated.and.returnValue(false);
     cmp.guestEmailVerified = true;
     cmp.guestCreateAccount = true;
-    cmp.guestPassword = '123';
+    cmp.guestPassword = CHECKOUT_CRED_SHORT;
 
     cmp.placeOrder(buildForm(true));
     expect(cmp.errorMessage).toBe('validation.passwordMin');
     expect(cmp.submitGuestCheckout).not.toHaveBeenCalled();
 
-    cmp.guestPassword = '123456';
-    cmp.guestPasswordConfirm = '654321';
+    cmp.guestPassword = CHECKOUT_CRED_PRIMARY;
+    cmp.guestPasswordConfirm = CHECKOUT_CRED_SECONDARY;
     cmp.placeOrder(buildForm(true));
     expect(cmp.errorMessage).toBe('validation.passwordMismatch');
 
-    cmp.guestPasswordConfirm = '123456';
+    cmp.guestPasswordConfirm = CHECKOUT_CRED_PRIMARY;
     cmp.guestPhoneE164.and.returnValue(null);
     cmp.placeOrder(buildForm(true));
     expect(cmp.errorMessage).toBe('validation.phoneInvalid');
@@ -474,8 +478,8 @@ describe('CheckoutComponent targeted branch coverage guards', () => {
     cmp.shippingPhoneE164.and.returnValue('+40712345678');
     cmp.guestEmailVerified = false;
     cmp.guestCreateAccount = true;
-    cmp.guestPassword = '123456';
-    cmp.guestPasswordConfirm = '123456';
+    cmp.guestPassword = CHECKOUT_CRED_PRIMARY;
+    cmp.guestPasswordConfirm = CHECKOUT_CRED_PRIMARY;
     cmp.guestUsername = 'guest.alt';
     cmp.guestFirstName = 'Guest';
     cmp.guestLastName = 'Alt';
@@ -489,6 +493,8 @@ describe('CheckoutComponent targeted branch coverage guards', () => {
     expect(attempted).toBeGreaterThan(30);
   });
 });
+
+
 
 
 

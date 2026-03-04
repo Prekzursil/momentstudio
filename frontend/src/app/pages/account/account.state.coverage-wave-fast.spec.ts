@@ -12,6 +12,9 @@ function mockSignal<T>(initial: T): SignalLike<T> {
   return fn;
 }
 
+const ACCOUNT_FAST_CRED = 'cred-fast';
+const ACCOUNT_FAST_PASSKEY = 'cred-passkey';
+
 function createAccountHarness(): any {
   const state: any = Object.create(AccountState.prototype);
   state.now = mockSignal(Date.parse('2026-03-03T00:00:00Z'));
@@ -65,6 +68,64 @@ function createAccountHarness(): any {
   };
 
   return state;
+}
+
+
+function primeAsyncSignals(state: any): void {
+  state.myCommentsLoading = mockSignal(false);
+  state.myCommentsError = mockSignal<string | null>(null);
+  state.myComments = mockSignal<any[]>([]);
+  state.myCommentsMeta = mockSignal<any>(null);
+  state.secondaryEmailsLoading = mockSignal(false);
+  state.secondaryEmailsLoaded = mockSignal(false);
+  state.secondaryEmailsError = mockSignal<string | null>(null);
+  state.secondaryEmails = mockSignal<any[]>([]);
+  state.sessionsLoading = mockSignal(false);
+  state.sessionsLoaded = mockSignal(false);
+  state.sessionsError = mockSignal<string | null>(null);
+  state.sessions = mockSignal<any[]>([]);
+  state.securityEventsLoading = mockSignal(false);
+  state.securityEventsLoaded = mockSignal(false);
+  state.securityEventsError = mockSignal<string | null>(null);
+  state.securityEvents = mockSignal<any[]>([]);
+  state.twoFactorLoading = mockSignal(false);
+  state.twoFactorLoaded = mockSignal(false);
+  state.twoFactorError = mockSignal<string | null>(null);
+  state.twoFactorStatus = mockSignal<any>(null);
+}
+
+function primeProfile(state: any): void {
+  state.profile = mockSignal({
+    id: 'user-1',
+    username: 'existing-user',
+    name: 'Existing Name',
+    email: 'user@example.com',
+    email_verified: true,
+    google_sub: 'google-user',
+    avatar_url: null,
+  });
+  state.auth = {
+    isAuthenticated: () => true,
+    updateUsername: jasmine.createSpy('updateUsername').and.returnValue(of(null)),
+    updateProfile: jasmine.createSpy('updateProfile').and.returnValue(
+      of({
+        id: 'user-1',
+        username: 'new-user',
+        name: 'Updated Name',
+        email: 'user@example.com',
+        email_verified: true,
+        google_sub: 'google-user',
+        avatar_url: null,
+      }),
+    ),
+  };
+  state.theme = { setPreference: jasmine.createSpy('setPreference') };
+  state.lang = { setLanguage: jasmine.createSpy('setLanguage') };
+  state.toast = jasmine.createSpyObj('ToastService', ['success', 'error']);
+  state.translate = { instant: (key: string) => key };
+  state.profileThemePreference = 'system';
+  state.profileLanguage = 'en';
+  state.completeForcedProfileFlowIfSatisfied = jasmine.createSpy('completeForcedProfileFlowIfSatisfied');
 }
 
 describe('AccountState fast URL and storage helpers', () => {
@@ -359,29 +420,6 @@ describe('AccountState fast notification unsaved-change branch', () => {
 });
 
 describe('AccountState fast comments and security loaders', () => {
-  function primeAsyncSignals(state: any): void {
-    state.myCommentsLoading = mockSignal(false);
-    state.myCommentsError = mockSignal<string | null>(null);
-    state.myComments = mockSignal<any[]>([]);
-    state.myCommentsMeta = mockSignal<any>(null);
-    state.secondaryEmailsLoading = mockSignal(false);
-    state.secondaryEmailsLoaded = mockSignal(false);
-    state.secondaryEmailsError = mockSignal<string | null>(null);
-    state.secondaryEmails = mockSignal<any[]>([]);
-    state.sessionsLoading = mockSignal(false);
-    state.sessionsLoaded = mockSignal(false);
-    state.sessionsError = mockSignal<string | null>(null);
-    state.sessions = mockSignal<any[]>([]);
-    state.securityEventsLoading = mockSignal(false);
-    state.securityEventsLoaded = mockSignal(false);
-    state.securityEventsError = mockSignal<string | null>(null);
-    state.securityEvents = mockSignal<any[]>([]);
-    state.twoFactorLoading = mockSignal(false);
-    state.twoFactorLoaded = mockSignal(false);
-    state.twoFactorError = mockSignal<string | null>(null);
-    state.twoFactorStatus = mockSignal<any>(null);
-  }
-
   it('loads my comments and paginates forward/backward', () => {
     const state = createAccountHarness();
     primeAsyncSignals(state);
@@ -509,47 +547,6 @@ describe('AccountState fast idle and destroy branches', () => {
 });
 
 describe('AccountState fast profile-save and completion branches', () => {
-  function primeProfile(state: any) {
-    state.profile = mockSignal({
-      id: 'user-1',
-      username: 'existing-user',
-      name: 'Existing Name',
-      email: 'user@example.com',
-      email_verified: true,
-      google_sub: 'google-user',
-      avatar_url: null,
-    });
-    state.auth = {
-      isAuthenticated: () => true,
-      updateUsername: jasmine.createSpy('updateUsername').and.returnValue(of(null)),
-      updateProfile: jasmine.createSpy('updateProfile').and.returnValue(
-        of({
-          id: 'user-1',
-          username: 'new-user',
-          name: 'Updated Name',
-          email: 'user@example.com',
-          email_verified: true,
-          google_sub: 'google-user',
-          avatar_url: null,
-        })
-      ),
-    };
-    state.theme = { setPreference: jasmine.createSpy('setPreference') };
-    state.lang = { setLanguage: jasmine.createSpy('setLanguage') };
-    state.toast = jasmine.createSpyObj('ToastService', ['success', 'error']);
-    state.translate = { instant: (key: string) => key };
-    state.t = (key: string) => key;
-    state.captureProfileSnapshot = jasmine.createSpy('captureProfileSnapshot').and.returnValue({ username: 'new-user' });
-    state.syncProfileFormFromUser = jasmine.createSpy('syncProfileFormFromUser');
-    state.completeForcedProfileFlowIfSatisfied = jasmine.createSpy('completeForcedProfileFlowIfSatisfied');
-    state.loadAliases = jasmine.createSpy('loadAliases');
-    state.loadCooldowns = jasmine.createSpy('loadCooldowns');
-    state.profileThemePreference = 'system';
-    state.profileLanguage = 'en';
-    state.profileSaved = false;
-    state.profileError = null;
-    state.savingProfile = false;
-  }
 
   it('covers required-profile validation and username-password guard branches', () => {
     const state = createAccountHarness();
@@ -599,12 +596,12 @@ describe('AccountState fast profile-save and completion branches', () => {
     state.profileDateOfBirth = '2000-01-01';
     state.profilePhoneCountry = 'RO';
     state.profilePhoneNational = '0712345678';
-    state.profileUsernamePassword = 'current-password';
+    state.profileUsernamePassword = ACCOUNT_FAST_CRED;
 
     state.saveProfile();
     expect(state.theme.setPreference).toHaveBeenCalledWith('system');
     expect(state.lang.setLanguage).toHaveBeenCalledWith('en', { syncBackend: false });
-    expect(state.auth.updateUsername).toHaveBeenCalledWith('new-user', 'current-password');
+    expect(state.auth.updateUsername).toHaveBeenCalledWith('new-user', ACCOUNT_FAST_CRED);
     expect(state.auth.updateProfile).toHaveBeenCalled();
     expect(state.profileSaved).toBeTrue();
     expect(state.loadAliases).toHaveBeenCalledWith(true);
@@ -619,7 +616,7 @@ describe('AccountState fast profile-save and completion branches', () => {
     };
     completionState.route = {};
     completionState.completeForcedProfileFlowIfSatisfied = (AccountState.prototype as any).completeForcedProfileFlowIfSatisfied;
-    completionState.completeForcedProfileFlowIfSatisfied.call(completionState, {
+    completionState.completeForcedProfileFlowIfSatisfied({
       id: 'user-1',
       username: 'new-user',
       name: 'Updated Name',
@@ -700,16 +697,16 @@ describe('AccountState fast export/passkey branches', () => {
   it('covers downloadExportJob success and error branches', () => {
     const state = createAccountHarness();
     const anchor = { href: '', download: '', click: jasmine.createSpy('click') } as any;
-    const createUrl = (window.URL as any).createObjectURL ?? (() => 'blob:mock');
-    const revokeUrl = (window.URL as any).revokeObjectURL ?? (() => undefined);
-    if (!(window.URL as any).createObjectURL) {
-      (window.URL as any).createObjectURL = createUrl;
+    const createUrl = (globalThis.URL as any).createObjectURL ?? (() => 'blob:mock');
+    const revokeUrl = (globalThis.URL as any).revokeObjectURL ?? (() => undefined);
+    if (!(globalThis.URL as any).createObjectURL) {
+      (globalThis.URL as any).createObjectURL = createUrl;
     }
-    if (!(window.URL as any).revokeObjectURL) {
-      (window.URL as any).revokeObjectURL = revokeUrl;
+    if (!(globalThis.URL as any).revokeObjectURL) {
+      (globalThis.URL as any).revokeObjectURL = revokeUrl;
     }
-    const createSpy = spyOn(window.URL as any, 'createObjectURL').and.returnValue('blob:test');
-    const revokeSpy = spyOn(window.URL as any, 'revokeObjectURL').and.stub();
+    const createSpy = spyOn(globalThis.URL as any, 'createObjectURL').and.returnValue('blob:test');
+    const revokeSpy = spyOn(globalThis.URL as any, 'revokeObjectURL').and.stub();
     spyOn(document, 'createElement').and.returnValue(anchor);
 
     state.t = (key: string) => key;
@@ -746,8 +743,8 @@ describe('AccountState fast export/passkey branches', () => {
     state.receiptCopiedId = mockSignal<string | null>(null);
     state.receiptCopiedTimer = 321;
 
-    const clearSpy = spyOn(window, 'clearTimeout').and.stub();
-    const setSpy = spyOn(window, 'setTimeout').and.callFake(((fn: unknown) => {
+    const clearSpy = spyOn(globalThis, 'clearTimeout').and.stub();
+    const setSpy = spyOn(globalThis, 'setTimeout').and.callFake(((fn: unknown) => {
       if (typeof fn === 'function') fn();
       return 654 as any;
     }) as any);
@@ -792,7 +789,7 @@ describe('AccountState fast export/passkey branches', () => {
     state.passkeysError = mockSignal<string | null>(null);
     state.passkeys = mockSignal<any[]>([]);
     state.registeringPasskey = false;
-    state.passkeyRegisterPassword = 'password-1';
+    state.passkeyRegisterPassword = ACCOUNT_FAST_PASSKEY;
     state.passkeyRegisterName = 'Laptop key';
     state.loadPasskeys = jasmine.createSpy('loadPasskeys');
     state.refreshSecurityEvents = jasmine.createSpy('refreshSecurityEvents');
@@ -815,7 +812,7 @@ describe('AccountState fast export/passkey branches', () => {
     state.registerPasskey();
     await Promise.resolve();
     await Promise.resolve();
-    expect(state.auth.startPasskeyRegistration).toHaveBeenCalledWith('password-1');
+    expect(state.auth.startPasskeyRegistration).toHaveBeenCalledWith(ACCOUNT_FAST_PASSKEY);
     expect(credentialsCreate).toHaveBeenCalled();
     expect(state.auth.completePasskeyRegistration).toHaveBeenCalled();
     expect(state.toast.success).toHaveBeenCalledWith('account.security.passkeys.added');
@@ -857,3 +854,6 @@ describe('AccountState fast export/passkey branches', () => {
     expect(headerUsernameOnly).toBe('user3');
   });
 });
+
+
+
