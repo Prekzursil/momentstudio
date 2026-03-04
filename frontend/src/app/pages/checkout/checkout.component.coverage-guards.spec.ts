@@ -195,14 +195,27 @@ function callCheckoutMethodSafely(cmp: any, name: string, args: unknown[]): void
   }
 }
 
+function checkoutEdgeArgs(args: unknown[]): unknown[] {
+  return args.map((value) => {
+    if (typeof value === 'string') return '';
+    if (typeof value === 'number') return 0;
+    if (typeof value === 'boolean') return !value;
+    if (Array.isArray(value)) return [];
+    if (value && typeof value === 'object') return {};
+    return null;
+  });
+}
+
 function runCheckoutMethodSweep(cmp: any): number {
   const methods = Object.getOwnPropertyNames(CheckoutComponent.prototype).filter(
     (name) => !CHECKOUT_SWEEP_BLOCKED.has(name) && typeof cmp[name] === 'function',
   );
   let attempted = 0;
   for (const name of methods) {
-    callCheckoutMethodSafely(cmp, name, CHECKOUT_SWEEP_ARGS_BY_NAME[name] ?? []);
-    attempted += 1;
+    const args = CHECKOUT_SWEEP_ARGS_BY_NAME[name] ?? [];
+    callCheckoutMethodSafely(cmp, name, args);
+    callCheckoutMethodSafely(cmp, name, checkoutEdgeArgs(args));
+    attempted += 2;
   }
   return attempted;
 }

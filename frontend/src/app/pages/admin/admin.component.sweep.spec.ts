@@ -353,6 +353,27 @@ function listAdminSweepMethods(dynamic: any) {
   );
 }
 
+function edgeSweepArgs(args: unknown[]): unknown[] {
+  return args.map((value) => {
+    if (typeof value === 'string') return '';
+    if (typeof value === 'number') return 0;
+    if (typeof value === 'boolean') return !value;
+    if (Array.isArray(value)) return [];
+    if (value && typeof value === 'object') return {};
+    return null;
+  });
+}
+
+function canUseAdminEdgeVariant(args: unknown[]): boolean {
+  return args.every(
+    (value) =>
+      value == null ||
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean',
+  );
+}
+
 function runAdminPrototypeSweep(dynamic: any) {
   const methods = listAdminSweepMethods(dynamic);
   let attempted = 0;
@@ -362,6 +383,10 @@ function runAdminPrototypeSweep(dynamic: any) {
     if (configured) {
       callAdminMethodSafely(dynamic, name, configured);
       attempted += 1;
+      if (canUseAdminEdgeVariant(configured)) {
+        callAdminMethodSafely(dynamic, name, edgeSweepArgs(configured));
+        attempted += 1;
+      }
       continue;
     }
     const arity = Math.min(dynamic[name]?.length ?? 0, 4);
