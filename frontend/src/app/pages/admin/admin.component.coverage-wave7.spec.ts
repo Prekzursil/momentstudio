@@ -798,3 +798,117 @@ describe('AdminComponent coverage wave 7 cms draft manager and revision helpers'
   });
 });
 
+
+function primeBlogHarness(component: any, admin: any): { blog: jasmine.SpyObj<any>; adminProxy: any } {
+  component.selectedBlogKey = 'blog.wave';
+  component.blogBaseLang = 'en';
+  component.blogEditLang = 'en';
+  component.blogForm = {
+    title: 'Wave title',
+    body_markdown: '# Body',
+    status: 'draft',
+    published_at: '',
+    published_until: '',
+    tags: '',
+    series: '',
+    cover_image_url: '',
+    cover_fit: 'cover',
+    reading_time_minutes: '',
+    summary: '',
+    pinned: false,
+    pin_order: '1'
+  } as any;
+  component.blogMeta = { summary_en: 'Summary' };
+  component.blogBulkAction = 'publish';
+  component.blogBulkSelection = new Set(['blog.wave']);
+
+  admin.getContent.and.returnValue(of({ title: 'Wave', body_markdown: 'Body', status: 'draft', meta: {}, version: 1 } as any));
+  admin.updateContentBlock.and.returnValue(of({ title: 'Wave', body_markdown: 'Body', status: 'draft', meta: {}, version: 2 } as any));
+
+  const adminProxy = component.admin as any;
+  adminProxy.getContentVersion = jasmine.createSpy('getContentVersion').and.returnValue(of({ body_markdown: 'old body' } as any));
+  adminProxy.rollbackContentVersion = jasmine.createSpy('rollbackContentVersion').and.returnValue(of({} as any));
+  adminProxy.uploadContentImage = jasmine
+    .createSpy('uploadContentImage')
+    .and.returnValue(of({ images: [{ id: 'img-1', url: '/media/img-1.jpg', sort_order: 1, focal_x: 50, focal_y: 50 }] } as any));
+
+  const blog = jasmine.createSpyObj('BlogService', ['hideCommentAdmin', 'unhideCommentAdmin', 'deleteComment']);
+  blog.hideCommentAdmin.and.returnValue(of({} as any));
+  blog.unhideCommentAdmin.and.returnValue(throwError(() => ({ error: { detail: 'unhide failed' } })));
+  blog.deleteComment.and.returnValue(of({} as any));
+  component.blog = blog;
+  return { blog, adminProxy };
+}
+
+describe('AdminComponent coverage wave 7 blog action matrix', () => {
+  it('covers blog bulk preview and bulk apply update path', () => {
+    const { component, admin, toast } = createAdminHarness();
+    const reloadSpy = spyOn(component as any, 'reloadContentBlocks').and.stub();
+    primeBlogHarness(component as any, admin as any);
+
+    expect(component.blogBulkPreview()).toContain('adminUi.blog.bulk.previewPublish');
+    component.applyBlogBulkAction();
+
+    expect(admin.getContent).toHaveBeenCalledWith('blog.wave');
+    expect(admin.updateContentBlock).toHaveBeenCalled();
+    expect(reloadSpy).toHaveBeenCalled();
+    expect(toast.success).toHaveBeenCalled();
+  });
+
+  it('covers moderation hide and unhide error branches plus delete', () => {
+    const { component } = createAdminHarness();
+    const { blog } = primeBlogHarness(component as any, (component as any).admin as any);
+    spyOn(component as any, 'loadFlaggedComments').and.stub();
+    spyOn(GLOBAL_CTX, 'prompt').and.returnValue('reason');
+    spyOn(GLOBAL_CTX, 'confirm').and.returnValue(true);
+
+    component.flaggedComments.set([{ id: 'c-1', is_hidden: false } as any]);
+    component.toggleHide({ id: 'c-1', is_hidden: false } as any);
+    expect(blog.hideCommentAdmin).toHaveBeenCalled();
+
+    component.flaggedComments.set([{ id: 'c-2', is_hidden: true } as any]);
+    component.toggleHide({ id: 'c-2', is_hidden: true } as any);
+    expect(blog.unhideCommentAdmin).toHaveBeenCalledWith('c-2');
+
+    component.adminDeleteComment({ id: 'c-3', is_hidden: false } as any);
+    expect(blog.deleteComment).toHaveBeenCalledWith('c-3');
+  });
+
+  it('covers blog revision helpers and base-language save path', () => {
+    const { component, admin, toast } = createAdminHarness();
+    const { adminProxy } = primeBlogHarness(component as any, admin as any);
+    spyOn(component as any, 'reloadContentBlocks').and.stub();
+    spyOn(component as any, 'loadBlogEditor').and.stub();
+    spyOn(GLOBAL_CTX, 'confirm').and.returnValues(true, true);
+
+    component.selectBlogVersion(3);
+    component.rollbackBlogVersion(2);
+    component.saveBlogPost();
+
+    expect(adminProxy.getContentVersion).toHaveBeenCalledWith('blog.wave', 3);
+    expect(adminProxy.rollbackContentVersion).toHaveBeenCalledWith('blog.wave', 2);
+    expect(admin.updateContentBlock).toHaveBeenCalled();
+    expect(toast.success).toHaveBeenCalled();
+  });
+
+  it('covers upload and drop image insertion branches for blog editor', async () => {
+    const { component, admin } = createAdminHarness();
+    const { adminProxy } = primeBlogHarness(component as any, admin as any);
+
+    const input = document.createElement('input');
+    Object.defineProperty(input, 'files', { value: [new File(['x'], 'upload.png', { type: 'image/png' })], configurable: true });
+    const textarea = document.createElement('textarea');
+    component.uploadAndInsertBlogImage(textarea, { target: input } as any);
+
+    const dropEvent = {
+      dataTransfer: { files: [new File(['y'], 'drop.png', { type: 'image/png' })] },
+      preventDefault: jasmine.createSpy('preventDefault'),
+      stopPropagation: jasmine.createSpy('stopPropagation')
+    } as any;
+    await component.onBlogImageDrop(textarea, dropEvent);
+
+    expect(adminProxy.uploadContentImage).toHaveBeenCalled();
+    expect(dropEvent.preventDefault).toHaveBeenCalled();
+  });
+});
+

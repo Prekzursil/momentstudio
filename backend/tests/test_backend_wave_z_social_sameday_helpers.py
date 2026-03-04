@@ -180,3 +180,119 @@ def test_sameday_fetch_template_rows(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(sameday, '_fetch_json_url', _fail)
     rows_fail = asyncio.run(sameday._fetch_template_rows(SimpleNamespace(), 'https://sameday.ro/api?q={q}'))
     assert rows_fail == []
+class _StreamResponse:
+    def __init__(self, *, url: str, html: str = '', content: bytes = b'', headers: dict[str, str] | None = None) -> None:
+        self.url = url
+        self._html = html
+        self.content = content
+        self.headers = headers or {}
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+    def raise_for_status(self) -> None:
+        return None
+
+    async def aiter_bytes(self):
+        if self._html:
+            yield self._html.encode('utf-8')
+
+
+class _AsyncClientStub:
+    def __init__(self, *, stream_response: _StreamResponse | None = None, get_response: _StreamResponse | None = None) -> None:
+        self._stream_response = stream_response
+        self._get_response = get_response
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+    def stream(self, _method: str, _url: str):
+        if self._stream_response is None:
+            raise RuntimeError('missing stream response')
+        return self._stream_response
+
+    async def get(self, _url: str):
+        if self._get_response is None:
+            raise RuntimeError('missing get response')
+        return self._get_response
+
+
+def test_social_source_normalization_and_candidate_helpers() -> None:
+    normalized = social._normalize_source_url('https://facebook.com//demo///?utm_source=x&foo=bar&fbclid=a')
+    assert normalized == 'https://facebook.com/demo/?foo=bar'
+
+    assert social._normalized_source_path('demo') == '/demo/'
+    assert social._normalized_netloc(host='facebook.com', scheme='https', port=443) == 'facebook.com'
+    assert social._normalized_netloc(host='facebook.com', scheme='https', port=444) == 'facebook.com:444'
+
+    assert social._normalize_image_url('data:image/png;base64,aaa', base_url='https://facebook.com') is None
+    assert social._normalize_image_url('javascript:alert(1)', base_url='https://facebook.com') is None
+    assert social._normalize_image_url('//cdninstagram.com/a.jpg', base_url='https://instagram.com/user') == 'https://cdninstagram.com/a.jpg'
+    assert social._normalize_image_url('/a.jpg', base_url='https://facebook.com/page') == 'https://facebook.com/a.jpg'
+
+
+def test_social_fetch_page_thumbnail_candidate_and_download_validation(monkeypatch: pytest.MonkeyPatch) -> None:
+    html = '<meta property="og:image" content="/thumb.jpg">'
+    stream_resp = _StreamResponse(url='https://facebook.com/page', html=html)
+
+    monkeypatch.setattr(
+        social.httpx,
+        'AsyncClient',
+        lambda **kwargs: _AsyncClientStub(stream_response=stream_resp),
+    )
+
+    thumb = asyncio.run(social._fetch_page_thumbnail_candidate('https://facebook.com/page'))
+    assert thumb == 'https://facebook.com/thumb.jpg'
+
+    image_resp = _StreamResponse(
+        url='https://cdninstagram.com/thumb.jpg',
+        content=b'img-bytes',
+        headers={'content-type': 'image/jpeg'},
+    )
+    monkeypatch.setattr(
+        social.httpx,
+        'AsyncClient',
+        lambda **kwargs: _AsyncClientStub(get_response=image_resp),
+    )
+    body = asyncio.run(social._download_thumbnail_bytes('https://cdninstagram.com/thumb.jpg'))
+    assert body == b'img-bytes'
+
+    bad_redirect = _StreamResponse(url='https://example.com/redirect.jpg', content=b'img', headers={'content-type': 'image/jpeg'})
+    monkeypatch.setattr(
+        social.httpx,
+        'AsyncClient',
+        lambda **kwargs: _AsyncClientStub(get_response=bad_redirect),
+    )
+    with pytest.raises(ValueError, match='redirect host'):
+        asyncio.run(social._download_thumbnail_bytes('https://cdninstagram.com/thumb.jpg'))
+
+
+def test_social_persist_and_hydration_paths(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(social, '_download_thumbnail_bytes', lambda _url: asyncio.sleep(0, result=b'png-bytes'))
+    monkeypatch.setattr(
+        social.storage,
+        'save_image_bytes',
+        lambda blob, **kwargs: f"/media/{kwargs['relative_path']}.jpg" if blob else None,
+    )
+
+    local = asyncio.run(social._persist_thumbnail('https://facebook.com/page', 'https://fbcdn.net/thumb.jpg'))
+    assert local and local.startswith('/media/social/')
+
+    assert asyncio.run(social._persist_thumbnail('https://facebook.com/page', '')) is None
+    assert asyncio.run(social._persist_thumbnail('https://facebook.com/page', '/media/social/existing.jpg')) == '/media/social/existing.jpg'
+
+    monkeypatch.setattr(social, 'fetch_social_thumbnail_url', lambda *args, **kwargs: asyncio.sleep(0, result='/media/social/new.jpg'))
+    meta = {
+        'instagram_pages': [{'url': 'https://instagram.com/demo', 'thumbnail_url': 'https://fbcdn.net/t.jpg'}],
+        'facebook_pages': [{'url': 'https://facebook.com/demo', 'thumbnail_url': ''}],
+    }
+    hydrated = asyncio.run(social.hydrate_site_social_meta(meta))
+    assert hydrated is not None
+    assert hydrated['instagram_pages'][0]['thumbnail_url'] == '/media/social/new.jpg'
+    assert hydrated['facebook_pages'][0]['thumbnail_url'] == '/media/social/new.jpg'
