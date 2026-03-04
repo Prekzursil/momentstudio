@@ -799,3 +799,206 @@ async def test_cli_wave_import_orders_and_shipping_lookup() -> None:
     )
     imported_orders = [item for item in session.added if isinstance(item, cli.Order)]
     assert imported_orders and imported_orders[-1].customer_email == 'buyer@example.com'
+
+class _SessionContext:
+    def __init__(self, session) -> None:
+        self._session = session
+
+    async def __aenter__(self):
+        return self._session
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+
+class _ExportSession:
+    def __init__(self, rows_per_query: list[list[object]]) -> None:
+        self._rows_per_query = list(rows_per_query)
+
+    async def execute(self, _stmt):
+        await asyncio.sleep(0)
+        rows = self._rows_per_query.pop(0) if self._rows_per_query else []
+        return _ExecuteResult(rows)
+
+
+class _ImportSession:
+    def __init__(self) -> None:
+        self.flush_calls = 0
+        self.commit_calls = 0
+        self.added: list[object] = []
+
+    def add(self, obj: object) -> None:
+        self.added.append(obj)
+
+    async def flush(self) -> None:
+        await asyncio.sleep(0)
+        self.flush_calls += 1
+
+    async def commit(self) -> None:
+        await asyncio.sleep(0)
+        self.commit_calls += 1
+
+    async def refresh(self, _obj) -> None:
+        await asyncio.sleep(0)
+
+
+@pytest.mark.anyio
+async def test_export_data_writes_json_payload(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    session = _ExportSession(
+        [
+            [SimpleNamespace(id='u1')],
+            [SimpleNamespace(id='c1')],
+            [SimpleNamespace(id='p1')],
+            [SimpleNamespace(id='a1')],
+            [SimpleNamespace(id='o1')],
+        ]
+    )
+    monkeypatch.setattr(cli, 'SessionLocal', lambda: _SessionContext(session))
+    monkeypatch.setattr(cli, '_serialize_user', lambda obj: {'id': str(obj.id)})
+    monkeypatch.setattr(cli, '_serialize_category', lambda obj: {'id': str(obj.id)})
+    monkeypatch.setattr(cli, '_serialize_product', lambda obj: {'id': str(obj.id)})
+    monkeypatch.setattr(cli, '_serialize_address', lambda obj: {'id': str(obj.id)})
+    monkeypatch.setattr(cli, '_serialize_order', lambda obj: {'id': str(obj.id)})
+
+    output = tmp_path / 'export-wave.json'
+    await cli.export_data(output)
+
+    payload = json.loads(output.read_text(encoding='utf-8'))
+    assert payload['users'] == [{'id': 'u1'}]
+    assert payload['orders'] == [{'id': 'o1'}]
+    assert 'Exported data to' in capsys.readouterr().out
+
+
+@pytest.mark.anyio
+async def test_import_data_runs_pipeline_and_commits(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    calls: dict[str, int] = {}
+    payload = {
+        'users': [{'id': str(uuid.uuid4()), 'email': 'u@example.com'}],
+        'categories': [{'id': str(uuid.uuid4()), 'slug': 'rings', 'name': 'Rings'}],
+        'products': [{'id': str(uuid.uuid4()), 'category_id': str(uuid.uuid4()), 'sku': 'SKU', 'slug': 'p', 'name': 'P'}],
+        'addresses': [{'id': str(uuid.uuid4()), 'line1': 'L1', 'city': 'City', 'postal_code': '123', 'country': 'RO'}],
+        'orders': [{'id': str(uuid.uuid4()), 'customer_email': 'b@example.com', 'customer_name': 'Buyer'}],
+    }
+    session = _ImportSession()
+
+    monkeypatch.setattr(cli, '_load_import_payload', lambda _path: payload)
+    monkeypatch.setattr(cli, 'SessionLocal', lambda: _SessionContext(session))
+
+    async def _load_user_ctx(_session):
+        calls['user_ctx'] = calls.get('user_ctx', 0) + 1
+        return {'taken'}, {'Display': 1}
+
+    async def _import_users(_session, **_kwargs):
+        calls['users'] = calls.get('users', 0) + 1
+
+    async def _import_categories(_session, **_kwargs):
+        calls['categories'] = calls.get('categories', 0) + 1
+
+    async def _build_tag_cache(_session, **_kwargs):
+        calls['tag_cache'] = calls.get('tag_cache', 0) + 1
+        return {}
+
+    async def _import_products(_session, **_kwargs):
+        calls['products'] = calls.get('products', 0) + 1
+
+    async def _import_addresses(_session, **_kwargs):
+        calls['addresses'] = calls.get('addresses', 0) + 1
+
+    async def _ensure_shipping_methods(_session, **_kwargs):
+        calls['shipping_methods'] = calls.get('shipping_methods', 0) + 1
+        return {}
+
+    async def _import_orders(_session, **_kwargs):
+        calls['orders'] = calls.get('orders', 0) + 1
+
+    monkeypatch.setattr(cli, '_load_user_import_context', _load_user_ctx)
+    monkeypatch.setattr(cli, '_import_users', _import_users)
+    monkeypatch.setattr(cli, '_import_categories', _import_categories)
+    monkeypatch.setattr(cli, '_build_tag_cache', _build_tag_cache)
+    monkeypatch.setattr(cli, '_import_products', _import_products)
+    monkeypatch.setattr(cli, '_import_addresses', _import_addresses)
+    monkeypatch.setattr(cli, '_ensure_shipping_methods', _ensure_shipping_methods)
+    monkeypatch.setattr(cli, '_import_orders', _import_orders)
+
+    input_path = tmp_path / 'import-wave.json'
+    input_path.write_text('{}', encoding='utf-8')
+
+    await cli.import_data(input_path)
+
+    assert calls == {
+        'user_ctx': 1,
+        'users': 1,
+        'categories': 1,
+        'tag_cache': 1,
+        'products': 1,
+        'addresses': 1,
+        'shipping_methods': 1,
+        'orders': 1,
+    }
+    assert session.flush_calls == 2
+    assert session.commit_calls == 1
+    assert 'Import completed' in capsys.readouterr().out
+
+
+@pytest.mark.anyio
+async def test_bootstrap_and_repair_owner_wrappers(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    session = _ImportSession()
+    user = SimpleNamespace(id=uuid.uuid4(), email='owner@example.com', username='owner')
+    calls: dict[str, int] = {}
+
+    monkeypatch.setattr(cli, 'SessionLocal', lambda: _SessionContext(session))
+
+    async def _load_candidates(_session, **_kwargs):
+        calls['candidates'] = calls.get('candidates', 0) + 1
+        return None, None, None
+
+    async def _demote(_session, **_kwargs):
+        calls['demote'] = calls.get('demote', 0) + 1
+
+    async def _create(_session, **_kwargs):
+        calls['create'] = calls.get('create', 0) + 1
+        return user
+
+    monkeypatch.setattr(cli, '_load_bootstrap_candidates', _load_candidates)
+    monkeypatch.setattr(cli, '_demote_owner_if_needed', _demote)
+    monkeypatch.setattr(cli, '_create_owner_user', _create)
+
+    await cli.bootstrap_owner(email='owner@example.com', password='secret-123', username='owner', display_name='Owner')
+
+    async def _require_owner(_session):
+        calls['require'] = calls.get('require', 0) + 1
+        return user
+
+    async def _repair_email(_session, **_kwargs):
+        calls['repair_email'] = calls.get('repair_email', 0) + 1
+
+    async def _repair_username(_session, **_kwargs):
+        calls['repair_username'] = calls.get('repair_username', 0) + 1
+
+    async def _repair_display(_session, **_kwargs):
+        calls['repair_display'] = calls.get('repair_display', 0) + 1
+
+    monkeypatch.setattr(cli, '_require_owner', _require_owner)
+    monkeypatch.setattr(cli, '_repair_owner_email', _repair_email)
+    monkeypatch.setattr(cli, '_repair_owner_username', _repair_username)
+    monkeypatch.setattr(cli, '_repair_owner_display_name', _repair_display)
+
+    await cli.repair_owner(
+        email='owner@example.com',
+        password='secret-123',
+        username='owner-fixed',
+        display_name='Owner Fixed',
+        verify_email=True,
+    )
+
+    assert calls['candidates'] == 1
+    assert calls['demote'] == 1
+    assert calls['create'] == 1
+    assert calls['require'] == 1
+    assert calls['repair_email'] == 1
+    assert calls['repair_username'] == 1
+    assert calls['repair_display'] == 1
+
+    output = capsys.readouterr().out
+    assert 'Owner created:' in output
+    assert 'Owner repaired:' in output
