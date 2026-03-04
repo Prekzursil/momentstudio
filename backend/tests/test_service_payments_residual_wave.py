@@ -105,7 +105,7 @@ async def test_discounts_param_fallback_coupon_creation(monkeypatch: pytest.Monk
 
 
 @pytest.mark.anyio('asyncio')
-async def test_create_checkout_session_and_payment_intent_matrix(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_create_checkout_session_matrix(monkeypatch: pytest.MonkeyPatch) -> None:
     session = _SessionStub()
 
     monkeypatch.setattr(payments_service, 'is_mock_payments', lambda: True)
@@ -147,6 +147,13 @@ async def test_create_checkout_session_and_payment_intent_matrix(monkeypatch: py
             cancel_url='https://cancel',
             line_items=bad_items,
         )
+
+
+@pytest.mark.anyio('asyncio')
+async def test_create_payment_intent_happy_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = _SessionStub()
+    monkeypatch.setattr(payments_service, 'is_stripe_configured', lambda: True)
+    monkeypatch.setattr(payments_service, 'init_stripe', lambda: None)
 
     cart = SimpleNamespace(id='cart-1', user_id='u1', items=[SimpleNamespace(unit_price_at_add=Decimal('12.50'), quantity=2)])
 
