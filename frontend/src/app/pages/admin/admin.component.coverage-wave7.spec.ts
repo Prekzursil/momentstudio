@@ -685,3 +685,110 @@ describe("AdminComponent coverage wave 7 permissive sweep", () => {
     expect(attempted).toBeGreaterThan(120);
   });
 });
+
+describe('AdminComponent coverage wave 7 cms draft manager and revision helpers', () => {
+  it('covers announce, home draft observe, undo/redo, and restore helpers', () => {
+    const { component } = createAdminHarness();
+    spyOn(GLOBAL_CTX, 'setTimeout').and.callFake(((cb: (...args: unknown[]) => unknown) => {
+      cb();
+      return 1 as any;
+    }) as any);
+    spyOn(GLOBAL_CTX, 'clearTimeout').and.stub();
+
+    component.homeBlocks = [{ key: 'story', type: 'story', enabled: true, title: { en: 'Story', ro: 'Poveste' }, body_markdown: { en: '', ro: '' } }] as any;
+    const homeDraft = component['cmsHomeDraft'];
+    const autosaveKey = 'adrianaart.cms.autosave.home.sections';
+    localStorage.setItem(autosaveKey, '{invalid-json');
+    const samePayload = { v: 1, ts: '2026-03-04T00:00:00.000Z', state_json: JSON.stringify(component.homeBlocks) };
+    localStorage.setItem(autosaveKey, JSON.stringify(samePayload));
+    homeDraft.initFromServer(component.homeBlocks);
+    const restorePayload = { v: 1, ts: '2026-03-04T00:00:01.000Z', state_json: JSON.stringify([{ key: 'story', type: 'story', enabled: false, title: { en: 'Story', ro: 'Poveste' }, body_markdown: { en: '', ro: '' } }]) };
+    localStorage.setItem(autosaveKey, JSON.stringify(restorePayload));
+    homeDraft.initFromServer(component.homeBlocks);
+    homeDraft.initFromServer(component.homeBlocks);
+
+    const nextBlocks = [{ key: 'story', type: 'story', enabled: true, title: { en: 'Story', ro: 'Poveste' }, body_markdown: { en: '', ro: '' } }, { key: 'why', type: 'why', enabled: true, title: { en: 'Why', ro: 'De ce' }, body_markdown: { en: '', ro: '' } }] as any;
+    homeDraft.observe(nextBlocks);
+
+    expect(homeDraft.isReady()).toBeTrue();
+    expect(component.homeDraftCanUndo()).toBeTrue();
+
+    component.undoHomeDraft();
+    component.redoHomeDraft();
+    component.restoreHomeDraftAutosave();
+    component.dismissHomeDraftAutosave();
+
+    component['announceCms']('draft-updated');
+    expect(component.cmsAriaAnnouncement).toBe('draft-updated');
+  });
+
+  it('covers ensurePageDraft/page helpers and blog draft helper branches', () => {
+    const { component } = createAdminHarness();
+    component.pageBlocks = { 'page.about': [{ key: 'b1', type: 'text', enabled: true, title: { en: 'Title', ro: 'Titlu' }, body_markdown: { en: 'Body', ro: 'Corp' } }] } as any;
+    component.pageBlocksStatus = { 'page.about': 'review' } as any;
+    component.pageBlocksPublishedAt = { 'page.about': '' } as any;
+    component.pageBlocksPublishedUntil = { 'page.about': '' } as any;
+    component.pageBlocksRequiresAuth = { 'page.about': true } as any;
+
+    const pageDraftA = component['ensurePageDraft']('page.about');
+    const pageDraftB = component['ensurePageDraft']('page.about');
+    expect(pageDraftA).toBe(pageDraftB);
+
+    pageDraftA.initFromServer(component['currentPageDraftState']('page.about'));
+    pageDraftA.observe(component['currentPageDraftState']('page.about'));
+
+    expect(component.pageDraftReady('page.about')).toBeTrue();
+    component.undoPageDraft('page.about');
+    component.redoPageDraft('page.about');
+    component.restorePageDraftAutosave('page.about');
+    component.dismissPageDraftAutosave('page.about');
+
+    component.selectedBlogKey = 'blog.sample';
+    component.blogEditLang = 'en';
+    component.blogForm = {
+      ...component.blogForm,
+      title: 'Draft title',
+      body_markdown: 'Body',
+      status: 'draft',
+      pinned: false,
+    };
+
+    const blogDraft = component['ensureBlogDraft']('blog.sample', 'en');
+    blogDraft.initFromServer(component['currentBlogDraftState']());
+    blogDraft.observe(component['currentBlogDraftState']());
+
+    expect(component.blogDraftReady()).toBeTrue();
+    component.restoreBlogDraftAutosave();
+    component.dismissBlogDraftAutosave();
+  });
+
+  it('covers revision title key switch branches and preview width branches', () => {
+    const { component } = createAdminHarness();
+
+    component.pagesRevisionKey = 'page.about';
+    expect(component.pagesRevisionTitleKey()).toBe('adminUi.site.pages.aboutLabel');
+    component.pagesRevisionKey = 'page.privacy-policy';
+    expect(component.pagesRevisionTitleKey()).toBe('adminUi.site.pages.legal.documents.privacy');
+    component.pagesRevisionKey = 'unknown';
+    expect(component.pagesRevisionTitleKey()).toBeUndefined();
+
+    component.homeRevisionKey = 'home.sections';
+    expect(component.homeRevisionTitleKey()).toBe('adminUi.home.sections.title');
+    component.homeRevisionKey = 'other';
+    expect(component.homeRevisionTitleKey()).toBe('adminUi.content.revisions.title');
+
+    component.settingsRevisionKey = 'seo.home';
+    expect(component.settingsRevisionTitleKey()).toBe('adminUi.site.seo.title');
+    component.settingsRevisionKey = 'site.assets';
+    expect(component.settingsRevisionTitleKey()).toBe('adminUi.site.assets.title');
+    component.settingsRevisionKey = 'unknown';
+    expect(component.settingsRevisionTitleKey()).toBe('adminUi.content.revisions.title');
+
+    (component as any).cmsPrefs.previewDevice = () => 'mobile';
+    expect(component.cmsPreviewMaxWidthClass()).toContain('390');
+    (component as any).cmsPrefs.previewDevice = () => 'tablet';
+    expect(component.cmsPreviewMaxWidthClass()).toContain('768');
+    (component as any).cmsPrefs.previewDevice = () => 'desktop';
+    expect(component.cmsPreviewMaxWidthClass()).toContain('1024');
+  });
+});
